@@ -88,7 +88,7 @@ public static class OutgameTutorialRunner
             if (t_def.Action != EOutgameTutorialAction.BattleEntry) continue;
 
             // 게이트를 거치지 않는 진입은 그 자리에서 씬을 떠난다(LeavesScene) — 되감아 재생할 화면이 없다.
-            // 시나리오 유무는 묻지 않는다: 토너먼트 구간의 진입은 대본 없이 덱 게이트만 켜므로,
+            // 시나리오 유무는 묻지 않는다: 모험 구간의 진입은 대본 없이 덱 게이트만 켜므로,
             // 그 항이 남으면 그 구간에서 앱을 다시 켰을 때 되감을 대상을 못 찾아 영구 정지한다.
             if (!t_def.ShowDeckGate) return;
 

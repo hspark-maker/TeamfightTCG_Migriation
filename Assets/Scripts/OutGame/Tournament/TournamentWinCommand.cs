@@ -5,7 +5,7 @@ using UnityEngine;
 
 // 정점 격파 신고의 단일 창구. 해금 사슬과 랭크 잠금의 진실원은 서버 reportTournamentWin 이다.
 // 낙인 반영은 여기서 하지 않는다: 응답의 updatedSlots 를 ServerSaveCommands 가 채택하면
-// ServerSlotRehydrator 가 토너먼트 화면 갱신까지 통지한다.
+// ServerSlotRehydrator 가 모험 화면 갱신까지 통지한다.
 //
 // 승패를 보내지 않는다 — 서버가 전투를 검증할 방법이 없어 "항상 true 인 인자"가 되고,
 // 그런 인자는 읽는 사람에게 검증되는 것처럼 보인다. 패배는 아예 부르지 않는 것이 계약이다.

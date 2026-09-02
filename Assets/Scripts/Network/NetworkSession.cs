@@ -112,7 +112,7 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
         DestroySceneManager();
         NetworkGameController.Instance?.ResetMatchState();
 
-        NetworkSceneManagerDefault t_sceneManager = CreateSceneManager();
+        NoRemoteSceneSyncManager t_sceneManager = CreateSceneManager();
         CreateRunner();
 
         StartGameResult t_result = await this.Runner.StartGame(BuildStartGameArgs(_roomName, t_sceneManager));
@@ -125,7 +125,7 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
         DestroySceneManager();
         NetworkGameController.Instance?.ResetMatchState();
 
-        NetworkSceneManagerDefault t_sceneManager = CreateSceneManager();
+        NoRemoteSceneSyncManager t_sceneManager = CreateSceneManager();
         CreateRunner();
 
         var t_args = new StartGameArgs
@@ -172,7 +172,7 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
             PlayerCount = 2,
             CustomLobbyName = RankedLobbyName,
             SceneManager = this.sceneManagerGo != null
-                ? this.sceneManagerGo.GetComponent<NetworkSceneManagerDefault>()
+                ? this.sceneManagerGo.GetComponent<NoRemoteSceneSyncManager>()
                 : null,
             IsOpen = true,
             IsVisible = true,
@@ -232,15 +232,19 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
 
     void CreateRunner()
     {
-        this.Runner = new GameObject("NetworkRunner").AddComponent<NetworkRunner>();
+        var t_runnerGo = new GameObject("NetworkRunner");
+        // 씬 전환을 각 클라가 직접 하게 되면서 러너가 씬에 딸려 죽으면 안 된다. Fusion 도 기동 중에
+        // MakeDontDestroyOnLoad 를 걸지만 그 시점은 내부 사정이라, 여기서 못 박아 두고 시작한다.
+        UnityEngine.Object.DontDestroyOnLoad(t_runnerGo);
+        this.Runner = t_runnerGo.AddComponent<NetworkRunner>();
         this.Runner.AddCallbacks(this);
     }
 
-    NetworkSceneManagerDefault CreateSceneManager()
+    NoRemoteSceneSyncManager CreateSceneManager()
     {
         this.sceneManagerGo = new GameObject("NetworkSceneManager");
         UnityEngine.Object.DontDestroyOnLoad(this.sceneManagerGo);
-        return this.sceneManagerGo.AddComponent<NetworkSceneManagerDefault>();
+        return this.sceneManagerGo.AddComponent<NoRemoteSceneSyncManager>();
     }
 
     void DestroySceneManager()
@@ -250,7 +254,7 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
         this.sceneManagerGo = null;
     }
 
-    static StartGameArgs BuildStartGameArgs(string _roomName, NetworkSceneManagerDefault _sceneManager)
+    static StartGameArgs BuildStartGameArgs(string _roomName, NoRemoteSceneSyncManager _sceneManager)
     {
         return new StartGameArgs
         {

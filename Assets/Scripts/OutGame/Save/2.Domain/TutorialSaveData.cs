@@ -16,8 +16,8 @@ public class TutorialSaveData
     // 좌표만으로는 저작이 바뀌면 다른 스텝을 가리키게 된다 — 초기화에서 이 번호로 좌표를 되찾는다.
     [FirestoreProperty("stepId")] public int StepId { get; set; }
 
-    // 직전 부팅 때의 진행 좌표와 그 좌표가 이어진 부팅 횟수 — 진행이 막혔는지 판정하는 데만 쓴다.
-    // -1은 "아직 한 번도 관측하지 않음". 0으로 두면 시작 좌표(0-0)와 우연히 같아 첫 부팅이 재관측으로 세어진다.
+    // 직전 초기화 때의 진행 좌표와 그 좌표가 이어진 초기화 횟수 — 진행이 막혔는지 판정하는 데만 쓴다.
+    // -1은 "아직 한 번도 관측하지 않음". 0으로 두면 시작 좌표(0-0)와 우연히 같아 첫 초기화가 재관측으로 세어진다.
     [FirestoreProperty("lastBootChapterIndex")] public int LastBootChapterIndex { get; set; } = -1;
     [FirestoreProperty("lastBootStepIndex")] public int LastBootStepIndex { get; set; } = -1;
     [FirestoreProperty("sameCoordBootCount")] public int SameCoordBootCount { get; set; }

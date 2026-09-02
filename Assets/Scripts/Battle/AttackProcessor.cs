@@ -219,6 +219,8 @@ public static class AttackProcessor
                 {
                     CardInstance t_revived = t_c;   // 연출 큐가 나중에 읽으므로 루프 변수를 캡처하지 않는다
                     BattlePresentationQueue.Run(() => CardPassive.Notify(t_revived, CardKeyword.Immortal));
+                    // 죽는 그림 → 디졸브 → 되살아나는 그림. 규칙(체력 복구)은 위에서 이미 끝났고 여기는 표시다.
+                    BattlePresentationQueue.Run(() => ImmortalVfx.PlayRevive(t_revived).Forget());
                 }
                 // 부활(불사)했으면 슬롯 유지 → Removed/RemoveCard 스킵(라이프사이클 재진입 없음).
                 if (t_c.IsAlive) continue;

@@ -88,6 +88,19 @@ public sealed class LobbyTabBarView : MonoBehaviour
             ? focus
             : GetButtonAnchor(_index);
 
+    /// <summary>도착 강조(UiPunch)를 받을 그래픽. 시각 앵커와 따로 두는 이유는 탭 버튼에
+    /// 자물쇠 배지 같은 런타임 자식이 붙기 때문이다 — 자식 순서로 짚으면 그쪽이 대신 튄다.</summary>
+    public RectTransform GetPunchAnchor(int _index)
+    {
+        if (focus != null && m_previousIndex == _index)
+            return focusIcon != null ? focusIcon.rectTransform : focus;
+
+        if (!TryGetView(_index, out TabButtonView t_view)) return null;
+
+        Image t_icon = t_view.Icon;
+        return t_icon != null ? t_icon.rectTransform : t_view.transform as RectTransform;
+    }
+
     public void SetSelected(int _index)
     {
         if (!TryGetView(_index, out _)) return;

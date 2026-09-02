@@ -17,6 +17,22 @@ public class FlowSynergyVfxConfig : SynergyVfxConfig
     [Tooltip("배율 상한. 흐름 스택은 무제한으로 자라므로 여기서 끊지 않으면 화면을 덮는다")]
     public float windScaleMax = 2.2f;
 
+    /// <summary>[Placed] 흐름은 배치도 바람으로 알린다 — 엠블럼 그림이 따로 없고, 발동 때와 같은 바람이
+    /// 그대로 그 자리에 분다. 엠블럼 줄이 배선돼 있으면 베이스 동작(엠블럼)이 이긴다.
+    ///
+    /// 크기 기준은 그 카드가 들고 있는 현재 스택(flowBonus)이다 — 여기선 BattleField를 못 보므로
+    /// 필드의 FlowStack 대신 카드가 마지막으로 재동기받은 값을 쓴다(흐름 카드끼리는 같은 값).</summary>
+    public override void PlayPlaced(CardView _view, CardInstance _card, SynergyData _synergy)
+    {
+        if (EntryFor(SynergyEmblemTiming.Placed) != null)
+        {
+            base.PlayPlaced(_view, _card, _synergy);
+            return;
+        }
+
+        SynergyVfx.PlayFlowWind(_view, this, Mathf.Max(1, _card != null ? _card.flowBonus : 1));
+    }
+
     /// <summary>그 스택에서 바람이 커질 배율. 스택 1이 기본 크기가 되도록 (stack-1)만큼만 더한다.</summary>
     public float WindScaleFor(int _stack)
     {

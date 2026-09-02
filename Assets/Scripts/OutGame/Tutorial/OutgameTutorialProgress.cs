@@ -4,7 +4,7 @@ using UnityEngine;
 // 아웃게임 첫시작 튜토리얼 진행도의 static 단일 창구(세이브 슬롯 매핑을 여기서만 안다)
 public static class OutgameTutorialProgress
 {
-    // 같은 좌표로 이만큼 더 부팅하면 진행이 막힌 것으로 본다(0=직후, 2=세 번째 부팅).
+    // 같은 좌표로 이만큼 더 초기화하면 진행이 막힌 것으로 본다(0=직후, 2=세 번째 초기화).
     // 두 번까지 봐주는 이유: 튜토 도중 앱을 끄는 것은 흔한 일이고, 오탐 대가(기능이 미리 열림)보다
     // 놓쳤을 때 대가(게임 자체를 못 함)가 훨씬 크다.
     const int STALL_BOOT_COUNT = 2;
@@ -130,7 +130,7 @@ public static class OutgameTutorialProgress
         OutgameFeatureLock.ClearStall();
     }
 
-    // 부팅을 거듭해도 좌표가 그대로면 그 스텝은 스스로 풀릴 수 없는 것이다 — 안내는 멈추더라도 게임은 열어 준다.
+    // 초기화를 거듭해도 좌표가 그대로면 그 스텝은 스스로 풀릴 수 없는 것이다 — 안내는 멈추더라도 게임은 열어 준다.
     // 진입 실패는 브리지가 그 자리에서 잡고, 여기는 신호를 영영 못 받는 대기형 정지(앵커 미등록 등)를 잡는다.
     static void DetectStall()
     {
@@ -153,7 +153,7 @@ public static class OutgameTutorialProgress
         if (t_slot.SameCoordBootCount < STALL_BOOT_COUNT) return;
 
         Debug.LogWarning($"[OutgameTutorialProgress] 좌표 {t_slot.ChapterIndex}-{t_slot.ChapterStepIndex}에서 "
-                       + $"{t_slot.SameCoordBootCount + 1}번째 부팅 — 진행이 막힌 것으로 보고 기능 잠금을 해제합니다.");
+                       + $"{t_slot.SameCoordBootCount + 1}번째 초기화 — 진행이 막힌 것으로 보고 기능 잠금을 해제합니다.");
         OutgameFeatureLock.NotifyStalled();
     }
 }

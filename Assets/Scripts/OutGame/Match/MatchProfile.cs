@@ -71,7 +71,7 @@ public readonly struct MatchProfile
                                 t_look.Plate, t_look.PlateColor);
     }
 
-    // 토너먼트 정점의 고정 상대. 랭크를 비우는 이유: 덱도 카드 레벨도 정점 저작값이라 내 티어와 무관하고,
+    // 모험 정점의 고정 상대. 랭크를 비우는 이유: 덱도 카드 레벨도 정점 저작값이라 내 티어와 무관하고,
     // 이 전투는 랭크에 반영되지도 않는다 — 배지를 붙이면 없는 랭크전을 있는 것처럼 보이게 한다.
     public static MatchProfile OfTournamentNode(string _name, Sprite _avatar)
         => new MatchProfile(_name, 0, string.Empty, null, _avatar);

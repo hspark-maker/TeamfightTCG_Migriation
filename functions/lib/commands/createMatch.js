@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createMatch = void 0;
 exports.expectedParticipantsOf = expectedParticipantsOf;
 const https_1 = require("firebase-functions/v2/https");
+const v2_1 = require("firebase-functions/v2");
 const firestore_1 = require("firebase-admin/firestore");
 const node_crypto_1 = require("node:crypto");
 const firebaseApp_1 = require("../firebaseApp");
@@ -179,6 +180,17 @@ exports.createMatch = (0, https_1.onCall)({ enforceAppCheck: false }, async (req
             expiresAt: firestore_1.Timestamp.fromMillis(record.expiresAtMs),
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
         }, { merge: true });
+        // 두 클라가 같은 페어링 문서에 붙었는지는 여기서만 대조할 수 있다(클라 응답에는 matchId 뿐).
+        v2_1.logger.info("createMatch pairing", {
+            matchId: record.matchId,
+            uid: uid.slice(0, 6),
+            ownerIndex: data.ownerIndex,
+            mode: data.mode,
+            status: decision.status,
+            participants: record.participantUids.length,
+            expectedParticipants: record.expectedParticipants,
+            pairingKeyHash: pairingId,
+        });
         return response;
     });
 });

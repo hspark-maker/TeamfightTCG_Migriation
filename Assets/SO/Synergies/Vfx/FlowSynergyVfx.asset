@@ -17,7 +17,7 @@ MonoBehaviour:
     id: 13
     prefab: {fileID: 6284609396194754941, guid: 5971013c2c057734f944ef99fb358127, type: 3}
     localOffset: {x: 0, y: -1.5, z: 0}
-    initialRotation: {x: -90, y: 0, z: 0}
+    initialRotation: {x: -110.862, y: 0, z: 0}
     lifetime: 2
     sortingOrder: 20
     scale: 0

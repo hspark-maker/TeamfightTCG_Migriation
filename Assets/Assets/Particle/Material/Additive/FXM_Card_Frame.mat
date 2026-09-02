@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: FXM_Card_Frame
-  m_Shader: {fileID: 4800000, guid: 99ce1473e9a20b84a9836e057bc8404f, type: 3}
+  m_Shader: {fileID: 4800000, guid: 768355665771fac468c262f54f1e3a12, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
@@ -40,9 +40,17 @@ Material:
         m_Texture: {fileID: 2800000, guid: a851c2062a736834097997e369e361bc, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _Noise_Tex:
+        m_Texture: {fileID: 2800000, guid: a851c2062a736834097997e369e361bc, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _Normal_Tex:
         m_Texture: {fileID: 2800000, guid: 2666899ff4f4907428a3bf2c565acae9, type: 3}
         m_Scale: {x: 0.5, y: -0.5}
+        m_Offset: {x: 0, y: 0}
+    - _Normal_Tex1:
+        m_Texture: {fileID: 2800000, guid: 2666899ff4f4907428a3bf2c565acae9, type: 3}
+        m_Scale: {x: 0.5, y: 0.5}
         m_Offset: {x: 0, y: 0}
     - unity_Lightmaps:
         m_Texture: {fileID: 0}
@@ -63,19 +71,29 @@ Material:
     - _Dissovle_Upanner: 0
     - _Dissovle_Vpanner: 0
     - _Main_Ins: 1.68
+    - _Main_Ins1: 1
     - _Main_Power: 1
+    - _Main_Power1: 1
     - _Noise_Ins: 1
     - _Noise_UPanner: 0
+    - _Noise_UPanner_2: 0.1
     - _Noise_VPanner: 0.1
+    - _Noise_VPanner_2: 0
     - _Normal_Upanner: 0
+    - _Normal_Upanner1: 0
     - _Normal_Vpanner: 0.1
+    - _Normal_Vpanner1: 0.1
+    - _Opacity1: 1
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 0
     - _USE_Dissovle: 0
+    - _USE_Y_Offset: 0
     - _XRMotionVectorsPass: 1
     - _distortion: 0.225
+    - _distortion1: 0.225
     m_Colors:
     - _Main_Color: {r: 1.6436743, g: 1.6436743, b: 1.6436743, a: 0}
+    - _Main_Color_1: {r: 1, g: 1, b: 1, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

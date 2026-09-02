@@ -240,7 +240,7 @@ function claimTournamentNode(
   current: Record<string, unknown>,
   chapterRows: ChapterNodeRow[],
   context: ClaimContext,
-): {clearedNodeIds: string[]; claimedChapterIds: string[]; pendingRewardNodeId: string} {
+): {clearedNodeIds: string[]; claimedChapterIds: string[]; seenUnlockIds: string[]; pendingRewardNodeId: string} {
   const tournament = current.tournament as Record<string, unknown> | undefined;
   const cleared = readIdList(tournament?.clearedNodeIds);
   const pending = typeof tournament?.pendingRewardNodeId === "string" ? tournament.pendingRewardNodeId : "";
@@ -262,6 +262,8 @@ function claimTournamentNode(
     clearedNodeIds: [...cleared, context.ownerId],
     // 챕터 낙인은 이 명령의 소관이 아니다 — 슬롯 전체 값을 쓰므로 그대로 실어 보내야 지워지지 않는다.
     claimedChapterIds: readIdList(tournament?.claimedChapterIds),
+    // 해금 안내 열람 낙인도 이 명령의 소관이 아니다 — 슬롯 전체 값이라 그대로 실어 보내야 지워지지 않는다.
+    seenUnlockIds: readIdList(tournament?.seenUnlockIds),
     pendingRewardNodeId: "",
   };
 }
@@ -281,7 +283,7 @@ function claimTournamentChapter(
   current: Record<string, unknown>,
   chapterRows: ChapterNodeRow[],
   context: ClaimContext,
-): {clearedNodeIds: string[]; claimedChapterIds: string[]; pendingRewardNodeId: string} {
+): {clearedNodeIds: string[]; claimedChapterIds: string[]; seenUnlockIds: string[]; pendingRewardNodeId: string} {
   const tournament = current.tournament as Record<string, unknown> | undefined;
   const claimedChapters = readIdList(tournament?.claimedChapterIds);
 
@@ -300,6 +302,8 @@ function claimTournamentChapter(
   return {
     clearedNodeIds: cleared,
     claimedChapterIds: [...claimedChapters, context.ownerId],
+    // 해금 안내 열람 낙인은 이 명령의 소관이 아니다 — 슬롯 전체 값이라 그대로 실어 보내야 지워지지 않는다.
+    seenUnlockIds: readIdList(tournament?.seenUnlockIds),
     pendingRewardNodeId: typeof tournament?.pendingRewardNodeId === "string" ? tournament.pendingRewardNodeId : "",
   };
 }

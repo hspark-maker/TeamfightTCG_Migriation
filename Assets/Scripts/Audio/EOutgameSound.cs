@@ -36,7 +36,7 @@ public enum EOutgameSound
     RankStarFill = 600,
     RankPromote  = 601,
 
-    // 토너먼트
+    // 모험
     TournamentNodeTap = 700,
     TournamentClear   = 701,
 

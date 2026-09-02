@@ -84,6 +84,14 @@ public class GameInitializer : MonoBehaviour
         }
         catch (System.Exception t_e)
         {
+            // 씬이 내려가며 취소된 경우다(러너 종료·전투 씬 언로드). 이 오브젝트는 이미 파괴돼 있어
+            // 출구 처리(GetComponent)가 MissingReferenceException 으로 다시 터진다 — 그건 원인이 아니라 소음이다.
+            if (this == null)
+            {
+                Debug.LogWarning($"[GameInitializer] 전투 초기화가 씬 종료로 취소됐다: {t_e.GetBaseException().Message}");
+                return;
+            }
+
             Debug.LogError($"[GameInitializer] 전투 초기화 실패 — 전투를 열지 못했다: {t_e}");
             AbortInit(EMatchEndReason.InitError);
         }
@@ -195,8 +203,8 @@ public class GameInitializer : MonoBehaviour
 
     /// <summary>모드 플래그를 **런타임 사실**과 대조한다.
     ///
-    /// DeckConfig.IsMultiplayer는 로비 패널의 OnPlayerJoined 콜백에서 켜지는데, 전투 씬으로 끌고 가는
-    /// 주체는 마스터의 Runner.LoadScene이다 — 즉 플래그의 authority와 씬 로드의 authority가 다르다.
+    /// DeckConfig.IsMultiplayer는 로비 패널의 OnPlayerJoined 콜백에서 켜지는데, 전투 씬을 여는 주체는
+    /// 각 클라의 BattleSceneEntry.Load다 — 즉 플래그의 authority와 씬 로드의 authority가 다르다.
     /// 콜백을 놓친(패널이 비활성화돼 구독이 끊긴) 클라이언트는 IsMultiplayer=false인 채 전투에 들어와
     /// 싱글 턴 객체 + 로컬 시드로 진행한다 = commit-reveal 우회, 양쪽이 아예 다른 게임을 한다.
     ///
@@ -231,7 +239,12 @@ public class GameInitializer : MonoBehaviour
     /// 이후 화면 비율 대응(BattleCameraFit)이 영영 멈춘다.</summary>
     void AbortInit(EMatchEndReason _reason)
     {
+        // 카메라 잠금 해제는 static 이라 이 오브젝트가 죽어도 반드시 돌아야 한다(먼저 부른다).
         BattleCameraFit.ClearExternalControl();
+
+        // 파괴된 오브젝트에서 GetComponent 를 부르면 MissingReferenceException 이다 —
+        // 씬이 내려가는 중이면 넘길 러너도 이미 없다.
+        if (this == null) return;
 
         // 초기화 실패는 사유를 가리지 않고 전부 무효 경기다 — 보드가 아직 서지 않아
         // 부전승으로 매길 판이 없고, AI가 인수할 상태도 없다.

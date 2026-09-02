@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LIMIT_BREAK_CURVE_SHRUNK = exports.LOCKED_DECK_SIZE = void 0;
 exports.parseCardSpecRow = parseCardSpecRow;
+exports.buildAiDeckSnapshots = buildAiDeckSnapshots;
 exports.validateDeckShape = validateDeckShape;
 exports.validateDeckSnapshots = validateDeckSnapshots;
 exports.computeDeckHash = computeDeckHash;
@@ -120,6 +121,38 @@ function parseCardSpecRow(raw) {
         return null;
     return { id, maxHp, keywords, keywordUnlockLevel, defaultEvolutionStage,
         synergies, hp2, hp3, hp4 };
+}
+/**
+ * 싱글 AI가 클라이언트의 GrowthAtLevel과 같은 규칙으로 쓰는 서버 스냅샷.
+ * @param {number[]} cardIds 카드 ID 배열
+ * @param {number} rawLevel 카드 레벨
+ * @param {object} specs 카드 스펙 맵
+ * @return {object} 카드 스냅샷 배열 또는 null
+ */
+function buildAiDeckSnapshots(cardIds, rawLevel, specs) {
+    if (cardIds.length !== exports.LOCKED_DECK_SIZE || new Set(cardIds).size !== cardIds.length ||
+        !Number.isSafeInteger(rawLevel))
+        return null;
+    const level = Math.max(BASE_LEVEL, Math.min(MAX_LEVEL, rawLevel));
+    const snapshots = [];
+    for (const cardId of [...cardIds].sort((a, b) => a - b)) {
+        const spec = specs.get(cardId);
+        if (spec == null)
+            return null;
+        const gains = [0, 0, spec.hp2, spec.hp3, spec.hp4];
+        let hpBonus = 0;
+        for (let current = BASE_LEVEL + 1; current <= level; current++)
+            hpBonus += gains[current];
+        snapshots.push({
+            cardId,
+            level,
+            hpBonus,
+            evolutionStage: level >= SECOND_EVOLUTION_LEVEL ? 2 : level >= FIRST_EVOLUTION_LEVEL ? 1 : 0,
+            unlockedKeywords: level >= spec.keywordUnlockLevel ? spec.keywords : 0,
+            synergyUnlocked: level >= FIRST_EVOLUTION_LEVEL,
+        });
+    }
+    return snapshots;
 }
 function validateDeckShape(snapshots) {
     if (snapshots.length !== exports.LOCKED_DECK_SIZE) {

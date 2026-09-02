@@ -10,7 +10,7 @@ using F = EOutgameFeature;
 /// 앵커를 누르라고 저작하는 실수가 컴파일도 통과하고, 런타임에 게이트가 영영 안 켜지는 것으로만 드러난다.
 ///
 /// 런타임은 이 표를 읽지 않는다 — 에디터 검증기 전용이다. 앵커를 추가하면 EOutgameTutorialAnchor 끝에 값을 더하고
-/// 이 테이블 끝에 그 행을 더한다. 빠뜨리면 아래 static 생성자가 부팅 때 소리내어 잡는다.</summary>
+/// 이 테이블 끝에 그 행을 더한다. 빠뜨리면 아래 static 생성자가 초기화 때 소리내어 잡는다.</summary>
 public readonly struct TutorialAnchorMeta
 {
     public readonly EOutgameTutorialAnchor Anchor;  // 자기 행의 앵커(테이블 정렬 검증용 — 아래 static 생성자)
@@ -129,8 +129,8 @@ public readonly struct TutorialAnchorMeta
         new(A.DeckEditCollectionCard,     F.None,               "덱 편집(컬렉션 격자)",    "UI/Deck/DeckEditCollectionGrid.cs"),
 
         // 26 UI/Tournament/TournamentMapOverlayView.cs가 지금 도전할 정점 하나에만 등록(정점은 런타임 생성).
-        //    잠금은 로비의 토너먼트 버튼(앵커 24)과 같은 Tournament 기능이 쥔다 — 잠겨 있으면 이 화면에 닿지 못한다
-        new(A.TournamentNode,             F.Tournament,         "토너먼트 지도",         "UI/Tournament/TournamentMapOverlayView.cs"),
+        //    잠금은 로비의 모험 버튼(앵커 24)과 같은 Tournament 기능이 쥔다 — 잠겨 있으면 이 화면에 닿지 못한다
+        new(A.TournamentNode,             F.Tournament,         "모험 지도",         "UI/Tournament/TournamentMapOverlayView.cs"),
 
         // 27 MatchDeckPanel.prefab의 덱 파워 배지. 잠금 없음
         new(A.MatchDeckPowerBadge,        F.None,               "매치 덱 화면",          "Assets/Assets/Prefabs/UI/MatchUI/MatchDeckPanel.prefab"),
@@ -147,7 +147,7 @@ public readonly struct TutorialAnchorMeta
         new(A.KeywordGrowthPanel,         F.None,               "키워드 강화 패널",       "UI/Growth/KeywordGrowthPanel.cs"),
     };
 
-    // 이 구조의 조용한 실패 두 가지를 이 창을 처음 열 때 소리내어 잡는다(에디터 어셈블리라 부팅이 아니다).
+    // 이 구조의 조용한 실패 두 가지를 이 창을 처음 열 때 소리내어 잡는다(에디터 어셈블리라 초기화가 아니다).
     //  (1) 앵커만 늘리고 행을 안 늘림 → 그 앵커가 폴백으로 떨어져 검증기가 "미등록"으로 오판한다.
     //  (2) 앵커를 중간에 끼워 넣고 행은 끝에 붙임 → 개수는 맞는데 삽입 지점 이후가 통째로 한 칸씩 밀린다.
     //      행마다 자기 앵커를 싣고 인덱스와 대조하는 것이 (2)를 잡는 유일한 방법이다.

@@ -370,14 +370,24 @@ public class CardAnimator : MonoBehaviour
     /// 두 곳이 같은 <c>GameTiming</c> 값을 공유해 박자를 맞춘다.
     /// 별가루·바닥 파동 파티클은 여기 없다 — 스폰 좌표와 정렬 레이어를 아는 <see cref="CardView"/>가 쏜다.
     /// 여기는 트윈만 소유한다.</summary>
-    public async UniTask PlayDeathAnim(float _duration = -1f)
+    /// <param name="_fadeTo">사망 페이드의 **끝 알파**. 기본 0(완전히 사라짐).
+    /// 뒤에 다른 연출이 이어 붙는 경우(불사 디졸브)에만 0보다 크게 준다 — 0까지 가면 사라진 카드를
+    /// 다시 보이게 해야 해서 "팍 나타남"이 생긴다.</param>
+    /// <param name="_keepEndPose">true면 끝난 뒤 슬롯 자리·크기 1로 되돌리지 **않는다**.
+    /// 반투명하게 남는 경우 그 복원이 "작아졌다 갑자기 커짐"으로 보이기 때문이다.
+    /// 되돌리는 책임은 이어받은 연출에 있다.</param>
+    /// <param name="_keepPopScale">true면 팝으로 부푼 크기를 **그대로 유지한다**(축소 생략).
+    /// 뒤이은 연출이 카드 위에서 도는 경우용 — 작아진 카드 위에서 디졸브가 돌면 그림이 잘 안 읽힌다.</param>
+    public async UniTask PlayDeathAnim(float _duration = -1f, float _fadeTo = 0f, bool _keepEndPose = false,
+                                       bool _keepPopScale = false)
     {
         if (_duration < 0f) _duration = GameTiming.Battle.DeathDuration;
+        _fadeTo = Mathf.Clamp01(_fadeTo);
         // 부유의 출발점은 지금 있는 자리지만, **되돌릴 자리는 슬롯**이다(아래 finally).
         // 진입 시점 좌표를 복원 기준으로 삼으면 어긋난 좌표가 새 기준이 되고, 슬롯은 재사용되므로
         // 그 어긋남이 다음 카드에 그대로 이월된다(카드가 조금씩 밀리던 원인).
         Vector3 t_liftFrom = transform.localPosition;
-        this.FadeTarget = 0f;   // 사망은 알파 0으로 끝난다(아래 주석 참조) — 그 사이 태어난 자식도 0으로
+        this.FadeTarget = _fadeTo;   // 사망은 알파 0으로 끝난다(아래 주석 참조) — 그 사이 태어난 자식도 그 값으로
         RefreshVisualCache();
 
         // 직전 피격 흰 판(HitOverlay)이 남은 채로 죽으면 축소·페이드에서 제외된 그 판만 남아
@@ -403,17 +413,18 @@ public class CardAnimator : MonoBehaviour
                            .SetEase(Ease.OutCubic))
             // 두 스케일 트윈은 시간이 겹치지 않는다(두 번째가 첫 번째가 끝나는 지점에서 시작).
             .Insert(0f, transform.DOScale(Vector3.one * DEATH_POP_SCALE, t_popDur).SetEase(Ease.OutQuad))
-            .Insert(t_popDur, transform.DOScale(Vector3.one * DEATH_SHRINK, t_shrinkDur)
-                                       .SetEase(Ease.OutQuint));
+            .Insert(t_popDur, transform.DOScale(Vector3.one * (_keepPopScale ? DEATH_POP_SCALE : DEATH_SHRINK),
+                                                t_shrinkDur).SetEase(Ease.OutQuint));
         // 페이드는 **줄어드는 구간에 붙인다** — 부푸는 동안은 또렷하게 보이고 터지면서 함께 사라져야
         // "부풀었다 터졌다"로 읽힌다. 부푸는 동안 이미 흐려지면 그냥 흐지부지 사라진 것이 된다.
         foreach (SpriteRenderer t_sr in this.cachedRenderers)
         {
             if (t_sr == this.hitOverlay) continue;
-            _ = t_seq.Insert(t_popDur, t_sr.DOFade(0f, t_shrinkDur).SetEase(Ease.InQuad));
+            _ = t_seq.Insert(t_popDur, t_sr.DOFade(_fadeTo * this.rendererBaseAlpha[System.Array.IndexOf(this.cachedRenderers, t_sr)],
+                                                   t_shrinkDur).SetEase(Ease.InQuad));
         }
         foreach (TMP_Text t_tmp in this.cachedTexts)
-            _ = t_seq.Insert(t_popDur, t_tmp.DOFade(0f, t_shrinkDur).SetEase(Ease.InQuad));
+            _ = t_seq.Insert(t_popDur, t_tmp.DOFade(_fadeTo, t_shrinkDur).SetEase(Ease.InQuad));
 
         // 연출 길이의 주인은 여전히 _duration이다. 팝+축소가 그보다 먼저 끝나도 시퀀스를 끝까지 붙잡는다 —
         // 호출부는 시퀀스 완료를 사망 완료로 본다.
@@ -425,7 +436,7 @@ public class CardAnimator : MonoBehaviour
         }
         finally
         {
-            if (this != null)
+            if (this != null && !_keepEndPose)
             {
                 // 슬롯(=Awake에서 잡은 원래 자리)과 크기 1로 되돌린다. 진입 시점 값이 아니라 **알려진 정상값**이라
                 // 어떤 이유로 어긋난 채 죽어도 그 어긋남이 슬롯에 남지 않는다.
@@ -435,6 +446,25 @@ public class CardAnimator : MonoBehaviour
                 transform.localScale = Vector3.one;
             }
         }
+    }
+
+    /// <summary>슬롯 자리·크기 1로 되돌린다. 사망 연출이 _keepEndPose로 자세를 남겼을 때
+    /// 이어받은 연출이 마무리로 부른다 — 복원 지점이 두 곳으로 갈리지 않게 여기 하나만 쓴다.</summary>
+    public void ResetToSlotPose(float _duration = 0f)
+    {
+        if (this == null) return;
+
+        transform.DOKill();
+        if (_duration <= 0f)
+        {
+            transform.position   = this.slotPosition;
+            transform.localScale = Vector3.one;
+            return;
+        }
+
+        // 작아진 채로 남은 카드를 **부드럽게** 되돌린다 — 즉시 되돌리면 "갑자기 커짐"으로 보인다.
+        _ = transform.DOMove(this.slotPosition, _duration).SetEase(Ease.OutQuad).SetLink(gameObject);
+        _ = transform.DOScale(Vector3.one, _duration).SetEase(Ease.OutQuad).SetLink(gameObject);
     }
 
     public async UniTask PlayDealAnim(Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration = -1f)

@@ -55,7 +55,8 @@ public sealed class ServerMatchmaker : IMatchmaker
 
             SoloMatchHandoff.Set(
                 t_result.MatchId, t_result.SeedHex, t_seed, t_result.RulesetVersion,
-                t_result.PlayerBoardOrder, t_result.EnemyBoardOrder);
+                t_result.PlayerBoardOrder, t_result.EnemyBoardOrder,
+                t_result.ResultProtocol, ComputeEnemyDeckHash(t_result.Deck, t_result.CardLevel));
 
             MatchProfile t_profile = MatchProfile.OfOpponent(
                 this.m_pool != null ? this.m_pool.PickName() : OpponentProfilePool.FALLBACK_NAME,
@@ -84,7 +85,21 @@ public sealed class ServerMatchmaker : IMatchmaker
             env = t_env,
             contentFingerprint = SpecSource.BattleFingerprint.ToLowerInvariant(),
             playerDeck = DeckConfig.PlayerDeck,
+            resultProtocol = 1,
         });
+    }
+
+    static string ComputeEnemyDeckHash(List<int> _deck, int _cardLevel)
+    {
+        int[] t_ids = _deck.ToArray();
+        Array.Sort(t_ids);
+        // 레벨 클램프는 실제 적 카드를 세우는 자리(BattleGrowthBridge.EnemyCardLevel)와 같은 하나를 쓴다 —
+        // 여기만 다르게 조이면 해시는 서버와 맞는데 필드는 다른 카드가 서서 재시뮬이 상시 발산한다.
+        int t_level = CardGrowthManager.ClampLevel(_cardLevel);
+        var t_growth = new CardGrowth[t_ids.Length];
+        for (int i = 0; i < t_ids.Length; i++)
+            t_growth[i] = CardGrowthManager.GrowthAtLevel(t_ids[i], t_level);
+        return NetworkGameController.ComputeDeckHash(t_ids, t_growth);
     }
 
     static bool SameCards(IReadOnlyList<int> _left, IReadOnlyList<int> _right)
@@ -128,4 +143,5 @@ internal sealed class FindAiMatchResult : ServerCommandResult
     [JsonProperty("cardLevel")] public int CardLevel { get; set; }
     [JsonProperty("playerBoardOrder")] public List<int> PlayerBoardOrder { get; set; }
     [JsonProperty("enemyBoardOrder")] public List<int> EnemyBoardOrder { get; set; }
+    [JsonProperty("resultProtocol")] public int ResultProtocol { get; set; }
 }

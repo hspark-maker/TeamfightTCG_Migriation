@@ -7,6 +7,11 @@ public class PredatorSynergyVfxConfig : SynergyVfxConfig
     // id는 쓰지 않는다 — BattleVfxId는 여러 곳이 공유하는 공용 축이고, 이건 포식자 전용이다.
     public VfxEntry impact;
 
+    [Header("빨림 발광 (줄기가 나가는 순간 공격자 자리)")]
+    [Tooltip("줄기 출발과 **같은 순간** 공격자 자리에서 나는 발광. 표식(impact)이 '물었다'라면 이건 '빨아들인다'다. " +
+             "미배선이면 생략된다.")]
+    public VfxEntry glow;
+
     [Header("흡수 궤적 (피격자 → 공격자)")]
     [Tooltip("피격자에서 공격자로 날아가는 궤적. 미배선이면 표식만 터지고 이동은 생략된다.")]
     public VfxEntry trail;

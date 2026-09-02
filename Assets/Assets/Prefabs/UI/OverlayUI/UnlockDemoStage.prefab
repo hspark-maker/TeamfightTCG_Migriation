@@ -103,7 +103,7 @@ Camera:
   m_Enabled: 0
   serializedVersion: 2
   m_ClearFlags: 2
-  m_BackGroundColor: {r: 0.1, g: 0.12, b: 0.18, a: 1}
+  m_BackGroundColor: {r: 0.93725497, g: 0.90196085, b: 0.85098046, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -128,7 +128,7 @@ Camera:
   far clip plane: 50
   field of view: 60
   orthographic: 1
-  orthographic size: 3.3
+  orthographic size: 3.8
   m_Depth: -100
   m_CullingMask:
     serializedVersion: 2
@@ -204,7 +204,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &2831403150405121758
 Transform:
   m_ObjectHideFlags: 0
@@ -297,7 +297,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8681528261072580252, guid: 373baa34fe87d184d9c18e6ea0ffbb3d, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.56
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 8681528261072580252, guid: 373baa34fe87d184d9c18e6ea0ffbb3d, type: 3}
       propertyPath: m_LocalPosition.z
@@ -520,7 +520,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8681528261072580252, guid: 373baa34fe87d184d9c18e6ea0ffbb3d, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.56
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 8681528261072580252, guid: 373baa34fe87d184d9c18e6ea0ffbb3d, type: 3}
       propertyPath: m_LocalPosition.z

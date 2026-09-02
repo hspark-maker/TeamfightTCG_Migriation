@@ -57,13 +57,13 @@ export function buildFreshAccountSlots(
     keywordGrowth: {levels: {}},
     rank: {points: 0, claimedTiers: []},
     albumReward: {claimedKeys: []},
-    tournament: {clearedNodeIds: [], claimedChapterIds: [], pendingRewardNodeId: ""},
+    tournament: {clearedNodeIds: [], claimedChapterIds: [], seenUnlockIds: [], pendingRewardNodeId: ""},
     tutorial: {
       outgameCompleted: false,
       chapterIndex: 0,
       chapterStepIndex: 0,
       stepId: 0,
-      // -1 은 "아직 부팅 좌표를 본 적 없다"는 뜻이다. 0 으로 두면 클라 TutorialSaveData 초기값과 갈린다.
+      // -1 은 "아직 초기화 좌표를 본 적 없다"는 뜻이다. 0 으로 두면 클라 TutorialSaveData 초기값과 갈린다.
       lastBootChapterIndex: -1,
       lastBootStepIndex: -1,
       sameCoordBootCount: 0,

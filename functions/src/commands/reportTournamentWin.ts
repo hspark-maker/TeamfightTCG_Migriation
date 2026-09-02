@@ -116,6 +116,8 @@ export const reportTournamentWin = onCall(async (request) => {
           tournament: {
             clearedNodeIds: cleared,
             claimedChapterIds: readNodeIdList(tournament?.claimedChapterIds),
+            // 해금 안내 열람 낙인은 이 명령의 소관이 아니다 — 슬롯 전체 값이라 그대로 실어 보내야 지워지지 않는다.
+            seenUnlockIds: readNodeIdList(tournament?.seenUnlockIds),
             pendingRewardNodeId: nodeId,
           },
         },

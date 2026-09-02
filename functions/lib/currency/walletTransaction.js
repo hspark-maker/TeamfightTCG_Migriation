@@ -42,19 +42,6 @@ const countedTransaction_1 = require("../observability/countedTransaction");
 const environments_1 = require("../save/environments");
 const walletStore_1 = require("./walletStore");
 /**
- * 지갑 문서만 여닫는 트랜잭션. 세이브 문서를 **아예 건드리지 않는** 명령이 쓴다
- * (전투 보상처럼 진행도가 아니라 잔액만 움직이는 것들).
- *
- * walletStore 는 functions-currency 로 미러되는 순수 파일이라 db 를 import 할 수 없다.
- * 이 파일은 미러 대상이 아니므로(scripts/shared-files.js 에 넣지 마라) 앱 핸들을 직접 쓴다.
- *
- * functions-currency 에 **같은 이름의 쌍둥이**가 있다(`functions-currency/src/currency/walletTransaction.ts`).
- * firebaseApp.ts 와 같은 이유로 일부러 두 벌이다 — 이 파일에 남은 것은 codebase 자기 db 핸들에
- * 묶인 트랜잭션 배관뿐이고, 재화 산술·문서 직렬화·키 목록·환경 목록·응답 모양은 전부
- * 미러되는 원본 한 벌(wallet·walletStore·currencyKeys·environments)에 있다.
- * 여기 재화 규칙을 새로 적기 시작하면 그 순간 두 codebase 가 갈린다.
- */
-/**
  * 지갑을 트랜잭션 1회로 읽고 고친다. 반환은 WalletPatch 뿐이다
  * — revision·updatedSlots 는 세이브 문서의 것이고 여기선 아무것도 오르지 않는다.
  * 같은 txId 로 다시 온 요청은 콜백에 들어가기도 전에 첫 응답을 되돌려준다(쓰기 0회).
@@ -66,9 +53,10 @@ const walletStore_1 = require("./walletStore");
  * @param {ReceiptKey} receipt 영수증 번호(요청 txId 또는 서버 발급)
  * @param {Function} mutate 현재 지갑을 받아 다음 지갑(nextWallet 산물)을 돌려준다
  * @param {Function} finalize 갱신된 지갑에 명령별 필드를 얹어 최종 응답을 만든다. 트랜잭션 안에서 돌다
+ * @param {WalletGuard} guard 지급 자격 문서. 넘기면 같은 트랜잭션에서 검사·낙인한다
  * @return {Promise<TResponse>} finalize 가 만든 응답
  */
-async function mutateWallet(env, uid, source, receipt, mutate, finalize) {
+async function mutateWallet(env, uid, source, receipt, mutate, finalize, guard) {
     if (!(0, environments_1.isKnownEnv)(env)) {
         throw new https_1.HttpsError("invalid-argument", `Unknown env: ${env}`);
     }
@@ -81,7 +69,7 @@ async function mutateWallet(env, uid, source, receipt, mutate, finalize) {
             // 감싸면 클라가 "잔액이 모자란다" 류의 도메인 사유로 오해하고 초기화를 다시 걸지 않는다.
             throw new https_1.HttpsError("failed-precondition", "Wallet document does not exist. Boot must call ensureWallet first.");
         }
-        // 영수증 조회가 마지막 읽기다 — 히트면 쓰기를 하나도 하지 않고 첫 응답을 그대로 돌려준다.
+        // 영수증 조회. 히트면 쓰기를 하나도 하지 않고 첫 응답을 그대로 돌려준다(자격 검사도 건너뛴다).
         const lookup = (0, walletStore_1.readReceipt)(await transaction.get((0, walletStore_1.receiptRef)(reference, receipt.txId)));
         if (lookup.hit) {
             if (lookup.source !== source) {
@@ -96,12 +84,21 @@ async function mutateWallet(env, uid, source, receipt, mutate, finalize) {
             }
             return lookup.result;
         }
+        // 자격 검사는 영수증 히트 **뒤**다. 히트한 재시도는 첫 호출이 이미 낙인했으므로
+        // 여기서 다시 보면 자기 낙인에 걸려 already-claimed 로 떨어진다.
+        // 읽기는 전부 쓰기 앞에 모여 있어야 한다(Firestore 트랜잭션 제약) — 그래서 mutate 앞이다.
+        const guardSnapshot = guard === undefined ? null : await transaction.get(guard.ref);
+        if (guard !== undefined && guardSnapshot !== null)
+            guard.verify(guardSnapshot);
         // 트랜잭션을 콜백에 넘기지 않는다 — 넘기면 walletStore 밖에서 쓰는 콜백이 생겨
         // 브랜드 타입 강제가 뚫린다.
         const update = mutate((0, walletStore_1.readWallet)(snapshot));
         // 응답은 쓰기 전에 짓는다 — 그것 그대로가 영수증에 담겨야 재시도가 같은 답을 받는다.
         const response = finalize({ rev: update.next.rev, balances: update.next.balances });
         (0, walletStore_1.writeWallet)(transaction, reference, update, receipt, response, firestore_1.FieldValue.serverTimestamp());
+        // 낙인은 지갑과 같은 커밋이다 — 갈라 놓으면 그 틈이 곧 이중 지급 창이다.
+        if (guard !== undefined)
+            transaction.set(guard.ref, guard.stamp, { merge: true });
         return response;
     });
 }

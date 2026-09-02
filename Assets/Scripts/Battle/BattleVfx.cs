@@ -177,6 +177,26 @@ public static class BattleVfx
         }
     }
 
+    /// <summary>앵커에 붙여 **수명 없이** 스폰하고 핸들을 넘긴다 — 끄는 시점을 호출부가 쥐는 지속형 표식용
+    /// (불사 대기 표식처럼 "조건이 유지되는 동안" 떠 있어야 하는 것). 항목이 여러 개면 첫 항목만 쓴다:
+    /// 지속형은 반납 대상이 하나여야 호출부가 핸들 하나로 끌 수 있다.
+    ///
+    /// 1회성 연출은 이걸 쓰지 말 것 — <see cref="PlayAttached"/>가 수명·반납까지 맡는다.</summary>
+    public static VfxHandle SpawnAttachedPersistent(BattleVfxId _id, Transform _anchor, bool _flip,
+        int _sortingLayerId)
+    {
+        if (s_library == null || _anchor == null || s_library.Collect(_id, s_collectBuffer) == 0) return default;
+
+        VfxEntry t_entry = s_collectBuffer[0];
+        GameObject t_go = SpawnAttached(t_entry.prefab, _anchor, t_entry.localOffset,
+                                        t_entry.initialRotation, _flip, out string t_poolId);
+        if (t_go == null) return default;
+
+        ApplySorting(t_go, _sortingLayerId, t_entry.sortingOrder);
+        ApplyScale(t_go, t_entry.prefab, t_entry.scale);
+        return new VfxHandle(t_poolId, t_go, 0f);   // 수명 0 = 자동 반납 없음(호출부가 Release)
+    }
+
     /// <summary>항목 배율을 **프리팹 원본 크기 기준으로** 다시 계산해 적용한다.
     /// 인스턴스의 현재 크기에 곱하지 않는 이유: 풀에서 재사용되면 지난 배율이 그대로 남아 누적된다.
     /// 배율이 0 이하(미설정)여도 원본 크기를 다시 써 넣어야 지난 스폰의 배율이 남지 않는다.</summary>

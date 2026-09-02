@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 흐름 시너지(덱 4장↑ 활성). 순수 스폰 트리거형 — 정적 스탯 없음.
@@ -19,6 +19,11 @@ public class FlowSynergyEffect : SynergyEffect
         return true;
     }
 
+    public override bool TryGetParam(string _key, out int _value)
+    {
+        _value = this.amount;
+        return _key == nameof(amount);
+    }
 
     // 동기 완결: 본문에 await 없이 상태변이 끝내고 CompletedTask 반환.
     public override UniTask OnEntered(SpawnCtx _ctx)
@@ -35,8 +40,8 @@ public class FlowSynergyEffect : SynergyEffect
             if (t_card != null && SynergyApplier.BelongsTo(t_card, _ctx.synergy))
                 t_card.flowBonus = _ctx.field.FlowStack;
         SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.field); // 흐름 카드 등장 시 배너+배지 pop
-        // 바람 스펙은 흐름 시너지의 연출 에셋이 소유. 타입 불일치면 null → 바람만 생략된다.
-        SynergyVfx.PlayFlowWind(_ctx.self, _ctx.field, _ctx.synergy?.vfx as FlowSynergyVfxConfig);
+        // 등장 바람은 여기서 띄우지 않는다 — 배치 연출이 끝나는 뷰 시점(FlowSynergyVfxConfig.PlayPlaced)이
+        // 유일한 발화점이다. 여기서도 띄우면 런타임 등장에서 같은 바람이 두 번 분다.
         return UniTask.CompletedTask;
     }
 

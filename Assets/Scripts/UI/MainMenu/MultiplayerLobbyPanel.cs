@@ -171,14 +171,11 @@ public class MultiplayerLobbyPanel : MonoBehaviour
     {
         SceneTransitionVideo.Instance?.PlayOverlay();
 
+        // 마스터 여부를 보지 않는다 — 두 클라가 각자 연다(BattleSceneEntry 설명 참조).
         NetworkRunner t_runner = NetworkSession.Instance?.Runner;
-        if (t_runner == null || !t_runner.IsSharedModeMasterClient) return;
+        if (t_runner == null) return;
 
-        string t_sceneName = NetworkSession.Instance.BattleSceneName;
-        int t_buildIndex = SceneUtility.GetBuildIndexByScenePath($"Assets/Scenes/{t_sceneName}.unity");
-        if (t_buildIndex < 0) t_buildIndex = SceneUtility.GetBuildIndexByScenePath(t_sceneName);
-
-        t_runner.LoadScene(SceneRef.FromIndex(t_buildIndex));
+        BattleSceneEntry.Load(NetworkSession.Instance.BattleSceneName);
     }
 
     async UniTaskVoid PrepareBattleAsync()

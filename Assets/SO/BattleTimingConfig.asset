@@ -67,7 +67,12 @@ MonoBehaviour:
   brandImpactHold: 0.08
   predatorImpactLead: 0.3
   predatorTravelDuration: 0.4
+  predatorTrailStagger: 0.06
   predatorArriveHold: 0.08
+  immortalDissolveDuration: 0.8
+  immortalReviveLead: 0.1
+  immortalReviveHold: 0.15
+  immortalRestoreDuration: 0.25
   approachSlow: 0.65
   approachFocusIn: 0.22
   approachFocusOut: 0.2

@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using TeamfightTCG.BattleCore;
@@ -30,15 +30,16 @@ public enum SynergyPreviewKind
     PredatorDrain,   // 포식자: 피격자 자리 표식 + 공격자에게 돌아오는 흡수 궤적
     TraceMark,       // 추적: 표식이 붙는 순간 피격자 자리 낙점
     LegacyCrown,     // 유산: 턴 시작 왕관 스택 표시
-    LegacyCrownFly,  // 유산: 사망 시 왕관이 아군에게 날아가는 국면
 }
 
 /// <summary>키워드에서 따로 확인할 수 있는 연출 종류.</summary>
 public enum KeywordPreviewKind
 {
-    Glow,
     Attack,
     Vfx,
+
+    // **새 값은 끝에만 추가한다** — keywordPreview가 씬에 int로 저장돼 있어 중간에 끼우면 선택이 밀린다.
+    Revive,   // 불사: 대기 표식 → 사망 → 디졸브 → 등장까지 한 호흡
 }
 
 /// <summary>이어 붙여 재생할 수 있는 한 마디. 인게임 <c>AttackFlow</c>가 실제로 도는 순서
@@ -109,7 +110,7 @@ public class AttackAnimTester : MonoBehaviour
     [Tooltip("연출을 확인할 키워드(실제 연출이 있는 키워드만 표시)")]
     [SerializeField] int keywordIndex = 0;
     [Tooltip("고른 키워드에서 확인할 연출")]
-    [SerializeField] KeywordPreviewKind keywordPreview = KeywordPreviewKind.Glow;
+    [SerializeField] KeywordPreviewKind keywordPreview = KeywordPreviewKind.Attack;
 
     [Header("연출별 값")]
     [Tooltip("엠블럼을 띄울 아군 슬롯")]
@@ -263,7 +264,6 @@ public class AttackAnimTester : MonoBehaviour
         // 테스터는 규칙 계층을 안 돌리므로 무쌍 광역 대상만 같은 규칙으로 직접 골라 넘긴다.
         CardView t_splash = _attacker.BoundCard.HasKeyword(CardKeyword.Peerless)
             ? FindSplashTarget(_defender) : null;
-        var (t_preKw, t_atKw) = AttackFlow.Keywords(_attacker.BoundCard);
 
         // 무장 VFX는 무장 시점에 켜진다. 버튼 공격은 무장 단계를 안 거치므로 여기서 대신 켜준다
         // (탭/드래그 공격은 FocusWeapon에서 이미 켜져 있고, SetArmedVfx는 중복 호출에 안전).
@@ -300,7 +300,6 @@ public class AttackAnimTester : MonoBehaviour
         // 광역 대상이 있으면 splash 경로 — AttackSequence가 거기서 무쌍 연출로 갈린다.
         await AttackSequence.PlaySplash(_attacker, _defender,
             _events: t_events, _splashView: t_splash,
-            _preEffectKw: t_preKw, _atEffectKw: t_atKw,
             _forceSpecial: this.useSpecialCinema);
 
         // 처형 연출. 인게임 조건과 같게 **처치 + 공격자 생존**일 때만 — 공격자가 반격에 같이 죽었으면 뜨면 안 된다.
@@ -463,13 +462,14 @@ public class AttackAnimTester : MonoBehaviour
         CardKeyword.Taunt,
         CardKeyword.Cunning,
         CardKeyword.Healer,
+        CardKeyword.Immortal,
     };
 
-    static readonly KeywordPreviewKind[] k_glowOnly = { KeywordPreviewKind.Glow };
-    static readonly KeywordPreviewKind[] k_glowAttack =
-        { KeywordPreviewKind.Glow, KeywordPreviewKind.Attack };
-    static readonly KeywordPreviewKind[] k_glowVfx =
-        { KeywordPreviewKind.Glow, KeywordPreviewKind.Vfx };
+    // 글로우 연출이 폐기돼 그것만 있던 키워드(도발·표식 등)는 미리보기가 없다 — 빈 배열이면 에디터가 목록을 안 그린다.
+    static readonly KeywordPreviewKind[] k_none   = { };
+    static readonly KeywordPreviewKind[] k_attack = { KeywordPreviewKind.Attack };
+    static readonly KeywordPreviewKind[] k_vfx    = { KeywordPreviewKind.Vfx };
+    static readonly KeywordPreviewKind[] k_revive = { KeywordPreviewKind.Revive };
 
     public CardKeyword[] PreviewableKeywords() => k_previewableKeywords;
 
@@ -484,13 +484,15 @@ public class AttackAnimTester : MonoBehaviour
         {
             case CardKeyword.Ranged:
             case CardKeyword.Peerless:
-                return k_glowAttack;
+                return k_attack;
             case CardKeyword.Execution:
             case CardKeyword.Cunning:
             case CardKeyword.Healer:
-                return k_glowVfx;
+                return k_vfx;
+            case CardKeyword.Immortal:
+                return k_revive;
             default:
-                return k_glowOnly;
+                return k_none;
         }
     }
 
@@ -501,6 +503,22 @@ public class AttackAnimTester : MonoBehaviour
         foreach (KeywordPreviewKind t_kind in t_available)
             if (t_kind == this.keywordPreview) return;
         this.keywordPreview = t_available[0];
+    }
+
+    /// <summary>불사 한 호흡: 대기 표식이 켜진 상태를 잠깐 보여 준 뒤 발동 연출(사망 → 디졸브 → 등장)까지.
+    ///
+    /// 테스터는 규칙 계층을 안 돌리므로 <c>reviveUsed</c>를 직접 세우지 않는다 —
+    /// 대신 표식을 코드로 켜고 끄며 게임과 **같은 진입점**(ImmortalVfx)만 태운다.</summary>
+    async UniTask PreviewImmortalRevive(CardView _view, CardInstance _card)
+    {
+        if (_view == null || _card == null) return;
+
+        // ① 대기: 부활을 아직 안 쓴 상태의 그림.
+        ImmortalVfx.SetAura(_view, true);
+        await Hold(this.untimedStepHold);
+
+        // ② 발동: 표식이 꺼지고 사망 → 디졸브 → 등장까지 게임과 같은 순서로 돈다.
+        await ImmortalVfx.PlayRevive(_card);
     }
 
     public void PlaySelectedKeyword() => PreviewSelectedKeyword().Forget();
@@ -523,15 +541,13 @@ public class AttackAnimTester : MonoBehaviour
             // 아이콘과 글로우가 같은 키워드를 보도록 해금 키워드로 임시 부여하고 다시 그린다.
             t_card.unlockedKeywords = (t_card.unlockedKeywords
                                      & ~(CardKeyword.Ranged | CardKeyword.Peerless | CardKeyword.Execution
-                                       | CardKeyword.Taunt | CardKeyword.Cunning | CardKeyword.Healer))
+                                       | CardKeyword.Taunt | CardKeyword.Cunning | CardKeyword.Healer
+                                       | CardKeyword.Immortal))
                                      | t_keyword;
             t_view.Render(t_card);
 
             switch (this.keywordPreview)
             {
-                case KeywordPreviewKind.Glow:
-                    await t_view.PlayKeywordGlow(t_keyword);
-                    break;
                 case KeywordPreviewKind.Attack:
                 {
                     CardView t_defender = this.enemyFieldView?.GetSlotView(this.defenderSlot);
@@ -542,6 +558,9 @@ public class AttackAnimTester : MonoBehaviour
                     if (t_keyword == CardKeyword.Execution) ExecutionVfx.Play(t_view);
                     else if (t_keyword == CardKeyword.Cunning) await CunningCore();
                     else if (t_keyword == CardKeyword.Healer) PlayCaretakerHeal();
+                    break;
+                case KeywordPreviewKind.Revive:
+                    await PreviewImmortalRevive(t_view, t_card);
                     break;
             }
         }
@@ -574,7 +593,6 @@ public class AttackAnimTester : MonoBehaviour
             case SynergyPreviewKind.PredatorDrain: PlayPredatorDrain();            break;
             case SynergyPreviewKind.TraceMark:     PlayTraceMark();                break;
             case SynergyPreviewKind.LegacyCrown:   PlayLegacyCrown();              break;
-            case SynergyPreviewKind.LegacyCrownFly: PlayLegacyCrownFly();           break;
         }
     }
 
@@ -606,10 +624,7 @@ public class AttackAnimTester : MonoBehaviour
         if (HasEffect<TraceSynergyEffect>(t_syn) || t_syn.vfx is TraceSynergyVfxConfig)
             t_list.Add(SynergyPreviewKind.TraceMark);
         if (HasEffect<LegacySynergyEffect>(t_syn) || t_syn.vfx is LegacySynergyVfxConfig)
-        {
             t_list.Add(SynergyPreviewKind.LegacyCrown);
-            t_list.Add(SynergyPreviewKind.LegacyCrownFly);
-        }
 
         return t_list.ToArray();
     }
@@ -653,7 +668,6 @@ public class AttackAnimTester : MonoBehaviour
             case SynergyPreviewKind.FlowWind:      return new[] { "emblemSlot", "flowStack" };
             case SynergyPreviewKind.CaretakerHeal: return new[] { "caretakerHeal" };
             case SynergyPreviewKind.LegacyCrown:
-            case SynergyPreviewKind.LegacyCrownFly:
                 return new[] { "legacyCrownCount" };
             default:                           return new string[0];
         }
@@ -718,27 +732,6 @@ public class AttackAnimTester : MonoBehaviour
         LegacyCrownVfx.Show(t_source, t_syn, Mathf.Max(1, this.legacyCrownCount));
     }
 
-    /// <summary>유산 왕관 비행(사망 국면). 회복 표기량은 0으로 넘긴다 — 미리보기는 체력을 올리지 않고,
-    /// 0이면 <c>HealLater</c>가 그 자리에서 빠져 표기 유예도 걸리지 않는다.</summary>
-    public void PlayLegacyCrownFly()
-    {
-        SynergyData t_syn = CurrentEmblemSynergy;
-        CardInstance t_source = this.playerFieldView?.GetSlotView(this.attackerSlot)?.BoundCard;
-        if (!WarnMissing(t_syn?.vfx is LegacySynergyVfxConfig, "LegacySynergyVfxConfig 미배선")) return;
-        if (!WarnMissing(((LegacySynergyVfxConfig)t_syn.vfx).crown.prefab != null, "crown 프리팹 미배선")) return;
-        if (!WarnMissing(t_source != null, $"아군 슬롯{this.attackerSlot}에 카드 없음")) return;
-
-        var t_targets = new List<CardInstance>();
-        for (int i = 0; i < BattleField.SLOT_COUNT; i++)
-        {
-            CardInstance t_card = this.playerFieldView?.GetSlotView(i)?.BoundCard;
-            if (t_card != null && t_card != t_source) t_targets.Add(t_card);
-        }
-        if (!WarnMissing(t_targets.Count > 0, "받을 아군이 없다 — 아군 슬롯을 2장 이상 채워라")) return;
-
-        LegacyCrownVfx.Fly(t_source, t_targets, 0, t_syn, Mathf.Max(1, this.legacyCrownCount));
-    }
-
     /// <summary>재생을 접는 이유를 로그로 남긴다. 아무 반응이 없으면 "연출이 깨졌다"와 "배선이 없다"를
     /// 구분할 수 없다(PlayEmblem이 쓰는 것과 같은 규약).</summary>
     bool WarnMissing(bool _ok, string _reason)
@@ -784,20 +777,19 @@ public class AttackAnimTester : MonoBehaviour
         SynergyVfx.PlayFlowWind(t_view, t_cfg, _stack);
     }
 
-    /// <summary>돌보미: 힐러와 같은 연출(HealVfx)을 아군 전원에게. 발사 주체는 슬롯0.</summary>
+    /// <summary>돌보미: 투사체 없이 아군 전원 자리에서 회복 표기가 동시에 터진다(게임 경로와 같은 그림 —
+    /// CaretakerSynergyEffect는 엠블럼과 같은 순간에 각 카드의 PlayHealEffect를 낸다).
+    /// 엠블럼은 별도 미리보기(SynergyPreviewKind.Emblem)라 여기선 회복 표기만 낸다.</summary>
     public void PlayCaretakerHeal()
     {
-        CardView t_src = this.playerFieldView?.GetSlotView(0);
-        if (t_src == null) return;
-
-        var t_targets = new List<(CardView view, CardInstance card, int amount)>();
         for (int i = 0; i < BattleField.SLOT_COUNT; i++)
         {
             CardView t_v = this.playerFieldView?.GetSlotView(i);
-            if (t_v != null && t_v.BoundCard != null)
-                t_targets.Add((t_v, t_v.BoundCard, Mathf.Max(0, this.caretakerHeal)));
+            if (t_v == null || t_v.BoundCard == null) continue;
+
+            // 테스터엔 유예된 표기가 없다 — _consumeDeferred:true로 부르면 소비할 몫이 0이라 숫자가 안 뜬다.
+            t_v.PlayHealEffect(Mathf.Max(0, this.caretakerHeal));
         }
-        if (t_targets.Count > 0) HealVfx.PlayHealBurst(t_src, t_targets);
     }
 
     /// <summary>지금 고른 시너지의 그 타이밍 엠블럼 1회. 게임과 같은 진입점(SynergyEmblemVfx.Play)을 탄다.

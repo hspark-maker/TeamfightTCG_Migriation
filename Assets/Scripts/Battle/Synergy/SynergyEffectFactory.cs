@@ -17,7 +17,6 @@ public static class SynergyEffectFactory
         "Stat"      => ScriptableObject.CreateInstance<StatSynergyEffect>(),
         "Flow"      => ScriptableObject.CreateInstance<FlowSynergyEffect>(),
         "Brand"     => ScriptableObject.CreateInstance<BrandSynergyEffect>(),
-        "Guardian"  => ScriptableObject.CreateInstance<GuardianSynergyEffect>(),
         "Caretaker" => ScriptableObject.CreateInstance<CaretakerSynergyEffect>(),
         "Predator"  => ScriptableObject.CreateInstance<PredatorSynergyEffect>(),
         "Legacy"    => ScriptableObject.CreateInstance<LegacySynergyEffect>(),
@@ -28,6 +27,6 @@ public static class SynergyEffectFactory
     /// <summary>시트 오타를 로드 시점에 드러내기 위한 목록. 에디터 검증기가 이 목록으로 대조한다.</summary>
     public static readonly string[] SupportedTypes =
     {
-        "Stat", "Flow", "Brand", "Guardian", "Caretaker", "Predator", "Legacy", "Trace",
+        "Stat", "Flow", "Brand", "Caretaker", "Predator", "Legacy", "Trace",
     };
 }

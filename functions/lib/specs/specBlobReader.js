@@ -1,18 +1,17 @@
 "use strict";
 /**
- * 스펙 표를 **블롭 문서 하나**로 읽는다. 원천은 `envs/{env}/specs/{table}/blob/current` 다.
+ * 스펙 표를 **블롭 문서 하나**로 읽는다. 표 크기와 무관하게 read 1건이다
+ * — `rows/` 미러를 읽던 시절에는 Card 41행 · Reward 85행 · CardPackDrop 322행이 그대로 과금됐다.
  *
- * 업로더(`Assets/Scripts/Editor/SpecFirestoreUploader.cs`)는 같은 commit 으로 메타 · 블롭 · `rows/`
- * 를 함께 쓴다. `rows/` 는 콘솔 열람용 미러라서 런타임이 그걸 읽으면 **읽기 과금이 행 수에 비례**한다
- * — Card 41행 · Reward 85행 · CardPackDrop 322행이라 표 하나 훑을 때마다 수백 건이 찍혔다.
- * 블롭은 표 크기와 무관하게 항상 1건이다.
+ * 원천은 `_index.tables[표].blobPath` 가 가리키는 **불변 릴리스 블롭**이다. 가변 `blob/current` 로
+ * 우회하지 않는다 — 우회하면 `_index` 포인터를 옛 버전으로 되돌려도 서버는 최신을 계속 봐서
+ * 클라와 서버가 다른 콘텐츠로 판정한다(반쪽 롤백).
  *
- * 블롭이 없는 표(블롭 도입 전에 올라간 표)는 `rows/` 로 폴백한다 — 재업로드 전까지 서버가 멈추면
- * 안 되기 때문이다. 폴백은 로그를 남기므로 남은 표를 추적할 수 있다.
+ * 예외는 `UNINDEXED_TABLES` 뿐이다. 업로더의 Composition 경로로 올라가는 표는 `_index` 에 실리지
+ * 않아 가변 `blob/current` 를 읽는다. 버전 고정 대상이 아니므로 해시가 아니라 짧은 TTL 로 캐시한다.
  *
- * 단 미러가 최신일 때만 폴백한다. 업로더는 `rows/` 미러를 끄고 올릴 수 있고(쓰기 비용 절감), 그때
- * 메타의 `rowsRevision` 이 `revision` 보다 뒤에 남는다. 그 상태에서 폴백하면 **낡은 마스터 데이터로**
- * 보상·추첨을 판정하게 되므로, 조용히 옛 값을 쓰는 대신 실패시킨다.
+ * 블롭이 없거나 무결성이 어긋나면 `rows/` 로 우회하지 않고 즉시 실패한다 — 폴백은 표 하나에
+ * 행 수만큼 과금되어, 깨진 채로 굴러가면 요금이 조용히 튄다.
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -55,11 +54,64 @@ exports.clearSpecCache = clearSpecCache;
 const node_crypto_1 = require("node:crypto");
 const logger = __importStar(require("firebase-functions/logger"));
 const firebaseApp_1 = require("../firebaseApp");
-/** 업로더 `SpecPayloadCodec.SchemaVersion` 과 맞물린 값. 어긋나면 블롭을 믿지 않고 폴백한다. */
-const SCHEMA_VERSION = 4;
-/** 캐시 수명. 스펙 업로드가 반영되기까지 최대 이만큼 늦는다. */
-const CACHE_TTL_MS = 5 * 60 * 1000;
+/** 앱이 해석할 수 있는 콘텐츠 세대. C# ContentVersion.Major 및 앱 버전 첫 자리와 같아야 한다. */
+// content-version:major
+const CONTENT_MAJOR = 4;
+// 새 테이블 세대 배포에서는 실제로 해석 가능한 직전 세대를 함께 넣어 pointer 롤백을 허용한다.
+// content-version:supported
+const SUPPORTED_CONTENT_MAJORS = new Set([CONTENT_MAJOR]);
 const cache = new Map();
+const indexCache = new Map();
+const INDEX_CACHE_TTL_MS = 30 * 1000;
+/**
+ * `_index.tables` 에 실리지 않는 표. 업로더의 PublishIndex 는 `SpecPayloadCodec.TableNames` 16개만
+ * 순회하고, 이 표는 Composition 경로(`SpecFirestoreUploader.Composition.cs`)가 따로 올린다.
+ * 인덱스에 넣는 것이 정답이지만 그 전까지는 여기 명시된 표만 가변 블롭을 허용한다 —
+ * 목록에 없는 미등재 표는 그대로 실패해야 새 표가 조용히 인덱스를 건너뛰는 것을 잡는다.
+ */
+const UNINDEXED_TABLES = new Set(["TournamentChapter"]);
+const UNINDEXED_CACHE_TTL_MS = 30 * 1000;
+async function readPublishedSpec(env, table) {
+    const now = Date.now();
+    let cached = indexCache.get(env);
+    if (cached === undefined || cached.expiresAt <= now) {
+        const snapshot = await firebaseApp_1.db.doc(`envs/${env}/specs/_index`).get();
+        if (!snapshot.exists) {
+            throw new Error(`published content index is missing for env ${env}`);
+        }
+        else {
+            const data = snapshot.data() ?? {};
+            const major = Number(data.major);
+            const minor = Number(data.minor);
+            if (!SUPPORTED_CONTENT_MAJORS.has(major) || !Number.isInteger(minor) || minor < 0) {
+                throw new Error(`published content ${major}.${minor} is incompatible`);
+            }
+            const rawTables = data.tables;
+            if (rawTables == null || typeof rawTables !== "object") {
+                throw new Error("published content index has no tables map");
+            }
+            const tables = {};
+            for (const [name, raw] of Object.entries(rawTables)) {
+                if (raw == null || typeof raw !== "object") {
+                    throw new Error(`published content index entry ${name} is invalid`);
+                }
+                const entry = raw;
+                const blobPath = String(entry.blobPath ?? "");
+                const payloadHash = String(entry.payloadHash ?? "");
+                if (blobPath === "" || payloadHash === "") {
+                    throw new Error(`published content index entry ${name} has no blobPath or payloadHash`);
+                }
+                tables[name] = { blobPath, payloadHash };
+            }
+            cached = { expiresAt: now + INDEX_CACHE_TTL_MS, tables };
+        }
+        indexCache.set(env, cached);
+    }
+    const published = cached.tables[table];
+    if (published === undefined)
+        throw new Error(`published content index has no ${table} entry`);
+    return published;
+}
 /**
  * 블롭 payload 해시. 업로더 `HashOf` 와 같은 규칙 — MD5 앞 8바이트를 hex 로.
  * @param {string} payload 블롭의 payload 필드
@@ -115,74 +167,62 @@ function parseSpecPayload(payload) {
     return rows;
 }
 /**
- * 블롭에서 표를 읽는다. 블롭이 없거나 무결성이 어긋나면 null 을 돌려 폴백을 부른다.
+ * 블롭 문서 하나를 읽어 행으로 편다. 실패는 원인별로 던진다 — 호출부가 한 문장으로 뭉개면
+ * callable 에러만 보고는 문서 부재인지 해시 불일치인지 파싱 실패인지 구분할 수 없다.
  * @param {string} env 환경 id
  * @param {string} table 표 이름
- * @return {Promise<SpecRow[] | null>} 행 배열, 못 믿으면 null
+ * @param {string} blobPath 읽을 블롭 문서 경로
+ * @param {string | null} indexHash `_index` 가 선언한 해시. 비인덱스 표는 null 이라 대조를 건너뛴다
+ * @return {Promise<{rows: SpecRow[], payloadHash: string}>} 행 배열과 실제 payload 해시
  */
-async function readFromBlob(env, table) {
-    const snapshot = await firebaseApp_1.db.doc(`envs/${env}/specs/${table}/blob/current`).get();
-    if (!snapshot.exists)
-        return null;
+async function readFromBlob(env, table, blobPath, indexHash) {
+    const snapshot = await firebaseApp_1.db.doc(blobPath).get();
+    if (!snapshot.exists) {
+        throw new Error(`spec blob ${table} document is missing at ${blobPath}`);
+    }
     const data = snapshot.data() ?? {};
-    const schemaVersion = Number(data.schemaVersion);
-    if (schemaVersion !== SCHEMA_VERSION) {
-        logger.warn("spec blob schema mismatch", { env, table, schemaVersion, expected: SCHEMA_VERSION });
-        return null;
+    // major가 없는 기존 blob은 schemaVersion을 호환 필드로 읽는다.
+    const contentMajor = Number(data.major ?? data.schemaVersion);
+    if (!SUPPORTED_CONTENT_MAJORS.has(contentMajor)) {
+        throw new Error(`spec blob ${table} content major ${contentMajor} is not in [${[...SUPPORTED_CONTENT_MAJORS]}]`);
     }
     const payload = data.payload;
     if (typeof payload !== "string" || payload === "") {
-        logger.warn("spec blob payload is missing", { env, table });
-        return null;
+        throw new Error(`spec blob ${table} payload is empty`);
     }
     // 해시·행수 대조는 클라 BattleContentSync 가 하는 검사와 같다. 반쪽 업로드된 표로
     // 보상·덱을 판정하지 않기 위해 서버도 같은 문턱을 넘긴다.
     const expectedHash = String(data.payloadHash ?? "");
     const actualHash = specPayloadHash(payload);
-    if (expectedHash !== actualHash) {
-        logger.warn("spec blob hash mismatch", { env, table, expectedHash, actualHash });
-        return null;
+    if (expectedHash !== actualHash || (indexHash !== null && indexHash !== actualHash)) {
+        throw new Error(`spec blob ${table} hash mismatch (doc=${expectedHash} actual=${actualHash} index=${indexHash ?? "-"})`);
     }
     let rows;
     try {
         rows = parseSpecPayload(payload);
     }
     catch (error) {
-        logger.warn("spec blob payload is unreadable", { env, table, error });
-        return null;
+        throw new Error(`spec blob ${table} payload is unreadable: ${String(error)}`);
     }
     const rowCount = Number(data.rowCount);
     if (Number.isInteger(rowCount) && rowCount !== rows.length) {
-        logger.warn("spec blob row count mismatch", { env, table, rowCount, parsed: rows.length });
-        return null;
+        throw new Error(`spec blob ${table} row count mismatch (meta=${rowCount} parsed=${rows.length})`);
     }
-    return rows;
+    return { rows, payloadHash: actualHash };
 }
 /**
- * 미러(`rows/`)에서 표를 읽는다. 미러가 이번 revision 을 따라오지 못했으면(업로더가 미러를 끄고 올렸다)
- * 읽지 않고 던진다 — 낡은 마스터로 판정하느니 그 callable 이 실패하는 편이 낫다.
- * @param {string} env 환경 id
- * @param {string} table 표 이름
- * @return {Promise<SpecRow[]>} 행 배열
+ * id 오름차순으로 세운다. id 를 못 읽는 행은 버린다 — 정렬 비교자가 NaN 을 뱉으면 순서가
+ * 미정의가 되어 클라와 다른 카드가 뽑힌다.
+ * @param {SpecRow[]} raw 파싱된 행
+ * @return {SpecRow[]} id 오름차순 행
  */
-async function readFromRowsMirror(env, table) {
-    // 미러 신선도는 메타에만 있다. 폴백은 드문 경로라 여기서 1건 더 읽는 값을 치를 만하다.
-    const meta = await firebaseApp_1.db.doc(`envs/${env}/specs/${table}`).get();
-    const revision = Number(meta.data()?.revision ?? -1);
-    // rowsRevision 이 없는 문서는 미러를 끌 수 없던 옛 업로더가 쓴 것이다 — 그때는 행 전량이 같은
-    // commit 에 실렸으므로 미러가 최신이다. 없다고 막으면 옛 표가 전부 폴백 불가가 된다.
-    const rowsRevision = Number(meta.data()?.rowsRevision ?? revision);
-    if (!meta.exists || revision !== rowsRevision) {
-        logger.error("spec rows mirror is stale", { env, table, revision, rowsRevision });
-        throw new Error(`spec table ${table} has no usable blob and its rows mirror is stale ` +
-            `(revision=${revision}, rowsRevision=${rowsRevision}). Re-upload the table.`);
-    }
-    const snapshot = await firebaseApp_1.db.collection(`envs/${env}/specs/${table}/rows`).get();
-    return snapshot.docs.map((document) => document.data());
+function sortById(raw) {
+    return raw
+        .filter((row) => Number.isInteger(Number(row.id)))
+        .sort((a, b) => Number(a.id) - Number(b.id));
 }
 /**
- * 표 하나를 통째로 읽는다(블롭 우선 · 캐시 경유). 행은 id 오름차순이고, id 를 못 읽는 행은 버린다
- * — 정렬 비교자가 NaN 을 뱉으면 순서가 미정의가 되어 클라와 다른 카드가 뽑힌다.
+ * 표 하나를 블롭에서 읽고 캐시한다. 인덱스 표는 payloadHash 로, 비인덱스 표는 짧은 TTL 로 판정한다.
  * @param {string} env 환경 id
  * @param {string} table 표 이름
  * @return {Promise<SpecRow[]>} id 오름차순 행
@@ -190,25 +230,32 @@ async function readFromRowsMirror(env, table) {
 async function readSpecRows(env, table) {
     const key = `${env}/${table}`;
     const cached = cache.get(key);
-    const now = Date.now();
-    if (cached !== undefined && cached.expiresAt > now)
-        return cached.rows;
-    let source = "blob";
-    let raw = await readFromBlob(env, table);
-    if (raw == null) {
-        // 폴백은 행 수만큼 과금된다. 로그의 source=rows 가 남아 있으면 그 표를 다시 올려야 한다.
-        source = "rows";
-        raw = await readFromRowsMirror(env, table);
+    if (UNINDEXED_TABLES.has(table)) {
+        const now = Date.now();
+        if (cached !== undefined && cached.expiresAt !== null && cached.expiresAt > now)
+            return cached.rows;
+        const blobPath = `envs/${env}/specs/${table}/blob/current`;
+        const read = await readFromBlob(env, table, blobPath, null);
+        const rows = sortById(read.rows);
+        cache.set(key, { payloadHash: read.payloadHash, rows, expiresAt: now + UNINDEXED_CACHE_TTL_MS });
+        logger.info("spec table loaded", { env, table, source: "unindexed-blob", rowCount: rows.length });
+        return rows;
     }
-    const rows = raw
-        .filter((row) => Number.isInteger(Number(row.id)))
-        .sort((a, b) => Number(a.id) - Number(b.id));
-    cache.set(key, { rows, expiresAt: now + CACHE_TTL_MS });
-    logger.info("spec table loaded", { env, table, source, rowCount: rows.length });
+    const published = await readPublishedSpec(env, table);
+    // 릴리스 블롭은 불변이라 해시가 같으면 내용도 같다 — 시간 만료가 필요 없다.
+    if (cached !== undefined && cached.expiresAt === null &&
+        cached.payloadHash === published.payloadHash) {
+        return cached.rows;
+    }
+    const read = await readFromBlob(env, table, published.blobPath, published.payloadHash);
+    const rows = sortById(read.rows);
+    cache.set(key, { payloadHash: read.payloadHash, rows, expiresAt: null });
+    logger.info("spec table loaded", { env, table, source: "published-blob", rowCount: rows.length });
     return rows;
 }
 /** 캐시를 비운다. 배포 직후 반영을 앞당기거나 테스트에서 격리할 때 쓴다. */
 function clearSpecCache() {
     cache.clear();
+    indexCache.clear();
 }
 //# sourceMappingURL=specBlobReader.js.map

@@ -49,6 +49,7 @@ public partial class ReleaseManagerWindow : EditorWindow
         this.selectedTab = (Tab)Mathf.Clamp(EditorPrefs.GetInt(PREF_TAB, 0), 0, 1);
         Revalidate();
         EnableDataTab();
+        EnableVersionManagement();
     }
 
     void OnDisable()
@@ -68,7 +69,7 @@ public partial class ReleaseManagerWindow : EditorWindow
 
         this.selectedTab = (Tab)GUILayout.Toolbar(
             (int)this.selectedTab,
-            new[] { "릴리즈", "데이터 · Firestore" },
+            new[] { "릴리즈", "데이터" },
             GUILayout.Height(26));
 
         if (this.selectedTab == Tab.Data)
@@ -79,6 +80,7 @@ public partial class ReleaseManagerWindow : EditorWindow
 
         this.scroll = EditorGUILayout.BeginScrollView(this.scroll);
         DrawModeSection();
+        DrawVersionManagementSection();
         DrawValidationSection();
         DrawBuildSection();
         DrawReport();

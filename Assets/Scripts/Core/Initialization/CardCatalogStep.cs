@@ -6,7 +6,7 @@ using UnityEngine;
 // 여기까지 성공해야 이 사본이 초기화를 선점한 것으로 본다(실패하면 루트가 걷히고 다른 사본이 다시 든다).
 public sealed class CardCatalogStep : MainInitializer
 {
-    // 카드 목록은 SpecData가 단일 진실원이며 CardCatalog가 부팅 시 구성한다. 시너지 표만 저작물로 받는다.
+    // 카드 목록은 SpecData가 단일 진실원이며 CardCatalog가 초기화 시 구성한다. 시너지 표만 저작물로 받는다.
     [SerializeField] SynergyRegistry synergyRegistry;
 
     public override UniTask Initialize(InitializationContext _context)

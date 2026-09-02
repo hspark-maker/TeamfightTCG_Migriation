@@ -43,7 +43,7 @@ public class GameResultPopup : MonoBehaviour
     [Tooltip("랭크 줄 묶음(라벨+아이콘+수치)의 루트. 배선하면 가감이 0인 전투(튜토리얼)에서 줄째로 감춘다. 미배선이면 0이 그대로 보인다.")]
     [SerializeField] GameObject rankLine;         // 랭크 줄 전체(옵션)
 
-    [Tooltip("골드 줄 묶음(라벨+아이콘+수치)의 루트. 배선하면 전투 보상이 없는 전투(토너먼트)에서 줄째로 감춘다. 미배선이면 0이 그대로 보인다.\n" +
+    [Tooltip("골드 줄 묶음(라벨+아이콘+수치)의 루트. 배선하면 전투 보상이 없는 전투(모험)에서 줄째로 감춘다. 미배선이면 0이 그대로 보인다.\n" +
              "일반 전투는 패배도 loseGold가 있어 이 줄이 사라지지 않는다.")]
     [SerializeField] GameObject goldLine;         // 골드 줄 전체(옵션)
 
@@ -296,7 +296,7 @@ public class GameResultPopup : MonoBehaviour
         // 랭크를 정산하지 않는 전투(튜토리얼)에서는 "0"이 아니라 줄 자체가 없어야 한다.
         if (this.rankLine != null) this.rankLine.SetActive(_rankDelta != 0);
 
-        // 전투 보상이 없는 전투(토너먼트)도 같은 규칙이다 — 상은 맵에서 따로 받는다.
+        // 전투 보상이 없는 전투(모험)도 같은 규칙이다 — 상은 맵에서 따로 받는다.
         if (this.goldLine != null) this.goldLine.SetActive(_gold != 0);
 
         // 생존 수를 모르는 경로(폴백)에서는 없는 값을 지어내지 않고 줄째로 감춘다.

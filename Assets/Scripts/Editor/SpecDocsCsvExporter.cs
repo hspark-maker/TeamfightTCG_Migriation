@@ -19,9 +19,10 @@ public static class SpecDocsCsvExporter
 {
     const string AUTO_PREF = "SpecDocsCsvExporter.Auto";
     const string PENDING_KEY = "SpecDocsCsvExporter.Pending";
-    const string AUTO_MENU = "CookApps/SpecData 적용 시 docs CSV 자동 갱신";
-    const string EXPORT_MENU = "CookApps/SpecData docs CSV 갱신";
-    const string FORCE_MENU = "CookApps/SpecData docs CSV 갱신(행 삭제 허용)";
+    // 진입점은 릴리즈 관리 창(데이터 탭)의 'SpecData ↔ docs CSV' 하나다.
+    // 예전엔 CookApps 메뉴에 이름만 던져 놨는데, 무엇을 어느 방향으로 덮는지가 이름에 안 드러나
+    // 아무도 못 쓰는 메뉴가 됐다. 설명을 붙일 수 있는 창으로 옮겼다.
+    const string FORCE_LABEL = "행 삭제 허용";
     public const string SPEC_BYTES_PATH = "Assets/Resources/SpecData.bytes";
     const string FILE_SUFFIX = "_sheet.csv";
     const int HEADER_SEARCH_LIMIT = 8;
@@ -42,13 +43,8 @@ public static class SpecDocsCsvExporter
         }
     }
 
-    [MenuItem(EXPORT_MENU)]
-    static void ExportFromMenu() => RunFromMenu(false);
-
-    [MenuItem(FORCE_MENU)]
-    static void ForceExportFromMenu() => RunFromMenu(true);
-
-    static void RunFromMenu(bool _allowRowDeletion)
+    /// <summary>사람이 눌러서 도는 내보내기(확인 대화 포함). 릴리즈 관리 창이 유일한 호출부다.</summary>
+    public static void RunExportInteractive(bool _allowRowDeletion)
     {
         // 손으로 부를 때는 로컬 SpecData가 시트보다 낡았을 수 있다. 그대로 쓰면 문서가 과거로 돌아간다.
         bool t_confirmed = EditorUtility.DisplayDialog(
@@ -65,16 +61,6 @@ public static class SpecDocsCsvExporter
         }
 
         Debug.Log($"[SpecDocsCsv] {t_summary}");
-    }
-
-    [MenuItem(AUTO_MENU)]
-    static void ToggleAuto() => AutoExport = !AutoExport;
-
-    [MenuItem(AUTO_MENU, true)]
-    static bool ToggleAutoValidate()
-    {
-        Menu.SetChecked(AUTO_MENU, AutoExport);
-        return true;
     }
 
     /// <summary>시트 적용 직후에는 코드 생성·컴파일이 걸려 있어 바로 못 읽는다. 한 박자 뒤로 미룬다.</summary>
@@ -147,7 +133,7 @@ public static class SpecDocsCsvExporter
                 t_skipped++;
                 Debug.LogWarning(
                     $"[SpecDocsCsv] '{t_table.Name}' 건너뜀 — 기존 CSV에만 있는 id {t_droppedIds.Count}개가 지워진다" +
-                    $"({string.Join(", ", t_droppedIds)}). 시트를 다시 받거나 '{FORCE_MENU}'로 강행할 것.");
+                    $"({string.Join(", ", t_droppedIds)}). 시트를 다시 받거나 '{FORCE_LABEL}'로 강행할 것.");
                 continue;
             }
 

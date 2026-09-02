@@ -31,6 +31,10 @@ using UnityEngine.UI;
 // 이 모드에서 딤을 끄면 판은 투명해지되 **입력은 계속 막는다** — 완료가 그 탭이기 때문이다(SetBlocker 참조).
 // 뒤 화면이 스스로 할 말을 다 하고 있어 문구 한 줄만 얹으면 되는 자리에 쓴다(강화 결과판 등).
 //
+// 클릭 스텝의 손가락은 탭 안무를 반복하고, 손끝이 닿는 박마다 접촉 이펙트를 한 발 터뜨린다(StartHandTap 참조).
+// 그 이펙트는 전역 오버레이가 아니라 프리팹 안 Hand의 자식(tapFx)이다 — 손을 따라다니므로 좌표를 계산할 일이 없고,
+// HandIcon보다 앞 형제라 손 그림 아래에 깔린다.
+//
 // 룩은 프리팹(OutgameTutorialGate.prefab)에서 저작한다. 미배선이면 딤+문구만 코드로 그리는 폴백으로 떨어진다
 // — 손가락 스프라이트가 Resources 밖에 있어 코드 경로에서는 얻을 방법이 없다.
 public class OutgameTutorialGateUI : MonoBehaviour
@@ -50,6 +54,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     [Header("표시 요소 (blocker 미배선 = 코드 폴백)")]
     [SerializeField] Image           blocker;       // 전체화면 딤 겸 입력 흡수막
     [SerializeField] RectTransform   hand;          // 손가락 포인터(옵션)
+    [SerializeField] TouchEffectItem tapFx;         // 손끝에서 터지는 접촉 이펙트. Hand 자식이라 좌표를 따로 옮기지 않는다(옵션)
     [SerializeField] RectTransform   messageRect;   // 안내 문구 프레임
     [SerializeField] TextMeshProUGUI messageText;
 
@@ -66,9 +71,32 @@ public class OutgameTutorialGateUI : MonoBehaviour
              "이 캔버스는 안전영역을 따르지 않으므로 홈 인디케이터에 물리지 않을 만큼은 띄운다")]
     [SerializeField] float messageBottomInset = 120f;
 
-    [Header("포인터 연출")]
-    [SerializeField] float pulseScale    = 1.08f;
-    [SerializeField] float pulseDuration = 0.6f;
+    [Header("포인터 탭 안무 (들기 → 찍기 → 눌림 → 쉼)")]
+    [Tooltip("손을 들었을 때의 배율. 1.0 이 화면에 닿은 자세이므로, 이 값이 클수록 크게 들었다 내려찍는다")]
+    [SerializeField] float tapLiftScale = 1.18f;
+
+    [Tooltip("손을 드는 데 걸리는 시간(초). 내려찍는 시간보다 뚜렷하게 길어야 탭 동작으로 읽힌다 — " +
+             "둘이 비슷해지면 그냥 숨쉬는 것처럼 보인다")]
+    [SerializeField] float tapLiftDuration = 0.34f;
+
+    [Tooltip("내려찍는 데 걸리는 시간(초). 이 구간이 끝나는 박이 곧 접촉이고, 그 자리에서 손끝 이펙트가 터진다")]
+    [SerializeField] float tapPressDuration = 0.12f;
+
+    [Tooltip("닿은 순간 손이 눌리는 배율(1.0 미만)")]
+    [SerializeField] float tapSquashScale = 0.955f;
+
+    [Tooltip("눌리는 데 걸리는 시간(초). 너무 짧으면 30fps 기기에서 한 프레임에 스쳐 사라진다")]
+    [SerializeField] float tapSquashDuration = 0.07f;
+
+    [Tooltip("눌린 자세로 머무는 시간(초). 이 머무름은 눌린 배율에서 잡는다 — " +
+             "1.0 에서 머물면 뒤따르는 쉼과 그림이 같아 두 구간이 한 덩어리로 보인다")]
+    [SerializeField] float tapHoldDuration = 0.06f;
+
+    [Tooltip("눌림이 풀리는 데 걸리는 시간(초)")]
+    [SerializeField] float tapRecoverDuration = 0.12f;
+
+    [Tooltip("다음 탭까지 쉬는 시간(초). 0 이면 쉬는 박이 없어 연타처럼 보인다")]
+    [SerializeField] float tapRestDuration = 0.32f;
 
     RectTransform m_canvasRect;
     Canvas        m_gateCanvas;   // 중첩 Canvas가 리셋하는 정렬 레이어·셰이더 채널을 복사해 올 원본
@@ -321,7 +349,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     void OnDestroy()
     {
         Release();      // 승격·리스너가 남으면 다음 스텝에서 오발화하거나 버튼이 영구히 떠 있는다
-        StopPulse();
+        StopHandTap();
         if (Instance == this) Instance = null;
     }
 
@@ -629,8 +657,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         if (this.hand != null && this.hand.gameObject.activeSelf != t_hand) this.hand.gameObject.SetActive(t_hand);
 
-        if (t_hand) StartPulse();
-        else        StopPulse();
+        if (t_hand) StartHandTap();
+        else        StopHandTap();
     }
 
     // 문구는 항상 홈(중앙, 저작이 하단이면 하단)에서 출발한다. 타깃을 피해 물러나는 판단은 Layout(PlaceMessage)
@@ -650,54 +678,56 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
     // localScale만 건드린다 — sizeDelta·anchoredPosition은 Layout이 매 프레임 덮어써 트윈이 조용히 사라진다.
     //
-    // 안무는 1.0 ↔ pulseScale을 오가는 숨쉬기다. Yoyo 한 줄 대신 스트로크를 둘로 펴 둔 이유는
-    // 손끝이 제자리로 돌아온 박에 콜백을 걸 자리가 필요해서지, 움직임을 바꾸려는 것이 아니다 —
-    // InOutSine이 ease(1-t) = 1-ease(t)를 만족하는 대칭 이징이라 Yoyo 역주행과 결과가 정확히 같다.
-    // 되돌아오는 쪽 이징을 비대칭(InQuad 등)으로 바꾸면 그 등가가 깨져 안무 자체가 달라진다.
-    void StartPulse()
+    // 안무는 한 번의 탭이다: 천천히 들었다가(lift) 빠르게 내려찍고(press), 닿은 자세로 눌렸다 풀린 뒤
+    // (squash·hold·recover) 다음 탭까지 쉰다(rest). 드는 시간이 찍는 시간보다 뚜렷하게 길다는 것이
+    // 이 안무의 전부다 — 두 시간이 비슷해지면 탭이 아니라 숨쉬기로 읽힌다.
+    // 접촉은 press가 끝나는 박 하나뿐이고, 손끝 이펙트도 정확히 그 자리에서 터진다.
+    //
+    // Hand의 원점이 곧 손끝이라(HandIcon 저작 규약) 어떤 배율에서도 가리키는 지점은 흔들리지 않는다.
+    //
+    // 시작 배율을 매번 못박는 이유: DOTween은 중첩 트윈의 시작값을 첫 재생 때 캐시해 루프마다 재사용하므로,
+    // 시퀀스를 만드는 순간의 배율이 모든 사이클의 시작값으로 굳는다. 밖에서 트윈이 죽어(DOTween.KillAll)
+    // 손이 들린 배율에 얼어붙은 채 다시 시작하면 진폭 0짜리 죽은 손이 된다.
+    void StartHandTap()
     {
-        if (this.pulseDuration <= 0f) return;
+        float t_cycle = this.tapLiftDuration + this.tapPressDuration + this.tapSquashDuration
+                      + this.tapHoldDuration + this.tapRecoverDuration + this.tapRestDuration;
+        if (t_cycle <= 0f) return;   // 길이 0짜리 무한 루프는 프레임을 잠근다
 
         // 숨겨 둔 손가락(메시지 모드)까지 돌릴 이유가 없다 — SetPointerActive가 먼저 활성 여부를 확정한다.
-        if (this.hand == null || !this.hand.gameObject.activeSelf || m_handTween != null) return;
+        if (this.hand == null || !this.hand.gameObject.activeSelf) return;
+
+        // IsActive까지 묻는다: 밖에서 죽은 트윈은 필드에 non-null로 남아, null 검사만으로는 영영 다시 서지 않는다.
+        if (m_handTween != null && m_handTween.IsActive()) return;
+
+        if (this.tapFx != null) this.tapFx.gameObject.SetActive(false);   // 지난 발의 잔상을 안고 켜지지 않게
+
+        this.hand.localScale = Vector3.one;
 
         m_handTween = DOTween.Sequence()
-            .Append(this.hand.DOScale(this.pulseScale, this.pulseDuration).SetEase(Ease.InOutSine))
-            .Append(this.hand.DOScale(1f, this.pulseDuration).SetEase(Ease.InOutSine))
+            .Append(this.hand.DOScale(this.tapLiftScale,   this.tapLiftDuration).SetEase(Ease.OutQuad))
+            .Append(this.hand.DOScale(1f,                  this.tapPressDuration).SetEase(Ease.InQuad))
             .AppendCallback(EmitHandTouchFx)
+            .Append(this.hand.DOScale(this.tapSquashScale, this.tapSquashDuration).SetEase(Ease.OutQuad))
+            .AppendInterval(this.tapHoldDuration)
+            .Append(this.hand.DOScale(1f,                  this.tapRecoverDuration).SetEase(Ease.OutQuad))
+            .AppendInterval(this.tapRestDuration)
             .SetLoops(-1)
             .SetLink(this.hand.gameObject);
     }
 
-    // 손끝이 화면에 닿는 박에 전역 터치 이펙트를 한 발 얹어 "여기를 누르라"를 눈으로 보여 준다.
-    // 첫 박을 StartPulse 시점으로 당기지 않는 이유: 트윈 콜백은 Update, Layout은 LateUpdate라
-    // 게이트를 막 연 프레임에는 손이 아직 이전 스텝 자리(또는 프리팹 원점)에 있다.
+    // 손끝이 화면에 닿는 박에 이펙트를 한 발 터뜨려 "여기를 누르라"를 눈으로 보여 준다.
+    // Hand의 자식이라 로컬 원점이 곧 손끝이고, 그래서 좌표를 계산해 넘길 것이 없다.
+    // 미배선이면 조용히 넘어간다 — 이 이펙트는 장식이지 진행 조건이 아니다.
     void EmitHandTouchFx()
     {
-        if (!TryGetHandScreenPos(out Vector2 t_screen)) return;
+        if (this.tapFx == null) return;
 
-        TouchEffectOverlay.PlayAt(t_screen);
-    }
-
-    // Hand는 손끝을 원점에 맞춰 저작한 빈 기준점이라 그 월드 좌표가 곧 손끝이다(펄스 스케일은 피벗 기준이라 무관).
-    // 캔버스를 hand에서 거슬러 찾으면 안 된다 — LiftOrnaments가 손가락에 승격용 중첩 Canvas를 붙여 둬서
-    // 그쪽이 잡힌다. 렌더 모드를 묻는 주인은 언제나 게이트 루트 캔버스다.
-    bool TryGetHandScreenPos(out Vector2 _screen)
-    {
-        _screen = default;
-
-        if (this.hand == null || !this.hand.gameObject.activeInHierarchy) return false;
-
-        Camera t_camera = (m_gateCanvas != null && m_gateCanvas.renderMode != RenderMode.ScreenSpaceOverlay)
-            ? m_gateCanvas.worldCamera
-            : null;
-
-        _screen = RectTransformUtility.WorldToScreenPoint(t_camera, this.hand.position);
-        return true;
+        this.tapFx.Play(Vector2.zero);
     }
 
     // SetLink는 파괴에만 반응하고 비활성화에는 반응하지 않는다 → 숨길 때 직접 죽이고 스케일을 되돌린다.
-    void StopPulse()
+    void StopHandTap()
     {
         if (m_handTween != null)
         {

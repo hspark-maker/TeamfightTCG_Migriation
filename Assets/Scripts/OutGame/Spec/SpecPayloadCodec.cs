@@ -16,7 +16,8 @@ public sealed class SpecTablePayload
 
 public static class SpecPayloadCodec
 {
-    public const int SchemaVersion = 4;
+    // 기존 메타·구클라이언트와의 호환 alias. 값의 의미는 앱 콘텐츠 호환 세대다.
+    public const int SchemaVersion = ContentVersion.Major;
     public static readonly string[] TableNames =
     {
         "Card", "Card_Test", "CardPack", "CardPackDrop", "AIDeck", "Reward",

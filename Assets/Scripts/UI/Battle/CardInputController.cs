@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
@@ -430,9 +430,6 @@ public class CardInputController
             this.dragState = DragState.AttackDrag;
             BeginTargeting();
             var t_validTargets = GetValidEnemyViews(this.owner);
-            foreach (var t_cv in t_validTargets)
-                if (BattleRules.IsTaunt(t_cv.BoundCard))
-                    t_cv.PlayKeywordGlow(CardKeyword.Taunt).Forget();
             ApplyDragTargetFade(t_validTargets);
             this.owner.MoveTo(this.centerPos).Forget();
             this.swipeGuide?.SetVisible(true);
@@ -701,10 +698,7 @@ public class CardInputController
         BattleBoardView.FadeCards(1f, t_targets.ToArray());
         foreach (var t_cv in t_targets)
             if (BattleRules.IsTaunt(t_cv.BoundCard))
-            {
-                t_cv.PlayKeywordGlow(CardKeyword.Taunt).Forget();
                 PlayTauntGuardVfx(t_cv);
-            }
 
         // 유효 타겟 각각에 공격 HP 프리뷰 표시(맞으면 남는 체력/치사 점멸).
         foreach (var t_cv in t_targets)

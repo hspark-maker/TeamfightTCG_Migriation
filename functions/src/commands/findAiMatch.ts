@@ -25,6 +25,7 @@ type AuthoredFindAiMatchData = {
   contentFingerprint: string;
   playerDeck: number[];
   txId: string;
+  resultProtocol: 0 | 1;
 };
 
 type FindAiMatchData = LegacyFindAiMatchData | AuthoredFindAiMatchData;
@@ -59,6 +60,7 @@ function parseData(raw: unknown): FindAiMatchData {
     // 정상 클라는 ServerSaveCommands가 같은 재시도에 같은 유효 txId를 싣는다. fallback UUID는
     // txId가 없는 수동 호출용일 뿐이며 clientReceiptId는 유효한 원본을 그대로 반환한다.
     txId: clientReceiptId(data?.txId, randomUUID()),
+    resultProtocol: data?.resultProtocol === 1 ? 1 : 0,
   };
 }
 
@@ -104,6 +106,7 @@ function storedResponse(raw: Record<string, unknown>, data: AuthoredFindAiMatchD
     cardLevel: aiDeck.cardLevel,
     playerBoardOrder,
     enemyBoardOrder,
+    resultProtocol: raw.resultProtocol === 1 ? 1 : 0,
   };
 }
 
@@ -172,6 +175,7 @@ export const findAiMatch = onCall(async (request) => {
         participantUids: [uid],
         expectedParticipants: 1,
         mode: "solo",
+        resultProtocol: authoredData.resultProtocol,
         ownerIndexByUid: {[uid]: 0},
         playerDeckCardIds: [...authoredData.playerDeck].sort((a, b) => a - b),
         aiDeck: {
@@ -197,6 +201,7 @@ export const findAiMatch = onCall(async (request) => {
         cardLevel: draw.cardLevel,
         playerBoardOrder,
         enemyBoardOrder,
+        resultProtocol: authoredData.resultProtocol,
       };
     });
     logger.info("AI match created", {

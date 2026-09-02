@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 
 /// <summary>전투 결과의 1회 확정, 보상·랭크 적용, 서버 증거 제출을 소유한다.</summary>
@@ -45,12 +45,15 @@ public sealed class BattleOutcome
         }
 
         long t_rankPointsBefore = RankManager.Points;
-        bool t_serverPayout = DeckConfig.IsMultiplayer;
+        bool t_serverPayout = DeckConfig.IsMultiplayer || SoloMatchHandoff.UsesResultSubmission;
         // 결과 팝업이 읽을 예상액이다 — 싱글·멀티 모두 확정 액수의 진실원은 서버 쪽이다.
         Reward = RewardService.CalculateReward(_won, t_remaining);
 
-        // 싱글 지급은 여기서 띄우기만 한다(기다리지 않는다) — 캐리어는 응답이 도착한 시점에 지급 경로가 세운다.
-        if (!t_serverPayout) RewardService.GrantBattleRewardAsync(_won, t_remaining);
+        // 구 결과 프로토콜의 싱글 지급만 여기서 띄운다. 새 싱글과 멀티는 submitMatchResult payout을 함께 쓴다.
+        // matchId는 **지금** 읽는다. 지급은 씬 밖에서 이어지는데 TurnRunner.Cleanup이 캐리어를 비우므로,
+        // 비동기 안에서 읽으면 이미 지워진 뒤일 수 있다.
+        if (!t_serverPayout)
+            RewardService.GrantBattleRewardAsync(_won, t_remaining, SoloMatchHandoff.MatchId);
 
         if (t_draw)
         {
@@ -81,7 +84,8 @@ public sealed class BattleOutcome
 
     void SubmitMatchEvidence(bool _won, int _remaining, long _rankPointsBefore, EMatchEndReason _reason)
     {
-        if (!DeckConfig.IsMultiplayer || _reason == EMatchEndReason.DebugForceWin || DeckConfig.AiTakeover)
+        if ((!DeckConfig.IsMultiplayer && !SoloMatchHandoff.UsesResultSubmission) ||
+            _reason == EMatchEndReason.DebugForceWin || DeckConfig.AiTakeover)
             return;
 
         int t_opponentRemaining = rules.enemyField.GetActiveCards().Count + rules.enemyField.WaitingCount;

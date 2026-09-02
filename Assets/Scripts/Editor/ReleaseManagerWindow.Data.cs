@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -9,12 +9,15 @@ public partial class ReleaseManagerWindow
 {
     const string DATA_SELECTION_PREF_KEY = "SpecFirestore.Selected";
     const string DATA_SELECTION_INITIALIZED_PREF_KEY = "SpecFirestore.Selected.Initialized";
+    const string DATA_PUBLISH_PREF_KEY = "SpecFirestore.PublishIndex";
 
     EContentRunMode dataUploadMode;
     List<string> dataTables;
     HashSet<string> dataSelected = new();
     string dataLoadError;
     string dataReport;
+    // 업로드가 끝나면 새 콘텐츠 버전을 공개할지. 끄면 표 문서만 올라가고 _index 포인터는 그대로다.
+    bool dataPublishIndex = true;
     Vector2 dataScroll;
     bool dataRulesOpen;
     bool dataRulesKnown;
@@ -23,6 +26,7 @@ public partial class ReleaseManagerWindow
     string adminAuthError;
     bool adminOAuthOpen;
     bool adminPasswordOpen;
+    bool specCsvOpen;
 
     void EnableDataTab()
     {
@@ -40,6 +44,8 @@ public partial class ReleaseManagerWindow
     void DrawDataTab()
     {
         this.dataScroll = EditorGUILayout.BeginScrollView(this.dataScroll);
+
+        DrawSpecCsvSection();
 
         Header("Firestore 데이터 관리");
         DrawRulesState();
@@ -71,14 +77,36 @@ public partial class ReleaseManagerWindow
         EditorGUILayout.Space();
         DrawDataTableSelection();
 
+        EditorGUILayout.Space(6);
+        bool t_publish = EditorGUILayout.ToggleLeft(
+            "업로드 후 테이블 버전을 올린다 (_index 공개)", this.dataPublishIndex);
+        if (t_publish != this.dataPublishIndex)
+        {
+            this.dataPublishIndex = t_publish;
+            EditorPrefs.SetBool(DATA_PUBLISH_PREF_KEY, t_publish);
+        }
+        if (!this.dataPublishIndex)
+            EditorGUILayout.HelpBox(
+                "버전을 올리지 않으면 표 문서(blob/current · rows/ · 메타)만 최신이 되고 _index는 옛 버전을 가리킨 채 남는다." +
+                "\n그 사이 클라이언트는 옛 콘텐츠를 보지만 서버의 rows 폴백 경로는 새 데이터를 볼 수 있어 판정이 갈릴 수 있다." +
+                "\n확인이 끝나면 이 체크를 켜고 다시 실행해 공개하라 — 해시가 같은 표는 건너뛴다.",
+                MessageType.Warning);
+        else
+            EditorGUILayout.HelpBox(
+                "세대 체크: 새 카드 ID · 새 키워드 · 새 시너지 · 새 랭크 등급을 추가했다면 " +
+                "ContentVersion.MinAppMajor를 올리고 그 세대를 지원하는 앱 빌드를 먼저 배포해야 한다. " +
+                "누락하면 구 앱이 새 행을 해석하지 못해 초기화에 실패할 수 있다.",
+                MessageType.Info);
+
         string t_blocker = DataUploadBlocker(t_hasEnv, t_envError);
         if (!string.IsNullOrEmpty(t_blocker))
             EditorGUILayout.HelpBox(t_blocker, MessageType.Error);
 
         using (new EditorGUI.DisabledScope(t_blocker != null))
         {
-            if (GUILayout.Button($"{t_envId} 환경으로 업로드 ({this.dataSelected.Count}개)", GUILayout.Height(32)))
-                RunDataUpload(t_envId, t_modeMismatch);
+            string t_verb = this.dataPublishIndex ? "업로드 + 공개" : "업로드만";
+            if (GUILayout.Button($"{t_envId} 환경으로 {t_verb} ({this.dataSelected.Count}개)", GUILayout.Height(32)))
+                RunDataUpload(t_envId, t_modeMismatch, this.dataPublishIndex);
         }
 
         EditorGUILayout.Space(10);
@@ -101,7 +129,7 @@ public partial class ReleaseManagerWindow
         EditorGUILayout.HelpBox(
             $"{SpecFirestoreUploader.TOURNAMENT_CHAPTER_TABLE}(챕터·정점)를 TournamentConfig 저작에서 만들어 올린다. " +
             "서버가 챕터 완주를 판정할 근거 표다. " +
-            "위 검증 게이트는 콘텐츠 프로필·카드 표만 보므로, 토너먼트 저작 결함은 업로드 시점에 따로 검사해 중단하거나 경고한다. " +
+            "위 검증 게이트는 콘텐츠 프로필·카드 표만 보므로, 모험 저작 결함은 업로드 시점에 따로 검사해 중단하거나 경고한다. " +
             "도감 구성(AlbumEntry·AlbumThemeInfo)은 스펙시트가 진실원이라 위 표 목록에서 올린다.",
             MessageType.Info);
 
@@ -221,6 +249,68 @@ public partial class ReleaseManagerWindow
         }
     }
 
+    // ── SpecData ↔ docs CSV ────────────────────────────────────────────────
+    // 예전에는 CookApps 메뉴에 항목 4개로 흩어져 있었다. 이름만 봐서는 무엇이 무엇을 덮는지
+    // (bytes → CSV 인지 CSV → bytes 인지) 알 수 없어 아무도 손대지 못했다.
+    // 여기 모아 방향과 위험을 글로 적는다 — 되돌리기 어려운 쪽(CSV → bytes)은 아래에 따로 뺐다.
+
+    void DrawSpecCsvSection()
+    {
+        Header("SpecData ↔ docs CSV");
+
+        EditorGUILayout.HelpBox(
+            "저장소의 docs/SpecData/{표}_sheet.csv 는 '지금 앱에 실린 SpecData'를 사람이 읽을 수 있게 떠 둔 사본이다.\n" +
+            "값의 진실원은 구글 스펙시트 → SpecData.bytes 순서이고, 이 CSV 는 그 결과를 따라 적는 문서다.",
+            MessageType.Info);
+
+        this.specCsvOpen = EditorGUILayout.Foldout(this.specCsvOpen, "내보내기 · 되돌려 넣기", true);
+        if (!this.specCsvOpen) return;
+
+        EditorGUI.indentLevel++;
+
+        // ① 정방향: bytes → CSV. 문서를 최신으로 맞추는 쪽이라 위험이 낮다.
+        EditorGUILayout.LabelField("SpecData → docs CSV (문서 갱신)", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField(
+            "지금 앱에 실린 SpecData 값으로 docs CSV 를 덮어쓴다. 시트를 받은 지 오래됐으면 문서가 과거로 되돌아간다.",
+            EditorStyles.wordWrappedMiniLabel);
+
+        bool t_auto = SpecDocsCsvExporter.AutoExport;
+        bool t_next = EditorGUILayout.ToggleLeft(
+            "시트 적용 직후 자동으로 내보내기", t_auto);
+        if (t_next != t_auto) SpecDocsCsvExporter.AutoExport = t_next;
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button("지금 내보내기", GUILayout.Height(24)))
+                SpecDocsCsvExporter.RunExportInteractive(false);
+
+            // CSV 에서 행이 사라지는 건 표가 줄었다는 뜻이라 기본은 막는다. 시트에서 실제로 지운 경우에만 쓴다.
+            if (GUILayout.Button("내보내기 (행 삭제 허용)", GUILayout.Height(24)))
+                SpecDocsCsvExporter.RunExportInteractive(true);
+        }
+
+        EditorGUILayout.Space(6);
+
+        // ② 역방향: CSV → bytes. 진실원을 우회하므로 경고를 먼저 세운다.
+        EditorGUILayout.LabelField("docs CSV → SpecData (로컬 실험본)", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "시트를 거치지 않고 CSV 를 고쳐 바로 돌려 보고 싶을 때만 쓴다.\n" +
+            "여기서 만든 SpecData.bytes 는 로컬 실험본이라, 시트에 반영하지 않으면 다음 '시트 적용 & CS 생성'에서 사라진다.",
+            MessageType.Warning);
+
+        if (GUILayout.Button("docs CSV 로 SpecData 덮어쓰기", GUILayout.Height(24))
+            && EditorUtility.DisplayDialog(
+                "로컬 실험본 만들기",
+                "docs/SpecData CSV 내용으로 Assets/Resources/SpecData.bytes 를 다시 쓴다.\n" +
+                "진실원(스펙시트)을 우회하는 임시 경로다. 계속할까?",
+                "덮어쓰기", "취소"))
+        {
+            SpecLocalCsvImporter.RunImportInteractive();
+        }
+
+        EditorGUI.indentLevel--;
+    }
+
     void DrawDataTableSelection()
     {
         if (!string.IsNullOrEmpty(this.dataLoadError))
@@ -274,6 +364,7 @@ public partial class ReleaseManagerWindow
         this.dataTables = SpecFirestoreUploader.ListTables(out this.dataLoadError);
         this.dataReport = null;
 
+        this.dataPublishIndex = EditorPrefs.GetBool(DATA_PUBLISH_PREF_KEY, true);
         bool t_initialized = EditorPrefs.GetBool(DATA_SELECTION_INITIALIZED_PREF_KEY, false);
         string t_saved = EditorPrefs.GetString(DATA_SELECTION_PREF_KEY, string.Empty);
         this.dataSelected = new HashSet<string>(t_saved.Split('|'));
@@ -298,6 +389,7 @@ public partial class ReleaseManagerWindow
     string DataUploadBlocker(bool _hasEnv, string _envError)
     {
         if (!_hasEnv) return _envError;
+        if (!ContentVersionConsistency.TryValidate(out string t_versionError)) return t_versionError;
         if (!SpecAdminAuth.IsSignedIn) return "관리자 로그인이 필요하다.";
         if (!SpecAdminAuth.HasAdminClaim) return "로그인한 계정에 admin 클레임이 없어 스펙을 쓸 수 없다.";
         if (!string.IsNullOrEmpty(this.dataLoadError)) return "표 목록을 먼저 정상적으로 읽어야 한다.";
@@ -383,7 +475,7 @@ public partial class ReleaseManagerWindow
         _failed++;
     }
 
-    void RunDataUpload(string _envId, bool _modeMismatch)
+    void RunDataUpload(string _envId, bool _modeMismatch, bool _publish)
     {
         Revalidate();
         string t_blocker = DataUploadBlocker(true, null);
@@ -402,7 +494,12 @@ public partial class ReleaseManagerWindow
         if (!EditorUtility.DisplayDialog(
                 "스펙시트 업로드",
                 $"{FirebaseRootPath.Environment(_envId)}/specs/ 아래 표 {this.dataSelected.Count}개를 배포한다.\n" +
-                "표별 메타·행 갱신·사라진 행 삭제가 각각 하나의 원자 커밋으로 반영된다.",
+                "표별 메타·행 갱신·사라진 행 삭제가 각각 하나의 원자 커밋으로 반영된다." +
+                (_publish
+                    ? "\n\n표가 모두 성공하면 새 테이블 버전을 공개한다(_index 갱신)." +
+                      "\n\n세대 확인: 새 카드 ID · 키워드 · 시너지 · 랭크 등급을 추가했다면 " +
+                      "ContentVersion.MinAppMajor를 올리고 새 앱을 먼저 배포했는지 확인할 것."
+                    : "\n\n버전은 올리지 않는다 — _index는 현재 버전을 계속 가리키고 표 문서만 최신이 된다."),
                 "업로드", "취소"))
             return;
 
@@ -454,6 +551,25 @@ public partial class ReleaseManagerWindow
         finally
         {
             EditorUtility.ClearProgressBar();
+        }
+
+        // 선택한 표 중 하나라도 실패하거나 취소됐으면 새 콘텐츠 minor를 공개하지 않는다.
+        // 표 문서는 먼저 올라가도 구클라이언트의 레거시 경로만 볼 수 있고, 신클라이언트는 기존 _index를 유지한다.
+        if (!_publish && !t_cancelled && t_failed == 0)
+            t_report.AppendLine("SKIP publish: 테이블 버전을 올리지 않는 업로드다 — _index는 그대로다.");
+        if (_publish && !t_cancelled && t_failed == 0)
+        {
+            string t_publishLine = SpecFirestoreUploader.PublishIndex(_envId, out string t_publishError);
+            if (string.IsNullOrEmpty(t_publishError))
+            {
+                t_report.AppendLine($"PUBLISH {t_publishLine}");
+            }
+            else
+            {
+                t_report.AppendLine($"FAIL publish: {t_publishError}");
+                Debug.LogError($"[SpecFirestore] 콘텐츠 인덱스 공개 실패: {t_publishError}");
+                t_failed++;
+            }
         }
 
         string t_cancelNote = t_cancelled ? " / 사용자 취소" : string.Empty;

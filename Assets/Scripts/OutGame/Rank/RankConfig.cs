@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 랭크 등급 테이블 + 승패 포인트 튜닝 파라미터
+// 랭크 UI 스킨 저작본. 런타임 수치·표시명은 RankGradeSpec이 서버 표로 덮어쓴 복제본을 사용한다.
 [CreateAssetMenu(fileName = "RankConfig", menuName = "Card Battle/Rank Config")]
 public class RankConfig : ScriptableObject
 {
@@ -14,7 +14,7 @@ public class RankConfig : ScriptableObject
     /// 별을 세는 자리는 전부 이 값을 봐야 한다.</summary>
     public const int WinsPerDivision = 4;
 
-    // 승리 시 더할 랭크 포인트
+    // 에디터 미리보기용 기본값. 런타임 진실원은 RankGrade.winPoints다.
     [Tooltip("승리 시 더할 랭크 포인트 = 별 한 칸. 전 등급 공용이다. 저작 규칙: 모든 등급의 pointsPerDivision을 " +
              "이 값 x 4(별 칸 수)로 맞춘다 — 어긋나면 1승이 별 한 칸을 정확히 채우지 못하고 칸 경계가 승패와 따로 논다. " +
              "값 자체를 바꿀 일은 거의 없다(화면에 포인트 수치가 없어 크기는 보이지 않는다). 너무 작게 잡지는 말 것 — " +
@@ -22,7 +22,7 @@ public class RankConfig : ScriptableObject
              "승급전(다음 등급 진입선 바로 아래에서 치르는 한 판)에는 이 값이 쓰이지 않는다 — 승급전은 가감이 아니라 스냅이다.")]
     public long winPoints = 10;
 
-    // 패배 시 뺄 랭크 포인트(양수로 입력)
+    // 에디터 미리보기용 기본값. 런타임 진실원은 RankGrade.losePoints다.
     [Tooltip("패배 시 뺄 랭크 포인트 = 별 한 칸. 양수로 입력한다(코드에서 뺀다). 1승 1칸 / 1패 1칸의 대칭이라 winPoints와 같게 둔다. " +
              "그래서 단계 안에서는 승률 50%면 제자리이고, 오르려면 절반보다 더 이겨야 한다. " +
              "다만 포인트 바닥이 현재 단계의 진입 임계치라 한 번 딴 단계는 잃지 않는다(별 줄이 비어도 브론즈 2는 브론즈 2다) — " +
@@ -39,7 +39,7 @@ public class RankConfig : ScriptableObject
     [Tooltip("첫 티어 미도달(언랭크) 상태에서 쓸 배지 스프라이트. 비워두면 첫 등급 배지가 그대로 보여 도달한 것처럼 읽히므로 저작을 권한다.")]
     public Sprite unrankedBadge;
 
-    // 등급 테이블(기본값은 RankConfig.asset과 일치해야 한다)
+    // 배지 스킨과 에디터 미리보기용 기본값. 런타임 수치·표시명은 RankGrade 서버 표에서 조립한다.
     [Tooltip("등급 테이블. entryPoints 오름차순으로 저작한다. 4단계에서 다음 등급 entryPoints를 넘기면 인덱스 연속성으로 다음 등급 1단계가 된다. " +
              "단계 폭이 winPoints x 4로 고정되므로 등급 폭도 그 4배(현재 160)로 균일하다.")]
     public List<RankGradeConfig> grades = new List<RankGradeConfig>

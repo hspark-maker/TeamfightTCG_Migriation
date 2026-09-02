@@ -1,5 +1,5 @@
 /// <summary>
-/// 보상 토너먼트 전투 런타임 단일 진실원. 싱글 경로 전용.
+/// 모험 전투 런타임 단일 진실원. 싱글 경로 전용.
 /// 활성 시: 적 카드 레벨이 랭크가 아니라 정점 저작값으로 고정되고(초기화(InitializationRunner)의 EnemyGrowthProvider),
 /// 전투 결과가 랭크 대신 <c>TournamentResultHandoff</c>로 나간다(BattleOutcome.TryCapture).
 /// 수명 종점은 TurnRunner.Cleanup — 로비에서 진입을 취소한 경로는 씬 전환이 없으므로 진입점이 직접 End한다.

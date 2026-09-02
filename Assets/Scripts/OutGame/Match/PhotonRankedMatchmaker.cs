@@ -26,10 +26,12 @@ public sealed class PhotonRankedMatchmaker : IMatchmaker
     }
 
     readonly IMatchmaker m_aiFallback;
+    readonly int? m_tierOverride;
 
-    public PhotonRankedMatchmaker(IMatchmaker _aiFallback)
+    public PhotonRankedMatchmaker(IMatchmaker _aiFallback, int? _tierOverride = null)
     {
         this.m_aiFallback = _aiFallback;
+        this.m_tierOverride = _tierOverride;
     }
 
     public async UniTask<MatchOpponent?> FindOpponentAsync(CancellationToken _ct)
@@ -53,6 +55,12 @@ public sealed class PhotonRankedMatchmaker : IMatchmaker
         // 티어는 매칭 축이라 서버 값으로 시작한다 — 로컬 캐시는 초기화 이후 갱신되지 않는다.
         MatchmakingProfile t_localProfile = await MatchmakingProfile.FromServerAsync();
         if (_ct.IsCancellationRequested) return (EOutcome.Canceled, default);
+        if (this.m_tierOverride.HasValue)
+        {
+            t_localProfile = new MatchmakingProfile(
+                t_localProfile.Nickname, this.m_tierOverride.Value,
+                t_localProfile.AvatarId, t_localProfile.FrameId, t_localProfile.Ticket);
+        }
         (EOutcome outcome, MatchmakingProfile? knownOpponent) t_search =
             await SearchRankedOpponentAsync(t_session, t_localProfile, _ct);
         if (t_search.outcome != EOutcome.Matched)

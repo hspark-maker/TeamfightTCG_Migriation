@@ -92,8 +92,6 @@ RectTransform:
   m_Children:
   - {fileID: 4982905464960873246}
   - {fileID: 3867891717272135405}
-  - {fileID: 4744770135578658048}
-  - {fileID: 8308487217358158430}
   - {fileID: 4240463608707400901}
   m_Father: {fileID: 6870404034472247805}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -971,7 +969,9 @@ RectTransform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 0.90563554, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 4744770135578658048}
+  - {fileID: 8308487217358158430}
   m_Father: {fileID: 392638601574185110}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
@@ -1017,6 +1017,19 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 4.49
+--- !u!114 &8104459237611028745
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2956305767364865637}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
+  key: 28
 --- !u!1 &3172104365737703777
 GameObject:
   m_ObjectHideFlags: 0
@@ -1184,8 +1197,6 @@ RectTransform:
   m_Children:
   - {fileID: 1847752748367986267}
   - {fileID: 4726054889253289704}
-  - {fileID: 1015116535208811796}
-  - {fileID: 5740440687136769730}
   - {fileID: 8531649486331541646}
   m_Father: {fileID: 6284538003045798158}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -1221,15 +1232,15 @@ RectTransform:
   m_GameObject: {fileID: 3437102487273689040}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1, y: 1.1041969, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1269365349469323181}
+  m_Father: {fileID: 4726054889253289704}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -202.7, y: -5.1}
-  m_SizeDelta: {x: -462.6621, y: 12.410904}
+  m_AnchoredPosition: {x: 11.606049, y: -5.6319475}
+  m_SizeDelta: {x: 31.609009, y: 5.0178986}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &8210053641911851115
 CanvasRenderer:
@@ -1442,7 +1453,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 0.5}
   m_AnchorMax: {x: 1, y: 0.5}
-  m_AnchoredPosition: {x: -31.200012, y: -0.099998474}
+  m_AnchoredPosition: {x: -31.199951, y: -0.099998474}
   m_SizeDelta: {x: 144.22, y: 82.221}
   m_Pivot: {x: 1, y: 0.5}
 --- !u!222 &4081220191548015893
@@ -2104,7 +2115,7 @@ RectTransform:
   m_Father: {fileID: 1301178476859205196}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
+  m_AnchorMax: {x: 1, y: 0.96282893}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -2652,6 +2663,19 @@ MonoBehaviour:
   m_FlexibleWidth: 1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &4471028836195510313
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7106232095072429103}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
+  key: 13
 --- !u!1 &7111215831560738556
 GameObject:
   m_ObjectHideFlags: 0
@@ -2682,7 +2706,9 @@ RectTransform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 0.90563554, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 1015116535208811796}
+  - {fileID: 5740440687136769730}
   m_Father: {fileID: 1269365349469323181}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
@@ -2728,6 +2754,19 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 4.49
+--- !u!114 &4471028836195510327
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7111215831560738556}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
+  key: 27
 --- !u!1 &7122003655975478253
 GameObject:
   m_ObjectHideFlags: 0
@@ -3226,14 +3265,14 @@ RectTransform:
   m_GameObject: {fileID: 7833837077286166829}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1, y: 1.1041969, z: 1}
   m_ConstrainProportionsScale: 1
   m_Children: []
-  m_Father: {fileID: 1269365349469323181}
+  m_Father: {fileID: 4726054889253289704}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 6.100006, y: 2.474381}
+  m_AnchoredPosition: {x: -26.729523, y: 2.7316608}
   m_SizeDelta: {x: 89.3618, y: 89.359}
   m_Pivot: {x: 0, y: 0.5}
 --- !u!222 &6743818475399048698
@@ -3387,14 +3426,14 @@ RectTransform:
   m_GameObject: {fileID: 8198425569565688688}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1, y: 1.1041969, z: 1}
   m_ConstrainProportionsScale: 1
   m_Children: []
-  m_Father: {fileID: 392638601574185110}
+  m_Father: {fileID: 3867891717272135405}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 6.100006, y: 2.474381}
+  m_AnchoredPosition: {x: -26.729523, y: 2.7315598}
   m_SizeDelta: {x: 89.3618, y: 89.359}
   m_Pivot: {x: 0, y: 0.5}
 --- !u!222 &6865583597670678963
@@ -3509,7 +3548,7 @@ MonoBehaviour:
   mySection: {fileID: 6284538003045798158}
   mySoloAnchoredPos: {x: 0, y: 1046}
   battleLabel: {fileID: 0}
-  soloLabelText: "매칭 시작!"
+  soloLabelText: "\uB9E4\uCE6D \uC2DC\uC791!"
   introFx:
     enemyInfoBar: {fileID: 6870404034472247805}
     myInfoBar: {fileID: 6284538003045798158}
@@ -3694,15 +3733,15 @@ RectTransform:
   m_GameObject: {fileID: 8671995433216547379}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1, y: 1.1041969, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 392638601574185110}
+  m_Father: {fileID: 3867891717272135405}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -202.7, y: -5.1}
-  m_SizeDelta: {x: -462.6621, y: 12.410904}
+  m_AnchoredPosition: {x: 11.606049, y: -5.6319475}
+  m_SizeDelta: {x: 31.609009, y: 5.0178986}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1768449874673247722
 CanvasRenderer:
@@ -5279,42 +5318,3 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.AspectRatioFitter
   m_AspectMode: 3
   m_AspectRatio: 0.7524
---- !u!114 &4471028836195510313
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7106232095072429103}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
-  key: 13
---- !u!114 &4471028836195510327
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7111215831560738556}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
-  key: 27
---- !u!114 &8104459237611028745
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2956305767364865637}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
-  key: 28

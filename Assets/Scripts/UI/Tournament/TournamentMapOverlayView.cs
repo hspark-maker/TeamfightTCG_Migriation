@@ -2,14 +2,15 @@ using System;
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-// 보상 토너먼트 세로 경로 맵(로비 위를 덮는 전체 화면 오버레이).
+// 모험 세로 경로 맵(로비 위를 덮는 전체 화면 오버레이).
 //
 // 좌표의 진실원은 챕터 타일 프리팹이다 — 정점 자리도 길 조각도 디자이너가 타일 안에 저작하고,
 // 코드는 타일을 쌓고 저작된 자리에 정점을 놓고 길 조각을 상태에 따라 틴트할 뿐 좌표를 만들지 않는다.
 // 자기 여닫음은 스스로 소유하고, 씬 전환만 모른다 — 도전을 이벤트로 올리면 LobbyRoot(LobbyMatchLauncher)가 잇는다.
-public class TournamentMapOverlayView : MonoBehaviour
+public class TournamentMapOverlayView : MonoBehaviour, IPointerClickHandler
 {
     [SerializeField] ScrollRect scrollRect;
     [SerializeField] RectTransform content;          // 타일과 정점이 놓일 Content(레이아웃 그룹 없이 코드가 좌표를 잡는다)
@@ -41,15 +42,28 @@ public class TournamentMapOverlayView : MonoBehaviour
     [Header("연출")]
     [SerializeField] PopupTransition transition = new PopupTransition();
 
-    [Tooltip("보상 팝업이 걷히고 길이 차오르기까지의 정박. 이 사이에 클리어 도장이 꽂힌다 —\n" +
-             "너무 짧으면 도장과 길이 겹쳐 사건이 둘 다 뭉갠다.")]
-    [SerializeField] float claimHoldIn = 0.45f;
-
     [Tooltip("길 점 하나가 금색으로 물드는 시간.")]
     [SerializeField] float linkDotDuration = 0.15f;
 
     [Tooltip("길 점과 점 사이 간격. 구간마다 점이 6~9개로 갈리므로 총 길이도 함께 갈린다.")]
     [SerializeField] float linkDotStagger = 0.06f;
+
+    [Header("해금 연출")]
+    [Tooltip("맵에 들어와 새로 열린 것들을 훑는 총 상한(초).\n" +
+             "넘치면 사이를 건너뛰고 가장 앞선(최신) 대상 하나로 곧장 넘어가 그것만 마저 보여준다 — " +
+             "그 마지막 하나는 예산을 넘겨서라도 보여준다. 유저가 실제로 갈 자리가 거기이기 때문이다.\n" +
+             "건너뛴 대상은 표식이 서지 않아 다음 진입에서 이어 재생된다(개수 상한과 같은 방향이다).\n" +
+             "길이는 띠·정점이 저작한 제 안무가 정하므로 여기서는 총량만 조인다.\n\n" +
+             "★ 0이면 첫 대상부터 건너뛰기가 걸려 항상 최신 하나만 나온다 — '무제한'이 아니라 '사슬을 끄고 " +
+             "목적지만 보여준다'는 저작이다. 여러 대상을 훑게 하려면 반드시 0보다 큰 값을 줄 것.")]
+    [SerializeField] float introBudget = 4f;
+
+    [Tooltip("한 번의 진입에서 훑을 대상 수 상한(띠와 정점을 합쳐서 센다).\n" +
+             "넘치면 오래된 것부터 버린다 — 유저가 실제로 갈 자리는 가장 앞선 챕터·정점이다.")]
+    [SerializeField] int introMaxSteps = 3;
+
+    [Tooltip("대상과 대상 사이 숨. 스크롤이 곧 '여기가 열렸다'는 문장이라, 붙여 놓으면 어디를 봤는지 읽히지 않는다.")]
+    [SerializeField] float introGap = 0.15f;
 
     /// <summary>정점 도전 요청(도전 가능한 정점만 올라온다). LobbyRoot가 전투로 잇는다.</summary>
     public event Action<int> NodeSelected;
@@ -97,6 +111,25 @@ public class TournamentMapOverlayView : MonoBehaviour
     int m_litLink = -1;
 
     Sequence m_claimSeq;
+
+    // 아직 훑지 않은 해금 대상(아래에서 위로). 재생한 것은 여기서 빠져 m_introSeen으로 옮겨 간다.
+    readonly List<IntroTarget> m_introTargets = new List<IntroTarget>();
+
+    // 이번 진입에서 실제로 재생한 대상. 끝맺음·중단이 이 목록만 표식한다 — 버린 대상은 다음 진입의 몫이다.
+    readonly List<IntroTarget> m_introSeen = new List<IntroTarget>();
+
+    // 잠긴 모습으로 미리 세워 둔 부품 전부. 재생 대상보다 넓다 — 챕터에 딸려 세운 정점들이 여기 함께 담긴다.
+    // 푸는 쪽은 이 목록만 본다: 담기지 않은 부품은 손잡이가 선 채로 굳어 Refresh를 영영 받지 못한다.
+    readonly List<IntroTarget> m_introStaged = new List<IntroTarget>();
+
+    // 지금까지 쓴 연출 시간. 각 안무의 길이는 재생해 봐야 알 수 있어 예산을 미리 나눌 수 없다.
+    float m_introSpent;
+
+    // 대상 하나를 훑는 동안 도는 대기 시퀀스(대상마다 새로 선다).
+    Sequence m_introSeq;
+
+    // 해금 사슬이 화면을 쥐고 있는가 — 대상이 남아 있으면 대기 시퀀스가 없는 틈에도 참이다.
+    bool IsIntroPending => this.m_introSeq != null || this.m_introTargets.Count > 0;
 
     void Awake()
     {
@@ -149,8 +182,18 @@ public class TournamentMapOverlayView : MonoBehaviour
         if (this.m_built) this.RefreshNodes();
         else this.Build();
 
+        // 수령 사슬이 화면을 쥐고 있으면 수집조차 하지 않는다 — 표식을 세우지 않으니 다음 깨끗한 진입에서 그대로 재생된다.
+        if (this.CanCollectUnlockIntro) this.CollectUnlockIntro();
+
+        // 무대는 사슬이 시작되기 전에 통째로 선다 — 대상마다 제 차례에 잠그면 띠 안무가 도는 몇 초 동안
+        // 정점들이 열린 모습으로 서 있다가 뒤늦게 잠겨, 유저 눈에는 역행으로 읽힌다.
+        this.StageUnlockIntro();
+
         this.ApplyTutorialAnchor(true);   // Build 경로는 RefreshNodes를 거치지 않는다
         this.ScrollToCurrent();
+
+        // 스크롤이 애니 없이 즉시 앉고 그 안에서 레이아웃이 확정된다 — 그 뒤라야 대상을 제자리에서 화면에 넣을 수 있다.
+        this.PlayUnlockIntro();
     }
 
     /// <summary>맵을 닫는다. 하단바는 퇴장 트윈과 나란히 돌려준다 — OnDisable을 기다리면 늦는다.</summary>
@@ -173,16 +216,41 @@ public class TournamentMapOverlayView : MonoBehaviour
     public void OpenReturnReward(string _nodeId)
     {
         if (!this.IsOnStage) return;
-        if (this.m_claimSeq != null) return;             // 다른 정점의 수령 연출이 아직 돌고 있다
+        // 다른 정점의 수령이 아직 끝나지 않았다 — 왕복 중도 포함한다(대기 owner가 하나뿐이라 겹치면 차단막이 어긋난다).
+        if (this.m_claimSeq != null || TournamentRewardFlow.IsClaiming) return;
+
+        // 신고가 늦은 복귀에서는 맵이 이미 해금 사슬을 돌고 있다(열 때는 PendingRewardNodeId가 비어 수집 게이트를 통과했다).
+        // 여기서 물러나도 수령은 유실되지 않는다 — 사슬이 끝나면 그 정점이 선물 모습으로 서고, OnNodeTapped가 같은 팝업을 연다.
+        if (this.IsIntroPending) return;
 
         int t_index = TournamentProgress.IndexOf(_nodeId);
         if (t_index < 0 || t_index >= this.m_nodes.Count) return;
         if (!TournamentProgress.IsRewardPending(t_index)) return;
 
-        // 팝업이 걷히는 프레임에 도장이 그 자리에 꽂히므로, 그 자리가 화면 안에 있어야 결말이 보인다.
+        // 도장이 그 자리에 꽂히므로(서버가 클리어를 확정하는 프레임), 그 자리가 화면 안에 있어야 결말이 보인다.
         this.ScrollToNode(t_index);
 
         this.OpenNodeReward(t_index);
+    }
+
+    /// <summary>해금 사슬 스킵. 맵 바닥에 떨어진 탭만 받는다 — 정점·띠 위의 탭은 그 부품이 가져간다.</summary>
+    // 눌린 오브젝트를 이 루트와 견주지 않는다: 루트에는 Graphic이 없어 그 비교가 늘 어긋나고, 스킵이 영영 서지 않았다.
+    // 가려낼 일은 이미 끝나 있다 — 클릭은 자기를 받아 가는 자식(정점·띠의 버튼)에서 멈추므로,
+    // 여기까지 올라온 탭은 그것을 받아 갈 부품이 없던 자리, 곧 맵 바닥이다.
+    //
+    // 사슬이 화면 한가운데 세운 바로 그 정점·띠를 탭해도 스킵이 돌아야 한다 — 그 자리는 유저가 보고 있는 자리다.
+    // 그것은 부품 쪽 계약이다: 잠긴 버튼은 interactable만 내리면 클릭을 먹고 삼켜(ExecuteEvents가 isActiveAndEnabled만 본다)
+    // 여기까지 올라오지 않으므로, 각 뷰가 버튼을 enabled=false로 내려 클릭을 통과시킨다.
+    // 맵은 올라온 탭을 스킵으로 받는 쪽만 책임진다.
+    public void OnPointerClick(PointerEventData _e)
+    {
+        if (!this.IsIntroPending) return;
+        if (_e == null || _e.button != PointerEventData.InputButton.Left) return;
+
+        // 스크롤로 소비된 포인터는 탭이 아니다 — 없으면 맵을 끌어 넘긴 뒤 손 떼는 순간 연출이 지워진다.
+        if (_e.dragging) return;
+
+        this.AbortUnlockIntro();
     }
 
     // 챕터 타일을 쌓고 타일에 저작된 자리에만 정점을 세운다. 좌표를 코드가 만들지 않으므로 저작이 빠지면 그 정점은 안 나온다.
@@ -463,6 +531,13 @@ public class TournamentMapOverlayView : MonoBehaviour
     // 진행 통지 → 전 정점 재바인딩 + 길 색 갱신. 재빌드가 아니라 Refresh라 스크롤 위치가 보존된다.
     void RefreshNodes()
     {
+        // 억제가 잘못 남았다 — 결말을 쥔 주체(왕복·점등)가 둘 다 없으면 이 통지가 그대로 진실이다.
+        // 팝업 콜백이 유실되는 경로(공용 팝업을 다른 흐름이 덮어쓴다)에서 맵이 옛 그림으로 굳지 않게 스스로 푼다.
+        // 사슬 쪽은 대기 시퀀스가 아니라 IsIntroPending으로 묻는다 — 대상과 대상 사이의 틈에서 억제가 먼저 풀리면
+        // 다음 대상이 세울 "잠긴 모습" 첫 박이 그 사이에 도착한 통지에 지워진다.
+        if (this.m_suspendRefresh && this.m_claimSeq == null && !this.IsIntroPending && !TournamentRewardFlow.IsClaiming)
+            this.m_suspendRefresh = false;
+
         // 점등 연출이 결말을 손에 쥐고 있다 — 다 돌고 나서 스스로 푼다.
         if (this.m_suspendRefresh) return;
 
@@ -480,6 +555,9 @@ public class TournamentMapOverlayView : MonoBehaviour
     // 수령 대기 정점은 제외한다: 그 자리에서 할 일은 도전이 아니라 수령이다.
     void ApplyTutorialAnchor(bool _on)
     {
+        // 해금 사슬이 도는 동안은 지목하지 않는다 — 안내 손가락이 연출 위에 겹치면 어느 쪽을 보라는 말인지 갈린다.
+        if (this.IsIntroPending) _on = false;
+
         int t_target = -1;
 
         if (_on)
@@ -515,15 +593,20 @@ public class TournamentMapOverlayView : MonoBehaviour
     bool TryScrollToLastBand()
     {
         for (int t_i = this.m_bands.Count - 1; t_i >= 0; t_i--)
-        {
-            if (this.m_bands[t_i] == null) continue;
-            if (!(this.m_bands[t_i].transform is RectTransform t_rect)) continue;
-
-            this.ScrollToContentY(t_rect.anchoredPosition.y);
-            return true;
-        }
+            if (this.ScrollToBand(t_i)) return true;
 
         return false;
+    }
+
+    // 챕터 띠를 뷰포트 한가운데로. 타일이 미저작인 챕터엔 띠가 없어 false다.
+    bool ScrollToBand(int _chapterIndex)
+    {
+        if (_chapterIndex < 0 || _chapterIndex >= this.m_bands.Count) return false;
+        if (this.m_bands[_chapterIndex] == null) return false;
+        if (!(this.m_bands[_chapterIndex].transform is RectTransform t_rect)) return false;
+
+        this.ScrollToContentY(t_rect.anchoredPosition.y);
+        return true;
     }
 
     // 인덱스 비례가 아니라 정점의 실제 y로 계산한다(저작 자리가 고르지 않아 비례식이 안 맞는다).
@@ -560,9 +643,16 @@ public class TournamentMapOverlayView : MonoBehaviour
     // 정점 뷰가 이미 잠긴 버튼을 죽여 두지만, 진입 판정의 주인은 화면이다(저작·상태가 갈려도 새지 않게).
     void OnNodeTapped(int _index)
     {
+        // 해금 사슬이 도는 동안의 탭은 스킵이지 도전이 아니다(스킵은 루트가 받는다).
+        // 스킵 쪽과 같은 잣대를 쓴다 — 대기 시퀀스가 갈리는 틈에 정점 탭만 통과해 전투로 새지 않게.
+        if (this.IsIntroPending) return;
+
         // 길 점등은 관문이 아니다(상태가 이미 진실이라 다음 정점은 눌러도 된다).
         // 다만 도장이 꽂히는 중인 그 정점만은 막는다.
         if (this.m_claimSeq != null && _index == this.m_claimNode) return;
+
+        // 수령 왕복이 도는 동안은 두 번째 수령을 받지 않는다 — 대기 owner가 하나뿐이라 먼저 끝난 쪽이 남은 차단막을 걷는다.
+        if (TournamentRewardFlow.IsClaiming) return;
 
         // 선물은 도전이 아니라 수령이다 — 전투로 잇지 않고 보상 팝업으로 간다.
         if (TournamentProgress.IsRewardPending(_index))
@@ -576,31 +666,38 @@ public class TournamentMapOverlayView : MonoBehaviour
         this.NodeSelected?.Invoke(_index);
     }
 
-    // 수령 → 점등 → 해금. 억제를 팝업보다 먼저 걸어야 [획득]이 부르는 ClearNode의 통지가 결말을 앞질러 그리지 않는다.
+    // 수령 → 점등 → 해금. 갱신을 억제하지 않는다 — 도장은 누른 프레임에 낙관으로 꽂혀야 하고,
+    // 그것을 그리는 것이 바로 진행 통지가 부르는 RefreshNodes 다.
+    //
+    // 대신 길 구간 하나만 미리 쥔다. 서버 확정 통지가 점등보다 먼저 도착하는데,
+    // 그때 RefreshLinks 가 이 구간을 금색으로 칠해 버리면 차오르는 연출이 통째로 사라진다.
     void OpenNodeReward(int _index)
     {
         if (!TournamentProgress.TryGetNode(_index, out TournamentNodeDef t_node)) return;
 
-        this.m_suspendRefresh = true;
+        this.m_litLink = this.m_links.FindIndex(_link => _link.Index == _index) >= 0 ? _index : -1;
 
-        // 폴백(보상 0건·팝업 미배선)도 흐름이 콜백을 책임진다 — 여기서 곧바로 이으면 서버 왕복 전이라 클리어가 아직 없다.
-        // false는 수령을 시작조차 못 한 경우뿐이라 걸어 둔 억제만 푼다.
-        if (!TournamentRewardFlow.Open(t_node.nodeId, () => this.PlayClaimSequence(_index)))
+        // 결말 중 확정 사건(길 점등·해금)만 _onClaimed 가 잇는다. 도장은 그보다 앞서 낙관으로 끝나 있다.
+        // _onClosed 는 수령 없이 닫힌 경로에서 쥐고 있던 길 구간을 놓는 안전망이다.
+        if (!TournamentRewardFlow.Open(t_node.nodeId,
+                _onClaimed: () => this.PlayClaimSequence(_index),
+                _onClosed:  this.AbortIfIdle))
             this.AbortClaimSequence();
     }
 
-    // 팝업이 걷히는 프레임에 결말을 그리고, 길이 차오르는 것은 그 위에 얹는다.
+    // 서버가 클리어를 확정한 프레임에 결말을 그리고, 길이 차오르는 것을 곧바로 잇는다.
+    // 팝업의 분출·퇴장은 이 위에서 제 안무를 마저 돈다 — 그것을 기다리면 수령과 결말 사이가 통째로 빈다.
     // 해금을 점등 끝에 매달아 두면 상태를 보려고 길이 다 찰 때까지 기다려야 한다 — 길은 장식이지 관문이 아니다.
     void PlayClaimSequence(int _index)
     {
         // 맵을 떠난 뒤 콜백이 도착했다 — 다음 진입에서 진실이 그려진다.
-        if (!this.IsOpen)
+        if (!this.IsOnStage)
         {
             this.AbortClaimSequence();
             return;
         }
 
-        // 수령이 성사되지 않은 채 닫혔다면 보여줄 결말이 없다(외부 강제 Hide 경로).
+        // 수령이 성사되지 않았다면 보여줄 결말이 없다(서버 거절·외부 강제 Hide 경로).
         if (!TournamentProgress.TryGetNode(_index, out TournamentNodeDef t_node)
             || !TournamentProgress.IsCleared(t_node.nodeId))
         {
@@ -612,12 +709,15 @@ public class TournamentMapOverlayView : MonoBehaviour
         int t_slot = this.m_links.FindIndex(_link => _link.Index == _index);
         this.m_litLink = t_slot >= 0 ? _index : -1;
 
-        this.RevealClear(_index);
+        // 서버 낙인이 방금 섰다 — 다음 정점이 열린 모습으로 갈아 끼운다.
+        // 이 정점의 도장은 낙관 시점에 이미 꽂혔으므로 여기서 다시 부르지 않는다(TournamentNodeView.Refresh).
+        this.RefreshNodes();
 
         this.m_claimNode = _index;
         this.m_claimSeq = DOTween.Sequence().SetLink(this.gameObject);
 
-        float t_at = this.claimHoldIn;
+        // 정박 없이 곧바로 차오른다 — 도장은 이미 꽂혔고, 이 점등이 "확정됐다"를 잇는 두 번째 박이다.
+        float t_at = 0f;
         t_at += t_slot >= 0 ? this.InsertLinkFill(this.m_links[t_slot], t_at)
                             : this.InsertChapterSeam(_index, t_at);
 
@@ -667,17 +767,8 @@ public class TournamentMapOverlayView : MonoBehaviour
         return 0.15f;
     }
 
-    // 억제를 풀어 진실을 그리고, 그 프레임에 도장이 꽂힌다(팝업이 걷히는 바로 그 프레임이다).
-    void RevealClear(int _index)
-    {
-        this.m_suspendRefresh = false;
-        this.RefreshNodes();
-
-        if (_index >= 0 && _index < this.m_nodes.Count) this.m_nodes[_index]?.PlayClearStamp();
-    }
-
     // 사슬의 끝 — 길이 다 찬 자리에서 다음 정점이 튄다.
-    // 상태는 이미 팝업이 걷히던 프레임에 열렸고, 이 펀치는 "여기가 다음이다"를 가리키는 손짓이다.
+    // 상태는 이미 도장이 꽂히던 프레임에 열렸고, 이 펀치는 "여기가 다음이다"를 가리키는 손짓이다.
     void PunchNext(int _index)
     {
         int t_next = _index + 1;
@@ -686,12 +777,22 @@ public class TournamentMapOverlayView : MonoBehaviour
         // 챕터가 랭크로 잠겨 있으면 튀지 않는다 — 자물쇠가 튀면 "열렸다"는 거짓말이 된다.
         if (TournamentProgress.IsRankLocked(t_next)) return;
 
-        this.m_nodes[t_next]?.PlayUnlockPunch();
+        // 자리가 미저작이라 세우지 못한 정점은 화면에 아무것도 튀지 않는다 — 표식만 세우면 그 1회 연출이 조용히 소모된다.
+        TournamentNodeView t_node = this.m_nodes[t_next];
+        if (t_node == null) return;
+
+        t_node.PlayUnlockPunch();
+
+        // 이 펀치가 곧 그 정점의 해금 연출이다 — 여기서 표식을 세우지 않으면 다음 진입에 같은 연출이 한 번 더 터진다.
+        TournamentProgress.MarkNodeUnlockSeen(t_next);
     }
 
     // 어디서 끊겨도 진실로 스냅시킨다 — 연출은 장식일 뿐이라 중간 색에서 굳는 것만 막으면 된다.
     void AbortClaimSequence()
     {
+        // 맵의 모든 이탈 경로가 이 문을 지난다 — 해금 사슬도 여기서 함께 걷힌다(반대로 부르지 않는다, 재귀가 된다).
+        this.AbortUnlockIntro();
+
         if (this.m_claimSeq != null && this.m_claimSeq.IsActive()) this.m_claimSeq.Kill();
         this.m_claimSeq = null;
         this.m_claimNode = -1;
@@ -707,6 +808,379 @@ public class TournamentMapOverlayView : MonoBehaviour
 
         this.m_suspendRefresh = false;
         this.RefreshNodes();
+    }
+
+    // 수령 없이 팝업이 닫힌 경로의 안전망 — 쥐고 있던 길 구간을 놓는다.
+    // 사슬이 이미 시작됐거나 왕복이 아직 도는 중이면 손대지 않는다: 전자는 제 손으로 놓고,
+    // 후자는 곧 도착할 _onClaimed 가 그 구간을 점등에 쓴다.
+    void AbortIfIdle()
+    {
+        if (TournamentRewardFlow.IsClaiming || this.m_claimSeq != null || this.m_litLink < 0) return;
+
+        this.AbortClaimSequence();
+    }
+
+    // 수령이 화면을 쥐고 있는 동안은 해금을 훑지 않는다 — 전투 복귀도 같은 Open()을 타므로
+    // 이 문이 없으면 수령 연출과 해금 사슬이 한 프레임에 겹친다.
+    bool CanCollectUnlockIntro
+        => string.IsNullOrEmpty(TournamentProgress.PendingRewardNodeId)
+           && !TournamentRewardFlow.IsClaiming
+           && this.m_claimSeq == null;
+
+    // 이번 진입에서 처음 열린 것들을 화면 아래에서 위로 늘어놓는다(챕터 띠 → 그 챕터의 새 정점들 → 다음 챕터).
+    // 차분만 받아 둔다 — 표식은 실제로 재생한 뒤에야 선다.
+    void CollectUnlockIntro()
+    {
+        this.m_introTargets.Clear();
+        this.m_introSeen.Clear();
+        this.m_introSpent = 0f;
+
+        // 표식 없이 진행 흔적만 있던 세이브다 — 소급으로 조용히 덮였으니 이번엔 아무것도 재생하지 않는다.
+        if (TournamentProgress.TryBackfillSeenUnlocks()) return;
+
+        if (!TournamentProgress.TryTakeUnlockShowcase(out TournamentUnlockShowcase t_showcase)) return;
+
+        int t_chapters = TournamentProgress.ChapterCount;
+
+        for (int t_c = 0; t_c < t_chapters; t_c++)
+        {
+            this.GetChapterNodeRange(t_c, out int t_nodeStart, out int t_count);
+
+            if (t_showcase.Chapters != null && t_showcase.Chapters.Contains(t_c))
+                this.AddIntroTarget(new IntroTarget(true, t_c));
+
+            if (t_showcase.Nodes != null)
+            {
+                for (int t_i = 0; t_i < t_showcase.Nodes.Count; t_i++)
+                {
+                    int t_node = t_showcase.Nodes[t_i];
+                    if (t_node >= t_nodeStart && t_node < t_nodeStart + t_count)
+                        this.AddIntroTarget(new IntroTarget(false, t_node));
+                }
+            }
+        }
+
+        // 개수 상한은 앞쪽(오래된 것)부터 버린다 — 유저가 실제로 갈 자리는 가장 앞선 챕터·정점이다.
+        // 목록에는 재생할 수 있는 대상만 들어와 있으므로 이 트림이 "보여줄 수 있는 것"만 센다.
+        // 무대 세우기는 수집이 끝난 뒤에 도므로 여기서 잘린 대상은 애초에 세워지지 않는다(풀어 줄 것도 없다).
+        int t_max = Mathf.Max(1, this.introMaxSteps);
+        while (this.m_introTargets.Count > t_max) this.m_introTargets.RemoveAt(0);
+    }
+
+    // 챕터가 차지하는 평탄 정점 구간. 타일을 쌓을 때(BuildChapterTiles)와 같은 셈이다 — 앞 챕터의 정점 수를 누적한다.
+    void GetChapterNodeRange(int _chapterIndex, out int _start, out int _count)
+    {
+        _start = 0;
+        _count = 0;
+
+        int t_chapters = TournamentProgress.ChapterCount;
+
+        for (int t_c = 0; t_c <= _chapterIndex && t_c < t_chapters; t_c++)
+        {
+            int t_nodes = TournamentProgress.TryGetChapter(t_c, out TournamentChapterDef t_chapter) ? t_chapter.NodeCount : 0;
+
+            if (t_c == _chapterIndex)
+            {
+                _count = t_nodes;
+                return;
+            }
+
+            _start += t_nodes;
+        }
+    }
+
+    // 화면에 세울 부품이 없는 대상은 아예 담지 않는다 — 담으면 개수 상한 자리를 먹어 정상 대상을 밀어내고,
+    // 사슬은 아무것도 못 보여준 채 억제·탭 차단·앵커 해제만 걸다 끝난다(그 상태가 진입마다 되풀이된다).
+    // 빼도 표식은 재생한 것만 세우므로, 저작을 고친 다음 진입에서 그대로 다시 나온다.
+    void AddIntroTarget(IntroTarget _target)
+    {
+        if (!this.HasIntroView(_target)) return;
+
+        this.m_introTargets.Add(_target);
+    }
+
+    // 그 자리에 부품이 실제로 서 있는가. 자리 미저작 정점·타일 미저작 챕터는 목록에 빈칸으로 남아 있다.
+    bool HasIntroView(IntroTarget _target)
+    {
+        if (_target.Index < 0) return false;
+
+        if (_target.IsBand)
+            return _target.Index < this.m_bands.Count && this.m_bands[_target.Index] != null;
+
+        return _target.Index < this.m_nodes.Count && this.m_nodes[_target.Index] != null;
+    }
+
+    // 맵이 열리는 첫 프레임에 무대를 통째로 세운다 — 재생은 하지 않고 잠긴 모습만 굳힌다.
+    // 챕터가 대상이면 그 장의 정점 전부를 함께 세운다: "이 장이 잠겨 있었다"는 문장은
+    // 새로 열린 정점 하나만 잠긴 그림으로는 서지 않는다(신규 유저의 첫 챕터가 정확히 그 경우다).
+    void StageUnlockIntro()
+    {
+        this.m_introStaged.Clear();
+        if (this.m_introTargets.Count == 0) return;
+
+        for (int t_i = 0; t_i < this.m_introTargets.Count; t_i++)
+        {
+            IntroTarget t_target = this.m_introTargets[t_i];
+
+            if (!t_target.IsBand)
+            {
+                this.StageIntroNode(t_target.Index);
+                continue;
+            }
+
+            if (t_target.Index < 0 || t_target.Index >= this.m_bands.Count) continue;
+            if (this.m_bands[t_target.Index] == null) continue;
+
+            this.m_bands[t_target.Index].StageChapterLocked();
+            this.MarkStaged(t_target);
+
+            this.GetChapterNodeRange(t_target.Index, out int t_start, out int t_count);
+            for (int t_n = t_start; t_n < t_start + t_count; t_n++) this.StageIntroNode(t_n);
+        }
+    }
+
+    // 세우기는 멱등이라 겹쳐 불려도 안전하다(재생 대상이 제 챕터에 겹치는 경우).
+    void StageIntroNode(int _index)
+    {
+        if (_index < 0 || _index >= this.m_nodes.Count) return;
+        if (this.m_nodes[_index] == null) return;
+
+        this.m_nodes[_index].StageUnlockLocked();
+        this.MarkStaged(new IntroTarget(false, _index));
+    }
+
+    // 세운 목록에 없으면 담는다. 세운 것과 푼 것의 개수가 맞아야 손잡이가 굳지 않는다.
+    void MarkStaged(IntroTarget _target)
+    {
+        for (int t_i = 0; t_i < this.m_introStaged.Count; t_i++)
+            if (this.m_introStaged[t_i].IsBand == _target.IsBand && this.m_introStaged[t_i].Index == _target.Index) return;
+
+        this.m_introStaged.Add(_target);
+    }
+
+    // 세운 것을 전부 진실로 되돌린다(끝맺음·중단의 단일 창구). Abort*는 세우기만 한 무대도 복원까지 간다.
+    void ReleaseAllStaged()
+    {
+        for (int t_i = 0; t_i < this.m_introStaged.Count; t_i++) this.ReleaseIntroView(this.m_introStaged[t_i]);
+
+        this.m_introStaged.Clear();
+    }
+
+    // 챕터 띠 안무가 끝난 시각에 그 장의 정점들을 제 진실로 돌려보낸다 — 이것이 "이 장이 열렸다"는 문장이다.
+    // 아직 제 차례를 기다리는 재생 대상은 두고 간다: 그 정점은 PlayUnlockReveal이 무대를 이어받아야 한다.
+    void ReleaseChapterNodes(int _chapterIndex)
+    {
+        this.GetChapterNodeRange(_chapterIndex, out int t_start, out int t_count);
+
+        for (int t_i = this.m_introStaged.Count - 1; t_i >= 0; t_i--)
+        {
+            IntroTarget t_target = this.m_introStaged[t_i];
+
+            if (t_target.IsBand) continue;
+            if (t_target.Index < t_start || t_target.Index >= t_start + t_count) continue;
+            if (this.IsPendingTarget(t_target.Index)) continue;
+
+            this.m_introStaged.RemoveAt(t_i);
+            this.ReleaseIntroView(t_target);
+        }
+    }
+
+    // 아직 재생을 기다리는 정점인가(이미 재생한 것·버린 것은 거짓이다).
+    bool IsPendingTarget(int _nodeIndex)
+    {
+        for (int t_i = 0; t_i < this.m_introTargets.Count; t_i++)
+            if (!this.m_introTargets[t_i].IsBand && this.m_introTargets[t_i].Index == _nodeIndex) return true;
+
+        return false;
+    }
+
+    void ReleaseIntroView(IntroTarget _target)
+    {
+        if (_target.IsBand)
+        {
+            if (_target.Index >= 0 && _target.Index < this.m_bands.Count) this.m_bands[_target.Index]?.AbortUnlock();
+            return;
+        }
+
+        if (_target.Index >= 0 && _target.Index < this.m_nodes.Count) this.m_nodes[_target.Index]?.AbortUnlockReveal();
+    }
+
+    // 예산 초과로 목록 앞쪽을 버린다. 버리는 대상은 이미 잠긴 채 세워져 있으므로 목록에서 지우는 것만으로는 모자라다 —
+    // 풀지 않으면 재생될 일도 없는 부품이 잠긴 모습으로 굳는다.
+    void DropIntroTargets(int _count)
+    {
+        for (int t_i = 0; t_i < _count && this.m_introTargets.Count > 0; t_i++)
+        {
+            IntroTarget t_target = this.m_introTargets[0];
+            this.m_introTargets.RemoveAt(0);
+
+            this.ReleaseIntroView(t_target);
+
+            for (int t_s = this.m_introStaged.Count - 1; t_s >= 0; t_s--)
+                if (this.m_introStaged[t_s].IsBand == t_target.IsBand && this.m_introStaged[t_s].Index == t_target.Index)
+                    this.m_introStaged.RemoveAt(t_s);
+
+            // 띠를 버리면 그 띠에 딸려 세운 정점들도 풀어 줄 주체가 사라진다.
+            if (t_target.IsBand) this.ReleaseChapterNodes(t_target.Index);
+        }
+    }
+
+    // 사슬의 시작. 억제를 걸어 두어야 해금이 세우는 "잠긴 모습" 첫 박이 진행 통지에 지워지지 않는다.
+    void PlayUnlockIntro()
+    {
+        if (this.m_introTargets.Count == 0) return;
+
+        this.m_suspendRefresh = true;
+        this.StepUnlockIntro();
+    }
+
+    // 길이는 재생해 봐야 알 수 있으므로 시간표를 한 번에 짜지 않는다 —
+    // 한 대상이 끝나는 시각에 다음 대상을 예약해 하나씩 이어 붙인다.
+    void StepUnlockIntro()
+    {
+        // 재생에 실패한 대상은 숨도 쉬지 않고 곧바로 다음을 당겨 쓴다 — 빈 사슬이 introGap씩 도는 시간이 없게.
+        float t_length = 0f;
+        bool t_played = false;
+        IntroTarget t_playing = default;
+
+        while (this.m_introTargets.Count > 0)
+        {
+            // 예산을 다 썼으면 사이를 버리고 가장 앞선(최신) 대상 하나로 건너뛴다 — 개수 상한과 같은 방향이다.
+            // 재생은 그대로 아래에서 위로 간다: 자르는 쪽만 최신을 남기고, 남은 것은 목록 순서대로 훑는다.
+            // 버린 대상은 표식이 서지 않으니 다음 진입에서 이어 재생된다.
+            if (this.m_introSpent >= Mathf.Max(0f, this.introBudget))
+                this.DropIntroTargets(this.m_introTargets.Count - 1);
+
+            IntroTarget t_target = this.m_introTargets[0];
+            this.m_introTargets.RemoveAt(0);
+
+            // 화면에 아무것도 나오지 않은 대상은 본 것으로 치지 않는다 — 저작을 고친 뒤 다시 나와야 한다.
+            // 다만 길이 0을 잣대로 삼지 않는다: 부품이 제자리에 있으면서 0을 돌려주는 길(비활성·미바인딩)이 있어,
+            // 그것까지 되풀이하면 진입마다 같은 자리에서 예산만 태우고 영영 걸린다.
+            if (!this.TryPlayIntroTarget(t_target, out t_length)) continue;
+
+            this.m_introSeen.Add(t_target);
+            this.m_introSpent += t_length;
+            t_playing = t_target;
+            t_played = true;
+            break;
+        }
+
+        if (!t_played)
+        {
+            this.EndUnlockIntro();
+            return;
+        }
+
+        Sequence t_seq = DOTween.Sequence().SetLink(this.gameObject);
+        t_seq.AppendInterval(Mathf.Max(0.01f, t_length + Mathf.Max(0f, this.introGap)));
+
+        // 띠 안무가 끝나는 시각이 곧 그 장이 열리는 시각이다 — 딸려 세운 정점들을 여기서 함께 풀어 준다.
+        // 다음 대상으로 넘어가는 숨(introGap)까지 기다리면 열림이 한 박 늦게 도착한다.
+        if (t_playing.IsBand) t_seq.InsertCallback(t_length, () => this.ReleaseChapterNodes(t_playing.Index));
+
+        t_seq.OnComplete(() =>
+        {
+            this.m_introSeq = null;
+            this.StepUnlockIntro();
+        });
+
+        this.m_introSeq = t_seq;
+    }
+
+    // 대상 자리로 옮기고 그 부품의 안무를 시작한다. 스크롤이 곧 "여기가 열렸다"는 문장이다.
+    // 부품이 제 시퀀스를 스스로 돌리므로 맵은 길이만 받아 다음 차례의 시작 시각을 잡는다.
+    // 반환값은 "그 자리에 부품이 있었는가"다 — 길이와 따로 답해야 표식이 빈 자리까지 소모하지 않는다.
+    // 수집이 이미 걸러 두어 거짓은 거의 오지 않지만 안전망으로 남긴다: 사슬은 여러 초에 걸쳐 도는데
+    // 그 사이 재빌드·파괴로 부품이 사라질 수 있고, 그때도 표식은 서지 않아야 한다.
+    bool TryPlayIntroTarget(IntroTarget _target, out float _length)
+    {
+        _length = 0f;
+
+        if (!this.HasIntroView(_target)) return false;
+
+        if (_target.IsBand)
+        {
+            this.ScrollToBand(_target.Index);
+            _length = this.m_bands[_target.Index].PlayChapterUnlock();
+            return true;
+        }
+
+        this.ScrollToNode(_target.Index);
+        _length = this.m_nodes[_target.Index].PlayUnlockReveal();
+        return true;
+    }
+
+    // 사슬의 끝 — 억제를 풀어 진실을 그리고, 실제로 보여준 것만 한 번에 표식한다.
+    void EndUnlockIntro()
+    {
+        this.m_introSeq = null;
+        this.m_introTargets.Clear();
+
+        // 재생까지 가지 못하고 세우기만 남은 것이 있다 — 풀지 않으면 그 부품만 잠긴 모습으로 굳는다.
+        this.ReleaseAllStaged();
+
+        this.m_suspendRefresh = false;
+        this.RefreshNodes();
+        this.ApplyTutorialAnchor(this.IsOnStage);   // 사슬이 끝난 뒤에야 안내가 선다
+
+        this.CommitUnlockSeen();
+    }
+
+    // 어디서 끊겨도 진실로 스냅시킨다 — 스킵도 "봤다"는 의사 표시라 표식은 그대로 남긴다.
+    void AbortUnlockIntro()
+    {
+        // 세우기만 하고 사슬이 서지 못한 경로가 있다 — 그때도 무대는 걷어야 한다.
+        if (!this.IsIntroPending && this.m_introSeen.Count == 0 && this.m_introStaged.Count == 0) return;
+
+        Sequence t_seq = this.m_introSeq;
+        this.m_introSeq = null;
+        if (t_seq != null && t_seq.IsActive()) t_seq.Kill();
+
+        this.m_introTargets.Clear();
+
+        // 반쯤 걷힌 베일·부푼 자물쇠가 그대로 굳지 않게 세운 부품마다 제 안무를 끝으로 당긴다.
+        // 재생한 것도 세운 목록에 그대로 남아 있어 이 한 줄이 둘을 함께 걷는다.
+        this.ReleaseAllStaged();
+
+        this.m_suspendRefresh = false;
+        this.RefreshNodes();
+        this.ApplyTutorialAnchor(this.IsOnStage);
+
+        this.CommitUnlockSeen();
+    }
+
+    // 보여준 대상만 배치 커밋한다(저장은 한 번만 튄다). 버린 대상은 담지 않는다 — 다음 진입에서 재생돼야 한다.
+    void CommitUnlockSeen()
+    {
+        if (this.m_introSeen.Count == 0) return;
+
+        var t_chapters = new List<int>();
+        var t_nodes = new List<int>();
+
+        for (int t_i = 0; t_i < this.m_introSeen.Count; t_i++)
+        {
+            IntroTarget t_target = this.m_introSeen[t_i];
+            if (t_target.IsBand) t_chapters.Add(t_target.Index);
+            else t_nodes.Add(t_target.Index);
+        }
+
+        this.m_introSeen.Clear();
+
+        TournamentProgress.MarkUnlockSeen(new TournamentUnlockShowcase(t_chapters, t_nodes));
+    }
+
+    // 해금 사슬이 훑을 대상 하나. 띠와 정점이 한 줄에 섞여 서므로 병렬 리스트로 흩지 않는다(PathLink와 같은 관용구).
+    readonly struct IntroTarget
+    {
+        public readonly bool IsBand;   // 거짓이면 정점
+        public readonly int Index;     // 띠면 챕터 번호, 정점이면 평탄 정점 번호
+
+        public IntroTarget(bool _isBand, int _index)
+        {
+            IsBand = _isBand;
+            Index = _index;
+        }
     }
 
     // 구간 하나의 길 조각. 평탄 인덱스·루트·틴트 대상이 늘 붙어 다녀야 해서 병렬 리스트로 흩지 않는다.

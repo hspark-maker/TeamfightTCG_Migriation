@@ -1,6 +1,6 @@
 import {HttpsError} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
-import {FieldValue} from "firebase-admin/firestore";
+import {DocumentReference, DocumentSnapshot, FieldValue} from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
 import {withCountedTransaction} from "../observability/countedTransaction";
 import {isKnownEnv} from "../save/environments";
@@ -31,6 +31,24 @@ import {
  */
 
 /**
+ * 지급 자격을 쥔 바깥 문서. 지갑 쓰기와 **같은 트랜잭션**에서 읽고 낙인한다.
+ *
+ * 영수증(txId)은 "같은 요청이 두 번 왔는가" 만 가른다 — 클라가 새 txId 를 붙여 같은 자격을
+ * 다시 청구하는 것은 못 막는다. 자격이 매치 문서처럼 한 번만 소진되어야 하는 것이면
+ * 그 문서 자체를 낙인해야 하고, 낙인이 지갑 쓰기와 갈라지면 그 사이에서 이중 지급이 성립한다.
+ * 트랜잭션을 콜백에 넘기지 않는 이유는 mutate 와 같다 — 여기서 열면 walletStore 밖에서
+ * 지갑을 쓰는 경로가 생긴다. 그래서 읽기(verify)와 쓰기(stamp)를 값으로만 받는다.
+ */
+export type WalletGuard = {
+  /** 자격 문서. verify 가 통과하면 stamp 가 merge 로 얹힌다. */
+  ref: DocumentReference;
+  /** 자격 판정. 부적격이면 던진다(rejectDomain 등) — 던지면 지갑도 낙인도 쓰이지 않는다. */
+  verify: (snapshot: DocumentSnapshot) => void;
+  /** 자격 소진 낙인. 다음 청구가 verify 에서 걸리도록 만드는 필드다. */
+  stamp: Record<string, unknown>;
+};
+
+/**
  * 지갑을 트랜잭션 1회로 읽고 고친다. 반환은 WalletPatch 뿐이다
  * — revision·updatedSlots 는 세이브 문서의 것이고 여기선 아무것도 오르지 않는다.
  * 같은 txId 로 다시 온 요청은 콜백에 들어가기도 전에 첫 응답을 되돌려준다(쓰기 0회).
@@ -42,6 +60,7 @@ import {
  * @param {ReceiptKey} receipt 영수증 번호(요청 txId 또는 서버 발급)
  * @param {Function} mutate 현재 지갑을 받아 다음 지갑(nextWallet 산물)을 돌려준다
  * @param {Function} finalize 갱신된 지갑에 명령별 필드를 얹어 최종 응답을 만든다. 트랜잭션 안에서 돌다
+ * @param {WalletGuard} guard 지급 자격 문서. 넘기면 같은 트랜잭션에서 검사·낙인한다
  * @return {Promise<TResponse>} finalize 가 만든 응답
  */
 export async function mutateWallet<TResponse>(
@@ -51,6 +70,7 @@ export async function mutateWallet<TResponse>(
   receipt: ReceiptKey,
   mutate: (wallet: WalletState) => WalletUpdate,
   finalize: (wallet: WalletPatch) => TResponse,
+  guard?: WalletGuard,
 ): Promise<TResponse> {
   if (!isKnownEnv(env)) {
     throw new HttpsError("invalid-argument", `Unknown env: ${env}`);
@@ -70,7 +90,7 @@ export async function mutateWallet<TResponse>(
       );
     }
 
-    // 영수증 조회가 마지막 읽기다 — 히트면 쓰기를 하나도 하지 않고 첫 응답을 그대로 돌려준다.
+    // 영수증 조회. 히트면 쓰기를 하나도 하지 않고 첫 응답을 그대로 돌려준다(자격 검사도 건너뛴다).
     const lookup = readReceipt(await transaction.get(receiptRef(reference, receipt.txId)));
     if (lookup.hit) {
       if (lookup.source !== source) {
@@ -89,6 +109,12 @@ export async function mutateWallet<TResponse>(
       return lookup.result as TResponse;
     }
 
+    // 자격 검사는 영수증 히트 **뒤**다. 히트한 재시도는 첫 호출이 이미 낙인했으므로
+    // 여기서 다시 보면 자기 낙인에 걸려 already-claimed 로 떨어진다.
+    // 읽기는 전부 쓰기 앞에 모여 있어야 한다(Firestore 트랜잭션 제약) — 그래서 mutate 앞이다.
+    const guardSnapshot = guard === undefined ? null : await transaction.get(guard.ref);
+    if (guard !== undefined && guardSnapshot !== null) guard.verify(guardSnapshot);
+
     // 트랜잭션을 콜백에 넘기지 않는다 — 넘기면 walletStore 밖에서 쓰는 콜백이 생겨
     // 브랜드 타입 강제가 뚫린다.
     const update = mutate(readWallet(snapshot));
@@ -96,6 +122,8 @@ export async function mutateWallet<TResponse>(
     const response = finalize({rev: update.next.rev, balances: update.next.balances});
     writeWallet(
       transaction, reference, update, receipt, response, FieldValue.serverTimestamp());
+    // 낙인은 지갑과 같은 커밋이다 — 갈라 놓으면 그 틈이 곧 이중 지급 창이다.
+    if (guard !== undefined) transaction.set(guard.ref, guard.stamp, {merge: true});
 
     return response;
   });

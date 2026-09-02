@@ -25,6 +25,18 @@ MonoBehaviour:
     skipOnCounter: 0
     countByStrength: {x: 0, y: 0}
     speedByStrength: {x: 0, y: 0}
+  glow:
+    id: 0
+    prefab: {fileID: 2879490034239414401, guid: 106f1b8922ba00f44b1f523e09bd9ec8, type: 3}
+    localOffset: {x: 0, y: 0, z: 0}
+    initialRotation: {x: 0, y: 0, z: 0}
+    lifetime: 1.2
+    sortingOrder: 20
+    scale: 1
+    alignToDirection: 0
+    skipOnCounter: 0
+    countByStrength: {x: 0, y: 0}
+    speedByStrength: {x: 0, y: 0}
   trail:
     id: 0
     prefab: {fileID: 2934288814078788184, guid: 8e1413ea09295cc4180be03a85207cf0, type: 3}

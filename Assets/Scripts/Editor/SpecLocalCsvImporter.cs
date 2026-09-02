@@ -34,8 +34,8 @@ public static class SpecLocalCsvImporter
     /// <summary>저장소 루트의 docs/SpecData. Assets의 형제 디렉터리다.</summary>
     static string DocsDir => Path.Combine(Directory.GetParent(Application.dataPath).FullName, "docs", "SpecData");
 
-    [MenuItem("CookApps/로컬 CSV로 SpecData 갱신 (실험본)")]
-    static void MenuImport()
+    /// <summary>사람이 눌러서 도는 되돌려 넣기. 릴리즈 관리 창이 유일한 호출부다.</summary>
+    public static void RunImportInteractive()
     {
         if (!Import(out string t_summary, out string t_error)) { Debug.LogError("[SpecLocalCsv] " + t_error); return; }
         Debug.LogWarning("[SpecLocalCsv] " + t_summary + "\n※ 이건 로컬 실험본이다. 시트에 반영하지 않으면 다음 '시트 적용 & CS 생성'에서 사라진다.");

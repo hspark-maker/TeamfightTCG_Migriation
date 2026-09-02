@@ -50,6 +50,11 @@ public static class PredatorVfx
 
             if (_attacker == null) return;
 
+            // 줄기가 나가는 그 순간 **공격자** 자리에서 한 번 발광한다 — 빨아들이는 쪽이 어디인지 먼저 읽힌다.
+            // 자리는 transform.position(지금 있는 자리) — 줄기가 도착하는 지점과 같은 기준이라 둘이 어긋나지 않는다.
+            if (_vfx.glow.prefab != null)
+                BattleVfx.Play(_vfx.glow, _attacker.transform.position, _attacker.VfxSortingLayerId);
+
             // 줄기 여러 개가 시차를 두고 빨려 들어간다. 개수는 저작값이고 궤적은 인덱스에서 파생한다 —
             // 난수를 쓰면 두 클라의 화면이 갈린다(연출이라도 관전·리플레이에서 티가 난다).
             int t_count = Mathf.Max(1, _vfx.trailCount);

@@ -6,7 +6,7 @@ using UnityEngine;
 
 // 정적 보상 수령을 서버에 묻는 단일 창구.
 // 자격 판정·지급·낙인의 진실원은 서버 claimReward 다 — 각 도메인의 CanClaim 은 왕복을 아끼는 낙관 검사일 뿐이고,
-// 둘이 엇갈렸을 때 이기는 쪽은 언제나 서버다. 랭크 티어와 토너먼트 정점이 같은 계약을 쓰므로 여기 하나로 모은다.
+// 둘이 엇갈렸을 때 이기는 쪽은 언제나 서버다. 랭크 티어와 모험 정점이 같은 계약을 쓰므로 여기 하나로 모은다.
 internal static class RewardClaimCommand
 {
     // 서버 ClaimOwnerType 과 같은 문자열이어야 한다(스펙시트 Reward.ownerType 열 값).

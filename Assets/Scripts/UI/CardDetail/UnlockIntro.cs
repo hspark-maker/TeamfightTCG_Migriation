@@ -16,8 +16,6 @@ public readonly struct UnlockIntro
     /// <summary>어느 키워드인가. 시너지면 None.</summary>
     public readonly CardKeyword Keyword;
 
-    // 데모 무대가 대본을 고르고 연출 에셋(vfx)을 꺼내는 데 쓴다. id 문자열만 나르면 무대가 레지스트리에서
-    // 이미 손에 있던 것을 다시 푸는 두 번째 해석 지점이 생긴다.
     /// <summary>어느 시너지인가. 키워드 줄이면 null.</summary>
     public readonly SynergyData Synergy;
 
@@ -54,12 +52,7 @@ public readonly struct UnlockIntro
         _intro = default;
         if (_synergy == null) return false;
 
-        // 요구 장수는 본문에 섞지 않는다 — 티어를 줄로 세우는 화면(UnlockIntroRow)이 Synergy를 보고 직접 그린다.
-        //
-        // 배율은 1이다. SynergyIconStrip.IconPadCompensation(1.39)이 전제한 "시너지 PNG의 투명 여백"은
-        // 실측에서 반증됐다 — 현행 8종이 쓰는 아이콘은 전부 여백이 없어 그 보정을 걸면 39% 부푼다.
-        // 상수 자체는 건드리지 않는다: 같은 값을 쓰는 다른 세 화면(KeywordExplain·CardDetailChip·ExplainPopup)은
-        // 프리팹 rect가 그 보정을 전제로 저작돼 있어 함께 움직이면 그쪽이 깨진다.
+        // 배율 1 — 현행 시너지 아이콘은 여백이 없어 SynergyIconStrip.IconPadCompensation(1.39)을 걸면 부푼다.
         _intro = new UnlockIntro(_synergy.activeIcon, 1f,
                                  SynergyText.Name(_synergy), SynergyText.Effect(_synergy), CardKeyword.None,
                                  _synergy);

@@ -2,11 +2,8 @@ using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 잠김 판(Lock)이 걷히는 순간의 연출 — 빛이 자물쇠로 모였다가, 자물쇠가 터지며 판이 사라진다.
+// 잠김 판이 걷히는 순간의 연출 — 빛이 자물쇠로 모였다가, 자물쇠가 터지며 판이 사라진다.
 // 잠김 판 노드에 붙인다(키워드 섹션·시너지 섹션 각각 한 장).
-//
-// 경계: "언제 걷히는가"는 전부 호출부(CardDetailOverlayView)가 판정한다. 여기는 부르면 한 번 도는 연출만 소유한다.
-// 빛 알갱이는 획득 코인과 같은 궤적기(CoinBurstEffect → UiGainBurst)를 쓴다 — 두 연출의 손맛이 갈리지 않게.
 [RequireComponent(typeof(RectTransform))]
 public class SectionUnlockFx : MonoBehaviour
 {
@@ -53,8 +50,7 @@ public class SectionUnlockFx : MonoBehaviour
     CoinBurstEffect m_burst;
     Sequence        m_seq;
 
-    // 저작값. 연출이 끝나거나 잘려도 여기로 되돌린다 — 다시 잠기는 화면(다른 카드로 넘김)에서
-    // 투명한 판이나 사라진 자물쇠가 뜨지 않게. 진입 시점 값을 기준으로 삼으면 그 어긋남이 이월된다.
+    // 저작값. 진입 시점 값을 기준으로 삼으면 앞 연출의 어긋남이 이월된다.
     float   m_plateAlpha0 = 1f;
     float   m_markAlpha0  = 1f;
     Vector3 m_markScale0  = Vector3.one;
@@ -65,8 +61,7 @@ public class SectionUnlockFx : MonoBehaviour
     RectTransform Mark       => this.lockMark != null ? this.lockMark : (RectTransform)transform;
     Graphic       MarkGraphic => this.Mark != null ? this.Mark.GetComponent<Graphic>() : null;
 
-    /// <summary>판을 연출로 걷는다. 꺼져 있으면 아무것도 하지 않는다.
-    /// 끝나면 노드를 <b>비활성</b>으로 남긴다 — 즉시 걷던 예전 동작과 최종 상태가 같아야 한다.</summary>
+    /// <summary>판을 연출로 걷고 노드를 비활성으로 남긴다. 꺼져 있으면 아무것도 하지 않는다.</summary>
     public Tween Play()
     {
         if (!gameObject.activeInHierarchy) return null;
@@ -81,21 +76,18 @@ public class SectionUnlockFx : MonoBehaviour
 
         var t_seq = DOTween.Sequence().SetLink(gameObject);
 
-        // ① 빛이 자물쇠로 모인다. 알갱이가 닿을 때마다 자물쇠가 한 번씩 튄다.
         Sequence t_gather = BuildGather(t_mark);
         if (t_gather != null) t_seq.Append(t_gather);
 
-        // 뒷빛은 ①과 **같은 구간에** 차오른다 — 알갱이가 모이는 동안 자물쇠 뒤가 밝아져야
-        // "빛이 자물쇠로 몰린다"로 읽힌다. 0초에 얹어 모임과 길이를 맞춘다.
+        // 뒷빛은 모임과 같은 구간을 덮어야 "빛이 자물쇠로 몰린다"로 읽힌다.
         float t_gatherLen = t_gather != null ? Mathf.Max(0.02f, t_gather.Duration()) : 0f;
         StageBackLight(t_seq, t_gatherLen, t_break);
 
-        // ② 자물쇠가 커지며 사라지고, 같은 박자에 판이 걷힌다.
         t_seq.Append(t_mark.DOScale(this.m_markScale0 * this.breakScale, t_break).SetEase(Ease.OutCubic));
         if (t_glyph != null) t_seq.Join(t_glyph.DOFade(0f, t_break).SetEase(Ease.InQuad));
         if (t_plate != null) t_seq.Join(t_plate.DOFade(0f, t_break).SetEase(Ease.InQuad));
 
-        // 정상 종료든 잘림이든 한 곳에서 끝낸다 — 판은 꺼지고 값은 저작값으로 돌아간다(멱등).
+        // 잘려도 판은 꺼지고 값은 저작값으로 돌아가게 마무리는 한 곳에서.
         t_seq.OnKill(() =>
         {
             this.m_seq = null;
@@ -109,9 +101,7 @@ public class SectionUnlockFx : MonoBehaviour
         return t_seq;
     }
 
-    /// <summary>남은 구간을 최종 상태로 끌어당긴다(탭 스킵). 완료 콜백은 정상 종료와 같게 흐른다 —
-    /// 다음 박을 여는 곳이 그 콜백이라 Kill로 끊으면 흐름이 그 자리에서 멈춘다.
-    /// 돌고 있지 않으면 false — 부른 쪽은 "이 박은 이미 지났다"로 읽는다.</summary>
+    /// <summary>남은 구간을 최종 상태로 끌어당긴다(탭 스킵). 돌고 있지 않으면 false.</summary>
     public bool RequestSkip()
     {
         Sequence t_seq = this.m_seq;
@@ -140,13 +130,12 @@ public class SectionUnlockFx : MonoBehaviour
 
     void OnDisable()
     {
-        // 연출 도중 꺼지면 마무리 콜백이 오지 않는다 — 여기서 끊어 알갱이와 트윈을 걷는다.
+        // 연출 도중 꺼지면 마무리 콜백이 오지 않아 알갱이와 트윈이 남는다.
         KillRunning();
         RestoreAuthored();
     }
 
-    /// <summary>자물쇠 뒤 빛을 시퀀스에 얹는다. 모이는 동안 차오르고, 터질 때 한 번 더 부풀었다 꺼진다.
-    /// 시간 축을 Insert로 못 박는 이유 — 모임(_gatherLen)과 같은 구간을 덮어야 두 축이 한 몸으로 읽힌다.</summary>
+    /// <summary>자물쇠 뒤 빛을 시퀀스에 얹는다. 모이는 동안 차오르고, 터질 때 한 번 더 부풀었다 꺼진다.</summary>
     void StageBackLight(Sequence _seq, float _gatherLen, float _breakLen)
     {
         if (this.backLight == null) return;
@@ -154,25 +143,22 @@ public class SectionUnlockFx : MonoBehaviour
         var t_rt = (RectTransform)this.backLight.transform;
         this.backLight.gameObject.SetActive(true);
 
-        // 차오름: 알파 0 → backLightAlpha, 크기 0.6배 → backLightScale.
         float t_rise = Mathf.Max(0.02f, _gatherLen);
         _seq.Insert(0f, this.backLight.DOFade(this.backLightAlpha, t_rise).SetEase(Ease.OutQuad));
         _seq.Insert(0f, t_rt.DOScale(this.m_backScale0 * this.backLightScale, t_rise).SetEase(Ease.OutQuad));
 
-        // 회전은 길이를 시간으로 환산한다 — 속도(초당 각도)를 저작값으로 두면 구간 길이를 바꿔도 손맛이 유지된다.
+        // 저작값이 속도(초당 각도)라 구간 길이로 환산한다.
         float t_total = t_rise + _breakLen;
         if (!Mathf.Approximately(this.backLightSpin, 0f))
             _seq.Insert(0f, t_rt.DOLocalRotate(new Vector3(0f, 0f, this.backLightSpin * t_total), t_total,
                                                RotateMode.LocalAxisAdd).SetEase(Ease.Linear));
 
-        // 터짐: 자물쇠가 깨지는 구간과 같은 박자로 한 번 더 부풀었다 사라진다.
         _seq.Insert(t_rise, t_rt.DOScale(this.m_backScale0 * this.backLightScale * this.backLightBurstScale, _breakLen)
                                 .SetEase(Ease.OutCubic));
         _seq.Insert(t_rise, this.backLight.DOFade(0f, _breakLen).SetEase(Ease.InQuad));
     }
 
     // 빛 알갱이. 자물쇠 자리에서 퍼졌다가 그 자리로 다시 모인다(출발 == 목적지).
-    // 스프라이트 미배선이면 CoinBurstEffect가 빈 시퀀스를 돌려주므로 이 단계만 조용히 빠진다.
     Sequence BuildGather(RectTransform _mark)
     {
         if (this.moteSprite == null || this.moteCount <= 0) return null;
@@ -191,8 +177,7 @@ public class SectionUnlockFx : MonoBehaviour
     {
         if (this.m_burst != null) return this.m_burst;
 
-        // 알갱이는 이 노드 기준 anchoredPosition으로 난다 — 원점·피벗을 부모와 맞춰야 궤적이 성립한다
-        // (CurrencyGainEffectPlayer.EnsureBurst와 같은 규약).
+        // 알갱이는 이 노드 기준 anchoredPosition으로 나므로 원점·피벗을 부모와 맞춰야 궤적이 성립한다.
         var t_go = new GameObject("UnlockBurst", typeof(RectTransform), typeof(CoinBurstEffect));
         var t_rt = (RectTransform)t_go.transform;
         t_rt.SetParent(transform, false);

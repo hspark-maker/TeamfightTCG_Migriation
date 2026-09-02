@@ -65,6 +65,10 @@ public class KeywordGrowthPanel : PooledUIBase
     // 버튼이 되살아나 같은 결제가 두 번 나간다.
     bool m_upgradePending;
 
+    // 강화 요청 한 건의 신원. 응답이 왔거나 연출이 걷히면 올려서, 그 요청을 따라다니던
+    // 대기 표시 예약(HoldAfterUpgradeFxAsync)이 뒤늦게 깨어나도 빈 차단막을 세우지 못하게 한다.
+    int m_upgradeGeneration;
+
     // 업그레이드 버튼이 안내 타깃으로 등록된 상태(자기 것만 해제하려고 들고 있다)
     bool m_upgradeAnchored;
 
@@ -207,12 +211,24 @@ public class KeywordGrowthPanel : PooledUIBase
         UniTask                t_fxDone  = this.PlayUpgradeFx(_cost);
         UniTask<EnhanceResult> t_request = KeywordGrowthManager.TryEnhanceAsync(_keyword);
 
-        EnhanceResult t_result = await t_request;
+        this.HoldAfterUpgradeFxAsync(t_fxDone, ++this.m_upgradeGeneration).Forget();
+
+        EnhanceResult t_result;
+
+        // Release가 한 번이라도 새면 전역 오버레이가 화면을 영영 잠근다.
+        try
+        {
+            t_result = await t_request;
+        }
+        finally
+        {
+            this.m_upgradeGeneration++;
+            this.m_upgradePending = false;
+            ServerWaitOverlay.Release(this);
+        }
 
         // 왕복 중 패널이 사라졌으면 맺을 무대가 없다(레벨·잔액은 서버가 이미 확정했다).
         if (this == null) return;
-
-        this.m_upgradePending = false;
 
         // 닫힌 뒤에 돌아온 응답도, 서버가 거절한 응답도 같다 — 앞세운 연출을 콜백 없이 걷고 잠금만 되돌린다.
         if (!this.m_visible || t_result.Outcome != EEnhanceOutcome.Success)
@@ -231,6 +247,18 @@ public class KeywordGrowthPanel : PooledUIBase
 
         this.m_fxPlaying = false;
         this.RefreshAction();
+    }
+
+    // 왕복 전체를 덮지 않는 이유는 앞세운 코인 연출이 지연을 감추는 장치 그 자체이기 때문이다.
+    async UniTaskVoid HoldAfterUpgradeFxAsync(UniTask _fxDone, int _generation)
+    {
+        await _fxDone;
+
+        // 연출을 걷는 쪽(KillUpgradeFx)이 TrySetResult로 이 await를 그 자리에서 인라인 재개시키므로,
+        // "이미 걷혔는가"를 플래그로 물으면 아직 내려가지 않은 값을 읽는다 — 세대만이 정확히 답한다.
+        if (this == null || _generation != this.m_upgradeGeneration) return;
+
+        ServerWaitOverlay.Hold(this);
     }
 
     KeywordGrowthCellView FindCell(CardKeyword _keyword)
@@ -345,6 +373,10 @@ public class KeywordGrowthPanel : PooledUIBase
 
     void KillUpgradeFx()
     {
+        // 아래 CompleteUpgradeFxWait가 대기 중인 HoldAfterUpgradeFxAsync를 인라인으로 깨우므로,
+        // 세대를 먼저 올려야 걷힌 요청이 차단막을 세우지 못한다.
+        this.m_upgradeGeneration++;
+
         Sequence t_sequence = this.m_upgradeFx;
         this.m_upgradeFx = null;
         if (t_sequence != null && t_sequence.IsActive()) t_sequence.Kill();

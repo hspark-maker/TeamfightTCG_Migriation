@@ -1,16 +1,12 @@
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
-using Fusion;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>멀티플레이 테스트 전용 단독 초기화. 로비 UI·세이브·초기화(InitializationRunner) 없이
-/// 덱을 정하고 방에 붙어 전투 씬까지 넘긴다. 정식 경로는 MultiplayerLobbyPanel이며,
-/// 이 스크립트는 그 흐름(덱 확정 → JoinRoom → 2인 → SetMultiplayer → Runner.LoadScene)을 그대로 따른다.</summary>
+/// 테스트 계정과 덱을 준비하고, 전투 진입은 정식 로비 런처에 위임한다.</summary>
 public class MultiplayerTestInitializer : MonoBehaviour
 {
-    const int REQUIRED_PLAYERS = 2;
-
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
 
     static bool s_commandLineSwitchConsumed;
@@ -26,12 +22,6 @@ public class MultiplayerTestInitializer : MonoBehaviour
     }
 #endif
 
-    [Header("방")]
-    [Tooltip("두 클라이언트가 같은 값이어야 같은 방에 붙는다.")]
-    [SerializeField] string roomName = "TestRoom";
-    [Tooltip("켜면 방 이름 대신 랜덤 매칭(JoinRandomRoom)을 쓴다.")]
-    [SerializeField] bool useRandomMatch;
-
     [Header("덱")]
     [Tooltip("저장된 덱 슬롯 0 이 유효하면 그쪽이 우선한다. 슬롯 0 이 비었을 때만 이 목록을 쓰고, " +
              "그것도 비면 카탈로그 앞에서 6장을 채운다. 서버 lockDeck 이 소유·성장을 세이브와 대조하므로 " +
@@ -45,11 +35,21 @@ public class MultiplayerTestInitializer : MonoBehaviour
     [SerializeField] string testAccountId = string.Empty;
 
     string status = "대기";
-    bool connecting;
+    System.IDisposable bootReadyHandle;
     bool switchingAccount;
-    int playerCount;
+    bool lastBusy;
     List<int> resolvedDeck;
     string resolvedAccountId = string.Empty;
+    LobbyMatchLauncher matchLauncher;
+
+    public event System.Action<string> OnStatusChanged;
+    public event System.Action OnStateChanged;
+    public string Status => this.status;
+    public IReadOnlyList<int> ResolvedDeck => this.resolvedDeck;
+    LobbyMatchLauncher MatchLauncher =>
+        this.matchLauncher != null ? this.matchLauncher : this.matchLauncher = GetComponent<LobbyMatchLauncher>();
+
+    public bool IsBusy => this.switchingAccount || (MatchLauncher != null && MatchLauncher.IsRunning);
 
     void Start()
     {
@@ -82,8 +82,17 @@ public class MultiplayerTestInitializer : MonoBehaviour
             return;
         }
 
+        // 소유 캐시를 세이브에서 채운다(설치기·ServerSlotRehydrator와 같은 순서: 소유 → 성장).
+        // 빼먹으면 s_owned가 빈 채로 남아, 카드 한 장만 지급해도 Save가 세이브의 소유 목록을 그 한 장으로 덮는다.
+        OwnershipManager.Init();
+        DeckSaveManager.LoadFromSave();
+
         // 멀티는 IMatchGrowthSource가 확정한 성장 스냅샷을 요구한다 — 설치기 없는 씬에서는 여기서 세운다.
         GrowthStandaloneInitializer.Ensure();
+
+        // 정식 덱 편집 프리팹과 카드 아트는 Addressables 캐시를 통해서만 얻는다.
+        if (!CardArtCache.IsComplete) StartCoroutine(CardArtCache.Preload(CardCatalog.AllSpecs));
+        if (!UiPrefabCache.IsComplete && !UiPrefabCache.HasFailed) UiPrefabCache.Preload().Forget();
 
         if (!TryResolveDeck(out this.resolvedDeck, out string t_deckError))
         {
@@ -99,31 +108,124 @@ public class MultiplayerTestInitializer : MonoBehaviour
         }
 
         // 자동 접속하지 않는다 — 두 클라이언트의 진입 시점을 손으로 맞춰야 서버 페어링을 관찰할 수 있다.
-        SetStatus($"덱 준비 완료(슬롯 0): {string.Join(", ", this.resolvedDeck)} — [접속]을 눌러라.");
+        SetStatus($"덱 준비 완료(슬롯 {DeckSaveManager.SelectedSlot}): {string.Join(", ", this.resolvedDeck)}");
+
+        // 이 씬은 Initialize.prefab(정식 기동)을 함께 들고 있고, 그 채택은 여기보다 **나중에** 끝난다 —
+        // 위에서 확정한 덱은 채택 전 세이브(=빈 슬롯) 기준이라 카탈로그 폴백일 수 있다.
+        // 채택이 끝나면 진짜 저장 덱으로 한 번 더 확정한다. 안 하면 서버 lockDeck 이 대조하는 덱과 갈린다.
+        this.bootReadyHandle?.Dispose();
+        this.bootReadyHandle = GameInitialization.WhenReady(ReapplySavedDeckAfterBoot);
     }
 
     void OnDestroy()
     {
-        if (NetworkSession.Instance == null) return;
-        NetworkSession.Instance.OnPlayerJoinedRoom -= HandlePlayerJoined;
-        NetworkSession.Instance.OnPlayerLeftRoom -= HandlePlayerLeft;
-        NetworkSession.Instance.OnConnectionFailed -= HandleConnectionFailed;
+        this.bootReadyHandle?.Dispose();
+        this.bootReadyHandle = null;
     }
 
-    public void Connect()
+    // 바쁨 상태의 주인이 런처(m_running)로 옮겨갔는데 런처는 상태 변경을 알리지 않는다. 폴링하지 않으면
+    // 매칭이 취소·실패로 끝난 뒤 OnStateChanged 가 영영 안 와서 디버그 패널의 버튼이 잠긴 채로 남는다
+    // (예전에는 this.connecting 이 이쪽 소유라 모든 출구가 SetStatus 를 거쳤다).
+    void Update()
     {
-        if (this.connecting) return;
-        if (!DeckConfig.HasDeck) { SetStatus("덱이 없어 접속하지 않는다."); return; }
-        ConnectAsync().Forget();
+        bool t_busy = IsBusy;
+        if (t_busy == this.lastBusy) return;
+        this.lastBusy = t_busy;
+
+        if (t_busy) OnStateChanged?.Invoke();
+        else SetStatus("로비 진입 절차가 끝났습니다 — 다시 시도할 수 있습니다.");
     }
+
+    // 기존 디버그 버튼 배선을 보존하되 방 직행은 없앤다. 두 버튼 모두 정식 로비 진입점을 탄다.
+    public void Connect() => StartRankedMatchmaking();
 
     public void Disconnect()
     {
         if (NetworkSession.Instance != null) NetworkSession.Instance.Disconnect().Forget();
-        this.connecting = false;
-        this.playerCount = 0;
         SetStatus("연결 해제");
     }
+
+    public bool TryApplySavedDeck(int _slot, out string _message)
+    {
+        if (_slot < 0 || _slot >= DeckSaveManager.SLOT_COUNT)
+        {
+            _message = $"슬롯은 0~{DeckSaveManager.SLOT_COUNT - 1} 사이여야 합니다.";
+            return false;
+        }
+        if (!DeckSaveManager.IsSlotValid(_slot))
+        {
+            _message = $"슬롯 {_slot}에 완성된 덱이 없습니다.";
+            return false;
+        }
+
+        if (!DeckSaveManager.TrySelectSlot(_slot))
+        {
+            _message = $"슬롯 {_slot} 저장 후 선택에 실패했습니다.";
+            return false;
+        }
+
+        this.resolvedDeck = new List<int>(DeckSaveManager.Load(_slot));
+        DeckConfig.Set(this.resolvedDeck);
+        _message = $"슬롯 {_slot} 출전 덱 확정: {string.Join(", ", this.resolvedDeck)}";
+        SetStatus(_message);
+        return true;
+    }
+
+    // 기동 채택 이후의 재확정. 편집으로 이미 다른 덱을 확정해 뒀으면 그것을 덮지 않는다 —
+    // 채택 완료가 유저 조작보다 늦게 올 수 있고, 그때 덮으면 방금 고른 덱이 조용히 되돌아간다.
+    void ReapplySavedDeckAfterBoot()
+    {
+        this.bootReadyHandle = null;
+        if (IsBusy) return;
+
+        int t_slot = DeckSaveManager.SelectedSlot;
+        if (t_slot < 0 || !DeckSaveManager.IsSlotValid(t_slot)) return;
+
+        List<int> t_saved = new List<int>(DeckSaveManager.Load(t_slot));
+        if (this.resolvedDeck != null && SameDeck(this.resolvedDeck, t_saved)) return;
+
+        this.resolvedDeck = t_saved;
+        DeckConfig.Set(this.resolvedDeck);
+        SetStatus($"초기화 완료 — 저장 덱으로 재확정(슬롯 {t_slot}): {string.Join(", ", this.resolvedDeck)}");
+    }
+
+    static bool SameDeck(List<int> _left, List<int> _right)
+    {
+        if (_left == null || _right == null || _left.Count != _right.Count) return false;
+        for (int t_i = 0; t_i < _left.Count; t_i++)
+            if (_left[t_i] != _right[t_i]) return false;
+        return true;
+    }
+
+    public void StartRankedMatchmaking()
+    {
+        if (IsBusy) return;
+
+        LobbyMatchLauncher t_launcher = MatchLauncher;
+        if (t_launcher == null)
+        {
+            SetStatus("정식 로비 런처가 배선되지 않았습니다.");
+            return;
+        }
+
+        t_launcher.StartAiBattle();
+        SetStatus(t_launcher.IsRunning
+            ? "정식 로비 진입 절차 시작"
+            : "정식 진입 조건을 충족하지 못했습니다(기능 잠금 또는 유효 덱 확인).");
+    }
+
+    public bool CanOpenDeckEditor =>
+        PlayerSaveCloud.IsGateComplete && CardArtCache.IsComplete && UiPrefabCache.IsComplete &&
+        UIPoolManager.Instance != null && DataLibrary.instance != null;
+
+    public bool DeckEditorLoadFailed => CardArtCache.HasFailed || UiPrefabCache.HasFailed;
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    public void SwitchToNewTestAccount()
+    {
+        if (!this.switchingAccount) SwitchToNewTestAccountAsync().Forget();
+    }
+#endif
 
     // ── 덱 확정 ───────────────────────────────────────────────────────────
 
@@ -146,7 +248,6 @@ public class MultiplayerTestInitializer : MonoBehaviour
         }
 
         this.switchingAccount = true;
-        this.connecting = false;
         SetStatus("새 테스트 계정 발급 중...");
 
         try
@@ -186,7 +287,6 @@ public class MultiplayerTestInitializer : MonoBehaviour
         }
 
         this.switchingAccount = true;
-        this.connecting = false;
         SetStatus($"테스트 계정 '{_accountId}' 로그인 중...");
 
         try
@@ -251,10 +351,11 @@ public class MultiplayerTestInitializer : MonoBehaviour
     {
         _error = null;
 
-        // 슬롯 0 이 정본이다 — 서버 lockDeck 이 이 덱의 소유·성장을 세이브 문서와 대조한다.
-        if (DeckSaveManager.IsSlotValid(0))
+        // 저장된 대표 슬롯을 그대로 쓴다 — 편집에서 선택한 좌표와 다음 매칭의 출전 덱이 같아야 한다.
+        int t_selectedSlot = DeckSaveManager.SelectedSlot;
+        if (t_selectedSlot >= 0 && DeckSaveManager.IsSlotValid(t_selectedSlot))
         {
-            _deck = new List<int>(DeckSaveManager.Load(0));
+            _deck = new List<int>(DeckSaveManager.Load(t_selectedSlot));
             return true;
         }
 
@@ -271,148 +372,12 @@ public class MultiplayerTestInitializer : MonoBehaviour
         return false;
     }
 
-    // ── 접속 ─────────────────────────────────────────────────────────────
-
-    async UniTaskVoid ConnectAsync()
-    {
-        this.connecting = true;
-        SetStatus("연결 중...");
-
-        NetworkSession t_session = EnsureSession();
-
-        t_session.OnPlayerJoinedRoom -= HandlePlayerJoined;
-        t_session.OnPlayerLeftRoom -= HandlePlayerLeft;
-        t_session.OnConnectionFailed -= HandleConnectionFailed;
-        t_session.OnPlayerJoinedRoom += HandlePlayerJoined;
-        t_session.OnPlayerLeftRoom += HandlePlayerLeft;
-        t_session.OnConnectionFailed += HandleConnectionFailed;
-
-        bool t_ok = this.useRandomMatch
-            ? await t_session.JoinRandomRoom()
-            : await t_session.JoinOrCreateRoom(this.roomName);
-
-        if (!t_ok)
-        {
-            this.connecting = false;
-            SetStatus("연결 실패. Photon AppId·네트워크 확인.");
-            return;
-        }
-
-        this.playerCount = CountActivePlayers();
-        UpdateWaitingStatus();
-
-        // 내가 늦게 들어와 이미 2인이면 OnPlayerJoined가 안 온다 — 여기서 한 번 더 판정한다.
-        if (this.playerCount >= REQUIRED_PLAYERS) BeginBattle();
-    }
-
-    /// <summary>씬에 NetworkSession이 없으면 만들어 준다(단독 실행 편의). 이미 있으면 그것을 쓴다.</summary>
-    static NetworkSession EnsureSession()
-    {
-        if (NetworkSession.Instance != null) return NetworkSession.Instance;
-        new GameObject("NetworkSession").AddComponent<NetworkSession>();
-        return NetworkSession.Instance;
-    }
-
-    void HandlePlayerJoined(PlayerRef _player)
-    {
-        this.playerCount = CountActivePlayers();
-        UpdateWaitingStatus();
-        if (this.playerCount >= REQUIRED_PLAYERS) BeginBattle();
-    }
-
-    void HandlePlayerLeft(PlayerRef _player)
-    {
-        this.playerCount = CountActivePlayers();
-        UpdateWaitingStatus();
-    }
-
-    void HandleConnectionFailed(string _reason)
-    {
-        this.connecting = false;
-        SetStatus($"연결 끊김: {_reason}");
-    }
-
-    void BeginBattle()
-    {
-        // 양쪽 클라가 각자 켠다. 씬 전환만 마스터가 건다(Fusion이 나머지를 따라오게 한다).
-        DeckConfig.SetMultiplayer(true);
-        SetStatus("전투 시작");
-
-        NetworkRunner t_runner = NetworkSession.Instance?.Runner;
-        if (t_runner == null || !t_runner.IsSharedModeMasterClient) return;
-
-        string t_sceneName = NetworkSession.Instance.BattleSceneName;
-        int t_buildIndex = SceneUtility.GetBuildIndexByScenePath($"Assets/Scenes/{t_sceneName}.unity");
-        if (t_buildIndex < 0) t_buildIndex = SceneUtility.GetBuildIndexByScenePath(t_sceneName);
-        if (t_buildIndex < 0)
-        {
-            SetStatus($"'{t_sceneName}'이 Build Settings에 없다.");
-            return;
-        }
-
-        t_runner.LoadScene(SceneRef.FromIndex(t_buildIndex));
-    }
-
-    int CountActivePlayers()
-    {
-        int t_count = 0;
-        if (NetworkSession.Instance?.Runner == null) return t_count;
-        foreach (PlayerRef _ in NetworkSession.Instance.Runner.ActivePlayers) t_count++;
-        return t_count;
-    }
-
-    void UpdateWaitingStatus() => SetStatus($"대기 중... ({this.playerCount}/{REQUIRED_PLAYERS})");
-
     void SetStatus(string _message)
     {
         this.status = _message;
         Debug.Log($"[MpTest] {_message}");
+        OnStatusChanged?.Invoke(_message);
+        OnStateChanged?.Invoke();
     }
 
-    // ── 디버그 화면 ───────────────────────────────────────────────────────
-    // 테스트 전용이라 UI 프리팹을 만들지 않고 OnGUI로 끝낸다.
-
-    // 기준 높이. 이보다 큰 화면에서는 같은 비율로 키운다 — 고해상도에서 IMGUI 기본 크기는 읽기 어렵다.
-    const float GUI_REFERENCE_HEIGHT = 720f;
-
-    void OnGUI()
-    {
-        const float WIDTH = 420f;
-
-        Matrix4x4 t_previousMatrix = GUI.matrix;
-        float t_scale = Mathf.Max(1f, Screen.height / GUI_REFERENCE_HEIGHT);
-        GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(t_scale, t_scale, 1f));
-
-        GUILayout.BeginArea(new Rect(20f, 20f, WIDTH, 460f), GUI.skin.box);
-
-        GUILayout.Label("멀티플레이 테스트");
-        GUILayout.Label($"방: {(this.useRandomMatch ? "(랜덤 매칭)" : this.roomName)}");
-        GUILayout.Label($"덱: {(this.resolvedDeck == null ? "-" : string.Join(", ", this.resolvedDeck))}");
-        GUILayout.Label($"상태: {this.status}");
-
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-        FirebaseAuthService t_auth = FirebaseAuthService.Instance;
-        string t_uid = string.IsNullOrEmpty(t_auth.UserId)
-            ? "-"
-            : t_auth.UserId.Substring(0, Mathf.Min(8, t_auth.UserId.Length));
-        GUILayout.Label($"Firebase: {t_auth.State} / UID {t_uid}");
-        GUILayout.Label($"테스트 계정 id: {(string.IsNullOrEmpty(this.resolvedAccountId) ? "-(기기 기본 계정)" : this.resolvedAccountId)}");
-        GUILayout.Label($"클라우드 세이브: {PlayerSaveCloud.State} (rev {PlayerSaveCloud.Revision})");
-#endif
-
-        GUILayout.Space(8f);
-        GUI.enabled = !this.connecting && !this.switchingAccount;
-        if (GUILayout.Button("접속", GUILayout.Height(32f))) Connect();
-        GUI.enabled = true;
-        if (GUILayout.Button("연결 해제", GUILayout.Height(28f))) Disconnect();
-
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-        GUI.enabled = !this.switchingAccount;
-        if (GUILayout.Button("새 테스트 계정 발급", GUILayout.Height(32f))) SwitchToNewTestAccountAsync().Forget();
-        GUI.enabled = true;
-#endif
-
-        GUILayout.EndArea();
-        GUI.matrix = t_previousMatrix;
-    }
 }
