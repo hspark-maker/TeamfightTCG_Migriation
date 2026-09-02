@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
@@ -116,7 +116,6 @@ public class EnemyTurn : TurnBase
             var (t_preSelectedSplash, t_splashView) = AttackFlow.PreSelectSplash(
                 t_atk, t_def, this.ctx.playerField, this.ctx.playerFieldView);
 
-            var (t_preKw, t_atKw) = AttackFlow.Keywords(t_atk);
 
             await AttackFlow.RunBeforeAttack(t_atk, t_def, this.ctx.enemyField, this.ctx.playerField,
                                              t_preSelectedSplash);   // 낙인 선피해(Execute 전 원자)
@@ -130,8 +129,8 @@ public class EnemyTurn : TurnBase
             }
 
             await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
-                t_result.events, t_preKw, t_atKw,
-                () => AttackFlow.RunAfterAttack(t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_result));
+                t_result.events,
+                () => AttackFlow.RunAfterAttackPhase(t_attackerView, t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_result));
 
             // 교활 퇴장은 보충 **전**에 — 슬롯 뷰가 아직 물러나는 카드를 그리고 있는 동안만 가능하다.
             await AttackFlow.PlayCunningSwap(this.ctx.enemyFieldView, t_attackerView, t_result);
@@ -141,8 +140,6 @@ public class EnemyTurn : TurnBase
             // 튜토리얼: 슬롯 지정 스텝대로 끝난 공격의 결과 보드를 기준선으로 재동기(PlayerTurn과 대칭).
             if (TutorialConfig.IsActive && t_scriptedSlots)
                 TutorialConfig.SyncBoardBaseline(this.ctx.playerField, this.ctx.enemyField);
-
-            await AttackFlow.PlayResultFlourish(t_attackerView, t_atk, t_def, t_result);
 
             if (t_result.canAttackAgain && t_atk.IsAlive)
             {

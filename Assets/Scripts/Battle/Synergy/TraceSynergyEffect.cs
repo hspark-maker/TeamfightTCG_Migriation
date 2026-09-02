@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 추적(Trace): [AfterAttack] 하나로 두 단계를 다 처리한다.
@@ -41,7 +41,14 @@ public class TraceSynergyEffect : SynergyEffect
         if (t_wasMarked && _ctx.defenderKilled && this.bonusHpOnMarkedKill > 0)
         {
             _ctx.self.GrantBonusHp(this.bonusHpOnMarkedKill);
-            SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.ownField);
+
+            // 표시는 [6] 처치 단계로 미룬다 — 이 보상은 "죽였다"가 조건이라 ④가 아니다.
+            // 여기서 그냥 내면 아직 서 있는(사망 연출 전) 적 앞에서 처치 보상 배너가 먼저 뜬다.
+            // 규칙(bonusHp)은 위에서 이미 끝났고 담기는 건 순수 표시뿐이다.
+            CardInstance t_self = _ctx.self;
+            SynergyData t_synergy = _ctx.synergy;
+            BattleField t_field = _ctx.ownField;
+            BattlePresentationQueue.RunOnKill(() => SynergyTriggers.Fire(t_self, t_synergy, t_field));
         }
 
         // 이미 표식이 붙은 적은 건너뛴다 — 비트는 어차피 멱등이라 규칙은 안 변하지만,

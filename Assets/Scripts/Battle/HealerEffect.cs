@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -68,7 +68,6 @@ public class HealerEffect
             // 뷰 조회는 재생 직전에 — 대기 중 슬롯이 비거나 카드가 죽었으면 null이 되고,
             // 그 경우 PlayHealBurst가 표기("+N")만 즉시 처리한다(회복 수치는 잃지 않는다).
             CardView t_src = CardView.GetView(_bursts[i].healer);
-            t_src?.PlayKeywordGlow(CardKeyword.Healer).Forget();
             HealVfx.PlayHealBurst(t_src, _bursts[i].healed);
         }
     }

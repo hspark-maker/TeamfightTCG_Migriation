@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
@@ -116,7 +116,6 @@ public class MultiplayerOpponentTurn : TurnBase
             var (t_preSelectedSplash, t_splashView) = AttackFlow.PreSelectSplash(
                 t_atk, t_def, this.ctx.playerField, this.ctx.playerFieldView);
 
-            var (t_preKw, t_atKw) = AttackFlow.Keywords(t_atk);
 
             await AttackFlow.RunBeforeAttack(t_atk, t_def, this.ctx.enemyField, this.ctx.playerField,
                                              t_preSelectedSplash);   // 낙인 선피해(Execute 전 원자)
@@ -131,8 +130,8 @@ public class MultiplayerOpponentTurn : TurnBase
             }
 
             await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
-                t_result.events, t_preKw, t_atKw,
-                () => AttackFlow.RunAfterAttack(t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_result));
+                t_result.events,
+                () => AttackFlow.RunAfterAttackPhase(t_attackerView, t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_result));
 
             // 교활 퇴장은 보충 **전**에 — 슬롯 뷰가 아직 물러나는 카드를 그리고 있는 동안만 가능하다.
             await AttackFlow.PlayCunningSwap(this.ctx.enemyFieldView, t_attackerView, t_result);
@@ -144,8 +143,6 @@ public class MultiplayerOpponentTurn : TurnBase
             this.ctx.playerFieldView.Refresh();
             this.ctx.playerDeckUI?.Refresh();
             await this.ctx.playerFieldView.PlayFillAnim(t_playerPlaced);
-
-            await AttackFlow.PlayResultFlourish(t_attackerView, t_atk, t_def, t_result);
 
             // PlayDeathAnim이 alpha/scale을 1로 리셋하므로, 죽은 슬롯만 즉시 숨김
             // 전체 Refresh는 RPC로 미리 배치된 신규 카드까지 노출시키므로 사용 금지

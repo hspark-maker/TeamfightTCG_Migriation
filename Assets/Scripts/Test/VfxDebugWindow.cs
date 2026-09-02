@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -272,18 +272,5 @@ public class VfxDebugWindow : MonoBehaviour
         if (GUILayout.Button("Heal VFX @T") && Target() != null) Target().PlayHealEffect(this.healAmount);
         if (GUILayout.Button("Hit @T") && Target() != null)     Target().PlayHitAnim(0.15f, this.healAmount, Source()).Forget();
         GUILayout.EndHorizontal();
-
-        GUILayout.Label("키워드 글로우 @T");
-        GUILayout.BeginHorizontal();
-        KeywordGlowButton(CardKeyword.Healer);
-        KeywordGlowButton(CardKeyword.Taunt);
-        KeywordGlowButton(CardKeyword.Ranged);
-        GUILayout.EndHorizontal();
-    }
-
-    void KeywordGlowButton(CardKeyword _kw)
-    {
-        if (GUILayout.Button(_kw.ToString()) && Target() != null)
-            Target().PlayKeywordGlow(_kw).Forget();
     }
 }

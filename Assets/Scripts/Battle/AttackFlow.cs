@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using UnityEngine;
 
@@ -8,24 +8,6 @@ using UnityEngine;
 /// </summary>
 public static class AttackFlow
 {
-    /// <summary>히트 시점(at)에 글로우를 이미 재생하는 키워드. <see cref="Keywords"/>와
-    /// <see cref="PlayResultFlourish"/>의 단일 진실원이다.
-    ///
-    /// 양쪽이 각자 나열하면 같은 글로우를 두 번 await 해 공격 뒤 대기가 KeywordGlowHold만큼 더 붙는다
-    /// (원거리·무쌍 후딜이 일반 공격의 두 배가 되던 원인). 여기 넣은 키워드는 PlayResultFlourish에서 빠진다.</summary>
-    public const CardKeyword AtHitGlowKeywords = CardKeyword.Ranged | CardKeyword.Peerless;
-
-    /// <summary>공격자 키워드로 연출용 pre/at 키워드 산출.
-    /// 무쌍/원거리 모두 히트 후(at) 글로우 — 다른 공격과 동일하게 히트 앞에 대기(딜레이) 없음.</summary>
-    public static (CardKeyword pre, CardKeyword at) Keywords(CardInstance _attacker)
-    {
-        CardKeyword t_pre = CardKeyword.None;
-        CardKeyword t_at  = CardKeyword.None;
-        if (_attacker.HasKeyword(CardKeyword.Ranged))   t_at |= CardKeyword.Ranged;
-        if (_attacker.HasKeyword(CardKeyword.Peerless)) t_at |= CardKeyword.Peerless;
-        return (t_pre & AtHitGlowKeywords, t_at & AtHitGlowKeywords);
-    }
-
     /// <summary>무쌍(Peerless) 광역 대상 사전 선정. 비무쌍이면 (null, null).</summary>
     public static (CardInstance splash, CardView splashView) PreSelectSplash(
         CardInstance _attacker, CardInstance _defender,
@@ -90,6 +72,38 @@ public static class AttackFlow
         await SynergyTriggers.AfterAttack(t_ctx);
     }
 
+    /// <summary>[4] 공격 후 단계 묶음 — 규칙 트리거(RunAfterAttack)를 돌리고
+    /// 마지막에 ⑥ 처치 연출을 **예약만** 하고 끝난다(EnqueueKillFlourish).
+    ///
+    /// **AttackSequence 의 _afterHit 로 넘겨** 사망 연출보다 앞에서 돌린다. 6단계 고정 순서
+    /// (공격 전 → 공격 중 → 피격 → 공격 후 → 사망 → 처치, 표는 AttackSequence.PlayCore)에서 이 묶음이 ④다.
+    ///
+    /// 키워드 글로우(발동 키워드·표식)는 폐기됐다 — 이 자리에 있던 결과 연출 PlayResultFlourish도 함께 사라졌다.
+    /// 남은 결과 연출은 처형 하나이고 그건 ⑥이다.</summary>
+    public static async UniTask RunAfterAttackPhase(
+        CardView _attackerView, CardInstance _attacker, CardInstance _defender,
+        BattleField _attackerField, BattleField _defenderField, AttackResult _result)
+    {
+        await RunAfterAttack(_attacker, _defender, _attackerField, _defenderField, _result);
+        EnqueueKillFlourish(_attacker, _result);
+    }
+
+    /// <summary>[6] 처치 연출 예약 — 처형 발동 그림. **여기서 재생하지 않는다.**
+    ///
+    /// 처형은 "죽였다"가 조건이라 ④가 아니라 ⑥이다. 쓰러지는 그림(⑤)보다 앞서 뜨면
+    /// 아직 서 있는 적 위에서 처형이 터지고, 같은 박에 뜨면 둘이 뭉갠다.
+    /// 큐에 담아 AttackSequence가 사망 연출 뒤에 푼다(BattlePresentationQueue.DrainKillsAsync).
+    ///
+    /// 판정은 AttackProcessor가 세운 attackerKeywords 그대로 — 여기서 처치/키워드를 다시 보지 않는다.</summary>
+    static void EnqueueKillFlourish(CardInstance _attacker, AttackResult _result)
+    {
+        if (!_result.attackerKeywords.HasFlag(CardKeyword.Execution)) return;
+
+        CardInstance t_attacker = _attacker;
+        // 뷰는 그때 다시 찾는다 — 예약과 재생 사이에 슬롯이 갈릴 수 있다.
+        BattlePresentationQueue.RunOnKill(() => ExecutionVfx.Play(CardView.GetView(t_attacker)));
+    }
+
     /// <summary>교활 스왑 교대 연출: 물러나는 카드 퇴장 → 슬롯 재렌더 → 들어온 카드가 덱에서 등장.
     ///
     /// **보드 보충(FillEmptySlots/Refresh) 직전에** 부를 것 — 그 전에는 슬롯 뷰가 아직 물러나는 카드를
@@ -108,21 +122,4 @@ public static class AttackFlow
         await CunningVfx.PlayEnter(_attackerView);
     }
 
-    /// <summary>발동 키워드 글로우 + 처형 연출. 교활 등장은 PlayCunningSwap 담당(덱에서 나오는 배치 연출).</summary>
-    public static async UniTask PlayResultFlourish(
-        CardView _attackerView, CardInstance _attacker, CardInstance _defender, AttackResult _result)
-    {
-        // 처형 발동(처치 + 재공격 권한)이면 전용 연출을 글로우와 같은 프레임에 얹는다.
-        // 판정은 AttackProcessor가 세운 attackerKeywords 그대로 — 여기서 처치/키워드를 다시 보지 않는다.
-        if (_result.attackerKeywords.HasFlag(CardKeyword.Execution))
-            ExecutionVfx.Play(CardView.GetView(_attacker));
-
-        // 히트 시점에 이미 재생한 키워드(원거리/무쌍)는 제외 — 안 빼면 같은 글로우를 두 번 기다린다.
-        // attackerKeywords 자체는 그대로 둔다(결과 소비처가 "무슨 키워드가 발동했나"를 읽는 값이라).
-        CardKeyword t_attackerGlow = _result.attackerKeywords & ~AtHitGlowKeywords;
-
-        await UniTask.WhenAll(
-            CardView.GetView(_attacker)?.PlayKeywordGlow(t_attackerGlow) ?? UniTask.CompletedTask,
-            CardView.GetView(_defender)?.PlayKeywordGlow(_result.defenderKeywords) ?? UniTask.CompletedTask);
-    }
 }

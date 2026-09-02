@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -7,9 +7,9 @@ using UnityEngine;
 // 스택 적립/회복 규칙은 CardInstance(legacyStack/Heal)에 위임(단일 진실원). RNG 미소비, 순수 산술.
 // 디스패처가 self 소속에 대해서만 발화하므로 여기서 소속 재판정 불필요.
 //
-// 왕관 연출(LegacyCrownVfx)의 발화점도 여기다 — 턴 시작(지금 스택 수만큼 떴다 사라짐)과
-// 파괴(그 왕관들이 아군에게 날아감)는 밖에서 구분할 수 없다. 둘 다 [Triggered] 하나로 나가기 때문이다.
-// "언제 몇 개를 띄우고 언제 날려 보내는가"를 아는 곳은 이 효과뿐이라 호출도 여기서 한다.
+// 연출(LegacyCrownVfx)의 발화점도 여기다 — 턴 시작(스택 수만큼 왕관이 떴다 사라짐)과
+// 파괴(회복받을 아군에게 궤적이 날아감)는 밖에서 구분할 수 없다. 둘 다 [Triggered] 하나로 나가기 때문이다.
+// "언제 무엇을 띄우고 언제 날려 보내는가"를 아는 곳은 이 효과뿐이라 호출도 여기서 한다.
 // 연출은 상태/RNG를 건드리지 않으므로 결정론 계약과 무관하다.
 [CreateAssetMenu(fileName = "LegacySynergyEffect", menuName = "Card Battle/Synergy Effect/Legacy")]
 public class LegacySynergyEffect : SynergyEffect
@@ -55,7 +55,7 @@ public class LegacySynergyEffect : SynergyEffect
     {
         if (_ctx.self == null || _ctx.field == null || _ctx.self.legacyStack <= 0) return;
 
-        // 회복 대상을 모아 두는 이유는 연출뿐이다 — 쌓인 왕관이 "누구에게" 날아가는지가 이 목록이다.
+        // 회복 대상을 모아 두는 이유는 연출뿐이다 — 궤적이 "누구에게" 날아가는지가 이 목록이다.
         // 규칙(회복량·대상 판정)은 아래 루프가 이미 끝낸 뒤라, 목록이 비어도 회복 결과는 바뀌지 않는다.
         int t_amount = _ctx.self.legacyStack;   // 대상마다 같은 값(오버힐이라 잘리지 않는다)
         var t_healed = new List<CardInstance>();
@@ -67,7 +67,7 @@ public class LegacySynergyEffect : SynergyEffect
             // 오버힐을 허용한다: 힐러와 같은 규칙으로 최대 체력을 넘겨 채운다(Heal의 _allowOverheal).
             // 안 그러면 체력이 꽉 찬 아군에게는 스택이 아무리 높아도 0이라, 판이 길어질수록 효과가 사라진다.
             //
-            // _showEffect:false — **표기는 왕관이 도착할 때** 낸다(힐러 투사체와 같은 규약).
+            // _showEffect:false — **표기는 궤적이 도착할 때** 낸다(힐러 투사체와 같은 규약).
             // 여기는 RemoveDead 안, 즉 공격 연출이 시작되기도 전이라 지금 회복 연출을 내면
             // 뒤따르는 돌진·피격·사망 연출과 뷰 갱신에 그대로 덮여 아무도 못 본다.
             // 수치는 지금 확정되고(결정론) 숫자만 도착까지 유예된다.
@@ -77,8 +77,20 @@ public class LegacySynergyEffect : SynergyEffect
 
         if (t_healed.Count > 0)
         {
-            SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.field);   // 실제 회복 발생 시에만 배너+배지 pop
-            LegacyCrownVfx.Fly(_ctx.self, t_healed, t_amount, _ctx.synergy);   // 왕관이 날아가 닿는 순간 회복 표기
+            // 표시는 [5] 사망 단계로 미룬다. 여기(RemoveDead 안)는 공격 모션이 시작되기도 전이라
+            // 그대로 재생하면 궤적이 **죽는 그림보다 먼저** 날아간다 — 6단계 순서
+            // (공격 전 → 공격 중 → 피격 → 공격 후 → 사망 → 처치)에서 사망 표시는 다섯 번째다.
+            // 접촉 프레임(Drain)이 아니라 사망 배치(DrainDeaths)인 이유도 같다: 이건 이 카드가
+            // 쓰러지며 남기는 것이라, 아직 멀쩡히 서 있는 카드에서 나가면 인과가 안 읽힌다.
+            // 규칙(회복량·대상)은 위에서 이미 확정됐다 — 여기 담기는 건 순수 표시뿐이다.
+            CardInstance t_self = _ctx.self;
+            SynergyData t_synergy = _ctx.synergy;
+            BattleField t_field = _ctx.field;
+            BattlePresentationQueue.RunOnDeath(() =>
+            {
+                SynergyTriggers.Fire(t_self, t_synergy, t_field);   // 실제 회복 발생 시에만 배너+배지 pop
+                LegacyCrownVfx.PlayHealTrails(t_self, t_healed, t_amount, t_synergy);   // 궤적 + 회복 표기
+            });
         }
     }
 }

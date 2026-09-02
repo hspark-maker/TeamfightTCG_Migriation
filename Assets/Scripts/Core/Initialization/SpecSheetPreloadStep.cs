@@ -14,7 +14,7 @@ public sealed class SpecSheetPreloadStep : MainInitializer
         GrowthSpec.Init();
 
         // 보상 표가 비면 앨범·모험·랭크는 조용히 0을 표시하고, 전투는 매판 0을 지급한다.
-        // 그 사고는 유저 신고 전에는 드러나지 않으므로 부팅에서 세운다.
+        // 그 사고는 유저 신고 전에는 드러나지 않으므로 초기화에서 세운다.
         if (!RewardSpec.TryValidateRequired(out string t_rewardError))
         {
             Debug.LogError($"[SpecSheetPreloadStep] {t_rewardError}");

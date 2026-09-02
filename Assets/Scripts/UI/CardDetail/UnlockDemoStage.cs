@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
@@ -653,12 +653,11 @@ public class UnlockDemoStage : SingletonOverlayBase
         await Hold(SYNERGY_HOLD, _token);
     }
 
-    // 유산: 턴마다 쌓은 것이 쓰러질 때 동료에게 간다.
-    // Show/Fly의 개수 인자 오버로드는 게임 상태를 안 바꾸는 미리보기 진입점이고,
-    // _healAmount 0이면 표기 유예(HealLater)도 걸리지 않는다.
+    // 유산: 턴마다 왕관이 하나씩 쌓인다. Show의 개수 인자 오버로드는 게임 상태를 안 바꾸는 미리보기 진입점이다.
+    // 파괴 국면은 대본에 없다 — 왕관 비행 연출이 제거돼 보여줄 그림이 없다(_ally는 그래서 지금 안 쓴다).
     async UniTask PlayLegacy(CardView _atk, CardView _def, CardView _ally, SynergyData _syn, CancellationToken _token)
     {
-        if (!(_syn.vfx is LegacySynergyVfxConfig t_cfg))
+        if (!(_syn.vfx is LegacySynergyVfxConfig))
         {
             WarnVfxType(_syn, "LegacySynergyVfxConfig");
             await PlayAnySynergy(_atk, _def, _syn, _token);
@@ -673,15 +672,9 @@ public class UnlockDemoStage : SingletonOverlayBase
         await Hold(LEGACY_STEP, _token);
         if (_token.IsCancellationRequested) return;
 
-        if (_ally == null || _ally.BoundCard == null)
-        {
-            // 받을 동료가 없으면 쌓이는 것까지만 보여준다 — 갈 곳 없는 비행은 "누구에게"가 빠진 그림이다.
-            await Hold(SYNERGY_HOLD, _token);
-            return;
-        }
-
-        LegacyCrownVfx.Fly(_atk.BoundCard, new[] { _ally.BoundCard }, 0, _syn, 2);
-        await Hold(t_cfg.flyDuration + t_cfg.arriveHold, _token);
+        // 파괴 국면(왕관 비행)은 연출 자체가 제거됐다 — 남은 것은 회복 숫자뿐이라 데모로 보여줄 그림이 없다.
+        // 그래서 대본은 "쌓이는 것"까지만 보여주고 끝낸다.
+        await Hold(SYNERGY_HOLD, _token);
     }
 
     // 대본이 아직 없는 시너지(새로 늘어난 것)와 연출 에셋 타입이 어긋난 경우의 폴백.
@@ -712,13 +705,10 @@ public class UnlockDemoStage : SingletonOverlayBase
     {
         if (_token.IsCancellationRequested) return UniTask.CompletedTask;
 
-        var (t_preKw, t_atKw) = AttackFlow.Keywords(_atk.BoundCard);
-
         CardView t_splashView = _splash != null && _splash.gameObject.activeSelf ? _splash : null;
 
         return AttackSequence.PlaySplash(_atk, _def,
                                          _events: Array.Empty<TeamfightTCG.BattleCore.BattleEvent>(), _splashView: t_splashView,
-                                         _preEffectKw: t_preKw, _atEffectKw: t_atKw,
                                          _afterHit: _afterHit,
                                          _forceSpecial: false);
     }
@@ -778,7 +768,6 @@ public class UnlockDemoStage : SingletonOverlayBase
 
         if (t_targets.Count == 0) return;
 
-        _healer.PlayKeywordGlow(CardKeyword.Healer).Forget();
         HealVfx.PlayHealBurst(_healer, t_targets);
 
         // 이 연출은 스스로 끝을 알리지 않는다 — 길이는 HealVfx가 아는 값을 그대로 받아 쓴다.

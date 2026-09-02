@@ -60,7 +60,7 @@ public static class TutorialStepExecutor
     /// <summary>실패 분기의 단일 창구 — 결말은 코드가 아니라 저작(onFailure)이 정한다.
     ///
     /// 커밋이 실행보다 앞서는 규약이라(OutgameTutorialStepContext) 실패 처리는 "선커밋을 되돌릴 것인가" 하나로 환원된다.
-    /// Halt는 되돌려 그 자리에 세우고(재시도는 다음 부팅), 호출자는 Failed를 받아 기능 잠금을 연다.</summary>
+    /// Halt는 되돌려 그 자리에 세우고(재시도는 다음 초기화), 호출자는 Failed를 받아 기능 잠금을 연다.</summary>
     static EOutgameTutorialStepResult Fail(TutorialStepDef _step, OutgameTutorialStepContext _context, string _reason)
     {
         bool t_halt = _step != null && _step.OnFailure == EOutgameTutorialFailure.Halt;
@@ -198,7 +198,7 @@ public static class TutorialStepExecutor
             Debug.LogError($"[TutorialStepExecutor] {_where} 자동 구매 왕복 실패(pack={t_packId}) — 이미 전진해 되돌리지 못한다.");
 
             // 되감을 구매 스텝이 없는 갈래라, 오지 않을 개봉 신호를 기다리는 칸에 갇혀 스스로 풀 수 없다.
-            // 망 오류 한 번에 부팅 3회(SameCoordBootCount)를 거듭하게 두지 않으려고 여기서 문을 연다(멱등).
+            // 망 오류 한 번에 초기화 3회(SameCoordBootCount)를 거듭하게 두지 않으려고 여기서 문을 연다(멱등).
             OutgameFeatureLock.NotifyStalled();
             return;
         }

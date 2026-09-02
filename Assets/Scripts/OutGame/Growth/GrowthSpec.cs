@@ -115,7 +115,7 @@ public static class GrowthSpec
         return true;
     }
 
-    /// <summary>전투가 설 수 있는 최소 저작인가. 부팅이 이걸 보고 복구 화면으로 보낸다 — 서버 lockDeck이
+    /// <summary>전투가 설 수 있는 최소 저작인가. 초기화가 이걸 보고 복구 화면으로 보낸다 — 서버 lockDeck이
     /// 카드 강화 규칙이나 한계돌파 곡선을 못 읽으면 덱 잠금 전체를 거절하므로, 그 상태로 로비까지 들여보내면
     /// 안내도 없이 전투 진입에서 막힌다. KeywordEnhance는 여기 없다 — 서버도 키워드 강화만 거절하고 전투는 세운다.</summary>
     public static bool TryValidateRequired(out string _error)

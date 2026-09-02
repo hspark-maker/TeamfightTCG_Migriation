@@ -258,7 +258,7 @@ public static class TutorialValidator
     }
 
     // (6) 덱 게이트가 세우는 화면은 시나리오가 붙잡는 것이라 앱을 끄면 사라진다 —
-    //     그 구간에서 재부팅하면 좌표가 진입 스텝으로 되감기고 사이 스텝이 다시 재생된다.
+    //     그 구간에서 재초기화하면 좌표가 진입 스텝으로 되감기고 사이 스텝이 다시 재생된다.
     static void ValidateDeckGate(TutorialStepDef _def, int _chapter, int _index,
                                  bool _inSpan, bool _unclosed, List<TutorialIssue> _issues)
     {
@@ -269,7 +269,7 @@ public static class TutorialValidator
 
         if (_inSpan && IsGrantOnEnter(_def.Action))
             Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "게이트 구간 지급",
-                $"덱 게이트가 열려 있는 구간의 {_def.Action} — 이 구간에서 재부팅하면 좌표가 진입 스텝으로 되감겨 지급이 다시 실행됩니다.",
+                $"덱 게이트가 열려 있는 구간의 {_def.Action} — 이 구간에서 재초기화하면 좌표가 진입 스텝으로 되감겨 지급이 다시 실행됩니다.",
                 "이 스텝을 게이트 구간 밖(전투 진입 전 또는 전투 후)으로 옮기세요.");
     }
 
@@ -313,13 +313,13 @@ public static class TutorialValidator
         var t_action = _def.Action;
 
         // (5) Halt는 좌표를 되돌려 재시도를 노리는 정책인데, 앵커도 완료 신호도 없으면 되돌려 봐야 다시 세울 수단이 없다.
-        //     되돌린 좌표가 온보딩은 세이브에 남아 다음 부팅을 노릴 수라도 있지만, 트리거는 메모리 전용이라 그 기회조차 없다.
+        //     되돌린 좌표가 온보딩은 세이브에 남아 다음 초기화를 노릴 수라도 있지만, 트리거는 메모리 전용이라 그 기회조차 없다.
         if (_def.OnFailure == EOutgameTutorialFailure.Halt
          && _def.Completion == EOutgameTutorialCompletion.Auto
          && _def.Anchor == EOutgameTutorialAnchor.None)
             Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "재개 불가 Halt",
                 $"{t_action}가 Halt인데 앵커도 완료 신호도 없습니다 — " + (_onboarding
-                    ? "되돌려도 이 초기화에서 다시 세울 수단이 없어 그 자리에서 안내가 끝납니다(재시도는 다음 부팅뿐입니다)."
+                    ? "되돌려도 이 초기화에서 다시 세울 수단이 없어 그 자리에서 안내가 끝납니다(재시도는 다음 초기화뿐입니다)."
                     : "트리거 좌표는 메모리 전용이라 되돌린 자리에서 이 안내가 그대로 끝납니다."),
                 "onFailure를 Skip으로 바꾸거나, 되돌아왔을 때 진행을 다시 세울 앵커를 주세요.");
 
