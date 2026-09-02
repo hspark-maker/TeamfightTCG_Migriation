@@ -103,7 +103,8 @@ public static partial class CardGrowthManager
 
     // 저장값은 저작 상한이 아니라 코드 천장으로 조인다 — 표가 상한을 낮춘 순간 클라만 레벨을 깎으면
     // 서버 덱 검증(고정 천장)과 갈려 lockDeck이 덱을 통째로 거절한다.
-    static int ClampLevel(int _level)
+    // 서버가 내려준 AI 레벨도 같은 이유로 여기를 지난다(BattleGrowthBridge · ServerMatchmaker).
+    public static int ClampLevel(int _level)
         => Mathf.Clamp(_level, CardGrowth.BaseLevel, GrowthSpec.CardMaxLevelCeiling);
 
     // 다음 레벨의 비용·성공률·HP 증가분(만렙이면 false)

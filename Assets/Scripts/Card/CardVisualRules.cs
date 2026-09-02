@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -59,7 +59,7 @@ public static class CardVisualRules
         => _card == null ? null : PickCardArt(_card.cardId, _card.evolutionStage);
 
     /// <summary>표시할 키워드 아이콘 1개 = (어떤 키워드, 어떤 스프라이트).
-    /// 인게임은 키워드까지 필요하고(iconMap → PlayKeywordGlow 역참조), 아웃게임은 스프라이트만 쓴다.
+    /// 인게임·아웃게임 둘 다 스프라이트를 쓰고, 키워드는 어느 칸이 무엇인지 가리는 식별자다.
     /// 두 값이 항상 짝이라 병렬 리스트 대신 한 덩어리로 돌려준다.</summary>
     public readonly struct KeywordIcon
     {
@@ -189,8 +189,7 @@ public static class CardVisualRules
             t_result.Add(new KeywordIcon(t_kw, t_icon));
         }
 
-        // 폴백은 "아이콘이 0개일 때"만. 키워드는 None으로 둔다 —
-        // 실제 보유 키워드가 아니므로 CardView의 iconMap 역참조(PlayKeywordGlow)가 이걸 집으면 안 된다.
+        // 폴백은 "아이콘이 0개일 때"만. 실제 보유 키워드가 아니므로 키워드는 None으로 둔다.
         if (t_result.Count == 0 && _config.DefaultIcon != null)
             t_result.Add(new KeywordIcon(CardKeyword.None, _config.DefaultIcon));
 

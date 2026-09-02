@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -179,7 +179,6 @@ sealed class HealerDemoScript : KeywordDemoScript
         // 유예를 먼저 걸어야 숫자가 오른다 — HealVfx의 도착 처리는 미리 예약된 몫만큼만 표기를 올린다.
         t_target.DeferHpDisplay(t_heal);
 
-        t_healer.PlayKeywordGlow(CardKeyword.Healer).Forget();
         HealVfx.PlayHealBurst(t_healer, new List<(CardView view, CardInstance card, int amount)>
         {
             (t_target, t_card, t_heal)

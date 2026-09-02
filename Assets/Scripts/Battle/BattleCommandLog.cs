@@ -57,7 +57,7 @@ public static class BattleCommandLog
 
     static void Record(int _actorOwner, BattleCommandKind _kind, int _a, int _b, byte _flags)
     {
-        if (!DeckConfig.IsMultiplayer || IsTruncated || IsFrozen) return;
+        if ((!DeckConfig.IsMultiplayer && !SoloMatchHandoff.UsesResultSubmission) || IsTruncated || IsFrozen) return;
 
         // owner가 확정되지 않은 상태(초기화 실패로 MyOwnerIndex가 -1 등)에서 기록하면
         // 양쪽 로그가 갈린다. 조용히 건너뛰면 그 사실이 숨으므로 로그를 명시적으로 무효화한다.

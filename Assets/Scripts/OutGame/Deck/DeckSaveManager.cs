@@ -42,7 +42,7 @@ public static class DeckSaveManager
     }
 
     /// <summary>대표 덱을 지정한다. 유효하지 않은 슬롯은 거부한다 —
-    /// 잘못된 좌표를 세이브에 굳히면 다음 부팅의 출전 덱이 통째로 어긋난다.</summary>
+    /// 잘못된 좌표를 세이브에 굳히면 다음 초기화의 출전 덱이 통째로 어긋난다.</summary>
     public static bool TrySelectSlot(int _index)
     {
         if (!IsValidSlot(_index)) return false;

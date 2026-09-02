@@ -1,12 +1,14 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using UnityEngine;
 
 /// <summary>유산(Legacy) 왕관 연출의 **개수와 순서**만 소유한다.
-/// 턴이 시작될 때 지금까지 쌓인 스택 수만큼 왕관을 띄웠다 거두고(<see cref="Show"/>),
-/// 그 카드가 죽는 순간 같은 수의 왕관을 회복받을 아군에게 날려 보낸다(<see cref="Fly"/>).
+/// 턴이 시작될 때 지금까지 쌓인 스택 수만큼 왕관을 띄웠다 거둔다(<see cref="Show"/>).
+///
+/// 그 카드가 죽는 순간에는 **왕관 없이 궤적(trail)만** 회복받을 아군에게 날아간다(<see cref="PlayHealTrails"/>) —
+/// 왕관까지 같이 쏟아지면 사망 연출과 겹쳐 둘 다 안 읽혔다.
 ///
 /// 프리팹/형태 = <see cref="LegacySynergyVfxConfig"/>, 스폰·정렬·풀 반납 = <see cref="BattleVfx"/>.
 /// 여기엔 어느 것도 두지 않는다(BrandVolleyVfx·HealVfx와 같은 규약).
@@ -20,7 +22,7 @@ using UnityEngine;
 ///   등장분은 showDuration 뒤, 비행분은 도착 뒤, 그리고 전투 종료엔 <see cref="Clear"/>가 남은 것을 쓸어담는다.</summary>
 public static class LegacyCrownVfx
 {
-    // 지금 화면에 떠 있는 왕관 전부(등장분 + 비행분). 각자 제 수명에 반납하지만,
+    // 지금 화면에 떠 있는 것 전부(턴 시작 왕관 + 파괴 시 날아가는 궤적). 각자 제 수명에 반납하지만,
     // 전투가 도중에 끝나면(항복·씬 전환) 그 타이머는 영영 안 온다 — 그때 쓸어담을 목록이다.
     static readonly List<VfxHandle> s_live = new List<VfxHandle>();
 
@@ -53,48 +55,102 @@ public static class LegacyCrownVfx
             ShowOne(t_view, t_i, t_count, t_scale, t_cfg).Forget();
     }
 
-    /// <summary>파괴: 쌓인 수만큼 왕관을 띄워 회복받은 아군에게 날려 보낸다.
-    /// 대상이 왕관보다 적으면 돌려 쓴다 — "몇 명이 회복됐나"가 아니라 "스택이 몇이었나"를 보여주는 연출이다.
+    /// <summary>파괴: 회복받을 아군에게 **궤적(trail)만** 날려 보낸다. 왕관은 타지 않는다 —
+    /// 죽는 카드에서 왕관이 쏟아지면 같은 박에 도는 사망 연출과 겹쳐 둘 다 안 읽혔다.
+    /// 궤적은 가늘어 사망 그림을 가리지 않으면서 "누구에게 갔는지"는 남긴다.
+    ///
+    /// 개수는 스택이 아니라 **대상 수**다 — 개수를 세어 보여줄 왕관이 없으니 돌려 쓸 이유도 없다.
     ///
     /// <paramref name="_healAmount"/>는 이미 적용된 회복량이다(수치는 규칙이 확정했고 여기선 표기만 낸다).
-    /// 대상마다 **한 번씩만** 낸다 — 왕관이 대상보다 많으면 첫 도착분이 표기를 맡고 나머지는 그림만 얹는다.
-    /// 반대로 왕관이 모자라 왕관을 못 받는 대상은 같은 시각에 따로 표기를 내준다:
-    /// 유예된 숫자(DeferHpDisplay)를 아무도 안 풀면 그 카드의 체력 표기가 영영 안 오른다.</summary>
-    public static void Fly(CardInstance _from, IReadOnlyList<CardInstance> _targets, int _healAmount,
-                           SynergyData _synergy)
-        => Fly(_from, _targets, _healAmount, _synergy, -1);
-
-    /// <summary>게임 상태를 바꾸지 않고 명시한 개수의 왕관 비행을 재생하는 미리보기 진입점.</summary>
-    public static void Fly(CardInstance _from, IReadOnlyList<CardInstance> _targets, int _healAmount,
-                           SynergyData _synergy, int _visibleCount)
+    /// 표기는 궤적이 닿는 순간 대상마다 한 번씩 — 유예된 숫자(DeferHpDisplay)를 아무도 안 풀면
+    /// 그 카드의 체력 표기가 영영 안 오른다. 궤적을 못 띄우는 경우(미배선·죽은 카드 뷰 없음)에도
+    /// 표기만은 반드시 나가야 해서 아래 폴백이 있다.</summary>
+    public static void PlayHealTrails(CardInstance _from, IReadOnlyList<CardInstance> _targets,
+                                      int _healAmount, SynergyData _synergy)
     {
         LegacySynergyVfxConfig t_cfg = ConfigOf(_synergy);
-        if (t_cfg == null || t_cfg.crown.prefab == null || _from == null) return;
-        if (_targets == null || _targets.Count == 0) return;
-
-        int t_count = _visibleCount >= 0 ? VisibleCount(_visibleCount, t_cfg) : VisibleCount(_from, t_cfg);
-        if (t_count <= 0) return;
-
-        CardView t_view = CardView.GetView(_from);
-        if (t_view == null) return;
+        if (t_cfg == null || _targets == null || _targets.Count == 0) return;
 
         // 죽는 카드의 뷰는 곧 사망 연출로 사라진다 — 출발 자리를 지금 값으로 굳혀 두지 않으면
-        // 비행 시작 시점에 뷰가 없어 왕관이 원점(0,0)에서 출발한다.
-        float   t_scale = CountScale(t_count, t_cfg);
-        Vector3 t_from  = SlotAnchor(t_view, t_cfg);
-        int     t_layer = t_view.VfxSortingLayerId;
+        // 비행 시작 시점에 뷰가 없어 궤적이 원점(0,0)에서 출발한다.
+        CardView t_view = CardView.GetView(_from);
 
-        for (int t_i = 0; t_i < t_count; t_i++)
+        if (t_cfg.trail.prefab == null || t_view == null)
         {
-            // 대상 목록을 한 바퀴 도는 동안(첫 t_targets.Count개)만 표기를 맡는다.
-            bool t_carriesHeal = t_i < _targets.Count;
-            FlyOne(t_from, t_layer, _targets[t_i % _targets.Count], t_i, t_count, t_scale,
-                   t_carriesHeal ? _healAmount : 0, t_cfg).Forget();
+            for (int t_i = 0; t_i < _targets.Count; t_i++)
+                HealLater(_targets[t_i], _healAmount, _cfg: t_cfg, _index: t_i).Forget();
+            return;
         }
 
-        // 왕관보다 대상이 많으면(스택 < 아군 수) 남은 대상은 왕관 없이 같은 박자에 표기만 낸다.
-        for (int t_i = t_count; t_i < _targets.Count; t_i++)
-            HealLater(_targets[t_i], _healAmount, _cfg: t_cfg, _index: t_i).Forget();
+        Vector3 t_start = SlotAnchor(t_view, t_cfg);
+        int     t_layer = t_view.VfxSortingLayerId;
+
+        for (int t_i = 0; t_i < _targets.Count; t_i++)
+            FlyTrail(t_start, t_layer, _targets[t_i], t_i, _healAmount, t_cfg).Forget();
+    }
+
+    /// <summary>궤적 하나가 대상에게 날아가고, 닿는 순간 그 대상의 회복 표기를 푼다.
+    /// 도착과 동시에 별(파티클)은 지우고 꼬리만 남긴다 — <see cref="ClearAndRetire"/>.
+    /// 어디서 끊기든 궤적은 반드시 반납한다(finally). 왕관과 달리 붙일 부모가 없어 스스로 난다.</summary>
+    static async UniTaskVoid FlyTrail(Vector3 _start, int _sortingLayerId, CardInstance _target,
+                                      int _index, int _healAmount, LegacySynergyVfxConfig _cfg)
+    {
+        VfxHandle t_trail = default;
+        try
+        {
+            float t_delay = _index * _cfg.flyStagger;
+            if (t_delay > 0f) await UniTask.Delay((int)(GameTiming.Battle.Scaled(t_delay) * 1000));
+
+            CardView t_view = CardView.GetView(_target);
+            if (t_view == null) return;
+
+            t_trail = BattleVfx.Spawn(_cfg.trail, _start, _sortingLayerId);
+            if (!t_trail.Valid || t_trail.Go == null) return;
+            s_live.Add(t_trail);
+            PlayAll(t_trail.Go);   // 궤적 프리팹은 playOnAwake가 꺼져 있어 직접 재생해야 보인다
+
+            await Travel(t_trail.Go, _start, t_view.SlotPosition, _index, _cfg);
+
+            // 도착 = 회복 표기의 발화점. 유예해 둔 숫자를 여기서 푼다(힐러 투사체와 같은 규약).
+            if (_healAmount > 0) t_view.PlayHealEffect(_healAmount, _consumeDeferred: true);
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            // 도착 = **별이 사라지는 순간**. 방출만 멈추면(FadeOut) 이미 뿌려진 알갱이가 제 수명을 다 살아
+            // 도착 지점에 별이 남아 떠 있는다 — 그래서 여기는 Clear까지 함께 건다.
+            ClearAndRetire(t_trail, _cfg).Forget();
+        }
+    }
+
+    /// <summary>도착 처리: 별을 즉시 지우고 꼬리만 남겼다 반납한다.
+    ///
+    /// <see cref="FadeOut"/>과 갈라지는 지점이 여기다 — 그쪽은 <b>방출만</b> 멈추고 이미 떠 있는 입자가
+    /// 스스로 꺼지기를 기다린다(왕관처럼 "사라지는" 그림이 필요한 경우). 궤적의 머리는 그러면 안 된다:
+    /// 도착했는데 별이 그 자리에 남아 제 수명만큼 떠 있으면 "닿았다"가 아니라 "멈췄다"로 읽힌다.
+    /// StopEmittingAndClear로 그 프레임에 지운다.
+    ///
+    /// 꼬리(TrailRenderer)는 파티클이 아니라 Clear에 안 걸린다 — 스스로 줄어들 시간을 arriveHold만큼 준 뒤
+    /// 반납한다. 반납 직전에 꼬리 점들도 지운다: 풀에서 재사용될 때 지난 자리부터 새 자리까지
+    /// 한 줄이 그어지는 것을 막는다.</summary>
+    static async UniTaskVoid ClearAndRetire(VfxHandle _handle, LegacySynergyVfxConfig _cfg)
+    {
+        if (!_handle.Valid || _handle.Go == null) { Retire(_handle); return; }
+        if (!s_live.Contains(_handle)) return;   // 전투 종료 정리가 이미 걷어갔다
+
+        foreach (ParticleSystem t_ps in _handle.Go.GetComponentsInChildren<ParticleSystem>(true))
+            t_ps.Stop(withChildren: false, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        if (_cfg.arriveHold > 0f)
+        {
+            await UniTask.Delay((int)(GameTiming.Battle.Scaled(_cfg.arriveHold) * 1000));
+            if (_handle.Go == null) return;   // 풀 flush / 씬 언로드
+        }
+
+        foreach (TrailRenderer t_tr in _handle.Go.GetComponentsInChildren<TrailRenderer>(true))
+            t_tr.Clear();
+
+        Retire(_handle);
     }
 
     /// <summary>전투 종료 정리. 풀 자체는 BattleCleanup이 flush하지만, 여기서 참조를 놓지 않으면
@@ -179,64 +235,14 @@ public static class LegacyCrownVfx
         await FadeOut(t_handle, _cfg);
     }
 
-    /// <summary>왕관 하나가 대상에게 날아간다. 궤적 프리팹이 배선돼 있으면 왕관에 붙여 따라 보낸다.
-    /// 어디서 끊기든 왕관은 반드시 반납한다(finally).</summary>
-    static async UniTaskVoid FlyOne(Vector3 _anchor, int _sortingLayerId, CardInstance _target,
-                                    int _index, int _count, float _scale, int _healAmount,
-                                    LegacySynergyVfxConfig _cfg)
-    {
-        VfxHandle t_crown = default;
-        VfxHandle t_trail = default;
-        try
-        {
-            float t_delay = _index * _cfg.flyStagger;
-            if (t_delay > 0f) await UniTask.Delay((int)(GameTiming.Battle.Scaled(t_delay) * 1000));
-
-            CardView t_view = CardView.GetView(_target);
-            if (t_view == null) return;
-
-            Vector3 t_start = SlotFor(_anchor, _index, _count, _scale, _cfg);
-            t_crown = Spawn(t_start, _sortingLayerId, _scale, _cfg);
-            if (!t_crown.Valid) return;
-
-            // 궤적은 왕관 자식으로 붙여 같이 움직인다 — 따로 날리면 둘의 속도가 갈라져 꼬리가 떨어진다.
-            if (_cfg.trail.prefab != null)
-            {
-                t_trail = BattleVfx.Spawn(_cfg.trail, t_start, _sortingLayerId);
-                if (t_trail.Valid && t_trail.Go != null)
-                {
-                    s_live.Add(t_trail);
-                    PlayAll(t_trail.Go);
-                    t_trail.Go.transform.SetParent(t_crown.Go.transform, worldPositionStays: true);
-                    t_trail.Go.transform.localPosition = Vector3.zero;
-                }
-            }
-
-            await Travel(t_crown.Go, t_start, t_view.SlotPosition, _index, _cfg);
-
-            // 도착 = 회복 표기의 발화점. 유예해 둔 숫자를 여기서 푼다(힐러 투사체와 같은 규약).
-            if (_healAmount > 0) t_view.PlayHealEffect(_healAmount, _consumeDeferred: true);
-
-            if (_cfg.arriveHold > 0f)
-                await UniTask.Delay((int)(GameTiming.Battle.Scaled(_cfg.arriveHold) * 1000));
-        }
-        catch (OperationCanceledException) { }
-        finally
-        {
-            // 부모(왕관)가 먼저 반납되면 궤적이 풀 밖에서 미아가 된다 — 떼어 낸 뒤 반납한다.
-            if (t_trail.Valid && t_trail.Go != null)
-                t_trail.Go.transform.SetParent(null, worldPositionStays: true);
-            Retire(t_trail);
-            FadeOut(t_crown, _cfg).Forget();
-        }
-    }
-
-    /// <summary>왕관을 못 받은 대상의 회복 표기. 비행분과 같은 시각에 풀어야 "같이 회복됐다"로 읽힌다.</summary>
+    /// <summary>궤적 없이 회복 표기만 푸는 폴백(궤적 미배선·죽은 카드 뷰 없음).
+    /// 여기서 안 풀면 유예된 숫자(DeferHpDisplay) 때문에 그 카드 체력 표기가 영영 안 오른다.</summary>
     static async UniTaskVoid HealLater(CardInstance _target, int _healAmount,
                                        LegacySynergyVfxConfig _cfg, int _index)
     {
         if (_healAmount <= 0) return;
 
+        // 궤적이 날았다면 걸렸을 시간과 같은 박자로 낸다 — 폴백만 먼저 뜨면 박자가 어긋난다.
         float t_wait = _index * _cfg.flyStagger + _cfg.flyDuration;
         await UniTask.Delay((int)(GameTiming.Battle.Scaled(t_wait) * 1000));
 
@@ -362,6 +368,7 @@ public static class LegacyCrownVfx
                           GameTiming.Battle.Scaled(_cfg.popDuration), vibrato: 1, elasticity: 0.6f)
             .SetLink(_go);
     }
+
 
     /// <summary>베지어 경로 비행. 트윈이 아니라 프레임 보간인 이유는 BrandVolleyVfx.Travel과 같다 —
     /// 카드 쪽 DOKill에 조용히 잘리지 않게 트윈 밖에 둔다.</summary>

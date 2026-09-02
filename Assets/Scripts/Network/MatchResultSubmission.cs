@@ -95,17 +95,19 @@ static class MatchResultSubmission
     {
         MultiplayerTurnRunner t_turn = MultiplayerTurnRunner.Instance;
         NetworkGameController t_net = NetworkGameController.Instance;
-        bool t_hasSeedIdentity = t_turn != null && !string.IsNullOrEmpty(t_turn.MatchId) &&
-            t_turn.SeedSource == "server";
-        if (!t_hasSeedIdentity || t_net == null ||
-            string.IsNullOrEmpty(t_net.LocalDeckHash) || string.IsNullOrEmpty(t_net.OpponentDeckHash) ||
-            string.IsNullOrEmpty(s_envId))
+        bool t_multiplayer = DeckConfig.IsMultiplayer;
+        bool t_hasMultiplayerIdentity = t_turn != null && !string.IsNullOrEmpty(t_turn.MatchId) &&
+            t_turn.SeedSource == "server" && t_net != null &&
+            !string.IsNullOrEmpty(t_net.LocalDeckHash) && !string.IsNullOrEmpty(t_net.OpponentDeckHash);
+        bool t_hasSoloIdentity = SoloMatchHandoff.TryGetResultIdentity(
+            out string t_soloMatchId, out string t_soloDeckHash, out string t_soloOpponentDeckHash);
+        if (string.IsNullOrEmpty(s_envId) || (t_multiplayer ? !t_hasMultiplayerIdentity : !t_hasSoloIdentity))
         {
             Debug.LogError("[MatchResult] 제출 증거가 완성되지 않아 서버 확정을 시작하지 못했다.");
             return false;
         }
 
-        string t_matchId = t_turn.MatchId;
+        string t_matchId = t_multiplayer ? t_turn.MatchId : t_soloMatchId;
         for (int i = 0; i < s_pending.Count; i++)
             if (s_pending[i].matchId == t_matchId) return true;
 
@@ -113,16 +115,16 @@ static class MatchResultSubmission
         {
             env = s_envId,
             matchId = t_matchId,
-            seedSource = t_turn.SeedSource,
+            seedSource = t_multiplayer ? t_turn.SeedSource : "server",
             // 서버 시드에는 nonce 가 없다. 서버도 seedSource=="server" 면 빈 문자열로 정규화한다.
             myNonce = string.Empty,
             opponentNonce = string.Empty,
-            myDeckHash = t_net.LocalDeckHash,
-            opponentDeckHash = t_net.OpponentDeckHash,
-            finalStateHash = t_net.FinalStateHash.ToString("x16"),
-            stateHashChain = t_net.StateHashChain.ToString("x16"),
-            stateHashChainPrev = t_net.StateHashChainPrev.ToString("x16"),
-            stateHashChainLength = t_net.StateHashChainLength,
+            myDeckHash = t_multiplayer ? t_net.LocalDeckHash : t_soloDeckHash,
+            opponentDeckHash = t_multiplayer ? t_net.OpponentDeckHash : t_soloOpponentDeckHash,
+            finalStateHash = (t_multiplayer ? t_net.FinalStateHash : _endStateHash).ToString("x16"),
+            stateHashChain = (t_multiplayer ? t_net.StateHashChain : 0UL).ToString("x16"),
+            stateHashChainPrev = (t_multiplayer ? t_net.StateHashChainPrev : 0UL).ToString("x16"),
+            stateHashChainLength = t_multiplayer ? t_net.StateHashChainLength : 0,
             contentFingerprint = SpecSource.BattleFingerprint.ToLowerInvariant(),
             won = _won,
             myRemaining = _myRemaining,
@@ -163,7 +165,7 @@ static class MatchResultSubmission
             // 물러나고 아래 finally가 재시도를 건다. PlayerSaveCloud·BattleContentSync와 같은 관문이다.
             if (!await EnsureSignedIn())
             {
-                ChargeAttemptAndDropExhausted("로그인 미완료");
+                ChargeAttempt();
                 return;
             }
             if (t_generation != s_generation) return;
@@ -195,6 +197,9 @@ static class MatchResultSubmission
                         Debug.LogError($"[MatchResult] 서버가 제출을 영구 거절했다(match={t_item.matchId}, " +
                                        $"code={t_code}, uid={FirebaseAuthService.Instance.UserId}): " +
                                        $"{t_exception.GetBaseException().Message}");
+                        // 큐에서 버리는 순간 이 판의 보상·랭크는 영영 오지 않는다. 결과 화면이 방금 보여 준 수치가
+                        // 조용히 어긋나는 것을 막으려면 여기서 반드시 알려야 한다.
+                        MatchResultFailurePopup.Show();
                         t_drop = true;
                     }
                     else
@@ -221,7 +226,10 @@ static class MatchResultSubmission
         }
     }
 
-    /// <summary>재시도가 무의미한 서버 판정. Unauthenticated는 로그인이 붙으면 통과하므로 여기 넣지 않는다.</summary>
+    /// <summary>재시도가 무의미한 서버 판정. Unauthenticated는 로그인이 붙으면 통과하므로 여기 넣지 않는다.
+    /// FailedPrecondition은 이 제출 자체가 서버 상태와 어긋났다는 뜻이라(랭크 기준선 불일치·구 프로토콜·정산 계산 실패)
+    /// 몇 번을 더 보내도 같은 답이 온다 — 서버가 <b>일시적</b> 사정(스펙 표 적재 실패 등)으로 거절할 때는
+    /// Unavailable로 내리기로 계약했다(functions/src/commands/submitMatchResult.ts).</summary>
     internal static bool IsPermanentRejection(Exception _exception, out FunctionsErrorCode _code)
     {
         _code = FunctionsErrorCode.None;
@@ -229,11 +237,15 @@ static class MatchResultSubmission
         _code = t_functions.ErrorCode;
         return _code == FunctionsErrorCode.InvalidArgument ||
                _code == FunctionsErrorCode.AlreadyExists ||
-               _code == FunctionsErrorCode.PermissionDenied;
+               _code == FunctionsErrorCode.PermissionDenied ||
+               _code == FunctionsErrorCode.FailedPrecondition;
     }
 
-    /// <summary>전송 루프 앞에서 물러나는 경로의 재시도 지수를 올린다.</summary>
-    static void ChargeAttemptAndDropExhausted(string _reason)
+    /// <summary>전송 루프 앞에서 물러나는 경로의 재시도 지수를 올린다. 여기서 큐를 버리지는 않는다 —
+    /// 물러난 이유(로그인 미완료 등)는 다음 시도에 풀릴 수 있어 영구 거절과 성격이 다르다.
+    /// <see cref="MaxAttempts"/>는 재시도 간격의 상한일 뿐 포기 지점이 아니다.
+    /// 물러난 사유는 판정한 자리(<see cref="EnsureSignedIn"/>)가 로그로 남긴다.</summary>
+    static void ChargeAttempt()
     {
         for (int i = s_pending.Count - 1; i >= 0; i--)
         {
@@ -310,6 +322,8 @@ static class MatchResultSubmission
             _complete = true;
             TryString(t_root, "reason", out string t_reason);
             Debug.LogError($"[MatchResult] 서버가 매치를 무효 처리했다(match={_matchId}, reason={t_reason}).");
+            // 무효는 payout 문서를 아예 만들지 않는다 — PayoutInbox가 나중에 메워 줄 것도 없다.
+            MatchResultFailurePopup.Show();
             return true;
         }
         if (t_status != "confirmed") return false;

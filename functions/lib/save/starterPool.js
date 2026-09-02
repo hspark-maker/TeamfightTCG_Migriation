@@ -68,7 +68,7 @@ function resolveStarterCardsFromRows(rows, grade, knownCardIds = new Set()) {
         if (!Number.isInteger(row.cardId) || row.cardId <= 0)
             continue;
         // 클라 PackSpec 은 CardCatalog.Contains 로 거른다. 서버가 이 필터를 잃으면 카탈로그에 없는
-        // 카드가 덱에 실리고, 클라 DeckSaveManager.IsSlotValid 가 그 슬롯을 무효로 봐 덱 0개로 부팅된다
+        // 카드가 덱에 실리고, 클라 DeckSaveManager.IsSlotValid 가 그 슬롯을 무효로 봐 덱 0개로 초기화된다
         // (StarterDeck 은 CardIds 가 비지 않아 재지급도 안 한다).
         if (knownCardIds.size > 0 && !knownCardIds.has(row.cardId))
             continue;

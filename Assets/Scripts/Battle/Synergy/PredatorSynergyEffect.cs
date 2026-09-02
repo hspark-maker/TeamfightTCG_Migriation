@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 포식자 시너지. 각 포식자 카드가 공격 후 생존 시 실제로 준 기본 공격 피해의 일정 비율만큼 회복.
@@ -15,10 +15,19 @@ public class PredatorSynergyEffect : SynergyEffect
         return true;
     }
 
+    public override bool TryGetParam(string _key, out int _value)
+    {
+        _value = this.lifestealPercent;
+        return _key == nameof(lifestealPercent);
+    }
+
+    /// <summary>흡혈량 계산의 단일 지점 — 전투와 대본이 같은 식을 본다.</summary>
+    public static int LifestealOf(int _damageDealt, int _percent)
+        => Mathf.FloorToInt(_damageDealt * (_percent / 100f));
 
     public override UniTask OnAfterAttack(AfterAttackCtx _ctx)
     {
-        int t_heal = Mathf.FloorToInt(_ctx.damageDealt * (this.lifestealPercent / 100f));
+        int t_heal = LifestealOf(_ctx.damageDealt, this.lifestealPercent);
         if (t_heal <= 0) return UniTask.CompletedTask;
         _ctx.self.Heal(t_heal);
         SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.ownField);   // 회복 발동 시에만 배너+배지 pop(스팸 방지)

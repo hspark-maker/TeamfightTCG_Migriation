@@ -8,7 +8,6 @@ public static class RankRewardManager
 {
     static RankConfig s_config;
     static bool s_configured;
-    static bool s_warnedDefault;
 
     public static bool IsConfigured => s_configured;
 
@@ -39,8 +38,7 @@ public static class RankRewardManager
         get
         {
             if (s_config != null) return s_config;
-            WarnDefaultConfig();
-            return s_config = ScriptableObject.CreateInstance<RankConfig>();
+            return RankGradeSpec.UninitializedConfig;
         }
     }
 
@@ -57,7 +55,7 @@ public static class RankRewardManager
     // 초기화에서 실제 애셋 주입(선택). null이면 기본 유지
     public static void SetConfig(RankConfig _config)
     {
-        if (_config == null) return;
+        if (_config == null) throw new ArgumentNullException(nameof(_config));
         s_config = _config;
         s_configured = true;
     }
@@ -67,15 +65,7 @@ public static class RankRewardManager
     {
         s_config = null;
         s_configured = false;
-        s_warnedDefault = false;
         OnChanged = null;
-    }
-
-    static void WarnDefaultConfig()
-    {
-        if (s_warnedDefault) return;
-        s_warnedDefault = true;
-        Debug.LogWarning("[RankRewardManager] RankConfig가 주입되지 않아 기본값으로 동작합니다.");
     }
 
     // 티어 보상 행 1회 스냅샷(범위 밖은 None + Locked)

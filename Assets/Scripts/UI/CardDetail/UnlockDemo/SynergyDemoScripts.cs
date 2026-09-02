@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -477,23 +477,8 @@ sealed class LegacyDemoScript : SynergyDemoScript
         await _stage.Hold(LEGACY_STEP, _token);
         if (_token.IsCancellationRequested) return;
 
-        if (t_ally == null || t_ally.BoundCard == null)
-        {
-            // 갈 곳 없는 비행은 "누구에게"가 빠진 그림이라 쌓이는 것까지만 보여준다.
-            await _stage.Hold(UnlockDemoNumbers.SYNERGY_HOLD, _token);
-            return;
-        }
-
-        // 만피면 왕관이 닿아도 숫자가 안 움직인다 — 받을 자리를 먼저 비워 둔다.
-        int t_heal = DemoHpDisplay.WoundDisplay(t_ally, t_stack);
-
-        // 유예를 먼저 걸어야 숫자가 오른다 — 도착 처리(LegacyCrownVfx.FlyOne)는 미리 예약된 몫만큼만 표기를 올린다.
-        t_ally.DeferHpDisplay(t_heal);
-
-        LegacyCrownVfx.Fly(t_atk.BoundCard, new[] { t_ally.BoundCard }, t_heal, this.Synergy, t_stack);
-        await _stage.Hold(t_cfg.flyDuration + t_cfg.arriveHold, _token);
-
-        // 취소 검사 앞인 것이 의도다 — 왕관 프리팹이 미배선이거나 판이 끊기면 도착이 없어, 낮춰 둔 표기가 그대로 굳는다.
-        DemoHpDisplay.SnapHpDisplay(t_ally);
+        // 파괴 국면(왕관 비행)은 연출 자체가 제거됐다 — LegacyCrownVfx 에 Fly 가 없다.
+        // 남는 것은 회복 숫자뿐이라 보여줄 그림이 없어, 대본은 "쌓이는 것"까지만 보여주고 끝낸다.
+        await _stage.Hold(UnlockDemoNumbers.SYNERGY_HOLD, _token);
     }
 }

@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 흐름 시너지(덱 4장↑ 활성). 순수 스폰 트리거형 — 정적 스탯 없음.
@@ -19,6 +19,11 @@ public class FlowSynergyEffect : SynergyEffect
         return true;
     }
 
+    public override bool TryGetParam(string _key, out int _value)
+    {
+        _value = this.amount;
+        return _key == nameof(amount);
+    }
 
     // 동기 완결: 본문에 await 없이 상태변이 끝내고 CompletedTask 반환.
     public override UniTask OnEntered(SpawnCtx _ctx)

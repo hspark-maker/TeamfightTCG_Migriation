@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -18,6 +18,11 @@ public class BrandSynergyEffect : SynergyEffect
         return true;
     }
 
+    public override bool TryGetParam(string _key, out int _value)
+    {
+        _value = this.damagePerMember;
+        return _key == nameof(damagePerMember);
+    }
 
     public override async UniTask OnBeforeAttack(BeforeAttackCtx _ctx)
     {

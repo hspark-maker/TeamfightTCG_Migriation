@@ -21,7 +21,7 @@ const APP_VERSION_MAX_LENGTH = 64;
  * 신규 계정의 세이브 문서와 지갑을 서버가 **한 트랜잭션**에 만든다. 이미 있으면 아무것도 쓰지 않고
  * 현재 revision 만 돌려준다.
  *
- * 클라는 문서를 먼저 읽고 **없을 때만** 부른다 — 매 부팅 호출이면 cold start 가 모든 유저의
+ * 클라는 문서를 먼저 읽고 **없을 때만** 부른다 — 매 초기화 호출이면 cold start 가 모든 유저의
  * 초기화에 얹힌다. 응답은 채택하지 않고 클라가 문서를 다시 읽어 정상 초기화 경로로 합류한다.
  */
 export const ensureAccount = onCall(async (request) => {

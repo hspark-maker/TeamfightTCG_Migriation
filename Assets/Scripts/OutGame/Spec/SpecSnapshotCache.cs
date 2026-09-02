@@ -4,7 +4,7 @@ using UnityEngine;
 
 public static class SpecSnapshotCache
 {
-    const int CacheSchemaVersion = 1;
+    const int CacheFormatVersion = 2;
     static readonly object SaveLock = new object();
 
     [Serializable]
@@ -12,18 +12,27 @@ public static class SpecSnapshotCache
     {
         public int schemaVersion;
         public string envId;
+        public int contentMajor;
+        public long contentMinor;
         public string fingerprint;
         public string payload;
     }
 
     public static bool TryLoad(string _envId, out string _payload, out string _fingerprint)
+        => TryLoad(_envId, out _payload, out _fingerprint, out _, out _);
+
+    public static bool TryLoad(
+        string _envId, out string _payload, out string _fingerprint,
+        out int _contentMajor, out long _contentMinor)
     {
         _payload = null;
         _fingerprint = null;
+        _contentMajor = 0;
+        _contentMinor = -1;
         try
         {
             string t_path = PathOf(_envId);
-            if (TryReadEnvelope(t_path, _envId, out _payload, out _fingerprint)) return true;
+            if (TryReadEnvelope(t_path, _envId, out _payload, out _fingerprint, out _contentMajor, out _contentMinor)) return true;
 
             string t_directory = Path.GetDirectoryName(t_path);
             if (!Directory.Exists(t_directory)) return false;
@@ -31,7 +40,7 @@ public static class SpecSnapshotCache
             Array.Sort(t_backups, (a, b) => File.GetLastWriteTimeUtc(b).CompareTo(File.GetLastWriteTimeUtc(a)));
             foreach (string t_backup in t_backups)
             {
-                if (!TryReadEnvelope(t_backup, _envId, out _payload, out _fingerprint)) continue;
+                if (!TryReadEnvelope(t_backup, _envId, out _payload, out _fingerprint, out _contentMajor, out _contentMinor)) continue;
                 try { File.Copy(t_backup, t_path, true); } catch { }
                 return true;
             }
@@ -44,24 +53,36 @@ public static class SpecSnapshotCache
         }
     }
 
-    static bool TryReadEnvelope(string _path, string _envId, out string _payload, out string _fingerprint)
+    static bool TryReadEnvelope(
+        string _path, string _envId, out string _payload, out string _fingerprint,
+        out int _contentMajor, out long _contentMinor)
     {
         _payload = null;
         _fingerprint = null;
+        _contentMajor = 0;
+        _contentMinor = -1;
         if (!File.Exists(_path)) return false;
         CacheEnvelope t_cache = JsonUtility.FromJson<CacheEnvelope>(File.ReadAllText(_path));
-        if (t_cache == null || t_cache.schemaVersion != CacheSchemaVersion ||
+        if (t_cache == null || t_cache.schemaVersion != CacheFormatVersion ||
             !string.Equals(t_cache.envId, _envId, StringComparison.Ordinal) ||
+            !ContentVersion.IsSupportedMajor(t_cache.contentMajor) ||
             string.IsNullOrEmpty(t_cache.payload) || string.IsNullOrEmpty(t_cache.fingerprint))
             return false;
         var t_manager = new SpecDataManager();
         if (!t_manager.Load(t_cache.payload)) return false;
         _payload = t_cache.payload;
         _fingerprint = t_cache.fingerprint;
+        _contentMajor = t_cache.contentMajor;
+        _contentMinor = t_cache.contentMinor;
         return true;
     }
 
     public static bool TrySave(string _envId, string _payload, string _fingerprint, out string _error)
+        => TrySave(_envId, _payload, _fingerprint, ContentVersion.Major, -1, out _error);
+
+    public static bool TrySave(
+        string _envId, string _payload, string _fingerprint,
+        int _contentMajor, long _contentMinor, out string _error)
     {
         lock (SaveLock)
         {
@@ -77,7 +98,8 @@ public static class SpecSnapshotCache
                 t_backup = t_path + "." + t_token + ".bak";
                 var t_cache = new CacheEnvelope
                 {
-                    schemaVersion = CacheSchemaVersion, envId = _envId,
+                    schemaVersion = CacheFormatVersion, envId = _envId,
+                    contentMajor = _contentMajor, contentMinor = _contentMinor,
                     fingerprint = _fingerprint, payload = _payload,
                 };
                 using (var t_stream = new FileStream(t_temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))

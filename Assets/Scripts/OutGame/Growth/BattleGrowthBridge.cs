@@ -43,7 +43,9 @@ public static class BattleGrowthBridge
                     : DeckConfig.EnemyCardLevel > 0 ? DeckConfig.EnemyCardLevel
                     : CardGrowth.BaseLevel;
 
-        int t_max = CardGrowthManager.MaxLevel;
-        return t_max > 0 && t_level > t_max ? t_max : t_level;
+        // 저작 상한(CardGrowthManager.MaxLevel)이 아니라 코드 천장으로 조인다. 서버는 AI 레벨을 고정 천장으로
+        // 조여 스냅샷을 만들고 재시뮬을 돌리므로, 여기서만 표 상한으로 더 깎으면 실제 필드가 서버보다 약해져
+        // 매 판 발산으로 잡힌다(제출 해시도 같은 클램프를 쓴다 — ServerMatchmaker.ComputeEnemyDeckHash).
+        return CardGrowthManager.ClampLevel(t_level);
     }
 }

@@ -49,6 +49,7 @@ public partial class ReleaseManagerWindow : EditorWindow
         this.selectedTab = (Tab)Mathf.Clamp(EditorPrefs.GetInt(PREF_TAB, 0), 0, 1);
         Revalidate();
         EnableDataTab();
+        EnableVersionManagement();
     }
 
     void OnDisable()
@@ -79,6 +80,7 @@ public partial class ReleaseManagerWindow : EditorWindow
 
         this.scroll = EditorGUILayout.BeginScrollView(this.scroll);
         DrawModeSection();
+        DrawVersionManagementSection();
         DrawValidationSection();
         DrawBuildSection();
         DrawReport();

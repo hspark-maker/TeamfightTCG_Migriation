@@ -20,6 +20,7 @@ GameObject:
   - component: {fileID: 1581884920793774149}
   - component: {fileID: 1581884920793774150}
   - component: {fileID: 1581884920793774151}
+  - component: {fileID: 1581884920793774154}
   - component: {fileID: 1581884920793774152}
   - component: {fileID: 1581884920793774153}
   m_Layer: 0
@@ -65,13 +66,14 @@ MonoBehaviour:
   - {fileID: 1581884920793774142}
   - {fileID: 1581884920793774143}
   - {fileID: 1581884920793774144}
+  - {fileID: 1581884920793774151}
+  - {fileID: 1581884920793774154}
   - {fileID: 1581884920793774145}
   - {fileID: 1581884920793774146}
   - {fileID: 1581884920793774147}
   - {fileID: 1581884920793774148}
   - {fileID: 1581884920793774149}
   - {fileID: 1581884920793774150}
-  - {fileID: 1581884920793774151}
   - {fileID: 1581884920793774152}
   - {fileID: 1581884920793774153}
 --- !u!114 &1581884920793774142
@@ -213,8 +215,26 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WaitCloudSaveGateStep
   initializerId: WaitCloudSaveGate
   required: 1
-  requiredIds: []
+  requiredIds:
+  - ContentProfile
   retryEntry: 1
+--- !u!114 &1581884920793774154
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2449901017464239670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da1aa621972ab9cfd80bfcd5aead9a8f, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::SpecSyncStep
+  initializerId: SpecSync
+  required: 1
+  requiredIds:
+  - WaitCloudSaveGate
+  retryEntry: 0
 --- !u!114 &1581884920793774152
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -247,7 +267,7 @@ MonoBehaviour:
   initializerId: SaveDependentManagers
   required: 1
   requiredIds: 
-  - WaitCloudSaveGate
+  - SpecSync
   retryEntry: 0
   starterDeckPackId: StarterPack
 --- !u!114 &1581884920793774144
@@ -280,7 +300,7 @@ MonoBehaviour:
   initializerId: CardCatalog
   required: 1
   requiredIds: 
-  - ContentProfile
+  - SpecSync
   synergyRegistry: {fileID: 11400000, guid: 0f17069139424ae7956455108c7f08a2, type: 2}
 --- !u!1 &3392005005194032163
 GameObject:
