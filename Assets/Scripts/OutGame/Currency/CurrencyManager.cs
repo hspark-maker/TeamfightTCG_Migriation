@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 // 재화 잔액의 읽기 창구 (static)
@@ -85,7 +85,7 @@ public static class CurrencyManager
         if (_notify) Notify(_type);
     }
 
-    /// <summary>남은 낙관분을 전부 버린다. 서버 잔액을 처음부터 다시 세우는 자리(부트·재로그인)에서만 부른다.</summary>
+    /// <summary>남은 낙관분을 전부 버린다. 서버 잔액을 처음부터 다시 세우는 자리(초기화·재로그인)에서만 부른다.</summary>
     public static void ClearPending()
     {
         // 아직 왕복이 살아 있는 티켓이 나중에 자기 몫을 또 빼면 누계가 음수로 굳는다 — 세대를 올려 그것들을 무효로 만든다.

@@ -1,21 +1,23 @@
-using System.Collections.Generic;
-using System.IO;
+﻿using System.Collections.Generic;
 using UnityEditor;
-using UnityEditor.Build.Reporting;
 using UnityEngine;
 
 /// <summary>
 /// 릴리즈 관리 창. Tools > Card Battle > 릴리즈 관리.
 ///
-/// 모드 · 카드 표 · 검증 · 빌드를 한 화면에 묶는다. 셋이 따로 놀면 조용히 어긋나기 때문이다:
-/// 모드만 바꾸고 표를 안 실으면 수치가 틀리고, 표만 갈고 빌드하면 런타임 프로필과 데이터가 갈린다.
+/// 모드 · 카드 표 · 검증 · 콘텐츠 버전을 한 화면에 묶는다. 따로 놀면 조용히 어긋나기 때문이다:
+/// 모드만 바꾸고 표를 안 실으면 수치가 틀리고, 표만 갈고 내보내면 런타임 프로필과 데이터가 갈린다.
 ///
-/// 현재 에디터 프로필이 곧 빌드 실행 모드다. 테스트 프로필은 개발 빌드로, 라이브 프로필은
-/// 릴리즈 빌드로 만들며, 에셋에 실린 표가 그 프로필과 다르면 빌드를 막는다.
+/// <para>빌드는 여기서 하지 않는다. Unity 의 Build Profiles 로만 만든다 —
+/// 이 창이 BuildPipeline.BuildPlayer 를 부르면 그 옵션이 Build Profiles 의 공유 설정
+/// (Library/BuildProfiles/SharedProfile.asset 의 m_Development)까지 바꿔 놓아서,
+/// 여기서 Test 빌드를 한 번 뽑으면 이후 Build Profiles 빌드가 전부 개발 빌드로 나갔다.</para>
+///
+/// <para>대신 빌드 전처리 <see cref="ContentProfileValidator"/> 가 어느 경로로 빌드하든
+/// 같은 검증을 걸고, 그 빌드가 개발/릴리즈 중 무엇인지 콘솔에 남긴다.</para>
 /// </summary>
 public partial class ReleaseManagerWindow : EditorWindow
 {
-    const string PREF_BUILD_DIR = "Release.BuildDir";
     const string PREF_TAB       = "Release.Tab";
 
     enum Tab
@@ -24,7 +26,6 @@ public partial class ReleaseManagerWindow : EditorWindow
         Data,
     }
 
-    string buildDir;
     Tab selectedTab;
 
     Vector2 scroll;
@@ -45,7 +46,6 @@ public partial class ReleaseManagerWindow : EditorWindow
 
     void OnEnable()
     {
-        this.buildDir = EditorPrefs.GetString(PREF_BUILD_DIR, "Builds");
         this.selectedTab = (Tab)Mathf.Clamp(EditorPrefs.GetInt(PREF_TAB, 0), 0, 1);
         Revalidate();
         EnableDataTab();
@@ -54,7 +54,6 @@ public partial class ReleaseManagerWindow : EditorWindow
 
     void OnDisable()
     {
-        EditorPrefs.SetString(PREF_BUILD_DIR, this.buildDir);
         EditorPrefs.SetInt(PREF_TAB, (int)this.selectedTab);
         DisableDataTab();
     }
@@ -82,7 +81,6 @@ public partial class ReleaseManagerWindow : EditorWindow
         DrawModeSection();
         DrawVersionManagementSection();
         DrawValidationSection();
-        DrawBuildSection();
         DrawReport();
         EditorGUILayout.EndScrollView();
     }
@@ -231,109 +229,6 @@ public partial class ReleaseManagerWindow : EditorWindow
             string.Join("\n", this.drift) + "\n\n" +
             $"표가 맞다면 ②에서 '{t_label} 표 → 카드 적용', 에셋이 맞다면 '카드 → {t_label} 표 내보내기'.",
             MessageType.Warning);
-    }
-
-    // ── ④ 빌드 ─────────────────────────────────────────────────────────────
-
-    void DrawBuildSection()
-    {
-        Header("④ 빌드");
-
-        BuildTarget t_target = EditorUserBuildSettings.activeBuildTarget;
-        EditorGUILayout.LabelField("타겟 플랫폼", $"{t_target}  (바꾸려면 File > Build Settings)");
-
-        this.buildDir = EditorGUILayout.TextField("출력 폴더", this.buildDir);
-
-        EContentRunMode t_runtimeMode = ContentRunModeEditor.Current;
-        EditorGUILayout.LabelField("빌드 실행 모드", ContentRunModeEditor.Label(t_runtimeMode));
-
-        int t_scenes = EnabledScenes().Length;
-        EditorGUILayout.LabelField("포함 씬", $"{t_scenes}개 (Build Settings 기준)");
-
-        EditorGUILayout.Space(4);
-
-        string t_block = BuildBlocker(t_runtimeMode, t_scenes);
-        if (t_block != null) EditorGUILayout.HelpBox(t_block, MessageType.Error);
-
-        using (new EditorGUI.DisabledScope(t_block != null))
-        {
-            if (GUILayout.Button($"{ContentRunModeEditor.Label(t_runtimeMode)} 빌드 실행", GUILayout.Height(34)))
-                RunBuild(t_target, t_runtimeMode);
-        }
-    }
-
-    /// <summary>빌드를 막을 사유(없으면 null). 데이터가 런타임 프로필과 어긋난 채 빌드가 나가는 것을 막는 게 목적이다.</summary>
-    string BuildBlocker(EContentRunMode _runtimeMode, int _sceneCount)
-    {
-        if (_sceneCount == 0) return "Build Settings에 활성 씬이 없다.";
-        if (string.IsNullOrWhiteSpace(this.buildDir)) return "출력 폴더를 입력할 것.";
-        if (this.issues == null) return "검증을 먼저 돌릴 것(③ 다시 검사).";
-        if (this.issues.Count > 0) return $"검증 문제 {this.issues.Count}건을 먼저 해결할 것.";
-
-        return null;
-    }
-
-    void RunBuild(BuildTarget _target, EContentRunMode _runtimeMode)
-    {
-        string t_path = Path.Combine(this.buildDir, OutputName(_target, _runtimeMode));
-
-        // 대조 경고는 빌드를 막지 않는다(의도적으로 에셋만 손댄 상태로 뽑는 일이 있다) —
-        // 대신 되돌리기 어려운 시점에 한 번 더 눈에 띄게 한다.
-        string t_driftNote = this.drift != null && this.drift.Count > 0
-            ? $"\n\n⚠ 표와 다른 값 {this.drift.Count}건 — 표가 아니라 에셋 값으로 나간다."
-            : "";
-
-        if (!EditorUtility.DisplayDialog("빌드",
-                $"{ContentRunModeEditor.Label(_runtimeMode)} 빌드를 만든다.\n\n" +
-                $"플랫폼: {_target}\n출력: {t_path}{t_driftNote}\n\n시간이 걸린다.", "빌드", "취소"))
-            return;
-
-        Directory.CreateDirectory(this.buildDir);
-
-        var t_options = new BuildPlayerOptions
-        {
-            scenes           = EnabledScenes(),
-            locationPathName = t_path,
-            target           = _target,
-            options          = _runtimeMode == EContentRunMode.Test ? BuildOptions.Development : BuildOptions.None,
-        };
-
-        BuildReport t_report = BuildPipeline.BuildPlayer(t_options);
-        BuildSummary t_summary = t_report.summary;
-
-        string t_text = $"[빌드 {t_summary.result}] {ContentRunModeEditor.Label(_runtimeMode)}\n" +
-                        $"{t_summary.outputPath}\n" +
-                        $"{t_summary.totalSize / (1024 * 1024)}MB / {t_summary.totalTime}\n" +
-                        $"에러 {t_summary.totalErrors} / 경고 {t_summary.totalWarnings}";
-
-        this.lastReport = t_text;
-        if (t_summary.result == BuildResult.Succeeded) Debug.Log(t_text);
-        else                                           Debug.LogError(t_text);
-
-        Revalidate();
-    }
-
-    static string[] EnabledScenes()
-    {
-        var t_list = new List<string>();
-        foreach (EditorBuildSettingsScene t_scene in EditorBuildSettings.scenes)
-            if (t_scene.enabled) t_list.Add(t_scene.path);
-        return t_list.ToArray();
-    }
-
-    static string OutputName(BuildTarget _target, EContentRunMode _runtimeMode)
-    {
-        string t_product = string.IsNullOrEmpty(PlayerSettings.productName) ? "Game" : PlayerSettings.productName;
-        string t_suffix = _runtimeMode == EContentRunMode.Test ? "_test" : "_live";
-        string t_name = t_product + t_suffix;
-        switch (_target)
-        {
-            case BuildTarget.StandaloneWindows:
-            case BuildTarget.StandaloneWindows64: return $"{t_name}/{t_name}.exe";
-            case BuildTarget.Android:             return $"{t_name}.apk";
-            case BuildTarget.StandaloneOSX:       return $"{t_name}.app";
-            default:                              return t_name;
-        }
     }
 
     // ── 공통 ───────────────────────────────────────────────────────────────

@@ -18,6 +18,13 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
     public void OnPreprocessBuild(BuildReport _report)
     {
         EContentRunMode t_mode = BuildMode(_report);
+
+        // 어느 창에서 빌드하든 여기는 지난다. 개발 빌드 여부를 산출물로 확인하려면 APK 를 깔아 봐야 해서
+        // 매번 추측이 붙던 자리 — 빌드 시작 시점에 한 줄로 못 박는다.
+        bool t_development = (_report.summary.options & BuildOptions.Development) != 0;
+        Debug.Log($"[빌드] mode={t_mode} development={t_development} target={_report.summary.platform} " +
+                  $"app={PlayerSettings.bundleVersion} tableGen={ContentVersion.Major} options={_report.summary.options}");
+
         ValidateOrThrow(t_mode);
     }
 

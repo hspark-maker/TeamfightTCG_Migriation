@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -18,7 +18,7 @@ public sealed class CardCatalogStep : MainInitializer
                 throw new InvalidOperationException("[CardCatalogStep] ContentProfileStep이 먼저 서야 한다.");
 
             CardCatalog.SetSource(synergyRegistry, t_profile.RunMode, t_profile.IncludeTestCards);
-            InitializationRunner.MarkBootClaimed();
+            InitializationRunner.MarkInitClaimed();
         }
         catch (Exception t_exception)
         {

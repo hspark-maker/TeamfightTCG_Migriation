@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 
 // "모든 카드 해금" 버튼 배선용 어댑터. 인스펙터 Button OnClick에 UnlockAll을 연결한다.
@@ -7,6 +7,14 @@ public class UnlockAllCardsButton : MonoBehaviour
 {
     // 배선하면 이미 전량 소유일 때 눌리지 않게 잠근다. 비워도 UnlockAll 자체는 동작한다.
     [SerializeField] Button targetButton;
+
+    void Awake()
+    {
+        // 릴리스 빌드에서는 전량 해금 버튼이 화면에 남으면 안 된다 — 소유는 세이브로 서버까지 올라간다.
+#if !UNITY_EDITOR && !DEVELOPMENT_BUILD
+        this.gameObject.SetActive(false);
+#endif
+    }
 
     void OnEnable()
     {
@@ -22,8 +30,10 @@ public class UnlockAllCardsButton : MonoBehaviour
     // Button OnClick 진입점.
     public void UnlockAll()
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         int t_added = OwnershipManager.GrantEntireCatalog();
         Debug.Log($"[Ownership] 전체 해금 — 신규 {t_added}장 / 소유 {OwnershipManager.OwnedCount}장");
+#endif
     }
 
     void RefreshInteractable()

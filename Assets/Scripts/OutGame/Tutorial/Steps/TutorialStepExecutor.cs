@@ -198,7 +198,7 @@ public static class TutorialStepExecutor
             Debug.LogError($"[TutorialStepExecutor] {_where} 자동 구매 왕복 실패(pack={t_packId}) — 이미 전진해 되돌리지 못한다.");
 
             // 되감을 구매 스텝이 없는 갈래라, 오지 않을 개봉 신호를 기다리는 칸에 갇혀 스스로 풀 수 없다.
-            // 망 오류 한 번에 초기화 3회(SameCoordBootCount)를 거듭하게 두지 않으려고 여기서 문을 연다(멱등).
+            // 망 오류 한 번에 초기화 3회(SameCoordInitCount)를 거듭하게 두지 않으려고 여기서 문을 연다(멱등).
             OutgameFeatureLock.NotifyStalled();
             return;
         }

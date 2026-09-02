@@ -1,3 +1,6 @@
+﻿// 릴리스 빌드에는 이 클래스 자체가 없다 — 소유·재화·성장·튜토리얼 진행도를 직접 뒤집는 동작이라
+// 출시본에 남으면 그대로 치트 표면이 된다. OutgameDebugOverlay 와 같은 조건이다.
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -423,3 +426,5 @@ public static class OutgameDebugActions
         return t_result;
     }
 }
+
+#endif

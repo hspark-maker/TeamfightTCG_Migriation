@@ -81,7 +81,7 @@
 - 서버 슬롯 채택 후 매니저 캐시 재수화: `OutGame/Save/3.Manager/ServerSlotRehydrator` — `DataSaveManager.OnServerSlotsAdopted` 의 유일한 구독자. `ESaveSlot` 비트별로 `OwnershipManager.Init` · `KeywordGrowthManager.Init` · `CardGrowthManager.Init` 를 초기화와 같은 순서로 다시 태운다(재화는 세이브 슬롯이 아니라 자기 채택 경로를 갖는다)
 - 클라우드: `OutGame/Save/4.Cloud/PlayerSaveCloud` (초기화 채택 · 디바운스 업로드의 단일 창구, `PlayerSaveCloud.IsGateComplete` · `PlayerSaveCloud.IsFreshAccount` · `PlayerSaveCloud.ShouldShowSyncBanner` · `PlayerSaveCloud.OnStateChanged`) · `PlayerSaveDocument` (`PlayerSaveDocument.ToFieldMap` / `PlayerSaveDocument.TryReadMeta`) · `PlayerSaveFirestorePaths` · `PlayerSaveFirebaseModule` · 상태 `EPlayerSaveCloudState`
 - 실패 표면(P3): 초기화 실패 `UI/Common/LoadingCoverView` 복구 화면(안내 + 재시도·종료 2버튼) · 판정 `UI/Common/CloudSyncStatusWatcher` · 배너 `UI/Common/CloudSyncBannerView` · 차단 모달은 `SimpleYNPopup` 재사용
-- 초기화 재시도(씬 재로드 없음): 단일 진입점 `InitializationInstaller.RestartBoot` — 실패한 캐시 되돌리기(`CardArtCache.ResetIfFailed` / `UiPrefabCache.ResetIfFailed`) → `GameInitialization.ResetForRetry` → `PlayerSaveCloud.ResetForRetry` → 게이트 재기동 순서를 여기서 소유한다. 재적재 자체는 게이트가 매번 거는 `InitializationInstaller.StartAssetLoads` 가 맡아 재시도 전용 적재 경로가 없다. 재시도 가능 판정은 `GameInitialization.CanRetry`. `LoadingCoverView.Retry` 는 화면만 되돌리고 이 하나를 부른다
+- 초기화 재시도(씬 재로드 없음): 복구 화면의 `UI/Common/LoadingCoverView.Retry` 가 `Core/Initialization/InitializationRunner.RestartGate` 를 부르고 초기화를 다시 돌린다. 재시도 가능 판정은 `Core/GameInitialization.CanRetry`. 실패한 캐시·클라우드 상태를 되돌리는 체인은 아직 없다(코드에 TODO 로 남아 있다) — 같은 실패를 그대로 다시 볼 수 있다
 - Firebase 코어: `Core/Firebase/FirebaseManager` · `FirebaseAuthService` · `FirebaseContext` · `FirebaseTimeouts` · `IFirebaseModule` · `FirebaseRootPath` · `EFirebaseAuthState`
 
 ## 재화·보상 (`OutGame/Currency/`, `OutGame/Reward/`, `Utils/`)

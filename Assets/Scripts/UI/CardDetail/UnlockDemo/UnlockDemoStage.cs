@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -192,14 +192,11 @@ public class UnlockDemoStage : SingletonOverlayBase, IUnlockDemoStage
     {
         if (_token.IsCancellationRequested) return UniTask.CompletedTask;
 
-        var (t_preKw, t_atKw) = AttackFlow.Keywords(_atk.BoundCard);
-
         // Neighbor 프로퍼티가 이미 거르지만 여기도 남긴다 — 인터페이스가 공개된 이상 이쪽이 마지막 방어선이다.
         CardView t_splashView = _splash != null && _splash.gameObject.activeSelf ? _splash : null;
 
         return AttackSequence.PlaySplash(_atk, _def,
                                          _events: Array.Empty<TeamfightTCG.BattleCore.BattleEvent>(), _splashView: t_splashView,
-                                         _preEffectKw: t_preKw, _atEffectKw: t_atKw,
                                          _afterHit: _afterHit,
                                          _forceSpecial: false);
     }

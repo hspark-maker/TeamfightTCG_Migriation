@@ -6,9 +6,6 @@ using UnityEngine.UI;
 
 public class SettingsPanel : PooledUIBase
 {
-    static readonly Color FrameRateSelected   = Color.white;
-    static readonly Color FrameRateUnselected = new Color(0.55f, 0.55f, 0.55f, 1f);
-
     // 등장/퇴장 floating 연출 값. 배경 dim은 제자리에 두고 패널만 뜬다 —
     // dim까지 움직이면 화면 끝에 안 덮인 띠가 드러난다.
     const float FloatEnterOffsetY = -60f;
@@ -422,20 +419,21 @@ public class SettingsPanel : PooledUIBase
         ApplySelectedTint(this.screenShakeOffButton, !GameManager.ScreenShakeEnabled);
     }
 
-    /// <summary>선택된 항목만 밝게. 여러 줄(FPS·화면 흔들림)이 같은 규약을 쓰도록 여기 한 곳에 둔다.</summary>
+    /// <summary>선택 표시를 <b>칸 자신</b>(SelectionStateView)에게 넘긴다 — 스프라이트도 색도 그쪽이 소유한다.
+    /// 여기(패널)는 "어느 칸이 선택인가"만 안다. 두 줄(FPS·화면 흔들림)이 같은 규약을 쓴다.
+    /// 컴포넌트가 미배선이면 그 칸만 표시가 안 바뀌므로 조용히 넘어가지 않고 로그로 드러낸다.</summary>
     static void ApplySelectedTint(Button _button, bool _selected)
     {
         if (_button == null) return;
 
-        Color t_tint = _selected ? FrameRateSelected : FrameRateUnselected;
+        SelectionStateView t_state = _button.GetComponent<SelectionStateView>();
+        if (t_state == null)
+        {
+            Debug.LogError($"[SettingsPanel] {_button.name}에 SelectionStateView 미배선 — 선택 표시가 안 바뀐다");
+            return;
+        }
 
-        // ColorTint 버튼이라 targetGraphic.color를 직접 쓰면 상태 전이가 바로 덮어쓴다 — ColorBlock을 갈아끼운다.
-        ColorBlock t_colors = _button.colors;
-        t_colors.normalColor      = t_tint;
-        t_colors.highlightedColor = t_tint;
-        t_colors.selectedColor    = t_tint;
-        t_colors.pressedColor     = new Color(t_tint.r * 0.75f, t_tint.g * 0.75f, t_tint.b * 0.75f, t_tint.a);
-        _button.colors = t_colors;
+        t_state.SetSelected(_selected);
     }
 
     void RefreshText(TMP_Text _text, float _val)
