@@ -62,8 +62,23 @@ public class TournamentMapOverlayView : MonoBehaviour, IPointerClickHandler
              "넘치면 오래된 것부터 버린다 — 유저가 실제로 갈 자리는 가장 앞선 챕터·정점이다.")]
     [SerializeField] int introMaxSteps = 3;
 
-    [Tooltip("대상과 대상 사이 숨. 스크롤이 곧 '여기가 열렸다'는 문장이라, 붙여 놓으면 어디를 봤는지 읽히지 않는다.")]
-    [SerializeField] float introGap = 0.15f;
+    [Tooltip("챕터 띠로 카메라가 미끄러지는 시간. 장이 바뀌는 이동이라 정점보다 길게 잡는다 — " +
+             "여행 지도에서는 이동 그 자체가 '여기가 열렸다'는 문장이다.")]
+    [SerializeField] float introTravelChapter = 0.45f;
+
+    [Tooltip("정점으로 카메라가 미끄러지는 시간. 같은 장 안의 짧은 이동이다.")]
+    [SerializeField] float introTravelNode = 0.28f;
+
+    [Tooltip("챕터 띠 안무가 끝난 뒤의 숨. 그 장의 정점들이 계단으로 풀리는 시간이기도 하다.")]
+    [SerializeField] float introGapChapter = 0.35f;
+
+    [Tooltip("정점 안무가 끝난 뒤의 숨. 작은 사건이라 붙여 둔다.")]
+    [SerializeField] float introGapNode = 0.10f;
+
+    [Tooltip("장이 열릴 때 그 장의 정점이 하나씩 풀리는 간격(길 점 간격과 같은 축이다).\n" +
+             "박을 먹는 것은 이번에 새로 열리는 정점뿐이다 — 잠긴 채 남을 정점은 장이 열리는 그 시각에 함께 내려간다.\n" +
+             "챕터 숨(introGapChapter) 안에서 계단이 끝나도록 코드가 다시 조이므로, 여는 정점이 많은 챕터에서는 이보다 촘촘해진다.")]
+    [SerializeField] float introNodeRelease = 0.06f;
 
     /// <summary>정점 도전 요청(도전 가능한 정점만 올라온다). LobbyRoot가 전투로 잇는다.</summary>
     public event Action<int> NodeSelected;
@@ -122,11 +137,32 @@ public class TournamentMapOverlayView : MonoBehaviour, IPointerClickHandler
     // 푸는 쪽은 이 목록만 본다: 담기지 않은 부품은 손잡이가 선 채로 굳어 Refresh를 영영 받지 못한다.
     readonly List<IntroTarget> m_introStaged = new List<IntroTarget>();
 
+    // 챕터 띠가 대상이라 개별 대상에서 빠진 정점들 — 그 장의 계단이 대신 연다.
+    // 개별 대상으로도 남겨 두면 계단이 그것을 "아직 제 차례를 기다리는 대상"으로 보고 건너뛰어 아무것도 열지 않는다.
+    readonly List<int> m_introChapterOpens = new List<int>();
+
     // 지금까지 쓴 연출 시간. 각 안무의 길이는 재생해 봐야 알 수 있어 예산을 미리 나눌 수 없다.
     float m_introSpent;
 
-    // 대상 하나를 훑는 동안 도는 대기 시퀀스(대상마다 새로 선다).
+    // 대상 하나를 훑는 동안 도는 대기 시퀀스(대상마다 새로 선다). 카메라 이동 단계도 같은 자리에 담는다 —
+    // 별도 필드로만 들고 있으면 마지막 대상의 이동 중에 IsIntroPending이 거짓으로 새어 그 틈으로 복귀 수령·정점 탭이 통과한다.
     Sequence m_introSeq;
+
+    // 사슬 안에서만 도는 카메라 이동. 사슬 밖의 즉시 대입 경로(ScrollToContentY)와는 섞이지 않는다.
+    Tween m_scrollTween;
+
+    // 사슬이 카메라의 주인인 동안 참. 해제 누락이 곧 "맵이 영영 안 끌린다"라 멱등하게 다룬다.
+    bool m_scrollLocked;
+
+    // 이번 사슬에서 탭 스킵이 한 번이라도 있었는가. 예산 검사를 우회하는 데만 쓴다 —
+    // m_introSpent에는 저작된 안무 길이가 통째로 더해져 있어, 없으면 스킵할수록 남은 대상이 더 많이 버려진다.
+    bool m_introSkipped;
+
+    // 지금 도는 것이 카메라 이동인가 부품 안무인가. 스킵이 "당길 안무가 아직 없다"를 구분하는 데만 쓴다.
+    bool m_introTraveling;
+
+    // 지금 훑고 있는 대상. 스킵이 Kill로 함께 지워진 콜백을 손으로 재현하려면 대상을 알아야 한다.
+    IntroTarget m_introPlaying;
 
     // 해금 사슬이 화면을 쥐고 있는가 — 대상이 남아 있으면 대기 시퀀스가 없는 틈에도 참이다.
     bool IsIntroPending => this.m_introSeq != null || this.m_introTargets.Count > 0;
@@ -250,7 +286,8 @@ public class TournamentMapOverlayView : MonoBehaviour, IPointerClickHandler
         // 스크롤로 소비된 포인터는 탭이 아니다 — 없으면 맵을 끌어 넘긴 뒤 손 떼는 순간 연출이 지워진다.
         if (_e.dragging) return;
 
-        this.AbortUnlockIntro();
+        // 사슬을 통째로 지우지 않는다 — 탭 한 번은 대상 하나를 결말까지 당기고 곧바로 다음으로 넘어간다.
+        this.SkipCurrentIntroTarget();
     }
 
     // 챕터 타일을 쌓고 타일에 저작된 자리에만 정점을 세운다. 좌표를 코드가 만들지 않으므로 저작이 빠지면 그 정점은 안 나온다.
@@ -622,22 +659,35 @@ public class TournamentMapOverlayView : MonoBehaviour, IPointerClickHandler
     }
 
     // Content 좌표 y를 뷰포트 한가운데로 가져온다(정점·띠가 같은 셈을 쓰게 하는 자리).
+    // 즉시 대입 경로다 — Open()은 "스크롤이 애니 없이 즉시 앉고 그 안에서 레이아웃이 확정된다"를 전제로 사슬을 세운다.
     void ScrollToContentY(float _y)
     {
-        if (this.scrollRect == null || this.content == null) return;
+        if (!this.TryGetContentNormalizedY(_y, out float t_normalized)) return;
+
+        this.scrollRect.verticalNormalizedPosition = t_normalized;
+    }
+
+    // Content 좌표 y를 뷰포트 한가운데로 가져오는 정규화 위치. 즉시 대입과 이동 트윈이 같은 자리를 겨냥하게 하는 셈이다.
+    // 거짓이면 겨냥할 자리가 없다(미배선·Content가 화면보다 짧아 스크롤 여백이 0).
+    bool TryGetContentNormalizedY(float _y, out float _normalized)
+    {
+        _normalized = 0f;
+
+        if (this.scrollRect == null || this.content == null) return false;
 
         Canvas.ForceUpdateCanvases();
 
         RectTransform t_viewport = this.scrollRect.viewport != null
             ? this.scrollRect.viewport
             : this.scrollRect.transform as RectTransform;
-        if (t_viewport == null) return;
+        if (t_viewport == null) return false;
 
         float t_scrollable = this.content.rect.height - t_viewport.rect.height;
-        if (t_scrollable <= 0f) return;   // Content가 화면보다 짧다 = 스크롤할 여백이 없다
+        if (t_scrollable <= 0f) return false;   // Content가 화면보다 짧다 = 스크롤할 여백이 없다
 
         float t_offset = _y - t_viewport.rect.height * 0.5f;
-        this.scrollRect.verticalNormalizedPosition = Mathf.Clamp01(t_offset / t_scrollable);
+        _normalized = Mathf.Clamp01(t_offset / t_scrollable);
+        return true;
     }
 
     // 정점 뷰가 이미 잠긴 버튼을 죽여 두지만, 진입 판정의 주인은 화면이다(저작·상태가 갈려도 새지 않게).
@@ -833,6 +883,7 @@ public class TournamentMapOverlayView : MonoBehaviour, IPointerClickHandler
     {
         this.m_introTargets.Clear();
         this.m_introSeen.Clear();
+        this.m_introChapterOpens.Clear();
         this.m_introSpent = 0f;
 
         // 표식 없이 진행 흔적만 있던 세이브다 — 소급으로 조용히 덮였으니 이번엔 아무것도 재생하지 않는다.
@@ -846,17 +897,20 @@ public class TournamentMapOverlayView : MonoBehaviour, IPointerClickHandler
         {
             this.GetChapterNodeRange(t_c, out int t_nodeStart, out int t_count);
 
-            if (t_showcase.Chapters != null && t_showcase.Chapters.Contains(t_c))
-                this.AddIntroTarget(new IntroTarget(true, t_c));
+            // 띠가 대상으로 섰으면 그 장의 새 정점은 계단이 맡는다 — 개별 대상으로도 남기면
+            // 계단이 그 정점을 건너뛰어(IsPendingTarget) 정작 열려야 할 정점을 잠긴 채 되돌린다.
+            bool t_bandTaken = t_showcase.Chapters != null && t_showcase.Chapters.Contains(t_c)
+                               && this.AddIntroTarget(new IntroTarget(true, t_c));
 
-            if (t_showcase.Nodes != null)
+            if (t_showcase.Nodes == null) continue;
+
+            for (int t_i = 0; t_i < t_showcase.Nodes.Count; t_i++)
             {
-                for (int t_i = 0; t_i < t_showcase.Nodes.Count; t_i++)
-                {
-                    int t_node = t_showcase.Nodes[t_i];
-                    if (t_node >= t_nodeStart && t_node < t_nodeStart + t_count)
-                        this.AddIntroTarget(new IntroTarget(false, t_node));
-                }
+                int t_node = t_showcase.Nodes[t_i];
+                if (t_node < t_nodeStart || t_node >= t_nodeStart + t_count) continue;
+
+                if (t_bandTaken) this.AddChapterOpen(t_node);
+                else this.AddIntroTarget(new IntroTarget(false, t_node));
             }
         }
 
@@ -892,11 +946,22 @@ public class TournamentMapOverlayView : MonoBehaviour, IPointerClickHandler
     // 화면에 세울 부품이 없는 대상은 아예 담지 않는다 — 담으면 개수 상한 자리를 먹어 정상 대상을 밀어내고,
     // 사슬은 아무것도 못 보여준 채 억제·탭 차단·앵커 해제만 걸다 끝난다(그 상태가 진입마다 되풀이된다).
     // 빼도 표식은 재생한 것만 세우므로, 저작을 고친 다음 진입에서 그대로 다시 나온다.
-    void AddIntroTarget(IntroTarget _target)
+    // 반환값은 "대상으로 섰는가"다 — 띠가 섰는지에 따라 그 장의 새 정점을 계단에 맡길지가 갈린다.
+    bool AddIntroTarget(IntroTarget _target)
     {
-        if (!this.HasIntroView(_target)) return;
+        if (!this.HasIntroView(_target)) return false;
 
         this.m_introTargets.Add(_target);
+        return true;
+    }
+
+    // 계단이 열 정점. 부품이 없는 자리는 담지 않는다 — 표식은 실제로 보여준 것만 세운다(AddIntroTarget과 같은 잣대).
+    void AddChapterOpen(int _nodeIndex)
+    {
+        if (!this.HasIntroView(new IntroTarget(false, _nodeIndex))) return;
+        if (this.m_introChapterOpens.Contains(_nodeIndex)) return;
+
+        this.m_introChapterOpens.Add(_nodeIndex);
     }
 
     // 그 자리에 부품이 실제로 서 있는가. 자리 미저작 정점·타일 미저작 챕터는 목록에 빈칸으로 남아 있다.
@@ -985,6 +1050,70 @@ public class TournamentMapOverlayView : MonoBehaviour, IPointerClickHandler
         }
     }
 
+    // 계단의 한 칸. 이번에 새로 열린 정점이면 스냅이 아니라 해금 안무로 연다 —
+    // 띠가 대상인 장에서는 그 정점이 개별 대상에서 빠져 있어(CollectUnlockIntro) 열어 줄 자리가 여기뿐이다.
+    // 그 밖의 정점은 지금처럼 진실로 돌려보낸다(잠긴 채 남을 정점이라 그림이 바뀌지 않는다).
+    void ReleaseChapterNode(int _nodeIndex)
+    {
+        if (this.IsPendingTarget(_nodeIndex)) return;
+
+        for (int t_i = this.m_introStaged.Count - 1; t_i >= 0; t_i--)
+        {
+            IntroTarget t_target = this.m_introStaged[t_i];
+
+            if (t_target.IsBand || t_target.Index != _nodeIndex) continue;
+
+            // 연 정점은 무대 목록에 그대로 둔다 — 이탈이 도는 안무를 걷는 문(ReleaseAllStaged)이 그 하나뿐이다.
+            if (this.TryOpenChapterNode(_nodeIndex)) return;
+
+            this.m_introStaged.RemoveAt(t_i);
+            this.ReleaseIntroView(t_target);
+            return;
+        }
+    }
+
+    // 계단이 여는 한 칸. 열었으면 참 — 표식도 여기서 세운다(PlayIntroBody를 지나지 않는 유일한 재생 경로다).
+    bool TryOpenChapterNode(int _nodeIndex)
+    {
+        if (!this.m_introChapterOpens.Remove(_nodeIndex)) return false;
+
+        var t_target = new IntroTarget(false, _nodeIndex);
+
+        // 계단이 도는 사이 재빌드·파괴로 부품이 사라졌다 — 표식 없이 스냅 경로로 돌려보낸다.
+        if (!this.HasIntroView(t_target)) return false;
+
+        // 잠긴 모습을 다시 보여주는 첫 박은 건너뛴다 — 띠 안무가 이미 그 문장을 말했고,
+        // 여기서 또 멈추면 이 정점만 제 칸에서 뒤처져 계단 밖으로 튀어나온다.
+        this.m_nodes[_nodeIndex].PlayUnlockReveal(true);
+        this.MarkIntroSeen(t_target);
+        return true;
+    }
+
+    // 계단이 미처 열지 못한 정점의 표식. 스킵도 "봤다"는 의사 표시라 재생과 같은 자리에 선다 —
+    // 빠뜨리면 그 정점만 다음 진입마다 해금 연출을 되풀이한다.
+    void MarkChapterOpensSeen(int _chapterIndex)
+    {
+        this.GetChapterNodeRange(_chapterIndex, out int t_start, out int t_count);
+
+        for (int t_i = this.m_introChapterOpens.Count - 1; t_i >= 0; t_i--)
+        {
+            int t_node = this.m_introChapterOpens[t_i];
+            if (t_node < t_start || t_node >= t_start + t_count) continue;
+
+            this.m_introChapterOpens.RemoveAt(t_i);
+            this.MarkIntroSeen(new IntroTarget(false, t_node));
+        }
+    }
+
+    // 표식은 실제로 보여준 것만 센다. 계단과 스킵이 같은 정점을 두 번 담을 수 있어 여기서 한 번으로 조인다.
+    void MarkIntroSeen(IntroTarget _target)
+    {
+        for (int t_i = 0; t_i < this.m_introSeen.Count; t_i++)
+            if (this.m_introSeen[t_i].IsBand == _target.IsBand && this.m_introSeen[t_i].Index == _target.Index) return;
+
+        this.m_introSeen.Add(_target);
+    }
+
     // 아직 재생을 기다리는 정점인가(이미 재생한 것·버린 것은 거짓이다).
     bool IsPendingTarget(int _nodeIndex)
     {
@@ -1030,54 +1159,99 @@ public class TournamentMapOverlayView : MonoBehaviour, IPointerClickHandler
     {
         if (this.m_introTargets.Count == 0) return;
 
+        // 사슬이 서지 못한 경로는 애초에 잠그지 않는다. 표식 초기화를 빠뜨리면 다음 진입부터 예산이 영영 무력화된다.
+        this.m_introSkipped = false;
+        this.LockScrollForIntro(true);
+
         this.m_suspendRefresh = true;
         this.StepUnlockIntro();
     }
 
+    // 사슬의 1단계 — 다음 대상을 골라 카메라만 그 자리로 미끄러뜨린다.
     // 길이는 재생해 봐야 알 수 있으므로 시간표를 한 번에 짜지 않는다 —
     // 한 대상이 끝나는 시각에 다음 대상을 예약해 하나씩 이어 붙인다.
     void StepUnlockIntro()
     {
-        // 재생에 실패한 대상은 숨도 쉬지 않고 곧바로 다음을 당겨 쓴다 — 빈 사슬이 introGap씩 도는 시간이 없게.
-        float t_length = 0f;
-        bool t_played = false;
-        IntroTarget t_playing = default;
-
         while (this.m_introTargets.Count > 0)
         {
             // 예산을 다 썼으면 사이를 버리고 가장 앞선(최신) 대상 하나로 건너뛴다 — 개수 상한과 같은 방향이다.
             // 재생은 그대로 아래에서 위로 간다: 자르는 쪽만 최신을 남기고, 남은 것은 목록 순서대로 훑는다.
             // 버린 대상은 표식이 서지 않으니 다음 진입에서 이어 재생된다.
-            if (this.m_introSpent >= Mathf.Max(0f, this.introBudget))
+            //
+            // 탭으로 당겨 온 사슬에는 이 문을 걸지 않는다: m_introSpent에는 저작된 안무 길이가 통째로 더해져 있어,
+            // 그대로 두면 스킵할수록 남은 대상이 더 많이 버려지는 역설이 된다(대상 수는 introMaxSteps가 이미 묶는다).
+            if (!this.m_introSkipped && this.m_introSpent >= Mathf.Max(0f, this.introBudget))
                 this.DropIntroTargets(this.m_introTargets.Count - 1);
 
             IntroTarget t_target = this.m_introTargets[0];
             this.m_introTargets.RemoveAt(0);
 
-            // 화면에 아무것도 나오지 않은 대상은 본 것으로 치지 않는다 — 저작을 고친 뒤 다시 나와야 한다.
-            // 다만 길이 0을 잣대로 삼지 않는다: 부품이 제자리에 있으면서 0을 돌려주는 길(비활성·미바인딩)이 있어,
-            // 그것까지 되풀이하면 진입마다 같은 자리에서 예산만 태우고 영영 걸린다.
-            if (!this.TryPlayIntroTarget(t_target, out t_length)) continue;
+            // 화면에 아무것도 나오지 않을 대상은 이동조차 하지 않는다 — 숨도 쉬지 않고 곧바로 다음을 당겨 쓴다.
+            if (!this.HasIntroView(t_target)) continue;
 
-            this.m_introSeen.Add(t_target);
-            this.m_introSpent += t_length;
-            t_playing = t_target;
-            t_played = true;
-            break;
-        }
+            this.m_introPlaying = t_target;
+            this.m_introTraveling = true;
 
-        if (!t_played)
-        {
-            this.EndUnlockIntro();
+            float t_travel = this.TravelToTarget(t_target);
+
+            // 이동도 m_introSeq에 담는다 — 이 자리를 비우면 마지막 대상의 이동 중에 IsIntroPending이 새어
+            // 그 틈으로 복귀 수령·정점 탭이 통과한다.
+            Sequence t_move = DOTween.Sequence().SetLink(this.gameObject);
+            t_move.AppendInterval(Mathf.Max(0.01f, t_travel));
+            t_move.OnComplete(() =>
+            {
+                this.m_introSeq = null;
+                this.PlayIntroBody();
+            });
+
+            this.m_introSeq = t_move;
             return;
         }
 
-        Sequence t_seq = DOTween.Sequence().SetLink(this.gameObject);
-        t_seq.AppendInterval(Mathf.Max(0.01f, t_length + Mathf.Max(0f, this.introGap)));
+        this.EndUnlockIntro();
+    }
 
-        // 띠 안무가 끝나는 시각이 곧 그 장이 열리는 시각이다 — 딸려 세운 정점들을 여기서 함께 풀어 준다.
-        // 다음 대상으로 넘어가는 숨(introGap)까지 기다리면 열림이 한 박 늦게 도착한다.
-        if (t_playing.IsBand) t_seq.InsertCallback(t_length, () => this.ReleaseChapterNodes(t_playing.Index));
+    // 사슬의 2단계 — 카메라가 도착한 자리에서 부품 안무를 세우고, 그 길이만큼 다음 차례를 미룬다.
+    // _chain이 거짓이면 대기 시퀀스를 세우지 않는다: 스킵이 곧바로 결말까지 당길 참이라 기다릴 것이 없다.
+    // 반환값은 "안무가 실제로 섰는가"다.
+    bool PlayIntroBody(bool _chain = true)
+    {
+        this.m_introTraveling = false;
+
+        IntroTarget t_playing = this.m_introPlaying;
+
+        if (!this.TryPlayIntroTarget(t_playing, out float t_length))
+        {
+            // 이동하는 사이 재빌드·파괴로 부품이 사라졌다 — 표식 없이 다음 대상으로 넘어간다.
+            if (_chain) this.StepUnlockIntro();
+            return false;
+        }
+
+        this.MarkIntroSeen(t_playing);
+        this.m_introSpent += t_length;
+
+        if (!_chain) return true;
+
+        // 큰 사건과 작은 사건의 숨을 가른다 — 같은 길이로 두면 둘의 무게가 구분되지 않는다.
+        float t_gap = Mathf.Max(0f, t_playing.IsBand ? this.introGapChapter : this.introGapNode);
+
+        // 계단이 여는 정점은 제 해금 안무를 돌린다 — 대기가 그 끝까지 품지 못하면
+        // 뒤이은 EndUnlockIntro·ReleaseAllStaged가 그 안무를 시작하자마자 걷어 간다.
+        float t_wait = Mathf.Max(0.01f, t_length + t_gap);
+        float t_step = 0f;
+
+        if (t_playing.IsBand)
+        {
+            t_step = this.ChapterStepInterval(t_playing.Index, t_gap);
+            t_wait = Mathf.Max(t_wait, this.ChapterStepsEnd(t_playing.Index, t_length, t_step));
+        }
+
+        Sequence t_seq = DOTween.Sequence().SetLink(this.gameObject);
+        t_seq.AppendInterval(t_wait);   // Append는 현재 길이 뒤에 붙는다 — 계단 콜백보다 먼저 세워야 대기가 밀리지 않는다
+
+        // 띠 안무가 끝나는 시각이 곧 그 장이 열리는 시각이다 — 딸려 세운 정점들을 여기서부터 계단으로 풀어 준다.
+        // 다음 대상으로 넘어가는 숨까지 기다리면 열림이 한 박 늦게 도착한다.
+        if (t_playing.IsBand) this.InsertChapterNodeSteps(t_seq, t_playing.Index, t_length, t_step);
 
         t_seq.OnComplete(() =>
         {
@@ -1086,13 +1260,183 @@ public class TournamentMapOverlayView : MonoBehaviour, IPointerClickHandler
         });
 
         this.m_introSeq = t_seq;
+        return true;
     }
 
-    // 대상 자리로 옮기고 그 부품의 안무를 시작한다. 스크롤이 곧 "여기가 열렸다"는 문장이다.
+    // 그 장의 정점을 인덱스 순서대로 하나씩 푼다 — "장이 열리면서 길이 뻗어 나간다"는 문장이다.
+    // 별도 시퀀스를 만들지 않고 대기 시퀀스에 얹는다: 그러면 중단·이탈의 Kill이 계단까지 함께 걷어
+    // 수명 관리를 세 곳(Abort·End·OnDisable)에 새로 배선하지 않아도 된다.
+    void InsertChapterNodeSteps(Sequence _seq, int _chapterIndex, float _at, float _step)
+    {
+        this.GetChapterNodeRange(_chapterIndex, out int t_start, out int t_count);
+        if (t_count <= 0) return;
+
+        // 잠긴 채 남을 정점도 제 칸을 밟는다 — 길을 따라 위에서 아래로 훑는 리듬이 곧 이 연출의 문장이고,
+        // 여는 정점은 그 리듬의 한 칸으로 들어와야 "맨 앞에서 시작"으로 읽힌다. 박을 빼면 혼자 튄다.
+        for (int t_i = 0; t_i < t_count; t_i++)
+        {
+            int t_node = t_start + t_i;
+            _seq.InsertCallback(_at + t_i * _step, () => this.ReleaseChapterNode(t_node));
+        }
+    }
+
+    // 계단의 박자. 잣대는 그 장의 전체 정점 수다 — 여는 정점만 박을 먹게 하면
+    // 새로 열리는 정점이 하나뿐인 장(온보딩의 첫 챕터가 정확히 그렇다)에서 간격이 0이 되어
+    // 계단이 통째로 사라지고, 그 정점 혼자 남들보다 늦게 열리는 것으로 읽힌다.
+    float ChapterStepInterval(int _chapterIndex, float _gap)
+    {
+        this.GetChapterNodeRange(_chapterIndex, out int _, out int t_count);
+        if (t_count <= 1) return 0f;
+
+        return Mathf.Min(Mathf.Max(0f, this.introNodeRelease), Mathf.Max(0f, _gap) / (t_count - 1));
+    }
+
+    // 계단이 다 끝나는 시각 — 마지막 칸이 여는 정점의 해금 안무까지 포함한다. 대기 길이가 이것을 품어야 한다.
+    float ChapterStepsEnd(int _chapterIndex, float _at, float _step)
+    {
+        this.GetChapterNodeRange(_chapterIndex, out int t_start, out int t_count);
+
+        float t_end = _at;
+
+        for (int t_i = 0; t_i < t_count; t_i++)
+        {
+            int t_node = t_start + t_i;
+            if (!this.m_introChapterOpens.Contains(t_node)) continue;
+
+            TournamentNodeView t_view = t_node < this.m_nodes.Count ? this.m_nodes[t_node] : null;
+            if (t_view != null) t_end = Mathf.Max(t_end, _at + t_i * _step + t_view.UnlockRevealDuration(true));
+        }
+
+        return t_end;
+    }
+
+    // 대상 자리로 카메라를 미끄러뜨린다. 반환값은 실제 이동 시간(0이면 이동이 없었다 — 곧바로 안무로 넘어간다).
+    // 사슬 안에서만 쓰는 경로다: 사슬 밖은 즉시 대입(ScrollToContentY)이 그대로 주인이다.
+    float TravelToTarget(IntroTarget _target)
+    {
+        this.KillScrollTween();
+
+        if (!this.TryGetIntroTargetY(_target, out float t_y)) return 0f;
+        if (!this.TryGetContentNormalizedY(t_y, out float t_normalized)) return 0f;
+
+        float t_duration = Mathf.Max(0f, _target.IsBand ? this.introTravelChapter : this.introTravelNode);
+
+        // 이미 그 자리다 — 0프레임 이동에 시간을 얹으면 사슬이 이유 없이 늘어진다.
+        if (t_duration <= 0f || Mathf.Abs(this.scrollRect.verticalNormalizedPosition - t_normalized) < 0.0005f)
+        {
+            this.scrollRect.verticalNormalizedPosition = t_normalized;
+            return 0f;
+        }
+
+        this.m_scrollTween = this.scrollRect
+            .DOVerticalNormalizedPos(t_normalized, t_duration)
+            .SetEase(Ease.InOutSine)
+            .SetLink(this.gameObject);
+
+        return t_duration;
+    }
+
+    // 대상 부품이 앉아 있는 Content 좌표 y. 자리 미저작·재빌드로 부품이 없으면 거짓이다.
+    bool TryGetIntroTargetY(IntroTarget _target, out float _y)
+    {
+        _y = 0f;
+
+        if (this.scrollRect == null || !this.HasIntroView(_target)) return false;
+
+        RectTransform t_rect = _target.IsBand
+            ? this.m_bands[_target.Index].transform as RectTransform
+            : this.m_nodes[_target.Index].transform as RectTransform;
+        if (t_rect == null) return false;
+
+        _y = t_rect.anchoredPosition.y;
+        return true;
+    }
+
+    // 이동을 걷고 대상 자리에 즉시 앉힌다 — 이동 중에 탭했더라도 당겨 낸 결말이 화면 안에서 보여야 한다.
+    void SnapToIntroTarget(IntroTarget _target)
+    {
+        if (!this.TryGetIntroTargetY(_target, out float t_y)) return;
+
+        this.ScrollToContentY(t_y);
+    }
+
+    void KillScrollTween()
+    {
+        Tween t_tween = this.m_scrollTween;
+        this.m_scrollTween = null;
+
+        if (t_tween != null && t_tween.IsActive()) t_tween.Kill();
+    }
+
+    // 사슬이 도는 동안 카메라의 주인을 하나로 만든다.
+    // vertical=false가 아니라 enabled 축이다 — ScrollRect가 켜져 있으면 드래그를 계속 소비해
+    // PointerEventData.dragging이 서고, OnPointerClick의 드래그 게이트에 걸려 탭 스킵이 통과하지 못한다.
+    void LockScrollForIntro(bool _on)
+    {
+        if (this.m_scrollLocked == _on) return;
+
+        this.m_scrollLocked = _on;
+
+        if (this.scrollRect == null) return;
+
+        if (_on) this.scrollRect.StopMovement();   // 잠기기 전에 굴러가던 관성은 여기서 끊는다
+        this.scrollRect.enabled = !_on;
+    }
+
+    // 탭 한 번 = 대상 하나를 결말까지. 당길 것이 있었으면 참.
+    // Kill은 대기 시퀀스에 매달린 두 콜백(다음 대상 예약·계단 해제)을 함께 지우므로 여기서 손으로 재현한다 —
+    // 빠지면 그 장의 정점들이 잠긴 모습으로 굳는다.
+    bool SkipCurrentIntroTarget()
+    {
+        if (!this.IsIntroPending) return false;
+
+        this.m_introSkipped = true;
+
+        // 대상과 대상 사이의 틈이다 — 당길 안무가 없으니 다음 대상의 이동을 곧바로 시작한다.
+        if (this.m_introSeq == null)
+        {
+            this.StepUnlockIntro();
+            return true;
+        }
+
+        this.KillScrollTween();
+        this.SnapToIntroTarget(this.m_introPlaying);
+
+        // 대기 시퀀스를 먼저 걷는다 — 이동 시퀀스를 살려 둔 채 안무를 세우면 그 OnComplete가 뒤늦게 또 세운다.
+        Sequence t_seq = this.m_introSeq;
+        this.m_introSeq = null;
+        if (t_seq.IsActive()) t_seq.Kill();
+
+        // 이동만 돌고 있었다면 안무가 아직 서지도 않았다 — 여기서 세워야 당길 결말이 생긴다.
+        if (this.m_introTraveling) this.PlayIntroBody(false);
+
+        IntroTarget t_playing = this.m_introPlaying;
+
+        if (t_playing.IsBand)
+        {
+            if (t_playing.Index >= 0 && t_playing.Index < this.m_bands.Count)
+                this.m_bands[t_playing.Index]?.RequestSkipUnlock();
+
+            // 스킵 경로는 계단을 쓰지 않는다 — 남은 정점을 즉시 전량 해제한다(이미 풀린 정점에 다시 불려도 멱등이다).
+            // 계단이 열었어야 할 정점은 표식만 세우고 넘긴다: 스킵도 "봤다"는 의사 표시라 여기서 빠뜨리면
+            // 그 정점만 다음 진입에서 해금 연출을 되풀이한다.
+            this.MarkChapterOpensSeen(t_playing.Index);
+            this.ReleaseChapterNodes(t_playing.Index);
+        }
+        else if (t_playing.Index >= 0 && t_playing.Index < this.m_nodes.Count)
+            this.m_nodes[t_playing.Index]?.RequestSkipReveal();
+
+        if (this.m_introTargets.Count > 0) this.StepUnlockIntro();
+        else this.EndUnlockIntro();
+
+        return true;
+    }
+
+    // 도착한 자리에서 그 부품의 안무를 시작한다. 카메라는 이 시점에 이미 대상 앞에 서 있다.
     // 부품이 제 시퀀스를 스스로 돌리므로 맵은 길이만 받아 다음 차례의 시작 시각을 잡는다.
     // 반환값은 "그 자리에 부품이 있었는가"다 — 길이와 따로 답해야 표식이 빈 자리까지 소모하지 않는다.
-    // 수집이 이미 걸러 두어 거짓은 거의 오지 않지만 안전망으로 남긴다: 사슬은 여러 초에 걸쳐 도는데
-    // 그 사이 재빌드·파괴로 부품이 사라질 수 있고, 그때도 표식은 서지 않아야 한다.
+    // 다만 길이 0을 잣대로 삼지 않는다: 부품이 제자리에 있으면서 0을 돌려주는 길(비활성·미바인딩)이 있어,
+    // 그것까지 되풀이하면 진입마다 같은 자리에서 예산만 태우고 영영 걸린다.
     bool TryPlayIntroTarget(IntroTarget _target, out float _length)
     {
         _length = 0f;
@@ -1101,12 +1445,10 @@ public class TournamentMapOverlayView : MonoBehaviour, IPointerClickHandler
 
         if (_target.IsBand)
         {
-            this.ScrollToBand(_target.Index);
             _length = this.m_bands[_target.Index].PlayChapterUnlock();
             return true;
         }
 
-        this.ScrollToNode(_target.Index);
         _length = this.m_nodes[_target.Index].PlayUnlockReveal();
         return true;
     }
@@ -1114,6 +1456,11 @@ public class TournamentMapOverlayView : MonoBehaviour, IPointerClickHandler
     // 사슬의 끝 — 억제를 풀어 진실을 그리고, 실제로 보여준 것만 한 번에 표식한다.
     void EndUnlockIntro()
     {
+        // 카메라를 유저에게 돌려주는 것이 사슬의 마지막 의무다 — 빠지면 맵이 영영 끌리지 않는다.
+        this.LockScrollForIntro(false);
+        this.KillScrollTween();
+        this.m_introTraveling = false;
+
         this.m_introSeq = null;
         this.m_introTargets.Clear();
 
@@ -1130,6 +1477,12 @@ public class TournamentMapOverlayView : MonoBehaviour, IPointerClickHandler
     // 어디서 끊겨도 진실로 스냅시킨다 — 스킵도 "봤다"는 의사 표시라 표식은 그대로 남긴다.
     void AbortUnlockIntro()
     {
+        // 조기 반환보다 위여야 한다 — 맵의 모든 이탈 경로(OnDisable·Close·Open)가 이 문을 지나므로,
+        // 여기서 놓치면 잠금이 남은 채 굳어 맵이 영영 끌리지 않는다.
+        this.LockScrollForIntro(false);
+        this.KillScrollTween();
+        this.m_introTraveling = false;
+
         // 세우기만 하고 사슬이 서지 못한 경로가 있다 — 그때도 무대는 걷어야 한다.
         if (!this.IsIntroPending && this.m_introSeen.Count == 0 && this.m_introStaged.Count == 0) return;
 
