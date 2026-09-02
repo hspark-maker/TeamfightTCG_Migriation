@@ -16,7 +16,15 @@ using UnityEngine;
 //   시너지 대본은 여기에 한 줄을 더한다: SynergyEffect 파생 클래스와 SynergyTriggers 디스패처를
 //   부르지 않고, CardInstance의 **상태 변경 메서드**(Heal · GrantShield · ClearShield)도 부르지 않는다 —
 //   그것들은 BattleEventStream.Emit을 타므로, 로비에서 부르면 전투 이벤트 스트림에 로비발 사건이 흐른다.
-//   보여줄 숫자가 필요하면 CardView의 표시 전용 API(OverrideHpDisplay · SetShieldVisible)로만 낸다.
+//   보여줄 숫자가 필요하면 CardView의 표시 전용 API(OverrideHpDisplay · DeferHpDisplay ·
+//   PlayHealEffect · SetShieldVisible)로만 낸다.
+//
+//   딱 하나 예외가 비늘 대본이다(ShowReducedHit): 감쇄 수치를 데모 카드에 얹어 두고 감쇄 식 자체는
+//   CardInstance에 맡긴다 — ApplySynergy는 필드 가산이라 Emit을 타지 않고, 이 카드는 매 바퀴 새로 세워진다.
+//
+// 숫자로 보이는 축은 배틀과 같이 **체력과 추가 생명력 둘뿐이다**(CardView에 공격력 텍스트가 없다).
+// 그래서 공격력·스택 축의 시너지(흐름)는 배틀에서도 숫자가 안 나오므로 여기서도 내지 않는다.
+// 수치의 정본은 스펙시트(SynergyEffectDef.parameters)이고, 대본은 TierParam으로 그것을 되읽는다.
 //
 // 무대는 y = 20000에 선다. 로비 Main Camera(직교 size 5, 원점)가 물리적으로 못 보는 자리라
 // 씬의 cullingMask를 건드릴 필요도, 전용 레이어를 저작할 필요도 없다(UiRectCapture와 같은 자리).
@@ -339,9 +347,17 @@ public class UnlockDemoStage : SingletonOverlayBase
 
         // 해금 안내는 방금 열린 그 하나만 말한다. 스펙에 저작된 나머지 키워드까지 뜨면
         // 띠 위쪽의 아이콘·이름과 카드 위의 배지가 서로 다른 것을 가리킨다.
-        // 규칙 쪽에도 같이 듣는다: Swing이 AttackFlow.Keywords(BoundCard)로 연출을 고르므로,
-        // 여기서 좁혀야 대본이 말하는 키워드와 실제로 재생되는 공격 연출이 어긋나지 않는다.
-        if (_keyword != CardKeyword.None) t_card.unlockedKeywords = _keyword;
+        //
+        // 좁히기는 표시에서 그치지 않는다: Swing이 AttackFlow.Keywords(BoundCard)를,
+        // AttackSequence가 HasKeyword(Ranged/Peerless)를 읽으므로 **공격 모션까지 이 축을 따른다**.
+        // 대본이 말하는 능력만 남기는 것이 이 무대의 목적이라 의도한 결과다 —
+        // 원거리 카드가 처형을 안내받으면 이 화면에서는 붙어서 친다.
+        //
+        // 단, 아이콘 줄에서 빠지는 키워드로 좁히면 줄이 비어 KeywordIconConfig의 기본 아이콘이
+        // 대신 뜬다(CardVisualRules.CollectKeywordIcons의 0개 폴백) — 안내와 무관한 그림이라
+        // 막으려던 어긋남을 도로 만든다. 그때는 좁히지 않고 카드의 스펙 키워드를 그대로 둔다.
+        const CardKeyword ICONLESS = CardVisualRules.IconRowExcluded | CardVisualRules.AlwaysStatus;
+        if ((_keyword & ~ICONLESS) != CardKeyword.None) t_card.unlockedKeywords = _keyword;
 
         _view.InitializeAnimator();   // 초기화(GameInitializer)이 없는 씬이라 직접 깨운다
         _view.Render(t_card, _synergy);
@@ -507,13 +523,13 @@ public class UnlockDemoStage : SingletonOverlayBase
         if (_token.IsCancellationRequested) return;
 
         SynergyEmblemVfx.Play(_atk, _syn, SynergyEmblemTiming.Triggered);
-        _atk.OverrideHpDisplay(_atk.BoundCard.hp, _atk.BoundCard.bonusHp + BULK_SHOW_BONUS);
+        ShowBonusHp(_atk, TierParam(_syn, "bonusHp", BULK_BONUS_FALLBACK));
 
         await Hold(SYNERGY_HOLD, _token);
     }
 
-    // 비늘: 맞아도 덜 아프다. **빈 이벤트 규약 자체가 대본이다** —
-    // 적이 치는데 피해 숫자가 안 뜨는 그림이 곧 "깎였다"이고, 접촉 순간의 엠블럼이 그 원인을 밝힌다.
+    // 비늘: 맞아도 덜 아프다. 피해 숫자가 아예 안 뜨면 "덜 아프다"가 아니라 "무적"으로 읽히므로,
+    // 배틀과 같이 **감쇄된 만큼만** 체력이 깎이는 그림을 낸다. 접촉 순간의 엠블럼이 그 원인을 밝힌다.
     async UniTask PlayScale(CardView _atk, CardView _def, CardView _ally, SynergyData _syn, CancellationToken _token)
     {
         if (_ally != null) SynergyEmblemVfx.Play(_ally, _syn, SynergyEmblemTiming.Placed);
@@ -522,9 +538,14 @@ public class UnlockDemoStage : SingletonOverlayBase
         await Hold(SynergyEmblemVfx.DurationOf(_syn, SynergyEmblemTiming.Placed), _token);
         if (_token.IsCancellationRequested) return;
 
+        int t_reduction = TierParam(_syn, "dmgReduction", SCALE_REDUCTION_FALLBACK);
+
         await Swing(_def, _atk, null, _token, _afterHit: () =>
         {
             SynergyEmblemVfx.Play(_atk, _syn, SynergyEmblemTiming.Triggered);
+
+            // 표기 조작은 반드시 공격 뒤다 — PlayHitAnim이 표기를 모델 값으로 되돌린다(_afterHit이 그 뒤에 온다).
+            ShowReducedHit(_atk, _def, t_reduction);
             return UniTask.CompletedTask;
         });
         if (_token.IsCancellationRequested) return;
@@ -567,16 +588,33 @@ public class UnlockDemoStage : SingletonOverlayBase
 
     // 돌보미: 동료가 나오면 서로를 돌본다. 게임 경로와 같은 그림 — 엠블럼이 돌보미 전원 위에 뜨고
     // 회복 표기가 **같은 순간** 각자 자리에서 터진다(힐러 투사체는 쓰지 않는다).
+    // 회복과 추가 생명력을 둘 다 낸다: CaretakerSynergyEffect가 같은 값으로 Heal + GrantBonusHp를 함께 한다.
     async UniTask PlayCaretaker(CardView _atk, CardView _ally, SynergyData _syn, CancellationToken _token)
     {
+        int t_amount = TierParam(_syn, "amount", CARETAKER_AMOUNT_FALLBACK);
+
+        // 만피에서 회복하면 숫자가 움직이지 않는다 — 표기를 먼저 낮춰 그 한 칸이 도로 차오르게 한다(PlayHealer와 같은 이유).
+        WoundDisplay(_atk, t_amount);
+        WoundDisplay(_ally, t_amount);
+
+        await Hold(SYNERGY_STEP, _token);
+        if (_token.IsCancellationRequested) return;
+
         SynergyEmblemVfx.Play(_atk, _syn, SynergyEmblemTiming.Triggered);
         if (_ally != null) SynergyEmblemVfx.Play(_ally, _syn, SynergyEmblemTiming.Triggered);
 
         // 데모엔 유예된 표기가 없으므로 _consumeDeferred는 기본값(false) — 그래야 "+N"이 실제로 뜬다.
-        if (_atk.BoundCard != null) _atk.PlayHealEffect(CARETAKER_SHOW_HEAL);
-        if (_ally != null && _ally.BoundCard != null) _ally.PlayHealEffect(CARETAKER_SHOW_HEAL);
+        if (_atk.BoundCard != null) _atk.PlayHealEffect(t_amount);
+        if (_ally != null && _ally.BoundCard != null) _ally.PlayHealEffect(t_amount);
 
         await Hold(SynergyEmblemVfx.DurationOf(_syn, SynergyEmblemTiming.Triggered), _token);
+        if (_token.IsCancellationRequested) return;
+
+        // 추가 생명력은 회복 굴림이 끝난 뒤에 얹는다 — 같은 프레임에 내면 어느 숫자가 움직였는지 안 읽힌다.
+        ShowBonusHp(_atk, t_amount);
+        ShowBonusHp(_ally, t_amount);
+
+        await Hold(SYNERGY_HOLD, _token);
     }
 
     // 흐름: 동료가 늘수록 바람이 커진다. 스택이 1에서 2로 오르는 것을 크기로 읽게 한다.
@@ -627,8 +665,9 @@ public class UnlockDemoStage : SingletonOverlayBase
         var t_sources = new List<CardView> { _atk };
         if (_ally != null) t_sources.Add(_ally);
 
+        int t_damage  = TierParam(_syn, "damagePerMember", BRAND_DAMAGE_FALLBACK);
         var t_damages = new int[t_sources.Count];
-        for (int t_i = 0; t_i < t_damages.Length; t_i++) t_damages[t_i] = BRAND_SHOW_DAMAGE;
+        for (int t_i = 0; t_i < t_damages.Length; t_i++) t_damages[t_i] = t_damage;
 
         // 표기 전용 볼리다(착탄이 PlayHitAnim + OverrideHpDisplay만 부른다) — 실제 체력은 그대로다.
         await BrandVolleyVfx.PlayVolley(t_sources, _def, t_damages,
@@ -638,7 +677,7 @@ public class UnlockDemoStage : SingletonOverlayBase
         await Swing(_atk, _def, null, _token);
     }
 
-    // 포식자: 때린 만큼 되마신다. 만피에서 시작하면 회복이 안 읽히므로 표기를 먼저 낮춰 둔다.
+    // 포식자: 때린 만큼 되마신다.
     // 곁자리는 세우지 않는다 — 흡혈은 개인 효과라 동료를 세워도 그 자리가 하는 일이 없다.
     async UniTask PlayPredator(CardView _atk, CardView _def, SynergyData _syn, CancellationToken _token)
     {
@@ -651,9 +690,17 @@ public class UnlockDemoStage : SingletonOverlayBase
 
         int t_hp    = _atk.BoundCard.hp;
         int t_bonus = _atk.BoundCard.bonusHp;
-        int t_drain = Mathf.Clamp(PREDATOR_SHOW_DRAIN, 1, Mathf.Max(1, t_hp - 1));
 
-        _atk.OverrideHpDisplay(t_hp - t_drain, t_bonus);
+        // 세 축 다 규칙 쪽이 진실원이다: 흡혈 식은 PredatorSynergyEffect.LifestealOf,
+        // 공격력은 AttackDamage, 그것이 대상에게 실제로 들어간 값은 ClampDamage.
+        int t_percent = TierParam(_syn, "lifestealPercent", PREDATOR_PERCENT_FALLBACK);
+        int t_dealt   = _def.BoundCard != null
+                      ? _def.BoundCard.ClampDamage(_atk.BoundCard.AttackDamage())
+                      : _atk.BoundCard.AttackDamage();
+
+        // 만피에서 시작하면 회복이 안 읽히므로 표기를 먼저 낮춰 둔다.
+        int t_drain = WoundDisplay(_atk, PredatorSynergyEffect.LifestealOf(t_dealt, t_percent));
+
         await Hold(SYNERGY_STEP, _token);
         if (_token.IsCancellationRequested) return;
 
@@ -697,14 +744,13 @@ public class UnlockDemoStage : SingletonOverlayBase
             if (_token.IsCancellationRequested) return;
         }
 
-        // 표기 조작은 반드시 공격 뒤다 — PlayHitAnim이 표기를 모델 값으로 되돌리므로 앞에 두면 조용히 지워진다.
-        _atk.OverrideHpDisplay(_atk.BoundCard.hp, _atk.BoundCard.bonusHp + TRACE_SHOW_BONUS);
+        // 숫자는 내지 않는다 — 1단계 표식이 주는 것은 "표식을 붙인다"뿐이고, 추가 생명력은 2단계 값이다.
         await Hold(SYNERGY_HOLD, _token);
     }
 
     // 유산: 턴마다 쌓은 것이 쓰러질 때 동료에게 간다.
-    // Show/Fly의 개수 인자 오버로드는 게임 상태를 안 바꾸는 미리보기 진입점이고,
-    // _healAmount 0이면 표기 유예(HealLater)도 걸리지 않는다.
+    // Show/Fly의 개수 인자 오버로드는 게임 상태를 안 바꾸는 미리보기 진입점이다 — 회복량은 넘기되
+    // 그것으로 움직이는 것은 동료의 **표기**뿐이다(모델은 이 무대에서 변하지 않는다).
     async UniTask PlayLegacy(CardView _atk, CardView _def, CardView _ally, SynergyData _syn, CancellationToken _token)
     {
         if (!(_syn.vfx is LegacySynergyVfxConfig t_cfg))
@@ -714,11 +760,16 @@ public class UnlockDemoStage : SingletonOverlayBase
             return;
         }
 
-        LegacyCrownVfx.Show(_atk.BoundCard, _syn, 1);
+        // 왕관 수 = 쌓인 스택이고, 회복량도 그 스택이다(LegacySynergyEffect.OnLethal) — 대본은 두 턴을 보여준다.
+        int t_amount = TierParam(_syn, "amount", LEGACY_AMOUNT_FALLBACK);
+        int t_stack  = t_amount;
+
+        LegacyCrownVfx.Show(_atk.BoundCard, _syn, t_stack);
         await Hold(LEGACY_STEP, _token);
         if (_token.IsCancellationRequested) return;
 
-        LegacyCrownVfx.Show(_atk.BoundCard, _syn, 2);
+        t_stack += t_amount;
+        LegacyCrownVfx.Show(_atk.BoundCard, _syn, t_stack);
         await Hold(LEGACY_STEP, _token);
         if (_token.IsCancellationRequested) return;
 
@@ -729,8 +780,21 @@ public class UnlockDemoStage : SingletonOverlayBase
             return;
         }
 
-        LegacyCrownVfx.Fly(_atk.BoundCard, new[] { _ally.BoundCard }, 0, _syn, 2);
+        // 만피면 왕관이 닿아도 숫자가 안 움직인다 — 받을 자리를 먼저 비워 둔다.
+        int t_heal = WoundDisplay(_ally, t_stack);
+
+        // 유예를 먼저 걸어야 숫자가 오른다: 도착 처리(LegacyCrownVfx.FlyOne)가 PlayHealEffect(_consumeDeferred: true)를
+        // 부르고, 그 분기는 **미리 예약된 몫만큼만** 표기를 올린다(PlayHealer와 같은 규약).
+        _ally.DeferHpDisplay(t_heal);
+
+        LegacyCrownVfx.Fly(_atk.BoundCard, new[] { _ally.BoundCard }, t_heal, _syn, t_stack);
         await Hold(t_cfg.flyDuration + t_cfg.arriveHold, _token);
+
+        // 유예분은 반드시 여기서 푼다 — 왕관 프리팹이 미배선이면 Fly가 아무것도 안 띄우고 돌아가
+        // **도착이 없으므로**, 낮춰 둔 동료의 체력 표기가 그 판 내내 굳는다.
+        // (바퀴를 넘기는 누수는 아니다: Render가 카드 교체 프레임에 유예를 스스로 지운다.)
+        // 끊겨서 도착이 없었던 경우까지 덮어야 하므로 취소 검사 앞이다.
+        SnapHpDisplay(_ally);
     }
 
     // 대본이 아직 없는 시너지(새로 늘어난 것)와 연출 에셋 타입이 어긋난 경우의 폴백.
@@ -820,11 +884,9 @@ public class UnlockDemoStage : SingletonOverlayBase
         CardView t_target = ActiveAlly;
         if (t_target == null || t_target.BoundCard == null) return;
 
-        CardInstance t_card    = t_target.BoundCard;
-        int          t_heal    = Mathf.Clamp(HEALER_SHOW_HEAL, 1, Mathf.Max(1, t_card.hp - 1));
-        int          t_wounded = t_card.hp - t_heal;
+        CardInstance t_card = t_target.BoundCard;
+        int          t_heal = WoundDisplay(t_target, HEALER_SHOW_HEAL);
 
-        t_target.OverrideHpDisplay(t_wounded, t_card.bonusHp);
         await Hold(SYNERGY_STEP, _token);
         if (_token.IsCancellationRequested) return;
 
@@ -842,6 +904,81 @@ public class UnlockDemoStage : SingletonOverlayBase
         // 이 연출은 스스로 끝을 알리지 않는다 — 길이는 HealVfx가 아는 값을 그대로 받아 쓴다.
         await UniTask.Delay(Ms(HealVfx.BurstDuration(1)), cancellationToken: _token)
                      .SuppressCancellationThrow();
+    }
+
+    // ── 표기 ────────────────────────────────────────────────────────────
+    //
+    // 전부 CardView의 표시 전용 API만 쓴다. 모델(CardInstance)의 체력·추가 생명력은 이 무대에서 변하지 않으므로,
+    // 다음 Render(ApplyRoles)나 PlayHitAnim이 표기를 저작 상태로 되돌린다.
+
+    /// <summary>이 시너지 1단계가 저작한 수치. 시트에 그 키가 없거나 값이 비었으면 _fallback.
+    /// <c>tiers</c>는 <c>[NonSerialized]</c>라 카탈로그 초기화(SynergySpecSource.Apply) 전에는 비어 있다.</summary>
+    static int TierParam(SynergyData _synergy, string _key, int _fallback)
+    {
+        SynergyTier t_tier = _synergy != null && _synergy.tiers != null && _synergy.tiers.Length > 0
+                           ? _synergy.tiers[0]
+                           : null;
+        if (t_tier?.effects == null) return _fallback;
+
+        // 0 이하는 "없는 값"으로 본다 — 시트 칸이 비면 효과 클래스가 미저작 필드(0)를 true와 함께
+        // 돌려주고, 그대로 쓰면 대본이 숫자를 못 내 통째로 무음이 된다.
+        foreach (SynergyEffect t_effect in t_tier.effects)
+            if (t_effect != null && t_effect.TryGetParam(_key, out int t_value) && t_value > 0) return t_value;
+
+        return _fallback;
+    }
+
+    /// <summary>회복을 보여주기 전에 표기를 그만큼 낮추고, 실제로 낮춘 양을 돌려준다.
+    /// 만피에서 회복하면 숫자가 한 칸도 움직이지 않아 무엇이 좋아졌는지 안 읽힌다.
+    /// 0까지 떨어뜨리지 않는다 — 죽은 것으로 읽힌다.</summary>
+    static int WoundDisplay(CardView _view, int _amount)
+    {
+        if (_view == null || _view.BoundCard == null) return 0;
+
+        CardInstance t_card  = _view.BoundCard;
+        int          t_wound = Mathf.Clamp(_amount, 1, Mathf.Max(1, t_card.hp - 1));
+
+        _view.OverrideHpDisplay(t_card.hp - t_wound, t_card.bonusHp);
+        return t_wound;
+    }
+
+    /// <summary>추가 생명력 "+N"만 표기에 얹는다(체력은 모델 값 그대로).</summary>
+    static void ShowBonusHp(CardView _view, int _amount)
+    {
+        if (_view == null || _view.BoundCard == null || _amount <= 0) return;
+        _view.OverrideHpDisplay(_view.BoundCard.hp, _view.BoundCard.bonusHp + _amount);
+    }
+
+    /// <summary>표기를 모델 값으로 되돌린다(유예해 둔 회복 표기도 함께 푼다).</summary>
+    static void SnapHpDisplay(CardView _view)
+    {
+        if (_view == null || _view.BoundCard == null) return;
+        _view.OverrideHpDisplay(_view.BoundCard.hp, _view.BoundCard.bonusHp);
+    }
+
+    // 비늘 감쇄를 반영한 피격 표기. 감쇄 식과 그 하한의 진실원은 CardInstance라 값을 카드에 얹어 두고
+    // PreviewAfterDamage에 맡긴다 — 여기서 raw - reduction을 다시 쓰면 하한 규칙이 두 곳으로 갈린다.
+    // ApplySynergy는 필드 가산이라 BattleEventStream을 타지 않고, 이 카드는 매 바퀴 새로 세워지는
+    // 데모 전용 인스턴스라 전투로 새어 나가지 않는다(그래도 이중 적용을 막으려 ClearSynergy를 먼저 건다).
+    static void ShowReducedHit(CardView _view, CardView _attacker, int _reduction)
+    {
+        if (_view == null || _view.BoundCard == null || _attacker == null || _attacker.BoundCard == null) return;
+        if (_reduction <= 0) return;
+
+        CardInstance t_card = _view.BoundCard;
+        t_card.ClearSynergy();
+        t_card.ApplySynergy(0, CardKeyword.None, _reduction);
+
+        // 공격력은 체력에서 나오므로(AttackDamage) 실제 값을 그대로 쓰면 데모 카드가 한 방에 0으로 표기된다 —
+        // 죽지 않는 최대 피해까지 한 칸씩 물러난다. "얼마면 죽는가"는 규칙(WouldDieFrom)에게만 묻는다:
+        // 감쇄가 뺄셈이 아니게 되거나 하한이 바뀌어도 이 자리가 따라 틀리지 않는다.
+        int t_raw = _attacker.BoundCard.AttackDamage();
+        while (t_raw > 0 && t_card.WouldDieFrom(t_raw)) t_raw--;
+        if (t_raw <= 0) return;
+
+        (int t_hp, int t_bonusHp) = t_card.PreviewAfterDamage(t_raw);
+
+        _view.OverrideHpDisplay(t_hp, t_bonusHp);
     }
 
     // ── 수명 ────────────────────────────────────────────────────────────
@@ -931,17 +1068,20 @@ public class UnlockDemoStage : SingletonOverlayBase
     const float LEGACY_STEP     = 0.55f;   // 왕관이 한 개 늘어나는 간격
     const float TRACE_MARK_HOLD = 0.35f;   // 표식이 붙고 동료가 달려들기까지
 
-    // 대본이 보여주는 숫자. 규칙에서 오는 값이 아니라 **읽히기 위한 값**이다 —
-    // 시트의 실제 수치를 끌어오면 티어에 따라 0이 되는 날 대본이 통째로 무음이 된다.
     // 배지가 켜졌다는 사실만 나르므로 수치 자체는 화면에 안 나온다 — 무대에 아군이 둘 서는 데서 온 값이다.
     const int SYNERGY_SHOW_COUNT  = 2;
 
-    const int BULK_SHOW_BONUS     = 3;
-    const int CARETAKER_SHOW_HEAL = 2;
-    const int HEALER_SHOW_HEAL    = 1;   // 규칙과 같은 값(HealerEffect: 힐러 하나당 아군 1 회복)
-    const int BRAND_SHOW_DAMAGE   = 1;
-    const int PREDATOR_SHOW_DRAIN = 3;
-    const int TRACE_SHOW_BONUS    = 2;
+    // 시너지 수치의 정본은 스펙시트(SynergyEffectDef.parameters)다. 아래는 **그 키가 없을 때만** 쓰는 폴백 —
+    // 시트를 못 읽는 자리(카탈로그 초기화 전)에서 대본이 통째로 무음이 되지 않게 1단계 저작값을 그대로 적어 둔다.
+    const int BULK_BONUS_FALLBACK       = 3;    // Bulk.bonusHp
+    const int CARETAKER_AMOUNT_FALLBACK = 1;    // Caretaker.amount (회복 + 추가 생명력)
+    const int SCALE_REDUCTION_FALLBACK  = 1;    // Scale.dmgReduction
+    const int BRAND_DAMAGE_FALLBACK     = 1;    // Brand.damagePerMember
+    const int PREDATOR_PERCENT_FALLBACK = 50;   // Predator.lifestealPercent
+    const int LEGACY_AMOUNT_FALLBACK    = 1;    // Legacy.amount (턴마다 쌓이는 스택)
+
+    // 힐러는 시너지가 아니라 키워드 축이라 시트 조회 대상이 아니다(HealerEffect: 힐러 하나당 아군 1 회복).
+    const int HEALER_SHOW_HEAL    = 1;
 
     static int Ms(float _seconds) => Mathf.Max(0, (int)(_seconds * 1000f));
 }
