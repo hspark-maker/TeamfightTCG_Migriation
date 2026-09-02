@@ -64,7 +64,7 @@ public class UnlockDemoStage : SingletonOverlayBase, IUnlockDemoStage
     // 판이 도는 중에 들어온 걷기 지시 — 부수는 일은 그 판이 풀린 뒤 RunLoop이 한다.
     bool m_disposePending;
 
-    // 이번 무대가 안내하는 카드. 앞자리에 서고, 배역과 달리 대본이 고르는 값이 아니다.
+    // 이번 무대가 안내하는 카드. 배역과 달리 대본이 고르는 값이 아니다.
     int m_cardId;
 
     // 이번 무대의 배역. 자리가 곧 진영이다 — 윗줄은 적, 아랫줄은 아군.
@@ -102,7 +102,6 @@ public class UnlockDemoStage : SingletonOverlayBase, IUnlockDemoStage
     /// <summary>_card가 속한 _synergy가 일하는 모습을 반복 재생하고 그 텍스처를 돌려준다. 연출 에셋이 없으면 null.</summary>
     public Texture Begin(int _card, SynergyData _synergy) => BeginCore(_card, UnlockDemoScriptTable.For(_synergy));
 
-    // 공개 자리에서 오버로드로 가르는 이유: 호출부는 언제나 둘 중 하나만 안다. 안쪽은 대본 하나로 합쳐 루프가 두 벌로 복제되지 않게 한다.
     // 순서가 계약이다 — TurnState.LocalOwnerIndex를 배역보다 먼저 세워야 Render와 VFX 오프셋·회전이 같은 방향을 본다.
     Texture BeginCore(int _card, IUnlockDemoScript _script)
     {
