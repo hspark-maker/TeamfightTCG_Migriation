@@ -1192,16 +1192,25 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         LimitBreakAsync(t_card).Forget();
     }
 
-    // 서버 왕복 한계돌파. 오른 단계·줄어든 간식을 누른 프레임에 미리 그리고, 응답은 그것을 확정하거나 되돌린다.
+    // 서버 왕복 한계돌파. 오른 단계는 응답이 도착한 프레임에 처음 드러난다 — 강화와 같은 규율이다.
     async UniTaskVoid LimitBreakAsync(int _card)
     {
-        // 앞세운 표시는 예약 통지로만 그린다 — 선검사에 걸려 요청이 나가지 않은 프레스에 섬광이 터지지 않는다.
-        await CardGrowthManager.TryLimitBreakAsync(_card, () => ShowLimitBreakReserved(_card));
+        ELimitBreakOutcome t_outcome;
 
-        // 왕복 중 이 창이 사라졌다면 되돌릴 화면이 없다(간식·단계는 매니저가 스스로 걷는다).
+        // Release는 반드시 finally에서 — 예외나 조기 반환으로 한 번이라도 새면 전역 오버레이가 화면을 영영 잠근다.
+        ServerWaitOverlay.Hold(this);
+        try
+        {
+            t_outcome = await CardGrowthManager.TryLimitBreakAsync(_card);
+        }
+        finally
+        {
+            this.m_ritualPlaying = false;
+            ServerWaitOverlay.Release(this);
+        }
+
+        // 왕복 중 이 창이 사라졌다면 그릴 화면이 없다(단계·간식은 서버가 이미 확정했다).
         if (this == null) return;
-
-        this.m_ritualPlaying = false;
 
         // 창이 닫혔으면 그릴 것도 깨울 안내도 없다 — 한계돌파는 튜토리얼 통지를 타지 않는다.
         if (!this.isActiveAndEnabled) return;
@@ -1210,15 +1219,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         int t_now = CardAt(this.m_index);
         if (t_now > 0) RefreshGrowth(t_now, OwnershipManager.IsOwned(t_now));
 
+        // 새 단계가 드러나는 그 한 박을 강조한다. 갱신 뒤라 섬광이 물러날 때 이미 오른 체력이 서 있다.
+        if (t_outcome == ELimitBreakOutcome.Success && this.cardView != null) this.cardView.FlashGrowth();
+
         RefreshArrows();
-    }
-
-    // 서버가 확정하기 전의 단계·간식이 이미 캐시에 서 있는 프레임. 오른 체력과 다음 단계 비용을 여기서 그린다.
-    void ShowLimitBreakReserved(int _card)
-    {
-        RefreshGrowth(_card, OwnershipManager.IsOwned(_card));
-
-        if (this.cardView != null) this.cardView.FlashGrowth();
     }
 
     void OnEnhancePressed()

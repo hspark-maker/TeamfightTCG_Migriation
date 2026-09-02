@@ -29,9 +29,6 @@ public static partial class CardGrowthManager
     // 초기화에서 클라우드 세이브 채택 이후 1회 호출
     public static void Init()
     {
-        // 서버값을 세우기 바로 앞줄이다 — 여기서 낙관분을 버려야 앞세운 간식·단계가 서버값 위에 한 번 더 얹히지 않는다.
-        ClearPendingLimitBreak();
-
         s_growth.Clear();
 
         KeywordGrowthManager.OnChanged -= NotifyGrowthChanged;
@@ -90,14 +87,9 @@ public static partial class CardGrowthManager
         => Snapshot(_id, ClampLevel(_level), false, 0);
 
     /// <summary>카드 번호의 성장 스냅샷(기록이 없으면 미강화). HP 보너스·해금 상태는 저장값이 아니라 레벨에서 파생된다.
-    /// <b>서버가 확정한 값만</b> 담는다 — 전투 스탯과 서버 제출(lockDeck)이 이 길로 지나므로,
-    /// 아직 왕복 중인 한계돌파를 여기 얹으면 서버가 모르는 체력이 실려 덱 잠금이 거절된다.
-    /// 화면에 그릴 값은 <see cref="DisplayGrowthOf"/> 가 답한다.</summary>
+    /// 화면도 전투도 이 길 하나로 읽는다 — 서버가 확정하지 않은 값이 여기 얹히면 서버가 모르는 체력이
+    /// lockDeck 에 실려 덱 잠금이 거절된다.</summary>
     public static CardGrowth GrowthOf(int _id) => Snapshot(_id, LevelOf(_id), true, LimitBreakOf(_id));
-
-    /// <summary>화면에 그릴 성장 스냅샷. 서버가 아직 확정하지 않은 한계돌파까지 얹혀 있어
-    /// 유저가 누른 프레임에 체력이 오른다 — 표시 창구(<see cref="DeckPower"/>) 밖에서는 쓰지 않는다.</summary>
-    public static CardGrowth DisplayGrowthOf(int _id) => Snapshot(_id, LevelOf(_id), true, DisplayLimitBreakOf(_id));
 
     // 카드의 현재 강화 레벨(기록 없음 = 미강화)
     public static int LevelOf(int _id)
