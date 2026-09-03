@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>디버그 되감기 예약의 단일 창구 — "다음 초기화에 세이브를 밀고 이 좌표에서 시작한다".
@@ -9,6 +10,7 @@ using UnityEngine;
 ///
 /// 적용이 2단인 이유: 밀기는 클라우드 채택 뒤이면서 매니저들이 슬롯을 캐싱하기 <b>전</b>(InstallSaveDependent 맨 앞)이어야 하고,
 /// 지급 재생은 카탈로그·덱·시퀀스가 전부 준비된 <b>뒤</b>(초기화(InitializationRunner) 끝)여야 한다.
+/// 밀기가 서버 왕복이 된 뒤에도 이 경계는 그대로다 — 왕복이 끝나야 매니저 Init()들이 밀린 슬롯을 읽는다.
 /// </summary>
 public static class OutgameTutorialRewind
 {
@@ -62,40 +64,40 @@ public static class OutgameTutorialRewind
         LocalPrefs.Save();
     }
 
-    /// <summary>1단 — 아웃게임 세이브를 첫실행으로 밀고 예약 좌표를 심는다.
+    /// <summary>1단 — 서버에 아웃게임 세이브 초기화를 요청하고 예약 좌표를 심는다.
     /// <b>SaveDependentManagersStep.InstallOnce() 맨 앞</b>에서만 호출한다 —
     /// 클라우드 채택보다 앞서면 채택이 슬롯을 그대로 덮고, 매니저 Init()들이 슬롯 참조를 캐싱한 뒤면 반영되지 않는다.</summary>
-    public static void ApplyWipeIfScheduled()
+    // 미는 주체가 서버인 이유는 진행도의 단조성이다 — 클라가 세이브를 뒤로 쓸 수 있으면 보상 수령 표식을 비워 재수령이 뚫린다.
+    public static async UniTask ApplyWipeIfScheduled()
     {
         // 밀기는 새 예약(PREF_KEY)에만 반응한다 — 재생만 남은 상태를 여기서 다시 집으면 매 초기화 반복 와이프다.
         if (!TryGetCoord(PREF_KEY, out int t_chapter, out int t_step)) return;
 
-        var t_data = DataSaveManager.Data;
+        try
+        {
+            // 슬롯 9개 채택은 이 창구가 한다(AdoptServerResult → AdoptServerSlots) — 클라가 따로 쓰거나 저장하지 않는다.
+            // InvokeInitAsync는 Loading을 단언하는데 이 시점은 이미 Ready라 쓸 수 없다.
+            await ServerSaveCommands.InvokeAsync<ServerCommandResult>(
+                "devRewindTutorial",
+                new
+                {
+                    env          = ContentProfileConfig.Active.CloudEnvId,
+                    chapterIndex = t_chapter,
+                    stepIndex    = t_step,
+                });
+        }
+        catch (Exception t_exception)
+        {
+            // QA 경로라 실패가 게임 진입을 막으면 안 된다. 예약을 남기면 매 부팅이 같은 왕복을 반복하면서 원인은 안 보이므로
+            // 걷어내고 로그만 남긴다 — QA가 에디터 창에서 다시 예약하면 된다.
+            Cancel();
+            Debug.LogError($"[TutorialRewind] 서버 되감기 실패 — 예약을 취소했다. 좌표 {t_chapter}-{t_step} · {t_exception.GetBaseException().Message}");
+            return;
+        }
 
-        // 슬롯을 통째로 새 인스턴스로 — UserSaveData의 슬롯 전부를 여기서 센다. 하나라도 빠지면 그 축만
-        // 이전 세션 값으로 남아, 되감기로 본 화면이 실제 신규 유저의 화면과 조용히 달라진다(키워드 만렙 잔존이 그랬다).
-        // 진행 흔적이 세이브 슬롯에만 있는 것도 아니다 — 기기 로컬에 사는 축은 아래에서 따로 민다.
-        //
-        // 재화는 없다 — 잔액은 세이브를 떠나 서버 지갑 문서로 갔고 클라는 그 문서를 쓰지 못한다.
-        // 되감기 뒤에도 잔액이 그대로 남는다는 뜻이다. test env 디버그 경로라 그 차이를 수용한다.
-        t_data.Ownership     = new OwnershipSaveData();
-        t_data.Deck          = new DeckSaveData();
-        t_data.Rank          = new RankSaveData();
-        t_data.CardGrowth    = new CardGrowthSaveData();
-        t_data.KeywordGrowth = new KeywordGrowthSaveData();
-        t_data.AlbumReward   = new AlbumRewardSaveData();
-        t_data.Adventure    = new AdventureSaveData();
-        t_data.Tutorial      = new TutorialSaveData();
-        t_data.Profile       = new ProfileSaveData();
-
-        t_data.Tutorial.ChapterIndex     = t_chapter;
-        t_data.Tutorial.ChapterStepIndex = t_step;
-
-        // 세이브 슬롯 밖에 사는 진행 흔적도 함께 민다 — 슬롯만 밀면 그 축이 이전 세션 값으로 남아
+        // 세이브 슬롯 밖에 사는 진행 흔적은 서버가 모른다 — 슬롯만 밀면 그 축이 이전 세션 값으로 남아
         // "되감았는데 그 연출만 안 나온다"가 된다(해금 연출 이력은 기기 로컬이라 슬롯 목록에 없다).
         AdventureUnlockSeenStore.Clear();
-
-        DataSaveManager.Save();
 
         // 밀기는 끝났다 — 예약을 재생 전용 키로 옮겨 다음 초기화가 세이브를 다시 밀지 않게 한다.
         LocalPrefs.DeleteKey(PREF_KEY);
@@ -106,7 +108,8 @@ public static class OutgameTutorialRewind
         // 알아서 내리므로 no-op이고, 리로드를 끈 에디터 세션에서만 실효가 있다 — 그 한 경우를 위한 방어다.
         OutgameFeatureLock.ClearStall();
 
-        Debug.Log($"[TutorialRewind] 세이브 초기화 — 좌표 {t_chapter}-{t_step}로 되감음(모든 슬롯 첫실행 · 해금 연출 이력 · 정지 판정 해제).");
+        // 잔액은 되돌지 않는다 — 지갑은 세이브 문서 밖이고 되돌리는 경로가 서버에도 없다. test env 전용이라 그 차이를 수용한다.
+        Debug.Log($"[TutorialRewind] 서버 세이브 초기화 — 좌표 {t_chapter}-{t_step}로 되감음(슬롯 전체 첫실행 · 해금 연출 이력 · 정지 판정 해제 · 잔액 유지).");
     }
 
     /// <summary>2단 — 예약 좌표 직전까지의 <b>결정적인</b> 지급만 재생하고 예약을 소비한다.

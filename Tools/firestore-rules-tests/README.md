@@ -2,6 +2,9 @@
 
 `firestore.rules` 가 실제 세이브 문서 스키마와 어긋나지 않았는지 검증한다.
 
+최상위 키 목록은 `fixtures/clientContract.js` 가 `PlayerSaveDocument.cs` 에서 직접 뽑아 오고,
+`0a`·`0b`·`0c` 가 픽스처와 룰을 그 목록에 묶는다. 슬롯이 개명되면 이 셋이 먼저 빨간불이 된다.
+
 룰이 조용히 낡으면 배포하는 날 전 유저 저장이 거부된다 — 커밋 `809d040d3` 이 그 사고였고,
 그때는 운영에 전면 개방 룰이 올라가 있어서 증상이 안 보였다. 이 테스트가 룰과
 `Assets/Scripts/OutGame/Save/4.Cloud/PlayerSaveDocument.cs` 의 `ToFieldMap` 을 묶어 둔다.
