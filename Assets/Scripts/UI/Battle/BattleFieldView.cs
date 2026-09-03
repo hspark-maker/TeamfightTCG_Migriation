@@ -59,9 +59,9 @@ public class BattleFieldView : MonoBehaviour
         return t_rect;
     }
 
-    /// <summary>보충 카드가 덱에서 나와 슬롯에 앉기까지. 등장 연출은 CardAppearSequence가
-    /// 중앙 도착 시점에 모든 경로 공통으로 낸다(여기 on/off 축은 없다).</summary>
-    public async UniTask PlayFillAnim(List<CardInstance> _placed)
+    /// <summary><paramref name="_playAppearVfx"/>=true면 각 카드가 <b>중앙에 선 순간</b> 등장 연출이 터진다.
+    /// 턴 보충은 끄고(매 턴 터지면 표식 가치가 없다) 멀리건 교체만 켠다 — 교활 교대는 CunningVfx.PlayEnter가 켠다.</summary>
+    public async UniTask PlayFillAnim(List<CardInstance> _placed, bool _playAppearVfx = false)
     {
         if (_placed == null || _placed.Count == 0) return;
 
@@ -107,7 +107,8 @@ public class BattleFieldView : MonoBehaviour
             if (i == _placed.Count - 1) t_pile?.PlayDrawOut();
 
             // 등장 순서(중앙 정지 → 컷씬 → 슬롯)는 CardAppearSequence 단독 — 교활 교대 등장과 공유한다.
-            await CardAppearSequence.Play(t_view, _placed[i], t_from, t_mid, t_dests[i], this.cardDealDuration);
+            await CardAppearSequence.Play(t_view, _placed[i], t_from, t_mid, t_dests[i], this.cardDealDuration,
+                                          _playAppearVfx);
         }
     }
 

@@ -95,8 +95,9 @@ public static class MulliganPhase
         if (t_outView != null) await CunningVfx.PlayExit(t_outView, BattleVfxId.None);
 
         // 연출: 교체 표시(Refresh) 후 새 카드만 딜 애니(FillAndAnimate와 동형).
+        // 등장 연출을 켠다 — 교활 교대 등장과 같은 그림(중앙에 선 순간 발화).
         t_view.Refresh();
-        await t_view.PlayFillAnim(new List<CardInstance> { t_in });
+        await t_view.PlayFillAnim(new List<CardInstance> { t_in }, _playAppearVfx: true);
     }
 
     /// <summary>후공 플레이어가 자기 슬롯 카드 1장을 탭(또는 스킵)할 때까지 대기. 선택 슬롯 인덱스, 스킵이면 -1.

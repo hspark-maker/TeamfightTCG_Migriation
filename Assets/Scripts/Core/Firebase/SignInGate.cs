@@ -56,13 +56,20 @@ public static class SignInGate
     public static void MarkPanelReady() => s_panelReady = true;
 
     /// <summary>화면이 유저의 선택을 확정한다. 키를 남겨 다음 실행부터는 화면이 서지 않는다.</summary>
-    public static void Complete(ESignInMethod _method)
+    public static void Complete(ESignInMethod _method) => Complete(_method, true);
+
+    /// <param name="_remember">기기에 남길 것인가. 유저가 고른 것이 아니라 <b>화면이 없어 대신 정한</b>
+    /// 결론은 남기지 않는다 — 남기면 로그인 화면이 있는 다음 실행에서도 그 계정에 묶인다.</param>
+    static void Complete(ESignInMethod _method, bool _remember)
     {
         if (_method == ESignInMethod.None || s_completed) return;
 
         s_completed = true;
-        LocalPrefs.SetString(MethodKey, _method.ToString());
-        LocalPrefs.Save();
+        if (_remember)
+        {
+            LocalPrefs.SetString(MethodKey, _method.ToString());
+            LocalPrefs.Save();
+        }
         s_choice?.TrySetResult(_method);
     }
 
@@ -92,8 +99,12 @@ public static class SignInGate
 
         if (!s_panelReady && !s_completed)
         {
-            Debug.LogWarning("[SignInGate] 로그인 화면이 없어 익명으로 진행한다.");
-            Complete(ESignInMethod.Anonymous);
+            // 이 결론은 기기에 남기지 않는다 — 유저가 고른 것이 아니라 화면이 없어 대신 정한 것이라,
+            // 남기면 로그인 화면이 있는 다음 실행에서도 이번에 발급된 익명 계정에 영영 묶인다
+            // (에디터에서 로비 씬으로 바로 시작하면 실제로 그렇게 됐다).
+            Debug.LogWarning("[SignInGate] No sign-in screen appeared — continuing anonymously for this run only "
+                           + "(the choice is not stored).");
+            Complete(ESignInMethod.Anonymous, false);
         }
 
         return await s_choice.Task;

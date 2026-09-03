@@ -18,12 +18,12 @@ public static class CardAppearSequence
     /// <summary><paramref name="_card"/>는 컷씬 자격 판정 대상(= 이 슬롯에 들어온 인스턴스).
     /// 뷰의 BoundCard와 같아야 한다 — 호출 전 Refresh/Render가 끝나 있어야 하는 이유.
     ///
-    /// 등장 연출(<see cref="BattleVfxId.CardAppear"/>)은 <b>모든 등장</b>에 난다 — 발화 지점은
-    /// 카드가 덱에서 나와 <b>중앙에 선 순간</b> 하나다(교체·퇴장 쪽이 아니다).
-    /// 예전엔 교활 교대·멀리건만 켜는 플래그였는데, "덱에서 새 카드가 나왔다"는 사건은
-    /// 보충·오프닝도 같아서 경로마다 그림이 갈릴 이유가 없다.</summary>
+    /// <paramref name="_playAppearVfx"/>는 <b>등장 연출(CardAppear)</b>을 켠다. 발화 지점은
+    /// 카드가 덱에서 나와 <b>중앙에 선 순간</b> 하나다 — 교체(퇴장) 쪽이 아니다.
+    /// 교활 교대·멀리건 교체만 켠다: 두 경우 모두 "덱에서 새 카드가 나왔다"가 사건이라 표식이 값을 갖는다.
+    /// 턴 보충·오프닝 배치는 끈다 — 매번 터지면 표식 가치가 없다.</summary>
     public static async UniTask Play(CardView _view, CardInstance _card,
-        Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration)
+        Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration, bool _playAppearVfx = false)
     {
         if (_view == null) return;
 
@@ -32,7 +32,7 @@ public static class CardAppearSequence
         await _view.PlayDealToMid(_from, _mid, _dest, _duration);
         if (_view == null) return;
 
-        PlayMidArrival(_view);
+        PlayMidArrival(_view, _playAppearVfx);
 
         bool t_cancelled = await UniTask.Delay((int)(GameTiming.Battle.DealMidPause * 1000),
                 cancellationToken: _view.GetCancellationTokenOnDestroy())
@@ -47,10 +47,11 @@ public static class CardAppearSequence
     /// 오프닝 배치(BattleIntro.DealCards)는 카드를 겹쳐 뿌리느라 <see cref="Play"/>를 통째로 못 타서
     /// 이 함수만 따로 부른다(중앙 도착 연출이 두 벌로 갈리지 않게).
     ///
-    /// 보충·오프닝·멀리건 교체·교활 교대가 모두 같은 그림이다 — 경로별 on/off는 두지 않는다.</summary>
-    public static void PlayMidArrival(CardView _view)
+    /// 켤지 말지는 호출부가 정한다(<paramref name="_playAppearVfx"/>) — 지금은 멀리건 교체·교활 교대만 켠다.</summary>
+    public static void PlayMidArrival(CardView _view, bool _playAppearVfx)
     {
         if (_view == null) return;
+        if (!_playAppearVfx) return;
 
         BattleVfx.Play(BattleVfxId.CardAppear, _view.transform.position, _view.VfxSortingLayerId);
     }
