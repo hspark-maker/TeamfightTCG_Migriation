@@ -101,6 +101,7 @@ static class PlayerSaveCloud
         SetState(EPlayerSaveCloudState.Loading);
 
         WalletCloud.Initialize(in _context);
+        TutorialGrantsCloud.Initialize(in _context);
         PlayerSaveDocument.CacheDeviceInfo();
 
         DataSaveManager.SetImmediateUploadHandler(RequestImmediateUpload);
@@ -266,6 +267,7 @@ static class PlayerSaveCloud
         s_gateComplete = false;
         LastError = string.Empty;
         WalletCloud.ResetForRetry();
+        TutorialGrantsCloud.ResetForRetry();
         SetState(EPlayerSaveCloudState.Loading);
 
         LoadAsync(s_generation).Forget();
@@ -301,6 +303,7 @@ static class PlayerSaveCloud
         s_context = default;
         Revision = 0;
         WalletCloud.Shutdown();
+        TutorialGrantsCloud.Shutdown();
         SetUploadFailures(0);
         SetState(EPlayerSaveCloudState.Disabled);
 
@@ -392,6 +395,9 @@ static class PlayerSaveCloud
         // 지갑 읽기를 세이브 읽기 왕복에 얹는다 — 초기화 예산에 문서 하나치 지연을 더하지 않으려는 것이다.
         // TryReadAsync는 던지지 않는다(세이브 쪽이 먼저 실패해도 관측되지 않는 예외가 남지 않게).
         UniTask<bool> t_walletRead = WalletCloud.TryReadAsync(t_userId);
+        // 튜토리얼 무료 한 방 표식도 같은 자리에 얹는다. 읽기 실패는 접지 않는다 —
+        // 최종 판정은 서버가 하고 클라 값은 표시·통과 판정용이라, 못 읽었다고 신규 계정을 복구 화면으로 보내면 그게 사고다.
+        UniTask<bool> t_grantsRead = TutorialGrantsCloud.TryReadAsync(t_userId);
 
         DocumentSnapshot t_document;
         try
@@ -401,12 +407,14 @@ static class PlayerSaveCloud
         catch (Exception t_exception)
         {
             await t_walletRead;
+            await t_grantsRead;
             if (_generation != s_generation) return;
             Fail($"Remote save read failed ({t_exception.GetBaseException().Message}).");
             return;
         }
 
         bool t_walletReadOk = await t_walletRead;
+        bool t_grantsReadOk = await t_grantsRead;
         if (_generation != s_generation) return;
         if (t_document == null)
         {
@@ -441,6 +449,9 @@ static class PlayerSaveCloud
                 return;
             }
         }
+
+        if (!t_grantsReadOk)
+            Debug.LogWarning($"[PlayerSaveCloud] Tutorial grants read failed ({TutorialGrantsCloud.LastError}).");
 
         if (!t_walletReadOk)
         {

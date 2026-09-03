@@ -70,11 +70,12 @@ public class AlbumThemeCellView : MonoBehaviour
         if (progressRow != null) progressRow.SetActive(!t_done);
         if (doneRow != null) doneRow.SetActive(t_done);
 
-        // 마지막 칸을 꽂는 순간 상자가 나타나는 게 보상 신호다 — 그 전엔 감춘다
-        if (t_hidden > 0)
+        // 위장분이 남아도 잠긴 상자로 그린다 — 페이지 오버레이와 같은 규칙이다
+        if (t_hidden > 0 && t_info.State != EAlbumRewardState.Claimed)
         {
-            var t_empty = default(AlbumRewardInfo);
-            chest.Bind(t_empty, null);
+            var t_masked = new AlbumRewardInfo(
+                t_info.Rewards, t_info.Owned - t_hidden, t_info.Total, EAlbumRewardState.Locked);
+            chest.Bind(t_masked, null);
         }
         else chest.Bind(t_info, ClaimReward);
 

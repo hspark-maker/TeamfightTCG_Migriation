@@ -217,6 +217,16 @@ public class OutgameTutorialBridge : MonoBehaviour
             return;
         }
 
+        // 서버가 이 축의 무료 한 방을 이미 소진했다면 이 스텝이 시킨 강화는 성립한 뒤다 — 응답 유실로 완료 신호만 잃은 자리라 여기서 통과시킨다.
+        // 미달성이면 잘라내지 않고 흘려보낸다 — 이 스텝의 딤을 세우는 것은 아래 TryOpenGate 하나뿐이다.
+        if (m_step.Completion == EOutgameTutorialCompletion.Enhance
+         && m_step.FreeOfCharge
+         && OutgameTutorialGuide.IsFreeShotSpentOnServer(EOutgameTutorialAction.WaitEnhance))
+        {
+            OnGateSatisfied();
+            return;
+        }
+
         // 설명 스텝은 앵커가 없어도 정상이다(강조 없이 문구만) — 완료가 딤 탭이라 진행이 막히지 않는다.
         // 억제 씬에서도 띄운다: 억제하면 완료 신호인 딤 자체가 사라져 진행이 영구히 멈춘다.
         if (m_step.Completion == EOutgameTutorialCompletion.Confirm && m_step.Anchor == EOutgameTutorialAnchor.None)
@@ -482,6 +492,10 @@ public class OutgameTutorialBridge : MonoBehaviour
     }
 
     // 개봉 오버레이 열림/닫힘. 씬이 바뀌지 않으므로 재개해 줄 새 브리지가 없다 — 이 브리지가 직접 이어간다.
+    // 세션 도중 서버 소진 표식이 켜졌다 = 이 스텝이 시킨 강화가 이미 성립했다.
+    // 다시 적용하면 PresentStep의 프리체크가 통과 판정을 한다(응답을 잃어 완료 신호만 못 받은 자리).
+    void OnServerFreeShotSpentChanged() => ApplyCurrentStep();
+
     void OnPackOverlayOpened() => ApplyCurrentStep();
 
     void OnPackOverlayClosed() => ApplyCurrentStep();
@@ -582,6 +596,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         CardRewardOverlay.OnAnyClosed             += OnOverlayClosed;
         CardSetRewardOverlay.OnAnyClosed          += OnOverlayClosed;
         PackRewardOverlay.OnAnyClosed             += OnOverlayClosed;
+        OutgameTutorialGuide.OnFreeShotSpentChanged += OnServerFreeShotSpentChanged;
         m_subscribed = true;
     }
 
@@ -609,6 +624,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         CardRewardOverlay.OnAnyClosed             -= OnOverlayClosed;
         CardSetRewardOverlay.OnAnyClosed          -= OnOverlayClosed;
         PackRewardOverlay.OnAnyClosed             -= OnOverlayClosed;
+        OutgameTutorialGuide.OnFreeShotSpentChanged -= OnServerFreeShotSpentChanged;
         m_subscribed = false;
     }
 }

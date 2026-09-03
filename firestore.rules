@@ -50,7 +50,7 @@ service cloud.firestore {
         return request.resource.data.keys().hasOnly([
           'schemaVersion', 'revision', 'updatedAt', 'deviceId', 'appVersion',
           'ownership', 'deck', 'cardGrowth', 'keywordGrowth',
-          'rank', 'albumReward', 'tournament', 'tutorial', 'profile'
+          'rank', 'albumReward', 'adventure', 'tutorial', 'profile'
         ]) &&
         // hasOnly 와 같은 키를 hasAll 로도 요구한다. 슬롯을 optional 로 두면
         // 메타 5키 + revision+1 만 보내 소유·랭크를 통째로 날릴 수 있고,
@@ -64,7 +64,7 @@ service cloud.firestore {
         request.resource.data.keys().hasAll([
           'schemaVersion', 'revision', 'updatedAt', 'deviceId', 'appVersion',
           'ownership', 'deck', 'cardGrowth', 'keywordGrowth',
-          'rank', 'albumReward', 'tournament', 'tutorial', 'profile'
+          'rank', 'albumReward', 'adventure', 'tutorial', 'profile'
         ]) &&
         request.resource.data.schemaVersion is int &&
         request.resource.data.schemaVersion > 0 &&
@@ -86,7 +86,7 @@ service cloud.firestore {
         request.resource.data.cardGrowth is map && request.resource.data.cardGrowth.size() <= 2000 &&
         request.resource.data.keywordGrowth is map && request.resource.data.keywordGrowth.size() <= 64 &&
         request.resource.data.albumReward is map && request.resource.data.albumReward.size() <= 128 &&
-        request.resource.data.tournament is map && request.resource.data.tournament.size() <= 128 &&
+        request.resource.data.adventure is map && request.resource.data.adventure.size() <= 128 &&
         request.resource.data.tutorial is map && request.resource.data.tutorial.size() <= 128 &&
         // profile 안쪽은 보지 않는다 — ProfileSaveData 의 nickname/avatarId/frameId 는
         // 초기값이 없어 신규 계정 첫 업로드에 null 로 실린다(기본 id 를 세이브에 굳히지

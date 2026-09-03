@@ -142,7 +142,11 @@ public static partial class CardGrowthManager
         EnhanceCommandResult t_command = await EnhanceCommand.EnhanceCardAsync(t_id, t_freeShot, t_pending);
 
         // 결제 전에 막힌 결말은 값이 하나도 안 바뀌었다 — 통지 없이 물러난다(화면이 스스로 되돌린다).
-        if (!t_command.Settled) return new EnhanceResult(t_command.Outcome, LevelOf(t_id));
+        if (!t_command.Settled)
+        {
+            await RefreshFreeShotMarkIfRejectedAsync(t_freeShot, t_command);
+            return new EnhanceResult(t_command.Outcome, LevelOf(t_id));
+        }
 
         // 레벨·잔액은 응답 채택이 갈아끼운 슬롯을 ServerSlotRehydrator가 Init으로 다시 태워 이미 캐시에 있다 —
         // 여기서 대입하거나 저장하면 서버와 이중 진실원이 된다.
@@ -192,6 +196,17 @@ public static partial class CardGrowthManager
         OutgameTutorialGuide.ResetFreeShotForDebug();   // 강화를 처음부터 다시 보는 상태다
         Save();
         OnGrowthChanged?.Invoke();
+    }
+
+    // 무료 한 방을 청구했는데 서버가 잔액 부족·만렙으로 막았다면 그 한 방은 이미 서버가 먹은 뒤다
+    // (안내 구간에는 제 돈으로 낼 잔액이 없다) — 응답을 잃어 클라만 모르는 자리라 표식을 다시 읽는다.
+    // 왕복은 이 갈래에서만 늘어난다: 무료가 아닌 강화의 평범한 잔액 부족에는 붙지 않는다.
+    static async UniTask RefreshFreeShotMarkIfRejectedAsync(bool _freeShot, EnhanceCommandResult _command)
+    {
+        if (!_freeShot || !_command.RejectedByServer) return;
+        if (_command.Outcome != EEnhanceOutcome.NotAffordable && _command.Outcome != EEnhanceOutcome.MaxLevel) return;
+
+        await OutgameTutorialGuide.RefreshFreeShotSpentAsync();
     }
 
     // 사유의 순서가 곧 계약이다 — 호출부가 NotReady로 로그를 가르므로 초기화 판정이 만렙·비용보다 앞선다.
