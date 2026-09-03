@@ -21,9 +21,10 @@ public static class CunningVfx
     /// <summary>필드의 카드가 덱으로 물러나는 그림. 교활 교대 말고 <b>멀리건 교체</b>도 같은 연출을 쓴다 —
     /// "필드 카드가 덱으로 돌아간다"는 사건은 하나뿐이라 그림도 하나여야 한다.
     ///
-    /// <paramref name="_exitVfx"/>만 경로마다 다르다. <b>안개(CunningFog)는 교활 전용 표식</b>이고,
-    /// 그냥 교체(멀리건)는 반짝임(CardAppear)을 쓴다 — 물러나는 그림은 같아도 "왜 물러나는가"는 달라서
-    /// 안개를 같이 띄우면 교활이 발동한 것으로 읽힌다. <see cref="BattleVfxId.None"/>이면 연출 없이 물러난다.</summary>
+    /// <paramref name="_exitVfx"/>만 경로마다 다르다. <b>안개(CunningFog)는 교활 전용 표식</b>이라 여기 남고,
+    /// 그냥 교체(멀리건)는 <see cref="BattleVfxId.None"/>으로 조용히 물러난다 —
+    /// 반짝임(CardAppear)은 <b>들어오는 카드가 중앙에 설 때</b>로 옮겼다(CardAppearSequence).
+    /// 퇴장에 붙이면 "교체됐다"가, 등장에 붙이면 "새 카드가 나왔다"가 읽힌다.</summary>
     public static async UniTask PlayExit(CardView _view, BattleVfxId _exitVfx = BattleVfxId.CunningFog)
     {
         if (_view == null) return;
@@ -95,7 +96,7 @@ public static class CunningVfx
         Vector3 t_mid  = CameraUtil.ScreenFractionToWorld(0.5f, 0.5f, t_dest.z);
 
         return CardAppearSequence.Play(_view, _view.BoundCard, t_from, t_mid, t_dest,
-                                       GameTiming.Battle.CardDealDuration, _playSwapVfx: true);
+                                       GameTiming.Battle.CardDealDuration, _playAppearVfx: true);
     }
 
     /// <summary>퇴장 목표는 해당 소유자의 실제 덱 버튼. 버튼은 safe-area 하위이므로 화면 형태를 그대로 따른다.

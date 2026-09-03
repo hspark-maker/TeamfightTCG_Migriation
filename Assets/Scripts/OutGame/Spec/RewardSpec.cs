@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-public enum ERewardOwnerType { Album, Tournament, Rank, Battle }
+public enum ERewardOwnerType { Album, Adventure, Rank, Battle }
 public enum ERewardType { Currency }
 
 // 모든 정적 보상의 단일 조회 창구. 수령 여부는 각 기능의 기존 세이브 키가 계속 소유한다.

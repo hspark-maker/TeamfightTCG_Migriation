@@ -19,7 +19,7 @@
 - 룰 슬롯 동결에서 **`deck` · `profile` · `tutorial` 은 제외**(클라가 계속 쓴다). `rank` 는 싱글 전투 판정이 범위 밖이라 자동 제외.
 - 순서는 **구멍 크기 순**.
 
-**의도한 결말** — 세이브 9슬롯 중 **5슬롯(`ownership` · `cardGrowth` · `keywordGrowth` · `albumReward` · `tournament`)이 서버 전용**이 되고, 재화가 움직인 모든 기록이 영수증에 남으며 재시도가 재과금이 되지 않는다.
+**의도한 결말** — 세이브 9슬롯 중 **5슬롯(`ownership` · `cardGrowth` · `keywordGrowth` · `albumReward` · `adventure`)이 서버 전용**이 되고, 재화가 움직인 모든 기록이 영수증에 남으며 재시도가 재과금이 되지 않는다.
 
 ---
 
@@ -35,7 +35,7 @@
 | 2 | 릴리스 빌드 디버그 치트 | `OutgameDebugActions.cs` · `UI/Debug/*` | 버튼 하나로 3~6번 전부 | **P0** |
 | 3 | 소유 `ownership` | ~~튜토리얼 5경로~~ → 디버그 3 · 되감기 4 | 전 카드 무료 → 팩 우회 + 도감 보상 연쇄 | **P2 완료** · 잔여는 P0 |
 | 4 | ~~한계돌파~~ | ~~`CardGrowthManager.Snack.cs:TryLimitBreak`~~ | 간식 0으로 HP 보너스 최대 · `lockDeck` 도 통과 | **P3 완료** · 잔여는 P0 |
-| 5 | ~~모험 해금·낙인~~ | ~~`TournamentProgress.MarkRewardPending`~~ | 챕터 건너뛰고 정점 보상 수령 | **P4 완료** · 잔여는 P0 |
+| 5 | ~~모험 해금·낙인~~ | ~~`AdventureProgress.MarkRewardPending`~~ | 챕터 건너뛰고 정점 보상 수령 | **P4 완료** · 잔여는 P0 |
 | 6 | 싱글 랭크 `rank.points` | `RankManager.ApplyBattleResult` | 팩 잠금·티어 보상·챕터 잠금 자격 | **범위 밖** |
 | 7 | 세이브 슬롯 무동결 | `firestore.rules` `affectedKeys` 0건 | 위 3·4·5를 룰 층에서 못 막는다 | **P6** |
 
@@ -47,9 +47,9 @@
 
 `#if UNITY_EDITOR || DEVELOPMENT_BUILD` 안에 있는 것은 `OutgameDebugActions.cs:73-172` 의 서버 진단 3개와 `OutGame/Debug/OutgameDebugOverlay.cs` 파일 전체뿐이다. 나머지는 리테일 빌드에 그대로 실린다.
 
-- `Assets/Scripts/OutGame/Debug/OutgameDebugActions.cs` — 파일 전체를 가드로 감싼다. 현재 노출: `MaxCardGrowth`/`ResetCardGrowth` · `UnlockAllCards`/`RevokeAllCards` · `RaiseTier`/`LowerTier`/`StepTier`/`JumpToPromoStandby`/`ResetTier` · `SkipTutorial`/`ResetTutorial`/`RestartTutorialFromChapter` · `ToggleFeatureLock` · `StartCurrentTournamentNode` · `ForceAlbumInsertSession`
+- `Assets/Scripts/OutGame/Debug/OutgameDebugActions.cs` — 파일 전체를 가드로 감싼다. 현재 노출: `MaxCardGrowth`/`ResetCardGrowth` · `UnlockAllCards`/`RevokeAllCards` · `RaiseTier`/`LowerTier`/`StepTier`/`JumpToPromoStandby`/`ResetTier` · `SkipTutorial`/`ResetTutorial`/`RestartTutorialFromChapter` · `ToggleFeatureLock` · `StartCurrentAdventureNode` · `ForceAlbumInsertSession`
 - `Assets/Scripts/UI/Debug/UnlockAllCardsButton.cs` · `Assets/Scripts/UI/Debug/DebugCurrencyButton.cs` — 파일 전체 가드. **`MonoBehaviour` 라 프리팹에 붙은 채 빌드에 실린다** — 가드 후 프리팹 참조가 끊어지지 않는지 확인
-- 매니저 쪽 `*ForDebug` public static API 도 같이 가드: `RankManager.SetTierForDebug`/`StepTierForDebug`/`SetPromoStandbyForDebug`/`ResetForDebug` · `TournamentProgress.ResetForDebug` · `RankRewardManager.ResetForDebug` · `OutgameTutorialProgress.JumpForDebug`/`ClearTriggersForDebug`/`ResetForDebug` · `CardGrowthManager.DebugMaxAll`/`DebugResetAll` · `OwnershipManager.GrantEntireCatalog`/`RevokeAll`
+- 매니저 쪽 `*ForDebug` public static API 도 같이 가드: `RankManager.SetTierForDebug`/`StepTierForDebug`/`SetPromoStandbyForDebug`/`ResetForDebug` · `AdventureProgress.ResetForDebug` · `RankRewardManager.ResetForDebug` · `OutgameTutorialProgress.JumpForDebug`/`ClearTriggersForDebug`/`ResetForDebug` · `CardGrowthManager.DebugMaxAll`/`DebugResetAll` · `OwnershipManager.GrantEntireCatalog`/`RevokeAll`
 
 `GrantCurrency` 계열은 이미 서버가 막는다 — `functions-currency/src/commands/devGrantCurrency.ts:30` 이 `env !== "test"` 를 거부하고 리테일은 `live` 다. 나머지는 순수 클라 조작이라 서버 방어선이 0이다.
 
@@ -126,18 +126,18 @@
 
 착수 시 실측하니 문안보다 실태가 앞서 있었다. `ClearNodeAsync` · `ClaimChapterRewardAsync` 는 이미 서버 `RewardClaimCommand` 로 위임되어 있었고, 클라가 세이브를 직접 쓰는 자리는 **`MarkRewardPending` 하나**였다(`ResetForDebug` 는 P0 몫). 그래서 이번 작업의 본체는 "낙인을 서버가 소유하게 만드는 것"이 됐다.
 
-1. **callable `reportTournamentWin(nodeId)` 신설**(`functions/src/commands/reportTournamentWin.ts`). 이름을 `clearTournamentNode` 로 하지 않은 것은 이 명령이 하는 일이 클리어 확정이 아니라 **격파 신고**이기 때문이다(확정은 여전히 `claimReward` 다). `claimReward.ts` 안의 동명 내부 함수는 `claimTournamentNode` 로 바꿔 이름 공간을 비웠다.
+1. **callable `reportAdventureWin(nodeId)` 신설**(`functions/src/commands/reportAdventureWin.ts`). 이름을 `clearAdventureNode` 로 하지 않은 것은 이 명령이 하는 일이 클리어 확정이 아니라 **격파 신고**이기 때문이다(확정은 여전히 `claimReward` 다). `claimReward.ts` 안의 동명 내부 함수는 `claimAdventureNode` 로 바꿔 이름 공간을 비웠다.
    **`won` 을 받지 않는다** — 서버가 검증할 방법이 없어 "항상 true 인 인자"가 되고, 그런 인자는 읽는 사람에게 검증되는 것처럼 보인다. 패배는 아예 호출하지 않는 것이 계약이다.
-2. **사슬의 진실원은 새 `prevNodeId` 열이다.** 당초 문안은 `TournamentChapter` 표(24행)를 그대로 읽으라 했지만, 그 표의 `order` 는 챕터 **안**의 순서라 경계를 넘지 못하고 `id` 는 저작 순회 위치라 앞에 행 하나만 끼워도 밀린다. 클라 진실원(`StateOf` 의 `_index - 1` 인접)을 그대로 표에 새겨 정렬 의미론에 기대지 않게 했다. **뿌리(`prevNodeId` 가 빈 행)가 하나가 아니면 그 열이 없던 구 블롭**이라는 뜻이라 fail-closed 로 막는다(`ChainUnreadable`).
+2. **사슬의 진실원은 새 `prevNodeId` 열이다.** 당초 문안은 `AdventureChapter` 표(24행)를 그대로 읽으라 했지만, 그 표의 `order` 는 챕터 **안**의 순서라 경계를 넘지 못하고 `id` 는 저작 순회 위치라 앞에 행 하나만 끼워도 밀린다. 클라 진실원(`StateOf` 의 `_index - 1` 인접)을 그대로 표에 새겨 정렬 의미론에 기대지 않게 했다. **뿌리(`prevNodeId` 가 빈 행)가 하나가 아니면 그 열이 없던 구 블롭**이라는 뜻이라 fail-closed 로 막는다(`ChainUnreadable`).
 3. **랭크 잠금의 축은 등급이 아니라 점수(`requiredPoints` 열)다.** 서버에는 `ERankGrade` 가 없고 `RankGrade` 표의 `id` 채번과 `RankConfig.grades` 리스트 순서를 맞춰 줄 코드도 없어서, 등급 인덱스를 축으로 쓰면 두 진실원이 조용히 갈린다. **첫 등급은 0 으로 낮춘다** — `RankConfig.ResolveTierIndex` 가 첫 등급 진입 점수에 못 미쳐도 인덱스 0 을 돌려주므로, `entryPoints` 를 그대로 쓰면 `points` 0 인 신규 계정을 서버만 잠근다. 등가성이 기대는 두 불변식(`entryPoints` 오름차순 · 등급 오름차순)은 업로더가 검증한다.
 4. **`claimReward` 에 사슬 검사를 겹치지 않았다.** `pending !== ownerId` 검사가 이미 서버 낙인을 통과한 정점만 받으므로, 낙인을 서버가 소유하는 순간 사슬 검증을 상속한다. 대신 방어선 하나를 더했다 — **낙인이 표 밖 정점을 가리키면 거절**한다(구 클라가 스스로 찍어 둔 임의 낙인이 신규 서버에서 그대로 수령되는 창구).
-5. **표 파서를 `completionTable.ts` → `tournamentTable.ts` 로 이사**했다. 표 하나에 파서 하나가 기존 불변식이고(`rewardTable`↔Reward · `tutorialGrantTable`↔TutorialGrant), 이쪽은 완주 모수뿐 아니라 해금 사슬까지 잰다. `completionTable` 에는 도감과 공용 `isCompleted` 가 남는다.
-6. **클라는 두 곳에서 신고한다.** 전투 씬(`BattleOutcome`, `Forget`)이 먼저인 것은 기존 낙인이 거기 있던 이유와 같다 — 캐리어가 메모리라 로비까지 미루면 씬 로딩 중 종료가 승리를 삼킨다. 로비 복귀(`TournamentReturnFlow`)가 한 번 더 쏘는 것은 그 순간 네트워크가 없었을 때를 메운다. 서버가 재신고를 `AlreadyPending` 으로 성공 처리하고 창구(`TournamentWinCommand`)가 겹친 왕복을 합치므로 비용은 왕복 1회다.
+5. **표 파서를 `completionTable.ts` → `adventureTable.ts` 로 이사**했다. 표 하나에 파서 하나가 기존 불변식이고(`rewardTable`↔Reward · `tutorialGrantTable`↔TutorialGrant), 이쪽은 완주 모수뿐 아니라 해금 사슬까지 잰다. `completionTable` 에는 도감과 공용 `isCompleted` 가 남는다.
+6. **클라는 두 곳에서 신고한다.** 전투 씬(`BattleOutcome`, `Forget`)이 먼저인 것은 기존 낙인이 거기 있던 이유와 같다 — 캐리어가 메모리라 로비까지 미루면 씬 로딩 중 종료가 승리를 삼킨다. 로비 복귀(`AdventureReturnFlow`)가 한 번 더 쏘는 것은 그 순간 네트워크가 없었을 때를 메운다. 서버가 재신고를 `AlreadyPending` 으로 성공 처리하고 창구(`AdventureWinCommand`)가 겹친 왕복을 합치므로 비용은 왕복 1회다.
    **선물 등장은 신고가 끝난 뒤로 미뤘다** — 낙인이 서기 전에 내면 눌러도 수령이 튕긴다. 실패해도 신호는 조건 없이 낸다: 그것이 맵의 등장 예약(정점을 재워 두는 것)을 푸는 유일한 열쇠다.
    전투 씬 호출에 **취소 토큰을 물리지 않는다** — 씬 파괴가 업로드 봉인 해제(`InvokeAsync` 의 `finally`) 전에 취소를 던지면 이후 저장이 통째로 막힌다.
-7. **재수화는 `Tournament` 슬롯만** 넣었다(P5 에서 당겨옴, `AlbumReward` 는 P5 에 남는다). 다른 슬롯과 달리 `Init` 계열이 아니라 **통지뿐**이다 — `TournamentProgress` 가 세이브를 직독하고 캐시를 두지 않아 채택 시점에 값은 이미 새것이고 모르는 것은 화면뿐이다.
+7. **재수화는 `Adventure` 슬롯만** 넣었다(P5 에서 당겨옴, `AlbumReward` 는 P5 에 남는다). 다른 슬롯과 달리 `Init` 계열이 아니라 **통지뿐**이다 — `AdventureProgress` 가 세이브를 직독하고 캐시를 두지 않아 채택 시점에 값은 이미 새것이고 모르는 것은 화면뿐이다.
 
-**결과: 낙인을 *만드는* 판정이 서버로 갔다.** 도메인 코드에서 `tournament` 슬롯을 쓰는 경로는 `ResetForDebug` 하나만 남았다(P0 가 닫는다). `UserSaveData.VERSION` 은 8 그대로 — 세이브 필드 변화가 0이다.
+**결과: 낙인을 *만드는* 판정이 서버로 갔다.** 도메인 코드에서 `adventure` 슬롯을 쓰는 경로는 `ResetForDebug` 하나만 남았다(P0 가 닫는다). `UserSaveData.VERSION` 은 8 그대로 — 세이브 필드 변화가 0이다.
 
 **다만 낙인이 아직 서버 단독 소유는 아니다.** `PlayerSaveDocument` 가 여전히 문서 **전체**를 `SetOptions.Overwrite` 로 올리므로, 변조 클라는 정규 업로드 경로로 `pendingRewardNodeId` 를 세울 수 있다. 그렇게 세운 낙인이 표에 실재하는 정점을 가리키면 `claimReward` 의 `hasNode` 방어선을 통과하고 사슬 검증은 상속되지 않는다. **이 상속은 P6 슬롯 동결 이후에 완결된다** — P4 가 닫는 것은 "클라 코드가 사슬을 판정하던 것"이고, "클라가 슬롯에 쓸 수 있다는 것"은 P6 몫이다.
 
@@ -153,7 +153,7 @@
 
 `ServerSlotRehydrator.Rehydrate` 는 `Ownership`·`KeywordGrowth`·`CardGrowth` 세 슬롯만 재수화한다(파일 안 `TODO(R5+)`·`TODO(R7·R9)`).
 
-- **`AlbumReward` 추가.** `Tournament` 는 P4 가 당겨가 이미 붙었다(통지만 — `TournamentProgress` 는 세이브 직독이라 재구축할 캐시가 없다). `AlbumRewardManager` 도 지금은 `DataSaveManager.Data` 를 매번 읽어 우연히 맞지만, static 캐시를 도입하는 순간 깨진다.
+- **`AlbumReward` 추가.** `Adventure` 는 P4 가 당겨가 이미 붙었다(통지만 — `AdventureProgress` 는 세이브 직독이라 재구축할 캐시가 없다). `AlbumRewardManager` 도 지금은 `DataSaveManager.Data` 를 매번 읽어 우연히 맞지만, static 캐시를 도입하는 순간 깨진다.
 - **`Deck` 은 손대지 않는다** — 동결 제외 슬롯이고, TODO 가 지적한 "`DeckSaveManager.LoadFromSave` 가 Compact 후 SaveAll 을 타 채택 중 저장이 튄다"는 문제를 건드릴 이유가 없어졌다.
 - `Rank`·`Tutorial`·`Profile` 도 동결 제외라 재수화 대상이 아니다.
 
@@ -168,7 +168,7 @@
 ```
 // 서버 전용 슬롯 — 클라 업로드가 이 다섯 중 하나라도 바꾸면 거부한다.
 !request.resource.data.diff(resource.data).affectedKeys()
-   .hasAny(['ownership','cardGrowth','keywordGrowth','albumReward','tournament'])
+   .hasAny(['ownership','cardGrowth','keywordGrowth','albumReward','adventure'])
 ```
 
 `diff().affectedKeys()` 는 map 전체 동등 비교보다 싸다(`ownership`·`cardGrowth` 는 엔트리 2000 상한이라 비용이 문제가 된다). `SetOptions.Overwrite` 업로드여도 **값이 같으면 `affectedKeys` 에 들어가지 않으므로**, 클라가 서버가 준 값을 그대로 재업로드하는 정상 경로는 통과한다.
@@ -205,8 +205,8 @@
 
 ## 병행 선결 — 어느 단계든 막을 수 있다
 
-- **`envs/live/specs` 에 두 표가 없다.** 2026-08-31 실측 기준 `live` 는 10표다(`Card` 40 · `Card_Test` 40 · `CardPack` 11 · `CardPackDrop` 320 · `Reward` 84 · `RankGrade` 5 · `KeywordEnhance` 6 · `CardEnhance` 3 · `CardEnhanceRule` 1 · `CardLimitBreak` 3). 0표였던 당초 실측보다는 나아졌지만 **`TournamentChapter` 와 `AlbumEntry` 가 빠져 있어** `claimReward` 의 도감·모험 수령이 live 에서 fail-closed 로 막힌다. 서버는 표를 못 읽으면 거절하므로 이 두 표 업로드가 P4·P5 배포의 선행조건이다
-- **`envs/test` 는 4표가 블롭 없이 `rows/` 만 있다.** 블롭으로 선 8표(`Reward` 84 · `RankGrade` 5 · `KeywordEnhance` 6 · `CardEnhance` 3 · `CardEnhanceRule` 1 · `CardLimitBreak` 3 · `TournamentChapter` 24 · `AlbumEntry` 40)와 달리 `Card` · `Card_Test` · `CardPack` · `CardPackDrop` 은 서버가 행 폴백 경로로 읽어 표 크기에 비례한 읽기 과금이 붙는다(320행짜리 `CardPackDrop` 이 특히 그렇다). 블롭을 다시 구워 올린다
+- **`envs/live/specs` 에 두 표가 없다.** 2026-08-31 실측 기준 `live` 는 10표다(`Card` 40 · `Card_Test` 40 · `CardPack` 11 · `CardPackDrop` 320 · `Reward` 84 · `RankGrade` 5 · `KeywordEnhance` 6 · `CardEnhance` 3 · `CardEnhanceRule` 1 · `CardLimitBreak` 3). 0표였던 당초 실측보다는 나아졌지만 **`AdventureChapter` 와 `AlbumEntry` 가 빠져 있어** `claimReward` 의 도감·모험 수령이 live 에서 fail-closed 로 막힌다. 서버는 표를 못 읽으면 거절하므로 이 두 표 업로드가 P4·P5 배포의 선행조건이다
+- **`envs/test` 는 4표가 블롭 없이 `rows/` 만 있다.** 블롭으로 선 8표(`Reward` 84 · `RankGrade` 5 · `KeywordEnhance` 6 · `CardEnhance` 3 · `CardEnhanceRule` 1 · `CardLimitBreak` 3 · `AdventureChapter` 24 · `AlbumEntry` 40)와 달리 `Card` · `Card_Test` · `CardPack` · `CardPackDrop` 은 서버가 행 폴백 경로로 읽어 표 크기에 비례한 읽기 과금이 붙는다(320행짜리 `CardPackDrop` 이 특히 그렇다). 블롭을 다시 구워 올린다
 - **튜토리얼 지급용 무료 팩 행 저작.** P2 가 `TutorialGrant` 표를 걷어내면서 이 선결 조건이 `CardPack`/`CardPackDrop` 시트로 옮겨왔다 — 지금 시트에 선 무료 팩(`price` 0)은 `StarterPack`(드롭 6행) · `KeywordDeck`(6행) · `SynergyPack`(6행) 셋뿐이고, `RangePack` 은 SO(`Assets/SO/CardPack/TutorialPack/RangePack.asset`)에만 있고 시트에는 없다. step 2(7장) · step 3(1장) 지급을 덮을 팩도 아직 없어, 그 스텝들은 저작이 설 때까지 `GrantNotFound` 로 떨어진다. **시트와 SO 가 이미 한 곳에서 갈려 있다** — `docs/SpecData/CardPackDrop_sheet.csv` 의 `KeywordDeck` 풀은 `2·3·20·11·4·37` 인데 `KeywordPack.asset` 의 `poolIds` 는 첫 장이 26 이라, 서버가 주는 카드와 클라 저작이 한 장 어긋난다
 - **`link.xml` 갱신.** 새 callable 응답 DTO 를 만들 때마다 `OutGame/Save/link.xml` 에 추가한다(IL2CPP 스트리핑 방어, `6f6a8885c` 가 팩 DTO 로 한 번 겪었다)
 - **`functions-currency` 미러.** P1 이 `devGrantCurrency` 를 배선하면서 `functions-currency/scripts/shared-files.js` 의 미러 목록에 `currency/walletStore.ts` 와 `save/receiptId.ts` 가 함께 들어갔다. `npm test`(`test-wallet-mirror.js`)가 미러 순수성을 지킨다 — `walletStore` 에 `HttpsError` 를 넣으면 그 계약이 깨진다
@@ -223,8 +223,8 @@
 | P1 | **완료** — 회귀는 `functions/scripts/test-wallet-store.js`(영수증 줄 생성 · `readReceipt` 히트/미스 · 캐시본 왕복)와 에뮬레이터 전용 `functions/scripts/test-receipt-replay.js` 9케이스(같은 txId 재호출에서 `mutate` 콜백 미호출)다. **남은 것은 실기 4건**: ① `openPack` 1회 후 실서버 영수증에 `changes.Gold` 음수 · `after` 가 잔액과 일치 · `result` 에 뽑힌 카드 ② `devGrantCurrency` 로 **currency codebase** 에서도 영수증이 서는가(미러 경로는 회귀 밖이다) ③ 멀티 payout **지급 0건** ack 재시도가 `acked` 를 그대로 돌려주는가 ④ 기내모드로 타임아웃을 유발한 뒤 복구 → 클라 자동 재시도가 이중 지급 없이 통과하는가 |
 | P2 | `functions/scripts/test-tutorial-grant.js`(드롭 풀 전량 지급 · `drawCount`/`weight` 무관 · 유료·price 결손 팩 거절 · 카탈로그 밖 cardId 탈락 · 재호출 멱등) · 튜토리얼 완주 실기 왕복(카드가 시트의 팩 풀대로 들어오는가 · 재호출이 소유를 늘리지 않는가) |
 | P3 | **완료** — 회귀는 `test-growth.js` 가 아니라 **신규 `functions/scripts/test-limit-break.js`** 다(표 파서가 들어와 파일 성격이 갈렸다). 파서 11케이스(id≠stage 정렬 · 중복 stage · `snackCost` 하한 1 · `hpGain` 누적 합 · 상한 초과 행 무시 · 결손 fail-closed · 천장 클램프) + `test-deck-validation.js` 에 위조/표사고 3케이스 · `test-enhance.js` 에 `maxLimitBreak` 2케이스. 배포 후 전 함수 401 확인(403 없음 — 신규 `limitBreakCard` 도 invoker 바인딩 상속). **실기 합격선은 ⑤** — ① 한계돌파 1회 후 `revision` +1 · 지갑 무변경 ② 간식·단계·HP·`DeckPower` 재수화 ③ 왕복 중 연타·화살표 잠금·오버레이 재진입 ④ 최대 단계에서 `MaxStage` 거절이 세션을 안 끊는다 ⑤ **한계돌파한 카드가 든 덱으로 매치 잠금이 `hp_bonus_mismatch` 없이 통과** |
-| P4 | **완료** — `functions/scripts/test-tournament-progress.js`(챕터 경계 건너뛰기 · 구 블롭 fail-closed · 점수 경계값 · 표 밖 낙인 대조) · Unity 컴파일 0건. **남은 것은 실기**: ① 정점 격파 후 로비에서 곧바로 수령 ② 격파 직후 기내모드 → 복귀 재시도, 두 번 다 실패하면 `Playable` 로 남는가 ③ 챕터 2 첫 정점을 디버그로 진입해 승리 → `ChainBlocked` ④ 등급 미달 챕터 ⑤ 다른 기기 수령 후 → `AlreadyClaimed` + 맵 즉시 갱신 |
-| P5 | 서버가 `tournament`/`albumReward` 를 쓴 직후 매니저 캐시가 갱신되는지 — 재수화 없이 옛 값이 남으면 즉시 드러나게 로그 |
+| P4 | **완료** — `functions/scripts/test-adventure-progress.js`(챕터 경계 건너뛰기 · 구 블롭 fail-closed · 점수 경계값 · 표 밖 낙인 대조) · Unity 컴파일 0건. **남은 것은 실기**: ① 정점 격파 후 로비에서 곧바로 수령 ② 격파 직후 기내모드 → 복귀 재시도, 두 번 다 실패하면 `Playable` 로 남는가 ③ 챕터 2 첫 정점을 디버그로 진입해 승리 → `ChainBlocked` ④ 등급 미달 챕터 ⑤ 다른 기기 수령 후 → `AlreadyClaimed` + 맵 즉시 갱신 |
+| P5 | 서버가 `adventure`/`albumReward` 를 쓴 직후 매니저 캐시가 갱신되는지 — 재수화 없이 옛 값이 남으면 즉시 드러나게 로그 |
 | P6 | `Tools/firestore-rules-tests` 하네스(`firebase emulators:exec`, **Java 21+ 필요** — Unity 번들 JDK 17 불가). 신규 케이스 3군 전부 통과 후 룰 릴리즈 |
 
 **전체 왕복 (P6 배포 후)**

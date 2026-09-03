@@ -134,7 +134,7 @@ exports.lockDeck = (0, https_1.onCall)({ enforceAppCheck: false }, async (reques
     if (data.seedSource !== "server") {
         throw new https_1.HttpsError("failed-precondition", "legacy deck locks are not authoritative");
     }
-    const table = data.env === "test" ? "Card_Test" : "Card";
+    const table = "Card";
     const shapeError = (0, deckValidation_1.validateDeckShape)(data.cardSnapshots);
     const cardIds = new Set(data.cardSnapshots.map((card) => card.cardId));
     // 덱에 든 카드만 골라 읽던 자리다. 블롭은 표 전체가 문서 1개라 6장을 개별로 집는 것보다 싸고,

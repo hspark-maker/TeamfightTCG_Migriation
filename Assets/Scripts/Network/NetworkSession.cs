@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using Fusion;
@@ -8,7 +8,18 @@ using UnityEngine;
 public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
 {
     const string ProtocolSuffix = "-p3";
-    const string RankedLobbyName = "RankedMatchP3";
+    const string RankedLobbyBase = "RankedMatchP3";
+    const string RandomLobbyBase = "RandomMatchP3";
+    const string CodeLobbyBase   = "CodeMatch";
+
+    /// <summary>로비·세션 이름에 환경(live/test)을 박는다.
+    /// 이게 없으면 릴리스 빌드(live)와 테스트 프로필 에디터(test)가 같은 방에 들어가고,
+    /// 서로 다른 콘텐츠로 판이 선 뒤에야 InitialDeck 지문 대조가 그걸 잡는다 — 이미 늦다.
+    /// Fusion 의 SessionName 은 로비가 아니라 AppId 단위로 유일하므로 방 이름에도 함께 박는다
+    /// (같은 초대 코드를 live·test 유저가 각각 쳤을 때 한 방으로 붙는 것을 막는다).</summary>
+    static string EnvTag => ContentProfileConfig.Active.CloudEnvId;
+
+    static string LobbyName(string _base) => _base + "-" + EnvTag;
     const string TierProperty = "t";
     const string NicknameProperty = "n";
     const string AvatarProperty = "a";
@@ -133,7 +144,7 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
             GameMode     = GameMode.Shared,
             SessionName  = null,
             PlayerCount  = 2,
-            CustomLobbyName  = "RandomMatchP3",
+            CustomLobbyName  = LobbyName(RandomLobbyBase),
             SceneManager = t_sceneManager,
         };
 
@@ -151,7 +162,7 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
 
         CreateSceneManager();
         CreateRunner();
-        var t_result = await this.Runner.JoinSessionLobby(SessionLobby.Custom, RankedLobbyName);
+        var t_result = await this.Runner.JoinSessionLobby(SessionLobby.Custom, LobbyName(RankedLobbyBase));
         return t_result.Ok;
     }
 
@@ -159,7 +170,7 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
         => StartRankedRoom(_sessionName, default, false);
 
     public UniTask<bool> CreateRankedRoom(MatchmakingProfile _profile)
-        => StartRankedRoom($"ranked-{Guid.NewGuid():N}{ProtocolSuffix}", _profile, true);
+        => StartRankedRoom($"ranked-{EnvTag}-{Guid.NewGuid():N}{ProtocolSuffix}", _profile, true);
 
     async UniTask<bool> StartRankedRoom(string _sessionName, MatchmakingProfile _profile, bool _create)
     {
@@ -170,7 +181,7 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
             GameMode = GameMode.Shared,
             SessionName = _sessionName,
             PlayerCount = 2,
-            CustomLobbyName = RankedLobbyName,
+            CustomLobbyName = LobbyName(RankedLobbyBase),
             SceneManager = this.sceneManagerGo != null
                 ? this.sceneManagerGo.GetComponent<NoRemoteSceneSyncManager>()
                 : null,
@@ -261,15 +272,16 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
             GameMode     = GameMode.Shared,
             SessionName  = ProtocolRoomName(_roomName),
             PlayerCount  = 2,
-            CustomLobbyName  = "CodeMatch",
+            CustomLobbyName  = LobbyName(CodeLobbyBase),
             SceneManager = _sceneManager,
         };
     }
 
+    // 초대 코드에도 환경을 붙인다 — SessionName 은 AppId 단위로 유일해서 로비를 갈라도 겹칠 수 있다.
     static string ProtocolRoomName(string _roomName)
         => string.IsNullOrEmpty(_roomName) || _roomName.EndsWith(ProtocolSuffix, StringComparison.Ordinal)
             ? _roomName
-            : _roomName + ProtocolSuffix;
+            : _roomName + "-" + EnvTag + ProtocolSuffix;
 
     // ── INetworkRunnerCallbacks ───────────────────────────────────────────
 

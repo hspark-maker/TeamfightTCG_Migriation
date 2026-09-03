@@ -151,6 +151,11 @@ public class GameManager : MonoBehaviour
         QualitySettings.vSyncCount = 0;
         Application.targetFrameRate = _frameRate;
 
+        // 요청값이 그대로 서는지 화면에 남긴다 — 디스플레이 주사율보다 높은 값(예: 60Hz 기기의 144)은
+        // 플랫폼이 조용히 깎는다. 버튼이 안 먹는 것처럼 보이는 신고는 대부분 이쪽이라 근거를 찍어 둔다.
+        Debug.Log($"[FrameRate] 요청={_frameRate} 적용={Application.targetFrameRate} " +
+                  $"주사율={Screen.currentResolution.refreshRateRatio.value:0.#}Hz vSync={QualitySettings.vSyncCount}");
+
         if (!_save) return;
 
         LocalPrefs.SetInt(FrameRatePrefsKey, _frameRate);

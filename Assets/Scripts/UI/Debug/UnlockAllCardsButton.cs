@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 
 // "모든 카드 해금" 버튼 배선용 어댑터. 인스펙터 Button OnClick에 UnlockAll을 연결한다.

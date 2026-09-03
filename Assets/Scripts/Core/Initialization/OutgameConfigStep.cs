@@ -13,7 +13,7 @@ public sealed class OutgameConfigStep : MainInitializer
     // 재화 아이콘·표시명 표 SO. 미배선이면 아이콘은 프리팹 그림 그대로, 이름은 코드 기본값으로 떨어진다.
     [SerializeField] CurrencyLook currencyLook;
     // 모험 경로 SO. 미배선이면 정점이 0개라 모험 진입이 열리지 않는다.
-    [SerializeField] TournamentConfig tournamentConfig;
+    [SerializeField] AdventureConfig adventureConfig;
     // 프로필 아바타·프레임 표 SO. 미배선이면 아바타·프레임 그림이 전부 프리팹 저작값 그대로 남는다.
     [SerializeField] ProfileConfig profileConfig;
     // 덱 대표 이미지 후보 SO. 미배선이면 신규 덱이 이미지 키를 못 받고 표시가 첫 카드 아트로 떨어진다.
@@ -26,7 +26,23 @@ public sealed class OutgameConfigStep : MainInitializer
         // 앨범 구조는 여기서 즉시 조립된다 — 스펙시트(AlbumThemeInfo·AlbumEntry)를 읽으므로 SpecSource 뒤에 서야 한다.
         CardAlbum.SetSource(albumConfig);
         CurrencyLook.SetActive(currencyLook);
-        TournamentProgress.SetConfig(tournamentConfig);
+        if (!AdventureNodeSpec.TryBuildRuntime(adventureConfig, out AdventureConfig t_runtimeAdventure,
+                out string t_adventureError))
+        {
+            if (AdventureNodeSpec.UpdateRequired)
+            {
+                Debug.LogError($"[OutgameConfigStep] {t_adventureError}");
+                GameInitialization.MarkUpdateRequired();
+                Destroy(_context.Root);
+                _context.Abort();
+            }
+            else
+            {
+                FailToRecovery(_context, new System.InvalidOperationException(t_adventureError));
+            }
+            return UniTask.CompletedTask;
+        }
+        AdventureProgress.SetConfig(t_runtimeAdventure);
         ProfileManager.SetConfig(profileConfig);
 
         // 신규 덱 저장 시 여기서 대표 이미지 키를 뽑는다.

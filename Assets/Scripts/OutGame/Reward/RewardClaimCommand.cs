@@ -11,7 +11,7 @@ internal static class RewardClaimCommand
 {
     // 서버 ClaimOwnerType 과 같은 문자열이어야 한다(스펙시트 Reward.ownerType 열 값).
     internal const string OwnerRank = "Rank";
-    internal const string OwnerTournament = "Tournament";
+    internal const string OwnerAdventure = "Adventure";
     internal const string OwnerAlbum = "Album";
 
     const string COMMAND_NAME = "claimReward";

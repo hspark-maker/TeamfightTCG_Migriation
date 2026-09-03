@@ -13,7 +13,7 @@ public enum ESaveSlot
     KeywordGrowth = 1 << 4,
     Rank          = 1 << 5,
     AlbumReward   = 1 << 6,
-    Tournament    = 1 << 7,
+    Adventure    = 1 << 7,
     Tutorial      = 1 << 8,
     Profile       = 1 << 9,
 }

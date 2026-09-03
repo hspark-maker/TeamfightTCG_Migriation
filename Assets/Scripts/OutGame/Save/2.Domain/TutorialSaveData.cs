@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Firebase.Firestore;
 
 // 아웃게임 첫시작 튜토리얼 진행도 세이브 값 객체
@@ -18,9 +18,11 @@ public class TutorialSaveData
 
     // 직전 초기화 때의 진행 좌표와 그 좌표가 이어진 초기화 횟수 — 진행이 막혔는지 판정하는 데만 쓴다.
     // -1은 "아직 한 번도 관측하지 않음". 0으로 두면 시작 좌표(0-0)와 우연히 같아 첫 초기화가 재관측으로 세어진다.
-    [FirestoreProperty("lastBootChapterIndex")] public int LastBootChapterIndex { get; set; } = -1;
-    [FirestoreProperty("lastBootStepIndex")] public int LastBootStepIndex { get; set; } = -1;
-    [FirestoreProperty("sameCoordBootCount")] public int SameCoordBootCount { get; set; }
+    // 아래 세 필드의 FirestoreProperty 문자열은 이미 배포된 세이브 문서의 키다 —
+    // C# 이름만 초기화 용어로 맞추고 문자열은 건드리지 않는다. 바꾸면 기존 진행도가 끊긴다.
+    [FirestoreProperty("lastBootChapterIndex")] public int LastInitChapterIndex { get; set; } = -1;
+    [FirestoreProperty("lastBootStepIndex")] public int LastInitStepIndex { get; set; } = -1;
+    [FirestoreProperty("sameCoordBootCount")] public int SameCoordInitCount { get; set; }
 
     // 완주한 트리거 튜토리얼 키(EOutgameTutorialTrigger 이름)
     [FirestoreProperty("completedTriggers")] public List<string> CompletedTriggers { get; set; } = new List<string>();

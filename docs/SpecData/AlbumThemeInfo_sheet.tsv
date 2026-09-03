@@ -1,6 +1,0 @@
-﻿행 고유 번호(부여 후 변경 금지)	테마 안정 키 — 완성 보상 낙인 키의 뿌리. 리네임·순서 변경에도 불변	갤러리 표시 순서(0부터)	준비 중 테마면 1 — 갤러리에 흑백+자물쇠로만 뜨고 완성 모수에서 빠진다	화면 표시 이름	셀에 한 줄로 붙는 테마 소개
-id	themeId	order	locked	displayName	description
-int	string	int	int	string	string
-1	Theme_Nature	0	0	덩굴숲	덩굴 사이에 숨은 숲의 친구들
-2	Theme_Ocean	1	1	푸른바다	파도 아래에서 헤엄치는 친구들
-3	Theme_Snow	2	1	눈꽃설원	눈보라 너머에서 기다리는 친구들

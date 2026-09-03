@@ -580,7 +580,7 @@ static class PlayerSaveCloud
     {
         try
         {
-            EnsureAccountResult t_result = await ServerSaveCommands.InvokeBootAsync<EnsureAccountResult>(
+            EnsureAccountResult t_result = await ServerSaveCommands.InvokeInitAsync<EnsureAccountResult>(
                 "ensureAccount",
                 new
                 {
@@ -616,7 +616,7 @@ static class PlayerSaveCloud
     {
         try
         {
-            EnsureWalletResult t_result = await ServerSaveCommands.InvokeBootAsync<EnsureWalletResult>(
+            EnsureWalletResult t_result = await ServerSaveCommands.InvokeInitAsync<EnsureWalletResult>(
                 "ensureWallet",
                 new { env = s_envId });
 

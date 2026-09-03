@@ -17,7 +17,7 @@
 - 레벨은 HP만이 아니라 정체성 게이트다: **Lv3에서 시너지, Lv4에서 키워드가 열린다**(`firstEvolutionLevel: 3`, `secondEvolutionLevel: 4`).
   공격력 = 현재 HP(`CardInstance.AttackDamage`)라 성장축은 HP 하나뿐이다.
 
-## 1. AI 카드 레벨 재저작 — 완료 (`Assets/SO/Tournament/TournamentConfig.asset`)
+## 1. AI 카드 레벨 재저작 — 완료 (`Assets/SO/Adventure/AdventureConfig.asset`)
 
 `aiCardLevel`은 스펙시트에 없어 `.asset`이 진실원이다. 수정만으로 런타임에 반영된다.
 
@@ -34,12 +34,12 @@
 ## 2. 보상 재배분
 
 **주의 — 보상의 진실원은 `.asset`이 아니라 구글 스펙시트다.**
-`TournamentSpec` / `AlbumSpec`이 `SpecData.bytes`에서 값을 읽고, 시트에 키가 있으면 SO 값을 덮는다.
+`AdventureSpec` / `AlbumSpec`이 `SpecData.bytes`에서 값을 읽고, 시트에 키가 있으면 SO 값을 덮는다.
 Unity에서 확인한 결과 24정점·4챕터 완주·도감 테마/전체 완성이 **전부 시트에서 나온다**.
 → 아래 표를 시트에 반영한 뒤 `CookApps > SpecData` 창에서 **"시트 적용 & CS 생성"**을 돌려야 실제로 바뀐다.
 `.asset`은 같은 값으로 미러링해 두었다(폴백·에디터 표시용).
 
-### 2-1. TournamentReward — `amount`만 변경 (ownerKey·currency·order 그대로)
+### 2-1. AdventureReward — `amount`만 변경 (ownerKey·currency·order 그대로)
 
 | ownerKey | currency | 변경 전 | 변경 후 |
 |---|---|---:|---:|
@@ -125,4 +125,4 @@ Energy·Diamond는 손대지 않았다(Energy는 키워드 강화 재화 `Keywor
 ## 5. 검증
 
 - Unity 재임포트 후 확인: 노드 24개 / 챕터 4개, `AiCardLevelOrBase` = `1 1 2 2 2 2 / 2 2 3 3 3 3 / 3 3 3 4 4 4 / 4 4 4 4 4 4`, `CardGrowthManager.MaxLevel = 4` → 클램프로 잘리는 값 없음.
-- 보상 수치는 시트 반영 + `CookApps > SpecData` 재생성 후 `TournamentSpec.TryGetRewards` 덤프로 재확인할 것.
+- 보상 수치는 시트 반영 + `CookApps > SpecData` 재생성 후 `AdventureSpec.TryGetRewards` 덤프로 재확인할 것.

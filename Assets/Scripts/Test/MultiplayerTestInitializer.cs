@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -35,7 +35,7 @@ public class MultiplayerTestInitializer : MonoBehaviour
     [SerializeField] string testAccountId = string.Empty;
 
     string status = "대기";
-    System.IDisposable bootReadyHandle;
+    System.IDisposable initReadyHandle;
     bool switchingAccount;
     bool lastBusy;
     List<int> resolvedDeck;
@@ -113,14 +113,14 @@ public class MultiplayerTestInitializer : MonoBehaviour
         // 이 씬은 Initialize.prefab(정식 기동)을 함께 들고 있고, 그 채택은 여기보다 **나중에** 끝난다 —
         // 위에서 확정한 덱은 채택 전 세이브(=빈 슬롯) 기준이라 카탈로그 폴백일 수 있다.
         // 채택이 끝나면 진짜 저장 덱으로 한 번 더 확정한다. 안 하면 서버 lockDeck 이 대조하는 덱과 갈린다.
-        this.bootReadyHandle?.Dispose();
-        this.bootReadyHandle = GameInitialization.WhenReady(ReapplySavedDeckAfterBoot);
+        this.initReadyHandle?.Dispose();
+        this.initReadyHandle = GameInitialization.WhenReady(ReapplySavedDeckAfterInit);
     }
 
     void OnDestroy()
     {
-        this.bootReadyHandle?.Dispose();
-        this.bootReadyHandle = null;
+        this.initReadyHandle?.Dispose();
+        this.initReadyHandle = null;
     }
 
     // 바쁨 상태의 주인이 런처(m_running)로 옮겨갔는데 런처는 상태 변경을 알리지 않는다. 폴링하지 않으면
@@ -173,9 +173,9 @@ public class MultiplayerTestInitializer : MonoBehaviour
 
     // 기동 채택 이후의 재확정. 편집으로 이미 다른 덱을 확정해 뒀으면 그것을 덮지 않는다 —
     // 채택 완료가 유저 조작보다 늦게 올 수 있고, 그때 덮으면 방금 고른 덱이 조용히 되돌아간다.
-    void ReapplySavedDeckAfterBoot()
+    void ReapplySavedDeckAfterInit()
     {
-        this.bootReadyHandle = null;
+        this.initReadyHandle = null;
         if (IsBusy) return;
 
         int t_slot = DeckSaveManager.SelectedSlot;

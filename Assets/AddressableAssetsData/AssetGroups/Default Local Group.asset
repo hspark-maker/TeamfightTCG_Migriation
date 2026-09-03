@@ -116,7 +116,7 @@ MonoBehaviour:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: dee8a2231ae459847a16e01635c0f514
-    m_Address: TournamentNodePopup
+    m_Address: AdventureNodePopup
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab

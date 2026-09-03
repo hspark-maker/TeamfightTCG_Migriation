@@ -1,7 +1,7 @@
 // 도감 완성의 **판정 근거 표** 해석과, 완성 판정 자체. 보상 해석(rewardTable.ts)과 소유를 나눈다 —
 // 저쪽은 "무엇을 주는가", 여기는 "다 모았는가" 다.
 //
-// TournamentChapter 표는 tournamentTable.ts 가 읽는다(표 하나에 파서 하나) — 저쪽은 완주 모수뿐
+// AdventureChapter 표는 adventureTable.ts 가 읽는다(표 하나에 파서 하나) — 저쪽은 완주 모수뿐
 // 아니라 해금 사슬까지 재므로 도감과 나눠 둔다. isCompleted 는 두 도메인이 함께 쓴다.
 //
 // 순수 모듈 제약: firebase-admin · HttpsError 를 들이지 마라. functions/scripts 의 회귀가

@@ -18,8 +18,8 @@ public static class ContentRunModeEditor
     public static string Label(EContentRunMode _mode)
         => _mode == EContentRunMode.Live ? "라이브" : "테스트";
 
-    public static string SheetNameOf(EContentRunMode _mode)
-        => _mode == EContentRunMode.Live ? "Card" : "Card_Test";
+    /// <summary>카드 표는 모드와 무관하게 하나다(Card_Test 표는 폐기).</summary>
+    public static string SheetNameOf(EContentRunMode _mode) => "Card";
 
     public static ContentProfileConfig ProfileOf(EContentRunMode _mode)
         => Resources.Load<ContentProfileConfig>(

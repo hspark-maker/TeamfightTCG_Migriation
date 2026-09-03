@@ -87,7 +87,7 @@ public class MatchProfileView : MonoBehaviour
                                                _profile.Avatar, _profile.Frame, _profile.FrameColor));
         }
 
-        // 배지는 랭크가 있을 때만 세운다 — 모험 정점은 랭크를 비워 오므로(MatchProfile.OfTournamentNode)
+        // 배지는 랭크가 있을 때만 세운다 — 모험 정점은 랭크를 비워 오므로(MatchProfile.OfAdventureNode)
         // 저작 스프라이트가 남아 있으면 없는 랭크전을 있는 것처럼 보이게 한다.
         if (rankBadge == null) return;
 

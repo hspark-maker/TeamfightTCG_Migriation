@@ -146,7 +146,7 @@ public class OutgameDebugOverlay : MonoBehaviour
         if (GUILayout.Button("RESET GROWTH",     GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ResetCardGrowth();
         if (GUILayout.Button("LOG OWNERSHIP",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LogOwnership();
         if (GUILayout.Button("ALBUM INSERT x3",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ForceAlbumInsertSession(3);
-        if (GUILayout.Button("TOURNAMENT NODE",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.StartCurrentTournamentNode();
+        if (GUILayout.Button("ADVENTURE NODE",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.StartCurrentAdventureNode();
 
         DrawServerProbes();
         DrawRarityPackControls();

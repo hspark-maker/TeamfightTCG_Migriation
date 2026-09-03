@@ -26,7 +26,7 @@ static class PlayerSaveDocument
     internal const string FIELD_KEYWORD_GROWTH = "keywordGrowth";
     internal const string FIELD_RANK = "rank";
     internal const string FIELD_ALBUM_REWARD = "albumReward";
-    internal const string FIELD_TOURNAMENT = "tournament";
+    internal const string FIELD_ADVENTURE = "adventure";
     internal const string FIELD_TUTORIAL = "tutorial";
     internal const string FIELD_PROFILE = "profile";
 
@@ -81,7 +81,7 @@ static class PlayerSaveDocument
             case ESaveSlot.KeywordGrowth: return FIELD_KEYWORD_GROWTH;
             case ESaveSlot.Rank: return FIELD_RANK;
             case ESaveSlot.AlbumReward: return FIELD_ALBUM_REWARD;
-            case ESaveSlot.Tournament: return FIELD_TOURNAMENT;
+            case ESaveSlot.Adventure: return FIELD_ADVENTURE;
             case ESaveSlot.Tutorial: return FIELD_TUTORIAL;
             case ESaveSlot.Profile: return FIELD_PROFILE;
             default: throw new ArgumentOutOfRangeException(nameof(_slot), _slot, "Unknown save slot.");

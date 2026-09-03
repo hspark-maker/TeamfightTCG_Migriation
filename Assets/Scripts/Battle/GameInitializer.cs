@@ -188,17 +188,18 @@ public class GameInitializer : MonoBehaviour
         // 로비가 이미 확정해 넘겼으면 그대로 쓴다 — 여기서 다시 뽑으면 덱 화면에서 공개한 패와 어긋난다.
         if (DeckConfig.HasEnemyDeck) return;
 
-        if (this.aiDeckConfig == null)
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        // 로비를 거치지 않는 에디터 직접 실행·테스트 빌드만 로컬 대체 덱을 허용한다.
+        if (ContentProfileConfig.Active.RunMode == EContentRunMode.Test && this.aiDeckConfig != null)
         {
-            Debug.LogWarning("[GameInitializer] aiDeckConfig 미배선 — 상대 덱 없이 전투가 시작된다.");
+            int t_tier = s_enemyTierProvider != null ? s_enemyTierProvider() : 0;
+            var t_deck = this.aiDeckConfig.GetDeckForTier(t_tier, out int t_cardLevel);
+            DeckConfig.SetEnemyDeck(t_deck, t_cardLevel);
             return;
         }
+#endif
 
-        // GetRandomDeck은 UnityEngine.Random을 쓴다 — MatchRandom(셔플 시드)을 소비하지 않으므로
-        // 시드 설정(InitializeSinglePlayerFields)보다 앞에서 뽑아도 결정론에 영향이 없다.
-        int t_tier = s_enemyTierProvider != null ? s_enemyTierProvider() : 0;
-        var t_deck = this.aiDeckConfig.GetDeckForTier(t_tier, out int t_cardLevel);
-        DeckConfig.SetEnemyDeck(t_deck, t_cardLevel);
+        Debug.LogError("[GameInitializer] 프로덕션 진입에 상대 덱이 없다 — 로컬 AI 덱으로 대체하지 않는다.");
     }
 
     /// <summary>모드 플래그를 **런타임 사실**과 대조한다.

@@ -28,8 +28,7 @@ public sealed class CardIdDrawer : PropertyDrawer
         try
         {
             SpecSource.Init();
-            Add(SpecSource.LoadCards(EContentRunMode.Live), t_specs);
-            Add(SpecSource.LoadCards(EContentRunMode.Test), t_specs);
+            Add(SpecSource.LoadCards(), t_specs);
         }
         catch (Exception t_exception)
         {

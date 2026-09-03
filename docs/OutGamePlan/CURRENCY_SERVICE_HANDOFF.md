@@ -28,7 +28,7 @@
 - `6f6a8885c` `link.xml` 에 팩 개봉 응답 DTO — IL2CPP 스트리핑 방어
 - `d2a4fdc3c` `claimReward` 의 보상 영구 손실·계정 영구 잠김 경로 2건
 - `84f53288f` C4 — `enhanceCard`·`enhanceKeyword` + 튜토 무료 한 방 서버 이전 + 거절 사유 전달 경로 교정
-- `fe4fe954d` C5.5 — 도감·챕터 **구성**을 스펙 표로 승격(`AlbumEntry` 40행 · `TournamentChapter` 24행) + 업로더 오버로드
+- `fe4fe954d` C5.5 — 도감·챕터 **구성**을 스펙 표로 승격(`AlbumEntry` 40행 · `AdventureChapter` 24행) + 업로더 오버로드
 - `3f522a2e3` C5.6 — 도감·챕터 **수령**을 `claimReward` 로 이전(ownerType `Album` 추가 · 챕터는 `chapter_` 접두사 분기)
 - `c7ab0c290` C3.5 — 수령 경로의 낙인 즉시 업로드 · 폴백 콜백 계약 · `granted` 연출 입력
 - `660963744` C5 — `claimBattleReward` · `devGrantCurrency`
@@ -121,9 +121,9 @@ C3 리뷰가 남긴 것들이다. 셋 다 **이미 서버로 옮긴 수령 경�
 지급 판정은 서버가 가져갔는데 그 앞뒤의 영속·연출 배관이 옛 로컬 지급 시절 형태로 남아 있었다.
 C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계에 섞지 않고 독립 커밋으로 닫았다. **서버 무변경 · 클라 전용.**
 
-- `TournamentProgress.MarkRewardPending` 의 디바운스 `DataSaveManager.Save()` → **`SaveImmediate()`**.
+- `AdventureProgress.MarkRewardPending` 의 디바운스 `DataSaveManager.Save()` → **`SaveImmediate()`**.
   자격을 재는 쪽이 서버라, 격파 직후 바로 수령하면 낙인이 원격에 없어 `NotEligible` 로 튕겼다
-- `TournamentRewardFlow.Open` 의 폴백(보상 0건·팝업 미배선)이 `ClearNodeAsync` 를 던져 두고 false 를 돌려,
+- `AdventureRewardFlow.Open` 의 폴백(보상 0건·팝업 미배선)이 `ClearNodeAsync` 를 던져 두고 false 를 돌려,
   호출부가 그 자리에서 부른 `PlayClaimSequence` 가 아직 false 인 `IsCleared` 가드에 걸려 **점등·해금이 통째로 빠졌다**.
   **`Open` 의 반환값 의미를 "팝업이 떴는가" → "`_onClosed` 가 오는가" 로 바꿨다** — 폴백은 `ClaimThenNotify` 가
   왕복 뒤에(거절돼도) 콜백을 부르고, false 는 시작조차 못 한 경우(빈 id·이미 클리어)뿐이라 호출부는 `AbortClaimSequence` 로 억제만 푼다
@@ -132,7 +132,7 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 
 **배관 (수령 4도메인이 공유)** — `RewardClaimCommand.ClaimAsync` 가 `UniTask<bool>` → **`UniTask<RewardClaimOutcome>`**
 (`Succeeded` + `IReadOnlyList<CurrencyGain> Granted`. 변환은 기존 `CurrencyCode.TryParse`, 못 읽는 표기·0 이하는 버린다).
-`RankRewardManager.ClaimAsync` · `AlbumRewardManager.Claim*` · `TournamentProgress.ClearNodeAsync` · `ClaimChapterRewardAsync` 가 그대로 흘리고,
+`RankRewardManager.ClaimAsync` · `AlbumRewardManager.Claim*` · `AdventureProgress.ClearNodeAsync` · `ClaimChapterRewardAsync` 가 그대로 흘리고,
 `RewardClaimPopup` 이 `BuildLightGain` 직전에 `AdoptGranted` 로 분출 버킷을 실지급으로 세운다.
 
 - **표시 슬롯은 여전히 클라 스펙이다 — 표시는 예고, 분출·롤업만 서버가 이긴다.** 수령 전엔 서버 값이 없다
@@ -193,10 +193,10 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 
 **늦게 도착하는 연출 구멍을 같이 닫았다.** `LobbyGainEffectDirector` 는 캐리어를 `Start` 와 팩 오버레이 닫힘에서만 소비해, 응답이 로비 진입보다 늦으면 잔액만 조용히 올랐다(**멀티는 상대 제출이 늦을 때마다 이미 그랬다**). `BattleRewardHandoff.OnGainAdded` 를 **네 번째 진입점**으로 붙였다.
 
-- 이 경로는 **`OnAnyFinished` 를 내지 않는다**(`Play(_silent: true)`). 내면 그 신호를 기다리던 튜토리얼 `CardGain` 스텝과 `TournamentReturnFlow` 의 선물 등장이 자기 차례로 오인해 조기 통과한다 — 튜토리얼 전투도 전투 골드를 받으므로 실재하는 갈래다
+- 이 경로는 **`OnAnyFinished` 를 내지 않는다**(`Play(_silent: true)`). 내면 그 신호를 기다리던 튜토리얼 `CardGain` 스텝과 `AdventureReturnFlow` 의 선물 등장이 자기 차례로 오인해 조기 통과한다 — 튜토리얼 전투도 전투 골드를 받으므로 실재하는 갈래다
 - 돌고 있는 연출(`m_master.IsActive()`)·도감 삽입(`AlbumInsertSession`/`Queue`)·튜토 러너 2종 중 하나라도 살아 있으면 **비켜선다**. 캐리어는 남아 다음 `Start` 가 집는다(`PlayWhenReady` 가 `m_master.Complete(true)` 로 진행 중인 카드 비행을 잘라 버리기 때문)
 
-**이 표는 닫혔다 — `CurrencyManager.Earn`/`Spend`/`Save` 는 C6.4 에서 삭제됐고 호출부는 0 이다.** 이력만 남긴다: 전투 보상 `Utils/RewardService`(C5) · 디버그 지급 `OutGame/Debug/OutgameDebugActions`(C5) · 도감·정점 `AlbumRewardManager`·`TournamentProgress`(C5.6) · 멀티 payout `Network/PayoutInbox`(C6.5). 지금 잔액을 세우는 클라 코드는 `CurrencyManager.Adopt` 하나이고 그 호출부는 `WalletCloud` 하나다.
+**이 표는 닫혔다 — `CurrencyManager.Earn`/`Spend`/`Save` 는 C6.4 에서 삭제됐고 호출부는 0 이다.** 이력만 남긴다: 전투 보상 `Utils/RewardService`(C5) · 디버그 지급 `OutGame/Debug/OutgameDebugActions`(C5) · 도감·정점 `AlbumRewardManager`·`AdventureProgress`(C5.6) · 멀티 payout `Network/PayoutInbox`(C6.5). 지금 잔액을 세우는 클라 코드는 `CurrencyManager.Adopt` 하나이고 그 호출부는 `WalletCloud` 하나다.
 
 **알려진 위험 4건 — 전부 이번 구조가 만든 것이고, 닫는 자리는 C6·C8 이다.**
 
@@ -221,7 +221,7 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 서버가 판정할 근거가 SO 에만 있었다. 두 표로 올렸고 `envs/test` 에 rev 1 로 서 있다.
 
 - **`AlbumEntry`** (`id | themeId | pageId | cardId | order`) — **40행.** `Theme_Nature` · `P1`~`P5`(9/9/9/9/4) · cardId 1~40 유니크
-- **`TournamentChapter`** (`id | chapterId | nodeId | order`) — **24행.** `chapter_01`~`04` 각 6정점
+- **`AdventureChapter`** (`id | chapterId | nodeId | order`) — **24행.** `chapter_01`~`04` 각 6정점
 
 **업로드는 기존 커밋 기계를 그대로 쓴다.** `SpecFirestoreUploader.Upload` 에서 SpecData 매니저에 묶인 두 줄과 그 뒤를 갈라 `UploadSnapshot`·`TryBuildSnapshotFrom` 으로 뺐고, 새 경로가 같은 함수를 부른다 — 해시·정렬·문서 ID·`updateTime` precondition·500writes/10MiB 가드가 한 벌이다. 진입점은 릴리즈 관리 창의 "구성 표" 칸이고 **사람이 1회 실행**한다(admin 클레임 필요).
 
@@ -236,11 +236,11 @@ C4·C5.5·C5.6 이 그냥 지나가 세 번 미뤄졌던 몫이라 다른 단계
 `claimReward` 의 **ownerType 확장**이다. 새 callable 이 아니다.
 
 - 도감 → ownerType **`"Album"`**, ownerId 는 `b` / `t:{theme}` / `p:{theme}/{page}`. **이 문자열이 이미 세 곳에서 같다** — `AlbumSpec.OwnerIdOf` 가 만드는 값 · 세이브 `claimedKeys` · `Reward` 표 `ownerId`. 그래서 스키마 변경이 없었다
-- 챕터 → ownerType **`"Tournament"` 유지** + `chapter_` 접두사로 분기. 새 ownerType 을 만들면 `Reward` 표의 챕터 행까지 고쳐 표를 다시 올려야 한다
+- 챕터 → ownerType **`"Adventure"` 유지** + `chapter_` 접두사로 분기. 새 ownerType 을 만들면 `Reward` 표의 챕터 행까지 고쳐 표를 다시 올려야 한다
 - 자격은 서버가 **`ownership.cardIds`·`clearedNodeIds` 로 재계산**한다. 판정은 순수 모듈 `functions/src/completionTable.ts` 로 떼어 회귀가 `lib` 를 직접 부른다
 - **모수 0 은 완성이 아니다.** 표에 그 페이지·챕터 행이 없으면 `NotEligible`. 표를 못 읽어도 fail-closed
 - `judgeRewardClaim` 의 미저작 통과는 **정점만** 남는다. 판정을 `node_` 접두사가 아니라 **`chapter_` 부정**으로 한 이유: nodeId 는 저작 자유값이라 접두사를 강제하면 미저작 정점이 소급해 막힌다
-- 클라는 로컬 지급·낙인·`Save` 를 지우고 `ClaimAsync` 한 줄로. 수령 3종과 챕터가 `UniTask` 가 되면서 흐름 2개와 호출부 4곳이 따라갔다 — **폴백도 `await` 로 낙인을 기다린다**(같은 프레임에 연출을 붙이면 `TournamentMapOverlayView` 의 스킵 버그를 되풀이한다)
+- 클라는 로컬 지급·낙인·`Save` 를 지우고 `ClaimAsync` 한 줄로. 수령 3종과 챕터가 `UniTask` 가 되면서 흐름 2개와 호출부 4곳이 따라갔다 — **폴백도 `await` 로 낙인을 기다린다**(같은 프레임에 연출을 붙이면 `AdventureMapOverlayView` 의 스킵 버그를 되풀이한다)
 
 **`CurrencyManager.Earn` 호출부가 5 → 3 이 됐다.** 남은 셋은 전투 보상 · 디버그 지급(C5) · 멀티 payout(C6).
 
@@ -487,7 +487,7 @@ C6.2(`0b2b6b3d6`, 지갑을 트랜잭션에 들인 판)부터 **나흘간 빨간
 
 ## 스펙 표 실태 (실측 2026-08-28)
 
-`envs/test/specs` **14표**(C5.5 가 `AlbumEntry`·`TournamentChapter` 를 더했다), **`envs/live/specs` 0표** — 이 작업의 모든 검증은 `test` 에서만 성립한다. 릴리즈 전 `live` 업로드는 별건(R3 몫).
+`envs/test/specs` **14표**(C5.5 가 `AlbumEntry`·`AdventureChapter` 를 더했다), **`envs/live/specs` 0표** — 이 작업의 모든 검증은 `test` 에서만 성립한다. 릴리즈 전 `live` 업로드는 별건(R3 몫).
 
 **`Reward` 표(84행)가 통합 진실원**이다. 컬럼 `id | ownerType | ownerId | order | rewardType | rewardId | amount`. 이 브랜치의 세이브 키와 정확히 일치한다 — 앨범 `t:Theme_Nature`/`p:Theme_Nature/P1`/`b` · 정점 `node_01`~`node_24` · 챕터 `chapter_01`~`chapter_04` · 랭크 티어 인덱스 `0`~`19` · 전투 `win.perCard`=Gold 10 / `win.floor`=Gold 10 / `lose.flat`=Gold 5. **24정점 전부 보상이 저작돼 있다.**
 

@@ -22,7 +22,7 @@ public static class DataSaveManager
         ESaveSlot.KeywordGrowth,
         ESaveSlot.Rank,
         ESaveSlot.AlbumReward,
-        ESaveSlot.Tournament,
+        ESaveSlot.Adventure,
         ESaveSlot.Tutorial,
         ESaveSlot.Profile,
     };
@@ -140,7 +140,7 @@ public static class DataSaveManager
             case ESaveSlot.KeywordGrowth: return _data.KeywordGrowth;
             case ESaveSlot.Rank: return _data.Rank;
             case ESaveSlot.AlbumReward: return _data.AlbumReward;
-            case ESaveSlot.Tournament: return _data.Tournament;
+            case ESaveSlot.Adventure: return _data.Adventure;
             case ESaveSlot.Tutorial: return _data.Tutorial;
             case ESaveSlot.Profile: return _data.Profile;
             default: throw new ArgumentOutOfRangeException(nameof(_slot), _slot, "Unknown save slot.");
@@ -166,7 +166,7 @@ public static class DataSaveManager
         if (_slots.KeywordGrowth != null) { Data.KeywordGrowth = _slots.KeywordGrowth; t_touched |= ESaveSlot.KeywordGrowth; }
         if (_slots.Rank != null) { Data.Rank = _slots.Rank; t_touched |= ESaveSlot.Rank; }
         if (_slots.AlbumReward != null) { Data.AlbumReward = _slots.AlbumReward; t_touched |= ESaveSlot.AlbumReward; }
-        if (_slots.Tournament != null) { Data.Tournament = _slots.Tournament; t_touched |= ESaveSlot.Tournament; }
+        if (_slots.Adventure != null) { Data.Adventure = _slots.Adventure; t_touched |= ESaveSlot.Adventure; }
         if (_slots.Tutorial != null) { Data.Tutorial = _slots.Tutorial; t_touched |= ESaveSlot.Tutorial; }
         if (_slots.Profile != null) { Data.Profile = _slots.Profile; t_touched |= ESaveSlot.Profile; }
 
@@ -199,7 +199,7 @@ public static class DataSaveManager
         if (t_data.KeywordGrowth == null) t_data.KeywordGrowth = new KeywordGrowthSaveData();
         if (t_data.Rank == null) t_data.Rank = new RankSaveData();
         if (t_data.AlbumReward == null) t_data.AlbumReward = new AlbumRewardSaveData();
-        if (t_data.Tournament == null) t_data.Tournament = new TournamentSaveData();
+        if (t_data.Adventure == null) t_data.Adventure = new AdventureSaveData();
         if (t_data.Tutorial == null) t_data.Tutorial = new TutorialSaveData();
         if (t_data.Profile == null) t_data.Profile = new ProfileSaveData();
 
