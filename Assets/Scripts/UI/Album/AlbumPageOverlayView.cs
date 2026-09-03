@@ -9,10 +9,7 @@ using UnityEngine.UI;
 public class AlbumPageOverlayView : MonoBehaviour
 {
     [Header("닫기")]
-    [Tooltip("바깥을 눌러 닫는 딤판. **이 버튼이 딤판 그 자체**여야 한다 — 닫기 판정만 맡는 투명 버튼이면 안 된다.\n" +
-             "삽입 연출 중 SetFrontmost가 이 rect를 화면 끝까지 늘려 상단바·탭바까지 덮게 하므로,\n" +
-             "판정과 그림이 갈리면 늘어나는 것과 어두워지는 것이 서로 다른 오브젝트가 된다.\n\n" +
-             "⚠ Transition은 None으로 저작한다 — ColorTint면 잠금 시 상태색이 곱해져 딤이 옅어진다(ApplyInteractable 참고).")]
+    [Tooltip("바깥을 눌러 닫는 딤판")]
     [SerializeField] Button dimButton;
     [SerializeField] Button closeButton;
 
@@ -39,10 +36,7 @@ public class AlbumPageOverlayView : MonoBehaviour
     [Tooltip("선택 — 오버레이 전면 raycastTarget 위에 올린 스와이프 감지기.")]
     [SerializeField] HorizontalSwipeDetector swipeDetector;
 
-    [Tooltip("좌/우 민감도. 화면 폭의 이 비율만큼 끌면 종이가 완전히 세워진다(진행도 0.5 = 넘어가기 직전).\n" +
-             "작을수록 민감하다 — 0.4면 화면 폭의 40%를 끌어야 다 세워지고, 0.15면 15%만 끌어도 다 세워진다.\n" +
-             "넘김이 실제로 확정되는 임계는 감지기(HorizontalSwipeDetector.snapRatio)가 따로 정한다 —\n" +
-             "이 값은 손가락 이동과 그림이 세워지는 정도의 배율일 뿐이다.")]
+    [Tooltip("좌/우 민감도")]
     [Range(0.05f, 1f)] [SerializeField] float dragFullRatio = 0.4f;
 
     [Tooltip("임계 미달로 손을 뗐을 때 제자리로 돌아오는 시간.")]
@@ -513,11 +507,12 @@ public class AlbumPageOverlayView : MonoBehaviour
         int t_hidden = AlbumInsertMask.HiddenCountIn(t_page);
         pageGauge.Set(t_info.Owned - t_hidden, t_info.Total);
 
-        // 위장분이 남아 있으면 상자를 감춘다 — 마지막 칸을 꽂는 순간의 등장이 보상 신호다
-        if (t_hidden > 0)
+        // 위장분이 남아도 잠긴 상자로 그린다 — 빈 스냅샷은 보상 미저작이라 상자를 통째로 걷는다
+        if (t_hidden > 0 && t_info.State != EAlbumRewardState.Claimed)
         {
-            var t_empty = default(AlbumRewardInfo);
-            pageChest.Bind(t_empty, null);
+            var t_masked = new AlbumRewardInfo(
+                t_info.Rewards, t_info.Owned - t_hidden, t_info.Total, EAlbumRewardState.Locked);
+            pageChest.Bind(t_masked, null);
         }
         else
         {

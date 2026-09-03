@@ -91,12 +91,12 @@ internal static class EnhanceCommand
     {
         switch (_rejected.Reason)
         {
-            case REASON_NOT_AFFORDABLE: return EnhanceCommandResult.Blocked(EEnhanceOutcome.NotAffordable);
-            case REASON_MAX_LEVEL:      return EnhanceCommandResult.Blocked(EEnhanceOutcome.MaxLevel);
+            case REASON_NOT_AFFORDABLE: return EnhanceCommandResult.Rejected(EEnhanceOutcome.NotAffordable, _rejected.Reason);
+            case REASON_MAX_LEVEL:      return EnhanceCommandResult.Rejected(EEnhanceOutcome.MaxLevel, _rejected.Reason);
         }
 
         Debug.LogWarning($"[EnhanceCommand] {_commandName} 를 서버가 거절했다 — {_rejected.Message}");
-        return EnhanceCommandResult.Blocked(EEnhanceOutcome.NotReady);
+        return EnhanceCommandResult.Rejected(EEnhanceOutcome.NotReady, _rejected.Reason);
     }
 }
 
@@ -111,17 +111,29 @@ internal readonly struct EnhanceCommandResult
     /// <summary>안내가 대준 무료 한 방을 서버가 실제로 먹였는가.</summary>
     internal readonly bool FreeShotUsed;
 
-    internal EnhanceCommandResult(EEnhanceOutcome _outcome, int _level, bool _freeShotUsed)
+    /// <summary>서버가 붙인 거절 사유 코드. 서버 거절이 아닌 결말(성립·통신 실패)에서는 빈 문자열이다.</summary>
+    internal readonly string RejectReason;
+
+    internal EnhanceCommandResult(EEnhanceOutcome _outcome, int _level, bool _freeShotUsed, string _rejectReason = null)
     {
         Outcome      = _outcome;
         Level        = _level;
         FreeShotUsed = _freeShotUsed;
+        RejectReason = _rejectReason ?? string.Empty;
     }
 
     /// <summary>결제 전에 막힌 결말(레벨 변화도 재화 소모도 없다).</summary>
     internal static EnhanceCommandResult Blocked(EEnhanceOutcome _outcome)
         => new EnhanceCommandResult(_outcome, 0, false);
 
+    /// <summary>서버가 사유를 붙여 거절한 결말. 사유를 실어 올리는 이유는 "왜 막혔는가"가
+    /// 호출부에서 다른 사실의 근거가 되기 때문이다(무료 청구를 거절당한 자리 = 서버는 이미 소진으로 안다).</summary>
+    internal static EnhanceCommandResult Rejected(EEnhanceOutcome _outcome, string _reason)
+        => new EnhanceCommandResult(_outcome, 0, false, _reason);
+
     /// <summary>거래가 성립해 응답 레벨을 믿어도 되는가.</summary>
     internal bool Settled => Outcome == EEnhanceOutcome.Success || Outcome == EEnhanceOutcome.Failed;
+
+    /// <summary>서버가 판정해 막은 결말인가(클라 낙관 검사·통신 실패와 가른다).</summary>
+    internal bool RejectedByServer => !string.IsNullOrEmpty(RejectReason);
 }

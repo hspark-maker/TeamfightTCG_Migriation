@@ -1249,7 +1249,7 @@ MonoBehaviour:
   closeButton: {fileID: 4710797006238417973}
   pageGauge:
     fill: {fileID: 0}
-    fillRect: {fileID: 0}
+    fillRect: {fileID: 6680151188892663376}
     label: {fileID: 6526349891250661130}
   pageChest:
     button: {fileID: 4080383840422864266}
@@ -1826,7 +1826,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: -2.7999878, y: 3.5}
   m_SizeDelta: {x: -144, y: -67.95555}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &2833519911445616834

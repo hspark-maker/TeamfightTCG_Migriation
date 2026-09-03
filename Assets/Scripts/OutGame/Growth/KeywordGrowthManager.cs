@@ -110,7 +110,11 @@ public static class KeywordGrowthManager
         EnhanceCommandResult t_command = await EnhanceCommand.EnhanceKeywordAsync(_keyword, t_freeShot, t_pending);
 
         // 결제 전에 막힌 결말은 값이 하나도 안 바뀌었다 — 통지 없이 물러난다.
-        if (!t_command.Settled) return new EnhanceResult(t_command.Outcome, LevelOf(_keyword));
+        if (!t_command.Settled)
+        {
+            await RefreshFreeShotMarkIfRejectedAsync(t_freeShot, t_command);
+            return new EnhanceResult(t_command.Outcome, LevelOf(_keyword));
+        }
 
         // 레벨은 응답 채택이 갈아끼운 슬롯을 ServerSlotRehydrator가 Init으로 다시 태워 이미 캐시에 있다 —
         // 여기서 대입하거나 저장하면 서버와 이중 진실원이 된다.
@@ -123,6 +127,17 @@ public static class KeywordGrowthManager
         OnEnhanced?.Invoke(_keyword);
 
         return new EnhanceResult(t_command.Outcome, t_level);
+    }
+
+    // 무료 한 방을 청구했는데 서버가 잔액 부족·만렙으로 막았다면 그 한 방은 이미 서버가 먹은 뒤다
+    // (안내 구간에는 제 돈으로 낼 잔액이 없다) — 응답을 잃어 클라만 모르는 자리라 표식을 다시 읽는다.
+    // 왕복은 이 갈래에서만 늘어난다: 무료가 아닌 강화의 평범한 잔액 부족에는 붙지 않는다.
+    static async UniTask RefreshFreeShotMarkIfRejectedAsync(bool _freeShot, EnhanceCommandResult _command)
+    {
+        if (!_freeShot || !_command.RejectedByServer) return;
+        if (_command.Outcome != EEnhanceOutcome.NotAffordable && _command.Outcome != EEnhanceOutcome.MaxLevel) return;
+
+        await OutgameTutorialGuide.RefreshFreeShotSpentAsync();
     }
 
     // 튜토리얼 무료 보정을 여기 하나로 모은다 — 조회가 갈리면 표시·활성 판정·소모가 서로 다른 값을 본다.

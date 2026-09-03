@@ -185,7 +185,7 @@ test('7c. 슬롯 누락 update 는 거부 (세이브 비우기 우회)', async (
   await seed(1);
   const t_meta = saveDocument(2);
   for (const t_slot of ['ownership', 'deck', 'cardGrowth', 'keywordGrowth',
-    'rank', 'albumReward', 'tournament', 'tutorial', 'profile']) {
+    'rank', 'albumReward', 'adventure', 'tutorial', 'profile']) {
     delete t_meta[t_slot];
   }
   await assertFails(setDoc(doc(authed(), savePath()), t_meta));
