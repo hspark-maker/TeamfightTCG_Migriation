@@ -36,7 +36,7 @@ export function saveDocument(_revision, _overrides = {}) {
     keywordGrowth: { levels: { Ranged: 0 } },
     rank: { points: 0, claimedTiers: [] },
     albumReward: { claimedKeys: [] },
-    tournament: { clearedNodeIds: [], claimedChapterIds: [], pendingRewardNodeId: '' },
+    adventure: { clearedNodeIds: [], claimedChapterIds: [], pendingRewardNodeId: '' },
     tutorial: {
       outgameCompleted: false,
       chapterIndex: 0,
@@ -92,7 +92,7 @@ export function freshAccountDocument() {
     keywordGrowth: { levels: {} },
     rank: { points: 0, claimedTiers: [] },
     albumReward: { claimedKeys: [] },
-    tournament: { clearedNodeIds: [], claimedChapterIds: [], pendingRewardNodeId: '' },
+    adventure: { clearedNodeIds: [], claimedChapterIds: [], pendingRewardNodeId: '' },
     profile: { nickname: null, avatarId: null, frameId: null },
   });
 }
@@ -125,7 +125,7 @@ export function serverFreshAccountDocument(_overrides = {}) {
     keywordGrowth: { levels: {} },
     rank: { points: 0, claimedTiers: [] },
     albumReward: { claimedKeys: [] },
-    tournament: { clearedNodeIds: [], claimedChapterIds: [], pendingRewardNodeId: '' },
+    adventure: { clearedNodeIds: [], claimedChapterIds: [], pendingRewardNodeId: '' },
     // 베이스에서 물려받지 않고 명시한다 — 여기 lastBoot* = -1 은 서버와 맞춰야 하는 계약이라,
     // 기존 계정 픽스처를 손댔을 때 "서버 쌍둥이"가 조용히 따라 바뀌면 안 된다.
     tutorial: {
