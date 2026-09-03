@@ -34,7 +34,9 @@ public enum BattleVfxId
     TauntBlocked     = 18,  // 도발에 막힌 **공격자** 카드 위에 서는 표식
     TauntGuard       = 21,  // 도발 보유자 **본인**에게 나는 연출. 18과 짝이다 —
                             // "막는 쪽"과 "막힌 쪽"이 다른 그림이어야 누가 왜 막았는지 읽힌다.
-    CardAppear       = 19,
+    CardAppear       = 19,  // 덱에서 나온 카드가 중앙에 서는 순간(FX_Cunning). 등장 경로 **전부** 공통 —
+                            // 보충·오프닝 배치·멀리건 교체·교활 교대. 발화 지점은
+                            // CardAppearSequence.PlayMidArrival 하나다.
     HealerArrival    = 20,  // 힐러 투사체가 대상에 닿는 순간의 임팩트. **힐러 경로 전용**이라
                             // 모든 회복이 공통으로 내는 Heal(5)과 겹쳐 난다 — 둘을 합치면
                             // 돌보미·포식자처럼 투사체가 없는 회복에서도 도착 임팩트가 터진다.
