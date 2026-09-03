@@ -1,7 +1,7 @@
 /**
  * 카드팩 판정에 필요한 스펙 표 읽기. 표 자체는 `../specs/specBlobReader` 가 블롭 문서 1개로 읽는다.
  *
- * 팩 1회 개봉에 표 4개(CardPack · CardPackDrop · Card|Card_Test · RankGrade)를 봐야 한다.
+ * 팩 1회 개봉에 표 4개(CardPack · CardPackDrop · Card · RankGrade)를 봐야 한다.
  * 여기서는 그 표들을 팩 어휘로 옮기는 일만 한다 — 읽기 · 캐시 · 무결성 대조는 리더의 몫이다.
  *
  * **orderBy 를 쓰지 않는다.** 이 프로젝트에는 firestore.indexes.json 이 없어 복합 인덱스를 만들 수 없다

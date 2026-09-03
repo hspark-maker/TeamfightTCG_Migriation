@@ -54,6 +54,12 @@ public sealed class SpecSheetPreloadStep : MainInitializer
             return;
         }
 
+        if (!AdventureNodeSpec.TryValidateRequired(out string t_adventureError))
+        {
+            FailRequiredSpec(_context, AdventureNodeSpec.UpdateRequired, t_adventureError);
+            return;
+        }
+
         // 필수 표가 모두 유효한 뒤에만 전역에 공개한다. 판정과 보상은 같은 서버 스냅샷을 본다.
         RankManager.SetConfig(t_runtimeRank);
         RankRewardManager.SetConfig(t_runtimeRank);

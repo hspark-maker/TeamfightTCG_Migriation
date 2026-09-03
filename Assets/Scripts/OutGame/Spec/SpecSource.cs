@@ -41,42 +41,26 @@ public static class SpecSource
     // 초기화에서 1회. 지연 로드도 되지만 첫 조회 프레임에 복호화·파싱이 걸리지 않게 미리 당긴다.
     public static void Init() => EnsureLoaded();
 
-    /// <summary>현재 콘텐츠 모드의 표 데이터를 순수 <see cref="CardSpec"/> 값으로 변환한다.</summary>
-    public static Dictionary<int, CardSpec> LoadCards(EContentRunMode _mode)
+    /// <summary>카드 표 데이터를 순수 <see cref="CardSpec"/> 값으로 변환한다.
+    /// 표는 Card 하나다 — 테스트 프로필도 같은 표를 읽고, 테스트 전용 카드는
+    /// 표 안의 <see cref="ECardChannel"/> 열로 갈린다(<c>CardCatalog.SetSource</c>의 includeTestCards).</summary>
+    public static Dictionary<int, CardSpec> LoadCards()
     {
         SpecDataManager t_manager = Manager;
         if (t_manager == null)
             throw new InvalidOperationException("[SpecSource] SpecData를 읽지 못해 카드 정의를 만들 수 없다.");
 
         var t_specs = new Dictionary<int, CardSpec>();
-        if (_mode == EContentRunMode.Test)
-        {
-            IReadOnlyList<Card_Test> t_rows = t_manager.Card_Test?.All;
-            if (t_rows == null || t_rows.Count == 0)
-                throw new InvalidOperationException("[SpecSource] Card_Test 표가 비었다.");
-            foreach (Card_Test t_row in t_rows) AddCard(t_specs, From(t_row));
-        }
-        else
-        {
-            IReadOnlyList<Card> t_rows = t_manager.Card?.All;
-            if (t_rows == null || t_rows.Count == 0)
-                throw new InvalidOperationException("[SpecSource] Card 표가 비었다.");
-            foreach (Card t_row in t_rows) AddCard(t_specs, From(t_row));
-        }
+        IReadOnlyList<Card> t_rows = t_manager.Card?.All;
+        if (t_rows == null || t_rows.Count == 0)
+            throw new InvalidOperationException("[SpecSource] Card 표가 비었다.");
+        foreach (Card t_row in t_rows) AddCard(t_specs, From(t_row));
         return t_specs;
     }
 
     static CardSpec From(Card _row)
     {
         if (_row == null) throw new InvalidOperationException("Card 표에 null 행이 있다.");
-        return CreateCard(_row.id, _row.name, _row.displayName, _row.channel, _row.maxHp, _row.keywords,
-            _row.keywordUnlockLevel, _row.defaultEvolutionStage, _row.hp2, _row.hp3, _row.hp4,
-            _row.cardExplain, _row.grade, _row.synergies);
-    }
-
-    static CardSpec From(Card_Test _row)
-    {
-        if (_row == null) throw new InvalidOperationException("Card_Test 표에 null 행이 있다.");
         return CreateCard(_row.id, _row.name, _row.displayName, _row.channel, _row.maxHp, _row.keywords,
             _row.keywordUnlockLevel, _row.defaultEvolutionStage, _row.hp2, _row.hp3, _row.hp4,
             _row.cardExplain, _row.grade, _row.synergies);
@@ -231,7 +215,7 @@ public static class SpecSource
         }
         if (!string.IsNullOrEmpty(t_envId))
         {
-            string t_battleTable = ContentProfileConfig.Active.RunMode == EContentRunMode.Test ? "Card_Test" : "Card";
+            const string t_battleTable = "Card";
             if (SpecPayloadCodec.TryBuildLocalTable(t_manager, t_battleTable, out SpecTablePayload t_battlePayload, out string t_battleError))
                 s_battleFingerprint = SpecPayloadCodec.CombinedHash(t_envId, new[] { t_battlePayload });
             else

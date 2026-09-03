@@ -350,12 +350,12 @@ public static class OutgameDebugActions
     }
 
     // 모험 현재 정점 도전(맵 UI가 붙기 전 검증용). 로비 진입점을 그대로 태운다 — 전투 진입 규율을 우회하지 않는다.
-    public static void StartCurrentTournamentNode()
+    public static void StartCurrentAdventureNode()
     {
-        int t_index = TournamentProgress.CurrentNodeIndex;
+        int t_index = AdventureProgress.CurrentNodeIndex;
         if (t_index < 0)
         {
-            Debug.LogWarning("[OutgameDebug] 도전 가능한 정점이 없다 — TournamentConfig 미배선/미저작이거나 전부 클리어했다.");
+            Debug.LogWarning("[OutgameDebug] 도전 가능한 정점이 없다 — AdventureConfig 미배선/미저작이거나 전부 클리어했다.");
             return;
         }
 
@@ -366,7 +366,7 @@ public static class OutgameDebugActions
             return;
         }
 
-        t_launcher.StartTournamentBattle(t_index);
+        t_launcher.StartAdventureBattle(t_index);
         Debug.Log($"[OutgameDebug] 모험 정점 #{t_index + 1} 도전 — 덱 화면 진입");
     }
 

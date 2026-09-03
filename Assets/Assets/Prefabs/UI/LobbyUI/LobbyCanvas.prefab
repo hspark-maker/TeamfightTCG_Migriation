@@ -984,7 +984,7 @@ MonoBehaviour:
   lobbyTabController: {fileID: 3797395670514148879}
   deckPanel: {fileID: 3228001466242478929}
   matchPanel: {fileID: 5258775699516550056}
-  tournamentPanel: {fileID: 6741009150353787377}
+  adventurePanel: {fileID: 6741009150353787377}
 --- !u!1 &1244772157711284030
 GameObject:
   m_ObjectHideFlags: 0
@@ -5434,7 +5434,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 671d6cff0c20bd64c853db48bac7bf36, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TournamentMapPanel
+  m_EditorClassIdentifier: Assembly-CSharp::AdventureMapPanel
 --- !u!1001 &7857085950436996758
 PrefabInstance:
   m_ObjectHideFlags: 0

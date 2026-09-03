@@ -22,7 +22,7 @@ public class UserSaveData
     [FirestoreProperty("keywordGrowth")] public KeywordGrowthSaveData KeywordGrowth { get; set; } = new KeywordGrowthSaveData();
     [FirestoreProperty("rank")] public RankSaveData Rank { get; set; } = new RankSaveData();
     [FirestoreProperty("albumReward")] public AlbumRewardSaveData AlbumReward { get; set; } = new AlbumRewardSaveData();
-    [FirestoreProperty("tournament")] public TournamentSaveData Tournament { get; set; } = new TournamentSaveData();
+    [FirestoreProperty("adventure")] public AdventureSaveData Adventure { get; set; } = new AdventureSaveData();
     [FirestoreProperty("tutorial")] public TutorialSaveData Tutorial { get; set; } = new TutorialSaveData();
     [FirestoreProperty("profile")] public ProfileSaveData Profile { get; set; } = new ProfileSaveData();
 }

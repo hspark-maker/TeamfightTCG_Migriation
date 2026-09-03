@@ -42,40 +42,6 @@ public partial class Card
 }
 
 [GeneratorSpecData]
-public partial class Card_Test
-{
-    /// 카드 고유 번호(부여 후 변경 금지)
-    [GeneratorId(nameof(id), typeof(int))]
-    public int id;
-    /// 에셋 이름(매칭 키)
-    public string name;
-    /// 화면 표시 이름
-    public string displayName;
-    /// Live=실행 노출 / TestOnly=테스트만
-    public string channel;
-    /// 기본 체력(=공격력)
-    public int maxHp;
-    /// 키워드(여러 개는 / 로 구분)
-    public string keywords;
-    /// 키워드 열리는 강화 레벨(0=처음부터)
-    public int keywordUnlockLevel;
-    /// SynergyData 에셋 이름(여러 개는 / 로 구분)
-    public string synergies;
-    /// 시작 진화 단계(0=미진화)
-    public int defaultEvolutionStage;
-    /// Lv2 진입 시 증가 HP
-    public int hp2;
-    /// Lv3 진입 시 증가 HP
-    public int hp3;
-    /// Lv4 진입 시 증가 HP
-    public int hp4;
-    /// 도감 설명문
-    public string cardExplain;
-    /// 카드 등급(Common/Rare/Arcane/Mythic)
-    public string grade;
-}
-
-[GeneratorSpecData]
 public partial class CardPack
 {
     /// 팩 고유 번호(부여 후 변경 금지)
@@ -286,6 +252,27 @@ public partial class AlbumEntry
 }
 
 [GeneratorSpecData]
+public partial class AdventureChapter
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 챕터 안정 키 — 완주 판정과 완주 보상 낙인 키
+    public string chapterId;
+    /// 정점 안정 키 — 클리어 낙인 키. 전체에서 유일
+    public string nodeId;
+    /// 챕터 안 정점 순서(0부터)
+    public int order;
+    /// 전역 직전 정점 — 해금 사슬. 첫 정점만 비우고 챕터 경계를 넘어 이어진다(비운 행이 둘이면 서버가 전면 차단)
+    public string prevNodeId;
+    /// 이 챕터에 들어갈 수 있는 rank.points 하한. 첫 등급 챕터는 0(신규 계정도 첫 등급으로 읽힌다)
+    public long requiredPoints;
+    /// 참고용 이름(데이터 아님)
+    public string aiDeckId;
+    public int aiCardLevel;
+}
+
+[GeneratorSpecData]
 public partial class AlbumThemeInfo
 {
     /// 행 고유 번호(부여 후 변경 금지)
@@ -301,24 +288,6 @@ public partial class AlbumThemeInfo
     public string displayName;
     /// 셀에 한 줄로 붙는 테마 소개
     public string description;
-}
-
-[GeneratorSpecData]
-public partial class TournamentChapter
-{
-    /// 행 고유 번호(부여 후 변경 금지)
-    [GeneratorId(nameof(id), typeof(int))]
-    public int id;
-    /// 챕터 안정 키 — 완주 판정과 완주 보상 낙인 키
-    public string chapterId;
-    /// 정점 안정 키 — 클리어 낙인 키. 전체에서 유일
-    public string nodeId;
-    /// 챕터 안 정점 순서(0부터)
-    public int order;
-    /// 전역 직전 정점 — 해금 사슬. 첫 정점만 비우고 챕터 경계를 넘어 이어진다(비운 행이 둘이면 서버가 전면 차단)
-    public string prevNodeId;
-    /// 이 챕터에 들어갈 수 있는 rank.points 하한. 첫 등급 챕터는 0(신규 계정도 첫 등급으로 읽힌다)
-    public long requiredPoints;
 }
 
 [GeneratorSpecData]

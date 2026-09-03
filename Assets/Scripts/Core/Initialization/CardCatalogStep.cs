@@ -17,7 +17,7 @@ public sealed class CardCatalogStep : MainInitializer
             if (t_profile == null)
                 throw new InvalidOperationException("[CardCatalogStep] ContentProfileStep이 먼저 서야 한다.");
 
-            CardCatalog.SetSource(synergyRegistry, t_profile.RunMode, t_profile.IncludeTestCards);
+            CardCatalog.SetSource(synergyRegistry, t_profile.IncludeTestCards);
             InitializationRunner.MarkInitClaimed();
         }
         catch (Exception t_exception)

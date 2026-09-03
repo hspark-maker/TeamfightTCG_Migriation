@@ -27,7 +27,7 @@ public static class CardStandaloneInitializer
         {
             ContentProfileConfig t_profile = ContentProfileConfig.Active;
             SpecSource.Init();
-            CardCatalog.SetSource(_synergyRegistry, t_profile.RunMode, t_profile.IncludeTestCards);
+            CardCatalog.SetSource(_synergyRegistry, t_profile.IncludeTestCards);
             return true;
         }
         catch (Exception t_exception)

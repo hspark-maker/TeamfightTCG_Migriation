@@ -13,7 +13,7 @@ public class ServerSlotPatch
     [JsonProperty("keywordGrowth")] public KeywordGrowthSaveData KeywordGrowth { get; set; }
     [JsonProperty("rank")] public RankSaveData Rank { get; set; }
     [JsonProperty("albumReward")] public AlbumRewardSaveData AlbumReward { get; set; }
-    [JsonProperty("tournament")] public TournamentSaveData Tournament { get; set; }
+    [JsonProperty("adventure")] public AdventureSaveData Adventure { get; set; }
     [JsonProperty("tutorial")] public TutorialSaveData Tutorial { get; set; }
     [JsonProperty("profile")] public ProfileSaveData Profile { get; set; }
 }

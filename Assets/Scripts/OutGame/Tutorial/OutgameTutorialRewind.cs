@@ -84,7 +84,7 @@ public static class OutgameTutorialRewind
         t_data.CardGrowth    = new CardGrowthSaveData();
         t_data.KeywordGrowth = new KeywordGrowthSaveData();
         t_data.AlbumReward   = new AlbumRewardSaveData();
-        t_data.Tournament    = new TournamentSaveData();
+        t_data.Adventure    = new AdventureSaveData();
         t_data.Tutorial      = new TutorialSaveData();
         t_data.Profile       = new ProfileSaveData();
 
@@ -93,7 +93,7 @@ public static class OutgameTutorialRewind
 
         // 세이브 슬롯 밖에 사는 진행 흔적도 함께 민다 — 슬롯만 밀면 그 축이 이전 세션 값으로 남아
         // "되감았는데 그 연출만 안 나온다"가 된다(해금 연출 이력은 기기 로컬이라 슬롯 목록에 없다).
-        TournamentUnlockSeenStore.Clear();
+        AdventureUnlockSeenStore.Clear();
 
         DataSaveManager.Save();
 

@@ -149,13 +149,12 @@ public partial class ReleaseManagerWindow : EditorWindow
         EditorGUILayout.HelpBox(
             "카드 값의 진실원은 구글 스펙시트다. 시트를 고쳤으면 CookApps > SpecData 창에서 " +
             "'시트 적용 & CS 생성'을 먼저 돌린 뒤 위 버튼을 누른다.\n" +
-            "라이브 = Card 시트 / 테스트 = Card_Test 시트. 같은 카드는 두 시트에서 **같은 id**여야 한다 " +
-            "— 매칭 키가 id라 번호가 갈리면 새 에셋으로 복제된다.\n" +
+            "카드 표는 Card 하나다 — 테스트 프로필도 같은 표를 읽고, 테스트 전용 카드는 channel 열로 갈린다.\n" +
             "시트에서 이름을 바꾸면 에셋 이름도 따라 바뀐다(참조는 guid라 유지된다).",
             MessageType.Info);
 
         this.showColumnHelp = EditorGUILayout.Foldout(this.showColumnHelp, "열 설명", true);
-        if (this.showColumnHelp) EditorGUILayout.HelpBox("카드 값은 Card/Card_Test SpecData가 소유하며 런타임은 int ID로 참조합니다.", MessageType.None);
+        if (this.showColumnHelp) EditorGUILayout.HelpBox("카드 값은 Card SpecData가 소유하며 런타임은 int ID로 참조합니다.", MessageType.None);
     }
 
     // ── ③ 검증 ─────────────────────────────────────────────────────────────

@@ -54,7 +54,7 @@ function parseRewardRows(rows) {
  * 규칙: order 오름차순(동률은 id) · rewardType 은 "Currency" 만(대소문자 구분) ·
  * 같은 order 중복 줄은 버림 · 모르는 재화와 0 이하 지급량은 버림.
  * @param {RewardRow[]} rows Reward 표 전량
- * @param {string} ownerType Album | Tournament | Rank | Battle
+ * @param {string} ownerType Album | Adventure | Rank | Battle
  * @param {string} ownerId 소유자 키(정점 nodeId · 랭크 티어 인덱스 문자열 등)
  * @return {RewardResolution} 지급 목록과 버린 줄
  */
@@ -62,7 +62,7 @@ function resolveRewards(rows, ownerType, ownerId) {
     const gains = [];
     const dropped = [];
     const seenOrders = new Set();
-    // 축이 다르면 절대 섞이지 않는다 — Rank/"1" 과 Tournament/"1" 은 남남이다.
+    // 축이 다르면 절대 섞이지 않는다 — Rank/"1" 과 Adventure/"1" 은 남남이다.
     const owned = rows
         .filter((row) => row.ownerType === ownerType && row.ownerId === ownerId)
         .sort((a, b) => (a.order - b.order) || (a.id - b.id));
@@ -94,12 +94,12 @@ function resolveRewards(rows, ownerType, ownerId) {
     return { gains, dropped };
 }
 /**
- * 챕터 완주 보상의 ownerId 접두사. 챕터는 ownerType 을 정점과 공유하고(둘 다 "Tournament")
+ * 챕터 완주 보상의 ownerId 접두사. 챕터는 ownerType 을 정점과 공유하고(둘 다 "Adventure")
  * 이 접두사로만 갈린다 — 새 ownerType 을 만들면 Reward 표의 챕터 행까지 다시 저작해야 한다.
  */
 exports.CHAPTER_OWNER_PREFIX = "chapter_";
 /**
- * ownerType "Tournament" 안에서 챕터 완주인가(아니면 정점이다). 판정 표와 명령이 같은
+ * ownerType "Adventure" 안에서 챕터 완주인가(아니면 정점이다). 판정 표와 명령이 같은
  * 술어를 봐야 두 쪽이 다른 분기로 갈리지 않는다.
  * @param {string} ownerId 소유자 키
  * @return {boolean} 챕터 완주 키면 true
@@ -109,14 +109,14 @@ function isChapterOwnerId(ownerId) {
 }
 /**
  * 수령을 허용할지 판정한다. **표가 비었으면 소유자 축과 무관하게 거절**한다 —
- * 표를 못 읽은 것과 저작이 없는 것을 함께 삼키면 토너먼트는 클리어 낙인만 남고
+ * 표를 못 읽은 것과 저작이 없는 것을 함께 삼키면 모험는 클리어 낙인만 남고
  * 재수령이 AlreadyClaimed 로 막혀 보상을 영영 못 받는다.
  *
- * 표는 읽혔는데 그 ownerId 행만 없는 경우는 저작 규약이다 — **토너먼트 정점만** 통과시켜 해금을
+ * 표는 읽혔는데 그 ownerId 행만 없는 경우는 저작 규약이다 — **모험 정점만** 통과시켜 해금을
  * 넘긴다(미저작 정점이 RewardPending 으로 굳으면 진행이 끊긴다). 랭크 티어 · 도감 완성 · 챕터 완주는
  * 넘길 진행이 없고 낙인만 남으므로 거절한다 — 통과시키면 나중에 보상을 저작해도 AlreadyClaimed 로 막힌다.
  * @param {RewardRow[]} rows Reward 표 전량
- * @param {string} ownerType Tournament | Rank | Album
+ * @param {string} ownerType Adventure | Rank | Album
  * @param {string} ownerId 소유자 키
  * @return {RewardClaimJudgement} 허용 여부와 지급 목록
  */
@@ -125,7 +125,7 @@ function judgeRewardClaim(rows, ownerType, ownerId) {
     if (rows.length === 0) {
         return { allow: false, reason: "NotEligible", specEmpty: true, gains: [], dropped };
     }
-    const carriesProgress = ownerType === "Tournament" && !isChapterOwnerId(ownerId);
+    const carriesProgress = ownerType === "Adventure" && !isChapterOwnerId(ownerId);
     if (gains.length === 0 && !carriesProgress) {
         return { allow: false, reason: "RewardNotFound", specEmpty: false, gains, dropped };
     }

@@ -37,8 +37,8 @@ public enum EOutgameSound
     RankPromote  = 601,
 
     // 모험
-    TournamentNodeTap = 700,
-    TournamentClear   = 701,
+    AdventureNodeTap = 700,
+    AdventureClear   = 701,
 
     // 매칭
     MatchSearch = 800,

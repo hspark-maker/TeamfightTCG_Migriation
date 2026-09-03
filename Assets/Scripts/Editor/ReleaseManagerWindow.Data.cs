@@ -127,7 +127,7 @@ public partial class ReleaseManagerWindow
     {
         EditorGUILayout.LabelField("구성 표 (SO 저작 → 스펙)", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            $"{SpecFirestoreUploader.TOURNAMENT_CHAPTER_TABLE}(챕터·정점)를 TournamentConfig 저작에서 만들어 올린다. " +
+            $"{SpecFirestoreUploader.ADVENTURE_CHAPTER_TABLE}(챕터·정점)를 AdventureConfig 저작에서 만들어 올린다. " +
             "서버가 챕터 완주를 판정할 근거 표다. " +
             "위 검증 게이트는 콘텐츠 프로필·카드 표만 보므로, 모험 저작 결함은 업로드 시점에 따로 검사해 중단하거나 경고한다. " +
             "도감 구성(AlbumEntry·AlbumThemeInfo)은 스펙시트가 진실원이라 위 표 목록에서 올린다.",
@@ -429,7 +429,7 @@ public partial class ReleaseManagerWindow
         if (!EditorUtility.DisplayDialog(
                 "구성 표 업로드",
                 $"{FirebaseRootPath.Environment(_envId)}/specs/ 아래 " +
-                $"{SpecFirestoreUploader.TOURNAMENT_CHAPTER_TABLE} 표를 배포한다.\n" +
+                $"{SpecFirestoreUploader.ADVENTURE_CHAPTER_TABLE} 표를 배포한다.\n" +
                 "SO 저작을 그대로 옮기며, 표별 메타·행 갱신·사라진 행 삭제가 각각 하나의 원자 커밋으로 반영된다.",
                 "업로드", "취소"))
             return;
@@ -440,9 +440,9 @@ public partial class ReleaseManagerWindow
 
         try
         {
-            EditorUtility.DisplayProgressBar("구성 표 업로드", $"{SpecFirestoreUploader.TOURNAMENT_CHAPTER_TABLE} …", 0f);
-            string t_chapterLine = SpecFirestoreUploader.UploadTournamentChapters(_envId, out string t_chapterError);
-            AppendUploadResult(t_report, SpecFirestoreUploader.TOURNAMENT_CHAPTER_TABLE, t_chapterLine, t_chapterError,
+            EditorUtility.DisplayProgressBar("구성 표 업로드", $"{SpecFirestoreUploader.ADVENTURE_CHAPTER_TABLE} …", 0f);
+            string t_chapterLine = SpecFirestoreUploader.UploadAdventureChapters(_envId, out string t_chapterError);
+            AppendUploadResult(t_report, SpecFirestoreUploader.ADVENTURE_CHAPTER_TABLE, t_chapterLine, t_chapterError,
                                ref t_done, ref t_failed);
         }
         catch (Exception t_exception)

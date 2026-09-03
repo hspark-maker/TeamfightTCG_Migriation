@@ -13,7 +13,6 @@ using UnityEngine.SceneManagement;
 public class LobbyMatchLauncher : MonoBehaviour
 {
     [SerializeField] LobbyOverlayHost overlayHost;
-    [SerializeField] AIDeckConfig   aiDeckConfig;   // BattleScene GameInitializer가 참조하는 것과 동일 에셋
 
     [Header("매칭 연출")]
     [SerializeField] OpponentProfilePool profilePool;
@@ -29,7 +28,7 @@ public class LobbyMatchLauncher : MonoBehaviour
 
     [Header("모험")]
     [Tooltip("모험 맵 오버레이. 여닫음은 맵이 스스로 갖고, 여는 계기·전투 진입만 로비 쪽이 쥔다 — 맵이 컨트롤러·런처를 인스펙터로 물면 그 배선이 탭 프리팹 오버라이드로 남는다.")]
-    [SerializeField] TournamentMapOverlayView tournamentPanel;
+    [SerializeField] AdventureMapOverlayView adventurePanel;
 
     const string BATTLE_SCENE = "BattleScene";
 
@@ -137,13 +136,13 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (matchPanel != null)
         {
             matchPanel.PlayRequested += StartAiBattle;
-            matchPanel.TournamentRequested += OpenTournamentMap;
+            matchPanel.AdventureRequested += OpenAdventureMap;
         }
 
-        if (tournamentPanel != null) tournamentPanel.NodeSelected += StartTournamentBattle;
+        if (adventurePanel != null) adventurePanel.NodeSelected += StartAdventureBattle;
 
-        TournamentReturnFlow.ReturnRequested += HandleTournamentReturn;
-        TournamentReturnFlow.RewardClaimRequested += HandleRewardClaim;
+        AdventureReturnFlow.ReturnRequested += HandleAdventureReturn;
+        AdventureReturnFlow.RewardClaimRequested += HandleRewardClaim;
 
         OutgameFeatureLock.OnChanged += ApplyPlayLock;
         ApplyPlayLock();
@@ -163,13 +162,13 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (matchPanel != null)
         {
             matchPanel.PlayRequested -= StartAiBattle;
-            matchPanel.TournamentRequested -= OpenTournamentMap;
+            matchPanel.AdventureRequested -= OpenAdventureMap;
         }
 
-        if (tournamentPanel != null) tournamentPanel.NodeSelected -= StartTournamentBattle;
+        if (adventurePanel != null) adventurePanel.NodeSelected -= StartAdventureBattle;
 
-        TournamentReturnFlow.ReturnRequested -= HandleTournamentReturn;
-        TournamentReturnFlow.RewardClaimRequested -= HandleRewardClaim;
+        AdventureReturnFlow.ReturnRequested -= HandleAdventureReturn;
+        AdventureReturnFlow.RewardClaimRequested -= HandleRewardClaim;
 
         OutgameFeatureLock.OnChanged -= ApplyPlayLock;
     }
@@ -181,7 +180,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         yield return null;
         Canvas.ForceUpdateCanvases();
 
-        TournamentReturnFlow.Restore();
+        AdventureReturnFlow.Restore();
     }
 
     /// <summary>PlayBtn 진입점. 이름은 인스펙터 배선 호환을 위해 유지한다 —
@@ -213,13 +212,13 @@ public class LobbyMatchLauncher : MonoBehaviour
     }
 
     /// <summary>모험 정점 도전. 상대·덱·AI 레벨이 저작 고정이라 매칭을 태우지 않는다.
-    /// TournamentRun.Begin은 모든 가드를 통과한 뒤에 온다 — 중간에 return하며 세워 두면 그게 곧 로비 누수다.</summary>
-    public void StartTournamentBattle(int _nodeIndex)
+    /// AdventureRun.Begin은 모든 가드를 통과한 뒤에 온다 — 중간에 return하며 세워 두면 그게 곧 로비 누수다.</summary>
+    public void StartAdventureBattle(int _nodeIndex)
     {
         if (m_running) return;
 
-        if (!TournamentProgress.CanEnter(_nodeIndex)) return;
-        if (!TournamentProgress.TryGetNode(_nodeIndex, out TournamentNodeDef t_node)) return;
+        if (!AdventureProgress.CanEnter(_nodeIndex)) return;
+        if (!AdventureProgress.TryGetNode(_nodeIndex, out AdventureNodeDef t_node)) return;
 
         // 저작 덱이 비면 상대 없이 전투가 뜬다(DeckConfig.SetEnemyDeck은 null도 못 받는다) — 진입 단계에서 막는다.
         if (t_node.enemyDeckIds == null || t_node.enemyDeckIds.Count == 0)
@@ -236,10 +235,10 @@ public class LobbyMatchLauncher : MonoBehaviour
             return;
         }
 
-        if (!TournamentRun.Begin(t_node.nodeId, t_node.AiCardLevelOrBase)) return;
+        if (!AdventureRun.Begin(t_node.nodeId, t_node.AiCardLevelOrBase)) return;
 
         var t_preset = new MatchOpponent(
-            MatchProfile.OfTournamentNode(t_node.displayName, t_node.avatar), t_node.EnemyDeckIds);
+            MatchProfile.OfAdventureNode(t_node.displayName, t_node.avatar), t_node.EnemyDeckIds);
 
         RunEntryAsync(t_preset).Forget();
     }
@@ -315,11 +314,11 @@ public class LobbyMatchLauncher : MonoBehaviour
         // (RunEntryChainAsync가 매칭 블록을 건너뛴다), 그래서 서버 매치 신원 자체가 없다 —
         // SoloMatchSync는 그것을 "findAiMatch가 발급한 매치 신원이 없다"로 거절하므로 정점이 영영 시작되지 않는다.
         //
-        // 여기서 통과시켜도 보상 자격은 클라가 못 만든다: 정점 격파는 reportTournamentWin이,
+        // 여기서 통과시켜도 보상 자격은 클라가 못 만든다: 정점 격파는 reportAdventureWin이,
         // 지급은 claimReward가 서버에서 선행 사슬·랭크 잠금을 다시 재고 결정한다(matchId를 쓰지 않는 경로).
         // 남는 구멍은 정점 전투에 한해 출전 덱 소유·성장 대조가 빠진다는 것 — 그건 findAiMatch에
         // 모험 모드를 여는 서버 작업이 필요하다.
-        if (TournamentRun.IsActive) return true;
+        if (AdventureRun.IsActive) return true;
 
         ESoloMatchSyncResult t_result = await SoloMatchSync.RunAsync(this.GetCancellationTokenOnDestroy());
 
@@ -351,11 +350,11 @@ public class LobbyMatchLauncher : MonoBehaviour
     }
 
     // 진입을 접고 로비를 되돌린다. 진입 게이트가 여럿이라 되돌리는 자리는 하나여야 한다 —
-    // m_running 을 안 내리면 PlayBtn 이 영영 안 먹고, TournamentRun 을 안 끊으면
+    // m_running 을 안 내리면 PlayBtn 이 영영 안 먹고, AdventureRun 을 안 끊으면
     // 다음 일반 전투의 AI 레벨이 정점 레벨로 굳는다.
     void ShowEntryBlocked(string _message)
     {
-        TournamentRun.End();
+        AdventureRun.End();
         // 봉인만 되고 전투로 가지 못한 매치다. 남겨 두면 다음 진입이 그 시드·보드 순서를 소비한다.
         SoloMatchHandoff.Clear();
         m_matchShell?.Close();
@@ -411,7 +410,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         finally
         {
             m_running = false;
-            if (!t_confirmed) TournamentRun.End();
+            if (!t_confirmed) AdventureRun.End();
         }
 
         // 씬이 내려가며 취소된 경우 — 파괴 중인 오브젝트를 건드리지 않는다.
@@ -445,7 +444,11 @@ public class LobbyMatchLauncher : MonoBehaviour
             MatchOpponent? t_matched = await t_matchShell.RunMatchAsync(Matchmaker, _ct);
             if (t_matched == null) return false;   // 취소 = 로비로 되돌아간다
 
-            ConfirmOpponent(t_matched);
+            if (!ConfirmOpponent(t_matched))
+            {
+                ShowEntryBlocked("상대 덱을 준비하지 못했습니다.\n네트워크 연결을 확인한 뒤 다시 시도해 주세요.");
+                return false;
+            }
 
             // 성공한 매칭 화면은 곧 시작될 씬 전환이 덮는다. 여기서 닫으면 콘텐츠 확인 동안 로비가 드러난다.
             return true;
@@ -453,7 +456,11 @@ public class LobbyMatchLauncher : MonoBehaviour
 
         // 고정 상대(모험 정점)와 튜토리얼은 매칭을 타지 않는다.
         MatchOpponent? t_opponent = _preset;
-        ConfirmOpponent(t_opponent, _preset.HasValue);
+        if (!ConfirmOpponent(t_opponent, _preset.HasValue))
+        {
+            ShowEntryBlocked("상대 덱을 준비하지 못했습니다.\n네트워크 연결을 확인한 뒤 다시 시도해 주세요.");
+            return false;
+        }
 
         if (DeckShell == null)
         {
@@ -519,21 +526,21 @@ public class LobbyMatchLauncher : MonoBehaviour
     // 상대를 전투 전에 확정한다 — 덱 화면의 EnemySection과 실제 전투가 같은 값을 보게 하는 유일한 지점.
     // 튜토리얼은 전투가 TutorialConfig.EnemyDeck으로 초기화되므로(GameInitializer) 여기서 랜덤을 뽑으면
     // 화면에 그린 6장이 실제 상대와 달라진다 — "상대 덱을 미리 확인한다"는 안내가 거짓이 된다.
-    void ConfirmOpponent(MatchOpponent? _matched, bool _preset = false)
+    bool ConfirmOpponent(MatchOpponent? _matched, bool _preset = false)
     {
         // 고정 상대는 저작값이 곧 진실이다 — 어떤 폴백도 태우지 않는다(태우면 맵에 그린 정점과 실제 상대가 갈린다).
         if (_preset && _matched.HasValue)
         {
             MatchOpponentHandoff.Set(_matched.Value);
             DeckConfig.SetEnemyDeck(_matched.Value.Deck, _matched.Value.CardLevel);
-            return;
+            return true;
         }
 
         if (TutorialConfig.IsActive && TutorialConfig.EnemyDeck != null)
         {
             MatchOpponentHandoff.Clear();
             DeckConfig.SetEnemyDeck(TutorialConfig.EnemyDeck);
-            return;
+            return true;
         }
 
         if (_matched.HasValue) MatchOpponentHandoff.Set(_matched.Value);
@@ -543,14 +550,12 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (_matched.HasValue && _matched.Value.IsValid)
         {
             DeckConfig.SetEnemyDeck(_matched.Value.Deck, _matched.Value.CardLevel);
-            return;
+            return true;
         }
 
-        int t_cardLevel = 0;
-        List<int> t_deck = aiDeckConfig != null
-            ? aiDeckConfig.GetDeckForTier(RankManager.TierIndex, out t_cardLevel)
-            : new List<int>();
-        DeckConfig.SetEnemyDeck(t_deck, t_cardLevel);
+        Debug.LogError("[LobbyMatchLauncher] 매칭 응답에 유효한 상대 덱이 없다 — 로컬 AI 덱으로 대체하지 않는다.");
+        MatchOpponentHandoff.Clear();
+        return false;
     }
 
     void ApplyPlayLock()
@@ -571,33 +576,33 @@ public class LobbyMatchLauncher : MonoBehaviour
 
     void GoToDeckTab()
     {
-        tournamentPanel?.Close();   // 맵이 떠 있는 채로 덱 탭에 가면 오버레이가 덱 화면을 가린다
+        adventurePanel?.Close();   // 맵이 떠 있는 채로 덱 탭에 가면 오버레이가 덱 화면을 가린다
         if (deckPanel != null) lobbyTabController?.Select(deckPanel);
     }
 
-    void OpenTournamentMap()
+    void OpenAdventureMap()
     {
         // 버튼을 죽여 두는 것만으로는 부족하다 — 잠김 표시는 표현 레이어 몫이고, 진입을 실제로 막는 주체는 여기다.
-        // 정점 전투 복귀(HandleTournamentReturn)는 이 문을 거치지 않는다 — 거치게 하면 랭크가 복귀를 삼킨다.
-        if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Tournament)) return;
+        // 정점 전투 복귀(HandleAdventureReturn)는 이 문을 거치지 않는다 — 거치게 하면 랭크가 복귀를 삼킨다.
+        if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure)) return;
 
-        tournamentPanel?.Open();
-        // 복귀 재오픈(HandleTournamentReturn)은 이 자리를 거치지 않는다 — 안내가 전투 복귀 연출 위에 겹치지 않는 이유다.
-        TriggeredTutorialRunner.Fire(EOutgameTutorialTrigger.TournamentMapFirstOpen);
+        adventurePanel?.Open();
+        // 복귀 재오픈(HandleAdventureReturn)은 이 자리를 거치지 않는다 — 안내가 전투 복귀 연출 위에 겹치지 않는 이유다.
+        TriggeredTutorialRunner.Fire(EOutgameTutorialTrigger.AdventureMapFirstOpen);
     }
 
     // 정점 전투 복귀 — 떠났던 화면(배틀 탭 + 맵)을 되돌린다. 승패 무관하게 맵으로 온다.
     // 보상 팝업은 여기서 열지 않는다(서버 낙인이 선 뒤에 따로 온다) — 맵은 이미 미수령 상태를 그리고 있다.
-    void HandleTournamentReturn(string _nodeId, bool _won)
+    void HandleAdventureReturn(string _nodeId, bool _won)
     {
         // 탭 트리거는 끈다 — 탭 진입 튜토리얼이 방금 세운 맵을 덮으면 복귀가 무의미해진다.
         if (matchPanel != null) lobbyTabController?.Select(matchPanel, false);
 
-        tournamentPanel?.Open();
+        adventurePanel?.Open();
     }
 
     // 낙인이 선 직후의 보상 수령. 승리 복귀에서만 온다.
-    void HandleRewardClaim(string _nodeId) => tournamentPanel?.OpenReturnReward(_nodeId);
+    void HandleRewardClaim(string _nodeId) => adventurePanel?.OpenReturnReward(_nodeId);
 
     // 유저가 로비 덱 탭에서 정해 둔 대표 덱을 씬 전환 캐리어에 싣는다. 유효 덱이 하나도 없으면 false —
     // 진입 앞단(StartAiBattle)이 이미 걸러 내므로 여기까지 오는 일은 세이브가 도중에 비었을 때뿐이다.

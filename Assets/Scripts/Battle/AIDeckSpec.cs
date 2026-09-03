@@ -21,6 +21,8 @@ public static class AIDeckSpec
     // 반대로 SpecSource가 이쪽을 부르게 하면 OutGame -> Battle 역참조가 생긴다.
     static SpecDataManager s_source;
     static readonly List<AIDeckConfig.DeckEntry> s_decks = new List<AIDeckConfig.DeckEntry>();
+    static readonly Dictionary<string, AIDeckConfig.DeckEntry> s_decksById =
+        new Dictionary<string, AIDeckConfig.DeckEntry>(System.StringComparer.Ordinal);
 
     public static void Init() => EnsureLoaded();
 
@@ -36,6 +38,21 @@ public static class AIDeckSpec
         // 실패분은 내보내지 않는다 — 반환값을 안 보는 호출자가 생겨도 빈 cardIds 덱이 새지 않게.
         _decks = s_ready ? s_decks : System.Array.Empty<AIDeckConfig.DeckEntry>();
         return s_ready;
+    }
+
+    /// <summary>안정 키로 덱 한 벌을 찾는다. 모험처럼 등장 풀과 무관하게 고정 덱을 참조하는 경로가 쓴다.</summary>
+    public static bool TryGetDeck(string _deckId, out IReadOnlyList<int> _cardIds)
+    {
+        EnsureLoaded();
+        if (s_ready && !string.IsNullOrEmpty(_deckId) &&
+            s_decksById.TryGetValue(_deckId, out AIDeckConfig.DeckEntry t_entry))
+        {
+            _cardIds = t_entry.CardIds;
+            return true;
+        }
+
+        _cardIds = System.Array.Empty<int>();
+        return false;
     }
 
     public static bool TryValidateRequired(out string _error)
@@ -62,6 +79,7 @@ public static class AIDeckSpec
         s_error = null;
         s_updateRequired = false;
         s_decks.Clear();
+        s_decksById.Clear();
 
         IReadOnlyList<AIDeck> t_rows = t_manager?.AIDeck?.All;
         if (t_rows == null || t_rows.Count == 0)
@@ -94,12 +112,6 @@ public static class AIDeckSpec
                 Skip($"비어 있거나 중복인 deckId를 제외한다: '{t_row.deckId}'.");
                 continue;
             }
-            if (t_row.fromTier < 0 || (t_row.toTier != 0 && t_row.toTier < t_row.fromTier))
-            {
-                Skip($"'{t_row.deckId}'의 티어 구간 {t_row.fromTier}~{t_row.toTier}이 유효하지 않아 제외한다.");
-                continue;
-            }
-
             List<int> t_cardIds = BuildCards(t_row);
             if (t_cardIds == null)
             {
@@ -121,7 +133,7 @@ public static class AIDeckSpec
 
             if (!t_rowValid) continue;
 
-            s_decks.Add(new AIDeckConfig.DeckEntry
+            var t_entry = new AIDeckConfig.DeckEntry
             {
                 deckName = t_row.deckName,
                 cardIds = t_cardIds,
@@ -130,7 +142,9 @@ public static class AIDeckSpec
                 weight = t_row.weight,
                 fromLevel = t_row.fromLevel,
                 toLevel = t_row.toLevel,
-            });
+            };
+            s_decks.Add(t_entry);
+            s_decksById.Add(t_row.deckId, t_entry);
         }
 
         s_ready = t_valid && s_decks.Count > 0;
@@ -166,5 +180,6 @@ public static class AIDeckSpec
         s_updateRequired = false;
         s_source = null;
         s_decks.Clear();
+        s_decksById.Clear();
     }
 }

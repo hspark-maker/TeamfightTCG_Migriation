@@ -39,7 +39,7 @@ public static class BattleGrowthBridge
     // 카드마다 레벨이 흔들린다. 추첨은 덱을 고르는 자리(AIDeckConfig.TakeDeck)에서 판당 1회다.
     static int EnemyCardLevel()
     {
-        int t_level = TournamentRun.IsActive ? TournamentRun.AiCardLevel
+        int t_level = AdventureRun.IsActive ? AdventureRun.AiCardLevel
                     : DeckConfig.EnemyCardLevel > 0 ? DeckConfig.EnemyCardLevel
                     : CardGrowth.BaseLevel;
 

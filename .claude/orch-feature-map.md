@@ -14,10 +14,10 @@
 폴더별 목록만으로는 "A 가 어디를 거쳐 B 로 가는지" 를 알 수 없어 경계를 넘는 경로만 따로 적는다. 각 줄은 코드에서 확인한 호출·대입 순서다.
 
 - 저장한 덱이 전투 필드로: 진실원 `OutGame/Save/3.Manager/DataSaveManager.Data` 의 `DeckSaveData` · 메모리 캐시 `OutGame/Deck/DeckSaveManager.GetSlot` / `DeckSaveManager.Load` · 전투 씬 진입 전 확정 `Battle/DeckConfig.Set` (호출부 `UI/Lobby/LobbyMatchLauncher` · `UI/Match/MatchDeckShell` · `UI/DeckSelectPopup`) · 배치 `Battle/GameInitializer` 가 `Battle/BattleField.Initialize` 에 `DeckConfig.PlayerDeck` 을 넘긴다
-- 상대(AI) 덱: `Battle/GameInitializer` 가 `AIDeckConfig.GetDeckForTier` 결과를 `DeckConfig.SetEnemyDeck` 에 넣는다 — 미설정이면 `DeckConfig.HasEnemyDeck` 이 false 라 랜덤 폴백
+- 상대(AI) 덱: `UI/Lobby/LobbyMatchLauncher.ConfirmOpponent` 가 유일한 확정 지점 — 유효한 상대가 없으면 **로컬 덱 대체 없이 진입을 막는다**(`LobbyMatchLauncher.ShowEntryBlocked`). `Battle/GameInitializer` 폴백은 에디터·개발 빌드 + `EContentRunMode.Test` 전용
 - 아웃게임 성장값이 전투 스탯으로: `Core/Initialization/BattleGrowthBridgeStep` 이 `OutGame/Growth/CardGrowthManager.GrowthOf` 를 `Battle/GameInitializer.GrowthProvider` 에 주입한다(`GameInitializer.EnemyGrowthProvider` · `GameInitializer.BaseGrowthProvider` 도 같은 자리) — `Battle/` 은 `OutGame/` 을 직접 참조하지 않는다
 - 전투 결과가 랭크로: `Battle/TurnRunner` 가 `RankManager.ApplyBattleResult` 를 호출한다
-- 모험 정점이 대치 화면으로: `UI/Tournament/TournamentNodeView` 클릭 → `UI/Lobby/LobbyMatchLauncher.StartTournamentBattle` 이 `MatchProfile.OfTournamentNode` 로 고정 상대를 만들고 `LobbyMatchLauncher.RunEntryChainAsync` 에 프리셋으로 넘긴다 · 대치 연출 `UI/Match/MatchmakingShell.PlayVersusAsync` · 덱 화면 인계 `MatchmakingShell.PlayHandoffAsync` → `MatchDeckShell.PrepareForHandoff`. 랭크전은 같은 셸의 `MatchmakingShell.RunMatchAsync` 를 타고 덱 화면을 거치지 않는다
+- 모험 정점이 대치 화면으로: `UI/Adventure/AdventureNodeView` 클릭 → `UI/Lobby/LobbyMatchLauncher.StartAdventureBattle` 이 `MatchProfile.OfAdventureNode` 로 고정 상대를 만들고 `LobbyMatchLauncher.RunEntryChainAsync` 에 프리셋으로 넘긴다 · 대치 연출 `UI/Match/MatchmakingShell.PlayVersusAsync` · 덱 화면 인계 `MatchmakingShell.PlayHandoffAsync` → `MatchDeckShell.PrepareForHandoff`. 랭크전은 같은 셸의 `MatchmakingShell.RunMatchAsync` 를 타고 덱 화면을 거치지 않는다
 - 카드 소유 변경이 덱 편집 UI 로: `OutGame/Card/OwnershipManager.OnOwnershipChanged` 이벤트를 `UI/Deck/DeckEditController` 가 구독 · 편성 가능 필터는 `UI/Deck/DeckEditCollectionGrid` 가 `OwnershipManager.IsOwned` 로 건다
 - 재화 변동이 화면으로: 잔액의 진실원은 서버 지갑 문서다 — callable 응답의 `wallet` 을 `OutGame/Save/4.Cloud/ServerSaveCommands` 가 `WalletCloud.Adopt` 에 넘기고, 그것이 `CurrencyManager.Adopt` 로 메모리 잔액을 갈아끼운다. 클라에 잔액을 쓰는 경로는 없다
 - 전투 연출이 사운드로: `Battle/AttackSequence` 가 `Audio/SoundManager.Instance` 의 `SoundManager.PlayCinemaEnter` 를 부른다 · 사망은 `SoundManager.PlayDeath` · 타격은 `SoundManager.PlayHit`
@@ -36,7 +36,7 @@
 - 효과 훅 베이스: `BattleEffect` (`BattleEffect.OnLethal` / `BattleEffect.OnRemoved`) — 시너지·패시브가 여기 붙는다
 - 보드·대상: `BattleField` · `TargetFilter` · `BattleResultBeat` · 공격 튜닝 `NormalTuning` · `PeerlessTuning`
 - 규칙·판정: `BattleRules` · `ExecutionRule` · `BattleOverForecast` · `BattleFinisher` · `BattleCleanup`
-- AI 카드 레벨 배선: `GameInitializer.EnemyGrowthProvider` · `GameInitializer.BaseGrowthProvider` · `GameInitializer.GrowthAtLevelProvider` 를 `Core/InitializationInstaller` 가 주입한다 — 실제 레벨은 모험 정점 저작값(`TournamentNodeDef.aiCardLevel` · `TournamentRun.AiCardLevel`)일 때만 오르고 그 밖에는 `CardGrowth.BaseLevel` 고정이다(랭크 티어 곡선 축은 제거됨 · 배선 `Core/Initialization/BattleGrowthBridgeStep.EnemyCardLevel`), 스탯은 `CardGrowthManager.GrowthAtLevel` · `CardGrowth.BaseLevel`
+- AI 카드 레벨 배선: `GameInitializer.EnemyGrowthProvider` · `GameInitializer.BaseGrowthProvider` · `GameInitializer.GrowthAtLevelProvider` 를 `OutGame/Growth/BattleGrowthBridge` 가 주입한다(스텝은 `Core/Initialization/BattleGrowthBridgeStep`) — 실제 레벨은 모험 정점 값(서버 AdventureChapter.aiCardLevel 표 값 → `AdventureNodeSpec` → `AdventureRun.AiCardLevel`)일 때만 오르고 그 밖에는 `CardGrowth.BaseLevel` 고정이다(랭크 티어 곡선 축은 제거됨 · 배선 `Core/Initialization/BattleGrowthBridgeStep.EnemyCardLevel`), 스탯은 `CardGrowthManager.GrowthAtLevel` · `CardGrowth.BaseLevel`
 - 초기화·셔플: `GameInitializer` · `ShufflePolicy` · `MulliganPhase` · `MatchSeeding` · `MatchRandom` · `DeckConfig` · `AIDeckConfig` (`DeckEntry`)
 - 타이밍: `Battle/Timing/BattleTimingConfig` · `Battle/Timing/GameTiming` · `BattleTimings`
 - 사망·처형 연출: 길이 단일 지점 `Battle/Timing/BattleTimingConfig.DeathDuration` (내부 박자는 전부 이 값 안에서 끝난다) · 애니 `UI/Battle/CardAnimator.PlayDeathAnim` · 시퀀스 `AttackSequence.PlayVictimDeaths` · 처형 `ExecutionRule` · `ExecutionVfx` · 사운드 `Audio/SoundManager.PlayDeath` · 미리보기 플래그 `UI/Battle/BattleUxFlags.DeathPreview` · 사망 트리거 `SynergyTriggers.Lethal` · `SynergyTriggers.Removed`
@@ -76,7 +76,7 @@
 
 **진실원은 Firestore 문서**(`envs/{envId}/users/{uid}/save/current`) 하나다. 로컬 캐시도 오프라인 초기화도 없다 — 원격에 닿지 못하면 게임이 진행되지 않는다. 3계층 구조.
 
-- 도메인: `OutGame/Save/2.Domain/UserSaveData` (루트, `UserSaveData.VERSION`) 아래 `OwnershipSaveData` · `DeckSaveData` (`DeckSlotSaveData`) · `CardGrowthSaveData` (`CardGrowthEntry`) · `KeywordGrowthSaveData` · `RankSaveData` · `AlbumRewardSaveData` · `TutorialSaveData` · `TournamentSaveData` · `ProfileSaveData`
+- 도메인: `OutGame/Save/2.Domain/UserSaveData` (루트, `UserSaveData.VERSION`) 아래 `OwnershipSaveData` · `DeckSaveData` (`DeckSlotSaveData`) · `CardGrowthSaveData` (`CardGrowthEntry`) · `KeywordGrowthSaveData` · `RankSaveData` · `AlbumRewardSaveData` · `TutorialSaveData` · `AdventureSaveData` · `ProfileSaveData`
 - 매니저: `OutGame/Save/3.Manager/DataSaveManager` (`DataSaveManager.Save` / `DataSaveManager.SaveImmediate` / `DataSaveManager.Data` / `DataSaveManager.AdoptRemote` / `DataSaveManager.CreateSnapshot`) — 각 기능 매니저가 여기로 flush 한다. `DataSaveManager.Load` 는 없다(초기화 채택이 대신한다)
 - 서버 슬롯 채택 후 매니저 캐시 재수화: `OutGame/Save/3.Manager/ServerSlotRehydrator` — `DataSaveManager.OnServerSlotsAdopted` 의 유일한 구독자. `ESaveSlot` 비트별로 `OwnershipManager.Init` · `KeywordGrowthManager.Init` · `CardGrowthManager.Init` 를 초기화와 같은 순서로 다시 태운다(재화는 세이브 슬롯이 아니라 자기 채택 경로를 갖는다)
 - 클라우드: `OutGame/Save/4.Cloud/PlayerSaveCloud` (초기화 채택 · 디바운스 업로드의 단일 창구, `PlayerSaveCloud.IsGateComplete` · `PlayerSaveCloud.IsFreshAccount` · `PlayerSaveCloud.ShouldShowSyncBanner` · `PlayerSaveCloud.OnStateChanged`) · `PlayerSaveDocument` (`PlayerSaveDocument.ToFieldMap` / `PlayerSaveDocument.TryReadMeta`) · `PlayerSaveFirestorePaths` · `PlayerSaveFirebaseModule` · 상태 `EPlayerSaveCloudState`
@@ -128,13 +128,15 @@
 - 매칭 UI: `UI/Match/MatchmakingShell` (진입점 둘 — 랭크전 `MatchmakingShell.RunMatchAsync` · 모험 대치 `MatchmakingShell.PlayVersusAsync`, 프리팹은 MatchmakingRoot.prefab 하나) · `MatchDeckShell` · `MatchDeckStripController` · `MatchDeckPanelView` · `MatchProfileView` · 연출 `MatchDeckIntroFx` · `MatchHandoffFx` · `MatchmakingFx` · `MatchmakingEntryFx` · `MatchmakingBgFx` · `MatchHandoffTargets` · `UI/MainMenu/RandomMatchPanel` · `MultiplayerLobbyPanel`
 - 매치 연출 튜닝: 두 모드가 부품 한 벌을 공유하고 저작값 14개만 갈아끼운다 — `MatchmakingFx.ClashTuning` · `MatchmakingEntryFx.EntranceTuning` · `MatchmakingBgFx.SeamTuning` (각 부품에 `Capture*` / `Apply*` 짝). 랭크전 값은 프리팹 저작을 `Awake` 가 캡처하고, 대치 값은 셸의 `versusIntro*` 필드다
 
-## 모험 (`OutGame/Tournament/`, `UI/Tournament/`)
+## 모험 (`OutGame/Adventure/`, `UI/Adventure/`)
 
-- 진행도 단일 창구: `TournamentProgress` (정점 해금 판정 · 클리어 지급 · 낙인, `TournamentProgress.OnChanged` 로 맵 갱신 통지)
-- 데이터: `TournamentConfig` · `TournamentNodeDef` · `ETournamentNodeState` · 검증 `TournamentValidator`
-- 전투 연결: `Battle/TournamentRun` · 결과 전달 `TournamentResultHandoff`
-- 저장: `OutGame/Save/2.Domain/TournamentSaveData`
-- UI: `UI/Tournament/TournamentMapOverlayView` · `TournamentNodeView` · `TournamentRewardFlow` · `TournamentReturnFlow`
+- 진행도 단일 창구: `AdventureProgress` (정점 해금 판정 · 클리어 지급 · 낙인, `AdventureProgress.OnChanged` 로 맵 갱신 통지)
+- 데이터: `AdventureConfig` · `AdventureNodeDef` · `EAdventureNodeState` · 검증 `AdventureValidator`
+- 전투 수치의 진실원은 **서버 AdventureChapter 표**(aiDeckId · aiCardLevel)다 — `AdventureNodeSpec.TryValidateRequired`(`SpecSheetPreloadStep`)로 검사하고 `AdventureNodeSpec.TryBuildRuntime`(`OutgameConfigStep`)이 SO 사본에 덮어 `AdventureProgress.SetConfig` 로 넘긴다(RankGradeSpec 과 같은 패턴 · 행이 없으면 폴백 없이 초기화 실패). SO 는 표현과 업로드 키 `AdventureNodeDef.aiDeckId` 만 든다 · 카드 목록은 `Battle/AIDeckSpec.TryGetDeck` 이 AIDeck 표에서
+- 서버 표를 만드는 쪽은 `Editor/SpecFirestoreUploader.UploadAdventureChapters` — `aiDeckId` 미저작이면 업로드가 중단된다(빈 채로 올라가면 전 유저 초기화가 막힌다)
+- 전투 연결: `Battle/AdventureRun` · 결과 전달 `AdventureResultHandoff`
+- 저장: `OutGame/Save/2.Domain/AdventureSaveData`
+- UI: `UI/Adventure/AdventureMapOverlayView` · `AdventureNodeView` · `AdventureRewardFlow` · `AdventureReturnFlow`
 
 ## 튜토리얼 (`OutGame/Tutorial/`, `UI/Tutorial/`)
 
@@ -168,7 +170,7 @@
 
 ## 초기화·코어·유틸
 
-- 기동: `Core/InitializationInstaller` · `Core/GameInitialization` (`EGameInitState`) · `Core/GameManager` · `EContentRunMode` · `Core/ContentProfileConfig` · `Core/Rendering/ScreenBlurFeature`
+- 기동: `Core/Initialization/InitializationRunner` (스텝 목록이 순서를 정한다 · 재시도는 `MainInitializer.RetryEntry` 저작 스텝부터) · `Core/Initialization/MainInitializer` · `Core/GameInitialization` (`EGameInitState`) · `Core/GameManager` · `EContentRunMode` · `Core/ContentProfileConfig` · `Core/Rendering/ScreenBlurFeature`
 - 데이터·풀: `Utils/DataLibrary` · `ObjectPooler` · `ParticlePooler` · `PooledParticle` · `LogUtil` · `CameraUtil` · `KoreanText` · `EdgeShadeSprite` · `ShineBandSprite`
 - 사운드: `Audio/SoundManager` · `SoundConfig` · `UIClickSound`
 - 디버그: `OutGame/Debug/OutgameDebugOverlay` · `OutgameDebugActions` · `UI/Debug/DebugCurrencyButton` · `UnlockAllCardsButton` · `Test/BattleDebugKill` · `Test/VfxDebugWindow` (`VfxSlot`) · `Test/AttackAnimTester` (`AttackStep`) · `SynergyPreviewKind` · `KeywordPreviewKind`

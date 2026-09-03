@@ -10,16 +10,16 @@ using UnityEngine;
 public static partial class SpecFirestoreUploader
 {
     /// <summary>모험 구성 표 이름(챕터 → 정점).</summary>
-    public const string TOURNAMENT_CHAPTER_TABLE = "TournamentChapter";
+    public const string ADVENTURE_CHAPTER_TABLE = "AdventureChapter";
 
-    // 서버 tournamentTable.MAX_NODE_ID_LENGTH 와 같은 값이어야 한다 — 넘는 키는 서버 정제가
+    // 서버 adventureTable.MAX_NODE_ID_LENGTH 와 같은 값이어야 한다 — 넘는 키는 서버 정제가
     // 조용히 버려서, 그 정점이 clearedNodeIds 에 있으면 슬롯 전체 쓰기가 기록을 지운다.
-    const int MAX_TOURNAMENT_ID_LENGTH = 64;
+    const int MAX_ADVENTURE_ID_LENGTH = 64;
 
     // 열 순서 = 필드 선언 순서다(TryBuildSnapshotFrom이 GetFields로 읽는다). 첫 열은 반드시 int id.
     // id는 순회 위치에서 파생하는 일련번호라 안정 키가 아니다 — 소비는 blob payload뿐이고
     // rows/{id} 문서 경로를 참조 키로 쓰면 앞에 행 하나만 끼워도 가리키는 대상이 바뀐다
-    sealed class TournamentChapterRow
+    sealed class AdventureChapterRow
     {
         public int id;
         public string chapterId;
@@ -27,18 +27,20 @@ public static partial class SpecFirestoreUploader
         public int order;
         public string prevNodeId;
         public long requiredPoints;
+        public string aiDeckId;
+        public int aiCardLevel;
     }
 
-    /// <summary>TournamentConfig 저작을 TournamentChapter 표로 올린다. 성공하면 보고 줄을, 실패하면 null과 _error를 준다.</summary>
-    public static string UploadTournamentChapters(string _envId, out string _error)
+    /// <summary>AdventureConfig 저작을 AdventureChapter 표로 올린다. 성공하면 보고 줄을, 실패하면 null과 _error를 준다.</summary>
+    public static string UploadAdventureChapters(string _envId, out string _error)
     {
         if (!TryBeginCompositionUpload(out string t_projectId, out string t_apiKey, out _error)) return null;
-        if (!TryLoadAuthoringAsset<TournamentConfig>(out TournamentConfig t_config, out _error)) return null;
+        if (!TryLoadAuthoringAsset<AdventureConfig>(out AdventureConfig t_config, out _error)) return null;
         if (!TryLoadAuthoringAsset<RankConfig>(out RankConfig t_rankConfig, out _error)) return null;
-        if (!TryBuildTournamentChapterRows(t_config, t_rankConfig, out List<TournamentChapterRow> t_rows, out _error)) return null;
-        if (!TryBuildSnapshotFrom(t_rows, TOURNAMENT_CHAPTER_TABLE, out TableSnapshot t_snapshot, out _error)) return null;
+        if (!TryBuildAdventureChapterRows(t_config, t_rankConfig, out List<AdventureChapterRow> t_rows, out _error)) return null;
+        if (!TryBuildSnapshotFrom(t_rows, ADVENTURE_CHAPTER_TABLE, out TableSnapshot t_snapshot, out _error)) return null;
 
-        return UploadSnapshot(t_projectId, t_apiKey, _envId, TOURNAMENT_CHAPTER_TABLE, t_snapshot, out _error);
+        return UploadSnapshot(t_projectId, t_apiKey, _envId, ADVENTURE_CHAPTER_TABLE, t_snapshot, out _error);
     }
 
     // 자격·설정을 SpecData 업로드와 같은 순서로 본다 — 준비를 다 하고 첫 요청에서 403으로 죽지 않게 먼저 막는다
@@ -150,11 +152,11 @@ public static partial class SpecFirestoreUploader
         return true;
     }
 
-    static bool TryBuildTournamentChapterRows(
-        TournamentConfig _config, RankConfig _rankConfig,
-        out List<TournamentChapterRow> _rows, out string _error)
+    static bool TryBuildAdventureChapterRows(
+        AdventureConfig _config, RankConfig _rankConfig,
+        out List<AdventureChapterRow> _rows, out string _error)
     {
-        _rows = new List<TournamentChapterRow>();
+        _rows = new List<AdventureChapterRow>();
 
         if (!TryBuildGradeEntryPoints(_rankConfig, out Dictionary<ERankGrade, long> t_entryPoints, out _error))
             return false;
@@ -166,10 +168,10 @@ public static partial class SpecFirestoreUploader
         // 사슬은 챕터 경계를 넘는다 — 클라 StateOf 가 평탄 인덱스로 직전 하나만 보기 때문이다.
         string t_prevNodeId = string.Empty;
 
-        IReadOnlyList<TournamentChapterDef> t_chapters = _config.Chapters;
+        IReadOnlyList<AdventureChapterDef> t_chapters = _config.Chapters;
         for (int t_c = 0; t_c < t_chapters.Count; t_c++)
         {
-            TournamentChapterDef t_chapter = t_chapters[t_c];
+            AdventureChapterDef t_chapter = t_chapters[t_c];
             if (!t_chapter.HasStableKey)
             {
                 _error = $"chapterId 미저작 챕터(index {t_c}, '{t_chapter.title}') — 서버가 식별할 키가 없다.";
@@ -182,9 +184,9 @@ public static partial class SpecFirestoreUploader
                 return false;
             }
 
-            if (t_chapter.chapterId.Length > MAX_TOURNAMENT_ID_LENGTH)
+            if (t_chapter.chapterId.Length > MAX_ADVENTURE_ID_LENGTH)
             {
-                _error = $"chapterId '{t_chapter.chapterId}' 가 {MAX_TOURNAMENT_ID_LENGTH}자를 넘는다 — " +
+                _error = $"chapterId '{t_chapter.chapterId}' 가 {MAX_ADVENTURE_ID_LENGTH}자를 넘는다 — " +
                          "서버 정제가 이 키를 버려 완주 수령이 막힌다.";
                 return false;
             }
@@ -205,7 +207,7 @@ public static partial class SpecFirestoreUploader
 
             for (int t_n = 0; t_n < t_nodeCount; t_n++)
             {
-                TournamentNodeDef t_node = t_chapter.nodes[t_n];
+                AdventureNodeDef t_node = t_chapter.nodes[t_n];
                 if (!t_node.HasStableKey)
                 {
                     _error = $"nodeId 미저작 정점(챕터 '{t_chapter.chapterId}' index {t_n}) — 서버가 식별할 키가 없다.";
@@ -218,14 +220,23 @@ public static partial class SpecFirestoreUploader
                     return false;
                 }
 
-                if (t_node.nodeId.Length > MAX_TOURNAMENT_ID_LENGTH)
+                if (t_node.nodeId.Length > MAX_ADVENTURE_ID_LENGTH)
                 {
-                    _error = $"nodeId '{t_node.nodeId}' 가 {MAX_TOURNAMENT_ID_LENGTH}자를 넘는다 — " +
+                    _error = $"nodeId '{t_node.nodeId}' 가 {MAX_ADVENTURE_ID_LENGTH}자를 넘는다 — " +
                              "서버 정제가 이 키를 버려 격파 신고가 막히고 클리어 기록도 지워진다.";
                     return false;
                 }
 
-                _rows.Add(new TournamentChapterRow
+                // 전투 수치는 이 표가 진실원이다(AdventureNodeSpec 이 여기서 읽어 런타임 설정을 만든다).
+                // 빼먹고 올리면 다음 초기화에서 전 유저가 복구 화면에 갇힌다 — 그래서 업로드를 막는다.
+                if (!t_node.HasAiDeckKey)
+                {
+                    _error = $"aiDeckId 미저작 정점 '{t_node.nodeId}' — 서버 표에 상대 덱 키가 비면 " +
+                             "클라 초기화가 이 표를 거부한다(AdventureNodeSpec). AIDeck 표의 덱 키를 저작할 것.";
+                    return false;
+                }
+
+                _rows.Add(new AdventureChapterRow
                 {
                     id = t_nextId++,
                     chapterId = t_chapter.chapterId,
@@ -233,6 +244,8 @@ public static partial class SpecFirestoreUploader
                     order = t_n,
                     prevNodeId = t_prevNodeId,
                     requiredPoints = t_requiredPoints,
+                    aiDeckId = t_node.aiDeckId,
+                    aiCardLevel = t_node.AiCardLevelOrBase,
                 });
 
                 t_prevNodeId = t_node.nodeId;

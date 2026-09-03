@@ -121,16 +121,16 @@ public readonly struct TutorialAnchorMeta
         // 23 UI/Growth/KeywordGrowthPanel.cs:335(패널이 열려 있는 동안만). 잠금 없음
         new(A.KeywordGrowthUpgradeButton, F.None,               "키워드 강화 패널",       "UI/Growth/KeywordGrowthPanel.cs:335"),
 
-        // 24 Tab_Match.prefab의 TournamentBtn(2563422757509691373)에 key: 24.
-        //    잠금은 프리팹 저작이 아니라 UI/Lobby/LobbyMatchTabPanel.cs의 Awake가 FeatureLockView.Attach(Tournament)로 건다
-        new(A.TournamentButton,           F.Tournament,         "로비/배틀 탭",          "Assets/Assets/Prefabs/UI/LobbyUI/Tabs/Tab_Match.prefab"),
+        // 24 Tab_Match.prefab의 AdventureBtn(2563422757509691373)에 key: 24.
+        //    잠금은 프리팹 저작이 아니라 UI/Lobby/LobbyMatchTabPanel.cs의 Awake가 FeatureLockView.Attach(Adventure)로 건다
+        new(A.AdventureButton,           F.Adventure,         "로비/배틀 탭",          "Assets/Assets/Prefabs/UI/LobbyUI/Tabs/Tab_Match.prefab"),
 
         // 25 UI/Deck/DeckEditCollectionGrid.cs가 anchorCard로 지목된 카드 타일에만 등록(해제는 Clear). 잠금 없음
         new(A.DeckEditCollectionCard,     F.None,               "덱 편집(컬렉션 격자)",    "UI/Deck/DeckEditCollectionGrid.cs"),
 
-        // 26 UI/Tournament/TournamentMapOverlayView.cs가 지금 도전할 정점 하나에만 등록(정점은 런타임 생성).
-        //    잠금은 로비의 모험 버튼(앵커 24)과 같은 Tournament 기능이 쥔다 — 잠겨 있으면 이 화면에 닿지 못한다
-        new(A.TournamentNode,             F.Tournament,         "모험 지도",         "UI/Tournament/TournamentMapOverlayView.cs"),
+        // 26 UI/Adventure/AdventureMapOverlayView.cs가 지금 도전할 정점 하나에만 등록(정점은 런타임 생성).
+        //    잠금은 로비의 모험 버튼(앵커 24)과 같은 Adventure 기능이 쥔다 — 잠겨 있으면 이 화면에 닿지 못한다
+        new(A.AdventureNode,             F.Adventure,         "모험 지도",         "UI/Adventure/AdventureMapOverlayView.cs"),
 
         // 27 MatchDeckPanel.prefab의 덱 파워 배지. 잠금 없음
         new(A.MatchDeckPowerBadge,        F.None,               "매치 덱 화면",          "Assets/Assets/Prefabs/UI/MatchUI/MatchDeckPanel.prefab"),

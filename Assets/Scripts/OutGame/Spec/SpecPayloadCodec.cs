@@ -20,7 +20,7 @@ public static class SpecPayloadCodec
     public const int SchemaVersion = ContentVersion.Major;
     public static readonly string[] TableNames =
     {
-        "Card", "Card_Test", "CardPack", "CardPackDrop", "AIDeck", "Reward",
+        "Card", "CardPack", "CardPackDrop", "AIDeck", "Reward",
         "RankGrade", "KeywordEnhance", "CardEnhance", "CardEnhanceRule", "CardLimitBreak",
         "AlbumEntry", "AlbumThemeInfo",
         "SynergyDef", "SynergyTierDef", "SynergyEffectDef",
@@ -256,7 +256,7 @@ public static class SpecPayloadCodec
 
     static Type RowTypeOf(string _table) => _table switch
     {
-        "Card" => typeof(Card), "Card_Test" => typeof(Card_Test), "CardPack" => typeof(CardPack),
+        "Card" => typeof(Card), "CardPack" => typeof(CardPack),
         "CardPackDrop" => typeof(CardPackDrop), "AIDeck" => typeof(AIDeck), "Reward" => typeof(Reward),
         "RankGrade" => typeof(RankGrade), "KeywordEnhance" => typeof(KeywordEnhance),
         "CardEnhance" => typeof(CardEnhance), "CardEnhanceRule" => typeof(CardEnhanceRule),

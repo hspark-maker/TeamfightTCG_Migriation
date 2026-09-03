@@ -44,12 +44,12 @@ const packSpecReader_1 = require("../packs/packSpecReader");
 const payout_1 = require("../payout");
 const rewardTable_1 = require("../rewardTable");
 const completionTable_1 = require("../completionTable");
-const tournamentTable_1 = require("../tournamentTable");
+const adventureTable_1 = require("../adventureTable");
 const packSlots_1 = require("../packs/packSlots");
 const wallet_1 = require("../currency/wallet");
 const walletStore_1 = require("../currency/walletStore");
 /** 소유자 키 하나의 최대 길이. 저작 키는 node_01 · p:Theme_Nature/P1 처럼 짧다. */
-const MAX_OWNER_ID_LENGTH = tournamentTable_1.MAX_NODE_ID_LENGTH;
+const MAX_OWNER_ID_LENGTH = adventureTable_1.MAX_NODE_ID_LENGTH;
 /**
  * 도메인 거절. 던지기와 로그는 save/domainReject 한 곳이고, 여기 남은 것은 사유 오타를 막는 타입 관문이다.
  * @param {ClaimReject} reason 사유 코드
@@ -65,8 +65,8 @@ function reject(reason, message, context) {
  * @param {unknown} value 문서의 리스트 값
  * @return {string[]} 정리된 키 목록
  */
-// 정제 규약은 tournamentTable 이 소유한다 — 상한을 한쪽만 고치면 갈린다.
-const readIdList = tournamentTable_1.readNodeIdList;
+// 정제 규약은 adventureTable 이 소유한다 — 상한을 한쪽만 고치면 갈린다.
+const readIdList = adventureTable_1.readNodeIdList;
 /**
  * 수령한 티어 목록. 티어 범위 밖 값을 걸러 낸다. 룰 상한(MAX_CLAIMED_TIERS)은 여기가 아니라
  * 쓰기 직전 appendClaimedTier 가 건다 — 읽기에서 잘라 내면 낙인이 조용히 사라진다.
@@ -145,11 +145,11 @@ async function loadAlbumThemes(context) {
  * @return {Promise<ChapterNodeRow[]>} 대응 목록
  */
 async function loadChapterNodes(context) {
-    const rows = await (0, packSpecReader_1.readSpecRows)(context.env, "TournamentChapter");
-    const entries = (0, tournamentTable_1.parseChapterNodeRows)(rows);
+    const rows = await (0, packSpecReader_1.readSpecRows)(context.env, "AdventureChapter");
+    const entries = (0, adventureTable_1.parseChapterNodeRows)(rows);
     if (entries.length === 0) {
-        logger.error("TournamentChapter spec is empty or unreadable", { ...context, rowCount: rows.length });
-        reject("NotEligible", "Tournament chapter spec is unreadable.", { ...context, specRowCount: rows.length });
+        logger.error("AdventureChapter spec is empty or unreadable", { ...context, rowCount: rows.length });
+        reject("NotEligible", "Adventure chapter spec is unreadable.", { ...context, specRowCount: rows.length });
     }
     return entries;
 }
@@ -193,38 +193,38 @@ function claimRankTier(current, tier, required, tierCount, context) {
 }
 /**
  * 정점 수령 — 이 도메인은 "수령 = 클리어 확정"이라 낙인이 clearedNodeIds 하나다(별도 claimed 목록이 없다).
- * 해금 사슬은 여기서 재지 않는다 — reportTournamentWin 이 낙인을 세울 때 이미 쟀고,
+ * 해금 사슬은 여기서 재지 않는다 — reportAdventureWin 이 낙인을 세울 때 이미 쟀고,
  * 여기서 다시 재면 같은 판정이 두 곳에 생긴다. 이 자리가 보는 것은 그 낙인의 존재다.
  * 지급·클리어 낙인·미수령 해제가 한 트랜잭션이어야 지급됐는데 선물이 남는 상태가 저장되지 않는다.
  * @param {Record<string, unknown>} current 현재 문서
  * @param {ChapterNodeRow[]} chapterRows 챕터↔정점 대응 표
  * @param {ClaimContext} context 요청 맥락
- * @return {object} tournament 슬롯 전체 값
+ * @return {object} adventure 슬롯 전체 값
  */
-function claimTournamentNode(current, chapterRows, context) {
-    const tournament = current.tournament;
-    const cleared = readIdList(tournament?.clearedNodeIds);
-    const pending = typeof tournament?.pendingRewardNodeId === "string" ? tournament.pendingRewardNodeId : "";
+function claimAdventureNode(current, chapterRows, context) {
+    const adventure = current.adventure;
+    const cleared = readIdList(adventure?.clearedNodeIds);
+    const pending = typeof adventure?.pendingRewardNodeId === "string" ? adventure.pendingRewardNodeId : "";
     if (cleared.includes(context.ownerId)) {
-        reject("AlreadyClaimed", `Tournament node '${context.ownerId}' is already cleared.`, { ...context, pending });
+        reject("AlreadyClaimed", `Adventure node '${context.ownerId}' is already cleared.`, { ...context, pending });
     }
     if (pending !== context.ownerId) {
-        reject("NotEligible", `Tournament node '${context.ownerId}' has no pending reward.`, { ...context, pending });
+        reject("NotEligible", `Adventure node '${context.ownerId}' has no pending reward.`, { ...context, pending });
     }
-    // 낙인이 표 밖 정점을 가리키면 거절한다 — 해금 판정이 서버로 오기 전(reportTournamentWin 이전)
+    // 낙인이 표 밖 정점을 가리키면 거절한다 — 해금 판정이 서버로 오기 전(reportAdventureWin 이전)
     // 클라가 스스로 찍어 둔 임의 낙인이 그대로 수령되는 창구를 막는다.
-    if (!(0, tournamentTable_1.hasNode)(chapterRows, context.ownerId)) {
-        reject("NotEligible", `Tournament node '${context.ownerId}' is not in the chapter spec.`, { ...context, pending, specRowCount: chapterRows.length });
+    if (!(0, adventureTable_1.hasNode)(chapterRows, context.ownerId)) {
+        reject("NotEligible", `Adventure node '${context.ownerId}' is not in the chapter spec.`, { ...context, pending, specRowCount: chapterRows.length });
     }
     return {
         clearedNodeIds: [...cleared, context.ownerId],
         // 챕터 낙인은 이 명령의 소관이 아니다 — 슬롯 전체 값을 쓰므로 그대로 실어 보내야 지워지지 않는다.
-        claimedChapterIds: readIdList(tournament?.claimedChapterIds),
+        claimedChapterIds: readIdList(adventure?.claimedChapterIds),
         pendingRewardNodeId: "",
     };
 }
 /**
- * 챕터 완주 수령 — 낙인은 claimedChapterIds 다. tournament 슬롯 **전체 값**을 돌려준다.
+ * 챕터 완주 수령 — 낙인은 claimedChapterIds 다. adventure 슬롯 **전체 값**을 돌려준다.
  *
  * 정점 진행(clearedNodeIds)과 미수령 정점(pendingRewardNodeId)은 이 명령의 소관이 아니지만
  * 슬롯 단위 덮어쓰기라 그대로 실어 보내야 지워지지 않는다 — 특히 pendingRewardNodeId 는
@@ -232,24 +232,24 @@ function claimTournamentNode(current, chapterRows, context) {
  * @param {Record<string, unknown>} current 현재 문서
  * @param {ChapterNodeRow[]} chapterRows 챕터↔정점 대응 표
  * @param {ClaimContext} context 요청 맥락
- * @return {object} tournament 슬롯 전체 값
+ * @return {object} adventure 슬롯 전체 값
  */
-function claimTournamentChapter(current, chapterRows, context) {
-    const tournament = current.tournament;
-    const claimedChapters = readIdList(tournament?.claimedChapterIds);
+function claimAdventureChapter(current, chapterRows, context) {
+    const adventure = current.adventure;
+    const claimedChapters = readIdList(adventure?.claimedChapterIds);
     // Claimed 검사가 완주 검사보다 먼저다 — 저작에서 정점이 늘어 완주가 풀려도 기수령은 유지된다.
     if (claimedChapters.includes(context.ownerId)) {
-        reject("AlreadyClaimed", `Tournament chapter '${context.ownerId}' is already claimed.`, { ...context });
+        reject("AlreadyClaimed", `Adventure chapter '${context.ownerId}' is already claimed.`, { ...context });
     }
-    const required = (0, tournamentTable_1.chapterNodeIds)(chapterRows, context.ownerId);
-    const cleared = readIdList(tournament?.clearedNodeIds);
+    const required = (0, adventureTable_1.chapterNodeIds)(chapterRows, context.ownerId);
+    const cleared = readIdList(adventure?.clearedNodeIds);
     if (!(0, completionTable_1.isCompleted)(required, new Set(cleared))) {
-        reject("NotEligible", `Tournament chapter '${context.ownerId}' is not complete.`, { ...context, requiredCount: required.length, missingCount: (0, completionTable_1.missingCount)(required, new Set(cleared)) });
+        reject("NotEligible", `Adventure chapter '${context.ownerId}' is not complete.`, { ...context, requiredCount: required.length, missingCount: (0, completionTable_1.missingCount)(required, new Set(cleared)) });
     }
     return {
         clearedNodeIds: cleared,
         claimedChapterIds: [...claimedChapters, context.ownerId],
-        pendingRewardNodeId: typeof tournament?.pendingRewardNodeId === "string" ? tournament.pendingRewardNodeId : "",
+        pendingRewardNodeId: typeof adventure?.pendingRewardNodeId === "string" ? adventure.pendingRewardNodeId : "",
     };
 }
 /**
@@ -281,8 +281,8 @@ function claimAlbumReward(current, entryRows, themeRows, context) {
 /**
  * 정적 보상 수령. 자격 판정·지급·낙인을 서버가 소유한다.
  *
- * 범위는 네 갈래다 — 랭크 티어 · 토너먼트 정점 · 토너먼트 챕터 완주 · 도감 완성.
- * 판정 근거는 전부 스펙 표에 있고(RankGrade · TournamentChapter · AlbumEntry · AlbumThemeInfo) 표가 비면
+ * 범위는 네 갈래다 — 랭크 티어 · 모험 정점 · 모험 챕터 완주 · 도감 완성.
+ * 판정 근거는 전부 스펙 표에 있고(RankGrade · AdventureChapter · AlbumEntry · AlbumThemeInfo) 표가 비면
  * fail-closed 로 거절한다. 지급은 지갑 문서로 나가고 세이브에는 낙인 슬롯만 남는다.
  */
 exports.claimReward = (0, https_1.onCall)(async (request) => {
@@ -293,14 +293,14 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
     if (!(0, saveDocument_1.isKnownEnv)(env)) {
         throw new https_1.HttpsError("invalid-argument", `Unknown env: ${env}`);
     }
-    if (ownerType !== "Rank" && ownerType !== "Tournament" && ownerType !== "Album") {
-        throw new https_1.HttpsError("invalid-argument", `ownerType must be Rank, Tournament or Album, got '${ownerType}'.`);
+    if (ownerType !== "Rank" && ownerType !== "Adventure" && ownerType !== "Album") {
+        throw new https_1.HttpsError("invalid-argument", `ownerType must be Rank, Adventure or Album, got '${ownerType}'.`);
     }
     if (ownerId.length === 0 || ownerId.length > MAX_OWNER_ID_LENGTH) {
         throw new https_1.HttpsError("invalid-argument", "ownerId must be a non-empty string.");
     }
     const context = { uid, env, ownerType, ownerId };
-    const isChapter = ownerType === "Tournament" && (0, rewardTable_1.isChapterOwnerId)(ownerId);
+    const isChapter = ownerType === "Adventure" && (0, rewardTable_1.isChapterOwnerId)(ownerId);
     // 스펙 읽기는 트랜잭션 밖이다 — 유저 문서와 무관하고, 재실행마다 다시 읽으면 비용만 는다.
     let tierIndex = -1;
     let tierCount = 0;
@@ -326,7 +326,7 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
         albumEntries = await loadAlbumEntries(context);
         albumThemes = await loadAlbumThemes(context);
     }
-    else if (ownerType === "Tournament") {
+    else if (ownerType === "Adventure") {
         // 챕터뿐 아니라 정점 수령도 읽는다 — 낙인이 표에 없는 정점을 가리키는지 대조하는 데 쓴다.
         chapterNodes = await loadChapterNodes(context);
     }
@@ -342,7 +342,7 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
     if (!judgement.allow) {
         if (judgement.specEmpty) {
             // 표를 통째로 못 읽은 것은 저작이 없는 것과 다르다 — 배포/업로드 사고이고 유저 잘못이 아니다.
-            // 여기서 토너먼트를 통과시키면 클리어 낙인만 남고 재수령이 AlreadyClaimed 로 막혀 보상을 영영 못 받는다.
+            // 여기서 모험를 통과시키면 클리어 낙인만 남고 재수령이 AlreadyClaimed 로 막혀 보상을 영영 못 받는다.
             logger.error("Reward spec is empty — refusing every claim until it is uploaded", { ...context, specOwnerId, specRowCount: rewardRows.length });
         }
         reject(judgement.reason, judgement.specEmpty ?
@@ -377,9 +377,9 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
             };
         }
         if (isChapter) {
-            return { slots: { tournament: claimTournamentChapter(current, chapterNodes, context) }, wallet: paid };
+            return { slots: { adventure: claimAdventureChapter(current, chapterNodes, context) }, wallet: paid };
         }
-        return { slots: { tournament: claimTournamentNode(current, chapterNodes, context) }, wallet: paid };
+        return { slots: { adventure: claimAdventureNode(current, chapterNodes, context) }, wallet: paid };
     }, (adopted) => {
         replayed = false;
         return { ...adopted, granted: gains };

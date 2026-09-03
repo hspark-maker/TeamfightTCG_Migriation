@@ -8,9 +8,8 @@ import {
   STARTER_PACK_ID,
 } from "./starterPool";
 
-/** 카드 카탈로그가 될 수 있는 표. 클라 SpecSource 가 ContentProfile 의 RunMode 로 하나를 고르는데,
- * 서버는 그 선택을 알 수 없어 합집합으로 본다 — 여기서 걸러야 할 것은 "어느 표에도 없는 카드"다. */
-const CARD_TABLES = ["Card", "Card_Test"];
+/** 카드 카탈로그 표. 클라·서버 모두 Card 하나만 읽는다(Card_Test 표는 폐기). */
+const CARD_TABLES = ["Card"];
 
 /** 스타터 카드가 어디서 나왔는가. 로그·응답에 실어 사후에 갈래를 판별한다. */
 export type StarterSource = "spec" | "fallback" | "specError";
