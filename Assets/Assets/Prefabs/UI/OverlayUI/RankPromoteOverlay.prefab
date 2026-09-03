@@ -4844,7 +4844,7 @@ ParticleSystemRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 6b6a29821790e484fb33e0e455a649fe, type: 2}
+  - {fileID: 2100000, guid: d5abe74e29ca4f24a9158cccd678ef47, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -5468,6 +5468,12 @@ MonoBehaviour:
   - {r: 0.9490196, g: 0.75686276, b: 0.30588236, a: 1}
   - {r: 0.49803922, g: 0.83137256, b: 0.75686276, a: 1}
   - {r: 0.56078434, g: 0.76862746, b: 0.9607843, a: 1}
+  gradeParticles:
+  - {fileID: 1422907604488482406}
+  - {fileID: 2306201549820298034}
+  - {fileID: 5574218412865241027}
+  - {fileID: 5496828468097607545}
+  - {fileID: 1374811933046138795}
   titleGradeUp: "\uC2B9\uAE09\uC804 \uC2B9\uB9AC!"
   titleFirstEntry: "\uB7AD\uD06C \uBC30\uC815"
   transition:
@@ -10487,7 +10493,7 @@ ParticleSystemRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 6b6a29821790e484fb33e0e455a649fe, type: 2}
+  - {fileID: 2100000, guid: d5abe74e29ca4f24a9158cccd678ef47, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -15460,7 +15466,7 @@ ParticleSystemRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 6b6a29821790e484fb33e0e455a649fe, type: 2}
+  - {fileID: 2100000, guid: d5abe74e29ca4f24a9158cccd678ef47, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -20489,7 +20495,7 @@ ParticleSystemRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2466282667599290096}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -25387,7 +25393,7 @@ ParticleSystemRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2735004704672960921}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -25405,7 +25411,7 @@ ParticleSystemRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 6b6a29821790e484fb33e0e455a649fe, type: 2}
+  - {fileID: 2100000, guid: d5abe74e29ca4f24a9158cccd678ef47, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -70437,7 +70443,7 @@ ParticleSystemRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8629156555919813357}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -75353,7 +75359,7 @@ ParticleSystemRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 6b6a29821790e484fb33e0e455a649fe, type: 2}
+  - {fileID: 2100000, guid: d5abe74e29ca4f24a9158cccd678ef47, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
