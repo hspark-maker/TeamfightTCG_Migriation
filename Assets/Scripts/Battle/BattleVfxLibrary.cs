@@ -18,7 +18,8 @@ public enum BattleVfxId
     PeerlessSwing    = 8,   // 무쌍 연출의 휘두름(공격자 앞에서 대상 쪽으로). 베기와 짝 — 벨 때마다 같이 난다
     ExecutionSpark   = 9,   // (사용 안 함) 처형 발동의 스파크 — 마법진(ExecutionCircle)만 남겼다. 값은 재사용 금지.
     ExecutionCircle  = 10,  // 처형 발동: 처형자 카드 자리에 한 번
-    CunningFog       = 11,  // 교활 퇴장: 카드가 덱으로 돌아가기 직전 자리에 깔리는 안개
+    CunningFog       = 11,  // 덱과 카드가 오가는 자리에 깔리는 안개. 교활 퇴장(덱으로 돌아감)과
+                            // **모든 등장**(덱에서 나와 중앙에 섬, CardAppearSequence.PlayMidArrival)이 함께 쓴다.
     // 12·13은 (사용 안 함) 시너지 고유 연출이라 그 시너지의 SynergyVfxConfig로 옮겼다 —
     // 여기 남기면 시너지가 늘 때마다 이 enum이 같이 늘고, 값은 직렬화라 되돌릴 수도 없다.
     // 값 자체는 재사용 금지(기존 에셋에 남아 있을 수 있다).

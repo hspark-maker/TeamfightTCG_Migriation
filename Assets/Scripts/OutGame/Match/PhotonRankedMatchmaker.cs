@@ -101,12 +101,14 @@ public sealed class PhotonRankedMatchmaker : IMatchmaker
         NetworkSession _session, MatchmakingProfile _localProfile, CancellationToken _ct)
     {
         float t_startedAt = Time.realtimeSinceStartup;
+        // 총 시간은 탐색 시작에서 한 번만 뽑는다 — 판정마다 다시 뽑으면 같은 탐색 안에서 기준이 흔들린다.
+        MatchmakingWindow t_policy = MatchmakingPolicy.Roll();
         string t_myLastRoom = null;   // 내가 만들고 내린 방. 목록에 잠시 남아 스스로를 후보로 집는 걸 막는다.
 
         while (!_ct.IsCancellationRequested)
         {
             float t_elapsed = Time.realtimeSinceStartup - t_startedAt;
-            if (t_elapsed >= MatchmakingPolicy.SearchSeconds)
+            if (t_elapsed >= t_policy.SearchSeconds)
                 return (EOutcome.NoOpponent, null);
 
             if (!await _session.JoinRankedLobby())
@@ -127,7 +129,7 @@ public sealed class PhotonRankedMatchmaker : IMatchmaker
             }
 
             t_elapsed = Time.realtimeSinceStartup - t_startedAt;
-            int t_window = MatchmakingPolicy.TierWindow(t_elapsed);
+            int t_window = t_policy.TierWindow(t_elapsed);
             List<(SessionInfo session, MatchmakingProfile profile)> t_candidates =
                 CollectCandidates(_session, _localProfile.TierIndex, t_window, t_myLastRoom);
 
@@ -141,7 +143,7 @@ public sealed class PhotonRankedMatchmaker : IMatchmaker
                 if (t_canceled) return (EOutcome.Canceled, null);
 
                 t_elapsed = Time.realtimeSinceStartup - t_startedAt;
-                t_window = MatchmakingPolicy.TierWindow(t_elapsed);
+                t_window = t_policy.TierWindow(t_elapsed);
                 t_candidates = CollectCandidates(_session, _localProfile.TierIndex, t_window, t_myLastRoom);
             }
 
@@ -150,7 +152,7 @@ public sealed class PhotonRankedMatchmaker : IMatchmaker
             for (int i = 0; i < t_candidates.Count && i < MAX_JOIN_ATTEMPTS; i++)
             {
                 if (_ct.IsCancellationRequested) return (EOutcome.Canceled, null);
-                if (Time.realtimeSinceStartup - t_startedAt >= MatchmakingPolicy.SearchSeconds) break;
+                if (Time.realtimeSinceStartup - t_startedAt >= t_policy.SearchSeconds) break;
 
                 if (!await _session.JoinRankedRoom(t_candidates[i].session.Name)) continue;
                 if (await WaitForOpponentAsync(_session, JOIN_CONFIRM_SECONDS, _ct))
@@ -172,8 +174,8 @@ public sealed class PhotonRankedMatchmaker : IMatchmaker
             t_myLastRoom = _session.CurrentSessionName;
 
             t_elapsed = Time.realtimeSinceStartup - t_startedAt;
-            float t_wait = Mathf.Min(MatchmakingPolicy.SecondsUntilNextStage(t_elapsed),
-                                     MatchmakingPolicy.SearchSeconds - t_elapsed);
+            float t_wait = Mathf.Min(t_policy.SecondsUntilNextStage(t_elapsed),
+                                     t_policy.SearchSeconds - t_elapsed);
             bool t_paired = t_wait > 0f && await WaitForOpponentAsync(_session, t_wait, _ct);
             if (t_paired) return (EOutcome.Matched, null);
 
