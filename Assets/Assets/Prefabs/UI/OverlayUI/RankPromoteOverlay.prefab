@@ -5196,7 +5196,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &3732190993736980034
 RectTransform:
   m_ObjectHideFlags: 0
@@ -5206,7 +5206,7 @@ RectTransform:
   m_GameObject: {fileID: 1374811933046138795}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4401394861372953363}
@@ -5468,6 +5468,12 @@ MonoBehaviour:
   - {r: 0.9490196, g: 0.75686276, b: 0.30588236, a: 1}
   - {r: 0.49803922, g: 0.83137256, b: 0.75686276, a: 1}
   - {r: 0.56078434, g: 0.76862746, b: 0.9607843, a: 1}
+  gradeParticles:
+  - {fileID: 1422907604488482406}
+  - {fileID: 2306201549820298034}
+  - {fileID: 5574218412865241027}
+  - {fileID: 5496828468097607545}
+  - {fileID: 1374811933046138795}
   titleGradeUp: "\uC2B9\uAE09\uC804 \uC2B9\uB9AC!"
   titleFirstEntry: "\uB7AD\uD06C \uBC30\uC815"
   transition:
@@ -30517,7 +30523,7 @@ RectTransform:
   m_GameObject: {fileID: 3645530447727427546}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2101987787750461198}

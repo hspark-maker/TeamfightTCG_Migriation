@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -22,7 +23,7 @@ public enum EPromoteKind
 // 드물게 오는 것만 여기서 멈춰 세우는 것이 두 사건의 격을 벌리는 방법이다.
 //
 // 배지 안에서 여덟 단계로 흩어져 벌어지던 것을 여기로 옮긴다 — 약한 사건 여덟 개보다 강한 사건 하나가 크다.
-// 그래서 안무의 모든 축(섬광·링·광선·킥·배지)이 **같은 한 프레임**에 겹친다. 시간축에 흩지 말 것.
+// 그래서 안무의 모든 축(섬광·링·광선·킥·배지·등급 파티클)이 **같은 한 프레임**에 겹친다. 시간축에 흩지 말 것.
 //
 // 등급 승급은 암전 → 정적 → 꽂힘 → 충격 → 여운의 순서이고, 정적(silence)이 이 안무의 절반이다.
 // 어두운 화면에 아무것도 없는 그 빈 박이 다음 프레임을 만든다.
@@ -85,6 +86,13 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
              "이 색은 섬광·버스트 링·광선에 실린다. RGB만 갈아끼우고 알파는 각 판의 저작값을 그대로 쓴다.\n" +
              "저작 후보: 브론즈 #C88A46 / 실버 #D8E0E8 / 골드 #F2C14E / 플래티넘 #7FD4C1 / 다이아 #8FC4F5")]
     [SerializeField] Color[] gradeColors;
+
+    [Tooltip("등급별 파티클 뭉치. **배열 순서 = ERankGrade 순서(브론즈 / 실버 / 골드 / 플래티넘 / 다이아)** 로 " +
+             "gradeColors와 같은 규약이다 — 등급을 늘리면 여기도 같은 자리에 뭉치를 채워야 한다.\n" +
+             "**활성 상태는 코드가 통째로 소유한다** — 프리팹에서는 전부 꺼 두고, 안무가 도달 등급 한 벌만 켠다.\n" +
+             "안에 든 파티클이 playOnAwake 원샷이라 **켜는 순간이 곧 재생 시작**이다. 따로 Play를 부르지 않는다.\n" +
+             "**배열이 비었거나 도달 등급보다 짧으면 그 등급은 파티클 없이 지나간다**(연출은 그대로 돈다).")]
+    [SerializeField] GameObject[] gradeParticles;
 
     [Tooltip("등급 승급(승급전 승리)에 세우는 문구.")]
     [SerializeField] string titleGradeUp = "승급전 승리!";
@@ -219,6 +227,12 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
     string m_fromName = string.Empty;
     string m_toName   = string.Empty;
 
+    // 도달 등급. 색과 파티클 뭉치를 고르는 축이라 안무를 짜는 자리에서도 다시 읽어야 한다.
+    ERankGrade m_toGrade;
+
+    // 뭉치 안의 파티클 전량. 끄기 직전에 씻을 대상이다.
+    List<ParticleSystem> m_particles;
+
     // 저작 상태 1회 캡처. 안무가 미는 값의 원본이자 점화가 정착할 목표다.
     Vector3[] m_rayScales;
     Vector3[] m_rayEulers;
@@ -271,6 +285,8 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
         if (this.tierNameText != null) this.tierNameText.text = this.m_fromName;
         if (this.titleText != null) this.titleText.text = TitleOf(_kind);
         if (this.gradeNameText != null) this.gradeNameText.text = _to.Grade.ToString().ToUpperInvariant();
+
+        this.m_toGrade = _to.Grade;
 
         ApplyGradeTint(_to.Grade);
 
@@ -428,6 +444,7 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
         }
 
         StageImpact(_seq, t_impact, t_badge);
+        StageGradeParticles(_seq, t_impact);
         StageRays(_seq, t_impact);
         StageAfterglow(_seq, t_impact);
 
@@ -577,6 +594,16 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
                                              vibrato: 2, elasticity: 0.8f));
     }
 
+    // 도달 등급의 파티클 뭉치가 배지와 같은 프레임에 점화된다.
+    // 켜는 것이 곧 재생이라(playOnAwake) 시각을 따로 저작하지 않는다 — 이 축만 뒤로 밀면 사건이 둘로 갈라진다.
+    void StageGradeParticles(Sequence _seq, float _at)
+    {
+        GameObject t_group = ParticleOf(this.m_toGrade);
+        if (t_group == null) return;
+
+        _seq.InsertCallback(_at, () => t_group.SetActive(true));
+    }
+
     // 씨앗 길이에서 저작 길이까지 뻗으며 과다 노출됐다가 저작 알파로 정착한다(RankPromoStandby와 같은 문법).
     void StageRays(Sequence _seq, float _at)
     {
@@ -626,6 +653,7 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
         // 저작값을 손대기 전에 잡아 둔다 — 자세를 되돌리는 자리가 원본을 모르면 0으로 밀어버린다.
         Capture();
         KillLoops();
+        HideGradeParticles();
 
         if (this.contentGroup != null) this.contentGroup.alpha = 0f;
 
@@ -680,6 +708,9 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
         // Show를 한 번도 거치지 않고 여기로 오는 길이 있다(부모 비활성). 원본을 모르는 채 자세를 되돌리면 0으로 민다.
         Capture();
         KillLoops();
+
+        // 파티클은 화면과 함께 걷힌다 — 남겨 두면 5초짜리 여운이 뒤따르는 보상 패널 위로 샌다.
+        HideGradeParticles();
 
         if (this.contentGroup != null) this.contentGroup.alpha = 1f;
 
@@ -784,6 +815,23 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
             this.m_gradeNamePos   = this.gradeNameText.rectTransform.anchoredPosition;
             this.m_gradeNameAlpha = this.gradeNameText.color.a;
         }
+
+        CollectParticleSystems();
+    }
+
+    // 뭉치 안의 파티클을 한 번에 모아 둔다. 끄기 직전에 씻을 대상이라 구조가 바뀌지 않는 이 자리에서 잡는다.
+    void CollectParticleSystems()
+    {
+        this.m_particles = new List<ParticleSystem>();
+
+        if (this.gradeParticles == null) return;
+
+        for (int t_i = 0; t_i < this.gradeParticles.Length; t_i++)
+        {
+            if (this.gradeParticles[t_i] == null) continue;
+
+            this.m_particles.AddRange(this.gradeParticles[t_i].GetComponentsInChildren<ParticleSystem>(includeInactive: true));
+        }
     }
 
     // 옛 배지를 저작 자리·배율로 되돌리고 감춘다(등장 전 = 파열 후).
@@ -863,6 +911,41 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
         if (this.gradeColors == null || t_i < 0 || t_i >= this.gradeColors.Length) return Color.white;
 
         return this.gradeColors[t_i];
+    }
+
+    // 도달 등급의 파티클 뭉치. 배선이 비었거나 짧으면 null로 떨어진다 — 파티클이 없다고 연출을 멈추지 않는다.
+    GameObject ParticleOf(ERankGrade _grade)
+    {
+        int t_i = (int)_grade;
+
+        if (this.gradeParticles == null || t_i < 0 || t_i >= this.gradeParticles.Length) return null;
+
+        return this.gradeParticles[t_i];
+    }
+
+    // 파티클 뭉치를 전부 끈다. 점화가 곧 켜기라, 껐다 켜는 이 자리가 다음 표시의 재점화까지 함께 보장한다.
+    //
+    // 끄기 **전에** 버퍼를 씻는 것이 핵심이다. UIParticle은 끝난 원샷을 Stop(StopEmitting)으로 세워 둘 뿐이라
+    // 날아가던 도중에 끄면 살아 있는 입자가 그대로 얼어붙고, 다음 점화에서 그 유령이 첫 프레임에 되살아난다.
+    // 씻는 자리를 켜는 프레임으로 옮기면 안 된다 — 그 한 프레임은 섬광·킥·사운드가 이미 겹쳐 있다.
+    void HideGradeParticles()
+    {
+        if (this.m_particles != null)
+            for (int t_i = 0; t_i < this.m_particles.Count; t_i++)
+            {
+                if (this.m_particles[t_i] == null) continue;
+
+                this.m_particles[t_i].Clear(withChildren: true);
+            }
+
+        if (this.gradeParticles == null) return;
+
+        for (int t_i = 0; t_i < this.gradeParticles.Length; t_i++)
+        {
+            if (this.gradeParticles[t_i] == null) continue;
+
+            this.gradeParticles[t_i].SetActive(false);
+        }
     }
 
     // 광선 뭉치가 천천히 돈다. 저작 각도에서 절대값으로 목표를 잡는다 — 상대 회전은 반복할수록 밀린다.
