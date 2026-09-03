@@ -351,8 +351,8 @@ public class BattleIntro : MonoBehaviour
             await t_view.PlayDealToMid(_from, t_screenCenter, _dests[i], this.cardDealDuration);
             if (t_view == null) break;
 
-            // 중앙 도착 연출은 런타임 등장과 같은 지점을 쓴다(안개는 모든 등장에 깔린다).
-            CardAppearSequence.PlayMidArrival(t_view, _playAppearVfx: false);
+            // 중앙 도착 연출은 런타임 등장과 같은 지점을 쓴다(등장 연출은 모든 경로 공통).
+            CardAppearSequence.PlayMidArrival(t_view);
 
             // 중앙 정지는 카드를 읽는 시간이라 그대로 둔다(통짜 경로가 두 토막 사이에 넣던 것과 같은 값).
             bool t_cancelled = await UniTask.Delay((int)(GameTiming.Battle.DealMidPause * 1000))

@@ -23,8 +23,7 @@ public static class CunningVfx
     ///
     /// <paramref name="_exitVfx"/>만 경로마다 다르다. 퇴장 안개(CunningFog)는 교활만 깔고,
     /// 그냥 교체(멀리건)는 <see cref="BattleVfxId.None"/>으로 조용히 물러난다.
-    /// 같은 안개를 <b>등장</b> 쪽도 쓰지만(CardAppearSequence.PlayMidArrival) 그건 모든 등장 공통이라
-    /// 이 퇴장 분기와는 무관하다 —
+    /// 등장 연출은 들어오는 카드 쪽(CardAppearSequence.PlayMidArrival)이 모든 경로 공통으로 낸다 —
     /// 반짝임(CardAppear)은 <b>들어오는 카드가 중앙에 설 때</b>로 옮겼다(CardAppearSequence).
     /// 퇴장에 붙이면 "교체됐다"가, 등장에 붙이면 "새 카드가 나왔다"가 읽힌다.</summary>
     public static async UniTask PlayExit(CardView _view, BattleVfxId _exitVfx = BattleVfxId.CunningFog)
@@ -98,7 +97,7 @@ public static class CunningVfx
         Vector3 t_mid  = CameraUtil.ScreenFractionToWorld(0.5f, 0.5f, t_dest.z);
 
         return CardAppearSequence.Play(_view, _view.BoundCard, t_from, t_mid, t_dest,
-                                       GameTiming.Battle.CardDealDuration, _playAppearVfx: true);
+                                       GameTiming.Battle.CardDealDuration);
     }
 
     /// <summary>퇴장 목표는 해당 소유자의 실제 덱 버튼. 버튼은 safe-area 하위이므로 화면 형태를 그대로 따른다.

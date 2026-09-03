@@ -18,22 +18,21 @@ public static class CardAppearSequence
     /// <summary><paramref name="_card"/>는 컷씬 자격 판정 대상(= 이 슬롯에 들어온 인스턴스).
     /// 뷰의 BoundCard와 같아야 한다 — 호출 전 Refresh/Render가 끝나 있어야 하는 이유.
     ///
-    /// <paramref name="_playAppearVfx"/>는 <b>등장 반짝임(CardAppear)</b>을 켠다. 발화 지점은
-    /// 카드가 덱에서 나와 <b>중앙에 선 순간</b> 하나다 — 교체(퇴장) 쪽이 아니다.
-    /// 교활 교대·멀리건 교체가 이걸 켠다: 두 경우 모두 "덱에서 새 카드가 나왔다"가 사건이라
-    /// 반짝임은 들어오는 카드에 붙어야 읽힌다(물러나는 카드에 붙이면 교체 자체가 강조된다).</summary>
+    /// 등장 연출(<see cref="BattleVfxId.CardAppear"/>)은 <b>모든 등장</b>에 난다 — 발화 지점은
+    /// 카드가 덱에서 나와 <b>중앙에 선 순간</b> 하나다(교체·퇴장 쪽이 아니다).
+    /// 예전엔 교활 교대·멀리건만 켜는 플래그였는데, "덱에서 새 카드가 나왔다"는 사건은
+    /// 보충·오프닝도 같아서 경로마다 그림이 갈릴 이유가 없다.</summary>
     public static async UniTask Play(CardView _view, CardInstance _card,
-        Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration, bool _playAppearVfx = false)
+        Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration)
     {
         if (_view == null) return;
 
         // 컷씬은 **중앙에 멈춘 채** 본다. 끝나거나 스킵된 그 시점에 슬롯으로 들어간다.
-        // 반짝임 유무로 흐름을 가르지 않는다 — 통짜 PlayDealAnim도 결국 같은 세 토막이라
-        // 나눠 두면 중앙 도착 시점을 모든 경로가 똑같이 잡는다.
+        // 통짜 PlayDealAnim도 결국 같은 세 토막이라, 나눠 두면 중앙 도착 시점을 모든 경로가 똑같이 잡는다.
         await _view.PlayDealToMid(_from, _mid, _dest, _duration);
         if (_view == null) return;
 
-        PlayMidArrival(_view, _playAppearVfx);
+        PlayMidArrival(_view);
 
         bool t_cancelled = await UniTask.Delay((int)(GameTiming.Battle.DealMidPause * 1000),
                 cancellationToken: _view.GetCancellationTokenOnDestroy())
@@ -48,15 +47,11 @@ public static class CardAppearSequence
     /// 오프닝 배치(BattleIntro.DealCards)는 카드를 겹쳐 뿌리느라 <see cref="Play"/>를 통째로 못 타서
     /// 이 함수만 따로 부른다(중앙 도착 연출이 두 벌로 갈리지 않게).
     ///
-    /// 안개(CunningFog)는 <b>등장 전부</b>에 깔린다 — 원래 교활 퇴장 전용 표식이었지만,
-    /// "덱에서 나와 중앙에 선다"는 사건이 같으므로 보충·오프닝·멀리건·교활 교대가 모두 같은 그림이다.
-    /// 반짝임(CardAppear)만 경로별로 갈린다(<paramref name="_playAppearVfx"/>).</summary>
-    public static void PlayMidArrival(CardView _view, bool _playAppearVfx)
+    /// 보충·오프닝·멀리건 교체·교활 교대가 모두 같은 그림이다 — 경로별 on/off는 두지 않는다.</summary>
+    public static void PlayMidArrival(CardView _view)
     {
         if (_view == null) return;
 
-        BattleVfx.Play(BattleVfxId.CunningFog, _view.transform.position, _view.VfxSortingLayerId);
-        if (_playAppearVfx)
-            BattleVfx.Play(BattleVfxId.CardAppear, _view.transform.position, _view.VfxSortingLayerId);
+        BattleVfx.Play(BattleVfxId.CardAppear, _view.transform.position, _view.VfxSortingLayerId);
     }
 }
