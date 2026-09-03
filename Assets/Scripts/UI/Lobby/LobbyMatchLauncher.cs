@@ -419,7 +419,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (t_confirmed) EnterBattle();
     }
 
-    // 일반전은 출전 덱 확정 → 매칭 연출 → 상대 확정 순서다. 어느 단계든 포기하면 false로 빠져 로비가 그대로 남는다.
+    // 일반전은 덱 화면 → 전투 시작 → 매칭 연출 → 상대 확정 순서다. 어느 단계든 포기하면 false로 빠져 로비가 그대로 남는다.
     // 고정 상대(모험)와 튜토리얼은 상대가 이미 정해져 있으므로 기존처럼 상대를 먼저 확정한다.
     async UniTask<bool> RunEntryChainAsync(CancellationToken _ct, MatchOpponent? _preset = null)
     {
@@ -433,9 +433,27 @@ public class LobbyMatchLauncher : MonoBehaviour
             MatchOpponentHandoff.Clear();
             DeckConfig.ClearEnemyDeck();
 
-            // 출전 덱은 유저가 로비 덱 탭에서 정해 둔 대표 덱이다. 덱 확인 화면을 거치지 않으므로
-            // 여기가 일반전에서 DeckConfig.PlayerDeck을 채우는 유일한 지점이다.
-            if (!TryApplySelectedDeck()) return false;
+            // 대전 입장은 덱 화면을 먼저 세운다 — 상대를 구하기 전에 유저가 출전 덱을 확정하고
+            // "전투 시작"을 눌러야 매칭이 돈다. 덱 확정(DeckConfig.PlayerDeck)은 그 화면의
+            // TryConfirmSelection이 하므로 여기서 따로 채우지 않는다.
+            if (DeckShell != null)
+            {
+                // VS 패널은 세우지 않는다 — 상대는 아래 매칭이 정한다.
+                if (!await DeckShell.RunSelectionAsync(_ct, _editorOnly: true)) return false;   // 포기 = 로비로 되돌아간다
+            }
+            // 덱 화면 미배선이면 예전처럼 로비 대표 덱으로 곧장 간다 — 연출이 없다고 전투를 막지 않는다.
+            else if (!TryApplySelectedDeck()) return false;
+
+            // 직전 취소가 버리고 나온 매칭이 아직 정리 중이면 세션이 겹친다 — 끝날 때까지만 붙잡는다.
+            // 대개 덱 화면을 보는 사이에 끝나 여기서 기다리는 일은 없다(그때는 즉시 통과).
+            if (MatchmakingRun.IsPending)
+            {
+                ServerWaitOverlay.Hold(this);
+                try     { await MatchmakingRun.WaitAsync(); }
+                finally { ServerWaitOverlay.Release(this); }
+
+                if (_ct.IsCancellationRequested) return false;
+            }
 
             MatchmakingShell t_matchShell = MatchShell;
             if (t_matchShell == null) return false;
@@ -489,8 +507,8 @@ public class LobbyMatchLauncher : MonoBehaviour
         return await DeckShell.RunSelectionAsync(_ct);
     }
 
-    // 대치 인트로 → 갈라짐 → 덱 화면. 덱 화면을 앞세우는 경로는 지금 이것 하나뿐이다 —
-    // 랭크전(RunEntryChainAsync의 매칭 갈래)은 로비 대표 덱으로 곧장 전투에 들어가 덱 화면을 거치지 않는다.
+    // 대치 인트로 → 갈라짐 → 덱 화면. 고정 상대(모험)는 상대를 먼저 보여 준 뒤 덱을 짠다 —
+    // 랭크전은 반대로 덱 화면이 매칭보다 앞에 선다(상대가 아직 없다).
     //
     // 덱 화면을 대치가 "끝난 뒤에" 세우는 이유: 상대가 이미 정해져 있어 미리 세울 시간을 벌어 줄 대기가 없다.
     // 진입 안무 앞에 세우면 그 레이아웃 비용이 첫 프레임에 그대로 얹힌다.

@@ -27,6 +27,10 @@ static class PlayerSaveDocument
     internal const string FIELD_RANK = "rank";
     internal const string FIELD_ALBUM_REWARD = "albumReward";
     internal const string FIELD_ADVENTURE = "adventure";
+
+    /// <summary>모험 도메인 개명(2026-09-03) 전의 이름. 옛 문서에만 남아 있고 여기서는 판정에만 쓴다 —
+    /// 고치는 것은 서버(repairSaveSlots)다. 룰이 클라의 이 필드 삭제를 허용하지 않는다.</summary>
+    internal const string LEGACY_FIELD_ADVENTURE = "tournament";
     internal const string FIELD_TUTORIAL = "tutorial";
     internal const string FIELD_PROFILE = "profile";
 
@@ -112,6 +116,30 @@ static class PlayerSaveDocument
     }
 
     /// <summary>메타를 못 읽은 문서가 실제로 무엇을 담고 있었는지 한 줄로 설명한다. 실패 로그 전용.</summary>
+    /// <summary>개명 전 이름이 남은 문서인가. 참이면 서버 명령(repairSaveSlots)이 고쳐야 한다.
+    ///
+    /// <para>룰의 최상위 전수 검증은 옛 키를 hasOnly 로, 빠진 새 키를 hasAll 로 막는다 —
+    /// 클라가 무엇을 보내든 저장이 거부되므로 여기서 미리 잡아 초기화 중에 한 번 고친다.
+    /// 판정은 원본 필드로 한다: 역직렬화된 <see cref="UserSaveData"/>는 모르는 필드를 이미 버린 뒤다.</para></summary>
+    internal static bool NeedsSlotRepair(DocumentSnapshot _snapshot)
+    {
+        if (_snapshot == null || !_snapshot.Exists) return false;
+
+        try
+        {
+            Dictionary<string, object> t_raw = _snapshot.ToDictionary();
+
+            return t_raw.ContainsKey(LEGACY_FIELD_ADVENTURE) || !t_raw.ContainsKey(FIELD_ADVENTURE);
+        }
+        catch (Exception t_exception)
+        {
+            // 못 읽으면 고칠 대상인지도 알 수 없다 — 여기서 참을 돌려 왕복을 늘리지 않는다.
+            Debug.LogWarning($"[PlayerSaveDocument] 슬롯 개명 판정 실패: {t_exception.GetBaseException().Message}");
+
+            return false;
+        }
+    }
+
     internal static string DescribeMeta(DocumentSnapshot _snapshot)
     {
         if (_snapshot == null) return "snapshot=null";

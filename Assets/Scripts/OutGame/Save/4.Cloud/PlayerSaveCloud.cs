@@ -525,6 +525,39 @@ static class PlayerSaveCloud
             }
         }
 
+        // 개명 전 이름이 남은 문서는 룰의 최상위 전수 검증을 어느 쪽으로도 통과하지 못한다 —
+        // 접속은 되는데 저장만 전부 거부된다. 서버만 고칠 수 있으므로(Admin SDK가 룰을 우회한다)
+        // 여기서 한 번 고치고 문서를 다시 읽어 그 뒤 판정을 이어간다. 고칠 것이 없으면 왕복도 없다.
+        if (PlayerSaveDocument.NeedsSlotRepair(t_document))
+        {
+            if (!await TryRepairSaveSlotsAsync(_generation)) return;
+
+            try
+            {
+                t_document = await ReadAsync(_generation, t_userId);
+            }
+            catch (Exception t_exception)
+            {
+                if (_generation != s_generation) return;
+                Fail($"Save re-read after slot repair failed ({t_exception.GetBaseException().Message}).");
+                return;
+            }
+
+            if (_generation != s_generation) return;
+            if (t_document == null || !t_document.Exists)
+            {
+                Fail("Save document is missing after slot repair.");
+                return;
+            }
+
+            if (!PlayerSaveDocument.TryReadMeta(t_document, out t_schemaVersion, out t_revision))
+            {
+                Fail("Remote save metadata is missing or has a broken type after slot repair. " +
+                     $"[{PlayerSaveDocument.DescribeMeta(t_document)}]");
+                return;
+            }
+        }
+
         if (t_schemaVersion < UserSaveData.VERSION)
         {
             // 승급은 지갑 이관(v7 → v8)까지만 있다. 그보다 오래된 문서는 변환할 코드가 없다.
@@ -606,6 +639,40 @@ static class PlayerSaveCloud
 
             // 분류로 갈래를 두지 않는다 — 초기화에는 오프라인 폴백이 없어 Transient든 아니든 결론이 복구 화면 하나다.
             Fail($"Account creation failed [{CloudFailureClassifier.Describe(t_exception)}]: " +
+                 t_exception.GetBaseException().Message);
+            return false;
+        }
+    }
+
+    // 개명된 슬롯을 새 이름으로 옮긴다. 멱등이라 이미 고쳐진 문서면 서버가 아무것도 쓰지 않는다.
+    static async UniTask<bool> TryRepairSaveSlotsAsync(int _generation)
+    {
+        try
+        {
+            RepairSaveSlotsResult t_result = await ServerSaveCommands.InvokeInitAsync<RepairSaveSlotsResult>(
+                "repairSaveSlots",
+                new { env = s_envId });
+
+            if (_generation != s_generation) return false;
+            if (t_result == null)
+            {
+                Fail("Save slot repair returned nothing.");
+                return false;
+            }
+
+            if (t_result.Repaired)
+                Debug.Log($"[PlayerSaveCloud] repairSaveSlots renamed=[{string.Join(", ", t_result.Renamed ?? new string[0])}] " +
+                          $"filled=[{string.Join(", ", t_result.Filled ?? new string[0])}] env={s_envId}");
+
+            return true;
+        }
+        catch (Exception t_exception)
+        {
+            if (_generation != s_generation) return false;
+
+            // ensureAccount와 같은 이유로 분류 갈래를 두지 않는다 — 고치지 못하면 저장이 영영 거부되므로
+            // 오프라인 폴백이 없고 결론이 복구 화면 하나다.
+            Fail($"Save slot repair failed [{CloudFailureClassifier.Describe(t_exception)}]: " +
                  t_exception.GetBaseException().Message);
             return false;
         }

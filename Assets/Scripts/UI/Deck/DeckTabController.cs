@@ -3,7 +3,7 @@ using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 덱 탭 루트(Tab_Deck에 부착). 탭에 들어오면 곧바로 편집 화면을 연다 — 목록 뎁스는 없다.
+// 덱 탭 루트(Tab_Deck에 부착). 이 탭에는 내용이 없다 — 탭에 들어오면 풀 UI 덱 편집 화면(DeckEditController)을 열 뿐이다.
 // 덱을 갈아타는 일은 편집 화면 하단의 덱 선택 바(DeckStripView)가 맡는다.
 //
 // 탭 셸(LobbyTabController)이 단순 SetActive 토글이라 라이프사이클 훅이 없으므로,
@@ -12,9 +12,6 @@ using UnityEngine.UI;
 // 편집 화면은 이 프리팹 안에 없다 — 매치 셸과 같은 한 인스턴스를 공유한다(DeckEditController).
 public class DeckTabController : LobbyTabPanel
 {
-    [Tooltip("구 덱 목록 패널. 뎁스가 하나로 합쳐지면서 더 이상 켜지 않는다(노드째 비활성) — 배선만 남겨 둔 것은 롤백 여지다.")]
-    [SerializeField] GameObject listPanel;
-
     [Tooltip("덱 탭에 있는 동안 숨길 로비 상단 바. 미배선이면 LobbyRoot/TopBar를 찾아 쓴다.")]
     [SerializeField] GameObject topBar;
 
@@ -55,8 +52,6 @@ public class DeckTabController : LobbyTabPanel
         // 편집 중 탭이 꺼졌다 켜지면 이전 편집분은 무저장 폐기된다.
         // 편집은 DeckEditController의 메모리 사본에서만 일어나고 세이브는 손대지 않으므로
         // 손실은 "이번 편집분"뿐이고 기존 덱은 온전하다 — 그래서 확인 팝업 없이 다시 열어도 안전하다.
-        if (listPanel != null) listPanel.SetActive(false);
-
         OpenEditorForResolvedSlot();
         SetTopBarHidden(true);
     }
@@ -267,8 +262,9 @@ public class DeckTabController : LobbyTabPanel
 
         m_editing = true;
 
-        // ⚠ 편집 화면은 풀 캔버스(order 300)라 하단 탭바를 덮는다 — 탭 버튼이 안 보인다.
-        //   나가는 길은 편집 화면의 뒤로가기 하나이고, 저장 확인은 그 경로가 이미 거친다(RequestLeave).
+        // 편집 화면은 풀 캔버스(UiSortingOrder.PooledOverlay)라 로비 캔버스의 하단 탭바를 덮는다.
+        // 그동안만 탭바를 그 위로 올려 다른 탭으로 나가는 길을 남긴다 — 이탈은 RequestLeave 를 그대로 거친다.
+        Shell?.LiftTabBar(true);
     }
 
     // 편집 화면을 내린다. 가드를 먼저 내려야 허가 경로가 재개한 탭 전환이 다시 가드로 들어오지 않는다.
@@ -277,6 +273,8 @@ public class DeckTabController : LobbyTabPanel
         if (!m_editing) return;   // 편집을 연 적이 없으면 풀에 묻지 않는다(GetUI가 "No Such UI" 로그를 남긴다)
 
         m_editing = false;
+
+        Shell?.LiftTabBar(false);
 
         // 내리기 직전의 편집 대상을 회수한다 — 하단 바로 덱을 갈아탄 것은 편집기만 알고 있다.
         // 그 갈아탄 덱이 곧 출전 덱이므로 대표 좌표도 여기서 함께 따라간다.

@@ -118,6 +118,10 @@ public sealed class PhotonRankedMatchmaker : IMatchmaker
                 return (EOutcome.NoOpponent, null);
             }
 
+            // 로비 참가는 취소 토큰을 못 받는 Photon 호출이라, 그 왕복이 도는 동안 누른 취소는 여기서야 보인다.
+            // 확인하지 않으면 이미 포기한 매칭이 목록 대기·방 생성까지 밀고 나간다.
+            if (_ct.IsCancellationRequested) break;
+
             // 목록을 못 받은 채로 "후보 없음"이라 판정하면 양쪽이 방만 만들다 끝난다 — 한 번 더 기다린다.
             // 그래도 안 오면 방은 세운다. 안 세우면 상대가 나를 찾을 방법 자체가 없다.
             // (여기서 로비를 다시 붙지 않는 게 중요하다 — 재접속하면 오던 목록이 매번 버려진다.)
@@ -172,6 +176,9 @@ public sealed class PhotonRankedMatchmaker : IMatchmaker
                 continue;
             }
             t_myLastRoom = _session.CurrentSessionName;
+
+            // 방 생성도 토큰을 못 받는 왕복이다 — 그 사이 취소가 왔으면 상대를 기다리지 않고 접는다.
+            if (_ct.IsCancellationRequested) break;
 
             t_elapsed = Time.realtimeSinceStartup - t_startedAt;
             float t_wait = Mathf.Min(t_policy.SecondsUntilNextStage(t_elapsed),

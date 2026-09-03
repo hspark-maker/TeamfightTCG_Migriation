@@ -294,7 +294,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         // 전투 시작은 갈 곳이 있을 때만 보인다 — 주입 여부가 곧 표시 여부다.
         if (this.playButton != null) this.playButton.gameObject.SetActive(this.m_request.onPlay != null);
 
-        // 하단 바와 전투 시작 버튼은 같은 자리를 쓴다 — 두 호스트가 배타적이라 축을 따로 두어도 겹치지 않는다.
+        // 하단 바와 전투 시작 버튼은 두 축이 독립이다 — 대전 진입에서는 둘이 같이 뜬다(자리는 프리팹 저작이 정한다).
         if (this.deckStrip != null) this.deckStrip.gameObject.SetActive(this.m_request.showDeckStrip);
     }
 

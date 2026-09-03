@@ -29,6 +29,28 @@ public class LobbyTabController : MonoBehaviour
 
     int m_currentIndex = -1;
 
+    // 탭바를 풀 오버레이 위로 올렸을 때의 중첩 캔버스. 되돌릴 때 overrideSorting만 끈다 —
+    // 컴포넌트를 떼면 같은 탭을 다시 열 때마다 붙였다 떼기를 반복한다.
+    Canvas m_liftedTabBar;
+
+    /// <summary>탭바를 풀 오버레이(<see cref="UiSortingOrder.PooledOverlay"/>) 위로 올리거나 되돌린다.
+    ///
+    /// <para>덱 탭처럼 내용이 풀 UI로 뜨는 탭은 그 화면이 로비 캔버스를 통째로 덮어 탭바가 사라진다 —
+    /// 나가는 길이 그 화면의 뒤로가기 하나만 남는다. 그동안만 탭바를 올려 하단 메뉴를 살려 둔다.</para></summary>
+    public void LiftTabBar(bool _lift)
+    {
+        if (tabBar == null) return;
+
+        if (_lift)
+        {
+            m_liftedTabBar = UiSortingOrder.LiftNested(tabBar.gameObject, UiSortingOrder.LobbyTabBarLifted);
+            return;
+        }
+
+        // 로비 캔버스의 정렬로 되돌린다. 켜 둔 채 두면 탭바가 다른 탭에서도 풀 오버레이 위에 남는다.
+        if (m_liftedTabBar != null) m_liftedTabBar.overrideSorting = false;
+    }
+
     public LobbyTabPanel CurrentPanel
         => m_currentIndex >= 0 && m_currentIndex < tabs.Count
             ? tabs[m_currentIndex].panel

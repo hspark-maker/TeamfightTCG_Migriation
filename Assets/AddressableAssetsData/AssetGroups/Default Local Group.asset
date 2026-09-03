@@ -103,6 +103,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fa7b83a15c5ed524abfc6e6a4e87a418
+    m_Address: LobbySettingPanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d6e19f59ebf8d1e469e3206f09162b0f
     m_Address: CardSetRewardOverlay
     m_ReadOnly: 0
