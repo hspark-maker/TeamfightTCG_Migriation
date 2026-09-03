@@ -1248,8 +1248,7 @@ MonoBehaviour:
   dimButton: {fileID: 3357805823623825714}
   closeButton: {fileID: 4710797006238417973}
   pageGauge:
-    fill: {fileID: 0}
-    fillRect: {fileID: 6680151188892663376}
+    fillRect: {fileID: 7239135171971350040}
     label: {fileID: 6526349891250661130}
   pageChest:
     button: {fileID: 4080383840422864266}
