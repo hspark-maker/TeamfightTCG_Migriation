@@ -910,6 +910,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 145ae6a6aa563e2489ff8acf60a091fa, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DeckTabController
-  listPanel: {fileID: 2689959282682261712}
   topBar: {fileID: 0}
   topBarSlideSeconds: 0.22

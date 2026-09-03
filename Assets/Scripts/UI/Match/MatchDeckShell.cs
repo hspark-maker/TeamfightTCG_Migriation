@@ -41,10 +41,15 @@ public class MatchDeckShell : MonoBehaviour
     // 되돌리는 곳은 진입(Open) 한 곳뿐이라, 전투로 닫히지 않은 화면이 다시 열릴 때만 풀린다.
     bool m_launching;
 
+    // 덱 편집 화면만 쓰는 진입(랭크전 대전 입장). 이때는 VS 패널을 한 번도 세우지 않는다 —
+    // 상대가 아직 없어 보여 줄 것이 없고, 스쳐 지나가면 빈 상대 칸이 한 프레임 번쩍인다.
+    bool m_editorOnly;
+
     // 전투 시작 게이트. 호스트(LobbyMatchLauncher)가 씬을 로드하기 "전에" 이걸 await 하고,
     // true를 받으면 DeckConfig.PlayerDeck이 확정된 상태로 배틀 씬으로 넘어간다.
     // false = 유저가 전투를 포기했다(또는 씬이 내려갔다) → 호스트가 복귀를 처리한다.
-    public async UniTask<bool> RunSelectionAsync(CancellationToken _ct)
+    /// <param name="_editorOnly">참이면 VS 패널 없이 덱 편집 화면만 세운다. 상대가 정해지기 전(랭크전)의 진입이다.</param>
+    public async UniTask<bool> RunSelectionAsync(CancellationToken _ct, bool _editorOnly = false)
     {
         // 이미 진행 중인데 다시 부르면 선택 상태를 덮어쓰고, Confirm 한 번에 두 await가 동시에 깨어난다.
         if (m_selecting)
@@ -54,12 +59,15 @@ public class MatchDeckShell : MonoBehaviour
             return false;
         }
 
-        m_selecting = true;
-        m_gate      = EGate.Pending;
+        m_selecting  = true;
+        m_gate       = EGate.Pending;
+        m_editorOnly = _editorOnly;
 
         // 전환이 이미 세워 둔 화면이면 다시 열지 않는다 — 등장 안무가 감춰 둔 칸이 저작값으로 되살아난다.
         if (!m_prepared) Open();
         m_prepared = false;
+
+        if (_editorOnly) OpenEditor();
 
         // 씬 파괴로 취소되면 Confirm/Cancel 어느 쪽도 오지 않는다 — 예외 대신 취소 여부를 값으로 받는다.
         bool t_canceled = await UniTask.WaitUntil(() => m_gate != EGate.Pending, cancellationToken: _ct)
@@ -106,7 +114,8 @@ public class MatchDeckShell : MonoBehaviour
         OutgameTutorialRunner.NotifyDeckGateBattleLaunched();
 
         // 뷰가 없으면 태울 안무도 없다 — 연출 때문에 전투가 시작되지 않는 길을 만들지 않는다.
-        if (panelView == null)
+        // 편집 화면만 쓰는 진입도 같다: 안무의 주인인 VS 패널이 꺼져 있어 콜백이 돌지 않는다(게이트가 영영 안 열린다).
+        if (panelView == null || m_editorOnly)
         {
             m_gate = EGate.Confirmed;
 
@@ -185,6 +194,9 @@ public class MatchDeckShell : MonoBehaviour
             showDeckPower = false,
             holdoutCard = OutgameTutorialRunner.TryGetPendingEquipCard(out var t_equip) ? t_equip : 0,
             onPlay = OnEditorPlay,
+            // 대전 진입에서도 덱 선택 바를 남긴다 — 여기서 덱을 갈아탄 뒤 바로 시작하는 흐름이라
+            // 시작 버튼과 함께 떠 있어야 한다(둘의 자리는 프리팹 저작이 정한다).
+            showDeckStrip = true,
         });
         if (t_editor == null) return;
 
@@ -218,7 +230,10 @@ public class MatchDeckShell : MonoBehaviour
     void OnEditorPlay()
     {
         HideEditorIfOpen();
-        ShowMatchPanel();
+
+        // 편집 화면만 쓰는 진입은 돌아갈 VS 패널이 없다 — 세우면 매칭 화면 직전에 빈 상대 칸이 번쩍인다.
+        if (!m_editorOnly) ShowMatchPanel();
+
         Confirm();
     }
 
@@ -226,6 +241,15 @@ public class MatchDeckShell : MonoBehaviour
     void OnEditorExit()
     {
         HideEditorIfOpen();
+
+        // 편집 화면이 곧 이 진입의 전부다 — 뒤로가기는 돌아갈 패널이 아니라 전투 포기다.
+        if (m_editorOnly)
+        {
+            Cancel();
+
+            return;
+        }
+
         ShowMatchPanel();
     }
 
