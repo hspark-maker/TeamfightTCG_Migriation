@@ -5,6 +5,7 @@ public enum ESyncUiPrefab
     SceneCurtain,
     LockBadge,
     LoadingCover,
+    MatchmakingRoot,
 }
 
 [CreateAssetMenu(fileName = "SyncUiPrefabCatalog", menuName = "UI/Sync UI Prefab Catalog")]
@@ -13,6 +14,7 @@ public sealed class SyncUiPrefabCatalog : ScriptableObject
     [SerializeField] GameObject sceneCurtain;
     [SerializeField] GameObject lockBadge;
     [SerializeField] GameObject loadingCover;
+    [SerializeField] GameObject matchmakingRoot;
 
     public GameObject Get(ESyncUiPrefab _id)
         => _id switch
@@ -20,6 +22,7 @@ public sealed class SyncUiPrefabCatalog : ScriptableObject
             ESyncUiPrefab.SceneCurtain => sceneCurtain,
             ESyncUiPrefab.LockBadge => lockBadge,
             ESyncUiPrefab.LoadingCover => loadingCover,
+            ESyncUiPrefab.MatchmakingRoot => matchmakingRoot,
             _ => null,
         };
 }

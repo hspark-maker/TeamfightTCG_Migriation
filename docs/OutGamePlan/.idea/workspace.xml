@@ -2,29 +2,11 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="74f371c5-0899-44c7-ab1b-549ac4664e46" name="변경" comment="">
-      <change beforePath="$PROJECT_DIR$/../../Assets/AddressableAssetsData/AssetGroups/Default Local Group.asset" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/AddressableAssetsData/AssetGroups/Default Local Group.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/Battle/CardView/CardView.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/Battle/CardView/CardView.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/Common/TouchEffectOverlay.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/Common/TouchEffectOverlay.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/LobbyUI/Album/Panel_PageOverlay.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/LobbyUI/Album/Panel_PageOverlay.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/LobbyUI/Tabs/Tab_Collection_New.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/LobbyUI/Tabs/Tab_Collection_New.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/MatchUI/MatchDeckEditPanel.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/MatchUI/MatchDeckEditPanel.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/OverlayUI/UnlockDemoStage.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/OverlayUI/UnlockDemoStage.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/OverlayUI/UnlockIntroOverlay.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/OverlayUI/UnlockIntroOverlay.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Fonts/Cafe24Ssurround-v2.0 SDF.asset" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Fonts/Cafe24Ssurround-v2.0 SDF.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Fonts/Jalnan2 SDF 1.asset" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Fonts/Jalnan2 SDF 1.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Fonts/Jalnan2 SDF.asset" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Fonts/Jalnan2 SDF.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Fonts/ONE Mobile POP OTF SDF.asset" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Fonts/ONE Mobile POP OTF SDF.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Fonts/uK4mTd9JFejCoAXNZyXHV6glsI/Jalnan2/Jalnan2TTF SDF_outline.asset" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Fonts/uK4mTd9JFejCoAXNZyXHV6glsI/Jalnan2/Jalnan2TTF SDF_outline.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Resources/SpecData.bytes" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Resources/SpecData.bytes" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Scripts/Battle/Synergy/SynergyText.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Scripts/Battle/Synergy/SynergyText.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Scripts/UI/Album/Insert/AlbumInsertHintView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Scripts/UI/Album/Insert/AlbumInsertHintView.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Scripts/UI/CardDetail/UnlockDemoStage.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Scripts/UI/CardDetail/UnlockDemoStage.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Scripts/UI/CardDetail/UnlockIntro.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Scripts/UI/CardDetail/UnlockIntro.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Scripts/UI/CardDetail/UnlockIntroOverlay.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Scripts/UI/CardDetail/UnlockIntroOverlay.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Scripts/UI/CardDetail/UnlockIntroRow.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Scripts/UI/CardDetail/UnlockIntroRow.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../Assets/Scripts/UI/UIManager/PooledCardElement.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Scripts/UI/UIManager/PooledCardElement.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../SpecData/SynergyDef_sheet.csv" beforeDir="false" afterPath="$PROJECT_DIR$/../SpecData/SynergyDef_sheet.csv" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../SpecData/SynergyTierDef_sheet.csv" beforeDir="false" afterPath="$PROJECT_DIR$/../SpecData/SynergyTierDef_sheet.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/LobbyUI/LobbyCanvas.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Assets/Prefabs/UI/LobbyUI/LobbyCanvas.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../Assets/SO/UI/SyncUiPrefabCatalog.asset" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/SO/UI/SyncUiPrefabCatalog.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../Assets/Scripts/UI/Common/SyncUiPrefabCatalog.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Scripts/UI/Common/SyncUiPrefabCatalog.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../Assets/Scripts/UI/Lobby/LobbyMatchLauncher.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Scripts/UI/Lobby/LobbyMatchLauncher.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../Assets/Scripts/UI/Match/MatchmakingShell.cs" beforeDir="false" afterPath="$PROJECT_DIR$/../../Assets/Scripts/UI/Match/MatchmakingShell.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -43,21 +25,21 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.cidr.known.project.marker": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.readMode.enableVisualFormatting": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "cidr.known.project.marker": "true",
-    "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "feature__outgameUX",
-    "nodejs_package_manager_path": "npm",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.readMode.enableVisualFormatting&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;feature__outgameUX&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="디폴트 작업">
       <changelist id="74f371c5-0899-44c7-ab1b-549ac4664e46" name="변경" comment="" />
@@ -70,6 +52,7 @@
       <workItem from="1786602082270" duration="777000" />
       <workItem from="1787913957097" duration="1863000" />
       <workItem from="1788226691430" duration="658000" />
+      <workItem from="1788345270271" duration="721000" />
     </task>
     <servers />
   </component>

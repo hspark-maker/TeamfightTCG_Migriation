@@ -140,6 +140,14 @@ public class MatchmakingShell : MonoBehaviour
 
     void Awake()
     {
+        // 층의 주인은 표다 — 이 호출이 매번 UiSortingOrder.Matchmaking을 다시 찍으므로 프리팹 저작값은 읽기용 사본이고,
+        // 사본이 표와 갈리면 OnValidate가 잡는다. 승격 문은 하나여야 한다는 규약대로 여기서 걸고,
+        // Canvas·GraphicRaycaster가 빠진 채로 서는 경우까지 이 한 줄이 메운다(있으면 그대로 재사용된다).
+        UiSortingOrder.LiftNested(gameObject, UiSortingOrder.Matchmaking);
+
+        // 홈 좌표를 잡기 전에 와야 한다 — 아래에서 굳는 기준이 전부 이 rect 위에서 읽힌다.
+        FitToParent();
+
         if (myProfile       != null) m_myHome       = myProfile.Rect.anchoredPosition;
         if (opponentProfile != null) m_opponentHome = opponentProfile.Rect.anchoredPosition;
 
@@ -157,6 +165,44 @@ public class MatchmakingShell : MonoBehaviour
         m_approach = versusApproach;
 
         EnsureWired();
+    }
+
+    // 저작 사본이 표와 갈리면 프리팹만 고친 사람은 자기 수정이 먹은 줄 안다 — 고치는 그 자리에서 알린다.
+    // 실행 시점으로 미루면 늦고, 로비 밑에 중첩으로 선 캔버스는 저작값을 되돌려 주지도 않는다
+    // (overrideSorting이 꺼져 있으면 getter가 부모 값을 준다 · UiSortingOrder.DropNested).
+    void OnValidate()
+    {
+#if UNITY_EDITOR
+        var t_canvas = GetComponent<Canvas>();
+        if (t_canvas == null || !t_canvas.isRootCanvas) return;
+
+        if (t_canvas.sortingOrder != UiSortingOrder.Matchmaking)
+            Debug.LogWarning(
+                $"[MatchmakingShell] 저작된 층이 표와 다릅니다(저작 {t_canvas.sortingOrder} ≠ 표 {UiSortingOrder.Matchmaking}) — "
+              + "런타임은 표를 따르므로 프리팹만 고쳐서는 바뀌지 않습니다. UiSortingOrder.Matchmaking을 고칠 것.", this);
+#endif
+    }
+
+    /// <summary>부모 아래에서 화면을 꽉 채우게 되돌린다. 부모를 얻은 직후 한 번만 부르면 된다 —
+    /// 전투로 실려 갈 때 부모에서 떨어지지만 그때는 루트 Canvas가 rect를 소유하므로 되돌릴 것이 없다.
+    ///
+    /// <para>⚠ 프리팹에 저작된 루트 RectTransform 값을 믿을 수 없다. 이 프리팹은 루트에 Canvas를 갖는데,
+    /// Unity는 <b>루트</b> Canvas의 RectTransform을 Overlay 규약(pivot 0,0 · 앵커 0,0 · 배율 0)으로 매 프레임 덮어쓰고
+    /// 프리팹 저장도 그 상태를 직렬화한다(SceneCurtain.prefab도 같은 값으로 저작돼 있다).
+    /// 루트로 설 때는 Canvas가 다시 덮어 주므로 무해하지만, 로비 아래 <b>중첩</b>으로 설 때는 아무도 덮어 주지 않아
+    /// 화면이 크기 0으로 좌하단 구석에 앉는다.</para></summary>
+    void FitToParent()
+    {
+        if (transform.parent == null) return;
+
+        var t_rect = (RectTransform)transform;
+
+        t_rect.localScale = Vector3.one;
+        t_rect.anchorMin  = Vector2.zero;
+        t_rect.anchorMax  = Vector2.one;
+        t_rect.pivot      = new Vector2(0.5f, 0.5f);
+        t_rect.offsetMin  = Vector2.zero;
+        t_rect.offsetMax  = Vector2.zero;
     }
 
     void OnDestroy()
@@ -646,6 +692,49 @@ public class MatchmakingShell : MonoBehaviour
     public void Close()
     {
         gameObject.SetActive(false);
+    }
+
+    /// <summary>이 화면을 그대로 다음 씬으로 데려갈 수 있는가. 배경 두 판이 맞물려 화면을 덮고 있어야 한다 —
+    /// 판이 이미 갈라진 뒤(덱 화면으로 넘어간 모험 경로)라면 데려가 봐야 덮을 것이 없다.
+    ///
+    /// <para>진입 경로가 아니라 <b>화면의 상태</b>로 답한다. 밖에서 "매칭 갈래를 탔는가"로 추론하면
+    /// 진입 경로가 하나 늘 때마다 판정이 갈라진다.</para>
+    ///
+    /// <para>activeSelf가 아니라 activeInHierarchy인 이유: 이 화면은 로비 캔버스의 자식이라
+    /// 부모가 꺼지면 아무것도 안 보이는데도 activeSelf는 참을 답한다.</para></summary>
+    public bool CanCarryToScene => gameObject.activeInHierarchy && bgFx.IsClosed;
+
+    /// <summary>씬을 넘어가기 직전 정리. <b>도는 안무만</b> 걷고 판·프로필·배너는 그 자리에 그대로 둔다 —
+    /// 지금 화면이 그대로 실려 가는 것이 이 전환의 전부라, 무엇 하나라도 되돌리면 그 자리가 하드컷이 된다.</summary>
+    public void PrepareForCarry()
+    {
+        StopDots();
+        KillStage();
+        fx.StopScan();
+
+        // 고여 있던 빛은 시퀀스가 아니라 fx가 소유한다 — 무대만 걷으면 자가설치 노드가 남는다(OnDestroy와 같은 이유).
+        fx.ClearCharge();
+
+        // 씬이 갈리는 동안 취소가 눌리면 돌아갈 로비가 이미 없다.
+        SetCancelInteractable(false);
+    }
+
+    /// <summary>이 화면이 물러나며 뒤에 있는 것을 드러낸다(재생까지 하고 그 시퀀스를 돌려준다).
+    ///
+    /// <para>배경 두 판이 갈라지고, 그 결에 <b>두 프로필과 제목도 각자 자기 쪽 판을 따라</b> 위아래로 실려 나간다 —
+    /// 덱 화면으로 넘어갈 때(<see cref="PlayHandoffAsync"/>)와 같은 문법이다. 판만 열면 부품이 허공에 남았다가
+    /// 화면이 파괴되는 프레임에 통째로 증발한다.</para></summary>
+    public Sequence PlayCarryPart()
+    {
+        var t_root = (RectTransform)transform;
+
+        Sequence t_seq = handoffFx.BuildCarry(myProfile, opponentProfile, VersusRect, fx.Dim.Target,
+                                              t_root, ActiveRiders, fx.RaySprite);
+
+        t_seq.Insert(0f, bgFx.BuildPart(t_root));
+
+        // 화면 전환을 덮는 물건이라 timeScale을 신뢰하지 않는다 — 배속이 걸리면 판이 영영 안 걷힌다.
+        return t_seq.SetLink(gameObject).SetUpdate(true).Play();
     }
 
     RectTransform VersusRect => versusRoot != null ? (RectTransform)versusRoot.transform : null;

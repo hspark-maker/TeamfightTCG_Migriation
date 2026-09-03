@@ -92,6 +92,13 @@ public class MatchmakingBgFx
     Color m_bottomBaseColor;
     bool  m_imagesCaptured;
 
+    // 두 판이 맞물려 있는가. 판의 주인이 직접 든다 — 쓰는 쪽이 자기 플래그로 따라 들면
+    // BuildClose 호출이 하나 늘 때마다 수기 동기화가 어긋난다.
+    bool m_closed;
+
+    /// <summary>두 판이 맞물려 화면을 덮고 있는가. 이 화면을 그대로 다음 화면으로 데려갈 수 있는지가 여기서 갈린다.</summary>
+    public bool IsClosed => this.HasPanels && this.m_closed;
+
     /// <summary>갈라짐이 끝나는 시각. 화면을 내리는 쪽(셸)이 이보다 일찍 내리면 판이 또 증발한다.</summary>
     public float PartDuration => this.HasPanels ? this.partDuration : 0f;
 
@@ -178,6 +185,19 @@ public class MatchmakingBgFx
         // 맞물리는 프레임에 터진다 — 닫힘이 끝나는 자리다.
         this.StageSeam(t_seq, this.closeDuration);
 
+        this.m_closed = true;
+
+        // 반쯤 닫힌 채 굳으면 그 틈으로 뒤가 샌다. 특히 매치메이커가 이 0.22초 안에 상대를 돌려주면
+        // 발견 안무가 진입 시퀀스를 잘라 판이 벌어진 자리에 멈추는데, IsClosed는 참이라 그대로 실려 간다
+        // — 그러면 다음 씬 위에서 반쯤 열린 판이 다시 갈라진다(씬 커튼의 OnKill(SnapClosed)와 같은 이유).
+        t_seq.OnKill(() =>
+        {
+            if (!this.HasPanels) return;
+
+            this.top.anchoredPosition    = this.m_topHome;
+            this.bottom.anchoredPosition = this.m_bottomHome;
+        });
+
         return t_seq;
     }
 
@@ -202,6 +222,8 @@ public class MatchmakingBgFx
 
         // 갈라지기 시작하는 프레임에 한 번 — 맞물릴 때와 같은 선이 갈라짐의 신호가 된다.
         this.StageSeam(t_seq, 0f);
+
+        this.m_closed = false;
 
         return t_seq;
     }
@@ -245,6 +267,8 @@ public class MatchmakingBgFx
         this.bottom.DOKill();
         this.top.anchoredPosition    = this.m_topHome;
         this.bottom.anchoredPosition = this.m_bottomHome;
+
+        this.m_closed = false;
 
         // 지난 매칭이 덱 색으로 옮겨 놓은 기준을 되돌린다 — 안 되돌리면 다음 매칭이 덱 색으로 열린다.
         if (_tint == null || !this.m_imagesCaptured) return;
