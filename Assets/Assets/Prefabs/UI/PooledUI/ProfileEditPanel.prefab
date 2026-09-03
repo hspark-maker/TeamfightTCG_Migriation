@@ -857,12 +857,12 @@ MonoBehaviour:
   label: {fileID: 6774496731235410527}
   icon: {fileID: 0}
   selectedMark: {fileID: 0}
-  selectedSprite: {fileID: 21300000, guid: 3eba92f7629b145ae9366b196000a3f3, type: 3}
-  selectedColor: {r: 0.98, g: 0.78, b: 0.12, a: 1}
-  selectedLabelColor: {r: 0.2, g: 0.14, b: 0.02, a: 1}
-  normalSprite: {fileID: 21300000, guid: 3eba92f7629b145ae9366b196000a3f3, type: 3}
-  normalColor: {r: 0.45, g: 0.62, b: 0.78, a: 1}
-  normalLabelColor: {r: 1, g: 1, b: 1, a: 1}
+  selectedSprite: {fileID: 21300000, guid: bf152332a0a334948a71aea0cc2e00c0, type: 3}
+  selectedColor: {r: 1, g: 1, b: 1, a: 1}
+  selectedLabelColor: {r: 0.23529412, g: 0.09019608, b: 0, a: 1}
+  normalSprite: {fileID: 21300000, guid: 21ff107b7c311a049b517f59291ca232, type: 3}
+  normalColor: {r: 0.88235295, g: 0.83137256, b: 0.7764706, a: 1}
+  normalLabelColor: {r: 0.23529412, g: 0.09019608, b: 0, a: 1}
 --- !u!1 &5181494996849775323
 GameObject:
   m_ObjectHideFlags: 0
@@ -1476,12 +1476,12 @@ MonoBehaviour:
   label: {fileID: 3610291893012425880}
   icon: {fileID: 0}
   selectedMark: {fileID: 0}
-  selectedSprite: {fileID: 21300000, guid: 3eba92f7629b145ae9366b196000a3f3, type: 3}
-  selectedColor: {r: 0.98, g: 0.78, b: 0.12, a: 1}
-  selectedLabelColor: {r: 0.2, g: 0.14, b: 0.02, a: 1}
-  normalSprite: {fileID: 21300000, guid: 3eba92f7629b145ae9366b196000a3f3, type: 3}
-  normalColor: {r: 0.45, g: 0.62, b: 0.78, a: 1}
-  normalLabelColor: {r: 1, g: 1, b: 1, a: 1}
+  selectedSprite: {fileID: 21300000, guid: bf152332a0a334948a71aea0cc2e00c0, type: 3}
+  selectedColor: {r: 1, g: 1, b: 1, a: 1}
+  selectedLabelColor: {r: 0.23529412, g: 0.09019608, b: 0, a: 1}
+  normalSprite: {fileID: 21300000, guid: 21ff107b7c311a049b517f59291ca232, type: 3}
+  normalColor: {r: 0.88235295, g: 0.83137256, b: 0.7764706, a: 1}
+  normalLabelColor: {r: 0.23529412, g: 0.09019608, b: 0, a: 1}
 --- !u!1 &7347649016597621195
 GameObject:
   m_ObjectHideFlags: 0
@@ -1626,7 +1626,7 @@ RectTransform:
   m_Father: {fileID: 6250664301426549845}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
+  m_AnchorMax: {x: 1, y: 0.96282893}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}

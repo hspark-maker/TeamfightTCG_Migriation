@@ -979,7 +979,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LobbyMatchLauncher
   overlayHost: {fileID: 7849464544123050706}
-  aiDeckConfig: {fileID: 11400000, guid: 7275411125aa5674a90a9f07342babbc, type: 2}
   profilePool: {fileID: 11400000, guid: 7f6df2feb8d5076418b96358ee58377d, type: 2}
   lobbyTabController: {fileID: 3797395670514148879}
   deckPanel: {fileID: 3228001466242478929}
@@ -5401,6 +5400,10 @@ PrefabInstance:
     - target: {fileID: 3737722962652829203, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
       propertyPath: m_AnchoredPosition.y
       value: -100.00195
+      objectReference: {fileID: 0}
+    - target: {fileID: 4534652656508508557, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7319777168212348896, guid: f240957e1e8db1645a7c70c547727d25, type: 3}
       propertyPath: m_SizeDelta.y
