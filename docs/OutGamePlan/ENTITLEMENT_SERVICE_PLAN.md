@@ -135,6 +135,8 @@ interface Entitlement {
 - 서버 모듈 신설: `functions/src/entitlements/entitlementStore.ts`
   - `entitlementRef(db, env, uid, kind, key)` · `readEntitlements(transaction, ...)` · `writeEntitlement(...)` · `hasEntitlement(...)`
   - `walletStore` 관용구를 따른다 — `db` · `transaction` · `now` 를 전부 인자로 받고 `HttpsError` 를 모른다(`functions/src/currency/walletStore.ts` 참조).
+  - **삭제 API 는 두지 않는다.** 권리를 지우는 callable 은 그 자체가 재수령 도구이고, 그것을 막는 것이 룰이 아니라 코드 안의 env 문자열 비교뿐이다. QA 계정을 밀어야 하면 배포되지 않는 `functions/scripts/` 에서 Admin SDK 로 돌린다(`firebase.json` 의 functions ignore 목록에 `scripts` 가 들어 있다).
+  - 이 규칙은 **기존 `devRewindTutorial` 에도 적용된다.** 그것이 하는 일이 바로 QA 계정 밀기다. 배포되는 표면에 QA 도구를 두지 않으므로 같은 자리로 내린다 — 이관은 P1 에 적었다.
 - 룰 블록 신설: `firestore.rules` 의 `grants` 블록 아래. 읽기는 본인 uid + 알려진 env 로 열고 `list` 를 허용한다(현행 `grants` 는 `docId == 'current'` 고정이라 목록 읽기가 막혀 있다). 쓰기는 `if false`.
 - 룰 테스트 케이스 추가: `Tools/firestore-rules-tests/rules.test.js` 의 20~21c(grants) 다음 자리. 픽스처는 `fixtures/entitlementDocument.js` 를 새로 만든다.
   - 거부 케이스는 반드시 `seed(1)` 로 문서를 먼저 심고 update 로 위반을 쏜다. create 로 쓰면 `allow create: if false` 때문에 무조건 실패해 검증이 공허해진다(`Tools/firestore-rules-tests/README.md:69-72`).
@@ -150,6 +152,23 @@ interface Entitlement {
   - `RefreshAsync` 재읽기 경로도 함께 바뀐다(`OutGame/Growth/CardGrowthManager.cs:204-210` · `KeywordGrowthManager.cs:135-141` 이 부른다).
   - 표시 경로는 건드리지 않는다. 화면은 grants 를 직접 보지 않고, `CardGrowthManager.TryGetStepAt:232-240` 이 `HasFreeShot` 일 때 cost 를 0 으로 갈아끼운 결과만 그린다.
 - **옛 문서 쓰기는 이 단계에서 중단한다.** 무료 한 방은 마이그레이션 대상이 명확하고(P4), 이중 쓰기의 이득이 없다.
+
+#### 되감기를 callable 에서 스크립트로 내린다
+
+`devRewindTutorial` 은 QA 되감기가 세이브 슬롯 9개를 통째로 밀면서 **튜토리얼과 무관한 수령 낙인까지 비우는 것**을 막으려고 서버에 있었다(`devRewindTutorial.ts:15-16`). 그 낙인 셋(`rank.claimedTiers` · `albumReward.claimedKeys` · `adventure.clearedNodeIds`/`claimedChapterIds`)이 P2·P3 에서 세이브 밖으로 나가면 이 근거가 사라진다.
+
+튜토리얼 지급 자체는 원래 통로가 아니었다 — 판정은 이미 `grantTutorialCards` 가 하고, 그마저 소유에 없는 것만 골라 담아 두 번째 호출이 빈 배열이 되며(`grantTutorialCards.ts:91`), 튜토리얼 액션 24개 중 재화를 주는 것이 하나도 없다.
+
+근거가 사라져도 되감기 **자체**는 QA 도구로 계속 필요하다. 그래서 없앨 것은 되감기가 아니라 그것이 배포되는 함수라는 사실이다. P0 의 삭제 API 조항과 같은 자리로 내린다.
+
+- 신설: `functions/scripts/rewind-tutorial.js`. `check-pack-spec.js` 관용구를 따라 `lib/save/freshAccount.js` 의 `buildFreshAccountSlots` 를 그대로 불러 쓴다 — 첫실행 상태의 정의를 두 벌로 만들지 않는 것이 이 선택의 핵심이다. 쓰기 자격증명은 `grant-admin.js` 처럼 ADC 나 서비스 계정 키로 붙인다.
+  - **메타 5키 규약을 스크립트가 직접 지킨다.** `mutateSave` 를 타지 않으므로 `revision + 1` 과 `schemaVersion` 동등을 스스로 갱신해야 한다. 어긋나면 그 계정의 이후 클라 저장이 룰에 영구 거부된다(`firestore.rules:108-109`).
+- 제거: `functions/src/commands/devRewindTutorial.ts` · `functions/src/index.ts:3` 의 export · 클라 호출부(`OutGame/Tutorial/OutgameTutorialRewind.cs` 의 `ApplyWipeIfScheduled`).
+  - **배포 삭제 절차가 필요 없다.** 이 함수는 배포된 적이 없다. export 를 지우면 배포 목록에서 그냥 빠진다.
+  - 클라에서 1단이 사라지면 그것 때문에 있던 배관도 함께 빠진다 — `SaveDependentManagersStep.cs:62` 의 `await`(초기화 스텝을 async 로 만들고 `s_installing` 합류 게이트를 세운 원인)와 `PREF_KEY` → `PREF_REPLAY_KEY` 2단 예약. 인계 키는 "밀기와 재생 사이에서 초기화가 끊기면 다음 부팅이 또 민다"를 막으려던 것인데, 밀기가 클라에 없으면 그 사고가 성립하지 않는다.
+- **2단(`ApplyReplayIfScheduled`)은 그대로 클라에 남는다.** 좌표까지의 지급을 재생하려면 튜토리얼 스텝 저작을 읽어야 하는데 그것이 클라 SO 라 서버가 보지 못한다(`devRewindTutorial.ts:10` 주석도 같은 말을 한다). 예약 PlayerPrefs 는 좌표 전달용으로 남되 키 하나로 줄어든다.
+- **되감기는 권리를 되돌리지 않는다.** 권리 문서는 세이브 슬롯이 아니므로 첫실행 밀기가 지우지 않는다. 이것은 스크립트 이관과 무관한, 엔타이틀먼트 이관 자체의 귀결이다. 무료 한 방·수령 이력의 초기 상태가 필요하면 새 계정을 쓴다 — 되감기는 지금도 잔액을 되돌리지 않아(`OutgameTutorialRewind.cs:111`) 애초에 첫실행과 같지 않다.
+  - QA 에 미치는 실제 영향은 하나다. 무료 한 방이 `consumed` 로 남으므로 **되감기 후 온보딩 강화 스텝을 무료로 도는 경험을 재현할 수 없다.** 그 스텝은 한 번 정지 사고가 났던 자리다.
 
 ### P2 — 수령 표식 이관 (이중 쓰기)
 
@@ -271,7 +290,9 @@ firebase deploy --only functions
 
 7. **`adventure` 는 재수화를 구독한다**(`:26`). 셋 중 유일하다. 이관 후에도 `AdventureProgress.NotifyRehydrated()` 가 계속 울려야 한다.
 
-8. **문서 이름과 코드 이름이 다르다.** 기능 지도(`.claude/orch-feature-map.md`)는 `Tournament` 로 적고 있지만 실제 코드는 `adventure` 슬롯 · `reportAdventureWin` · `AdventureProgress` 다. 이 계획이 끝나면 지도도 함께 고친다.
+8. **되감기 스크립트는 `mutateSave` 를 타지 않는다.** Admin SDK 로 문서를 직접 쓰므로 메타 갱신을 대신해 줄 사람이 없다. `revision + 1` 과 `schemaVersion` 동등을 스스로 지켜야 하고, 어긋난 문서를 받은 계정은 이후 클라 저장이 **영구 거부**된다. 3번과 같은 급의 사고다.
+
+9. **문서 이름과 코드 이름이 다르다.** 기능 지도(`.claude/orch-feature-map.md`)는 `Tournament` 로 적고 있지만 실제 코드는 `adventure` 슬롯 · `reportAdventureWin` · `AdventureProgress` 다. 이 계획이 끝나면 지도도 함께 고친다.
 
 ---
 
@@ -297,7 +318,8 @@ firebase deploy --only functions
 
 ### 명시적으로 범위 밖
 
-- **카드 소유의 쓰기 주체 이관.** 클라가 소유를 늘리는 자리는 지금 넷이다 — 디버그 셋(`OutgameDebugActions.cs:235` · `:241`, `UI/Debug/UnlockAllCardsButton.cs:25`, `Test/MultiplayerTestDebugPanel.cs:54`)과 **튜토리얼 되감기**(`OutGame/Tutorial/OutgameTutorialRewind.cs:147` · `:171` · `:179`). 정상 플레이 경로는 없다. 그래서 이관 자체는 크지 않지만, 되감기의 카드 재지급을 서버 callable 로 옮기고 `Init` 의 카탈로그 정리 flush(`OwnershipManager.cs:40`)를 서버 쪽으로 넘기는 작업이 함께 붙는다. 그 전에는 룰을 조일 수 없다 — 조이는 순간 되감기와 디버그가 죽는다.
+- **카드 소유의 쓰기 주체 이관.** 클라가 소유를 늘리는 자리는 지금 넷이다 — 디버그 셋(`OutgameDebugActions.cs:235`, `UI/Debug/UnlockAllCardsButton.cs:25`, `Test/MultiplayerTestDebugPanel.cs:54` 가 모두 `GrantEntireCatalog` 을 부른다)과 **튜토리얼 되감기의 지급 재생**(`OutGame/Tutorial/OutgameTutorialRewind.cs:150` · `:174` · `:182`). 정상 플레이 경로는 없다. 그래서 이관 자체는 크지 않지만, 되감기의 카드 재지급을 서버로 옮기고 `Init` 의 카탈로그 정리 flush(`OwnershipManager.cs:40`)를 서버 쪽으로 넘기는 작업이 함께 붙는다. 그 전에는 룰을 조일 수 없다 — 조이는 순간 디버그와 이 재생이 죽는다.
+  - 인용한 세 줄은 **전부 2단(`ApplyReplayIfScheduled`)** 이다. 1단인 슬롯 밀기에는 소유 쓰기가 없다. P1 에서 1단이 `functions/scripts/` 의 Admin SDK 스크립트로 내려가면 그쪽은 룰을 타지 않으므로, 룰을 조여도 죽는 것은 2단과 디버그뿐이다.
 - **랭크 점수의 서버 이관.** 지금은 클라가 승패를 보고 계산해 세이브에 쓴다(`RankManager.cs:169-192`). 서버는 정산용으로 읽기만 한다(`submitMatchResult.ts:468`). **선행 조건은 전투 결과 판정의 서버화**다 — 서버가 승패를 모르면 점수를 계산할 근거가 없으므로 점수 계산만 떼어 옮길 수 없다. 둘 중 이쪽이 훨씬 크다.
 - **일일 지급 기능.** `expiresAt` 필드와 TTL 정책 자리만 열어 둔다. 실제 기능에는 날짜 경계 계산이 필요한데, 지금 서버가 시각을 판정에 쓰는 곳은 만료 비교뿐이고 그것도 전부 `now + TTL` 절대시각이다. 리셋 기준 시각과 타임존을 정하는 단일 지점이 없으므로, 그 규칙을 먼저 만들어야 한다.
 - **세이브 문서 전체의 서버 권위 전환.** 1절의 부분 이행 표에서 마지막 한 줄을 뒤집는 작업이다. 위 랭크 점수 이관도 그 안에 든다.
