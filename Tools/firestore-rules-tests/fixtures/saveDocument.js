@@ -4,6 +4,9 @@
 //         (필드 이름) + OutGame/Save/2.Domain/*SaveData.cs (슬롯 내부 모양).
 // 저기가 바뀌면 여기도 바뀌어야 한다. 안 맞추면 룰이 조용히 낡고, 배포하는 날
 // 전 유저 저장이 거부된다 — 커밋 809d040d3 이 정확히 그 사고였다.
+//
+// 최상위 키 목록과 스키마 버전만은 손으로 맞추지 않아도 된다 — rules.test.js 의 0a·0c 가
+// clientContract.js 로 .cs 를 직접 읽어 대조한다. 슬롯 내부 모양은 여전히 손으로 맞춰야 한다.
 import { serverTimestamp } from 'firebase/firestore';
 
 /** UserSaveData.VERSION 과 functions/src/save/saveDocument.ts 의 SCHEMA_VERSION 쌍둥이 상수. */
