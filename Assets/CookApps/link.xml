@@ -2,6 +2,7 @@
 <!--CookApps 패키지 자동 생성 (수정하지 마세요!!)-->
 <linker>
   <!--CookApps 내부 패키지-->
+  <assembly fullname="CookApps.Tech.LocalData" preserve="all" />
   <assembly fullname="AppleAuth" preserve="all" />
   <assembly fullname="CookApps.PlatformAuth" preserve="all" />
   <assembly fullname="CookApps.GoogleSignIn" preserve="all" />

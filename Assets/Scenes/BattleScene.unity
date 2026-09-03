@@ -656,17 +656,28 @@ MonoBehaviour:
   m_GameObject: {fileID: 154463621}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4f231c4fb786f3946a6b90b886c48677, type: 3}
+  m_Script: {fileID: 11500000, guid: 01614664b831546d2ae94a42149d80ac, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.EventSystems.StandaloneInputModule
+  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.UI.InputSystemUIInputModule
   m_SendPointerHoverToParent: 1
-  m_HorizontalAxis: Horizontal
-  m_VerticalAxis: Vertical
-  m_SubmitButton: Submit
-  m_CancelButton: Cancel
-  m_InputActionsPerSecond: 10
-  m_RepeatDelay: 0.5
-  m_ForceModuleActive: 0
+  m_MoveRepeatDelay: 0.5
+  m_MoveRepeatRate: 0.1
+  m_XRTrackingOrigin: {fileID: 0}
+  m_ActionsAsset: {fileID: -944628639613478452, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_PointAction: {fileID: -1654692200621890270, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_MoveAction: {fileID: -8784545083839296357, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_SubmitAction: {fileID: 392368643174621059, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_CancelAction: {fileID: 7727032971491509709, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_LeftClickAction: {fileID: 3001919216989983466, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_MiddleClickAction: {fileID: -2185481485913320682, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_RightClickAction: {fileID: -4090225696740746782, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_ScrollWheelAction: {fileID: 6240969308177333660, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_TrackedDevicePositionAction: {fileID: 6564999863303420839, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_TrackedDeviceOrientationAction: {fileID: 7970375526676320489, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_DeselectOnBackgroundClick: 1
+  m_PointerBehavior: 0
+  m_CursorLockBehavior: 0
+  m_ScrollDeltaPerTick: 6
 --- !u!1 &171939904
 GameObject:
   m_ObjectHideFlags: 0
@@ -3371,7 +3382,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 7.77
+  orthographic size: 7.3999996
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -3486,7 +3497,7 @@ MonoBehaviour:
   contentZ: 0
   applyInEditMode: 1
   drawGizmos: 1
-  status: "aspect 0.486  \uAC70\uB9AC 12.82  \uBC30\uC728 1.17\n\uAC00\uC2DC \xB13.60
+  status: "aspect 0.486  \uAC70\uB9AC 11.00  \uBC30\uC728 1.17\n\uAC00\uC2DC \xB13.60
     x \xB17.40  (\uB2F4\uC744 \uC601\uC5ED \xB13.60 x \xB14.70)\nOK \u2014 \uC804\uBD80
     \uBCF4\uC784"
 --- !u!1 &982015555
@@ -4798,7 +4809,9 @@ MonoBehaviour:
   playerFieldView: {fileID: 282937760}
   enemyFieldView: {fileID: 1542130815}
   introBackDistance: 9
+  introBackOrthoScale: 1.82
   fallbackTargetZ: -11
+  fallbackTargetOrthoSize: 6.351
   playerFaceDownPrefab: {fileID: 8213931047195785937, guid: e26cd5c9294b66d4fa5841e82931ea13, type: 3}
   enemyFaceDownPrefab: {fileID: 8213931047195785937, guid: a6b82b503f3c72b4b9429c1572e39a15, type: 3}
   deckIntroParent: {fileID: 1944050833}

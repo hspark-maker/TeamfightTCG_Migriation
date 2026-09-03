@@ -2,6 +2,7 @@ export {ping} from "./commands/ping";
 export {devBumpRevision} from "./commands/devBumpRevision";
 export {ensureAccount} from "./commands/ensureAccount";
 export {ensureWallet} from "./commands/ensureWallet";
+export {repairSaveSlots} from "./commands/repairSaveSlots";
 export {openPack} from "./commands/openPack";
 export {claimReward} from "./commands/claimReward";
 export {createMatch} from "./commands/createMatch";
