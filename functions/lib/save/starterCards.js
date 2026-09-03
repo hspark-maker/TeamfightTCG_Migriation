@@ -37,9 +37,8 @@ exports.resolveStarterCardIds = resolveStarterCardIds;
 const logger = __importStar(require("firebase-functions/logger"));
 const specBlobReader_1 = require("../specs/specBlobReader");
 const starterPool_1 = require("./starterPool");
-/** 카드 카탈로그가 될 수 있는 표. 클라 SpecSource 가 ContentProfile 의 RunMode 로 하나를 고르는데,
- * 서버는 그 선택을 알 수 없어 합집합으로 본다 — 여기서 걸러야 할 것은 "어느 표에도 없는 카드"다. */
-const CARD_TABLES = ["Card", "Card_Test"];
+/** 카드 카탈로그 표. 클라·서버 모두 Card 하나만 읽는다(Card_Test 표는 폐기). */
+const CARD_TABLES = ["Card"];
 /**
  * 카드 카탈로그의 id 집합. 행 문서 id 가 곧 카드 id 다(업로더가 id 열로 문서를 만든다).
  * @param {string} env 환경 id

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 // 아웃게임 첫시작 튜토리얼 진행도의 static 단일 창구(세이브 슬롯 매핑을 여기서만 안다)
@@ -7,7 +7,7 @@ public static class OutgameTutorialProgress
     // 같은 좌표로 이만큼 더 초기화하면 진행이 막힌 것으로 본다(0=직후, 2=세 번째 초기화).
     // 두 번까지 봐주는 이유: 튜토 도중 앱을 끄는 것은 흔한 일이고, 오탐 대가(기능이 미리 열림)보다
     // 놓쳤을 때 대가(게임 자체를 못 함)가 훨씬 크다.
-    const int STALL_BOOT_COUNT = 2;
+    const int STALL_INIT_COUNT = 2;
 
     public static bool IsCompleted => Slot.OutgameCompleted;
 
@@ -59,9 +59,9 @@ public static class OutgameTutorialProgress
     public static void ResetStallWatch()
     {
         var t_slot = Slot;
-        t_slot.LastBootChapterIndex = t_slot.ChapterIndex;
-        t_slot.LastBootStepIndex    = t_slot.ChapterStepIndex;
-        t_slot.SameCoordBootCount   = 0;
+        t_slot.LastInitChapterIndex = t_slot.ChapterIndex;
+        t_slot.LastInitStepIndex    = t_slot.ChapterStepIndex;
+        t_slot.SameCoordInitCount   = 0;
         Save();
     }
 
@@ -137,23 +137,23 @@ public static class OutgameTutorialProgress
         var t_slot = Slot;
         if (t_slot.OutgameCompleted) return;
 
-        if (t_slot.LastBootChapterIndex != t_slot.ChapterIndex
-         || t_slot.LastBootStepIndex    != t_slot.ChapterStepIndex)
+        if (t_slot.LastInitChapterIndex != t_slot.ChapterIndex
+         || t_slot.LastInitStepIndex    != t_slot.ChapterStepIndex)
         {
-            t_slot.LastBootChapterIndex = t_slot.ChapterIndex;
-            t_slot.LastBootStepIndex    = t_slot.ChapterStepIndex;
-            t_slot.SameCoordBootCount   = 0;
+            t_slot.LastInitChapterIndex = t_slot.ChapterIndex;
+            t_slot.LastInitStepIndex    = t_slot.ChapterStepIndex;
+            t_slot.SameCoordInitCount   = 0;
             Save();
             return;
         }
 
-        t_slot.SameCoordBootCount++;
+        t_slot.SameCoordInitCount++;
         Save();
 
-        if (t_slot.SameCoordBootCount < STALL_BOOT_COUNT) return;
+        if (t_slot.SameCoordInitCount < STALL_INIT_COUNT) return;
 
         Debug.LogWarning($"[OutgameTutorialProgress] 좌표 {t_slot.ChapterIndex}-{t_slot.ChapterStepIndex}에서 "
-                       + $"{t_slot.SameCoordBootCount + 1}번째 초기화 — 진행이 막힌 것으로 보고 기능 잠금을 해제합니다.");
+                       + $"{t_slot.SameCoordInitCount + 1}번째 초기화 — 진행이 막힌 것으로 보고 기능 잠금을 해제합니다.");
         OutgameFeatureLock.NotifyStalled();
     }
 }

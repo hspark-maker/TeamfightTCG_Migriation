@@ -69,8 +69,8 @@ MonoBehaviour:
   - {fileID: 1581884920793774151}
   - {fileID: 1581884920793774154}
   - {fileID: 1581884920793774145}
-  - {fileID: 1581884920793774146}
   - {fileID: 1581884920793774147}
+  - {fileID: 1581884920793774146}
   - {fileID: 1581884920793774148}
   - {fileID: 1581884920793774149}
   - {fileID: 1581884920793774150}
@@ -125,11 +125,12 @@ MonoBehaviour:
   required: 1
   requiredIds: 
   - CardCatalog
+  - SpecSheetPreload
   retryEntry: 0
   syncUiPrefabs: {fileID: 11400000, guid: 433bc64ee546c684e85071d606a25a87, type: 2}
   albumConfig: {fileID: 11400000, guid: 5c04cd167e805484b92609d72e119abd, type: 2}
   currencyLook: {fileID: 11400000, guid: b9d217f7eca0f6345ae5bd3b654b4a37, type: 2}
-  tournamentConfig: {fileID: 11400000, guid: ff32166a7a94716469f68bae386a7555, type: 2}
+  adventureConfig: {fileID: 11400000, guid: ff32166a7a94716469f68bae386a7555, type: 2}
   profileConfig: {fileID: 11400000, guid: 098146b7940589948afb63e709ac5357, type: 2}
   deckImageCatalog: {fileID: 11400000, guid: 20a3ae6097a4cb440ad35c4621cec66e, type: 2}
 --- !u!114 &1581884920793774147

@@ -127,7 +127,7 @@ public class AlbumThemeCellView : MonoBehaviour
         else     TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.AlbumThemeCell, t_rect);
     }
 
-    // 준비 중 테마의 잠김 룩 — 셀 전체 탈채도 + 썸네일 위 자물쇠(FeatureLockView·TournamentNodeView와 같은 관용구).
+    // 준비 중 테마의 잠김 룩 — 셀 전체 탈채도 + 썸네일 위 자물쇠(FeatureLockView·AdventureNodeView와 같은 관용구).
     // 차단(interactable)도 여기서 세운다 — 이 셀에는 잠김을 세우는 다른 계산식이 없어 서로 덮어쓸 일이 없다.
     void ApplyLocked(bool _locked)
     {

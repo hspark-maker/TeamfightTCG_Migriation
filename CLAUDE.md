@@ -4,6 +4,14 @@
 
 항상 한국어로 대답할 것.
 
+## 스펙 데이터 수정 규칙
+
+- 스펙 값의 저장소 진실원은 `docs/SpecData/*_sheet.csv`다. 값 변경은 CSV에만 한다.
+- `Assets/Resources/SpecData.bytes`는 공식 `SpecLocalCsvImporter`가 CSV에서 생성하는 파생물이다. 복호화·스플라이스·재암호화 등으로 직접 수정하지 않는다(복호화해서 **확인**하는 것은 유효한 검증 수단이다).
+- CSV를 고쳤으면 임포터를 돌려 bytes를 다시 만든다. 안 돌리면 CSV와 blob이 갈린 채로 남고, 게임은 옛 blob을 본다.
+- 정식 시트 스키마가 바뀌면 시트 반영과 CS 생성을 먼저 하고, 로컬 실험본이 필요할 때만 공식 CSV 임포터를 실행한다.
+- 자동 생성 파일 `Assets/Table/SpecDatas.cs`와 `Assets/Table/SpecDataManager.cs`를 수동 수정하지 않는다.
+
 ## Agent 활용 정책 (기본 = 적극 위임)
 
 실질적 작업은 사용자가 매번 지시하지 않아도 **스스로 판단해 커스텀 subagent 팀에 자동 위임**하고, 각 피드백을 취합한 뒤 진행한다. 위임을 물어보지 말고 그냥 소집한다(사용자가 "직접 해" 하면 인라인 처리).

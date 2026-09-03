@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 5243376360609879011}
   - component: {fileID: 2326935933005227434}
   - component: {fileID: 7839374978957722227}
+  - component: {fileID: 9101010101010100002}
   m_Layer: 0
   m_Name: 60FPS
   m_TagString: Untagged
@@ -61,14 +62,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.88235295, g: 0.83137256, b: 0.7764706, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: bf152332a0a334948a71aea0cc2e00c0, type: 3}
+  m_Sprite: {fileID: 21300000, guid: be10fe8abaafba349845c56a7d97c7fe, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -77,7 +78,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 4.19
+  m_PixelsPerUnitMultiplier: 1
 --- !u!114 &2326935933005227434
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -136,6 +137,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   overrideClips:
   - {fileID: 8300000, guid: ae192f2d23d3ff348bfcb79b9abfa80e, type: 3}
+--- !u!114 &9101010101010100002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 212987889828575300}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f3256c202511e90468aaa1175122af9d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  targetImage: {fileID: 5243376360609879011}
+  selectedTint: {r: 1, g: 1, b: 1, a: 1}
+  unselectedTint: {r: 0.55, g: 0.55, b: 0.55, a: 1}
 --- !u!1 &678455856961288614
 GameObject:
   m_ObjectHideFlags: 0
@@ -1652,6 +1668,7 @@ GameObject:
   - component: {fileID: 4260832494243779246}
   - component: {fileID: 2187050136713102520}
   - component: {fileID: 4608066497572471714}
+  - component: {fileID: 9101010101010100005}
   m_Layer: 0
   m_Name: ShakeOff
   m_TagString: Untagged
@@ -1700,14 +1717,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.88235295, g: 0.83137256, b: 0.7764706, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: bf152332a0a334948a71aea0cc2e00c0, type: 3}
+  m_Sprite: {fileID: 21300000, guid: be10fe8abaafba349845c56a7d97c7fe, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -1775,6 +1792,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   overrideClips:
   - {fileID: 8300000, guid: ae192f2d23d3ff348bfcb79b9abfa80e, type: 3}
+--- !u!114 &9101010101010100005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4267817379620189547}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f3256c202511e90468aaa1175122af9d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  targetImage: {fileID: 4260832494243779246}
+  selectedTint: {r: 1, g: 1, b: 1, a: 1}
+  unselectedTint: {r: 0.55, g: 0.55, b: 0.55, a: 1}
 --- !u!1 &4385072067334263181
 GameObject:
   m_ObjectHideFlags: 0
@@ -4212,6 +4244,7 @@ GameObject:
   - component: {fileID: 256601889573100738}
   - component: {fileID: 3863284739614266292}
   - component: {fileID: 8395843568167195043}
+  - component: {fileID: 9101010101010100004}
   m_Layer: 0
   m_Name: ShakeOn
   m_TagString: Untagged
@@ -4335,6 +4368,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   overrideClips:
   - {fileID: 8300000, guid: ae192f2d23d3ff348bfcb79b9abfa80e, type: 3}
+--- !u!114 &9101010101010100004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6046866597408480842}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f3256c202511e90468aaa1175122af9d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  targetImage: {fileID: 256601889573100738}
+  selectedTint: {r: 1, g: 1, b: 1, a: 1}
+  unselectedTint: {r: 0.55, g: 0.55, b: 0.55, a: 1}
 --- !u!1 &6088653995127162614
 GameObject:
   m_ObjectHideFlags: 0
@@ -5027,6 +5075,7 @@ GameObject:
   - component: {fileID: 5733728669326889570}
   - component: {fileID: 8345286996558913540}
   - component: {fileID: 4577340596202905173}
+  - component: {fileID: 9101010101010100003}
   m_Layer: 0
   m_Name: 144FPS
   m_TagString: Untagged
@@ -5099,7 +5148,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7789226408932298669}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
   m_Name: 
@@ -5150,6 +5199,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   overrideClips:
   - {fileID: 8300000, guid: ae192f2d23d3ff348bfcb79b9abfa80e, type: 3}
+--- !u!114 &9101010101010100003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7789226408932298669}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f3256c202511e90468aaa1175122af9d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  targetImage: {fileID: 5733728669326889570}
+  selectedTint: {r: 1, g: 1, b: 1, a: 1}
+  unselectedTint: {r: 0.55, g: 0.55, b: 0.55, a: 1}
 --- !u!1 &8111991090602027652
 GameObject:
   m_ObjectHideFlags: 0
@@ -5300,6 +5364,7 @@ GameObject:
   - component: {fileID: 4996008223445435488}
   - component: {fileID: 2929629499641339517}
   - component: {fileID: 9188366026313740268}
+  - component: {fileID: 9101010101010100001}
   m_Layer: 0
   m_Name: 30FPS
   m_TagString: Untagged
@@ -5423,3 +5488,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   overrideClips:
   - {fileID: 8300000, guid: ae192f2d23d3ff348bfcb79b9abfa80e, type: 3}
+--- !u!114 &9101010101010100001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8313982625116209426}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f3256c202511e90468aaa1175122af9d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  targetImage: {fileID: 4996008223445435488}
+  selectedTint: {r: 1, g: 1, b: 1, a: 1}
+  unselectedTint: {r: 0.55, g: 0.55, b: 0.55, a: 1}

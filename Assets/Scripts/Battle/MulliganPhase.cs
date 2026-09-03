@@ -87,15 +87,17 @@ public static class MulliganPhase
         if (t_in == null) return;
 
         // 교체된 카드가 덱으로 물러난다(교활 교대와 같은 그림). 표식만 다르다 —
-        // 안개는 교활 전용이라 여기선 등장과 같은 반짝임을 쓴다.
+        // 안개는 교활 전용이고, 반짝임은 들어오는 카드의 등장(아래 PlayFillAnim)으로 옮겼다.
+        // 그래서 퇴장은 연출 없이 조용히 간다.
         // **Refresh 전에** 불러야 한다 — 스왑은 끝났지만 슬롯 뷰는 아직 나가는 카드를 그리고 있고,
         // 이 창을 놓치면 새로 들어온 카드가 대신 돌아 나가는 그림이 된다(교활 호출 규약과 동일).
         // isRevealed는 MulliganSwap이 이미 false로 만들어 뒀다 — 연출이 상태를 만들지 않는다.
-        if (t_outView != null) await CunningVfx.PlayExit(t_outView, BattleVfxId.CardAppear);
+        if (t_outView != null) await CunningVfx.PlayExit(t_outView, BattleVfxId.None);
 
         // 연출: 교체 표시(Refresh) 후 새 카드만 딜 애니(FillAndAnimate와 동형).
+        // 등장 반짝임을 켠다 — 교활 교대 등장과 같은 그림(중앙에 선 순간 발화).
         t_view.Refresh();
-        await t_view.PlayFillAnim(new List<CardInstance> { t_in });
+        await t_view.PlayFillAnim(new List<CardInstance> { t_in }, _playAppearVfx: true);
     }
 
     /// <summary>후공 플레이어가 자기 슬롯 카드 1장을 탭(또는 스킵)할 때까지 대기. 선택 슬롯 인덱스, 스킵이면 -1.

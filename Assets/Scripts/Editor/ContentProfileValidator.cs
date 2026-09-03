@@ -18,6 +18,13 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
     public void OnPreprocessBuild(BuildReport _report)
     {
         EContentRunMode t_mode = BuildMode(_report);
+
+        // 어느 창에서 빌드하든 여기는 지난다. 개발 빌드 여부를 산출물로 확인하려면 APK 를 깔아 봐야 해서
+        // 매번 추측이 붙던 자리 — 빌드 시작 시점에 한 줄로 못 박는다.
+        bool t_development = (_report.summary.options & BuildOptions.Development) != 0;
+        Debug.Log($"[빌드] mode={t_mode} development={t_development} target={_report.summary.platform} " +
+                  $"app={PlayerSettings.bundleVersion} tableGen={ContentVersion.Major} options={_report.summary.options}");
+
         ValidateOrThrow(t_mode);
     }
 
@@ -64,7 +71,7 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
             var t_liveIds = new HashSet<int>();
             try
             {
-                foreach (CardSpec t_spec in SpecSource.LoadCards(EContentRunMode.Live).Values)
+                foreach (CardSpec t_spec in SpecSource.LoadCards().Values)
                     if (t_spec.Channel == ECardChannel.Live) t_liveIds.Add(t_spec.Id);
             }
             catch (Exception t_exception)
@@ -105,19 +112,16 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
             return;
         }
 
-        foreach (EContentRunMode t_mode in new[] { EContentRunMode.Live, EContentRunMode.Test })
+        // 카드 표는 Card 하나라 모드별로 두 번 돌 이유가 없다(Card_Test 표 폐기).
+        try
         {
-            List<string> t_issues = !_mode.HasValue || _mode.Value == t_mode ? _errors : _warnings;
-            try
-            {
-                foreach (CardSpec t_spec in SpecSource.LoadCards(t_mode).Values)
-                    foreach (string t_name in t_spec.SynergyNames)
-                        t_registry.Require(t_name);
-            }
-            catch (Exception t_exception)
-            {
-                t_issues?.Add($"{t_mode} 카드 시너지 검증 실패: {t_exception.Message}");
-            }
+            foreach (CardSpec t_spec in SpecSource.LoadCards().Values)
+                foreach (string t_name in t_spec.SynergyNames)
+                    t_registry.Require(t_name);
+        }
+        catch (Exception t_exception)
+        {
+            _errors.Add($"카드 시너지 검증 실패: {t_exception.Message}");
         }
     }
 
@@ -152,7 +156,7 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
         {
             List<string> t_issues = !_mode.HasValue || _mode.Value == t_mode ? _errors : _warnings;
             Dictionary<int, CardSpec> t_specs;
-            try { t_specs = SpecSource.LoadCards(t_mode); }
+            try { t_specs = SpecSource.LoadCards(); }
             catch (Exception t_exception)
             {
                 t_issues?.Add($"카드 아트 주소 검증용 {t_mode} 표 로드 실패: {t_exception.Message}");
@@ -247,14 +251,6 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
             }
             t_byId.Add(t_deck.deckId, t_deck);
 
-            int t_maxTier = t_tierCount > 0 ? t_tierCount - 1 : int.MaxValue;
-            if (t_deck.fromTier < 0 || t_deck.fromTier > t_maxTier ||
-                (t_deck.toTier != 0 && (t_deck.toTier < t_deck.fromTier || t_deck.toTier > t_maxTier)))
-            {
-                _errors.Add($"{t_deck.deckId} 티어 구간 오류: {t_deck.fromTier}~{t_deck.toTier}");
-                t_invalid.Add(t_deck.deckId);
-            }
-
             // 레벨은 한쪽만 채우면 런타임이 미저작으로 보고 조용히 바닥으로 떨어진다 — 반쪽 저작을 여기서 잡는다.
             bool t_hasFrom = t_deck.fromLevel > 0;
             bool t_hasTo = t_deck.toLevel > 0;
@@ -301,16 +297,16 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
         return t_cards;
     }
 
-    /// <summary>AI 덱의 fromTier/toTier 축은 <see cref="RankManager.TierIndex"/>다 — 상한을 여기에 박으면
-    /// 랭크 등급이 늘어난 날 커버리지 검사만 조용히 좁아진다. 0은 축을 못 찾았다는 뜻이고, 그때는
-    /// 상한·커버리지 검사를 건너뛴다 — 모르는 축으로 판정해 엉뚱한 빌드 실패를 내는 것보다 낫다.</summary>
+    /// <summary>AI 덱의 fromTier/toTier 축은 <see cref="RankManager.TierIndex"/>다. 0은 축을 못 찾았다는
+    /// 뜻이고, 그때는 커버리지 검사를 건너뛴다 — 모르는 축으로 판정해 엉뚱한 빌드 실패를 내는 것보다 낫다.
+    /// 구간 자체의 상한은 재지 않는다: 모험 전용 덱처럼 랭크 축 밖에 두려고 일부러 높은 티어를 쓰는 행이 있다.</summary>
     static int ResolveRankTierCount(List<string> _warnings)
     {
         int t_gradeCount = SpecSource.Manager?.RankGrade?.All?.Count ?? 0;
         int t_count = t_gradeCount * RankConfig.DivisionsPerGrade;
 
         if (t_count <= 0)
-            _warnings?.Add("RankGrade 서버 표가 비어 있어 AI 덱 티어 상한·커버리지 검사를 건너뛴다.");
+            _warnings?.Add("RankGrade 서버 표가 비어 있어 AI 덱 티어 커버리지 검사를 건너뛴다.");
         return t_count;
     }
 

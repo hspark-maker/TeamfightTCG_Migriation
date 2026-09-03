@@ -26,11 +26,11 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
 
     [Header("모험")]
     [Tooltip("모험 맵으로 가는 버튼. 이동 자체는 LobbyRoot가 한다 — 탭 패널은 탭 이동을 모른다.")]
-    [SerializeField] Button tournamentButton;
+    [SerializeField] Button adventureButton;
 
     public event Action PlayRequested;
 
-    public event Action TournamentRequested;
+    public event Action AdventureRequested;
 
     // 버튼의 저작 문구. 승급전 상태가 풀리면 여기로 돌아간다 — 평상시 문구를 코드가 다시 쓰지 않게.
     string m_defaultPlayText;
@@ -40,14 +40,14 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (playButton != null) playButton.onClick.AddListener(HandlePlayRequested);
         if (rankRewardButton != null) rankRewardButton.onClick.AddListener(OpenRankRewards);
         if (keywordGrowthButton != null) keywordGrowthButton.onClick.AddListener(OpenKeywordGrowth);
-        if (tournamentButton != null) tournamentButton.onClick.AddListener(HandleTournamentRequested);
+        if (adventureButton != null) adventureButton.onClick.AddListener(HandleAdventureRequested);
 
         if (playLabel != null) m_defaultPlayText = playLabel.text;
 
         // 잠김 룩은 코드로 얹는다 — 기능키↔버튼 짝이 아래 계산식 바로 옆에 있어야 둘이 갈리지 않는다.
         // PlayBtn만 프리팹 저작인 것은 그쪽 잠금 주체가 LobbyMatchLauncher라 중립 지점이 필요했기 때문이다.
         if (keywordGrowthButton != null) FeatureLockView.Attach(keywordGrowthButton.gameObject, EOutgameFeature.KeywordGrowth);
-        if (tournamentButton != null) FeatureLockView.Attach(tournamentButton.gameObject, EOutgameFeature.Tournament);
+        if (adventureButton != null) FeatureLockView.Attach(adventureButton.gameObject, EOutgameFeature.Adventure);
 
         // 탭이 꺼져 있는 동안에도 신호를 받아야 한다 — 놓치면 다른 탭에 있던 사이 끝난 연출을 영영 못 따라간다.
         OutgameFeatureLock.OnChanged += ApplyFeatureLocks;
@@ -66,7 +66,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (playButton != null) playButton.onClick.RemoveListener(HandlePlayRequested);
         if (rankRewardButton != null) rankRewardButton.onClick.RemoveListener(OpenRankRewards);
         if (keywordGrowthButton != null) keywordGrowthButton.onClick.RemoveListener(OpenKeywordGrowth);
-        if (tournamentButton != null) tournamentButton.onClick.RemoveListener(HandleTournamentRequested);
+        if (adventureButton != null) adventureButton.onClick.RemoveListener(HandleAdventureRequested);
 
         OutgameFeatureLock.OnChanged -= ApplyFeatureLocks;
         LobbyRankEffectDirector.OnAnyFinished -= RefreshPlayLabel;
@@ -96,8 +96,8 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (keywordGrowthButton != null)
             keywordGrowthButton.interactable = OutgameFeatureLock.IsUnlocked(EOutgameFeature.KeywordGrowth);
 
-        if (tournamentButton != null)
-            tournamentButton.interactable = OutgameFeatureLock.IsUnlocked(EOutgameFeature.Tournament);
+        if (adventureButton != null)
+            adventureButton.interactable = OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure);
     }
 
     /// <summary>랭크 보상 목록. 풀이 없으면(초기화 미초기화) 조용히 지나가지 않고 드러낸다.</summary>
@@ -129,5 +129,5 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
 
     void HandlePlayRequested() => PlayRequested?.Invoke();
 
-    void HandleTournamentRequested() => TournamentRequested?.Invoke();
+    void HandleAdventureRequested() => AdventureRequested?.Invoke();
 }

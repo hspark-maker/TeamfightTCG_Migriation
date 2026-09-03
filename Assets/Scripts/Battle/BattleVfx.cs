@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 /// <summary>
 /// 전투 이펙트를 "카드에 붙여서 풀에서 빌려 쓰는" 규약의 단일 지점.
@@ -251,15 +252,22 @@ public static class BattleVfx
 
     /// <summary>정렬 보정. 구매 에셋 VFX는 대개 Default 레이어라, Card 레이어인 카드 아트 **뒤로** 깔려 안 보인다.
     /// 정렬은 레이어가 order보다 먼저 판정되므로 레이어부터 맞춘 뒤 order를 올린다.
-    /// 풀 재사용분은 지난 값이 남아 있어 매 스폰마다 다시 잡아야 한다.</summary>
+    ///
+    /// 정렬을 거는 지점은 **루트 SortingGroup 하나**다(없으면 붙인다) — 자식 파티클 렌더러는 건드리지 않는다.
+    /// 예전엔 모든 자식 Renderer의 layer/order를 같은 값으로 덮었는데, 그러면 프리팹이 저작해 둔
+    /// 자기들끼리의 앞뒤(글로우 뒤 · 코어 앞)가 같은 order로 뭉개져 그리기 순서가 임의로 갈렸다.
+    /// SortingGroup은 그룹 <b>전체</b>를 씬에서 한 덩어리로 세우고, 안쪽 순서는 저작값 그대로 남긴다.
+    ///
+    /// 풀 재사용분은 지난 값이 남아 있어 매 스폰마다 다시 잡아야 한다(이제 그룹 값 하나만 다시 쓴다).</summary>
     public static void ApplySorting(GameObject _go, int _sortingLayerId, int _order)
     {
         if (_go == null) return;
-        foreach (Renderer t_r in _go.GetComponentsInChildren<Renderer>(true))
-        {
-            t_r.sortingLayerID = _sortingLayerId;
-            t_r.sortingOrder   = _order;
-        }
+
+        var t_group = _go.GetComponent<SortingGroup>();
+        if (t_group == null) t_group = _go.AddComponent<SortingGroup>();
+
+        t_group.sortingLayerID = _sortingLayerId;
+        t_group.sortingOrder   = _order;
     }
 
     /// <summary>PooledParticle이 없어 스스로 반납 못 하는 프리팹용 수명 타이머.

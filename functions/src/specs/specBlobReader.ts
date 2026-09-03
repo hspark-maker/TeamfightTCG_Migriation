@@ -54,7 +54,7 @@ const INDEX_CACHE_TTL_MS = 30 * 1000;
  * 인덱스에 넣는 것이 정답이지만 그 전까지는 여기 명시된 표만 가변 블롭을 허용한다 —
  * 목록에 없는 미등재 표는 그대로 실패해야 새 표가 조용히 인덱스를 건너뛰는 것을 잡는다.
  */
-const UNINDEXED_TABLES = new Set<string>(["TournamentChapter"]);
+const UNINDEXED_TABLES = new Set<string>(["AdventureChapter"]);
 const UNINDEXED_CACHE_TTL_MS = 30 * 1000;
 
 async function readPublishedSpec(env: string, table: string): Promise<PublishedSpec> {

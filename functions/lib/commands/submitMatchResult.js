@@ -233,7 +233,7 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false }, asyn
         throw new https_1.HttpsError("failed-precondition", "legacy match results are not authoritative");
     }
     const matchRef = firebaseApp_1.db.doc(`envs/${data.env}/matches/${data.matchId}`);
-    const cardTable = data.env === "test" ? "Card_Test" : "Card";
+    const cardTable = "Card";
     // 표 3개를 블롭으로 읽는다 — 행 문서를 훑으면 제출 1건마다 행 수만큼(Reward 85 · Card 41 …) 과금된다.
     // readSpecRows 가 (env, table) 단위로 5분 캐시를 이미 갖고 있다(specs/specBlobReader.ts).
     // 여기서 다시 캐시하지 마라 — TTL 이 두 벌이 되고 clearSpecCache 로 비워도 이쪽이 옛 값을 계속 준다.

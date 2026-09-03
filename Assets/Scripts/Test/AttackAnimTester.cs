@@ -557,7 +557,7 @@ public class AttackAnimTester : MonoBehaviour
                 case KeywordPreviewKind.Vfx:
                     if (t_keyword == CardKeyword.Execution) ExecutionVfx.Play(t_view);
                     else if (t_keyword == CardKeyword.Cunning) await CunningCore();
-                    else if (t_keyword == CardKeyword.Healer) PlayCaretakerHeal();
+                    else if (t_keyword == CardKeyword.Healer) PlayHealerBurst(t_view);
                     break;
                 case KeywordPreviewKind.Revive:
                     await PreviewImmortalRevive(t_view, t_card);
@@ -790,6 +790,33 @@ public class AttackAnimTester : MonoBehaviour
             // 테스터엔 유예된 표기가 없다 — _consumeDeferred:true로 부르면 소비할 몫이 0이라 숫자가 안 뜬다.
             t_v.PlayHealEffect(Mathf.Max(0, this.caretakerHeal));
         }
+    }
+
+    /// <summary>힐러 키워드 연출. 게임과 같은 진입점(<see cref="HealVfx.PlayHealBurst"/>)을 타므로
+    /// 힐러 발동 이펙트 → 투사체 비행 → 도착 임팩트 + "+N"까지 전부 나온다.
+    /// 예전엔 여기서 돌보미 힐(<see cref="PlayCaretakerHeal"/>)을 불러 범용 회복 파티클만 떴다.
+    ///
+    /// 표기를 실제로 굴리려면 회복이 <b>먼저</b> 들어가 있어야 한다(HealerEffect와 같은 순서) —
+    /// 표기는 유예분을 소비하는 방식이라 회복 없이 부르면 숫자가 0이라 안 뜬다.
+    /// 반복 재생하면 hp가 계속 오른다(게임과 같은 overheal) — RefreshField로 되돌린다.</summary>
+    public void PlayHealerBurst(CardView _healerView)
+    {
+        CardInstance t_healer = _healerView?.BoundCard;
+        if (t_healer == null) return;
+
+        var t_healed = new List<(CardView view, CardInstance card, int amount)>();
+        for (int i = 0; i < BattleField.SLOT_COUNT; i++)
+        {
+            CardView t_v = this.playerFieldView?.GetSlotView(i);
+            CardInstance t_c = t_v?.BoundCard;
+            if (t_c == null || t_c == t_healer) continue;   // 제외는 자기 자신뿐 — HealerEffect와 같은 규칙
+
+            int t_amount = t_c.Heal(1, _showEffect: false, _allowOverheal: true);
+            if (t_amount <= 0) continue;
+            t_healed.Add((t_v, t_c, t_amount));
+        }
+
+        if (t_healed.Count > 0) HealVfx.PlayHealBurst(_healerView, t_healed);
     }
 
     /// <summary>지금 고른 시너지의 그 타이밍 엠블럼 1회. 게임과 같은 진입점(SynergyEmblemVfx.Play)을 탄다.

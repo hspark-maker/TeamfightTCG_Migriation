@@ -43,7 +43,7 @@
 | 한계돌파(간식) | **서버** | `limitBreakCard`(`commands/limitBreakCard.ts` · 판정 `growth/limitBreakTable.ts` · `growth/cardGrowth.ts`). 소유·간식 잔량·단계 곡선을 서버가 재계산하고 `cardGrowth` 슬롯 갱신까지 한 트랜잭션이다. 클라 `CardGrowthManager.TryLimitBreakAsync` 는 낙관 선검사 뒤 `LimitBreakCommand` 로 넘기고 세이브에 대입하지 않는다 |
 | 소유 | **서버**(정상 경로) | 지급 callable 은 셋뿐이다 — `openPack` · `grantTutorialCards`(팩 진실원은 `CardPack`/`CardPackDrop` 시트) · `ensureAccount`. `StarterDeck.GrantIfNoDeck` 은 `IsOwned` 로 읽기만 한다. **잔여 로컬 쓰기는 리테일 치트뿐이다**: 디버그 3건(`OutgameDebugActions:234`·`:240` · `UnlockAllCardsButton:25`) · 되감기 3건(`OutgameTutorialRewind:141`·`:165`·`:173`) |
 | 랭크 | **혼재** | 싱글 `RankManager.ApplyBattleResult`(클라) · 멀티 `submitMatchResult` → `ApplyServerPayout`(서버). 승급전 판정 `ApplyPromoResult` 도 클라다 |
-| 모험 | **서버** | 격파 신고 `reportTournamentWin` 이 선행 사슬(`prevNodeId`)과 랭크 잠금(`requiredPoints`)을 재판정해 `pendingRewardNodeId` 낙인을 세우고, 클리어 확정·지급은 `claimReward` 가 한다. 클라 `MarkRewardPending` 은 삭제됐고 `StateOf`·`CanEnter` 는 표시용 낙관으로만 남았다. 슬롯 쓰기는 `ResetForDebug`(호출부 0건)와 되감기 초기화(`OutgameTutorialRewind:85`)뿐이다 |
+| 모험 | **서버** | 격파 신고 `reportAdventureWin` 이 선행 사슬(`prevNodeId`)과 랭크 잠금(`requiredPoints`)을 재판정해 `pendingRewardNodeId` 낙인을 세우고, 클리어 확정·지급은 `claimReward` 가 한다. 클라 `MarkRewardPending` 은 삭제됐고 `StateOf`·`CanEnter` 는 표시용 낙관으로만 남았다. 슬롯 쓰기는 `ResetForDebug`(호출부 0건)와 되감기 초기화(`OutgameTutorialRewind:85`)뿐이다 |
 | 덱 | **클라** | `DeckSaveManager.SaveSlot` 등이 직접 저장한다. `lockDeck` 은 멀티 매치 진입 검증이고 덱 저장 경로에서 호출되지 않는다 |
 | 튜토리얼 | **혼재** | 진행도는 클라다(`OutgameTutorialProgress.CommitStep`). 다만 카드 지급은 서버로 갔고(`TutorialStepExecutor` 5경로 → `TutorialGrantCommand.GrantAsync(packId)`), 강화 무료 한 방 소진은 서버 원장(`grants/current`)이 갖는다 |
 | 프로필 | **클라** | `ProfileManager.Apply` → `Persist`. `IsAvatarOwned`/`IsFrameOwned` 는 현재 무조건 true 를 돌려준다 |
@@ -54,7 +54,7 @@
 ## 2. callable 실태 (18개)
 
 `functions/src/index.ts` 16개 + `functions-currency/src/index.ts` 2개.
-직전 실측 이후 세 개가 늘었다 — `grantTutorialCards`(P2) · `reportTournamentWin`(P4) · `limitBreakCard`(P3).
+직전 실측 이후 세 개가 늘었다 — `grantTutorialCards`(P2) · `reportAdventureWin`(P4) · `limitBreakCard`(P3).
 
 | 함수 | 서버가 **판정** | 서버가 **검증** | 클라 입력을 **그대로 신뢰** |
 |---|---|---|---|
@@ -63,7 +63,7 @@
 | `enhanceKeyword` | 비용 · 레벨 | 키워드 화이트리스트 · 최대레벨 · 잔액 | keyword 플래그값 |
 | `limitBreakCard` | 다음 단계 · 간식 차감 · HP 보너스 | 소유(`readOwnedIds`) · 최대 단계 · 간식 잔량 · `CardLimitBreak` 표(결손 시 `RuleUnavailable`) · 영수증 멱등 | cardId |
 | `grantTutorialCards` | 줄 카드 집합(드롭 풀 전량) | `CardPack.price == 0`(결손도 유료로 간주) · 팩 행 존재 · 카탈로그 대조 | packId — **튜토리얼을 하지 않아도 무료 팩을 바로 호출할 수 있다**(순서·시점은 못 막는다) |
-| `reportTournamentWin` | 낙인(`pendingRewardNodeId`) | 선행 사슬 `prevNodeId`(뿌리 1개가 아니면 `ChainUnreadable` fail-closed) · 랭크 잠금 `requiredPoints` · 기클리어 · 미수령 잔존 | nodeId — **`won` 을 받지 않는다**(패배는 호출하지 않는 것이 계약). 잠금 판정 입력인 `rank.points` 는 여전히 클라 세이브 값이다 |
+| `reportAdventureWin` | 낙인(`pendingRewardNodeId`) | 선행 사슬 `prevNodeId`(뿌리 1개가 아니면 `ChainUnreadable` fail-closed) · 랭크 잠금 `requiredPoints` · 기클리어 · 미수령 잔존 | nodeId — **`won` 을 받지 않는다**(패배는 호출하지 않는 것이 계약). 잠금 판정 입력인 `rank.points` 는 여전히 클라 세이브 값이다 |
 | `claimReward` | 보상 액수 · 낙인 append | 기수령 · 자격(랭크 점수·챕터 완주·도감 완성) · 표 결손 시 fail-closed | 자격 근거 `rank.points`·`clearedNodeIds`·`ownership` 이 전부 클라 세이브 값이다 |
 | `claimBattleReward` | 금액(`payout.ts:computeCurrencyPayout`) · 지갑 가산 | 재화 키 · 금액 > 0 · remaining 클램프 | **`won`·`remaining` 을 그대로 믿는다. 전투를 하지 않아도 호출된다** |
 | `claimPayout` | 지급 대상 필터 · 지갑 가산 | uid·matchId·status · 20개 상한 · 금액은 서버 생성 문서만 | matchIds 목록(권한 밖은 무시) |
@@ -79,7 +79,7 @@
 `envs/{env}/specs/{table}/rows` 에서 읽는다(`packs/packSpecReader.ts:readSpecRows`, 5분 캐시):
 `Card`/`Card_Test` · `CardPack` · `CardPackDrop` · `RankGrade` · `Reward` ·
 `CardEnhanceRule`/`CardEnhance`/`KeywordEnhance` · `CardLimitBreak` · `AlbumEntry` ·
-`TournamentChapter`(파서가 `completionTable.ts` 에서 `tournamentTable.ts` 로 이사했고, 완주 모수뿐 아니라
+`AdventureChapter`(파서가 `completionTable.ts` 에서 `adventureTable.ts` 로 이사했고, 완주 모수뿐 아니라
 해금 사슬 `prevNodeId` 와 랭크 잠금 `requiredPoints` 도 이 표에서 읽는다).
 폴백은 둘뿐이고 둘 다 `logger.error` 를 남긴다(`packs/rankGrade.ts:FALLBACK_ENTRY_POINTS` ·
 `save/starterPool.ts:FALLBACK_STARTER_CARD_IDS`). 나머지는 표를 못 읽으면 fail-closed 로 거절한다.
@@ -99,7 +99,7 @@
 | `matchPairings` · `matchLocks` · `payouts` · `payoutState` | — | — | 규칙에 항목이 없어 말미 catch-all 전면 거부에 걸린다 |
 
 세이브 문서에서 클라가 임의로 쓸 수 있는 슬롯은 아홉 개 전부다: `ownership` · `cardGrowth` ·
-`keywordGrowth` · `rank` · `albumReward` · `tournament` · `deck` · `tutorial` · `profile`.
+`keywordGrowth` · `rank` · `albumReward` · `adventure` · `deck` · `tutorial` · `profile`.
 
 매치 4종(`createMatch`·`lockDeck`·`submitMatchResult`·`claimPayout`)은 `enforceAppCheck: false` 로 명시돼 있다.
 
@@ -111,10 +111,10 @@
 
 서버는 자격을 성실히 재계산하지만, 그 **입력이 클라가 쓴 세이브 값**이다.
 
-- `openPack` 의 랭크 잠금 · `claimReward(Rank)` 의 자격 · `reportTournamentWin` 의 챕터 잠금은 `rank.points` 를 읽는다
+- `openPack` 의 랭크 잠금 · `claimReward(Rank)` 의 자격 · `reportAdventureWin` 의 챕터 잠금은 `rank.points` 를 읽는다
 - `claimReward(Album)` 의 완성 판정은 `ownership.cardIds` 를 읽는다
 - `lockDeck` 의 소유·성장 검증도 같은 세이브 문서를 본다. 위조 세이브와 일관된 덱은 통과한다
-- `claimReward(Tournament)` 의 정점 자격은 `pendingRewardNodeId` 낙인의 존재다. 낙인을 *만드는* 판정은
+- `claimReward(Adventure)` 의 정점 자격은 `pendingRewardNodeId` 낙인의 존재다. 낙인을 *만드는* 판정은
   서버로 갔지만 슬롯이 열려 있어, 변조 클라가 정규 업로드로 세운 낙인이 표에 실재하는 정점을 가리키면
   `hasNode` 방어선을 통과하고 사슬 검증은 상속되지 않는다
 
@@ -145,7 +145,7 @@ C8 이 영수증(`wallet/current/receipts/{txId}`)을 세워 이 절의 절반�
 가드 **밖**에 있는 것(리테일 빌드에도 컴파일된다): `GrantCurrency` 와 `GrantGold`/`GrantDiamond`/
 `GrantEnergy`/`GrantShard`(직전 실측이 가드 안이라고 적은 것은 오기다) · `UnlockAllCards`/`RevokeAllCards` ·
 `MaxCardGrowth`/`ResetCardGrowth` · `RaiseTier`/`LowerTier`/`ResetTier`/`JumpToPromoStandby` ·
-`SkipTutorial`/`ResetTutorial` 계열 · `StartCurrentTournamentNode` · `ForceAlbumInsertSession` ·
+`SkipTutorial`/`ResetTutorial` 계열 · `StartCurrentAdventureNode` · `ForceAlbumInsertSession` ·
 `UI/Debug/UnlockAllCardsButton`(전처리 지시자가 아예 없고 프리팹 버튼에 직결된다).
 
 여기에 `OutgameTutorialRewind` 가 더해진다. 되감기 재생은 `LocalPrefs` 키 하나로 서고 호출부
@@ -164,20 +164,20 @@ C8 이 영수증(`wallet/current/receipts/{txId}`)을 세워 이 절의 절반�
   `RankManager.PreviewBattleResult` 가 `ApplyBattleResult` 의 클램프·승급 규칙을 줄 단위로 다시 구현한다
   (`RankManager.cs:166` 대 `:209`). 승급 곡선도 클라 `RankConfig` 와 서버 `RankGrade` 표 양쪽에 있다.
   **이 값이 남은 자기신고의 뿌리다** — `openPack` 의 랭크 잠금 · `claimReward(Rank)` 의 자격 ·
-  `reportTournamentWin` 의 챕터 잠금이 모두 이 하나를 읽는다
+  `reportAdventureWin` 의 챕터 잠금이 모두 이 하나를 읽는다
 - **한계돌파 곡선의 저작이 두 벌이다.** 서버는 `CardLimitBreak` 표를 `growth/limitBreakTable.ts` 로 읽고,
   클라 `GrowthRules.TryGetLimitBreakStep` 은 같은 곡선을 상수로 들고 있다(HP 가산 고정값 · 간식 비용 = 단계 수).
   클라 값은 버튼 표시와 낙관 선검사에만 쓰이므로 결과를 바꾸지는 않지만, 두 곡선이 갈리면 화면과 결과가 어긋난다.
   어긋남을 알리는 창구는 `LimitBreakCommand.LogSettled` 의 비교 로그 하나뿐이다
-- **모험 랭크 잠금의 축이 둘이다.** 클라 `TournamentProgress.IsChapterRankLocked` 는 등급(`ERankGrade`)으로,
+- **모험 랭크 잠금의 축이 둘이다.** 클라 `AdventureProgress.IsChapterRankLocked` 는 등급(`ERankGrade`)으로,
   서버 `judgeNodeUnlock` 은 점수(`requiredPoints`)로 잰다. 두 축의 등가성은 업로더 검증
   (`entryPoints` 와 등급이 함께 오름차순)에 기대고 있어, 표가 어긋나면 화면은 열려 있는데 신고만 `RankLocked` 로 막힌다
 
 ### (5) 재수화 구멍
 
 `ServerSlotRehydrator.Rehydrate` 는 네 슬롯을 다룬다 — `Ownership`·`KeywordGrowth`·`CardGrowth` 는
-`Init()` 로 캐시를 다시 세우고, P4 에서 더해진 `Tournament` 는 **통지뿐**이다
-(`TournamentProgress.NotifyRehydrated`). `TournamentProgress` 가 세이브를 직독하고 캐시를 두지 않아
+`Init()` 로 캐시를 다시 세우고, P4 에서 더해진 `Adventure` 는 **통지뿐**이다
+(`AdventureProgress.NotifyRehydrated`). `AdventureProgress` 가 세이브를 직독하고 캐시를 두지 않아
 값은 채택 시점에 이미 새것이고 모르는 것은 화면뿐이기 때문이다.
 
 `rank`·`albumReward` 매니저도 `DataSaveManager.Data` 를 매번 읽어 지금은 맞지만,

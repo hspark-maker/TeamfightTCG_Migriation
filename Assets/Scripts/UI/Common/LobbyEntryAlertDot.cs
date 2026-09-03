@@ -29,9 +29,9 @@ public class LobbyEntryAlertDot : AlertDotView
                     return KeywordGrowthManager.HasAnyAffordableStep
                            && OutgameFeatureLock.IsUnlocked(EOutgameFeature.KeywordGrowth);
 
-                case EAlertDotTarget.Tournament:
-                    return TournamentProgress.HasAnyWaiting
-                           && OutgameFeatureLock.IsUnlocked(EOutgameFeature.Tournament);
+                case EAlertDotTarget.Adventure:
+                    return AdventureProgress.HasAnyWaiting
+                           && OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure);
 
                 default:
                     return false;
@@ -60,8 +60,8 @@ public class LobbyEntryAlertDot : AlertDotView
                 break;
 
             // 등급이 올라 챕터 잠금이 풀리는 것도 점이 켜지는 사건이다.
-            case EAlertDotTarget.Tournament:
-                TournamentProgress.OnChanged += _handler;
+            case EAlertDotTarget.Adventure:
+                AdventureProgress.OnChanged += _handler;
                 RankManager.OnChanged += _handler;
                 OutgameFeatureLock.OnChanged += _handler;
                 break;
@@ -83,8 +83,8 @@ public class LobbyEntryAlertDot : AlertDotView
                 OutgameFeatureLock.OnChanged -= _handler;
                 break;
 
-            case EAlertDotTarget.Tournament:
-                TournamentProgress.OnChanged -= _handler;
+            case EAlertDotTarget.Adventure:
+                AdventureProgress.OnChanged -= _handler;
                 RankManager.OnChanged -= _handler;
                 OutgameFeatureLock.OnChanged -= _handler;
                 break;
@@ -103,5 +103,5 @@ public enum EAlertDotTarget
 {
     RankReward = 0,
     KeywordGrowth,
-    Tournament,
+    Adventure,
 }

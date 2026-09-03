@@ -16,13 +16,18 @@ using UnityEngine;
 public static class CardAppearSequence
 {
     /// <summary><paramref name="_card"/>는 컷씬 자격 판정 대상(= 이 슬롯에 들어온 인스턴스).
-    /// 뷰의 BoundCard와 같아야 한다 — 호출 전 Refresh/Render가 끝나 있어야 하는 이유.</summary>
+    /// 뷰의 BoundCard와 같아야 한다 — 호출 전 Refresh/Render가 끝나 있어야 하는 이유.
+    ///
+    /// <paramref name="_playAppearVfx"/>는 <b>등장 반짝임(CardAppear)</b>을 켠다. 발화 지점은
+    /// 카드가 덱에서 나와 <b>중앙에 선 순간</b> 하나다 — 교체(퇴장) 쪽이 아니다.
+    /// 교활 교대·멀리건 교체가 이걸 켠다: 두 경우 모두 "덱에서 새 카드가 나왔다"가 사건이라
+    /// 반짝임은 들어오는 카드에 붙어야 읽힌다(물러나는 카드에 붙이면 교체 자체가 강조된다).</summary>
     public static async UniTask Play(CardView _view, CardInstance _card,
-        Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration, bool _playSwapVfx = false)
+        Vector3 _from, Vector3 _mid, Vector3 _dest, float _duration, bool _playAppearVfx = false)
     {
         if (_view == null) return;
 
-        if (!_playSwapVfx)
+        if (!_playAppearVfx)
         {
             await _view.PlayDealAnim(_from, _mid, _dest, _duration);
             return;
@@ -32,8 +37,8 @@ public static class CardAppearSequence
         await _view.PlayDealToMid(_from, _mid, _dest, _duration);
         if (_view == null) return;
 
-        if (_playSwapVfx)
-            BattleVfx.Play(BattleVfxId.CardAppear, _view.transform.position, _view.VfxSortingLayerId);
+        // 중앙 도착 = 등장 반짝임 발화점.
+        BattleVfx.Play(BattleVfxId.CardAppear, _view.transform.position, _view.VfxSortingLayerId);
 
         bool t_cancelled = await UniTask.Delay((int)(GameTiming.Battle.DealMidPause * 1000),
                 cancellationToken: _view.GetCancellationTokenOnDestroy())

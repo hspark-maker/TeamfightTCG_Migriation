@@ -26,6 +26,7 @@ public static class SpecLocalCsvImporter
     static readonly HashSet<string> REMOVED_TABLES = new(StringComparer.Ordinal)
     {
         "SynergyEffectParamDef",
+        "Card_Test",
     };
 
     /// <summary>SpecDataAsset.EncryptKey. 로더의 _key 는 생성기가 난독화한 값이라 여기 쓸 수 없다.</summary>
@@ -123,7 +124,11 @@ public static class SpecLocalCsvImporter
 
     // ---------- CSV → JSON 배열 ----------
 
-    /// <summary>CSV 3줄 머리(설명 · 필드명 · 타입) 뒤의 행을 JSON 배열로 만든다.</summary>
+    /// <summary>CSV 머리(설명 · 필드명 · 타입) 뒤의 행을 JSON 배열로 만든다.
+    ///
+    /// <para>설명 줄이 없는 표(시트에 필드 주석을 달지 않은 표)가 섞여 있어 머리 줄 수를 세지 않고 **타입 줄을 찾는다**.
+    /// 3줄로 못 박으면 2줄짜리 표는 타입 줄을 필드명으로 읽어 <c>{"int":...}</c> 같은 행을 만들고,
+    /// 그 표는 id가 전부 0이 되어 SpecData 전체 파싱이 죽는다.</para></summary>
     static bool TryBuildArray(string _path, out string _json, out int _rowCount, out string _error)
     {
         _json = null;
@@ -131,14 +136,18 @@ public static class SpecLocalCsvImporter
         _error = null;
 
         List<List<string>> t_rows = ReadCsv(File.ReadAllText(_path));
-        if (t_rows.Count < 3) { _error = "머리 3줄(설명·필드명·타입)이 없다."; return false; }
+        if (t_rows.Count < 2) { _error = "머리(필드명·타입) 줄이 없다."; return false; }
 
-        List<string> t_fields = t_rows[1];
-        List<string> t_types  = t_rows[2];
+        int t_typeLine = IsTypeLine(t_rows[1]) ? 1 : 2;
+        if (t_typeLine >= t_rows.Count || !IsTypeLine(t_rows[t_typeLine]))
+        { _error = "타입 줄(int·long·float·double·bool·string)을 머리 2·3번째 줄에서 찾지 못했다."; return false; }
+
+        List<string> t_fields = t_rows[t_typeLine - 1];
+        List<string> t_types  = t_rows[t_typeLine];
         if (t_fields.Count != t_types.Count) { _error = "필드명 줄과 타입 줄의 칸 수가 다르다."; return false; }
 
         var t_builder = new StringBuilder("[");
-        for (int t_r = 3; t_r < t_rows.Count; t_r++)
+        for (int t_r = t_typeLine + 1; t_r < t_rows.Count; t_r++)
         {
             List<string> t_row = t_rows[t_r];
             if (t_row.Count == 0 || t_row.All(string.IsNullOrWhiteSpace)) continue;
@@ -169,6 +178,26 @@ public static class SpecLocalCsvImporter
         t_builder.Append(']');
         _json = t_builder.ToString();
         return true;
+    }
+
+    /// <summary>빈 칸을 뺀 모든 칸이 타입 이름이면 타입 줄이다. 필드명 줄이 이 꼴일 수는 없다.</summary>
+    static bool IsTypeLine(List<string> _cells)
+    {
+        bool t_any = false;
+        foreach (string t_cell in _cells)
+        {
+            string t_token = (t_cell ?? string.Empty).Trim();
+            if (t_token.Length == 0) continue;
+            switch (t_token)
+            {
+                case "int": case "long": case "float": case "double": case "bool": case "string":
+                    t_any = true;
+                    break;
+                default:
+                    return false;
+            }
+        }
+        return t_any;
     }
 
     /// <summary>타입 줄이 수치면 raw, 아니면 문자열. 잘못된 수치는 조용히 0으로 바꾸지 않는다.</summary>

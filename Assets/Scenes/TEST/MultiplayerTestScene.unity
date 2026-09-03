@@ -370,7 +370,7 @@ MonoBehaviour:
   lobbyTabController: {fileID: 0}
   deckPanel: {fileID: 0}
   matchPanel: {fileID: 0}
-  tournamentPanel: {fileID: 0}
+  adventurePanel: {fileID: 0}
 --- !u!1 &2000000000
 GameObject:
   m_ObjectHideFlags: 0
