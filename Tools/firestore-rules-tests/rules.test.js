@@ -19,6 +19,12 @@ import {
   legacyCurrencySlot,
   SCHEMA_VERSION,
 } from './fixtures/saveDocument.js';
+import {
+  clientTopLevelKeys,
+  clientSlotKeys,
+  clientSchemaVersion,
+  rulesTopLevelKeyLists,
+} from './fixtures/clientContract.js';
 import { walletDocument, receiptDocument } from './fixtures/walletDocument.js';
 import { grantsDocument } from './fixtures/grantsDocument.js';
 
@@ -67,6 +73,32 @@ beforeEach(async () => {
 
 after(async () => {
   await testEnv?.cleanup();
+});
+
+// --- 0. 계약 동기화 (에뮬레이터 없이도 선다) ---------------------------------
+
+// 픽스처는 손으로 베낀 사본이라 원본이 개명돼도 저절로 따라오지 않는다. 룰과 픽스처가
+// 나란히 낡으면 둘끼리 맞아떨어져서 아래 에뮬레이터 테스트가 전부 초록으로 남는다 —
+// 커밋 0e39a602e(슬롯 tournament → adventure)가 정확히 그 틈으로 새어 나갔고,
+// 배포한 날 모든 클라 세이브 update 가 PermissionDenied 로 거부됐다.
+// 그래서 여기서는 원본(.cs)을 진실원으로 두고 픽스처와 룰을 양쪽 다 대조한다.
+
+test('0a. 픽스처 최상위 키가 PlayerSaveDocument.cs 의 FIELD_* 와 같다', () => {
+  assert.deepEqual(
+    Object.keys(saveDocument(1)).sort(),
+    clientTopLevelKeys().sort(),
+  );
+});
+
+test('0b. firestore.rules 의 hasOnly·hasAll 이 그 키 목록과 같다', () => {
+  const t_lists = rulesTopLevelKeyLists(readFileSync(RULES_PATH, 'utf8'));
+  const t_client = clientTopLevelKeys().sort();
+  assert.deepEqual(t_lists.hasOnly.sort(), t_client);
+  assert.deepEqual(t_lists.hasAll.sort(), t_client);
+});
+
+test('0c. 픽스처 SCHEMA_VERSION 이 UserSaveData.VERSION 과 같다', () => {
+  assert.equal(SCHEMA_VERSION, clientSchemaVersion());
 });
 
 // --- 1·2. 실제 클라가 보내는 문서가 통과하는가 (핵심 회귀) -------------------
@@ -184,8 +216,7 @@ test('7b. 메타 필드 누락은 거부', async () => {
 test('7c. 슬롯 누락 update 는 거부 (세이브 비우기 우회)', async () => {
   await seed(1);
   const t_meta = saveDocument(2);
-  for (const t_slot of ['ownership', 'deck', 'cardGrowth', 'keywordGrowth',
-    'rank', 'albumReward', 'adventure', 'tutorial', 'profile']) {
+  for (const t_slot of clientSlotKeys()) {
     delete t_meta[t_slot];
   }
   await assertFails(setDoc(doc(authed(), savePath()), t_meta));
