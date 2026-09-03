@@ -47,7 +47,7 @@ assert.deepEqual(slots.keywordGrowth, {levels: {}});
 assert.deepEqual(slots.rank, {points: 0, claimedTiers: []});
 assert.deepEqual(slots.albumReward, {claimedKeys: []});
 assert.deepEqual(slots.tournament,
-  {clearedNodeIds: [], claimedChapterIds: [], seenUnlockIds: [], pendingRewardNodeId: ""});
+  {clearedNodeIds: [], claimedChapterIds: [], pendingRewardNodeId: ""});
 
 // -1 은 클라 TutorialSaveData 의 초기화자다. 0 으로 두면 되감기 판정이 달라진다.
 assert.equal(slots.tutorial.lastBootChapterIndex, -1);

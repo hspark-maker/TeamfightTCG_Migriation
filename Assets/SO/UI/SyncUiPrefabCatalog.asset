@@ -15,3 +15,4 @@ MonoBehaviour:
   sceneCurtain: {fileID: 2491093736843398019, guid: edfb63b93c4650142b908a5d7cfcbff1, type: 3}
   lockBadge: {fileID: 6417392085531120441, guid: ee7c257e8609beb44971c07a85276030, type: 3}
   loadingCover: {fileID: 504259994518015037, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
+  matchmakingRoot: {fileID: 3258554938227528000, guid: 9c3999eeb9743ed4bac70b580dd24467, type: 3}

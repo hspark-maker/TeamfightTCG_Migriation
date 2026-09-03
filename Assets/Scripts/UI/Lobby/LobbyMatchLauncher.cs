@@ -16,7 +16,6 @@ public class LobbyMatchLauncher : MonoBehaviour
     [SerializeField] AIDeckConfig   aiDeckConfig;   // BattleScene GameInitializer가 참조하는 것과 동일 에셋
 
     [Header("매칭 연출")]
-    [SerializeField] MatchmakingShell    matchShellPrefab;   // 미배선이면 매칭도 대치 인트로도 없이 구 동작
     [SerializeField] OpponentProfilePool profilePool;
 
     [Header("유효 덱 없음 안내")]
@@ -43,6 +42,8 @@ public class LobbyMatchLauncher : MonoBehaviour
     IMatchmaker      m_matchmaker;
     MatchmakingShell m_matchShell;
     LobbyOverlayHost m_overlayHost;
+
+    GameObject m_matchShellPrefab;
 
     /// <summary>
     /// 오버레이 호스트. **인스펙터가 프리팹 에셋을 물고 있으면 쓰지 않는다.**
@@ -76,34 +77,60 @@ public class LobbyMatchLauncher : MonoBehaviour
     IMatchmaker Matchmaker => m_matchmaker ??=
         new PhotonRankedMatchmaker(new ServerMatchmaker(profilePool));
 
-    // 로비 캔버스에 미리 얹지 않고 첫 매칭 때 띄운다 — 로비 프리팹을 저장할 때마다 SafeArea가
-    // 런타임 계산값으로 굳어(anchorMax) 관계없는 좌표가 함께 커밋된다. 부모는 덱 화면과 같은 SafeArea다.
+    // 프리팹 자체는 동기 UI 카탈로그의 의존성이라 부팅 때 이미 적재돼 있다 — 미루는 것은 생성뿐이다.
+    // 로비 캔버스에 미리 얹지 않고 첫 매칭 때 띄우는 이유는 로비 프리팹을 저장할 때마다 SafeArea가
+    // 런타임 계산값으로 굳어(anchorMax) 관계없는 좌표가 함께 커밋되기 때문이다.
+    //
+    // 부모는 SafeArea가 아니라 로비 캔버스 자신이다. 셸은 로비를 전부 덮는 전면 화면이라 안전 영역 안으로
+    // 들어갈 이유가 없고(덱 화면 LobbyOverlayHost도 같은 자리에 있다), 무엇보다 전투로 넘어갈 때
+    // 부모에서 떨어져 나가는데 그때 SafeArea rect → 화면 전체 rect로 바뀌면 노치 기기에서
+    // 프로필과 배너가 그 프레임에 점프한다. 두 자리의 rect가 같아야 이관이 티나지 않는다.
     MatchmakingShell MatchShell
     {
         get
         {
-            if (m_matchShell == null && matchShellPrefab != null)
+            if (m_matchShell == null && MatchShellPrefab != null)
             {
-                // 부모가 곧 셸의 자리다. 런처를 캔버스 밖(=루트)에 두면 셸이 캔버스 없이 생성돼
-                // 아무것도 렌더되지 않는데, 매칭 로직은 그대로 돌아서 "매칭은 되는데 화면만 안 뜨는"
-                // 무증상 결함이 된다 — 조용히 넘기지 않고 여기서 끊는다.
-                if (transform.parent == null)
+                // 셸은 자기 Canvas를 저작해 갖고 있으므로 부모의 캔버스를 빌리지는 않는다. 그래도 로비 캔버스를
+                // 요구하는 이유는 자리다 — 캔버스 밖에 세우면 로비가 살아 있는 동안 셸만 다른 계층에 떠서
+                // 로비와 함께 사라지지도, 함께 꺼지지도 않는다.
+                Canvas t_canvas = GetComponentInParent<Canvas>();
+                if (t_canvas == null)
                 {
                     Debug.LogError(
-                        "[LobbyMatchLauncher] 런처가 씬 루트에 있어 매칭 셸을 세울 자리가 없다 — "
-                      + "캔버스(SafeArea) 자식으로 배선할 것.", this);
+                        "[LobbyMatchLauncher] 런처가 캔버스 밖에 있어 매칭 셸을 세울 자리가 없다 — "
+                      + "로비 캔버스 자손으로 배선할 것.", this);
                     return null;
                 }
-                m_matchShell = Instantiate(matchShellPrefab, transform.parent);
+                // worldPositionStays를 끈다 — 켜 두면 프리팹의 월드 원점을 지키려고 로컬 좌표를 다시 계산하는데,
+                // 로비 캔버스는 Overlay라 그 원점이 화면 좌하단이다. 셸은 부모를 꽉 채우면 되므로 지킬 월드 자리가 없다.
+                GameObject t_instance = Instantiate(MatchShellPrefab, t_canvas.transform, false);
+
+                m_matchShell = t_instance.GetComponent<MatchmakingShell>();
+                if (m_matchShell == null)
+                {
+                    Debug.LogError(
+                        "[LobbyMatchLauncher] 카탈로그의 MatchmakingRoot에 MatchmakingShell이 없다 — "
+                      + "카탈로그가 다른 프리팹을 물고 있다.", this);
+                    Destroy(t_instance);
+                }
             }
 
             return m_matchShell;
         }
     }
 
+    // 카탈로그 미배선이면 매칭도 대치 인트로도 없이 구 동작으로 내려간다.
+    // 실패는 캐시하지 않는다 — 적재가 한 번 미끄러진 것뿐인데 캐시하면 그 로비 세션 내내 구 동작으로 굳는다.
+    // 대신 실패한 판마다 SyncUiPrefabs의 LogError가 진입 판정과 생성에서 두 줄 남는다.
+    GameObject MatchShellPrefab
+        => m_matchShellPrefab != null
+         ? m_matchShellPrefab
+         : m_matchShellPrefab = SyncUiPrefabs.Get(ESyncUiPrefab.MatchmakingRoot);
+
     // 튜토리얼 전투는 상대가 시나리오 고정이라 매칭을 태우지 않는다 —
     // 마지막 튜토 전투가 끝나며 TutorialConfig가 꺼지고, 그 다음 판부터 이 문이 열린다.
-    bool UseMatchmaking => !TutorialConfig.IsActive && matchShellPrefab != null;
+    bool UseMatchmaking => !TutorialConfig.IsActive && MatchShellPrefab != null;
 
     void OnEnable()
     {
@@ -259,7 +286,7 @@ public class LobbyMatchLauncher : MonoBehaviour
                 return;
             }
 
-            CurtainView.LoadScene(BATTLE_SCENE);
+            LoadBattleScene();
             return;
         }
 
@@ -300,6 +327,29 @@ public class LobbyMatchLauncher : MonoBehaviour
         return t_result == ESoloMatchSyncResult.Success;
     }
 
+    // 로비에서 전투로 넘어가는 마지막 문. 매칭 화면이 배경 두 판을 맞물린 채 서 있으면 그 화면을 그대로
+    // 데려가고(MatchSceneCarrier), 아니면 커튼을 새로 세운다.
+    //
+    // 데려가는 쪽을 앞에 두는 이유: 커튼은 매칭 화면과 같은 판(CurtainBoards 프리팹을 나눠 쓴다)을 그 위에
+    // 한 번 더 닫는 물건이라, 이미 닫혀 있는 화면 위에서는 판이 두 번 닫히고 그 위의 프로필·배너가 증발한다.
+    // 덱 화면을 거치는 경로(모험)는 판이 이미 갈라져 셸이 스스로 거절하고, 그쪽은 커튼이 맞다.
+    void LoadBattleScene()
+    {
+        if (m_matchShell != null && m_matchShell.CanCarryToScene)
+        {
+            // 소유권을 먼저 놓는다 — OnDestroy가 데려간 화면을 로비와 함께 죽이지 않게.
+            MatchmakingShell t_shell = m_matchShell;
+            m_matchShell = null;
+
+            if (MatchSceneCarrier.TryCarry(t_shell, new SceneLoadSwap(BATTLE_SCENE))) return;
+
+            // 못 걸었으면 주인 없이 떠 있게 두지 않는다. 아래 커튼이 이 화면을 덮은 채 씬을 갈아치운다.
+            m_matchShell = t_shell;
+        }
+
+        CurtainView.LoadScene(BATTLE_SCENE);
+    }
+
     // 진입을 접고 로비를 되돌린다. 진입 게이트가 여럿이라 되돌리는 자리는 하나여야 한다 —
     // m_running 을 안 내리면 PlayBtn 이 영영 안 먹고, TournamentRun 을 안 끊으면
     // 다음 일반 전투의 AI 레벨이 정점 레벨로 굳는다.
@@ -328,11 +378,16 @@ public class LobbyMatchLauncher : MonoBehaviour
             // 여기까지 왔는데 러너가 없으면 매칭이 세운 멀티 플래그가 거짓이다 — 싱글로 되돌려 전투는 살린다.
             Debug.LogError("[LobbyMatchLauncher] 멀티 진입인데 러너가 없다 — 싱글 경로로 전투를 연다.");
             DeckConfig.ResetMode();
-            CurtainView.LoadScene(BATTLE_SCENE);
+            LoadBattleScene();
             return;
         }
 
         SceneTransitionVideo.Instance?.PlayOverlay();
+
+        // 영상이 전환을 덮는 경로다. 매칭 화면은 자기 캔버스(UiSortingOrder.Matchmaking)를 갖고 있어
+        // 영상 캔버스(Initialize.prefab, order 1)보다 위라, 그대로 두면 영상이 그 뒤로 가려 정지한 매칭 화면만 보인다.
+        // 영상이 이미 화면을 덮은 뒤(페이드 없이 즉시 불투명하다) 걷으므로 로비가 새지 않는다.
+        m_matchShell?.Close();
 
         // 두 클라가 각자 연다. 마스터만 열고 Fusion 이 상대를 끌어오던 구조는 늦은 쪽의 로비 절차를
         // 강제 종료시켰고, 마스터가 끊기면 상대가 영영 못 들어왔다 — BattleSceneEntry 설명 참조.
@@ -415,7 +470,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         //
         // 셸을 여기서 붙잡아 넘긴다 — MatchShell은 비어 있으면 새로 만드는 프로퍼티라,
         // 전환 도중 셸이 파괴되면 저작 상태의 새 셸에서 갈라짐만 도는 경로가 생긴다.
-        // 셸이 미배선(matchShellPrefab 없음)이면 null이라 아래 곧장 뜨는 경로로 내려간다.
+        // 셸이 미배선(카탈로그에 MatchmakingRoot 없음)이면 null이라 아래 곧장 뜨는 경로로 내려간다.
         if (_preset.HasValue)
         {
             MatchmakingShell t_versus = MatchShell;

@@ -224,6 +224,28 @@ public class TournamentChapterBandView : MonoBehaviour
         this.Refresh();
     }
 
+    /// <summary>도는 해금 안무를 결말까지 당긴다. 당길 것이 있었으면 true.</summary>
+    public bool RequestSkipUnlock()
+    {
+        Sequence t_seq = this.m_introSeq;
+        if (t_seq == null || !t_seq.IsActive()) return false;
+
+        // 중첩까지 완료시켜야 BreakIntroLock·SettleIntro가 실제로 돈다 — Kill과 갈리는 자리가 여기다.
+        t_seq.Complete(true);
+        this.m_introSeq = null;
+
+        // 자물쇠 안무는 시퀀스 밖 트윈이라 Complete가 닿지 않는다. 순서를 뒤집어 먼저 당기면
+        // 아직 자고 있는 트윈이 끝나 버리고, 뒤이은 BreakIntroLock이 깨울 대상을 잃어 자물쇠가 화면에 남는다.
+        this.m_lockTween = null;
+        if (this.lockFx != null) this.lockFx.RequestSkip();
+
+        // SettleIntro가 [받기]를 되살리지만 당기기는 사슬 한복판이다 — 남은 대상이 도는 동안
+        // 그 버튼이 눌리면 보상 팝업이 사슬 위에 겹친다. 사슬이 끝나면 AbortUnlock이 되돌린다.
+        this.MuteClaimButton();
+
+        return true;
+    }
+
     // 잠김 안내. 요구 등급의 표시명·배지는 랭크가 소유하므로 여기서 문자열을 짓지 않는다.
     void ApplyRankLock(bool _locked, int _chapterIndex)
     {

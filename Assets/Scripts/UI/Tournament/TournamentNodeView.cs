@@ -401,8 +401,17 @@ public class TournamentNodeView : MonoBehaviour
         this.ApplyUnlockLocked();
     }
 
+    /// <summary>해금 안무의 총 길이(초). 재생하기 전에 물어야 하는 자리가 있다 —
+    /// 사슬(TournamentMapOverlayView)의 대기 길이가 이 안무를 품어야 시작하자마자 걷히지 않는다.</summary>
+    public float UnlockRevealDuration(bool _immediate = false)
+        => (_immediate ? 0f : Mathf.Max(0f, this.unlockHold))
+           + Mathf.Max(0.01f, this.unlockShed) + Mathf.Max(0.01f, this.unlockSettle);
+
     /// <summary>정점 해금(맵 진입 1회). 잠긴 모습을 한 박 보여준 뒤 베일이 걷히고 원판이 튄다. 총 길이를 돌려준다.</summary>
-    public float PlayUnlockReveal()
+    /// <param name="_immediate">잠긴 모습을 보여주는 첫 박을 건너뛴다. 장이 열리며 정점들이 차례로 풀리는
+    /// 계단에서 쓴다 — 띠 안무가 이미 "이 장이 잠겨 있었다"를 말했으므로 여기서 또 멈추면
+    /// 그 정점만 제 차례에서 뒤처져 혼자 늦게 열리는 것으로 읽힌다.</param>
+    public float PlayUnlockReveal(bool _immediate = false)
     {
         // 맵을 이미 떠났다면 그림만 진실로 남는다 — 꺼진 오브젝트 위에서 시퀀스를 돌리지 않는다.
         if (!this.isActiveAndEnabled) return 0f;
@@ -416,7 +425,7 @@ public class TournamentNodeView : MonoBehaviour
 
         float t_shed   = Mathf.Max(0.01f, this.unlockShed);
         float t_settle = Mathf.Max(0.01f, this.unlockSettle);
-        float t_shedAt = Mathf.Max(0f, this.unlockHold);
+        float t_shedAt = _immediate ? 0f : Mathf.Max(0f, this.unlockHold);
 
         // 무대를 이어받는 경우 앞선 안무가 중간값을 남겼을 수 있어, 걷을 것들의 시작값을 손으로 세운다.
         this.SetTonedIntensity(1f);
@@ -471,6 +480,23 @@ public class TournamentNodeView : MonoBehaviour
 
         this.m_unlockHold = false;
         this.Refresh();
+    }
+
+    /// <summary>도는 해금 안무를 결말까지 당긴다. 당길 것이 있었으면 true.</summary>
+    public bool RequestSkipReveal()
+    {
+        Sequence t_seq = this.m_unlockSeq;
+        if (t_seq == null || !t_seq.IsActive()) return false;
+
+        // 중첩까지 완료시켜야 SettleUnlock이 실제로 돌아 Refresh가 진실을 그린다 — Kill과 갈리는 자리가 여기다.
+        t_seq.Complete(true);
+
+        // 그 SettleUnlock이 탭 버튼을 되살리는데, 당기기는 사슬 한복판이라 아직 되살릴 때가 아니다.
+        // 되살아난 버튼이 다음 스킵 탭을 삼켜 "탭 한 번에 대상 하나"가 그 자리에서 깨진다.
+        // 사슬이 끝나면 AbortUnlockReveal이 첫 줄에서 되돌린다(ReleaseAllStaged 경유).
+        this.HoldTapInput(true);
+
+        return true;
     }
 
     void OnDisable()

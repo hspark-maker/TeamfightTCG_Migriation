@@ -15,6 +15,7 @@ public class TournamentSaveData
     // 목록이 아니라 한 칸이다 — 미수령이 있으면 다음 정점이 잠기고 그 정점 자신도 재진입이 막혀 둘이 동시에 생기지 않는다
     [FirestoreProperty("pendingRewardNodeId")] public string PendingRewardNodeId { get; set; } = "";
 
-    // 해금 연출을 이미 보여준 챕터·정점의 안정 키. 진행 낙인이 아니라 연출 이력이라 파생값이 아니다
-    [FirestoreProperty("seenUnlockIds")] public List<string> SeenUnlockIds { get; set; } = new List<string>();
+    // 해금 연출 이력(seenUnlockIds)은 이 슬롯에 없다 — 계정 진행도가 아니라 기기의 화면 이력이라
+    // TournamentUnlockSeenStore 가 로컬에 들고 있다. 서버가 판정하지 않는 값을 슬롯에 실으면
+    // 채택이 낡은 값으로 표식을 되감아 이미 본 연출이 되풀이된다
 }
