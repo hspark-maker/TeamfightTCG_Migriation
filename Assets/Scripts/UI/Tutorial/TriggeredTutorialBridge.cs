@@ -51,6 +51,8 @@ public class TriggeredTutorialBridge : MonoBehaviour
         AlbumPageOverlayView.OnAnyClosed              += OnOverlayClosed;
 
         KeywordGrowthManager.OnEnhanced += OnKeywordEnhanced;
+
+        OutgameTutorialGuide.OnFreeShotSpentChanged += OnServerFreeShotSpentChanged;
     }
 
     void Start()
@@ -73,6 +75,8 @@ public class TriggeredTutorialBridge : MonoBehaviour
         AlbumPageOverlayView.OnAnyClosed              -= OnOverlayClosed;
 
         KeywordGrowthManager.OnEnhanced -= OnKeywordEnhanced;
+
+        OutgameTutorialGuide.OnFreeShotSpentChanged -= OnServerFreeShotSpentChanged;
 
         CloseGate();
     }
@@ -134,6 +138,13 @@ public class TriggeredTutorialBridge : MonoBehaviour
         if (IsSurfaceWait(m_step.Completion))
         {
             if (IsSurfaceReady(m_step.Completion)) OnGateSatisfied();
+            return;
+        }
+
+        // 서버가 무료 한 방을 이미 소진했다면 이 스텝이 시킨 강화는 성립한 뒤다 — 응답 유실로 완료 신호만 잃은 자리라 여기서 통과시킨다.
+        if (IsFreeShotWait(m_step) && IsFreeShotSpent(m_step.Completion))
+        {
+            OnGateSatisfied();
             return;
         }
 
@@ -225,6 +236,16 @@ public class TriggeredTutorialBridge : MonoBehaviour
         => _completion == EOutgameTutorialCompletion.CardDetailReturn
             ? !CardDetailOverlayView.IsOpen
             : IsLobbySurfaceVisible();
+
+    // 이 스텝이 안내가 대주는 무료 한 방으로 성립하는 강화인가.
+    static bool IsFreeShotWait(TutorialStepDef _step)
+        => _step.FreeOfCharge
+        && _step.Completion == EOutgameTutorialCompletion.KeywordEnhance;
+
+    // 서버가 그 무료 한 방을 이미 소진했는가(= 기다리던 강화는 이미 끝났다).
+    static bool IsFreeShotSpent(EOutgameTutorialCompletion _completion)
+        => _completion == EOutgameTutorialCompletion.KeywordEnhance
+        && OutgameTutorialGuide.IsFreeShotSpentOnServer(EOutgameTutorialAction.WaitKeywordEnhance);
 
     // 로비 탭 화면이 그대로 보이는가(도감이 띄우는 팝업이 하나도 없는 상태).
     static bool IsLobbySurfaceVisible()
@@ -325,6 +346,15 @@ public class TriggeredTutorialBridge : MonoBehaviour
 
     // 발화 통지. 탭 전환 도중에 켜지므로 이 씬이 그대로 이어받는다.
     void OnActivated() => ApplyCurrentStep();
+
+    // 세션 도중 서버 소진 표식이 켜졌다 = 이 스텝이 시킨 강화가 이미 성립했다.
+    // 다시 적용하면 ApplyStepOnce의 프리체크가 통과 판정을 한다(응답을 잃어 완료 신호만 못 받은 자리).
+    void OnServerFreeShotSpentChanged()
+    {
+        if (!TriggeredTutorialRunner.IsRunning) return;
+
+        ApplyCurrentStep();
+    }
 
     // 완료 → 다음 스텝을 같은 씬에서 이어간다(트리거 튜토는 씬을 떠나지 않는다).
     void OnGateSatisfied()
