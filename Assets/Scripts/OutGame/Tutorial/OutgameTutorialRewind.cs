@@ -101,6 +101,10 @@ public static class OutgameTutorialRewind
         // "되감았는데 그 연출만 안 나온다"가 된다(해금 연출 이력은 기기 로컬이라 슬롯 목록에 없다).
         AdventureUnlockSeenStore.Clear();
 
+        // 무료 한 방 표식은 서버가 지웠지만, 그 문서를 읽는 것은 이 스텝보다 앞선 클라우드 채택이다 —
+        // 캐시를 여기서 걷지 않으면 옛 "소진" 값이 남아 강화 스텝이 통과 판정에 걸려 그냥 넘어간다.
+        OutgameTutorialGuide.ResetFreeShotForRewind();
+
         // 밀기는 끝났다 — 예약을 재생 전용 키로 옮겨 다음 초기화가 세이브를 다시 밀지 않게 한다.
         LocalPrefs.DeleteKey(PREF_KEY);
         LocalPrefs.SetString(PREF_REPLAY_KEY, $"{t_chapter},{t_step}");
