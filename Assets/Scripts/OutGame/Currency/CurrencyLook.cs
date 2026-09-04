@@ -22,7 +22,7 @@ public class CurrencyLook : ScriptableObject
                  "— 그림과 숫자가 어긋나느니 그 재화의 획득 연출을 건너뛴다.")]
         public Sprite barIcon;
 
-        [Tooltip("비워두면 코드 기본 이름(골드/다이아/에너지/강화 조각)으로 떨어진다.")]
+        [Tooltip("비워두면 코드 기본 이름(골드/다이아/에너지/강화 조각/룰렛 티켓)으로 떨어진다.")]
         public string displayName;
     }
 
@@ -102,6 +102,7 @@ public class CurrencyLook : ScriptableObject
             case ECurrencyType.Diamond: return "다이아";
             case ECurrencyType.Energy:  return "에너지";
             case ECurrencyType.Shard:   return "강화 조각";
+            case ECurrencyType.RouletteTicket: return "룰렛 티켓";
             default:                    return _type.ToString();   // 새 재화를 여기 안 적으면 영문 이름이 그대로 보인다(주어 없는 문장 방지)
         }
     }

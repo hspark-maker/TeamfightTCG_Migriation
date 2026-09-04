@@ -5,6 +5,7 @@ public enum ECurrencyType
     Diamond,
     Energy,
     Shard,  // 카드 강화 재화. 중복 카드 전용 재화와는 별개다
+    RouletteTicket,  // 룰렛 1회 회전 비용. 서버 지갑 키 개방은 2단계다
 
     Count,
 }

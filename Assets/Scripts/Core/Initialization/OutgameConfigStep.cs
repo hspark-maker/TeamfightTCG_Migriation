@@ -18,6 +18,8 @@ public sealed class OutgameConfigStep : MainInitializer
     [SerializeField] ProfileConfig profileConfig;
     // 덱 대표 이미지 후보 SO. 미배선이면 신규 덱이 이미지 키를 못 받고 표시가 첫 카드 아트로 떨어진다.
     [SerializeField] DeckImageCatalog deckImageCatalog;
+    // 룰렛 판 저작 SO. 미배선이거나 저작에 결함이 있으면 룰렛이 열리지 않는다(로비 버튼 미표시) — 나머지 기능은 정상이다.
+    [SerializeField] RouletteConfig rouletteConfig;
 
     public override UniTask Initialize(InitializationContext _context)
     {
@@ -44,6 +46,9 @@ public sealed class OutgameConfigStep : MainInitializer
         }
         AdventureProgress.SetConfig(t_runtimeAdventure);
         ProfileManager.SetConfig(profileConfig);
+
+        // 곁가지 컨텐츠라 실패해도 초기화를 세우지 않는다 — 결함은 SetConfig 안의 Validate가 LogError로 드러낸다.
+        RouletteManager.SetConfig(rouletteConfig);
 
         // 신규 덱 저장 시 여기서 대표 이미지 키를 뽑는다.
         DeckImages.SetSource(deckImageCatalog);
