@@ -279,7 +279,7 @@ public static class OutgameDebugActions
     // 튜토리얼 N편 처음으로 되감기 — 되돌리는 것은 좌표와 완료 낙인뿐이다(씬 재진입 시 적용).
     // 소유·재화·덱·랭크·성장은 그대로 남으므로 여기서 본 화면은 실제 신규 유저의 화면과 다르다
     // (덱 지급은 이미 있는 슬롯을 만나 조용히 지나가고, 카드 세트 지급은 가진 카드를 신규처럼 다시 연출한다).
-    // 첫실행 상태 그대로 보려면 에디터의 [Tools > Card Battle > 튜토리얼 스텝 되감기]로 예약하고 재생한다.
+    // 첫실행 상태 그대로 보려면 에디터의 [Tools > Card Battle > 튜토리얼 저작 도구]에서 [여기부터]로 예약하고 재생한다.
     public static void RestartTutorialFromChapter(int _chapterIndex)
     {
         int t_last    = OutgameTutorialRunner.ChapterCount - 1;
@@ -290,6 +290,28 @@ public static class OutgameDebugActions
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.ClearForce();
 
         Debug.Log($"[OutgameDebug] 튜토리얼 {t_chapter + 1}편 처음으로 — 좌표만 되감음(소유·재화 유지). 씬 재진입 시 적용 (저작된 총 {OutgameTutorialRunner.ChapterCount}편)");
+    }
+
+    // 계정 경험치 더하기. 만렙 구간은 전승 1,000판대라 이 문 없이는 확인할 수 없다.
+    public static void AddAccountExp(long _amount)
+    {
+        AccountLevelManager.AddExpForDebug(_amount);
+        AccountLevelInfo t_info = AccountLevelManager.GetInfo();
+        Debug.Log($"[OutgameDebug] 계정 경험치 +{_amount} — Lv.{t_info.Level} ({t_info.ExpInLevel}/{t_info.ExpToNext})");
+    }
+
+    // 만렙으로 밀기
+    public static void FillAccountLevel()
+    {
+        AccountLevelManager.FillToMaxForDebug();
+        Debug.Log($"[OutgameDebug] 계정 레벨 만렙 — Lv.{AccountLevelManager.Level}");
+    }
+
+    // 레벨 1로 되돌리기
+    public static void ResetAccountLevel()
+    {
+        AccountLevelManager.ResetForDebug();
+        Debug.Log("[OutgameDebug] 계정 레벨 초기화 — Lv.1");
     }
 
     // 티어 1단계 올리기/내리기

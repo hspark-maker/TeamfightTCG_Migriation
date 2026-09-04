@@ -252,6 +252,24 @@ public partial class AlbumEntry
 }
 
 [GeneratorSpecData]
+public partial class AlbumThemeInfo
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 테마 안정 키 — 완성 보상 낙인 키의 뿌리. 리네임·순서 변경에도 불변
+    public string themeId;
+    /// 갤러리 표시 순서(0부터)
+    public int order;
+    /// 준비 중 테마면 1 — 갤러리에 흑백+자물쇠로만 뜨고 완성 모수에서 빠진다
+    public int locked;
+    /// 화면 표시 이름
+    public string displayName;
+    /// 셀에 한 줄로 붙는 테마 소개
+    public string description;
+}
+
+[GeneratorSpecData]
 public partial class AdventureChapter
 {
     /// 행 고유 번호(부여 후 변경 금지)
@@ -270,24 +288,6 @@ public partial class AdventureChapter
     /// 참고용 이름(데이터 아님)
     public string aiDeckId;
     public int aiCardLevel;
-}
-
-[GeneratorSpecData]
-public partial class AlbumThemeInfo
-{
-    /// 행 고유 번호(부여 후 변경 금지)
-    [GeneratorId(nameof(id), typeof(int))]
-    public int id;
-    /// 테마 안정 키 — 완성 보상 낙인 키의 뿌리. 리네임·순서 변경에도 불변
-    public string themeId;
-    /// 갤러리 표시 순서(0부터)
-    public int order;
-    /// 준비 중 테마면 1 — 갤러리에 흑백+자물쇠로만 뜨고 완성 모수에서 빠진다
-    public int locked;
-    /// 화면 표시 이름
-    public string displayName;
-    /// 셀에 한 줄로 붙는 테마 소개
-    public string description;
 }
 
 [GeneratorSpecData]
@@ -337,4 +337,18 @@ public partial class SynergyTierDef
     /// 티어 라벨(시너지 이름과 같으면 표시 생략)
     public string label;
     public string effectSummary;
+}
+
+[GeneratorSpecData]
+public partial class AccountLevel
+{
+    /// 계정 레벨(=행 번호. 1부터 연속)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 이 레벨에 도달하는 데 필요한 누적 경험치
+    public long requiredExp;
+    /// 승리 1회 획득 경험치(전 행 동일)
+    public long winExp;
+    /// 패배·무승부 1회 획득 경험치(전 행 동일)
+    public long loseExp;
 }

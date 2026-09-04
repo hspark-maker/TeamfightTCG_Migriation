@@ -129,7 +129,7 @@ export const enhanceCard = onCall(async (request) => {
 
       const succeeded = rollSucceeded(step.successPermille, randomInt);
       if (succeeded && grantsReference !== null && freeShot !== null) {
-        writeGrantUsed(transaction, grantsReference, FREE_SHOT_AXIS, freeShot, FieldValue.serverTimestamp());
+        writeGrantUsed(transaction, grantsReference, FREE_SHOT_AXIS, FieldValue.serverTimestamp());
       }
 
       outcome = succeeded ? "Success" : "Failed";

@@ -124,7 +124,7 @@ exports.enhanceCard = (0, https_1.onCall)(async (request) => {
         }
         const succeeded = (0, enhanceRules_1.rollSucceeded)(step.successPermille, node_crypto_1.randomInt);
         if (succeeded && grantsReference !== null && freeShot !== null) {
-            (0, tutorialGrants_1.writeGrantUsed)(transaction, grantsReference, FREE_SHOT_AXIS, freeShot, firestore_1.FieldValue.serverTimestamp());
+            (0, tutorialGrants_1.writeGrantUsed)(transaction, grantsReference, FREE_SHOT_AXIS, firestore_1.FieldValue.serverTimestamp());
         }
         outcome = succeeded ? "Success" : "Failed";
         level = succeeded ? step.level : currentLevel;

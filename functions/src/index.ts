@@ -1,6 +1,6 @@
 export {ping} from "./commands/ping";
 export {devBumpRevision} from "./commands/devBumpRevision";
-export {devRewindTutorial} from "./commands/devRewindTutorial";
+export {devResetSave} from "./commands/devResetSave";
 export {ensureAccount} from "./commands/ensureAccount";
 export {ensureWallet} from "./commands/ensureWallet";
 export {repairSaveSlots} from "./commands/repairSaveSlots";

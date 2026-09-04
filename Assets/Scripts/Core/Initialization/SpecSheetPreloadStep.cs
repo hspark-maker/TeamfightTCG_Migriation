@@ -35,6 +35,7 @@ public sealed class SpecSheetPreloadStep : MainInitializer
         AIDeckSpec.Init();
         RewardSpec.Init();
         GrowthSpec.Init();
+        AccountLevelSpec.Init();
 
         if (!RankGradeSpec.TryValidateRequired(out string t_rankError))
         {
@@ -77,6 +78,13 @@ public sealed class SpecSheetPreloadStep : MainInitializer
         if (!GrowthSpec.TryValidateRequired(out string t_growthError))
         {
             Debug.LogError($"[SpecSheetPreloadStep] {t_growthError}");
+            GameInitialization.MarkRecoveryRequired();
+        }
+
+        // 곡선이 비면 계정 레벨이 1에 굳는다. 전투는 그대로 서므로 초기화를 끊지 않고 복구 표시만 세운다.
+        if (!AccountLevelSpec.TryValidateRequired(out string t_accountError))
+        {
+            Debug.LogError($"[SpecSheetPreloadStep] {t_accountError}");
             GameInitialization.MarkRecoveryRequired();
         }
     }
