@@ -12,6 +12,12 @@ public partial class ReleaseManagerWindow
     bool versionManualEntry;
     string versionManualVersion;
     bool versionAllowUnsupportedMajor;
+    SpecFirestoreUploader.AppVersionPolicyState appVersionPolicy;
+    string appVersionPolicyEnvId;
+    string appVersionPolicyError;
+    string appVersionPolicyReport;
+    bool appVersionPolicyLoaded;
+    bool appVersionAllowBlockCurrent;
 
     void EnableVersionManagement()
     {
@@ -23,6 +29,7 @@ public partial class ReleaseManagerWindow
         this.versionManualEntry = false;
         this.versionManualVersion = string.Empty;
         this.versionAllowUnsupportedMajor = false;
+        ClearAppVersionPolicy();
     }
 
     void DrawVersionManagementSection()
@@ -37,13 +44,26 @@ public partial class ReleaseManagerWindow
         if (!ContentVersionConsistency.TryValidate(out string t_consistencyError))
             EditorGUILayout.HelpBox(t_consistencyError, MessageType.Warning);
 
+        EContentRunMode t_previousMode = this.versionEnvMode;
         this.versionEnvMode = (EContentRunMode)EditorGUILayout.EnumPopup("대상 환경", this.versionEnvMode);
+        if (this.versionEnvMode != t_previousMode)
+        {
+            this.versionIndex = null;
+            this.versionError = null;
+            this.versionReport = null;
+            ClearAppVersionPolicy();
+        }
         bool t_hasEnv = TryGetDataEnvId(this.versionEnvMode, out string t_envId, out string t_envError);
         EditorGUILayout.LabelField("인덱스 경로",
             t_hasEnv ? $"{FirebaseRootPath.Environment(t_envId)}/specs/_index" : "(환경 프로필 없음)");
         if (!t_hasEnv) EditorGUILayout.HelpBox(t_envError, MessageType.Error);
 
         DrawAdminAuth();
+
+        DrawAppVersionPolicy(t_hasEnv, t_envId, t_envError);
+
+        EditorGUILayout.Space(10);
+        EditorGUILayout.LabelField("콘텐츠 표 세대", EditorStyles.boldLabel);
 
         using (new EditorGUI.DisabledScope(!t_hasEnv || !SpecAdminAuth.IsSignedIn))
         {
@@ -126,6 +146,183 @@ public partial class ReleaseManagerWindow
 
         if (!string.IsNullOrEmpty(this.versionReport))
             EditorGUILayout.HelpBox(this.versionReport, MessageType.Info);
+    }
+
+    void DrawAppVersionPolicy(bool _hasEnv, string _envId, string _envError)
+    {
+        EditorGUILayout.Space(6);
+        EditorGUILayout.LabelField("앱 버전 정책", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("정책 경로",
+            _hasEnv ? $"{FirebaseRootPath.Environment(_envId)}/config/app" : "(환경 프로필 없음)");
+        EditorGUILayout.HelpBox(
+            "minSupported보다 낮은 앱은 진입을 차단하고, latest보다 낮은 앱은 로비에서 업데이트를 권장합니다. " +
+            "스토어 반영을 확인한 뒤 값을 올리십시오.", MessageType.None);
+
+        using (new EditorGUI.DisabledScope(!_hasEnv || !SpecAdminAuth.IsSignedIn))
+        {
+            if (GUILayout.Button("앱 정책 새로고침", GUILayout.Height(24)))
+                RefreshAppVersionPolicy(_envId);
+        }
+
+        if (!string.IsNullOrEmpty(this.appVersionPolicyError))
+            EditorGUILayout.HelpBox(this.appVersionPolicyError, MessageType.Error);
+        if (!this.appVersionPolicyLoaded || this.appVersionPolicy == null)
+        {
+            EditorGUILayout.HelpBox("서버 정책을 먼저 새로고침해야 편집할 수 있습니다.", MessageType.Info);
+            return;
+        }
+
+        EditorGUILayout.LabelField("서버 문서", this.appVersionPolicy.Exists ? "있음" : "없음 (업로드 시 생성)");
+        this.appVersionPolicy.MinSupported = EditorGUILayout.TextField("최소 지원 버전", this.appVersionPolicy.MinSupported);
+        this.appVersionPolicy.Latest = EditorGUILayout.TextField("최신 버전", this.appVersionPolicy.Latest);
+        this.appVersionPolicy.StoreUrlAndroid = EditorGUILayout.TextField("Android 스토어 URL", this.appVersionPolicy.StoreUrlAndroid);
+        this.appVersionPolicy.StoreUrlIOS = EditorGUILayout.TextField("iOS 스토어 URL", this.appVersionPolicy.StoreUrlIOS);
+        this.appVersionPolicy.StoreUrl = EditorGUILayout.TextField("공통 스토어 URL(폴백)", this.appVersionPolicy.StoreUrl);
+        this.appVersionPolicy.NoticeId = EditorGUILayout.TextField("공지 ID", this.appVersionPolicy.NoticeId);
+        this.appVersionPolicy.NoticeTitle = EditorGUILayout.TextField("공지 제목", this.appVersionPolicy.NoticeTitle);
+        EditorGUILayout.LabelField("공지 본문");
+        this.appVersionPolicy.NoticeBody = EditorGUILayout.TextArea(
+            this.appVersionPolicy.NoticeBody ?? string.Empty, GUILayout.MinHeight(54));
+
+        bool t_blocksCurrent = CurrentBuildWouldBeBlocked(this.appVersionPolicy, out string t_currentText);
+        if (t_blocksCurrent)
+        {
+            EditorGUILayout.HelpBox(
+                $"이 정책은 현재 빌드 {t_currentText}의 진입을 즉시 차단합니다. 실수면 전 사용자가 진입하지 못합니다.",
+                MessageType.Error);
+            this.appVersionAllowBlockCurrent = EditorGUILayout.ToggleLeft(
+                "현재 빌드보다 높은 minSupported 배포를 허용한다 (스토어 반영 확인함)",
+                this.appVersionAllowBlockCurrent);
+        }
+        else this.appVersionAllowBlockCurrent = false;
+
+        string t_blocker = AppVersionPolicyBlocker(_hasEnv, _envError, _envId, t_blocksCurrent);
+        if (!string.IsNullOrEmpty(t_blocker)) EditorGUILayout.HelpBox(t_blocker, MessageType.Error);
+        using (new EditorGUI.DisabledScope(t_blocker != null))
+        {
+            if (GUILayout.Button("앱 버전 정책 업로드", GUILayout.Height(28)))
+                RunAppVersionPolicyUpload(_envId, t_blocksCurrent);
+        }
+
+        if (!string.IsNullOrEmpty(this.appVersionPolicyReport))
+            EditorGUILayout.HelpBox(this.appVersionPolicyReport, MessageType.Info);
+    }
+
+    void RefreshAppVersionPolicy(string _envId)
+    {
+        try
+        {
+            EditorUtility.DisplayProgressBar("앱 버전 정책", "서버 정책을 읽는 중...", 0.5f);
+            bool t_ok = SpecFirestoreUploader.TryGetAppVersionPolicy(
+                _envId, out SpecFirestoreUploader.AppVersionPolicyState t_state, out string t_error);
+            this.appVersionPolicy = t_ok ? t_state : null;
+            this.appVersionPolicyLoaded = t_ok;
+            this.appVersionPolicyEnvId = t_ok ? _envId : null;
+            this.appVersionPolicyError = t_ok ? null : t_error;
+            this.appVersionPolicyReport = null;
+            this.appVersionAllowBlockCurrent = false;
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+            Repaint();
+        }
+    }
+
+    string AppVersionPolicyBlocker(bool _hasEnv, string _envError, string _envId, bool _blocksCurrent)
+    {
+        if (!_hasEnv) return _envError;
+        if (!SpecAdminAuth.IsSignedIn) return "관리자 로그인이 필요합니다.";
+        if (!SpecAdminAuth.HasAdminClaim) return "로그인한 계정에 admin 클레임이 없습니다.";
+        if (!this.appVersionPolicyLoaded || this.appVersionPolicy == null)
+            return "서버 정책을 먼저 새로고침해야 합니다.";
+        if (!string.Equals(this.appVersionPolicyEnvId, _envId))
+            return "대상 환경이 바뀌었습니다. 서버 정책을 다시 새로고침해야 합니다.";
+
+        // updateTime이 비면 동시 변경 방지 조건이 빈 문자열로 나가 커밋이 400으로 떨어진다.
+        // 조건을 빼고 덮어쓰는 쪽이 더 위험하므로(다른 사람 정책을 조용히 밀어낸다) 여기서 세운다.
+        if (this.appVersionPolicy.Exists && string.IsNullOrEmpty(this.appVersionPolicy.UpdateTime))
+            return "서버 응답에 updateTime이 없어 동시 변경을 막을 수 없습니다. 다시 새로고침해야 합니다.";
+
+        string t_min = CleanVersionText(this.appVersionPolicy.MinSupported);
+        string t_latest = CleanVersionText(this.appVersionPolicy.Latest);
+        if (!string.IsNullOrEmpty(t_min) && !AppSemVer.TryParse(t_min, out _))
+            return "최소 지원 버전은 숫자 세 마디 형식이어야 합니다(예: 1.2.0).";
+        if (!string.IsNullOrEmpty(t_latest) && !AppSemVer.TryParse(t_latest, out _))
+            return "최신 버전은 숫자 세 마디 형식이어야 합니다(예: 1.4.0).";
+        if (AppSemVer.TryParse(t_min, out AppSemVer t_minVersion) &&
+            AppSemVer.TryParse(t_latest, out AppSemVer t_latestVersion) && t_latestVersion < t_minVersion)
+            return "최신 버전은 최소 지원 버전보다 낮을 수 없습니다.";
+
+        // 차단 화면의 출구는 스토어 버튼 하나뿐이다(재시도 버튼은 UpdateRequired에서 자동으로 숨는다).
+        // 주소가 하나도 없으면 차단당한 유저에게 "종료"만 남아 스토어로 갈 길이 없다.
+        if (!string.IsNullOrEmpty(t_min) && !HasAnyStoreUrl(this.appVersionPolicy))
+            return "minSupported를 저작하려면 스토어 URL이 최소 하나 필요합니다 — 없으면 차단 화면에 나갈 길이 없습니다.";
+
+        bool t_hasNoticeId = !string.IsNullOrWhiteSpace(this.appVersionPolicy.NoticeId);
+        bool t_hasNoticeBody = !string.IsNullOrWhiteSpace(this.appVersionPolicy.NoticeBody);
+        if (t_hasNoticeId != t_hasNoticeBody) return "공지 ID와 공지 본문은 함께 입력하거나 함께 비워야 합니다.";
+        if (_blocksCurrent && !this.appVersionAllowBlockCurrent)
+            return "현재 빌드를 차단하는 정책은 위 확인 체크가 필요합니다.";
+        return null;
+    }
+
+    void RunAppVersionPolicyUpload(string _envId, bool _blocksCurrent)
+    {
+        string t_warning =
+            $"{FirebaseRootPath.Environment(_envId)}/config/app 정책을 즉시 교체합니다.\n\n" +
+            $"minSupported={this.appVersionPolicy.MinSupported}\nlatest={this.appVersionPolicy.Latest}";
+        if (!EditorUtility.DisplayDialog("앱 버전 정책 업로드", t_warning, "업로드", "취소")) return;
+        if (_blocksCurrent && !EditorUtility.DisplayDialog(
+                "현재 빌드 차단 최종 확인",
+                $"현재 bundleVersion {PlayerSettings.bundleVersion}이 즉시 차단됩니다. 스토어 반영을 확인했습니까?",
+                "차단 정책 배포", "취소")) return;
+
+        try
+        {
+            EditorUtility.DisplayProgressBar("앱 버전 정책", "서버 정책을 올리는 중...", 0.65f);
+            string t_report = SpecFirestoreUploader.UploadAppVersionPolicy(
+                _envId, this.appVersionPolicy, out string t_error);
+            this.appVersionPolicyError = t_error;
+            if (t_error == null)
+            {
+                RefreshAppVersionPolicy(_envId);
+                this.appVersionPolicyReport = t_report;
+            }
+            else this.appVersionPolicyReport = null;
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+            Repaint();
+        }
+    }
+
+    static bool CurrentBuildWouldBeBlocked(
+        SpecFirestoreUploader.AppVersionPolicyState _policy, out string _currentText)
+    {
+        _currentText = PlayerSettings.bundleVersion;
+        return AppSemVer.TryParse(_currentText, out AppSemVer t_current) &&
+               AppSemVer.TryParse(CleanVersionText(_policy?.MinSupported), out AppSemVer t_min) &&
+               t_current < t_min;
+    }
+
+    static string CleanVersionText(string _value) => (_value ?? string.Empty).Trim();
+
+    // 런타임 ReadStoreUrl 과 같은 폴백 순서다 — 플랫폼 키가 비면 공통 키를 본다.
+    static bool HasAnyStoreUrl(SpecFirestoreUploader.AppVersionPolicyState _policy) =>
+        !string.IsNullOrWhiteSpace(_policy.StoreUrlAndroid) ||
+        !string.IsNullOrWhiteSpace(_policy.StoreUrlIOS) ||
+        !string.IsNullOrWhiteSpace(_policy.StoreUrl);
+
+    void ClearAppVersionPolicy()
+    {
+        this.appVersionPolicy = null;
+        this.appVersionPolicyEnvId = null;
+        this.appVersionPolicyError = null;
+        this.appVersionPolicyReport = null;
+        this.appVersionPolicyLoaded = false;
+        this.appVersionAllowBlockCurrent = false;
     }
 
     void RefreshVersionIndex(string _envId)

@@ -7,6 +7,10 @@ public static class GameInitialization
     static readonly List<ReadySubscription> s_readySubscriptions = new();
 
     internal static EGameInitState State { get; private set; } = EGameInitState.Initializing;
+
+    /// <summary>UpdateRequired 로 끊긴 사유. 다른 상태에서는 의미가 없다.</summary>
+    internal static EUpdateRequiredReason UpdateReason { get; private set; } = EUpdateRequiredReason.Content;
+
     public static bool IsReady => State == EGameInitState.Ready;
     public static bool IsTerminated =>
         State == EGameInitState.UpdateRequired || State == EGameInitState.RecoveryRequired;
@@ -30,6 +34,7 @@ public static class GameInitialization
     static void ResetStatics()
     {
         State = EGameInitState.Initializing;
+        UpdateReason = EUpdateRequiredReason.Content;
         s_readySubscriptions.Clear();
     }
 
@@ -98,8 +103,13 @@ public static class GameInitialization
         SetState(EGameInitState.RecoveryRequired);
     }
 
-    internal static void MarkUpdateRequired()
+    /// <param name="_reason">업데이트 화면이 문구와 스토어 버튼을 가르는 축. 기존 호출부는 전부
+    /// 콘텐츠 표 세대 사고라 기본값이 Content다.</param>
+    internal static void MarkUpdateRequired(EUpdateRequiredReason _reason = EUpdateRequiredReason.Content)
     {
+        // 사유는 상태보다 먼저 세운다 — SetState가 구독을 끊으며 화면 전이를 유발할 수 있는데,
+        // 그 화면이 아직 갱신 안 된 사유를 읽으면 첫 표시가 틀린다.
+        UpdateReason = _reason;
         SetState(EGameInitState.UpdateRequired);
     }
 

@@ -144,6 +144,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── 클라이언트 설정(버전 통지) ─────────────────────────────────────
+    // 읽기: 초기화의 AppVersionGate 가 앱 버전 정책 한 문서를 읽는다.
+    // 쓰기: 배포자(admin 클레임)만. 이 문서의 minSupported 하나로 전 유저 진입이 막히므로
+    //       클라이언트에게는 절대 쓰기를 열지 않는다.
+    match /envs/{envId}/config/{docId} {
+      allow read: if isSignedIn() && isKnownEnv(envId);
+      allow write: if isAdmin() && isKnownEnv(envId);
+    }
+
     // ── 마스터 데이터(스펙) ────────────────────────────────────────────
     // 읽기: 런타임 클라이언트가 BattleContentSync 로 메타·행을 내려받는다.
     // 쓰기: 배포자(admin 클레임)만. 에디터 업로더는 ID 토큰을 실어야 한다.
