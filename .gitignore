@@ -35,6 +35,10 @@
 ExportedObj/
 .consulo/
 *.csproj
+# Unity 가 자동 생성하는 csproj 만 막는 규칙이다. 손으로 쓴 서버·툴 프로젝트는 추적해야 한다 —
+# 빠지면 Cloud Build 컨텍스트에 안 실려 "csproj not found" 로만 드러난다(실제로 한 번 겪었다).
+!Services/**/*.csproj
+!Tools/**/*.csproj
 *.unityproj
 *.sln
 *.suo
