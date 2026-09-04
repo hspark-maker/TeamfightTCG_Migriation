@@ -144,6 +144,20 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── 일일·주간 미션 ─────────────────────────────────────────────────
+    // 진행도는 서버 커맨드(openPack·enhanceCard·limitBreakCard·claimReward)의 부수효과로만 오르고,
+    // 수령 낙인은 claimMission 만 찍는다. 클라 쓰기를 한 줄이라도 열면 진행도가 곧 치트가 된다.
+    //
+    // 세이브 문서와 별도 경로다 — isValidSave 계약과 무관하고, 그래서 세이브 스키마 버전을
+    // 올리지 않고 붙일 수 있다(grants 와 같은 축). 값 검증은 없다(클라 쓰기가 아예 없다).
+    match /envs/{envId}/users/{userId}/missions/{docId} {
+      // 읽기는 연다 — 화면이 진행도와 수령 가능 여부를 그리려면 이 문서를 봐야 한다.
+      // 진행도를 커맨드 응답에 실어 보내지 않는 이유는 영수증 재생이 낡은 값을 되돌려주기 때문이다.
+      allow read: if isSignedIn() && request.auth.uid == userId &&
+                  isKnownEnv(envId) && docId == 'current';
+      allow write: if false;
+    }
+
     // ── 클라이언트 설정(버전 통지) ─────────────────────────────────────
     // 읽기: 초기화의 AppVersionGate 가 앱 버전 정책 한 문서를 읽는다.
     // 쓰기: 배포자(admin 클레임)만. 이 문서의 minSupported 하나로 전 유저 진입이 막히므로

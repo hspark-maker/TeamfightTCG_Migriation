@@ -1,6 +1,10 @@
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
+import {FieldValue} from "firebase-admin/firestore";
 import {randomInt, randomUUID} from "node:crypto";
+import {db} from "../firebaseApp";
+import {beginMissionBump, commitMissionBump} from "../missions/missionStore";
+import {missionPeriod} from "../missions/period";
 import {
   isKnownEnv,
   mutateSave,
@@ -99,8 +103,14 @@ export const openPack = onCall(async (request) => {
   // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
   const txId = clientReceiptId(request.data?.txId, randomUUID());
 
+  // 기간은 여기서 **한 번만** 잰다 — 트랜잭션 콜백은 재실행되므로 그 안에서 재면
+  // 경계에 걸린 호출이 어느 기간에 실릴지가 재실행 운에 달린다.
+  const period = missionPeriod(Date.now());
+
   const result = await mutateSave(env, uid, "openPack", {kind: "client", txId},
-    (current, _transaction, wallet): SaveMutation => {
+    async (current, transaction, wallet): Promise<SaveMutation> => {
+      // 미션 읽기가 콜백의 첫 줄이다 — 아래 쓰기보다 반드시 앞이어야 한다(Firestore 트랜잭션 규칙).
+      const missions = await beginMissionBump(transaction, db, env, uid, period);
       // 트랜잭션이 재실행되면 이전 추첨을 버리고 다시 뽑는다 — 잔액·소유와 정합해야 한다.
       const points = Number((current.rank as {points?: unknown} | undefined)?.points ?? 0);
       const grade = gradeOf(thresholds, points);
@@ -131,6 +141,10 @@ export const openPack = onCall(async (request) => {
       const paid = spend(balances, pack.priceType, pack.price);
       goldBefore = balances[pack.priceType];
       goldAfter = paid[pack.priceType];
+
+      // 진행도는 콜백 **안**에서 올린다 — mutateSave 는 영수증이 히트하면 이 콜백을 통째로 건너뛰므로,
+      // 그 덕에 재시도가 진행도를 두 번 올리지 않는다. 콜백 밖으로 옮기면 그 보장이 사라진다.
+      commitMissionBump(transaction, missions, "OpenPack", 1, FieldValue.serverTimestamp());
 
       return {
         slots: {

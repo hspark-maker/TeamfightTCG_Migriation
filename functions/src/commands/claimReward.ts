@@ -1,4 +1,8 @@
+import {FieldValue} from "firebase-admin/firestore";
 import {randomUUID} from "node:crypto";
+import {db} from "../firebaseApp";
+import {beginMissionBump, commitMissionBump} from "../missions/missionStore";
+import {missionPeriod} from "../missions/period";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {
@@ -427,18 +431,31 @@ export const claimReward = onCall(async (request) => {
   // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
   const txId = clientReceiptId(request.data?.txId, randomUUID());
 
+  // 기간은 여기서 한 번만 잰다 — 콜백은 재실행되므로 그 안에서 재면 경계에 걸린 호출이 흔들린다.
+  const period = missionPeriod(Date.now());
+
   // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
   // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
   let replayed = true;
 
   const result = await mutateSave(env, uid, "claimReward", {kind: "client", txId},
-    (current, _transaction, wallet): SaveMutation => {
+    async (current, transaction, wallet): Promise<SaveMutation> => {
+      // 미션 읽기가 콜백의 첫 줄이다 — 아래 쓰기보다 반드시 앞이어야 한다(Firestore 트랜잭션 규칙).
+      const missions = await beginMissionBump(transaction, db, env, uid, period);
       // 지급은 자격 판정보다 먼저 계산해도 안전하다 — 거절은 아래 낙인 함수들이 던지고, 던지면 트랜잭션 전체가 없던 일이 된다.
       // 줄 것이 없으면 지갑을 아예 쓰지 않는다(claimBattleReward·claimPayout 과 같은 정책) — 보상 미저작 정점의
       // 해금 수령이 빈 지급으로 rev 만 올리면 클라가 달라진 것 없는 잔액을 채택하고 사고를 못 알아챈다.
       const paid = gains.length === 0 ?
         undefined :
         nextWallet(wallet, grant(wallet.balances, gains), "claimReward");
+
+      // 아래 낙인 함수들은 트랜잭션을 **읽지 않는다**(이미 받은 current 만 본다). 그래서 여기서 써도
+      // "모든 읽기가 모든 쓰기보다 앞" 규칙을 깨지 않는다. 거절이 던지면 트랜잭션째 없던 일이 되므로
+      // 자격 판정보다 앞선 이 위치가 진행도를 새게 하지도 않는다.
+      //
+      // 진행도를 올리는 것은 이 명령뿐이다 — claimMission 은 ClaimReward 를 올리지 않는다.
+      // 올리면 미션 수령이 미션을 낳는 자기참조가 된다.
+      commitMissionBump(transaction, missions, "ClaimReward", 1, FieldValue.serverTimestamp());
 
       if (ownerType === "Rank") {
         const rank = claimRankTier(current, tierIndex, requiredPoints, tierCount, context);
