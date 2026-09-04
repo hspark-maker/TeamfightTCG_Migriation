@@ -8,34 +8,58 @@ using UnityEngine;
 public class BarProgressGauge : RankProgressGauge
 {
     [Tooltip("폭이 줄고 느는 채움 사각. pivot·anchor의 x가 0이어야 왼쪽에서 자란다. " +
-             "저작 폭이 곧 100% 폭이라, 트랙과 같은 폭으로 저작한다.")]
+             "비워 두면 자기 RectTransform을 쓴다.")]
     [SerializeField] RectTransform fillRect;
 
-    // 저작된 100% 폭. Awake에 붙든다 — 이후에는 폭 자체가 진행을 담는 값이라 여기서 되물을 수 없다.
-    float m_fullWidth;
+    [Tooltip("100%일 때의 폭(px). 0이면 처음 그릴 때의 폭을 기준으로 붙든다. " +
+             "저작해 두면 그 값이 이긴다 — 배선을 눈으로 확인할 수 있어 권장한다.")]
+    [SerializeField] float fullWidth;
 
-    /// <summary>저작된 100% 폭(px). 미배선이면 0.</summary>
-    public float FullWidth => this.m_fullWidth;
+    /// <summary>100%일 때의 폭(px). 아직 확정되지 않았으면 0.</summary>
+    public float FullWidth => this.fullWidth;
 
     public override Vector2 MarkerPos(float _ratio)
     {
-        if (this.fillRect == null) return Vector2.zero;
+        RectTransform t_rect = Rect;
+        if (t_rect == null) return Vector2.zero;
 
-        Vector2 t_pos = this.fillRect.anchoredPosition;
-        return new Vector2(t_pos.x + this.m_fullWidth * Mathf.Clamp01(_ratio), t_pos.y);
+        EnsureFullWidth(t_rect);
+
+        Vector2 t_pos = t_rect.anchoredPosition;
+        return new Vector2(t_pos.x + this.fullWidth * Mathf.Clamp01(_ratio), t_pos.y);
     }
 
     protected override void ApplyRatio(float _ratio)
     {
-        if (this.fillRect == null) return;
+        RectTransform t_rect = Rect;
+        if (t_rect == null) return;
 
-        Vector2 t_size = this.fillRect.sizeDelta;
-        this.fillRect.sizeDelta = new Vector2(this.m_fullWidth * Mathf.Clamp01(_ratio), t_size.y);
+        EnsureFullWidth(t_rect);
+
+        Vector2 t_size = t_rect.sizeDelta;
+        t_rect.sizeDelta = new Vector2(this.fullWidth * Mathf.Clamp01(_ratio), t_size.y);
     }
 
-    void Awake()
+    // 배선을 Awake에 두지 않는다 — 부모의 OnEnable이 자식의 Awake보다 먼저 돌 수 있어,
+    // 그 사이에 그리기가 들어오면 미배선 상태로 새어 나간다.
+    RectTransform Rect
     {
-        if (this.fillRect == null) this.fillRect = transform as RectTransform;
-        if (this.fillRect != null) this.m_fullWidth = this.fillRect.sizeDelta.x;
+        get
+        {
+            if (this.fillRect == null) this.fillRect = transform as RectTransform;
+            return this.fillRect;
+        }
+    }
+
+    // 기준 폭을 처음 그리기 직전에 확정한다. 폭을 줄이는 것은 이 컴포넌트뿐이라 이 시점의 값이 곧 저작 폭이다.
+    // Awake에서 읽으면 그보다 먼저 도는 OnEnable이 이미 폭을 0으로 만든 뒤일 수 있고,
+    // 그 0을 기준으로 붙들면 게이지가 영영 되살아나지 않는다.
+    void EnsureFullWidth(RectTransform _rect)
+    {
+        if (this.fullWidth > 0f) return;
+
+        this.fullWidth = _rect.sizeDelta.x;
+        if (this.fullWidth <= 0f)
+            Debug.LogError($"[{name}] 게이지 기준 폭이 0이다 — 채움 사각의 저작 폭을 확인할 것.", this);
     }
 }

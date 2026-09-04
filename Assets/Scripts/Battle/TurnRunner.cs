@@ -39,7 +39,6 @@ public class TurnRunner : MonoBehaviour
     bool resultFinalized;// 결과 표시 경로에 진입했는가. 여운·팝업이 두 번 돌지 않게 하는 게이트.
     CurrencyGain lastReward; // CaptureResult에서 확정한 지급분. F-20 팝업 표시용(표시만, 재지급 없음).
     long lastRankDelta;  // CaptureResult에서 확정한 랭크 포인트 증감(클램프 반영). 팝업 표시용(표시만).
-    long lastExpDelta;   // CaptureResult에서 확정한 계정 경험치 증가분. 팝업 표시용(표시만).
 
     // 보상을 만든 생존 카드 스냅샷. 여운이 도는 동안 필드가 정리돼도 흔들리지 않게 값으로 잡아 둔다.
     List<int> lastSurvivorCards;
@@ -219,7 +218,7 @@ public class TurnRunner : MonoBehaviour
             await BattleResultBeat.Play(_won, this.destroyCt);
 
         GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
-        t_popup?.Show(this.lastReward, this.lastRankDelta, this.lastExpDelta, _won,
+        t_popup?.Show(this.lastReward, this.lastRankDelta, _won,
             this.lastSurvivorCards, this.lastFallenCards);
     }
 
@@ -256,7 +255,7 @@ public class TurnRunner : MonoBehaviour
 
         await BattleResultBeat.Play(_won, this.destroyCt);
         GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
-        t_popup?.Show(t_reward, _won ? 10 : -5, _won ? 100 : 50, _won, t_cards, t_fallen);
+        t_popup?.Show(t_reward, _won ? 10 : -5, _won, t_cards, t_fallen);
     }
 
     // 미리보기 전사 목록: 덱에서 생존 목록에 없는 카드를 담는다. 장수로 자르면 같은 카드가
@@ -487,7 +486,6 @@ public class TurnRunner : MonoBehaviour
 
         this.lastReward = this.battleOutcome.Reward;
         this.lastRankDelta = this.battleOutcome.RankDelta;
-        this.lastExpDelta = this.battleOutcome.ExpDelta;
         this.lastSurvivorCards = this.battleOutcome.SurvivorCards;
         this.lastFallenCards = this.battleOutcome.FallenCards;
     }

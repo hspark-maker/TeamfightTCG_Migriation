@@ -9,10 +9,6 @@ public sealed class BattleOutcome
     public bool IsCaptured { get; private set; }
     public CurrencyGain Reward { get; private set; }
     public long RankDelta { get; private set; }
-
-    /// <summary>이 전투로 오른 계정 경험치. 승패와 무관하게 언제나 오른다(패배·무승부는 정액분).</summary>
-    public long ExpDelta { get; private set; }
-
     public List<int> SurvivorCards { get; private set; }
     public List<int> FallenCards { get; private set; }
 
@@ -32,7 +28,7 @@ public sealed class BattleOutcome
 
         // 모험 갈래보다 위다 — 계정 경험치는 어느 전투에서든 오른다. 서버가 판정하는 축이 아니라
         // 멀티·서버 정산 갈래에서도 여기서 그대로 확정한다(랭크처럼 미리보기로 미루지 않는다).
-        ExpDelta = AccountLevelManager.ApplyBattleResult(_won).Delta;
+        AccountLevelManager.ApplyBattleResult(_won);
 
         List<CardInstance> t_active = rules.playerField.GetActiveCards();
         int t_remaining = t_active.Count + rules.playerField.WaitingCount;

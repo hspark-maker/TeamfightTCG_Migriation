@@ -995,6 +995,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BarProgressGauge
   tweenEase: 6
   fillRect: {fileID: 8078618823616736518}
+  fullWidth: 570.34
 --- !u!1 &3830130908842466256
 GameObject:
   m_ObjectHideFlags: 0
