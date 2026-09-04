@@ -19,7 +19,7 @@ MonoBehaviour:
   grades:
   - grade: 0
     displayName: Bronze
-    badge: {fileID: 21300000, guid: 073e687a687a64137b4fe82914a8b1e1, type: 3}
+    badge: {fileID: 21300000, guid: 600886ee52163fd4aaf6f72dd03991ba, type: 3}
     entryPoints: 100
     pointsPerDivision: 40
     rewards:
@@ -31,7 +31,7 @@ MonoBehaviour:
       amountPerDivision: 1
   - grade: 1
     displayName: Silver
-    badge: {fileID: 21300000, guid: 71c61a848654145898eb22d1a20ffea7, type: 3}
+    badge: {fileID: 21300000, guid: a947bc24ff6acdb4a87da52528c39b2a, type: 3}
     entryPoints: 260
     pointsPerDivision: 40
     rewards:
@@ -43,7 +43,7 @@ MonoBehaviour:
       amountPerDivision: 1
   - grade: 2
     displayName: Gold
-    badge: {fileID: 21300000, guid: 0683381c2b89b4ecaaf1567e2253709a, type: 3}
+    badge: {fileID: 21300000, guid: 56990de5e7816cc46b37b9661df3b8b4, type: 3}
     entryPoints: 420
     pointsPerDivision: 40
     rewards:
@@ -55,7 +55,7 @@ MonoBehaviour:
       amountPerDivision: 2
   - grade: 3
     displayName: Platinum
-    badge: {fileID: 21300000, guid: 1b4f4208288d44c1d9db74049007e648, type: 3}
+    badge: {fileID: 21300000, guid: 52f0ae0e55139a146a509a823189c2a0, type: 3}
     entryPoints: 580
     pointsPerDivision: 40
     rewards:
@@ -67,7 +67,7 @@ MonoBehaviour:
       amountPerDivision: 5
   - grade: 4
     displayName: Diamond
-    badge: {fileID: 21300000, guid: 5189664aecd61428b95637b575a90f58, type: 3}
+    badge: {fileID: 21300000, guid: 372238dadd0fed04298ffce7512bb6ff, type: 3}
     entryPoints: 740
     pointsPerDivision: 40
     rewards:
