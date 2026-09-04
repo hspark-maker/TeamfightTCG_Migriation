@@ -147,6 +147,9 @@ public class OutgameDebugOverlay : MonoBehaviour
         if (GUILayout.Button("LOG OWNERSHIP",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LogOwnership();
         if (GUILayout.Button("ALBUM INSERT x3",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ForceAlbumInsertSession(3);
         if (GUILayout.Button("ADVENTURE NODE",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.StartCurrentAdventureNode();
+        if (GUILayout.Button("ACCOUNT EXP +500", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.AddAccountExp(500);
+        if (GUILayout.Button("ACCOUNT LV MAX",   GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.FillAccountLevel();
+        if (GUILayout.Button("ACCOUNT LV RESET", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ResetAccountLevel();
 
         DrawServerProbes();
         DrawRarityPackControls();

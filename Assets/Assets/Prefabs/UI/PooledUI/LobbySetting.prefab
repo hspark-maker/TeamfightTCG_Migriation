@@ -11,7 +11,6 @@ GameObject:
   - component: {fileID: 2948925615356409813}
   - component: {fileID: 390270279369154464}
   - component: {fileID: 1517926276501863503}
-  - component: {fileID: 3135115882960862279}
   m_Layer: 0
   m_Name: Level_Gauge_Bar (2)
   m_TagString: Untagged
@@ -33,10 +32,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 8078618823616736518}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -0.095, y: 0.08790016}
-  m_SizeDelta: {x: 566.9475, y: 33.7151}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: -0.09500122, y: 0.08790016}
+  m_SizeDelta: {x: -3.3925, y: -4.1769}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &390270279369154464
 CanvasRenderer:
@@ -76,19 +75,6 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 17.26
---- !u!114 &3135115882960862279
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 253122711703241729}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 31a19414c41e5ae4aae2af33fee712f6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Mask
-  m_ShowMaskGraphic: 1
 --- !u!1 &688308710649669788
 GameObject:
   m_ObjectHideFlags: 0
@@ -928,6 +914,7 @@ GameObject:
   - component: {fileID: 8078618823616736518}
   - component: {fileID: 4523876671446947145}
   - component: {fileID: 2407317212308244214}
+  - component: {fileID: 2119242882820010390}
   m_Layer: 0
   m_Name: Level_Gauge_Bar
   m_TagString: Untagged
@@ -951,11 +938,11 @@ RectTransform:
   - {fileID: 814212040781953184}
   m_Father: {fileID: 2239047431341134689}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0.002533, y: 0.00019741}
+  m_AnchorMin: {x: 0, y: 0.5}
+  m_AnchorMax: {x: 0, y: 0.5}
+  m_AnchoredPosition: {x: 0.002532959, y: 0.00019741}
   m_SizeDelta: {x: 570.34, y: 37.892}
-  m_Pivot: {x: 0.5, y: 0.5}
+  m_Pivot: {x: 0, y: 0.5}
 --- !u!222 &4523876671446947145
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -994,6 +981,20 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 13.44
+--- !u!114 &2119242882820010390
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3490552812318814556}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4c8f47ff06f54e6499e0f032d91be802, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BarProgressGauge
+  tweenEase: 6
+  fillRect: {fileID: 8078618823616736518}
 --- !u!1 &3830130908842466256
 GameObject:
   m_ObjectHideFlags: 0
@@ -1933,7 +1934,6 @@ GameObject:
   - component: {fileID: 814212040781953184}
   - component: {fileID: 3906216771928350310}
   - component: {fileID: 3177491025061455899}
-  - component: {fileID: 7358253881465614819}
   m_Layer: 0
   m_Name: Level_Gauge_Bar (1)
   m_TagString: Untagged
@@ -1955,10 +1955,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 8078618823616736518}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -0.095, y: -0.9551}
-  m_SizeDelta: {x: 566.9475, y: 31.6292}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: -0.09500122, y: -0.9550991}
+  m_SizeDelta: {x: -3.3925, y: -6.2628}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &3906216771928350310
 CanvasRenderer:
@@ -1998,19 +1998,6 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 17.26
---- !u!114 &7358253881465614819
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8910760404524948609}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 31a19414c41e5ae4aae2af33fee712f6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Mask
-  m_ShowMaskGraphic: 1
 --- !u!1 &9098204539728041060
 GameObject:
   m_ObjectHideFlags: 0
@@ -2061,6 +2048,7 @@ GameObject:
   - component: {fileID: 2239047431341134689}
   - component: {fileID: 6661738280462250518}
   - component: {fileID: 4252798154189306041}
+  - component: {fileID: 2986664573273838231}
   m_Layer: 0
   m_Name: Level_Gauge
   m_TagString: Untagged
@@ -2127,6 +2115,25 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 9.65
+--- !u!114 &2986664573273838231
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9130989258303800057}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e59ce05f97e7254981d93ec31dd0c4f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AccountLevelView
+  levelText: {fileID: 8622174227022777222}
+  levelFormat: Lv.{0}
+  expText: {fileID: 8674151248940328088}
+  expFormat: '{0}  /  {1}'
+  gauge: {fileID: 2119242882820010390}
+  levelUpFillDuration: 0.25
+  levelUpPunch: 0.35
 --- !u!1001 &7303059451361165639
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -5,9 +5,9 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 전투 결과 팝업의 등장 연출 진행자.
-// 흐름: 암막 → 패널 팝 → 골드 줄(살아남은 카드가 한 장씩 골드로 빨려들며 가산) → 랭크 줄 → 안내문.
-// 골드와 랭크는 수치 연출을 한 벌(RollingCounter)로 공유한다 — 값을 실어 나르는 것만 카드와 별로 갈릴 뿐,
-// 팝하는 시점도 계단으로 오르는 리듬도 두 줄이 같다.
+// 흐름: 암막 → 패널 팝 → 골드 줄(살아남은 카드가 한 장씩 골드로 빨려들며 가산) → 랭크 줄 → 경험치 줄 → 안내문.
+// 골드·랭크·경험치는 수치 연출을 한 벌(RollingCounter)로 공유한다 — 값을 실어 나르는 것만 카드와 아이콘으로 갈릴 뿐,
+// 팝하는 시점도 계단으로 오르는 리듬도 세 줄이 같다.
 // 패배 팝업은 라인 등장까지만 하고 분출·롤링을 접는다 — 같은 스크립트를 승패 플래그로 갈라 쓴다.
 public class GameResultPopup : MonoBehaviour
 {
@@ -43,6 +43,12 @@ public class GameResultPopup : MonoBehaviour
     [Tooltip("랭크 줄 묶음(라벨+아이콘+수치)의 루트. 배선하면 가감이 0인 전투(튜토리얼)에서 줄째로 감춘다. 미배선이면 0이 그대로 보인다.")]
     [SerializeField] GameObject rankLine;         // 랭크 줄 전체(옵션)
 
+    [SerializeField] TMP_Text expPointText;       // 오른 계정 경험치 표시용(표시 전용)
+    [SerializeField] CoinBurstEffect expBurst;    // 경험치 아이콘 분출·수렴(옵션)
+
+    [Tooltip("계정 경험치 줄 묶음(라벨+아이콘+수치)의 루트. 배선하면 획득이 0인 전투에서 줄째로 감춘다. 미배선이면 0이 그대로 보인다.")]
+    [SerializeField] GameObject expLine;          // 경험치 줄 전체(옵션)
+
     [Tooltip("골드 줄 묶음(라벨+아이콘+수치)의 루트. 배선하면 전투 보상이 없는 전투(모험)에서 줄째로 감춘다. 미배선이면 0이 그대로 보인다.\n" +
              "일반 전투는 패배도 loseGold가 있어 이 줄이 사라지지 않는다.")]
     [SerializeField] GameObject goldLine;         // 골드 줄 전체(옵션)
@@ -77,6 +83,7 @@ public class GameResultPopup : MonoBehaviour
 
     RollingCounter m_gold;
     RollingCounter m_rank;
+    RollingCounter m_exp;
 
     bool m_revealDone;    // 연출 완료 여부. 진행 중 터치는 스킵, 완료 후 터치는 메인 이동.
 
@@ -95,6 +102,7 @@ public class GameResultPopup : MonoBehaviour
 
         this.m_gold = new RollingCounter(this.rewardGoldText, gameObject, this.goldRollDuration, this.goldPunch);
         this.m_rank = new RollingCounter(this.rankPointText, gameObject, this.goldRollDuration, this.goldPunch);
+        this.m_exp  = new RollingCounter(this.expPointText, gameObject, this.goldRollDuration, this.goldPunch);
     }
 
     void OnDisable()
@@ -106,7 +114,8 @@ public class GameResultPopup : MonoBehaviour
     }
 
     /// <summary>
-    /// 결과 팝업 노출. 두 값 모두 이미 지급·영속화된 값을 그대로 표시만 한다(_rankDelta는 패배 시 음수).
+    /// 결과 팝업 노출. 세 값 모두 이미 지급·영속화된 값을 그대로 표시만 한다(_rankDelta는 패배 시 음수,
+    /// _expDelta는 승패와 무관하게 양수이고 만렙에 닿으면 0이다).
     /// _won=false면 분출·롤링을 통째로 접고 확정값만 띄운다 — 축하 연출은 승리의 몫이다.
     /// _survivorCards는 승리 보상을 만든 생존 카드로, 왼쪽부터 한 장씩 차례로 골드로 빨려든다.
     /// null과 빈 리스트는 다른 뜻이다 — null은 "생존 수를 모른다"(코인 분출로 폴백),
@@ -114,7 +123,7 @@ public class GameResultPopup : MonoBehaviour
     /// _fallenCards는 이번 판에 잃은 카드로, 같은 줄 오른쪽에 흑백으로 서기만 한다 —
     /// 보상에도 골드 가산의 분모에도 관여하지 않는다. 오직 "몇 장 중"을 보여주는 몫이다.
     /// </summary>
-    public void Show(CurrencyGain _reward, long _rankDelta = 0, bool _won = true,
+    public void Show(CurrencyGain _reward, long _rankDelta = 0, long _expDelta = 0, bool _won = true,
                      IReadOnlyList<int> _survivorCards = null,
                      IReadOnlyList<int> _fallenCards = null)
     {
@@ -133,7 +142,7 @@ public class GameResultPopup : MonoBehaviour
         // 카드가 0장이면 값을 실어 나를 것이 없다 — 0에서 출발시키면 어디서 왔는지 모를 숫자가 혼자 오른다.
         bool t_goldWillRoll = _won && t_gold != 0 && (t_cards == null || t_cards.Count > 0);
 
-        ResetVisual(t_gold, _rankDelta, _won, t_goldWillRoll, t_cards, t_fallen);
+        ResetVisual(t_gold, _rankDelta, _expDelta, _won, t_goldWillRoll, t_cards, t_fallen);
 
         // 결과 연출은 통째로 unscaled로 돈다. 배너 Animator가 unscaled로 못박혀 있는 데다,
         // 부전승 경로(TurnRunner의 _withBeat:false)는 결정타 강조가 눌러둔 timeScale을
@@ -177,6 +186,10 @@ public class GameResultPopup : MonoBehaviour
         float t_rankAt = t_cardsFlew ? Mathf.Max(t_goldAt, t_end - this.rankOverlap) : t_goldAt;
         t_end = Mathf.Max(t_end, InsertLine(BuildCounterLine(this.m_rank, this.rankBurst, _won), t_rankAt));
 
+        // 경험치 줄은 랭크 줄 꼬리를 물고 들어온다 — 셋을 한 시점에 겹치면 무엇이 무엇인지 읽히지 않는다.
+        float t_expAt = Mathf.Max(t_rankAt, t_end - this.rankOverlap);
+        t_end = Mathf.Max(t_end, InsertLine(BuildCounterLine(this.m_exp, this.expBurst, _won), t_expAt));
+
         // 배너는 콜백 한 번으로 켜질 뿐 시퀀스에 길이를 남기지 않는다.
         // 끝점을 못 박아 두지 않으면 뒷줄이 전부 미배선인 화면에서 duration 0으로 즉시 완료되고,
         // 배너가 도는 중에 m_revealDone이 서서 첫 터치가 스킵이 아니라 씬 이동이 된다.
@@ -190,6 +203,7 @@ public class GameResultPopup : MonoBehaviour
         {
             this.m_gold.Finish();
             this.m_rank.Finish();
+            this.m_exp.Finish();
             this.m_revealDone = true;
         });
     }
@@ -282,7 +296,7 @@ public class GameResultPopup : MonoBehaviour
     }
 
     // 연출 시작 상태로 되돌린다(재진입 대비).
-    void ResetVisual(long _gold, long _rankDelta, bool _animate, bool _goldWillRoll,
+    void ResetVisual(long _gold, long _rankDelta, long _expDelta, bool _animate, bool _goldWillRoll,
                      IReadOnlyList<int> _survivorCards, IReadOnlyList<int> _fallenCards)
     {
         if (this.banner != null) this.banner.HideImmediate();
@@ -298,6 +312,9 @@ public class GameResultPopup : MonoBehaviour
 
         // 전투 보상이 없는 전투(모험)도 같은 규칙이다 — 상은 맵에서 따로 받는다.
         if (this.goldLine != null) this.goldLine.SetActive(_gold != 0);
+
+        // 경험치는 승패와 무관하게 오르지만, 곡선을 못 읽었거나 만렙이면 0이라 그때는 줄이 없어야 한다.
+        if (this.expLine != null) this.expLine.SetActive(_expDelta != 0);
 
         // 생존 수를 모르는 경로(폴백)에서는 없는 값을 지어내지 않고 줄째로 감춘다.
         if (this.survivorLabel != null)
@@ -316,6 +333,7 @@ public class GameResultPopup : MonoBehaviour
         // 굴릴 값이 있으면 0에서 출발, 없으면 곧장 확정값을 보여준다.
         this.m_gold.Reset(_gold, _goldWillRoll);
         this.m_rank.Reset(_rankDelta, _animate && _rankDelta != 0);
+        this.m_exp.Reset(_expDelta, _animate && _expDelta != 0);
     }
 
     // 전체화면 터치. 연출 중이면 스킵, 끝난 뒤면 메인 화면으로.
@@ -341,6 +359,7 @@ public class GameResultPopup : MonoBehaviour
         this.revealSeq = null;
         this.m_gold?.Kill();
         this.m_rank?.Kill();
+        this.m_exp?.Kill();
         this.cardFlight?.Reset();   // 시퀀스가 끊기면 마지막 정리 콜백이 오지 않는다.
     }
 

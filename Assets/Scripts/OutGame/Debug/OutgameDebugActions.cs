@@ -292,6 +292,28 @@ public static class OutgameDebugActions
         Debug.Log($"[OutgameDebug] 튜토리얼 {t_chapter + 1}편 처음으로 — 좌표만 되감음(소유·재화 유지). 씬 재진입 시 적용 (저작된 총 {OutgameTutorialRunner.ChapterCount}편)");
     }
 
+    // 계정 경험치 더하기. 만렙 구간은 전승 1,000판대라 이 문 없이는 확인할 수 없다.
+    public static void AddAccountExp(long _amount)
+    {
+        AccountLevelManager.AddExpForDebug(_amount);
+        AccountLevelInfo t_info = AccountLevelManager.GetInfo();
+        Debug.Log($"[OutgameDebug] 계정 경험치 +{_amount} — Lv.{t_info.Level} ({t_info.ExpInLevel}/{t_info.ExpToNext})");
+    }
+
+    // 만렙으로 밀기
+    public static void FillAccountLevel()
+    {
+        AccountLevelManager.FillToMaxForDebug();
+        Debug.Log($"[OutgameDebug] 계정 레벨 만렙 — Lv.{AccountLevelManager.Level}");
+    }
+
+    // 레벨 1로 되돌리기
+    public static void ResetAccountLevel()
+    {
+        AccountLevelManager.ResetForDebug();
+        Debug.Log("[OutgameDebug] 계정 레벨 초기화 — Lv.1");
+    }
+
     // 티어 1단계 올리기/내리기
     public static void RaiseTier() => StepTier(+1);
 
