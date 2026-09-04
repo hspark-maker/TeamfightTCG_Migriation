@@ -1,7 +1,6 @@
 using System;
 using DG.Tweening;
 using UnityEngine;
-using UnityEngine.UI;
 
 // 덱 탭 루트(Tab_Deck에 부착). 이 탭에는 내용이 없다 — 탭에 들어오면 풀 UI 덱 편집 화면(DeckEditController)을 열 뿐이다.
 // 덱을 갈아타는 일은 편집 화면 하단의 덱 선택 바(DeckStripView)가 맡는다.
@@ -9,25 +8,32 @@ using UnityEngine.UI;
 // 탭 셸(LobbyTabController)이 단순 SetActive 토글이라 라이프사이클 훅이 없으므로,
 // "탭이 켜지면 항상 편집 화면"을 OnEnable로 보장한다.
 //
-// 편집 화면은 이 프리팹 안에 없다 — 매치 셸과 같은 한 인스턴스를 공유한다(DeckEditController).
+// 편집 화면을 얻는 길은 둘이다: 이 탭 안에 놓인 인스턴스(editor 배선)를 직접 쓰거나,
+// 미배선이면 매치 셸과 한 인스턴스를 나눠 쓰는 풀(DeckEditController.OpenPooled)에서 세운다.
 public class DeckTabController : LobbyTabPanel
 {
-    [Tooltip("덱 탭에 있는 동안 숨길 로비 상단 바. 미배선이면 LobbyRoot/TopBar를 찾아 쓴다.")]
+    [Tooltip("덱 탭에 있는 동안 끌 로비 상단 바.\n"
+           + "미배선이면 LobbyRoot 아래에서 이름이 TopBar로 시작하는 자식을 찾는다.")]
     [SerializeField] GameObject topBar;
 
-    [Tooltip("상단 바가 접히고 펴지는 시간(초). 0이면 연출 없이 즉시.")]
+    [Tooltip("상단 바가 위로 걷히고 도로 내려오는 시간(초). 0이면 연출 없이 즉시 껐다 켠다.\n"
+           + "탭 콘텐츠 슬라이드와 한 박자로 읽히려면 LobbyTabController.contentSlideSeconds와 같은 값이어야 한다.")]
     [SerializeField] float topBarSlideSeconds = 0.22f;
+
+    [Tooltip("이 탭 안에 놓인 덱 편집 화면. 배선하면 풀을 거치지 않고 이 인스턴스를 직접 세운다.\n"
+           + "그 인스턴스의 DeckEditController에는 hostEmbedded를 켜 두어야 한다.\n"
+           + "미배선이면 풀이 세우는 전체화면 오버레이를 연다(덱 탭 단독 테스트 씬).")]
+    [SerializeField] DeckEditController editor;
 
     // 탭 셸(LobbyRoot)은 이 오브젝트의 상위 계층에 있다 — 인스펙터 배선 없이 첫 사용 시 찾아 캐시한다.
 
-    // 상단 바 접기에 쓰는 것들. 높이는 LobbyRoot의 세로 3분할이 읽는 값이라, 이걸 줄이면
-    // Content가 그만큼 위로 올라온다(바가 위로 말려 들어가는 그림).
-    LayoutElement m_topBarLayout;
-    CanvasGroup   m_topBarGroup;
-    float         m_topBarHeight = -1f;   // 펼친 높이. 접힌 상태를 원본으로 기억하지 않게 한 번만 잡는다
-    Tween         m_topBarTween;
-    bool          m_topBarHidden;
-    bool          m_editing;
+    // 우리가 끈 상단 바인지. 되돌리는 쪽이 이 값만 보게 해서, 다른 이유로 꺼져 있던 바를 대신 켜지 않는다.
+    bool m_topBarHidden;
+    bool m_editing;
+
+    // 상단 바의 저작된 제자리 y. 걷히는 중간값을 제자리로 굳히지 않게 한 번만 잡는다.
+    float m_topBarHomeY = float.NaN;
+    Tween m_topBarTween;
 
     // 로비가 넘긴 드래그 레이어. 편집 화면이 자기 레이어를 들고 있으면 무시된다
     // (풀드 화면은 자기 캔버스에 살아서 로비 캔버스의 고스트가 뒤로 깔린다 — SetDragController 주석).
@@ -52,73 +58,93 @@ public class DeckTabController : LobbyTabPanel
         // 편집 중 탭이 꺼졌다 켜지면 이전 편집분은 무저장 폐기된다.
         // 편집은 DeckEditController의 메모리 사본에서만 일어나고 세이브는 손대지 않으므로
         // 손실은 "이번 편집분"뿐이고 기존 덱은 온전하다 — 그래서 확인 팝업 없이 다시 열어도 안전하다.
+        // 오버라이드 한 줄이라 Revert 한 번에 꺼진다 — 꺼지면 풀에 등록돼 매치 화면이 이것을 빌려 간다.
+        if (this.editor != null && !this.editor.IsHostEmbedded)
+            Debug.LogError("[DeckTabController] 탭 안에 놓인 편집기인데 hostEmbedded가 꺼져 있다 — "
+                         + "DeckEditPanel 인스턴스의 DeckEditController에서 켤 것.", this.editor);
+
         OpenEditorForResolvedSlot();
         SetTopBarHidden(true);
     }
+
+    // 상단 바는 떠나는 것이 확정된 순간 되돌린다 — OnDisable은 슬라이드가 끝난 뒤라 한 박자 늦다.
+    public override void OnLeave() => SetTopBarHidden(false);
 
     // 탭 전환이 아닌 경로(로비 캔버스 비활성·씬 전환)로 덱 탭이 꺼지면 CloseEditor를 거치지 않는다 →
     // 가드가 셸에 남아 이후 모든 탭 전환이 죽은 편집기에게 넘어가고, 풀 캔버스의 편집 화면이 다른 탭 위에 남는다.
     void OnDisable()
     {
         HideEditor();
-        SetTopBarHidden(false);
+
+        // 편집기는 탭이 실제로 꺼진 지금 비운다 — 더 일찍 비우면 빈 판이 미끄러져 나간다.
+        if (this.editor != null) this.editor.Hide();
+
+        SetTopBarHidden(false);   // OnLeave를 거치지 않는 경로(캔버스 비활성·씬 전환)의 안전망
     }
 
     // 덱 화면은 상단 재화 바를 쓰지 않는다 — 카드 6칸과 컬렉션 목록이 세로를 다 쓴다.
     //
-    // SetActive로 끄지 않는다. 끄면 그 프레임에 Content가 180px만큼 튀어 오르고, 되돌아올 때 또 튄다.
-    // 대신 높이를 0으로 접어 위로 말려 들어가게 하고, 알파로 내용을 지운다 —
-    // 높이가 곧 세로 3분할의 몫이라 Content가 그 변화를 그대로 따라 올라온다.
+    // 높이를 접던 옛 방식은 로비에 세로 레이아웃 그룹이 없어 화면에 아무 변화도 주지 못했다.
     void SetTopBarHidden(bool _hide)
     {
-        if (this.m_topBarHidden == _hide) return;   // 중복 호출로 트윈을 다시 시작하지 않게
+        if (this.m_topBarHidden == _hide) return;
 
         GameObject t_bar = TopBar;
         if (t_bar == null) return;
 
-        // 다른 이유로 이미 꺼져 있는 바는 우리가 켜 주지 않는다.
-        if (!t_bar.activeSelf) return;
-
-        if (this.m_topBarLayout == null) this.m_topBarLayout = t_bar.GetComponent<LayoutElement>();
-        if (this.m_topBarLayout == null) return;
-
-        if (this.m_topBarHeight < 0f) this.m_topBarHeight = this.m_topBarLayout.preferredHeight;
-
-        if (this.m_topBarGroup == null)
-        {
-            this.m_topBarGroup = t_bar.GetComponent<CanvasGroup>();
-            if (this.m_topBarGroup == null) this.m_topBarGroup = t_bar.AddComponent<CanvasGroup>();
-        }
+        // 다른 이유로 이미 꺼져 있던 바를 우리가 껐다고 기록하면, 되돌릴 때 남의 상태를 대신 켜 준다.
+        if (_hide && !t_bar.activeSelf) return;
 
         this.m_topBarHidden = _hide;
 
-        float t_targetHeight = _hide ? 0f : this.m_topBarHeight;
-        float t_targetAlpha  = _hide ? 0f : 1f;
+        RectTransform t_rect = t_bar.transform as RectTransform;
+        if (t_rect == null || this.topBarSlideSeconds <= 0f)
+        {
+            t_bar.SetActive(!_hide);
+            return;
+        }
 
-        // 접힌 바 위로 손가락이 지나가도 메뉴 버튼이 눌리면 안 된다.
-        this.m_topBarGroup.blocksRaycasts = !_hide;
-        this.m_topBarGroup.interactable   = !_hide;
+        if (float.IsNaN(this.m_topBarHomeY)) this.m_topBarHomeY = t_rect.anchoredPosition.y;
 
+        // 완료 콜백은 부르지 않고 죽인다 — 걷던 트윈의 마무리(끄기)가 방금 켠 바를 도로 지운다.
         this.m_topBarTween?.Kill();
         this.m_topBarTween = null;
 
-        // 탭이 꺼지는 경로(OnDisable)에서도 걸린다 — 트윈 주인은 이 컨트롤러가 아니라 상단 바다.
-        // SetLink도 바에 건다: 이 오브젝트에 걸면 탭이 꺼지는 순간 트윈이 같이 죽어 바가 접힌 채 남는다.
-        if (this.topBarSlideSeconds <= 0f || !t_bar.activeInHierarchy)
+        // 자기 높이의 두 배만큼 올린다 — 한 배면 부모 상단선에 걸쳐 SafeArea 위쪽에서 끝이 스친다.
+        float t_away = this.m_topBarHomeY + t_rect.rect.height * 2f;
+
+        if (!_hide)
         {
-            this.m_topBarLayout.preferredHeight = t_targetHeight;
-            this.m_topBarGroup.alpha            = t_targetAlpha;
+            t_bar.SetActive(true);
+            t_rect.anchoredPosition = new Vector2(t_rect.anchoredPosition.x, t_away);
+            this.m_topBarTween = t_rect.DOAnchorPosY(this.m_topBarHomeY, this.topBarSlideSeconds)
+                .SetEase(Ease.OutCubic)
+                .SetUpdate(true)
+                .SetLink(t_bar);
 
             return;
         }
 
-        this.m_topBarTween = DOTween.Sequence()
-            .SetLink(t_bar)
+        // 이미 꺼진 계층에서는 트윈이 돌 무대가 없다 — 그 자리에서 끝낸다.
+        if (!t_bar.activeInHierarchy)
+        {
+            t_rect.anchoredPosition = new Vector2(t_rect.anchoredPosition.x, this.m_topBarHomeY);
+            t_bar.SetActive(false);
+
+            return;
+        }
+
+        // SetLink는 바에 건다 — 이 오브젝트에 걸면 탭이 꺼지는 순간 트윈이 죽어 바가 걷힌 자리에 남는다.
+        // 나갈 때도 OutCubic이다: 가속을 쓰면 첫 몇 프레임이 멈춘 듯 보여 누른 반응이 늦게 느껴진다.
+        this.m_topBarTween = t_rect.DOAnchorPosY(t_away, this.topBarSlideSeconds)
+            .SetEase(Ease.OutCubic)
             .SetUpdate(true)   // 결과창 등에서 timeScale이 눌려도 UI 전환은 같은 속도로 돈다
-            .Join(DOTween.To(() => this.m_topBarLayout.preferredHeight,
-                             _v => this.m_topBarLayout.preferredHeight = _v,
-                             t_targetHeight, this.topBarSlideSeconds).SetEase(Ease.OutCubic))
-            .Join(this.m_topBarGroup.DOFade(t_targetAlpha, this.topBarSlideSeconds));
+            .SetLink(t_bar)
+            .OnComplete(() =>
+            {
+                t_rect.anchoredPosition = new Vector2(t_rect.anchoredPosition.x, this.m_topBarHomeY);
+                t_bar.SetActive(false);
+            });
     }
 
     // 미배선이면 상위 계층의 LobbyRoot 아래 TopBar를 찾는다(LobbyTabs와 같은 관례).
@@ -133,10 +159,25 @@ public class DeckTabController : LobbyTabPanel
             while (t_root != null && t_root.name != "LobbyRoot") t_root = t_root.parent;
             if (t_root == null) return null;
 
-            Transform t_bar = t_root.Find("TopBar");
+            Transform t_bar = FindTopBar(t_root);
 
             return this.topBar = t_bar != null ? t_bar.gameObject : null;
         }
+    }
+
+    // 저작본이 사본 이름(TopBar (1))을 달고 있어, 정확한 일치로만 찾으면 상단 바 제어가 통째로 불발한다.
+    static Transform FindTopBar(Transform _root)
+    {
+        Transform t_exact = _root.Find("TopBar");
+        if (t_exact != null) return t_exact;
+
+        for (int t_i = 0; t_i < _root.childCount; t_i++)
+        {
+            Transform t_child = _root.GetChild(t_i);
+            if (t_child.name.StartsWith("TopBar", StringComparison.Ordinal)) return t_child;
+        }
+
+        return null;
     }
 
     // 기존 덱 편집 진입. _slotIndex는 DeckSaveManager 슬롯 좌표.
@@ -198,6 +239,9 @@ public class DeckTabController : LobbyTabPanel
     LobbyTabController Shell
         => this.m_shell != null ? this.m_shell : (this.m_shell = GetComponentInParent<LobbyTabController>(true));
 
+    DeckEditController Editor
+        => this.editor != null ? this.editor : DeckEditController.Pooled();
+
     // 탭 셸이 넘긴 이탈 요청. 저장 판정과 미완성 확인은 편집기가 하고(경로가 뒤로가기와 한 벌이어야 한다),
     // 허가가 떨어지면 편집 화면만 내리고 유저가 원래 누른 탭으로 보낸다 —
     // 여기서 CloseEditor를 부르면 기본 탭으로 한 번 갔다가 원래 누른 탭으로 또 가게 된다.
@@ -209,7 +253,7 @@ public class DeckTabController : LobbyTabPanel
             return;
         }
 
-        DeckEditController t_editor = DeckEditController.Pooled();
+        DeckEditController t_editor = Editor;
         if (t_editor == null)
         {
             HideEditor();
@@ -258,11 +302,21 @@ public class DeckTabController : LobbyTabPanel
     // 편집 화면을 세우지 못하면(풀 미초기화) 빈 탭에 머문다 — 나가는 길은 하단 탭바가 아니라 셸이 쥐고 있다.
     void ShowEditor(DeckEditData _data)
     {
+        // 탭 안에 놓인 인스턴스는 풀을 거치지 않는다 — 이미 제자리에 있으므로 요청만 넘기고 세우면 된다.
+        if (this.editor != null)
+        {
+            this.editor.Initialization(_data);
+            this.editor.Show();
+            m_editing = true;
+
+            return;
+        }
+
         if (DeckEditController.OpenPooled(_data) == null) return;
 
         m_editing = true;
 
-        // 편집 화면은 풀 캔버스(UiSortingOrder.PooledOverlay)라 로비 캔버스의 하단 탭바를 덮는다.
+        // 풀이 세운 편집 화면은 풀 캔버스(UiSortingOrder.PooledOverlay)라 로비 캔버스의 하단 탭바를 덮는다.
         // 그동안만 탭바를 그 위로 올려 다른 탭으로 나가는 길을 남긴다 — 이탈은 RequestLeave 를 그대로 거친다.
         Shell?.LiftTabBar(true);
     }
@@ -274,17 +328,21 @@ public class DeckTabController : LobbyTabPanel
 
         m_editing = false;
 
-        Shell?.LiftTabBar(false);
+        // 탭 안에 놓인 인스턴스는 탭바를 덮은 적이 없어 되돌릴 것도 없다.
+        if (this.editor == null) Shell?.LiftTabBar(false);
 
         // 내리기 직전의 편집 대상을 회수한다 — 하단 바로 덱을 갈아탄 것은 편집기만 알고 있다.
         // 그 갈아탄 덱이 곧 출전 덱이므로 대표 좌표도 여기서 함께 따라간다.
-        DeckEditController t_editor = DeckEditController.Pooled();
-        if (t_editor != null && t_editor.CurrentSlot >= 0)
+        DeckEditController t_editor = Editor;
+        if (t_editor == null) return;
+
+        if (t_editor.CurrentSlot >= 0)
         {
             m_lastSlot = t_editor.CurrentSlot;
             DeckSaveManager.TrySelectSlot(m_lastSlot);
         }
 
-        DeckEditController.HidePooled();
+        // 탭 안에 놓인 인스턴스는 아직 미끄러져 나가는 중이다 — 비우는 자리는 OnDisable이다.
+        if (this.editor == null) t_editor.Hide();
     }
 }

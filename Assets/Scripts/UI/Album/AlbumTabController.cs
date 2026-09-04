@@ -28,6 +28,9 @@ public class AlbumTabController : LobbyTabPanel
     AlbumInsertSession m_insertSession;
     bool m_insertPending;   // 시작 코루틴이 떠 있는 동안의 중복 진입 방지(탭 활성화와 큐 충전이 같은 프레임에 겹친다)
 
+    // 탭 전환 연출이 끝나 제자리에 섰는가. 슬롯 rect 실측은 이 뒤라야 한다.
+    bool m_settled;
+
     // 삽입 세션이 페이지 오버레이를 직접 몰아야 한다
     public AlbumPageOverlayView PageOverlay => pageOverlay;
 
@@ -88,11 +91,23 @@ public class AlbumTabController : LobbyTabPanel
 
         // 비활성화가 시작 코루틴을 끊는다 — 플래그가 남으면 다음 진입에서 영영 시작하지 못한다
         m_insertPending = false;
+        m_settled = false;
     }
 
-    // 탭이 켜진 그 프레임엔 그리드 cellSize가 아직 없다 — 양보 후 강제 갱신해야 세션이 슬롯 rect를 실측할 수 있다
+    public override void OnSettled() => m_settled = true;
+
+    // 탭이 켜진 그 프레임엔 그리드 cellSize가 아직 없다 — 양보 후 강제 갱신해야 세션이 슬롯 rect를 실측할 수 있다.
+    // 전환 슬라이드가 도는 동안도 마찬가지라 제자리에 설 때까지 함께 기다린다.
     IEnumerator BeginInsertNextFrame(AlbumInsertSession _session)
     {
+        // 셸을 거치지 않는 재활성에서는 OnSettled가 오지 않는다 — 영영 멈추면 그 카드가 빈 칸으로 남는다.
+        float t_wait = 0f;
+        while (!m_settled && t_wait < 1f)
+        {
+            t_wait += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
         yield return null;
         Canvas.ForceUpdateCanvases();
 

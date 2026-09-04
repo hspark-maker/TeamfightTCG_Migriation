@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using DG.Tweening;
 using UnityEngine;
 
 /// <summary>Coordinates tab policy; panels own lifecycle and the tab bar owns visuals.</summary>
@@ -27,11 +28,25 @@ public class LobbyTabController : MonoBehaviour
            + "탭 프리팹 안쪽을 인스펙터로 직접 배선하면 그 배선이 오버라이드로 남아 탭 diff를 흐린다.")]
     [SerializeField] DeckEditDragController dragController;
 
+    [Header("탭 전환 슬라이드")]
+    [Tooltip("콘텐츠 패널이 좌우로 미끄러지는 시간(초). 0이면 즉시 교체.\n"
+           + "하단 탭바 알약과 한 박자로 읽히려면 LobbyTabBarView.focusSlideSeconds와 같은 값이어야 한다.")]
+    [SerializeField] float contentSlideSeconds = 0.22f;
+
     int m_currentIndex = -1;
 
     // 탭바를 풀 오버레이 위로 올렸을 때의 중첩 캔버스. 되돌릴 때 overrideSorting만 끈다 —
     // 컴포넌트를 떼면 같은 탭을 다시 열 때마다 붙였다 떼기를 반복한다.
     Canvas m_liftedTabBar;
+
+    // 패널 루트의 저작된 x. 미끄러지던 중간 좌표를 제자리로 착각하지 않게 한 번만 잡는다.
+    float[] m_homeX;
+
+    // 미끄러져 나가는 중인 패널. 다음 전환이 들어오면 이 트윈부터 완결시킨다.
+    LobbyTabPanel m_leaving;
+
+    // 새 패널이 제자리에 선 뒤로 미뤄 둔 일. 전환이 새로 시작되면 폐기한다.
+    Action m_pendingArrive;
 
     /// <summary>탭바를 풀 오버레이(<see cref="UiSortingOrder.PooledOverlay"/>) 위로 올리거나 되돌린다.
     ///
@@ -68,10 +83,16 @@ public class LobbyTabController : MonoBehaviour
         // 서비스 주입은 첫 Select(Start)보다 먼저 끝나야 한다 — OnEnter에서 이미 쓸 수 있어야 하므로.
         var t_services = new LobbyTabServices(dragController, this);
 
+        m_homeX = new float[tabs.Count];
+
         for (int i = 0; i < tabs.Count; i++)
         {
             Tab t_tab = tabs[i];
             t_tab.panel?.Initialize(t_services);
+
+            RectTransform t_root = t_tab.panel != null ? t_tab.panel.Root : null;
+            m_homeX[i] = t_root != null ? t_root.anchoredPosition.x : 0f;
+
             tabBar?.ConfigureItem(
                 i,
                 string.IsNullOrEmpty(t_tab.label) ? t_tab.name : t_tab.label,
@@ -133,22 +154,32 @@ public class LobbyTabController : MonoBehaviour
         });
     }
 
+    /// <summary>탭을 실제로 갈아 끼운다. 슬라이드도 여기서만 시작한다 —
+    /// 앞선 RequestLeave가 취소되면 전환 자체가 무산되기 때문이다.</summary>
     void CommitSelection(int _index, bool _fireTrigger)
     {
+        FinishPendingSlide();
+
         // 화면을 세우거나(첫 선택) 코드가 되돌려 놓는 선택(_fireTrigger=false)은 사용자가 넘긴 게 아니라 소리를 내지 않는다.
         if (m_currentIndex >= 0 && _fireTrigger) SoundManager.Instance?.PlayCue(EOutgameSound.TabTurn);
+
+        int t_from = m_currentIndex;
+        bool t_slide = t_from >= 0 && contentSlideSeconds > 0f;
+        int t_direction = _index > t_from ? 1 : -1;
 
         LobbyTabPanel t_previous = CurrentPanel;
         if (t_previous != null)
         {
             t_previous.OnLeave();
-            t_previous.gameObject.SetActive(false);
+            if (t_slide) SlideOut(t_previous, t_from, t_direction);
+            else         t_previous.gameObject.SetActive(false);
         }
 
         for (int i = 0; i < tabs.Count; i++)
         {
             LobbyTabPanel t_panel = tabs[i].panel;
-            if (t_panel != null && i != _index)
+            // 떠나는 패널은 아직 화면 밖으로 미끄러지는 중이라 여기서 끄지 않는다 — 끄는 시점은 트윈이 끝날 때다.
+            if (t_panel != null && i != _index && t_panel != t_previous)
                 t_panel.gameObject.SetActive(false);
 
             if (tabs[i].background != null)
@@ -164,7 +195,100 @@ public class LobbyTabController : MonoBehaviour
         }
 
         tabBar?.SetSelected(_index);
-        if (_fireTrigger)
-            TriggeredTutorialRunner.Fire(tabs[_index].tutorialTrigger);
+
+        // 화면 좌표를 재는 일은 패널이 제자리에 선 뒤로 미룬다 — 도중에 재면 화면 밖을 짚는다.
+        m_pendingArrive = () =>
+        {
+            t_next?.OnSettled();
+            if (_fireTrigger) TriggeredTutorialRunner.Fire(tabs[_index].tutorialTrigger);
+        };
+
+        if (t_slide && t_next != null) SlideIn(t_next, _index, t_direction);
+        else                           InvokePendingArrive();
+    }
+
+    /// <summary>떠나는 패널을 화면 밖으로 밀어낸다. 끄는 것은 도착한 뒤다.</summary>
+    void SlideOut(LobbyTabPanel _panel, int _index, int _direction)
+    {
+        RectTransform t_root = _panel.Root;
+        if (t_root == null)
+        {
+            _panel.gameObject.SetActive(false);
+            return;
+        }
+
+        float t_home = HomeX(_index);
+        m_leaving = _panel;
+
+        t_root.DOKill();
+        t_root.DOAnchorPosX(t_home - _direction * SlideDistance(t_root), contentSlideSeconds)
+              .SetEase(Ease.OutCubic)
+              .SetUpdate(true)   // timeScale이 눌려도 같은 속도로 돈다
+              .SetLink(t_root.gameObject)
+              .OnComplete(() =>
+              {
+                  t_root.anchoredPosition = new Vector2(t_home, t_root.anchoredPosition.y);
+                  _panel.gameObject.SetActive(false);
+                  if (m_leaving == _panel) m_leaving = null;
+              });
+    }
+
+    /// <summary>새 패널을 화면 밖에서 제자리로 들인다. 도착한 뒤에 할 일은 m_pendingArrive가 들고 있다.</summary>
+    void SlideIn(LobbyTabPanel _panel, int _index, int _direction)
+    {
+        RectTransform t_root = _panel.Root;
+        if (t_root == null)
+        {
+            InvokePendingArrive();
+            return;
+        }
+
+        float t_home = HomeX(_index);
+
+        t_root.DOKill();
+        t_root.anchoredPosition = new Vector2(t_home + _direction * SlideDistance(t_root), t_root.anchoredPosition.y);
+        t_root.DOAnchorPosX(t_home, contentSlideSeconds)
+              .SetEase(Ease.OutCubic)
+              .SetUpdate(true)
+              .SetLink(t_root.gameObject)
+              .OnComplete(InvokePendingArrive);
+    }
+
+    // 도착 처리는 한 번만 돈다. 강제 완결로 콜백이 다시 들어와도 여기서 걸린다.
+    void InvokePendingArrive()
+    {
+        Action t_arrive = m_pendingArrive;
+        m_pendingArrive = null;
+        t_arrive?.Invoke();
+    }
+
+    /// <summary>진행 중인 전환을 그 자리에서 끝낸다 — 탭을 연타해도 기다리게 하지 않는다.
+    /// 완료 콜백까지 강제로 돌려(DOKill(true)) 비활성화와 좌표 복원을 빠뜨리지 않는다.</summary>
+    void FinishPendingSlide()
+    {
+        // 강제 완결이 떠나는 탭의 도착 처리까지 돌리면, 화면 밖 앵커를 기다리며 튜토리얼이 잠긴다.
+        m_pendingArrive = null;
+
+        if (m_leaving != null && m_leaving.Root != null) m_leaving.Root.DOKill(true);
+        m_leaving = null;
+
+        LobbyTabPanel t_current = CurrentPanel;
+        if (t_current != null && t_current.Root != null) t_current.Root.DOKill(true);
+    }
+
+    float HomeX(int _index)
+        => m_homeX != null && _index >= 0 && _index < m_homeX.Length ? m_homeX[_index] : 0f;
+
+    /// <summary>패널이 화면 밖으로 완전히 빠지는 거리.
+    /// SafeAreaFitter가 좌우 여백을 주면 부모 폭으로는 모자라, 캔버스 폭과 견줘 큰 쪽을 쓴다.</summary>
+    float SlideDistance(RectTransform _root)
+    {
+        float t_width = _root.parent is RectTransform t_parent ? t_parent.rect.width : 0f;
+
+        Canvas t_canvas = _root.GetComponentInParent<Canvas>();
+        RectTransform t_canvasRect = t_canvas != null ? t_canvas.rootCanvas.transform as RectTransform : null;
+        if (t_canvasRect != null) t_width = Mathf.Max(t_width, t_canvasRect.rect.width);
+
+        return t_width;
     }
 }
