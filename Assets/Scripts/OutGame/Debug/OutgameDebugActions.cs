@@ -279,7 +279,7 @@ public static class OutgameDebugActions
     // 튜토리얼 N편 처음으로 되감기 — 되돌리는 것은 좌표와 완료 낙인뿐이다(씬 재진입 시 적용).
     // 소유·재화·덱·랭크·성장은 그대로 남으므로 여기서 본 화면은 실제 신규 유저의 화면과 다르다
     // (덱 지급은 이미 있는 슬롯을 만나 조용히 지나가고, 카드 세트 지급은 가진 카드를 신규처럼 다시 연출한다).
-    // 첫실행 상태 그대로 보려면 에디터의 [Tools > Card Battle > 튜토리얼 스텝 되감기]로 예약하고 재생한다.
+    // 첫실행 상태 그대로 보려면 에디터의 [Tools > Card Battle > 튜토리얼 저작 도구]에서 [여기부터]로 예약하고 재생한다.
     public static void RestartTutorialFromChapter(int _chapterIndex)
     {
         int t_last    = OutgameTutorialRunner.ChapterCount - 1;
