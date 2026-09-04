@@ -103,7 +103,13 @@ async function readPublishedSpec(env: string, table: string): Promise<PublishedS
   return published;
 }
 
-/** 매치 생성 시점의 불변 릴리스 blob 포인터를 고정한다. 결과 재생은 현재 인덱스가 아니라 이 값을 읽는다. */
+/**
+ * 매치 생성 시점의 불변 릴리스 blob 포인터를 고정한다.
+ * 결과 재생은 현재 인덱스가 아니라 이 값을 읽는다.
+ * @param {string} env 대상 환경
+ * @param {string[]} tables 고정할 표 이름들
+ * @return {Promise<SpecPins>} 표 이름 → blob 포인터
+ */
 export async function readSpecPins(env: string, tables: readonly string[]): Promise<SpecPins> {
   const entries = await Promise.all(tables.map(async (table) => {
     if (UNINDEXED_TABLES.has(table)) throw new Error(`unindexed spec cannot be pinned: ${table}`);
@@ -113,7 +119,14 @@ export async function readSpecPins(env: string, tables: readonly string[]): Prom
   return Object.fromEntries(entries);
 }
 
-/** 클라이언트 SpecPayloadCodec.CombinedHash와 같은 식. 현재 전투 합의 지문은 Card pin 하나만 접는다. */
+/**
+ * 클라이언트 SpecPayloadCodec.CombinedHash와 같은 식.
+ * 현재 전투 합의 지문은 Card pin 하나만 접는다.
+ * @param {string} env 대상 환경
+ * @param {SpecPins} pins 고정된 blob 포인터들
+ * @param {string[]} tables 지문에 접을 표 이름들
+ * @return {string} 소문자 hex SHA-256
+ */
 export function fingerprintOfSpecPins(env: string, pins: SpecPins, tables: readonly string[]): string {
   let source = env;
   for (const table of tables) {
@@ -124,7 +137,14 @@ export function fingerprintOfSpecPins(env: string, pins: SpecPins, tables: reado
   return createHash("sha256").update(source, "utf8").digest("hex");
 }
 
-/** 고정된 매치가 참조하는 불변 blob을 읽는다. 현재 `_index`는 의도적으로 조회하지 않는다. */
+/**
+ * 고정된 매치가 참조하는 불변 blob을 읽는다.
+ * 현재 `_index`는 의도적으로 조회하지 않는다.
+ * @param {string} env 대상 환경
+ * @param {string} table 표 이름
+ * @param {SpecPin} pin 매치에 고정된 blob 포인터
+ * @return {Promise<SpecRow[]>} id 오름차순 행
+ */
 export async function readPinnedSpecRows(env: string, table: string, pin: SpecPin): Promise<SpecRow[]> {
   const expectedPrefix = `envs/${env}/specs/`;
   if (!pin.blobPath.startsWith(expectedPrefix) || pin.payloadHash === "") {

@@ -1,3 +1,5 @@
+// EmulatorDetection 은 Google.Api.Gax 소속이다 — Firestore using 만으로는 안 잡힌다.
+using Google.Api.Gax;
 using Google.Cloud.Firestore;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);

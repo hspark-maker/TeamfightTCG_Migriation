@@ -25,7 +25,13 @@ type CloudReplayResult = {
 let cachedIdentityToken: {audience: string; token: string; expiresAtMs: number} | null = null;
 let missingUrlLogged = false;
 
-/** 정산 트랜잭션이 끝난 뒤 실행하는 fail-open 섀도 재생. 어떤 실패도 플레이어 정산을 되돌리지 않는다. */
+/**
+ * 정산 트랜잭션이 끝난 뒤 실행하는 fail-open 섀도 재생.
+ * 어떤 실패도 플레이어 정산을 되돌리지 않는다.
+ * @param {"live" | "test"} env 대상 환경
+ * @param {string} matchId 재생할 매치 문서 ID
+ * @return {Promise<void>} 결과는 매치 문서와 로그에만 남는다
+ */
 export async function runCloudReplayShadow(env: "live" | "test", matchId: string): Promise<void> {
   const serviceUrl = (process.env.BATTLE_REPLAY_URL ?? "").replace(/\/+$/, "");
   if (serviceUrl === "") {
@@ -183,7 +189,7 @@ async function callReplay(serviceUrl: string, body: unknown): Promise<CloudRepla
   try {
     const response = await fetch(`${serviceUrl}/v1/battle/replay`, {
       method: "POST",
-      headers: {"content-type": "application/json", authorization: `Bearer ${token}`},
+      headers: {"content-type": "application/json", "authorization": `Bearer ${token}`},
       body: JSON.stringify(body),
       signal: controller.signal,
     });
