@@ -7,7 +7,7 @@ using UnityEngine;
 using TMPro;
 
 /// <summary>카드 한 장 **위에 얹히는 장식 계층 전부**를 소유한다.
-/// 키워드 아이콘 줄 / 키워드 프레임 장식 / 시너지 배지 / 키워드 글로우 / 패시브 글로우가 여기 있다.
+/// 키워드 아이콘 줄 / 키워드 프레임 장식 / 시너지 배지 / 키워드 글로우가 여기 있다.
 ///
 /// 이 넷을 한 덩어리로 묶은 이유: 전부 "카드가 가진 키워드·시너지를 카드 위에 그린다"는 같은 일이고,
 /// 표시 대상·순서 판정을 <see cref="CardVisualRules"/> 하나에서 받아온다는 계약도 공유한다.
@@ -15,7 +15,7 @@ using TMPro;
 /// 그쪽은 CardInstance를 그대로 읽어 그리는 일이라 장식과 갱신 축이 다르다.
 ///
 /// MonoBehaviour가 아니라 순수 C# 객체다 — CardView가 필드로 들고 생성한다.
-/// 인스펙터 배선(keywordIcon*·synergyBadge*·keywordFrames·passiveGlowSystem)은
+/// 인스펙터 배선(keywordIcon*·synergyBadge*·keywordFrames)은
 /// CardView의 SerializeField에 그대로 남고 값만 생성자로 주입된다(프리팹/씬 YAML 재직렬화 회피).
 ///
 /// 경계는 단방향이다: CardDecorView → CardVisualRules / GameTiming / TutorialConfig.
@@ -43,7 +43,6 @@ public class CardDecorView
     readonly float            synergyBadgeYStart;
     readonly float            synergyBadgeYStep;
     readonly int              synergyMaxBadges;
-    readonly ParticleSystem   passiveGlowSystem;
 
     // ── 장식 상태 ──
 
@@ -72,8 +71,7 @@ public class CardDecorView
         float                   _synergyBadgeXPos,
         float                   _synergyBadgeYStart,
         float                   _synergyBadgeYStep,
-        int                     _synergyMaxBadges,
-        ParticleSystem          _passiveGlowSystem)
+        int                     _synergyMaxBadges)
     {
         this.owner                      = _owner;
         this.bodyAlphaSource            = _bodyAlphaSource;
@@ -91,7 +89,6 @@ public class CardDecorView
         this.synergyBadgeYStart         = _synergyBadgeYStart;
         this.synergyBadgeYStep          = _synergyBadgeYStep;
         this.synergyMaxBadges           = _synergyMaxBadges;
-        this.passiveGlowSystem          = _passiveGlowSystem;
 
         // 첫 Refresh가 자리를 덮기 전에 저작값을 잡아 둔다 — 여기서 놓치면 되돌릴 원본이 없다.
         if (_keywordIconRoot != null && _keywordIconRoot.childCount > 0)
@@ -385,16 +382,5 @@ public class CardDecorView
             }
         }
     }
-    #endregion
-
-    #region Glow
-    public async UniTask PlayPassiveGlow()
-    {
-        if (this.passiveGlowSystem == null) return;
-        this.passiveGlowSystem.Play();
-        float t_dur = this.passiveGlowSystem.main.duration;
-        await UniTask.Delay((int)(t_dur * 1000), cancellationToken: this.owner.GetCancellationTokenOnDestroy()).SuppressCancellationThrow();
-    }
-
     #endregion
 }

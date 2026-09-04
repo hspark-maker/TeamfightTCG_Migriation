@@ -20,8 +20,6 @@ using UnityEngine;
 /// CardView는 이 클래스의 내부 상태를 읽지 않는다(전달 스텁 + 다른 카드의 조준 기울기 원복만).</summary>
 public class CardInputController
 {
-    const string TAUNT_BLOCKED_TEXT = "도발 카드를 먼저 공격해야 합니다";
-
     enum DragState { Idle, AttackDrag }
 
     // 한 터치의 제스처 종류. 손가락이 dragThreshold를 넘는 순간 초기 세로 방향으로 확정, 그 터치 끝까지 고정.
@@ -613,9 +611,10 @@ public class CardInputController
     /// <summary>이 필드의 확정 시너지 스냅샷에서 보유 장수. 없으면 -1(팝업이 ●/○ 마커를 생략).</summary>
     int OwnedCountOf(SynergyData _synergy)
     {
-        if (this.owner.LastBadgeState?.Active == null) return -1;
+        if (_synergy == null || this.owner.LastBadgeState?.Active == null) return -1;
         foreach (var t_a in this.owner.LastBadgeState.Active)
-            if (t_a != null && t_a.Synergy == _synergy) return t_a.Count;
+            if (t_a?.Runtime != null &&
+                string.Equals(t_a.Runtime.SynergyId, _synergy.SynergyId, System.StringComparison.Ordinal)) return t_a.Count;
         return -1;
     }
 
@@ -770,32 +769,6 @@ public class CardInputController
             foreach (CardView t_cv in _validTargets)
                 if (t_cv != null) t_cv.PlayAttentionPulse();
 
-        if (BattleSelection.TauntNoticeShown || _validTargets == null || _validTargets.Count == 0) return;
-
-        // 지정 타깃(튜토리얼)로 걸러진 경우는 스크립트가 따로 안내한다 → 도발로 막힌 경우만 문구.
-        CardView t_taunt = _validTargets.Find(cv => BattleRules.IsTaunt(cv?.BoundCard));
-        if (t_taunt == null) return;
-
-        BattleSelection.MarkTauntNoticeShown();
-        ShowTauntBlockedNotice(t_taunt.BoundCard);
-    }
-
-    /// <summary>도발 차단 안내 배너. 초상화는 도발 아이콘(있으면), 없으면 도발 카드 초상화.
-    /// BattleUxFlags.EffectNotifyBanner로 블라인드 중 — 우측 슬라이드 배너는 가독성·학습성이 낮다는 판단.
-    /// 배너가 없어도 거절 피드백은 남는다: 거절 대상 흔들기 + 도발 카드 펄스/글로우(RejectAsTarget).</summary>
-    static void ShowTauntBlockedNotice(CardInstance _tauntCard)
-    {
-        if (!BattleUxFlags.EffectNotifyBanner) return;
-        if (_tauntCard == null || !CardCatalog.Contains(_tauntCard.cardId)) return;
-
-        Sprite t_icon = DataLibrary.instance?.keywordIconConfig?.GetIcon(CardKeyword.Taunt);
-        UIPoolManager.Instance?.AddOrUpdateUI<EffectNotifyUI>(new EffectNotifyData
-        {
-            portrait       = t_icon != null ? t_icon : CardVisualRules.PickCardArt(_tauntCard.cardId, _tauntCard.evolutionStage),
-            preserveAspect = t_icon != null,
-            cardName       = _tauntCard.spec.DisplayName,
-            effectLabel    = TAUNT_BLOCKED_TEXT,
-        });
     }
 
     /// <summary>드래그 시작 시 유효 타깃 강조 페이드 — 밝기는 곧 "유효 타깃"의 시각화다.
@@ -870,7 +843,6 @@ public class CardInputController
     void BeginTargeting()
     {
         ClearRejectFocus();
-        BattleSelection.ResetTauntNotice();
     }
 
     /// <summary>같은 대상에 대해 프레임마다 거절 연출이 반복되지 않게 1회만 발화.

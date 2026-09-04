@@ -195,8 +195,6 @@ public class MultiplayerOpponentTurn : TurnBase
                 // 수동 재선택 모드면 송신측이 HandleCardViewAttack의 규칙 검사를 거치므로 백스톱을 유지한다.
                 t_executionFollowUp = BattleUxFlags.ExecutionRandomTarget;
                 t_executionAttacker = t_atk;
-                CardPassive.Notify(t_atk, CardKeyword.Execution);
-
                 if (DeckConfig.AiTakeover)
                 {
                     // EnemyTurn과 동일하게 처형 공격자는 유지하고 타깃만 AI 규칙으로 다시 고른다.

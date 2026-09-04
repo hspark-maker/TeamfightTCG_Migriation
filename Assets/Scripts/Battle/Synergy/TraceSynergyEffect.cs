@@ -1,5 +1,3 @@
-﻿using Cysharp.Threading.Tasks;
-using UnityEngine;
 
 // 추적(Trace): [AfterAttack] 하나로 두 단계를 다 처리한다.
 //  2단계 — 공격 후 살아남은 적에게 표식(Mark) 부여.
@@ -10,11 +8,10 @@ using UnityEngine;
 //
 // 결정론: RNG 미소비, 순수 산술. bonusHp·runtimeKeywords 둘 다 BattleStateHash가 폴딩하므로
 // 양쪽 클라가 같은 순서로 같은 값을 써야 한다 — 여기서 보드 순회나 시간 의존을 넣지 말 것.
-[CreateAssetMenu(fileName = "TraceSynergyEffect", menuName = "Card Battle/Synergy Effect/Trace")]
 public class TraceSynergyEffect : SynergyEffect
 {
-    [SerializeField] bool grantMarkOnAttack = true;
-    [SerializeField, Min(0)] int bonusHpOnMarkedKill;
+    bool grantMarkOnAttack = true;
+    int bonusHpOnMarkedKill;
 
     public override bool TrySetParam(string _key, string _value)
     {
@@ -26,10 +23,10 @@ public class TraceSynergyEffect : SynergyEffect
         }
     }
 
-    public override UniTask OnAfterAttack(AfterAttackCtx _ctx)
+    public override void OnAfterAttack(AfterAttackCtx _ctx)
     {
         // self는 트리거가 IsAlive까지 걸러 준다. target은 아무도 안 보므로 여기서 막는다.
-        if (_ctx.target == null) return UniTask.CompletedTask;
+        if (_ctx.target == null) return;
 
         // 공격 **전** 상태를 먼저 캡처한다 — 아래에서 붙인 표식이 같은 공격의 처치 보상을
         // 자기충족시키면 2단계만으로 4단계가 항상 터진다.
@@ -45,7 +42,7 @@ public class TraceSynergyEffect : SynergyEffect
             // 여기서 그냥 내면 아직 서 있는(사망 연출 전) 적 앞에서 처치 보상 배너가 먼저 뜬다.
             // 규칙(bonusHp)은 위에서 이미 끝났고 담기는 건 순수 표시뿐이다.
             CardInstance t_self = _ctx.self;
-            SynergyData t_synergy = _ctx.synergy;
+            SynergyRuntime t_synergy = _ctx.synergy;
             BattleField t_field = _ctx.ownField;
             BattlePresentationQueue.RunOnKill(() => SynergyTriggers.Fire(t_self, t_synergy, t_field));
         }
@@ -59,15 +56,15 @@ public class TraceSynergyEffect : SynergyEffect
             PlayMark(_ctx.target, _ctx.synergy);
         }
 
-        return UniTask.CompletedTask;
     }
 
     /// <summary>표식이 붙은 적 자리에 낙점을 띄운다. 규칙은 이미 위에서 끝났고 여기서부터는 표시뿐이라
     /// 기다리지 않는다 — 수명은 VfxEntry.lifetime이 쥐고 반납은 BattleVfx가 한다.
     /// 미배선이거나 뷰가 없으면 조용히 생략(연출은 선택).</summary>
-    static void PlayMark(CardInstance _target, SynergyData _synergy)
+    static void PlayMark(CardInstance _target, SynergyRuntime _synergy)
     {
-        if (!(_synergy?.vfx is TraceSynergyVfxConfig t_vfx) || t_vfx.mark.prefab == null) return;
+        CardCatalog.TryGetSynergyData(_synergy, out SynergyData t_presentation);
+        if (!(t_presentation?.vfx is TraceSynergyVfxConfig t_vfx) || t_vfx.mark.prefab == null) return;
 
         CardView t_view = CardView.GetView(_target);
         if (t_view == null) return;

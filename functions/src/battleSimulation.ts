@@ -1,5 +1,6 @@
 import {BattleCommand, decodeBattleCommands} from "./battleCommand";
 import {CardSnapshot, CardSpecForValidation} from "./deckValidation";
+import {resolveSynergyTier, SynergyEffectRule, SynergyRuleSet} from "./synergyRules";
 
 const MASK64 = (BigInt(1) << BigInt(64)) - BigInt(1);
 const GOLDEN = BigInt("0x9e3779b97f4a7c15");
@@ -22,7 +23,7 @@ type Card = {
   specKeywords: number;
 };
 
-type ActiveSynergy = {name: string; amount: number};
+type ActiveSynergy = {name: string; effects: readonly SynergyEffectRule[]};
 type Field = {owner: number; slots: Array<Card | null>; waiting: Card[];
   fallen: number[]; flow: number; active: ActiveSynergy[]};
 
@@ -32,6 +33,7 @@ export type BattleSimulationInput = {
   seedHex: string;
   decks: readonly [readonly CardSnapshot[], readonly CardSnapshot[]];
   specs: ReadonlyMap<number, CardSpecForValidation>;
+  synergyRules: SynergyRuleSet | null;
   commandLog: string;
 };
 
@@ -79,21 +81,21 @@ export class Rng {
 
 const SYNERGY_ALIASES: Readonly<Record<string, string>> = {
   "덩치": "Bulk", "돌보미": "Caretaker", "포식자": "Predator", "흐름": "Flow",
-  "유산": "Legacy", "수호자": "Guardian", "비늘": "Scale", "낙인": "Brand",
+  "유산": "Legacy", "비늘": "Scale", "낙인": "Brand", "추적": "Trace",
 };
 
 function synergyName(raw: string): string {
-  return SYNERGY_ALIASES[raw.trim()] ?? raw.trim();
+  const trimmed = raw.trim();
+  const name = trimmed.startsWith("Data_Synergy_") ? trimmed.slice("Data_Synergy_".length) : trimmed;
+  return SYNERGY_ALIASES[name] ?? name;
 }
 
-function synergyAmount(name: string, count: number): number {
-  if (name === "Brand" || name === "Flow" || name === "Caretaker") return count >= 5 ? 2 : count >= 3 ? 1 : 0;
-  if (name === "Bulk") return count >= 4 ? 6 : count >= 2 ? 3 : 0;
-  if (name === "Scale") return count >= 4 ? 2 : count >= 2 ? 1 : 0;
-  if (name === "Legacy") return count >= 4 ? 2 : count >= 2 ? 1 : 0;
-  if (name === "Predator") return count >= 4 ? 75 : count >= 2 ? 50 : 0;
-  if (name === "Guardian") return count >= 2 ? 1 : 0;
-  return 0;
+function synergyParam(active: ActiveSynergy, effectType: string, key: string, fallback?: number): number {
+  const effect = active.effects.find((item) => item.type === effectType);
+  const value = effect?.parameters[key];
+  if (value != null) return value;
+  if (fallback != null) return fallback;
+  throw new Error(`synergy_parameter_missing:${active.name}.${effectType}.${key}`);
 }
 
 function has(card: Card, keyword: Keyword): boolean {
@@ -105,7 +107,7 @@ function has(card: Card, keyword: Keyword): boolean {
 // 라이브 정산 경로는 이 값이 없으므로 종전대로 시드에서 셔플한다.
 function makeField(owner: number, deck: readonly CardSnapshot[],
   specs: ReadonlyMap<number, CardSpecForValidation>, seed: bigint,
-  boardOrder?: readonly number[], _fail?: {reason: string}): Field | null {
+  synergyRules: SynergyRuleSet, boardOrder?: readonly number[], _fail?: {reason: string}): Field | null {
   const cards: Card[] = [];
   for (const snapshot of deck) {
     const spec = specs.get(snapshot.cardId);
@@ -179,17 +181,27 @@ function makeField(owner: number, deck: readonly CardSnapshot[],
       }
     }
   }
-  field.active = order.map((name) => ({name, amount: synergyAmount(name, counts.get(name) ?? 0)}))
-    .filter((item) => item.amount > 0);
+  try {
+    for (const name of order) {
+      const tier = resolveSynergyTier(synergyRules, name, counts.get(name) ?? 0);
+      if (tier != null) field.active.push({name, effects: tier.effects});
+    }
+  } catch (error) {
+    if (_fail != null) _fail.reason = error instanceof Error ? error.message : "synergy_rule_invalid";
+    return null;
+  }
   for (const card of cards) {
     for (const active of field.active) {
       if (card.synergies.includes(active.name)) {
-        if (active.name === "Bulk") card.bonusHp += active.amount;
-        if (active.name === "Scale") card.reduction += active.amount;
+        const stat = active.effects.find((effect) => effect.type === "Stat");
+        if (stat != null) {
+          card.bonusHp += stat.parameters.bonusHp ?? 0;
+          card.reduction += stat.parameters.dmgReduction ?? 0;
+          card.synergyKeywords |= stat.parameters.grantedKeywords ?? 0;
+        }
       }
     }
   }
-  for (const card of field.slots) if (card != null && belongs(card, field, "Guardian")) card.shield = true;
   return field;
 }
 
@@ -224,16 +236,16 @@ function damage(card: Card, raw: number): number {
 function entered(field: Field, card: Card): void {
   for (const active of field.active) {
     if (!belongs(card, field, active.name)) continue;
-    if (active.name === "Guardian") card.shield = true;
     if (active.name === "Caretaker") {
+      const amount = synergyParam(active, "Caretaker", "amount");
       for (const ally of field.slots) {
         if (ally != null && ally.hp > 0 && belongs(ally, field, active.name)) {
-          heal(ally, active.amount); ally.bonusHp += active.amount;
+          heal(ally, amount); ally.bonusHp += amount;
         }
       }
     }
     if (active.name === "Flow") {
-      field.flow += active.amount;
+      field.flow += synergyParam(active, "Flow", "amount");
       for (const ally of field.slots) if (ally != null && ally.hp > 0 && belongs(ally, field, active.name)) ally.flowBonus = field.flow;
     }
   }
@@ -260,7 +272,9 @@ function beginTurn(field: Field): void {
         card.justSpawned = false; continue;
       }
       const legacy = field.active.find((item) => item.name === "Legacy");
-      if (legacy != null && belongs(card, field, "Legacy")) card.legacyStack += legacy.amount;
+      if (legacy != null && belongs(card, field, "Legacy")) {
+        card.legacyStack += synergyParam(legacy, "Legacy", "amount");
+      }
     }
   }
 }
@@ -306,13 +320,16 @@ function attack(command: BattleCommand, fields: readonly [Field, Field], rng: Rn
   const brand = own.active.find((item) => item.name === "Brand");
   if (brand != null && belongs(attacker, own, "Brand")) {
     const count = own.slots.filter((card) => card != null && card.hp > 0 && belongs(card, own, "Brand")).length;
-    damage(defender, Math.min(3, count) * brand.amount);
+    damage(defender, Math.min(3, count) * synergyParam(brand, "Brand", "damagePerMember"));
   }
   const attackDamage = (has(attacker, Keyword.Taunt) ? Math.max(1, Math.floor(attacker.hp / 2)) : attacker.hp) + attacker.flowBonus;
   const counterDamage = (has(defender, Keyword.Taunt) ? Math.max(1, Math.floor(defender.hp / 2)) : defender.hp) + defender.flowBonus;
   const splashDamage = has(attacker, Keyword.Peerless) ? Math.floor(attacker.hp / 2) : 0;
   const takesCounter = defender.hp > 0 && !has(attacker, Keyword.Ranged) && !has(defender, Keyword.Mark);
   const shouldSwap = has(attacker, Keyword.Cunning) && own.waiting.length > 0;
+  // Trace observes the target's state before its own [AfterAttack] hook grants Mark.
+  // Capture it before resolving damage so the same attack can never satisfy its own marked-kill condition.
+  const defenderWasMarked = has(defender, Keyword.Mark);
   if (Boolean(command.flags & 1) !== shouldSwap) return {again: false, error: "cunning_flag_mismatch"};
   const dealt = damage(defender, attackDamage);
   if (takesCounter) damage(attacker, counterDamage);
@@ -334,12 +351,21 @@ function attack(command: BattleCommand, fields: readonly [Field, Field], rng: Rn
     incoming.returned = false; attacker.returned = true; attacker.slot = -1; attacker.revealed = false; own.waiting.push(attacker);
   }
   removeDead(own); removeDead(enemy);
+  // [AfterAttack] Trace. C# runs this after RemoveDead and only while the attacker is alive.
+  // defenderKilled is the pre-revive lethal latch, so an Immortal target still counts as a marked kill.
+  const trace = own.active.find((item) => item.name === "Trace");
+  if (trace != null && attacker.hp > 0 && belongs(attacker, own, "Trace")) {
+    const markedKillBonus = synergyParam(trace, "Trace", "bonusHpOnMarkedKill", 0);
+    const grantsMark = synergyParam(trace, "Trace", "grantMarkOnAttack") !== 0;
+    if (defenderWasMarked && defenderKilled && markedKillBonus > 0) attacker.bonusHp += markedKillBonus;
+    if (grantsMark && !defenderWasMarked && defender.hp > 0) defender.runtime |= Keyword.Mark;
+  }
   // [AfterAttack] 포식자 흡혈. C# 은 AttackFlow.RunAfterAttack 이 Execute(=RemoveDead 포함) **뒤**에
   // 돌고 진입부가 `if (!_attacker.IsAlive) return;` 다. 이 순서를 지키지 않으면
   // 반격으로 죽은 포식자가 회복으로 되살아나 슬롯에 남고, 그 뒤 전투가 통째로 갈린다.
   const predator = own.active.find((item) => item.name === "Predator");
   if (predator != null && attacker.hp > 0 && belongs(attacker, own, "Predator")) {
-    heal(attacker, Math.floor(dealt * predator.amount / 100));
+    heal(attacker, Math.floor(dealt * synergyParam(predator, "Predator", "lifestealPercent") / 100));
   }
   fill(own); fill(enemy);
   return {again: defenderKilled && attacker.hp > 0 && has(attacker, Keyword.Execution)};
@@ -378,13 +404,14 @@ function stateHash(fields: readonly [Field, Field], draws: number): string {
 
 export function simulateBattle(input: BattleSimulationInput): BattleSimulationResult {
   try {
+    if (input.synergyRules == null) return {ok: false, reason: "synergy_rules_missing"};
     const seed = BigInt(`0x${input.seedHex}`);
     const rng = new Rng(seed);
     // 기본값은 "어디서 실패했는지 못 밝혔다"는 뜻이어야 한다. 특정 사유를 기본값으로 두면
     // 사유를 안 채운 실패 경로가 전부 그 이름을 뒤집어써서 원인 추적이 엉뚱한 데로 간다.
     const fail = {reason: "field_build_failed"};
-    const a = makeField(0, input.decks[0], input.specs, seed, input.boardOrders?.[0], fail);
-    const b = makeField(1, input.decks[1], input.specs, seed, input.boardOrders?.[1], fail);
+    const a = makeField(0, input.decks[0], input.specs, seed, input.synergyRules, input.boardOrders?.[0], fail);
+    const b = makeField(1, input.decks[1], input.specs, seed, input.synergyRules, input.boardOrders?.[1], fail);
     if (a == null || b == null) return {ok: false, reason: fail.reason};
     const fields: [Field, Field] = [a, b];
     const firstOwner = rng.range(2);
@@ -403,7 +430,6 @@ export function simulateBattle(input: BattleSimulationInput): BattleSimulationRe
           field.waiting.splice(index, 1); const outgoing = field.slots[command.a] as Card;
           incoming.slot = command.a; incoming.revealed = true; incoming.everRevealed = true; field.slots[command.a] = incoming;
           incoming.justSpawned = has(incoming, Keyword.Invincible);
-          if (belongs(incoming, field, "Guardian")) incoming.shield = true;
           outgoing.slot = -1; outgoing.revealed = false; field.waiting.push(outgoing);
         }
         continue;

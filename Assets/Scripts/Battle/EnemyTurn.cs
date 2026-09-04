@@ -143,7 +143,6 @@ public class EnemyTurn : TurnBase
 
             if (t_result.canAttackAgain && t_atk.IsAlive)
             {
-                CardPassive.Notify(t_atk, CardKeyword.Execution);
                 t_forcedAttacker = t_atk;
                 await UniTask.Delay((int)(GameTiming.Battle.EnemyExtraAttackDelay * 1000));
             }

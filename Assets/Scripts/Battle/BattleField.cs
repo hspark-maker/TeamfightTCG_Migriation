@@ -125,7 +125,7 @@ public class BattleField : MonoBehaviour
         {
             if (this.state.TryFillSlot(i, out CardInstance t_card, out bool t_cunningReturn))
             {
-                NotifyEntered(t_card); // [Entered] 런타임 등장(패시브+시너지). justSpawned 판정 전 — 패시브가 무적 부여 가능.
+                NotifyEntered(t_card); // [Entered] 런타임 등장 시너지. justSpawned 판정 전에 발화.
                 t_card.justSpawned = t_card.HasKeyword(CardKeyword.Invincible) || t_cunningReturn;
                 t_placed.Add(t_card);
             }
@@ -280,12 +280,7 @@ public class BattleField : MonoBehaviour
         this.Synergy = SynergyResolver.Resolve(
             t_cards.FindAll(c => c.synergyEnabled).ConvertAll(c => c.cardId));
         SynergyApplier.ApplyAll(this.Synergy, t_cards);
-        // [DeckResolved] 패시브 몫. **DeckResolved만 synergy→passive 역순인데 구조적 제약이다** —
-        // ApplyAll 안에 ClearSynergy가 있어서 패시브를 먼저 돌리면 패시브가 넣은 정적 스탯이 지워진다.
-        // (BattleTimings ◆ 참조.) ctx.state = 확정 스냅샷, ctx.synergy = null. 동기 void.
-        // [Placed] 시너지 몫. Initialize 시점엔 this.Synergy가 아직 null이라 거기선 발화가 불가능하다
-        // (패시브 Placed만 Initialize에서 발화 — justSpawned 판정에 무적 부여를 반영해야 하므로).
-        // 그래서 시너지 Placed는 스냅샷이 확정된 여기서 슬롯 카드에 대해 발화한다.
+        // [Placed]는 시너지 스냅샷이 확정된 여기서 슬롯 카드마다 발화한다.
         for (int i = 0; i < SLOT_COUNT; i++)
         {
             CardInstance t_placed = this.state.GetSlot(i);
@@ -323,9 +318,9 @@ public class BattleField : MonoBehaviour
     /// <summary>흐름: 스택 +1. 스택 권위는 BattleField 소유(FlowSynergyEffect가 런타임 스폰 시 호출). 순수 산술.</summary>
     public void AddFlowStack(int _amount) => this.state.AddFlowStack(_amount);
 
-    // [Entered] 런타임 등장 공통 후처리(패시브 → 시너지 순서 고정).
+    // [Entered] 런타임 등장 공통 후처리.
     // Placed(오프닝 배치)와 혼동 금지 — 오프닝은 시너지 미발화가 의도(등장=런타임 스폰만).
-    // 호출 위치는 justSpawned 판정 '전'이어야 한다(패시브가 무적을 부여하는 경우를 판정에 반영).
+    // 호출 위치는 justSpawned 판정 '전'이어야 한다(시너지의 키워드 부여를 판정에 반영).
     void NotifyEntered(CardInstance _card)
     {
         var t_ctx = new SpawnCtx(_card, this);

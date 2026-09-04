@@ -100,13 +100,14 @@ public class FieldSynergyPanel : MonoBehaviour
         {
             foreach (ActiveSynergy t_active in _state.Active)
             {
-                if (t_active?.Synergy == null) continue;
+                if (t_active?.Runtime == null ||
+                    !CardCatalog.TryGetSynergyData(t_active.Runtime, out SynergyData t_synergy)) continue;
                 if (this.maxIcons > 0 && t_used >= this.maxIcons) break;
 
                 SynergyIconView t_slot = SlotAt(t_used);
                 if (t_slot == null) continue;
 
-                t_slot.Bind(t_active.Synergy, t_active.Count);   // 그림 대입 + 이전 판 트윈 정리는 칸이 스스로 한다
+                t_slot.Bind(t_synergy, t_active.Count);   // 그림 대입 + 이전 판 트윈 정리는 칸이 스스로 한다
                 t_slot.gameObject.SetActive(true);
                 t_used++;
             }
@@ -168,7 +169,7 @@ public class FieldSynergyPanel : MonoBehaviour
         foreach (CardInstance t_card in this.field.GetActiveCards())
         {
             if (t_card == null || !t_card.IsAlive) continue;
-            if (!SynergyApplier.BelongsTo(t_card, _synergy)) continue;
+            if (!SynergyApplier.BelongsTo(t_card, _synergy?.SynergyId)) continue;
             CardView.GetView(t_card)?.SetTargetFocus(_on);
         }
     }

@@ -16,7 +16,7 @@ const slots = buildFreshAccountSlots(STARTER);
 
 assert.deepEqual(Object.keys(slots).sort(), [
   "albumReward", "cardGrowth", "deck", "keywordGrowth",
-  "ownership", "profile", "rank", "tournament", "tutorial"].sort());
+  "ownership", "profile", "rank", "adventure", "tutorial"].sort());
 
 // v8 부터 재화는 세이브를 떠났다 — 슬롯이 남으면 지갑과 세이브가 둘 다 잔액을 주장한다.
 assert.equal(slots.currency, undefined, "currency 슬롯은 지갑 문서로 갔다");
@@ -46,7 +46,7 @@ assert.deepEqual(slots.cardGrowth, {entries: {}});
 assert.deepEqual(slots.keywordGrowth, {levels: {}});
 assert.deepEqual(slots.rank, {points: 0, claimedTiers: []});
 assert.deepEqual(slots.albumReward, {claimedKeys: []});
-assert.deepEqual(slots.tournament,
+assert.deepEqual(slots.adventure,
   {clearedNodeIds: [], claimedChapterIds: [], pendingRewardNodeId: ""});
 
 // -1 은 클라 TutorialSaveData 의 초기화자다. 0 으로 두면 되감기 판정이 달라진다.

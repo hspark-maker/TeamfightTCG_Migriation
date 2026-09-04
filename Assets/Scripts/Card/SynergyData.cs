@@ -22,21 +22,6 @@ public enum SynergyEmblemScope
 // 엠블럼의 움직임 스타일은 enum이 아니라 **타입**이다 — SynergyEmblemSpec의 자식 하나가 몸짓 하나다.
 // (enum이면 몸짓을 늘릴 때 값 추가 + 재생부 switch + 안 쓰는 형태값 칸이 같이 늘어난다.)
 
-// 저작하지 않는다 — SynergySpecSource가 시트 행에서 만들어 꽂는다(인스펙터에 뜨지 않으므로 직렬화 속성도 없다).
-public class SynergyTier
-{
-    public int requiredCount;
-
-    // 이 단계의 별칭(SynergyTierDef.label). 비면 요구 장수만 나오고, 시너지 이름과 같으면 표시하지 않는다.
-    public string label;
-
-    // 이 단계가 무엇을 주는지 한 줄(SynergyTierDef.effectSummary). '3장 — 추가 생명력 +1'의 뒷부분이다.
-    // 효과 설명문(SynergyData.effectDescription)은 단계별 수치를 담지 않는다 — 그 축의 진실원이 여기다.
-    public string effectSummary;
-
-    public SynergyEffect[] effects;
-}
-
 [CreateAssetMenu(fileName = "NewSynergy", menuName = "Card Battle/Synergy Data")]
 public class SynergyData : ScriptableObject
 {
@@ -66,11 +51,8 @@ public class SynergyData : ScriptableObject
     {
         get
         {
-            if (!string.IsNullOrEmpty(this.synergyId)) return this.synergyId;
-            const string PREFIX = "Data_Synergy_";
-            return this.name.StartsWith(PREFIX, System.StringComparison.Ordinal)
-                 ? this.name.Substring(PREFIX.Length)
-                 : this.name;
+            string t_source = !string.IsNullOrEmpty(this.synergyId) ? this.synergyId : this.name;
+            return SynergyRuntime.NormalizeId(t_source);
         }
     }
 

@@ -39,18 +39,7 @@ public sealed class SynergyRegistry : ScriptableObject
 
     public static string NormalizeName(string _value)
     {
-        string t_name = (_value ?? string.Empty).Trim();
-        return t_name switch
-        {
-            "낙인" => "Data_Synergy_Brand",
-            "덩치" => "Data_Synergy_Bulk",
-            "돌보미" => "Data_Synergy_Caretaker",
-            "흐름" => "Data_Synergy_Flow",
-            "유산" => "Data_Synergy_Legacy",
-            "포식자" => "Data_Synergy_Predator",
-            "비늘" => "Data_Synergy_Scale",
-            "추적" => "Data_Synergy_Trace",
-            _ => t_name,
-        };
+        string t_id = SynergyRuntime.NormalizeId(_value);
+        return t_id.Length == 0 ? string.Empty : SynergyRuntime.AssetPrefix + t_id;
     }
 }

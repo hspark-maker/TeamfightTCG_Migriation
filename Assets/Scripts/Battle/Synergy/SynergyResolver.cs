@@ -1,82 +1,73 @@
 using System.Collections.Generic;
 
-// 카드 ID 덱의 순수함수로 SynergyState를 1회 산출한다.
-// 결정론: Dictionary 순회 tie-break 없이, 입력(덱) 등장 순서로 결정. UnityEngine.Random 금지.
+// 카드 ID 입력 순서로 활성 시너지를 결정한다. Dictionary 순회 순서에는 의존하지 않는다.
 public static class SynergyResolver
 {
     public static SynergyState Resolve(IEnumerable<int> deckCards)
     {
         if (deckCards == null) return SynergyState.Empty;
 
-        // 등장 순서 보존 + 카운트 집계
-        var t_order  = new List<SynergyData>();
-        var t_counts = new Dictionary<SynergyData, int>();
+        ISynergyRuleProvider t_provider = SynergyRuleProvider.Current;
+        var t_order = new List<string>();
+        var t_counts = new Dictionary<string, int>(System.StringComparer.Ordinal);
 
-        foreach (var t_card in deckCards)
+        foreach (int t_card in deckCards)
         {
-            if (!CardCatalog.Contains(t_card)) continue;
-            IReadOnlyList<SynergyData> t_synergies = CardCatalog.RequireSynergies(t_card);
+            if (!t_provider.ContainsCard(t_card)) continue;
+            IReadOnlyList<string> t_synergies = t_provider.SynergyIdsOf(t_card);
 
-            // 한 카드는 같은 시너지를 중복 나열해도 1회만 카운트(Distinct).
-            // 배열 등장 순서로 순회 → 결정론 유지(HashSet은 중복 판정용, 순회 순서엔 미개입).
-            var t_seen = new HashSet<SynergyData>();
-            foreach (var t_synergy in t_synergies)
+            var t_seen = new HashSet<string>(System.StringComparer.Ordinal);
+            foreach (string t_synergyId in t_synergies)
             {
-                if (t_synergy == null) continue;
-                if (!t_seen.Add(t_synergy)) continue;  // 이 카드에서 이미 카운트한 시너지
-                Accumulate(t_synergy, t_order, t_counts);
+                if (string.IsNullOrEmpty(t_synergyId) || !t_seen.Add(t_synergyId)) continue;
+                Accumulate(t_synergyId, t_order, t_counts);
             }
         }
 
         var t_active = new List<ActiveSynergy>();
-        foreach (var t_synergy in t_order)
+        foreach (string t_synergyId in t_order)
         {
-            int t_count = t_counts[t_synergy];
+            int t_count = t_counts[t_synergyId];
+            int t_bestIndex = -1;
+            SynergyTier t_bestTier = null;
+            IReadOnlyList<SynergyTier> t_tiers = t_provider.TiersOf(t_synergyId);
 
-            int         t_bestIndex = -1;
-            SynergyTier t_bestTier  = null;
-            var         t_tiers      = t_synergy.tiers;
             if (t_tiers != null)
             {
-                for (int i = 0; i < t_tiers.Length; i++)
+                for (int i = 0; i < t_tiers.Count; i++)
                 {
-                    var t_tier = t_tiers[i];
-                    if (t_tier == null) continue;
-                    if (t_tier.requiredCount > t_count) continue;
-                    // 만족하는 티어 중 requiredCount 최대(동률이면 뒤쪽 인덱스) = 최고 티어
+                    SynergyTier t_tier = t_tiers[i];
+                    if (t_tier == null || t_tier.requiredCount > t_count) continue;
                     if (t_bestTier == null || t_tier.requiredCount >= t_bestTier.requiredCount)
                     {
                         t_bestIndex = i;
-                        t_bestTier  = t_tier;
+                        t_bestTier = t_tier;
                     }
                 }
             }
 
-            if (t_bestTier == null) continue;  // 열린 티어 없음 → 비활성
-
+            if (t_bestTier == null) continue;
             t_active.Add(new ActiveSynergy
             {
-                Synergy   = t_synergy,
-                Count     = t_count,
+                Runtime = new SynergyRuntime(t_synergyId),
+                Count = t_count,
                 TierIndex = t_bestIndex,
-                Tier      = t_bestTier,
+                Tier = t_bestTier,
             });
         }
 
         return new SynergyState(t_active);
     }
 
-    private static void Accumulate(SynergyData _synergy, List<SynergyData> _order, Dictionary<SynergyData, int> _counts)
+    static void Accumulate(string _synergyId, List<string> _order, Dictionary<string, int> _counts)
     {
-        if (_synergy == null) return;
-        if (_counts.TryGetValue(_synergy, out int t_c))
+        if (_counts.TryGetValue(_synergyId, out int t_count))
         {
-            _counts[_synergy] = t_c + 1;
+            _counts[_synergyId] = t_count + 1;
+            return;
         }
-        else
-        {
-            _counts[_synergy] = 1;
-            _order.Add(_synergy);  // 첫 등장 순서 고정 → 결정론
-        }
+
+        _counts[_synergyId] = 1;
+        _order.Add(_synergyId);
     }
 }

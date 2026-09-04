@@ -1,48 +1,42 @@
-using Cysharp.Threading.Tasks;
-using UnityEngine;
-
 /// <summary>
-/// 전투 효과 공용 베이스. **훅 선언은 여기에만 있다** — <see cref="CardPassive"/>와
-/// <see cref="SynergyEffect"/>는 이 클래스를 상속만 하고 훅을 다시 선언하지 않는다.
-///
-/// 두 시스템의 차이는 훅 목록이 아니라 **활성 조건**이다:
-///   CardPassive   — 카드 고유, 카드당 1개, 항상 켜짐
-///   SynergyEffect — 덱 조합, requiredCount 임계로 활성, BelongsTo 그룹
-/// 예전엔 타이밍마다 한쪽만 구독할 수 있었는데 그건 원칙이 아니라 이력이었다
-/// (TurnBegan은 passive만, TurnEnded는 synergy만인 식). 지금은 **아무 효과나 아무 타이밍이나** 쓴다.
+/// 전투 효과 공용 베이스. **훅 선언은 여기에만 있다** — <see cref="SynergyEffect"/>는
+/// 이 클래스를 상속만 하고 훅을 다시 선언하지 않는다.
+/// 활성 조건은 덱 조합의 requiredCount 임계이며, BelongsTo 그룹으로 적용 대상을 제한한다.
 ///
 /// 타이밍 의미·발화 위치·계약은 <see cref="BattleTimings"/>가 단독 소유한다 — 여기서 재설명하지 마라.
 ///
-/// **계약은 반환 타입이 말한다.** 동기 void = "await 없이 그 자리에서 끝나야 한다"(순서 보장이 걸린 것),
-/// UniTask = "연출을 await해도 된다". 단 .Forget으로 발화되는 것은 **첫 await 전에 상태변이 완결**.
+/// **모든 규칙 훅은 동기 void다.** 호출이 끝날 때 상태 변경도 끝나야 한다.
+/// 대기가 필요한 표시는 SynergyTriggers의 presentation 인터페이스가 별도로 소유한다.
 /// **전 훅 MatchRandom 소비 금지.**
 ///
-/// ctx.synergy = 이 발화를 일으킨 시너지(passive 발화면 null). 시너지 효과는 이걸로
-/// SynergyApplier.BelongsTo 자기판정 + SynergyTriggers.Fire 배너 태그를 한다.
+/// ctx.synergy = 이 발화를 일으킨 시너지. 시너지 효과는 이걸로
+/// SynergyApplier.BelongsTo 자기판정 + SynergyTriggers.Fire 태그를 한다.
 /// </summary>
-public abstract class BattleEffect : ScriptableObject
+public abstract class BattleEffect
 {
+    public string name { get; set; }
+
     // ── 매치 / 배치 ──
     public virtual void    OnDeckResolved(DeckCtx _ctx) { }
-    public virtual UniTask OnPlaced(SpawnCtx _ctx)   => UniTask.CompletedTask;
-    public virtual UniTask OnEntered(SpawnCtx _ctx)  => UniTask.CompletedTask;
+    public virtual void    OnPlaced(SpawnCtx _ctx) { }
+    public virtual void    OnEntered(SpawnCtx _ctx) { }
 
     // ── 턴 ──
-    public virtual UniTask OnTurnBegan(TurnCtx _ctx) => UniTask.CompletedTask;
+    public virtual void    OnTurnBegan(TurnCtx _ctx) { }
     public virtual void    OnTurnEnded(TurnCtx _ctx) { }
 
     // ── 공격 ──
-    public virtual UniTask OnBeforeAttack(BeforeAttackCtx _ctx) => UniTask.CompletedTask;
+    public virtual void    OnBeforeAttack(BeforeAttackCtx _ctx) { }
     /// <summary>동기 void — 반격이 치사 래치보다 먼저 hp에 반영돼야 한다(BattleTimings ★ 참조).</summary>
     public virtual void    OnAttacked(AttackedCtx _ctx) { }
-    public virtual UniTask OnDamageDealt(DamageDealtCtx _ctx) => UniTask.CompletedTask;
-    public virtual UniTask OnSwappedOut(SwapOutCtx _ctx)      => UniTask.CompletedTask;
-    public virtual UniTask OnAfterAttack(AfterAttackCtx _ctx) => UniTask.CompletedTask;
+    public virtual void    OnDamageDealt(DamageDealtCtx _ctx) { }
+    public virtual void    OnSwappedOut(SwapOutCtx _ctx) { }
+    public virtual void    OnAfterAttack(AfterAttackCtx _ctx) { }
 
     // ── 사망 ──
     /// <summary>동기 void — 직후 IsAlive 게이트가 부활 여부를 본다. 여기서만 사망을 취소할 수 있다.</summary>
     public virtual void    OnLethal(DeathCtx _ctx) { }
-    public virtual UniTask OnRemoved(DeathCtx _ctx) => UniTask.CompletedTask;
+    public virtual void    OnRemoved(DeathCtx _ctx) { }
 
     // ── 보드 ──
     /// <summary>동기 void — 라이브 카운트 파생 상태 재동기용. 발화가 잦고 피해 계산 직전에도 걸린다.

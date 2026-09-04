@@ -38,9 +38,9 @@ public static class SynergyEmblemVfx
 
         foreach (ActiveSynergy t_active in _state.Active)
         {
-            SynergyData t_synergy = t_active?.Synergy;
-            if (t_synergy == null) continue;
-            if (!SynergyApplier.BelongsTo(_card, t_synergy)) continue;
+            if (t_active?.Runtime == null ||
+                !CardCatalog.TryGetSynergyData(t_active.Runtime, out SynergyData t_synergy)) continue;
+            if (!SynergyApplier.BelongsTo(_card, t_synergy?.SynergyId)) continue;
             // 무엇을 띄울지는 연출 에셋이 답한다(기본 = 엠블럼 줄, 흐름 = 바람). 여기 타입 분기를 두지 마라.
             if (t_synergy.vfx != null) t_synergy.vfx.PlayPlaced(_view, _card, t_synergy);
         }
@@ -61,7 +61,7 @@ public static class SynergyEmblemVfx
             foreach (CardInstance t_card in _field.GetActiveCards())
             {
                 if (t_card == null || !t_card.IsAlive) continue;
-                if (!SynergyApplier.BelongsTo(t_card, _synergy)) continue;
+                if (!SynergyApplier.BelongsTo(t_card, _synergy?.SynergyId)) continue;
 
                 // 뷰가 없는 시점(InitializeViews 이전)에도 규칙이 Fire를 걸 수 있다 — 몸짓은 뷰 자리를
                 // 읽어야 만들어지므로 여기서 걸러낸다(단일 대상 경로와 같은 가드).

@@ -1,14 +1,11 @@
-﻿using Cysharp.Threading.Tasks;
-using UnityEngine;
 
 // 배선 데모용 선언형 효과: 생명력 가산 + 키워드 부여 + 피해 감소.
 // "효과=데이터로 추가"의 증명 에셋. 규칙은 CardInstance.ApplySynergy에 위임.
-[CreateAssetMenu(fileName = "NewStatSynergyEffect", menuName = "Card Battle/Synergy Effect/Stat")]
 public class StatSynergyEffect : SynergyEffect
 {
-    [SerializeField] private int         bonusHp;   // 덩치: 생애 1회 bonusHp 가산 (ApplyDeckSynergy 1회 경로 전용, stateful)
-    [SerializeField] private CardKeyword grantedKeywords;
-    [SerializeField] private int         dmgReduction;   // 비늘: 받는 피해 상시 -N (정적, 멱등)
+    private int         bonusHp;   // 덩치: 생애 1회 bonusHp 가산 (ApplyDeckSynergy 1회 경로 전용, stateful)
+    private CardKeyword grantedKeywords;
+    private int         dmgReduction;   // 비늘: 받는 피해 상시 -N (정적, 멱등)
 
     public override bool TrySetParam(string _key, string _value)
     {
@@ -44,21 +41,19 @@ public class StatSynergyEffect : SynergyEffect
     // 전부 상태변이 없는 순수 표시다.
 
     // [Placed] 오프닝 배치. 디스패처가 self 소속만 발화하므로 소속 재판정 불필요.
-    public override UniTask OnPlaced(SpawnCtx _ctx)
+    public override void OnPlaced(SpawnCtx _ctx)
     {
         FireIfBonusHp(_ctx.self, _ctx.synergy, _ctx.field);
-        return UniTask.CompletedTask;
     }
 
     // [Entered] 런타임 등장. **이 디스패처는 BelongsTo 필터를 안 걸므로** 소속을 직접 판정해야 한다.
-    public override UniTask OnEntered(SpawnCtx _ctx)
+    public override void OnEntered(SpawnCtx _ctx)
     {
-        if (_ctx.self == null || !SynergyApplier.BelongsTo(_ctx.self, _ctx.synergy)) return UniTask.CompletedTask;
+        if (_ctx.self == null || !SynergyApplier.BelongsTo(_ctx.self, _ctx.synergy)) return;
         FireIfBonusHp(_ctx.self, _ctx.synergy, _ctx.field);
-        return UniTask.CompletedTask;
     }
 
-    void FireIfBonusHp(CardInstance _self, SynergyData _synergy, BattleField _field)
+    void FireIfBonusHp(CardInstance _self, SynergyRuntime _synergy, BattleField _field)
     {
         if (_self == null || this.bonusHp <= 0) return;
         SynergyTriggers.Fire(_self, _synergy, _field);

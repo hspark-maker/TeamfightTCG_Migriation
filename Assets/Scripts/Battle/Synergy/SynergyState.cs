@@ -3,7 +3,7 @@ using System.Collections.Generic;
 // 활성화된 단일 시너지 1건(어떤 SynergyData가 몇 장으로 어느 티어까지 열렸는지).
 public class ActiveSynergy
 {
-    public SynergyData Synergy;
+    public SynergyRuntime Runtime;
     public int         Count;
     public int         TierIndex;
     public SynergyTier Tier;

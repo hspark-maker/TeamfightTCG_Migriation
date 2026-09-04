@@ -84,7 +84,7 @@
 ┌── 🃏 Card ── 데이터 ────────────────────────────────┐ │
 │                                                     │ │
 │   CardData(SO)      CardInstance ★규칙 단일진실원★  │ │
-│   CardKeyword(Flags) CardPassive(SO 추상) + 9종     │ │
+│   CardKeyword(Flags)                                │ │
 │                                                     │ │
 └─────────────────────────────────────────────────────┘ │
            ▲                                            │
@@ -103,7 +103,7 @@
 
 | 규칙 | 설명 |
 |---|---|
-| `Card`는 위를 모름 | 예외: `CardPassive.Notify`가 연출용으로 `SoundManager`/`UIPoolManager` 직접 호출 |
+| `Card`는 위를 모름 | 카드 규칙은 상위 연출·UI 계층을 직접 호출하지 않음 |
 | `UI → Battle`은 **간접** | 직접 호출이 아니라 `TurnState` 조회 + `OnAttack` 이벤트 발행. `CardView`는 어떤 턴 클래스가 살아있는지 모름 |
 | `Battle → UI`는 **주입** | `TurnContext`로 뷰 참조를 받음 |
 | `Network → Battle`은 **경유** | 상태를 직접 밀지 않고 `MultiplayerTurnRunner`를 통과 |
@@ -152,10 +152,6 @@ Assets/Scripts/
 │   ├── CardData.cs ························ 카드 정의 (SO)
 │   ├── CardInstance.cs ··················· ★전투 규칙 단일 진실원★
 │   ├── CardKeyword.cs ···················· Flags enum (9종)
-│   ├── CardPassive.cs ···················· 추상 SO (9개 훅)
-│   ├── Passives/ ························· 챔피언 9종
-│   │     Aatrox  Fizz  Gwen  Kindred  Maokai
-│   │     Ornn    Poppy Rammus Teemo
 │   ├── AttackEffect.cs ··················· 파티클 · 투사체 · 타이밍
 │   ├── SynergyData.cs ···················· 시너지/클래스 메타
 │   └── KeywordIconConfig.cs ·············· 키워드 → 아이콘/라벨
@@ -172,7 +168,7 @@ Assets/Scripts/
 ├── UI/
 │   ├── Battle/ ··········· CardView · CardAnimator · BattleFieldView
 │   │                      DeckPileUI · BattleCamera · TurnBannerUI
-│   │                      EffectNotifyUI · GameResultPopup
+│   │                      GameResultPopup
 │   ├── MainMenu/ ········· MainMenuManager · DeckBuilderUI · DeckGroup
 │   │                      GameReadyPanel · MultiplayerLobbyPanel
 │   │                      RandomMatchPanel · SceneTransitionVideo
@@ -317,30 +313,30 @@ Assets/Scripts/
    │ keywords : Flags     │          │ slotIndex (-1 = 대기큐)  │
    │ maxHp / bonusHp      │          │ ownerIndex               │
    │ attackEffect         │          │ runtimeKeywords          │
-   │ passive              │          │ justSpawned              │
+   │                      │          │ justSpawned              │
    │ 보이스 · SFX 배열    │          │ savedHp / savedBonusHp   │
-   └──────────┬───────────┘          ├──────────────────────────┤
-              │                      │ ★ 규칙 단일 진실원 ★     │
-              │ passive              │  AttackDamage()          │
-              ▼                      │  ClampDamage(raw)        │
-   ┌──────────────────────┐          │  WouldDieFrom(raw)       │
-   │ CardPassive (abstract│          │  TakesCounterFrom(def)   │
-   │              SO)     │          │  PreviewAfterDamage(dmg) │
-   ├──────────────────────┤          │  TakeDamage(dmg)         │
-   │ OnSpawn              │          └────────────▲─────────────┘
-   │ OnTurnStart          │                       │ 0..*
-   │ OnAfterAttack        │          ┌────────────┴─────────────┐
-   │ OnKill               │          │  BattleField (Mono)      │
-   │ OnDealDamage         │          ├──────────────────────────┤
-   │ OnHit                │          │ slots[3]                 │
-   │ OnAttackedBy         │          │ waitingQueue             │
-   │ OnSwapOut            │          │ ownerIndex               │
-   │ OnDeath              │          ├──────────────────────────┤
-   └──────────┬───────────┘          │ FillEmptySlots()         │
-              │                      │ SwapWithWaiting()        │
-              ▼ 상속                 │ GetValidTargets()        │
-   Aatrox Fizz Gwen Kindred          │ GetShuffledIds()   ┐멀티 │
-   Maokai Ornn Poppy Rammus Teemo    │ InitializeFromRemote()   │
+   └──────────────────────┘          ├──────────────────────────┤
+                                     │ ★ 규칙 단일 진실원 ★     │
+                                     │  AttackDamage()          │
+                                     │  ClampDamage(raw)        │
+                                     │  WouldDieFrom(raw)       │
+                                     │  TakesCounterFrom(def)   │
+                                     │  PreviewAfterDamage(dmg) │
+                                     │  TakeDamage(dmg)         │
+                                     └────────────▲─────────────┘
+                                                  │ 0..*
+                                     ┌────────────┴─────────────┐
+                                     │  BattleField (Mono)      │
+                                     ├──────────────────────────┤
+                                     │ slots[3]                 │
+                                     │ waitingQueue             │
+                                     │ ownerIndex               │
+                                     ├──────────────────────────┤
+                                     │ FillEmptySlots()         │
+                                     │ SwapWithWaiting()        │
+                                     │ GetValidTargets()        │
+                                     │ GetShuffledIds()   ┐멀티 │
+                                     │ InitializeFromRemote()   │
                                      │ PlaceCardDirectly()┘     │
                                      └──────────────────────────┘
 
@@ -1113,10 +1109,6 @@ RPC가 "기다리기 시작하기 전"에 먼저 도착하는 레이스를 흡�
                            → CardInstance 규칙 메서드
                            → AttackBehaviorFactory 우선순위 ⚠️
                            → KeywordIconConfig
-
- 새 챔피언 패시브      →   CardPassive.cs (훅 목록)
-                           → Card/Passives/ 기존 구현 참고
-                           → SO 에셋 생성
 
  데미지/반격 규칙 변경 →   ★ CardInstance.cs (단일 진실원) ★
                            → 영향받는 behavior 확인

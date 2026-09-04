@@ -39,6 +39,7 @@ import {
 } from "../deckValidation";
 import {readSpecRows} from "../specs/specBlobReader";
 import {SERVER_AUTHORITATIVE_RULESET_VERSION} from "../matchPairing";
+import {parseSynergyRulesCached} from "../synergyRules";
 
 // 서버 재시뮬레이션 권위 스위치. 골든 벡터 검증 전까지 섀도(false)로 둔다.
 // 켜기 전 확인할 것: (1) C#/TS finalStateHash 일치 벡터, (2) Card 표에 maxHp·synergies·
@@ -226,15 +227,16 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
   // 표 3개를 블롭으로 읽는다 — 행 문서를 훑으면 제출 1건마다 행 수만큼(Reward 85 · Card 41 …) 과금된다.
   // readSpecRows 가 (env, table) 단위로 5분 캐시를 이미 갖고 있다(specs/specBlobReader.ts).
   // 여기서 다시 캐시하지 마라 — TTL 이 두 벌이 되고 clearSpecCache 로 비워도 이쪽이 옛 값을 계속 준다.
-  const [rewardSpecRows, rankSpecRows, cardSpecRows] = await Promise.all([
-    readSpecRows(data.env, "Reward"),
-    readSpecRows(data.env, "RankGrade"),
-    readSpecRows(data.env, cardTable),
-  ]);
   let rewardRows;
   let rankRows;
+  let synergyRules: ReturnType<typeof parseSynergyRulesCached> | null = null;
   const cardSpecs = new Map<number, CardSpecForValidation>();
   try {
+    const [rewardSpecRows, rankSpecRows, cardSpecRows] = await Promise.all([
+      readSpecRows(data.env, "Reward"),
+      readSpecRows(data.env, "RankGrade"),
+      readSpecRows(data.env, cardTable),
+    ]);
     rewardRows = parseRewardRows(rewardSpecRows as Record<string, unknown>[]);
     rankRows = parseRankGradeRows(rankSpecRows as Record<string, unknown>[]);
     for (const row of cardSpecRows) {
@@ -247,6 +249,19 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
     // 스펙 블롭이 깨졌거나 못 읽은 것이라 **제출 잘못이 아니다** — 표를 고치면 같은 제출이 그대로 통과한다.
     // failed-precondition 으로 내리면 클라가 이걸 영구 거절로 읽고 큐에서 버려 보상이 사라진다.
     throw new HttpsError("unavailable", "payout specs are unavailable");
+  }
+
+  try {
+    const [synergyDefRows, synergyTierRows, synergyEffectRows] = await Promise.all([
+      readSpecRows(data.env, "SynergyDef"),
+      readSpecRows(data.env, "SynergyTierDef"),
+      readSpecRows(data.env, "SynergyEffectDef"),
+    ]);
+    synergyRules = parseSynergyRulesCached(synergyDefRows, synergyTierRows, synergyEffectRows);
+  } catch (error) {
+    // 구 ruleset 정산은 시너지 재생 데이터와 무관하다. 섀도에서는 실패를 기록만 하고,
+    // 권위 ruleset에서는 simulateBattle의 synergy_rules_missing이 정산을 fail-closed 한다.
+    logger.error("synergy_spec_invalid", {env: data.env, error});
   }
 
   const result = await withCountedTransaction("submitMatchResult", async (tx) => {
@@ -379,6 +394,7 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
             seedHex,
             decks: [decks[0] as CardSnapshot[], decks[1] as CardSnapshot[]],
             specs: cardSpecs,
+            synergyRules,
             commandLog,
             boardOrders: entries[0].boardOrder == null ? undefined :
               [entries[0].boardOrder.owner0, entries[0].boardOrder.owner1],

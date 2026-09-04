@@ -538,7 +538,6 @@ public class PlayerTurn : TurnBase
 
         if (t_result.canAttackAgain)
         {
-            CardPassive.Notify(_attacker, CardKeyword.Execution);
             this.forcedAttacker      = _attacker;
             TurnState.ForcedAttacker  = _attacker;
 

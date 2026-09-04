@@ -215,7 +215,6 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
 
         if (t_result.canAttackAgain)
         {
-            CardPassive.Notify(_attacker, CardKeyword.Execution);
             this.forcedAttacker     = _attacker;
             TurnState.ForcedAttacker = _attacker;
             CardView.FadeTeam(0.3f, TurnState.LocalOwnerIndex);

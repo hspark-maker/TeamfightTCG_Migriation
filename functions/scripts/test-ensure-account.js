@@ -32,7 +32,7 @@ const STARTER = [1, 28, 20, 6, 11, 30];
 const TOP_LEVEL_KEYS = [
   "schemaVersion", "revision", "updatedAt", "deviceId", "appVersion",
   "ownership", "deck", "cardGrowth", "keywordGrowth",
-  "rank", "albumReward", "tournament", "tutorial", "profile",
+  "rank", "albumReward", "adventure", "tutorial", "profile",
 ].sort();
 
 (async () => {

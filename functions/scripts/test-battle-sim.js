@@ -10,8 +10,39 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const {Rng, simulateBattle} = require("../lib/battleSimulation.js");
+const {parseSynergyRules} = require("../lib/synergyRules.js");
 
 const SEED = BigInt("0x0123456789ABCDEF");
+
+function parseCsvLine(line) {
+  const values = [];
+  let value = "";
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      if (quoted && line[i + 1] === '"') { value += '"'; i++; }
+      else quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      values.push(value); value = "";
+    } else value += char;
+  }
+  values.push(value);
+  return values;
+}
+
+function readSheet(table) {
+  const file = path.join(__dirname, "..", "..", "docs", "SpecData", `${table}_sheet.csv`);
+  const lines = fs.readFileSync(file, "utf8").replace(/^\uFEFF/, "").split(/\r?\n/).filter(Boolean);
+  const headerIndex = lines.findIndex((line) => parseCsvLine(line)[0] === "id");
+  if (headerIndex < 0 || headerIndex + 1 >= lines.length) throw new Error(`${table}: header missing`);
+  const columns = parseCsvLine(lines[headerIndex]);
+  return lines.slice(headerIndex + 2).map((line) => Object.fromEntries(
+    parseCsvLine(line).map((value, index) => [columns[index], value])));
+}
+
+const synergyRules = parseSynergyRules(
+  readSheet("SynergyDef"), readSheet("SynergyTierDef"), readSheet("SynergyEffectDef"));
 
 // --- 1) splitmix64 ---
 {
@@ -80,6 +111,7 @@ const SEED = BigInt("0x0123456789ABCDEF");
     seedHex: "0123456789abcdef",
     decks: [deck, deck],
     specs,
+    synergyRules,
     commandLog: "",
   });
 
@@ -134,6 +166,7 @@ const SEED = BigInt("0x0123456789ABCDEF");
       seedHex: golden.seedHex,
       decks: golden.decks.map((deck) => deck.cards),
       specs,
+      synergyRules,
       commandLog: golden.commandLog,
       boardOrders,
     });

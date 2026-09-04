@@ -11,7 +11,7 @@ using TeamfightTCG.BattleCore;
 ///    → CardKeyword 추가 + CardInstance에 폴딩. **이 파일 수정 0.**
 ///      현 키워드 9개 중 6개가 이 방식이고, 유일하게 확장 비용이 안 늘어나는 경로다.
 /// ② 트리거 행동(피격 시/처치 시/공격 후에 무언가 한다)
-///    → 기존 CardPassive 또는 SynergyEffect 훅. **이 파일 수정 0.** .cs 1 + .asset 1로 끝난다.
+///    → 기존 SynergyEffect 훅. **이 파일 수정 0.** .cs 1 + 시트 행으로 끝난다.
 ///      이미 열린 훅 지점: Attacked / DamageDealt / SwappedOut / RemoveDead 내 Lethal·Removed.
 ///      훅 계약: 첫 await 전에 상태변이 완결 + **MatchRandom 미소비**(.Forget/동기 void 훅은 특히).
 /// ③ 추가 대상·시퀀스 자체 개입(광역 대상 수 변경, 다단 타격, 대상 대체)
@@ -98,13 +98,6 @@ public static class AttackProcessor
         }
         var t_atkCtx = new DamageDealtCtx(_attacker, _attackerField, t_actualAtkDmg, false);
         SynergyTriggers.DamageDealt(t_atkCtx);
-        // 배너·사운드는 표시라 접촉 프레임으로 미룬다(Execute는 공격 모션보다 앞이다).
-        if (t_ranged)
-        {
-            CardInstance t_ranger = _attacker;
-            BattlePresentationQueue.Run(() => CardPassive.Notify(t_ranger, CardKeyword.Ranged));
-        }
-
         // ---- 강화(일반): "공격한 후, 원래 체력의 50%만큼 추가 피해" ----
         // 자리가 여기인 이유:
         //  · 기본타·반격보다 뒤 — "공격한 후"이고, 반격에 공격자가 죽었으면 발동하지 않아야 한다(AfterAttack과 같은 기준).
@@ -218,7 +211,6 @@ public static class AttackProcessor
                 if (!t_c.IsAlive && t_c.HasKeyword(CardKeyword.Immortal) && t_c.ReviveAtHalf())
                 {
                     CardInstance t_revived = t_c;   // 연출 큐가 나중에 읽으므로 루프 변수를 캡처하지 않는다
-                    BattlePresentationQueue.Run(() => CardPassive.Notify(t_revived, CardKeyword.Immortal));
                     // 죽는 그림 → 디졸브 → 되살아나는 그림. 규칙(체력 복구)은 위에서 이미 끝났고 여기는 표시다.
                     BattlePresentationQueue.Run(() => ImmortalVfx.PlayRevive(t_revived).Forget());
                 }

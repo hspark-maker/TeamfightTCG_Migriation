@@ -1,7 +1,7 @@
 // claimReward 순수 모듈 회귀. 에뮬레이터 없이 lib/ 를 직접 require 한다(test-currency.js 관용구).
 //
 // 여기서 지키는 것은 세 가지다.
-//  1) 보상 축이 안 섞인다 — Rank/"1" 과 Tournament/"1" 은 남남이다. 섞이면 티어 보상이 정점에서 나온다.
+//  1) 보상 축이 안 섞인다 — Rank/"1" 과 Adventure/"1" 은 남남이다. 섞이면 티어 보상이 정점에서 나온다.
 //  2) 지급 순서가 order 로 결정된다 — 랭크 티어는 Gold+Diamond 두 줄이고 order 1·2 로 갈린다.
 //  3) parseRewardRows 가 여전히 Battle 행을 읽는다 — 깨지면 submitMatchResult 가 통째로 죽는다.
 const assert = require("node:assert/strict");
@@ -32,11 +32,11 @@ const {
   isCompleted,
   missingCount,
 } = require("../lib/completionTable.js");
-// TournamentChapter 표는 tournamentTable 로 이사했다(표 하나에 파서 하나).
+// AdventureChapter 표는 adventureTable 로 이사했다(표 하나에 파서 하나).
 const {
   parseChapterNodeRows,
   chapterNodeIds,
-} = require("../lib/tournamentTable.js");
+} = require("../lib/adventureTable.js");
 
 // 표 한 줄. 실제 Reward 시트의 컬럼 이름 그대로다(id | ownerType | ownerId | order | rewardType | rewardId | amount).
 const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Currency") =>
@@ -46,11 +46,11 @@ const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Curr
 {
   const rows = parseRewardRows([
     row(1, "Rank", "1", 1, "Gold", 100),
-    row(2, "Tournament", "1", 1, "Diamond", 7),
+    row(2, "Adventure", "1", 1, "Diamond", 7),
     row(3, "Album", "1", 1, "Shard", 9),
   ]);
   assert.deepEqual(resolveRewards(rows, "Rank", "1").gains, [{currency: "Gold", amount: 100}]);
-  assert.deepEqual(resolveRewards(rows, "Tournament", "1").gains, [{currency: "Diamond", amount: 7}]);
+  assert.deepEqual(resolveRewards(rows, "Adventure", "1").gains, [{currency: "Diamond", amount: 7}]);
   assert.deepEqual(resolveRewards(rows, "Album", "1").gains, [{currency: "Shard", amount: 9}]);
 
   // ownerId 는 문자열 그대로 대조한다 — "1" 과 "01" 은 다른 소유자다.
@@ -77,18 +77,18 @@ const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Curr
   assert.deepEqual(resolveRewards(rows, "Album", "p:Theme_Nature").gains, []);
   assert.deepEqual(resolveRewards(rows, "Album", "P:Theme_Nature/P1").gains, [], "대소문자도 그대로 대조한다");
 
-  // 도감 키는 토너먼트·랭크 축과 절대 섞이지 않는다.
-  assert.deepEqual(resolveRewards(rows, "Tournament", "b").gains, []);
+  // 도감 키는 모험·랭크 축과 절대 섞이지 않는다.
+  assert.deepEqual(resolveRewards(rows, "Adventure", "b").gains, []);
 }
 
 // ── 챕터는 ownerType 을 정점과 공유하고 chapter_ 접두사로만 갈린다 ───────────
 {
   const rows = parseRewardRows([
-    row(1, "Tournament", "node_01", 1, "Gold", 200),
-    row(2, "Tournament", "chapter_01", 1, "Diamond", 30),
+    row(1, "Adventure", "node_01", 1, "Gold", 200),
+    row(2, "Adventure", "chapter_01", 1, "Diamond", 30),
   ]);
-  assert.deepEqual(resolveRewards(rows, "Tournament", "chapter_01").gains, [{currency: "Diamond", amount: 30}]);
-  assert.deepEqual(resolveRewards(rows, "Tournament", "node_01").gains, [{currency: "Gold", amount: 200}]);
+  assert.deepEqual(resolveRewards(rows, "Adventure", "chapter_01").gains, [{currency: "Diamond", amount: 30}]);
+  assert.deepEqual(resolveRewards(rows, "Adventure", "node_01").gains, [{currency: "Gold", amount: 200}]);
 
   assert.equal(isChapterOwnerId("chapter_01"), true);
   assert.equal(isChapterOwnerId("node_01"), false);
@@ -121,21 +121,21 @@ const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Curr
 // ── 버리기: 모르는 rewardType · 모르는 재화 · 0 이하 ─────────────────────────
 {
   const rows = parseRewardRows([
-    row(1, "Tournament", "node_01", 1, "Gold", 200),
-    row(2, "Tournament", "node_01", 2, "12", 1, "Card"),
-    row(3, "Tournament", "node_01", 3, "Ruby", 5),
-    row(4, "Tournament", "node_01", 4, "Gold", 0),
-    row(5, "Tournament", "node_01", 5, "Gold", -50),
-    row(6, "Tournament", "node_01", 6, "", 10),
-    row(7, "Tournament", "node_01", 7, "currency", 10),
-    row(8, "Tournament", "node_01", 8, "gOLD", 5),
+    row(1, "Adventure", "node_01", 1, "Gold", 200),
+    row(2, "Adventure", "node_01", 2, "12", 1, "Card"),
+    row(3, "Adventure", "node_01", 3, "Ruby", 5),
+    row(4, "Adventure", "node_01", 4, "Gold", 0),
+    row(5, "Adventure", "node_01", 5, "Gold", -50),
+    row(6, "Adventure", "node_01", 6, "", 10),
+    row(7, "Adventure", "node_01", 7, "currency", 10),
+    row(8, "Adventure", "node_01", 8, "gOLD", 5),
   ]);
-  const resolved = resolveRewards(rows, "Tournament", "node_01");
+  const resolved = resolveRewards(rows, "Adventure", "node_01");
 
   // 재화 이름은 대소문자를 안 가린다(클라 CurrencyCode.TryParse 가 ignoreCase 다).
   assert.deepEqual(resolved.gains,
     [{currency: "Gold", amount: 200}, {currency: "Gold", amount: 5}],
-    "실측 Tournament/node_01 = Gold 200");
+    "실측 Adventure/node_01 = Gold 200");
   assert.deepEqual(resolved.dropped.map((d) => [d.id, d.reason]), [
     [2, "UnknownRewardType"],
     [3, "UnknownCurrency"],
@@ -228,7 +228,7 @@ const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Curr
 // ── 표를 못 읽음 vs 그 행만 없음 ────────────────────────────────────────────
 {
   // Reward 표가 통째로 비었다 = 업로드/배포 사고. 어떤 소유자에게도 자격을 잴 수 없다.
-  // 여기서 토너먼트를 통과시키면 클리어 낙인만 남고 재수령이 AlreadyClaimed 로 막혀 보상을 영영 못 받는다.
+  // 여기서 모험을 통과시키면 클리어 낙인만 남고 재수령이 AlreadyClaimed 로 막혀 보상을 영영 못 받는다.
   const empty = parseRewardRows([]);
 
   const rank = judgeRewardClaim(empty, "Rank", "3");
@@ -236,13 +236,13 @@ const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Curr
   assert.equal(rank.specEmpty, true);
   assert.equal(rank.reason, "NotEligible");
 
-  const tournament = judgeRewardClaim(empty, "Tournament", "node_01");
-  assert.equal(tournament.allow, false, "표가 비면 토너먼트도 거절 — 클리어 낙인을 남기지 않는다");
-  assert.equal(tournament.specEmpty, true);
-  assert.equal(tournament.reason, "NotEligible");
-  assert.deepEqual(tournament.gains, []);
+  const adventure = judgeRewardClaim(empty, "Adventure", "node_01");
+  assert.equal(adventure.allow, false, "표가 비면 모험도 거절 — 클리어 낙인을 남기지 않는다");
+  assert.equal(adventure.specEmpty, true);
+  assert.equal(adventure.reason, "NotEligible");
+  assert.deepEqual(adventure.gains, []);
 
-  for (const [ownerType, ownerId] of [["Album", "p:Theme_Nature/P1"], ["Tournament", "chapter_01"]]) {
+  for (const [ownerType, ownerId] of [["Album", "p:Theme_Nature/P1"], ["Adventure", "chapter_01"]]) {
     const judged = judgeRewardClaim(empty, ownerType, ownerId);
     assert.equal(judged.allow, false, `표가 비면 ${ownerType}/${ownerId} 도 거절`);
     assert.equal(judged.specEmpty, true);
@@ -250,16 +250,16 @@ const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Curr
   }
 }
 {
-  // 표는 읽혔고 그 ownerId 행만 없다 = 저작 규약. 토너먼트는 지급 0건으로 통과해 해금만 넘긴다
+  // 표는 읽혔고 그 ownerId 행만 없다 = 저작 규약. 모험은 지급 0건으로 통과해 해금만 넘긴다
   // (막으면 그 정점이 영영 RewardPending 으로 굳는다). 랭크는 넘길 진행이 없어 거절이 맞다.
-  const rows = parseRewardRows([row(1, "Tournament", "node_01", 1, "Gold", 200)]);
+  const rows = parseRewardRows([row(1, "Adventure", "node_01", 1, "Gold", 200)]);
 
-  const unauthored = judgeRewardClaim(rows, "Tournament", "node_09");
+  const unauthored = judgeRewardClaim(rows, "Adventure", "node_09");
   assert.equal(unauthored.allow, true, "미저작 정점은 여전히 통과한다");
   assert.equal(unauthored.authored, false);
   assert.deepEqual(unauthored.gains, []);
 
-  const authored = judgeRewardClaim(rows, "Tournament", "node_01");
+  const authored = judgeRewardClaim(rows, "Adventure", "node_01");
   assert.equal(authored.allow, true);
   assert.equal(authored.authored, true);
   assert.deepEqual(authored.gains, [{currency: "Gold", amount: 200}]);
@@ -270,7 +270,7 @@ const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Curr
   assert.equal(rank.reason, "RewardNotFound");
 
   // 도감·챕터는 랭크 편이다 — 넘길 진행이 없고 낙인만 남아 나중에 저작해도 AlreadyClaimed 로 막힌다.
-  for (const [ownerType, ownerId] of [["Album", "b"], ["Album", "t:Theme_Nature"], ["Tournament", "chapter_01"]]) {
+  for (const [ownerType, ownerId] of [["Album", "b"], ["Album", "t:Theme_Nature"], ["Adventure", "chapter_01"]]) {
     const judged = judgeRewardClaim(rows, ownerType, ownerId);
     assert.equal(judged.allow, false, `미저작 ${ownerType}/${ownerId} 은 거절이다`);
     assert.equal(judged.specEmpty, false);
@@ -278,8 +278,8 @@ const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Curr
   }
 
   // 정점은 접두사가 chapter_ 가 아니라서 통과 편에 남는다 — 챕터를 가르며 정점을 같이 막지 않았는지 본다.
-  assert.equal(judgeRewardClaim(rows, "Tournament", "node_24").allow, true, "미저작 정점은 여전히 통과한다");
-  assert.equal(judgeRewardClaim(rows, "Tournament", "chapter_01").allow, false);
+  assert.equal(judgeRewardClaim(rows, "Adventure", "node_24").allow, true, "미저작 정점은 여전히 통과한다");
+  assert.equal(judgeRewardClaim(rows, "Adventure", "chapter_01").allow, false);
 }
 
 // ── 도감 낙인 키 해석: 못 읽는 모양은 추측하지 않는다 ───────────────────────

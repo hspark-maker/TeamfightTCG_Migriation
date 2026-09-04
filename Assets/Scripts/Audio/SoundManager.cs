@@ -216,7 +216,6 @@ public class SoundManager : MonoBehaviour
     public void PlayDealCard() => PlayRandom(config?.dealCardClips);
     public void PlayTurnChange() => PlayRandom(config?.turnChangeClips);
     public void PlayCinemaEnter() => PlayRandom(config?.cinemaEnterClips);
-    public void PlayPassive() => PlayRandom(config?.passiveClips);
 
     // ── Voice (Pity) ──────────────────────────────────────────────────────
 

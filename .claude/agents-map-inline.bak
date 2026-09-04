@@ -78,7 +78,7 @@
 - 효과 훅 베이스: `BattleEffect` (`BattleEffect.OnLethal` / `BattleEffect.OnRemoved`) — 시너지·패시브가 여기 붙는다
 - 보드·대상: `BattleField` · `TargetFilter` · `BattleResultBeat` · 공격 튜닝 `NormalTuning` · `PeerlessTuning`
 - 규칙·판정: `BattleRules` · `ExecutionRule` · `BattleOverForecast` · `BattleFinisher` · `BattleCleanup`
-- AI 카드 레벨 배선: `GameInitializer.EnemyGrowthProvider` · `GameInitializer.BaseGrowthProvider` · `GameInitializer.GrowthAtLevelProvider` 를 `OutGame/Growth/BattleGrowthBridge` 가 주입한다(스텝은 `Core/Initialization/BattleGrowthBridgeStep`) — 실제 레벨은 모험 정점 값(서버 `AdventureChapter.aiCardLevel` → `AdventureNodeSpec` → `AdventureRun.AiCardLevel`)일 때만 오르고 그 밖에는 `CardGrowth.BaseLevel` 고정이다(랭크 티어 곡선 축은 제거됨 · 배선 `Core/Initialization/BattleGrowthBridgeStep.EnemyCardLevel`), 스탯은 `CardGrowthManager.GrowthAtLevel` · `CardGrowth.BaseLevel`
+- AI 카드 레벨 배선: `GameInitializer.EnemyGrowthProvider` · `GameInitializer.BaseGrowthProvider` · `GameInitializer.GrowthAtLevelProvider` 를 `OutGame/Growth/BattleGrowthBridge` 가 주입한다(스텝은 `Core/Initialization/BattleGrowthBridgeStep`) — 실제 레벨은 모험 정점 값(서버 AdventureChapter.aiCardLevel 표 값 → `AdventureNodeSpec` → `AdventureRun.AiCardLevel`)일 때만 오르고 그 밖에는 `CardGrowth.BaseLevel` 고정이다(랭크 티어 곡선 축은 제거됨 · 배선 `Core/Initialization/BattleGrowthBridgeStep.EnemyCardLevel`), 스탯은 `CardGrowthManager.GrowthAtLevel` · `CardGrowth.BaseLevel`
 - 초기화·셔플: `GameInitializer` · `ShufflePolicy` · `MulliganPhase` · `MatchSeeding` · `MatchRandom` · `DeckConfig` · `AIDeckConfig` (`DeckEntry`)
 - 타이밍: `Battle/Timing/BattleTimingConfig` · `Battle/Timing/GameTiming` · `BattleTimings`
 - 사망·처형 연출: 길이 단일 지점 `Battle/Timing/BattleTimingConfig.DeathDuration` (내부 박자는 전부 이 값 안에서 끝난다) · 애니 `UI/Battle/CardAnimator.PlayDeathAnim` · 시퀀스 `AttackSequence.PlayVictimDeaths` · 처형 `ExecutionRule` · `ExecutionVfx` · 사운드 `Audio/SoundManager.PlayDeath` · 미리보기 플래그 `UI/Battle/BattleUxFlags.DeathPreview` · 사망 트리거 `SynergyTriggers.Lethal` · `SynergyTriggers.Removed`
@@ -86,11 +86,11 @@
 
 ## 시너지 (`Battle/Synergy/`, 15파일 995줄)
 
-- 한글 시너지명 ↔ 코드 이름: 덩치=Bulk · 돌보미=Caretaker · 포식자=Predator · 흐름=Flow · 유산=Legacy · 수호자=Guardian · 비늘=Scale · 낙인=Brand · 언데드=Undead. 데이터는 Assets/SO/Synergies/Data_Synergy_\*.asset (지도 범위 밖), 스탯형(덩치·비늘)은 `StatSynergyEffect` 가 처리한다
+- 한글 시너지명 ↔ 코드 이름: 덩치=Bulk · 돌보미=Caretaker · 포식자=Predator · 흐름=Flow · 유산=Legacy · 비늘=Scale · 낙인=Brand · 추적=Trace. 데이터는 `docs/SpecData/Synergy*_sheet.csv` 이며, 스탯형(덩치·비늘)은 `StatSynergyEffect` 가 처리한다
 - 적용 지점: `SynergyApplier.ApplyAll` — 공격 계산에는 `CardInstance.AttackDamage` / `CardInstance.ApplySynergy` 경유로 반영
 - 트리거: `SynergyTriggers` (DamageDealt / Attacked / Lethal / SwappedOut)
 - 해석·진행도: `SynergyResolver` · `SynergyProgress` · `ActiveSynergy` · `SynergyText`
-- 개별 효과: `StatSynergyEffect` · `FlowSynergyEffect` · `BrandSynergyEffect` · `GuardianSynergyEffect` · `CaretakerSynergyEffect` · `PredatorSynergyEffect` · `UndeadSynergyEffect` · `LegacySynergyEffect` (왕관 스택 연출 `LegacyCrownVfx` · 배선 `LegacySynergyVfxConfig`) (공통 `SynergyEffect`)
+- 개별 효과: `StatSynergyEffect` · `FlowSynergyEffect` · `BrandSynergyEffect` · `CaretakerSynergyEffect` · `PredatorSynergyEffect` · `TraceSynergyEffect` · `LegacySynergyEffect` (왕관 스택 연출 `LegacyCrownVfx` · 배선 `LegacySynergyVfxConfig`) (공통 `SynergyEffect`)
 - 엠블럼·연출: `SynergyEmblemSpec` · `SynergyEmblemVfx` · `SynergyEmblemEntry` · `SynergyVfx` · `PopEmblem` · `RiseAndShakeEmblem` · `DropAndShineEmblem` · `StackUpEmblem` · `PrefabEmblem` · `ParticleEmblem` · `JointGap`
 - Vfx 설정·라이브러리: `SynergyVfxConfig` · `FlowSynergyVfxConfig` · `SwarmSynergyVfxConfig` · `EmblemOnlySynergyVfxConfig` · `BattleVfxLibrary` · `VfxEntry` · `VfxHandle` · `VfxStrengthScaler` · `CunningVfx` · `SwarmVfx`
 - 회복: `HealerEffect` · `HealVfx` — 트레일 잔상 `BattleTimingConfig.HealTrailLinger`

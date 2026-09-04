@@ -1,6 +1,4 @@
 ﻿using System.Collections.Generic;
-using Cysharp.Threading.Tasks;
-using UnityEngine;
 
 // 유산 시너지(덱 2장↑ 활성). 턴시작/사망 트리거형 — 정적 스탯 없음.
 // 내 턴이 시작될 때마다 legacyStack+1. 파괴 시 legacyStack만큼 살아있는 아군(자신 제외) 전원 회복.
@@ -11,10 +9,9 @@ using UnityEngine;
 // 파괴(회복받을 아군에게 궤적이 날아감)는 밖에서 구분할 수 없다. 둘 다 [Triggered] 하나로 나가기 때문이다.
 // "언제 무엇을 띄우고 언제 날려 보내는가"를 아는 곳은 이 효과뿐이라 호출도 여기서 한다.
 // 연출은 상태/RNG를 건드리지 않으므로 결정론 계약과 무관하다.
-[CreateAssetMenu(fileName = "LegacySynergyEffect", menuName = "Card Battle/Synergy Effect/Legacy")]
 public class LegacySynergyEffect : SynergyEffect
 {
-    [SerializeField, Min(1)] int amount = 1;
+    int amount = 1;
 
     public override bool TrySetParam(string _key, string _value)
     {
@@ -41,18 +38,18 @@ public class LegacySynergyEffect : SynergyEffect
     //     종료에 올리면 화면은 이미 다음 카드로 넘어가는 중이라 눈이 안 간다.
     // 총 적립량은 그대로다(자기 차례마다 1). 바뀌는 건 첫 턴에 죽었을 때 0이 아니라 1을 남긴다는 것뿐이다.
     //
-    // 동기 완결 계약: 상태변이(stack++)는 첫 await 전에 끝난다. 연출은 기다리지 않는다(await 없음) —
+    // 동기 완결 계약: 상태변이(stack++)는 반환 전에 끝난다. 연출은 기다리지 않는다 —
     // 스택이 쌓일수록 턴 시작이 그만큼 느려지면 안 된다.
     // ⚠ 무적/교활 복귀 카드는 그 턴 TurnBegan을 통째로 건너뛴다(TurnRunner의 justSpawned 스킵) — 그 턴은 안 쌓인다.
-    public override UniTask OnTurnBegan(TurnCtx _ctx)
+    public override void OnTurnBegan(TurnCtx _ctx)
     {
-        if (_ctx.self == null || !_ctx.self.IsAlive) return UniTask.CompletedTask;
+        if (_ctx.self == null || !_ctx.self.IsAlive) return;
 
         _ctx.self.legacyStack += this.amount;
         SynergyTriggers.Fire(_ctx.self, _ctx.synergy, _ctx.field);   // 스택 적립 표시(배너 + 배지 pop)
-        LegacyCrownVfx.Show(_ctx.self, _ctx.synergy);                // 오른 값만큼 왕관
+        if (CardCatalog.TryGetSynergyData(_ctx.synergy, out SynergyData t_presentation))
+            LegacyCrownVfx.Show(_ctx.self, t_presentation); // 오른 값만큼 왕관
 
-        return UniTask.CompletedTask;
     }
 
     // 사망: 축적한 스택만큼 아군(자신 제외 라이브) 전원 회복. 스택 0이면 no-op.
@@ -89,12 +86,13 @@ public class LegacySynergyEffect : SynergyEffect
             // 쓰러지며 남기는 것이라, 아직 멀쩡히 서 있는 카드에서 나가면 인과가 안 읽힌다.
             // 규칙(회복량·대상)은 위에서 이미 확정됐다 — 여기 담기는 건 순수 표시뿐이다.
             CardInstance t_self = _ctx.self;
-            SynergyData t_synergy = _ctx.synergy;
+            SynergyRuntime t_synergy = _ctx.synergy;
             BattleField t_field = _ctx.field;
             BattlePresentationQueue.RunOnDeath(() =>
             {
                 SynergyTriggers.Fire(t_self, t_synergy, t_field);   // 실제 회복 발생 시에만 배너+배지 pop
-                LegacyCrownVfx.PlayHealTrails(t_self, t_healed, t_amount, t_synergy);   // 궤적 + 회복 표기
+                if (CardCatalog.TryGetSynergyData(t_synergy, out SynergyData t_presentation))
+                    LegacyCrownVfx.PlayHealTrails(t_self, t_healed, t_amount, t_presentation); // 궤적 + 회복 표기
             });
         }
     }

@@ -13,6 +13,5 @@ public class SoundConfig : ScriptableObject
     public AudioClip[] dealCardClips;
     public AudioClip[] turnChangeClips;
     public AudioClip[] cinemaEnterClips;
-    public AudioClip[] passiveClips;
     [Range(0f, 1f)] public float sfxVolume = 1f;
 }
