@@ -10,6 +10,7 @@ const firebaseApp_1 = require("../firebaseApp");
 const countedTransaction_1 = require("../observability/countedTransaction");
 const matchPairing_1 = require("../matchPairing");
 const payloadGuards_1 = require("../match/payloadGuards");
+const specBlobReader_1 = require("../specs/specBlobReader");
 const PAIRING_KEY = /^[A-Za-z0-9_-]{1,128}$/;
 /**
  * 매치 정원. 검증 규칙(lockDeck)을 두 벌로 만들지 않으려고 AI 대전도 같은 매치 문서를 쓰고,
@@ -79,6 +80,14 @@ exports.createMatch = (0, https_1.onCall)({ enforceAppCheck: false }, async (req
     if (!uid)
         throw new https_1.HttpsError("unauthenticated", "authentication required");
     const data = parseCreateMatchData(request.data);
+    let currentSpecPins;
+    try {
+        currentSpecPins = await (0, specBlobReader_1.readSpecPins)(data.env, specBlobReader_1.BATTLE_REPLAY_SPEC_TABLES);
+    }
+    catch (error) {
+        v2_1.logger.error("battle_replay_spec_pin_failed", { env: data.env, error });
+        throw new https_1.HttpsError("unavailable", "battle replay specs are unavailable");
+    }
     const pairingId = (0, matchPairing_1.pairingDocumentId)(data.pairingKey);
     // 매치 문서 하나가 페어링 레코드까지 겸한다 — id 를 pairingKey 에서 파생해야 두 클라가
     // 같은 문서를 집는다. 시드는 이 값과 무관한 별도 난수라 예측 가능성이 옮겨가지 않는다.
@@ -158,6 +167,11 @@ exports.createMatch = (0, https_1.onCall)({ enforceAppCheck: false }, async (req
             priorRecord.participantUids.every((participant, index) => participant === record.participantUids[index]);
         if (unchanged && priorOwner === data.ownerIndex)
             return response;
+        const retainedSpecPins = (0, payloadGuards_1.objectRecord)(raw?.specPins) ??
+            currentSpecPins;
+        if ((0, specBlobReader_1.fingerprintOfSpecPins)(data.env, retainedSpecPins, ["Card"]) !== record.contentFingerprint) {
+            throw new https_1.HttpsError("failed-precondition", "content_fingerprint_mismatch");
+        }
         tx.set(matchRef, {
             matchId: record.matchId,
             env: data.env,
@@ -168,6 +182,8 @@ exports.createMatch = (0, https_1.onCall)({ enforceAppCheck: false }, async (req
             seedHex: record.seedHex,
             rulesetVersion: record.rulesetVersion,
             cardDataVersion: record.contentFingerprint,
+            // 기존 pairing 문서는 최초 생성자가 고정한 규칙 blob을 유지한다. 두 번째 참가자가 새 릴리스로 덮지 않는다.
+            specPins: retainedSpecPins,
             participantUids: record.participantUids,
             expectedParticipants: record.expectedParticipants,
             mode: data.mode,

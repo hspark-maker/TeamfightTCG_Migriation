@@ -103,7 +103,7 @@ public class BattleDebugKill : MonoBehaviour
         if (_card.IsAlive) _card.TakeDamage(int.MaxValue);   // 둘 다 있었을 때 남은 1회
 
         // [Lethal] → [Removed] → 슬롯 제거. 전투와 같은 함수라 훅 순서가 갈라지지 않는다.
-        AttackProcessor.RemoveDead(_field);
+        AttackProcessor.RemoveDead(_field.State);
 
         // 죽인 쪽 필드만 다시 그린다. 회복이 건너편까지 갔더라도(유산) 다음 턴 갱신이 따라잡는다 —
         // 여기서 모든 필드를 훑으면 디버그가 뷰 갱신 규칙의 두 번째 진실원이 된다.

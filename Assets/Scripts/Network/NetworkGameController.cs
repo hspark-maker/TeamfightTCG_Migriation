@@ -809,7 +809,7 @@ public class NetworkGameController : MonoBehaviour
     ///
     /// <para>계산이 실패해도 전투는 그대로 간다 — 카나리아가 게임을 죽이면 안 된다.
     /// 지문을 못 맡기면 센티널(0)이 나가고 상대는 비교를 생략한다.</para></summary>
-    public void StageStateHash(BattleField _a, BattleField _b)
+    public void StageStateHash(BattleFieldState _a, BattleFieldState _b)
     {
         try
         {

@@ -22,12 +22,9 @@ public class BattleField : MonoBehaviour
 
     HealerEffect healerEffect;
 
-    // 카드 영구 성장값 조회원. 인덱스 배열이 아니라 델리게이트인 이유는 셔플이 이 클래스 안에서 일어나기 때문 —
-    // 카드로 조회하면 셔플 순서와 무관하게 맞는다. null이면 성장 미적용(= 기존 동작).
-    // 이번 판에 확정 사망한 카드(슬롯에서 빠진 순서). 필드는 시체를 남기지 않으므로 —
-    // RemoveCard가 슬롯을 null로 만들고 나면 그 CardInstance를 아무도 붙잡지 않는다 —
-    // 빠지는 그 자리에서 적어두지 않으면 판이 끝난 뒤에는 "무엇을 잃었는가"를 복원할 방법이 없다.
-    internal BattleFieldState State => this.state;
+    /// <summary>규칙이 보는 필드 상태. 이 클래스는 씬 수명·연출 어댑터일 뿐이고,
+    /// 슬롯·대기열·성장 조회·전사 기록·시너지 훅 발화는 전부 상태 객체가 소유한다.</summary>
+    public BattleFieldState State => this.state;
     public int OwnerIndex => this.state.OwnerIndex;
     public int WaitingCount => this.state.WaitingCount;
     public bool IsEmpty => this.state.IsEmpty;
@@ -42,7 +39,7 @@ public class BattleField : MonoBehaviour
     public int FlowStack => this.state.FlowStack;
 
     /// <summary>이 덱으로 산출된 시너지 상태. 배틀 시작 시 1회 확정, 전투 중 불변. UI(SynergyPanelUI) 참조용.</summary>
-    public SynergyState Synergy { get; private set; }
+    public SynergyState Synergy => this.state.Synergy;
 
     void OnDestroy() => this.healerEffect?.Unsubscribe();
 
@@ -52,7 +49,6 @@ public class BattleField : MonoBehaviour
         System.Func<int, CardGrowth> _growthOf = null)
     {
         this.state.Reset(_ownerIndex, _growthOf);
-        this.Synergy = null; // 인스턴스 재사용(리매치) 시 이전 판 스냅샷으로 Placed가 발화하지 않게
         this.healerEffect?.Unsubscribe();
         this.healerEffect = new HealerEffect(this);
 
@@ -74,7 +70,7 @@ public class BattleField : MonoBehaviour
                 t_card.wasEverRevealed = true;
                 t_card.slotIndex = i;
                 this.state.SetSlot(i, t_card);
-                NotifyPlaced(t_card); // [Placed] 오프닝 배치 — 등장(Entered) 아님
+                this.state.NotifyPlaced(t_card); // [Placed] 오프닝 배치 — 등장(Entered) 아님
                 t_card.justSpawned = t_card.HasKeyword(CardKeyword.Invincible);
             }
             else
@@ -125,7 +121,7 @@ public class BattleField : MonoBehaviour
         {
             if (this.state.TryFillSlot(i, out CardInstance t_card, out bool t_cunningReturn))
             {
-                NotifyEntered(t_card); // [Entered] 런타임 등장 시너지. justSpawned 판정 전에 발화.
+                this.state.NotifyEntered(t_card); // [Entered] 런타임 등장 시너지. justSpawned 판정 전에 발화.
                 t_card.justSpawned = t_card.HasKeyword(CardKeyword.Invincible) || t_cunningReturn;
                 t_placed.Add(t_card);
             }
@@ -135,17 +131,7 @@ public class BattleField : MonoBehaviour
     }
 
     public CardInstance SwapWithWaiting(CardInstance _card)
-    {
-        if (!this.state.TryBeginSwapWithWaiting(_card, out CardInstance t_next,
-                out bool t_cunningReturn))
-            return null;
-        NotifyEntered(t_next); // [Entered] 런타임 등장(패시브+시너지).
-        t_next.justSpawned = t_next.HasKeyword(CardKeyword.Invincible) || t_cunningReturn;
-
-        // 재등장 턴의 TurnBegan 스킵 판정용. 현재 hp/bonusHp는 인스턴스에 그대로 유지한다.
-        this.state.CompleteSwapWithWaiting(_card);
-        return t_next;
-    }
+        => this.state.SwapWithWaiting(_card);
 
     /// <summary>후공 어드밴티지 멀리건: _slotIndex 슬롯 카드를 대기열의 _deckIndex 카드와 교환.
     /// 전투 시작 1회. 스왑-인 카드는 오프닝 배치와 동일한 [Placed] 경로(런타임 등장 [Entered] 아님) —
@@ -154,18 +140,13 @@ public class BattleField : MonoBehaviour
     /// _deckIndex는 호출부가 MatchRandom으로 산출(결정론, 멀티 확장 대비). 반환: 새로 슬롯에 들어온 카드(실패 시 null).</summary>
     public CardInstance MulliganSwap(int _slotIndex, int _deckIndex)
     {
+        // 교환 자체(대기열 추출 → 슬롯 배치 → 스왑-아웃 대기열 복귀)는 BattleFieldState.MulliganSwap 소유다.
         CardInstance t_in = this.state.MulliganSwap(_slotIndex, _deckIndex);
         if (t_in == null) return null;
 
-        // 대기열에서 _deckIndex 카드 추출. Queue는 임의 위치 제거가 없어 리스트(FIFO 순서) 경유로 재구성 — 양측 동일 알고리즘이라 결정론.
-
-        // 스왑-인 배치(오프닝 슬롯 카드와 동형). 시너지 재적용 없음.
-
-        // 스왑-아웃 카드 → 대기열 뒤로. 전투 시작 전 멀리건이므로 교활 복귀 플래그는 설정하지 않는다.
-
-        NotifyPlaced(t_in); // [Placed] 오프닝 배치 경로(패시브 OnPlaced + 시너지 Placed). Initialize+ApplyDeckSynergy가 슬롯 카드에 준 것과 동형.
+        this.state.NotifyPlaced(t_in); // [Placed] 오프닝 배치 경로. Initialize+ApplyDeckSynergy가 슬롯 카드에 준 것과 동형.
         t_in.justSpawned = t_in.HasKeyword(CardKeyword.Invincible);
-        NotifyBoardChanged(); // 보드 구성 변화 → 라이브 카운트 파생 재동기(Placed는 미발화라 명시 호출).
+        this.state.NotifyBoardChanged(); // 보드 구성 변화 → 라이브 카운트 파생 재동기(Placed는 미발화라 명시 호출).
         return t_in;
     }
 
@@ -179,10 +160,7 @@ public class BattleField : MonoBehaviour
     /// 교활 되돌림·스왑·멀리건은 슬롯을 <b>덮어쓰므로</b> 이 경로를 타지 않는다.
     /// 사망 외 용도로 이걸 부르기 시작하면 결과 화면의 전사 목록이 조용히 오염된다.</summary>
     public void RemoveCard(int _slotIndex)
-    {
-        this.state.RemoveCard(_slotIndex);
-        NotifyBoardChanged(); // 보드 구성 변화 → 라이브 카운트 파생 상태 재동기
-    }
+        => this.state.RemoveCard(_slotIndex);
 
     /// <summary>셔플된 카드 ID 배열 반환. 배틀 초기화 후 broadcast용.</summary>
     public int[] GetShuffledIds()
@@ -203,7 +181,6 @@ public class BattleField : MonoBehaviour
             ? t_value
             : default;
         this.state.Reset(_ownerIndex, t_growthOf);
-        this.Synergy = null; // 인스턴스 재사용(리매치) 시 이전 판 스냅샷으로 Placed가 발화하지 않게
         this.healerEffect?.Unsubscribe();
         this.healerEffect = new HealerEffect(this);
 
@@ -223,7 +200,7 @@ public class BattleField : MonoBehaviour
                 t_card.isRevealed = true;
                 t_card.wasEverRevealed = true;
                 this.state.SetSlot(i, t_card);
-                NotifyPlaced(t_card); // [Placed] 오프닝 배치 — 등장(Entered) 아님
+                this.state.NotifyPlaced(t_card); // [Placed] 오프닝 배치 — 등장(Entered) 아님
                 t_card.justSpawned = t_card.HasKeyword(CardKeyword.Invincible);
             }
             else
@@ -260,7 +237,7 @@ public class BattleField : MonoBehaviour
 
         // FillEmptySlots와 동형: 교활 복귀 플래그 소비 + 슬롯 세팅 + justSpawned 판정.
         this.state.PlaceIncoming(_slot, t_card, out bool t_cunningReturn);
-        NotifyEntered(t_card); // [Entered] 런타임 등장. 원격 미러도 소유 클라와 동형 발화.
+        this.state.NotifyEntered(t_card); // [Entered] 런타임 등장. 원격 미러도 소유 클라와 동형 발화.
         t_card.justSpawned = t_card.HasKeyword(CardKeyword.Invincible) || t_cunningReturn;
         return t_card;
     }
@@ -277,56 +254,21 @@ public class BattleField : MonoBehaviour
 
         // 성장 카드의 시너지는 1차 진화부터 카운트한다. CardData만 넘기기 전에 인스턴스에서
         // 필터해야 Resolver가 성장 계층을 알지 않아도 되고 기존 순수 집계 계약도 유지된다.
-        this.Synergy = SynergyResolver.Resolve(
-            t_cards.FindAll(c => c.synergyEnabled).ConvertAll(c => c.cardId));
+        this.state.SetSynergy(SynergyResolver.Resolve(
+            t_cards.FindAll(c => c.synergyEnabled).ConvertAll(c => c.cardId)));
         SynergyApplier.ApplyAll(this.Synergy, t_cards);
         // [Placed]는 시너지 스냅샷이 확정된 여기서 슬롯 카드마다 발화한다.
         for (int i = 0; i < SLOT_COUNT; i++)
         {
             CardInstance t_placed = this.state.GetSlot(i);
-            if (t_placed != null) SynergyTriggers.Placed(new SpawnCtx(t_placed, this));
+            if (t_placed != null) this.state.NotifyPlaced(t_placed);
         }
 
-        NotifyBoardChanged(); // 오프닝 배치분에도 라이브 카운트 파생 상태를 깔아준다(Entered는 오프닝에 미발화)
-    }
-
-    // [BoardChanged] 필드의 라이브 카드 구성이 바뀐 직후. 발화점은 이 클래스 안 3곳뿐이다:
-    // ApplyDeckSynergy(배치 확정) / NotifyEntered(등장) / RemoveCard(제거).
-    // "필드의 X 수만큼" 류 효과가 파생 상태를 재동기하는 지점 — 동기 완결, RNG 미소비.
-    // 패시브는 라이브 카드마다(self=그 카드), 시너지는 필드당 1회(self=null) — 순서는 패시브 → 시너지.
-    void NotifyBoardChanged()
-    {
-        // IsAlive 게이트 필수 — RemoveDead 루프 중간에 불리면 아직 제거 안 된 시체가 슬롯에 남아 있다.
-        // 파생 보드 상태를 쓰는 효과도 IsAlive로 거르므로 "라이브"의 정의를 양쪽 일치시킨다.
-        for (int i = 0; i < SLOT_COUNT; i++)
-        {
-            CardInstance t_c = this.state.GetSlot(i);
-            if (t_c == null || !t_c.IsAlive) continue;
-        }
-
-        SynergyTriggers.BoardChanged(new BoardCtx(this));
-    }
-
-    // [Placed] 오프닝 배치 확정 공통 후처리(패시브 → 시너지 순서 고정). 런타임 등장(Entered)과 혼동 금지.
-    // 호출 위치는 justSpawned 판정 '전'이어야 한다(효과가 무적을 부여하는 경우를 판정에 반영).
-    void NotifyPlaced(CardInstance _card)
-    {
-        var t_ctx = new SpawnCtx(_card, this);
-        SynergyTriggers.Placed(t_ctx);
+        this.state.NotifyBoardChanged(); // 오프닝 배치분에도 라이브 카운트 파생 상태를 깔아준다(Entered는 오프닝에 미발화)
     }
 
     /// <summary>흐름: 스택 +1. 스택 권위는 BattleField 소유(FlowSynergyEffect가 런타임 스폰 시 호출). 순수 산술.</summary>
     public void AddFlowStack(int _amount) => this.state.AddFlowStack(_amount);
-
-    // [Entered] 런타임 등장 공통 후처리.
-    // Placed(오프닝 배치)와 혼동 금지 — 오프닝은 시너지 미발화가 의도(등장=런타임 스폰만).
-    // 호출 위치는 justSpawned 판정 '전'이어야 한다(시너지의 키워드 부여를 판정에 반영).
-    void NotifyEntered(CardInstance _card)
-    {
-        var t_ctx = new SpawnCtx(_card, this);
-        SynergyTriggers.Entered(t_ctx);
-        NotifyBoardChanged(); // 등장으로 라이브 구성이 바뀜 → 파생 상태 재동기
-    }
 
     /// <summary>튜토리얼 확정승: 슬롯+대기 카드의 현재 체력을 _hp 이하로 낮춤(공격력=체력이라 적이 약해짐).
     /// bonusHp 제거. data.maxHp(공유 에셋)는 건드리지 않음 — 인스턴스 hp만.</summary>

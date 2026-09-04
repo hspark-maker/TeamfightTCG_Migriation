@@ -49,7 +49,7 @@ public class MultiplayerOpponentTurn : TurnBase
                 // 처형 재공격 대상의 단일 진실원은 ExecutionRule이다 — 도발을 무시하고 살아 있는 적 전부에서
                 // 뽑는 그 규칙을 AI 인수 후에도 그대로 쓴다(EnemyTurn.PickTargetFor와 동형).
                 CardInstance t_target = BattleUxFlags.ExecutionRandomTarget
-                    ? ExecutionRule.PickRandomTarget(t_takeoverAttacker, this.ctx.playerField)
+                    ? ExecutionRule.PickRandomTarget(t_takeoverAttacker, this.ctx.playerField.State)
                     : EnemyAi.PickTarget(this.ctx.playerField.GetValidTargets(t_takeoverAttacker));
                 if (!t_takeoverAttacker.IsAlive || t_target == null) return;
 
@@ -124,7 +124,7 @@ public class MultiplayerOpponentTurn : TurnBase
             using (BattleEventStream.CaptureScope t_events = BattleEventStream.BeginCapture())
             {
                 t_result = AttackProcessor.Execute(
-                    t_atk, t_def, this.ctx.enemyField, this.ctx.playerField,
+                    t_atk, t_def, this.ctx.enemyField.State, this.ctx.playerField.State,
                     t_preSelectedSplash, t_cunningSwap, t_ruleBackstopOff);
                 t_result.events = t_events.ToArray();
             }
@@ -183,7 +183,7 @@ public class MultiplayerOpponentTurn : TurnBase
 
             // divergence 카나리아 스냅샷. MultiplayerPlayerTurn과 **정확히 같은 지점**이어야 한다
             // (배리어 통과 + 양쪽 보충 완료 직후). 인자 순서는 무관하다 — BattleStateHash가 OwnerIndex로 정렬한다.
-            NetworkGameController.Instance?.StageStateHash(this.ctx.playerField, this.ctx.enemyField);
+            NetworkGameController.Instance?.StageStateHash(this.ctx.playerField.State, this.ctx.enemyField.State);
 
             // 내 카드 전멸 → CheckGameOver에 위임 (Execution 데드락 방지)
             if (this.ctx.playerField.IsEmpty) break;
@@ -208,7 +208,7 @@ public class MultiplayerOpponentTurn : TurnBase
                 {
                     // 결과가 null이면 송신측도 **공격 RPC를 보내지 않고 턴을 닫는다**(MultiplayerPlayerTurn).
                     // 그 경우까지 다음 RPC를 기다리면 오지 않을 패킷을 기다리다 상한 초과로 무효 경기가 된다.
-                    if (ExecutionRule.PickRandomTarget(t_atk, this.ctx.playerField) == null) break;
+                    if (ExecutionRule.PickRandomTarget(t_atk, this.ctx.playerField.State) == null) break;
                 }
 
                 await UniTask.Delay((int)(GameTiming.Battle.OpponentExtraAttackDelay * 1000));

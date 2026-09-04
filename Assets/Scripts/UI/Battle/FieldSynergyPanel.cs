@@ -38,8 +38,8 @@ public class FieldSynergyPanel : MonoBehaviour
 
     readonly List<SynergyIconView> icons = new List<SynergyIconView>();   // 재사용 풀(파괴하지 않는다)
     SynergyState lastState;
+    BattleFieldState field;        // 해당 진영에서 강조할 카드를 찾는 규칙 상태
     bool         drawnOnce;        // lastState가 null인 것과 "아직 한 번도 안 그렸다"를 가르는 값
-    BattleField  field;            // 확대할 카드를 찾는 출처(그 진영 필드)
     SynergyData  selected;         // 지금 설명이 열려 있는 시너지. null = 닫힘
 
     void OnEnable()  => panels.Add(this);
@@ -47,7 +47,7 @@ public class FieldSynergyPanel : MonoBehaviour
 
     /// <summary>그 진영 패널에 시너지를 그린다. 패널이 없는 씬(테스트 씬 등)에선 조용히 무동작.
     /// 필드를 같이 받는 이유는 아이콘을 눌렀을 때 **그 시너지를 가진 카드**를 찾아야 하기 때문이다.</summary>
-    public static void Show(bool _localSide, SynergyState _state, BattleField _field = null)
+    public static void Show(bool _localSide, SynergyState _state, BattleFieldState _field = null)
     {
         foreach (FieldSynergyPanel t_panel in panels)
         {

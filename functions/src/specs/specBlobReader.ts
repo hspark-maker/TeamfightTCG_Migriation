@@ -39,6 +39,12 @@ interface PublishedSpec {
   payloadHash: string;
 }
 
+export type SpecPin = Readonly<PublishedSpec>;
+export type SpecPins = Readonly<Record<string, SpecPin>>;
+export const BATTLE_REPLAY_SPEC_TABLES = [
+  "Card", "SynergyDef", "SynergyTierDef", "SynergyEffectDef",
+] as const;
+
 interface IndexCacheEntry {
   expiresAt: number;
   tables: Record<string, PublishedSpec>;
@@ -95,6 +101,44 @@ async function readPublishedSpec(env: string, table: string): Promise<PublishedS
   const published = cached.tables[table];
   if (published === undefined) throw new Error(`published content index has no ${table} entry`);
   return published;
+}
+
+/** 매치 생성 시점의 불변 릴리스 blob 포인터를 고정한다. 결과 재생은 현재 인덱스가 아니라 이 값을 읽는다. */
+export async function readSpecPins(env: string, tables: readonly string[]): Promise<SpecPins> {
+  const entries = await Promise.all(tables.map(async (table) => {
+    if (UNINDEXED_TABLES.has(table)) throw new Error(`unindexed spec cannot be pinned: ${table}`);
+    const published = await readPublishedSpec(env, table);
+    return [table, {...published}] as const;
+  }));
+  return Object.fromEntries(entries);
+}
+
+/** 클라이언트 SpecPayloadCodec.CombinedHash와 같은 식. 현재 전투 합의 지문은 Card pin 하나만 접는다. */
+export function fingerprintOfSpecPins(env: string, pins: SpecPins, tables: readonly string[]): string {
+  let source = env;
+  for (const table of tables) {
+    const pin = pins[table];
+    if (pin == null || pin.payloadHash === "") throw new Error(`spec pin missing: ${table}`);
+    source += `|${table}=${pin.payloadHash}`;
+  }
+  return createHash("sha256").update(source, "utf8").digest("hex");
+}
+
+/** 고정된 매치가 참조하는 불변 blob을 읽는다. 현재 `_index`는 의도적으로 조회하지 않는다. */
+export async function readPinnedSpecRows(env: string, table: string, pin: SpecPin): Promise<SpecRow[]> {
+  const expectedPrefix = `envs/${env}/specs/`;
+  if (!pin.blobPath.startsWith(expectedPrefix) || pin.payloadHash === "") {
+    throw new Error(`invalid spec pin for ${table}`);
+  }
+  const key = `${env}/${table}/${pin.payloadHash}`;
+  const cached = cache.get(key);
+  if (cached !== undefined && cached.expiresAt === null && cached.payloadHash === pin.payloadHash) {
+    return cached.rows;
+  }
+  const read = await readFromBlob(env, table, pin.blobPath, pin.payloadHash);
+  const rows = sortById(read.rows);
+  cache.set(key, {payloadHash: read.payloadHash, rows, expiresAt: null});
+  return rows;
 }
 
 /**

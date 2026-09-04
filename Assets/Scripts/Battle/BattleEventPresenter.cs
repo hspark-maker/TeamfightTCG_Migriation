@@ -1,4 +1,5 @@
 using TeamfightTCG.BattleCore;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 /// <summary>순수 BattleEvent를 현재 Unity 카드 뷰에 투영한다.</summary>
@@ -33,6 +34,11 @@ public static class BattleEventPresenter
                 break;
             case BattleEventKind.ShieldBroken:
                 t_view.PlayShieldBreakEffect();
+                break;
+            case BattleEventKind.Revive:
+                CardInstance t_revived = t_view.BoundCard;
+                if (t_revived != null)
+                    BattlePresentationQueue.Run(() => ImmortalVfx.PlayRevive(t_revived).Forget());
                 break;
         }
     }

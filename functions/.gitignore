@@ -3,6 +3,10 @@ lib/**/*.js
 lib/**/*.js.map
 !lib/synergyRules.js
 !lib/synergyRules.js.map
+!lib/battleReplayCloud.js
+!lib/battleReplayCloud.js.map
+!lib/commands/findAiMatch.js
+!lib/commands/findAiMatch.js.map
 
 # TypeScript v1 declaration files
 typings/

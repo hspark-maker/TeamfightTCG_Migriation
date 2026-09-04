@@ -138,7 +138,7 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
         using (BattleEventStream.CaptureScope t_events = BattleEventStream.BeginCapture())
         {
             t_result = AttackProcessor.Execute(
-                _attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
+                _attacker, _defender, this.ctx.playerField.State, this.ctx.enemyField.State,
                 t_preSelectedSplash, t_cunningSwap, t_derivedCommand);
             t_result.events = t_events.ToArray();
         }
@@ -202,7 +202,7 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
         // "상대 보충분이 도착했는가"가 회선 속도에 좌우돼 정상 경기에서도 지문이 갈린다.
         // 배리어를 통과하고 양쪽 보충이 모두 끝난 이 지점은 두 클라가 반드시 같은 보드다.
         // 이 지문은 **다음 배리어**에 실려 나간다(순번도 그때 것으로 맞춰진다).
-        NetworkGameController.Instance?.StageStateHash(this.ctx.playerField, this.ctx.enemyField);
+        NetworkGameController.Instance?.StageStateHash(this.ctx.playerField.State, this.ctx.enemyField.State);
 
         if (t_result.canAttackAgain && this.ctx.enemyField.IsEmpty)
         {
@@ -224,7 +224,7 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
             // MatchRandom 소비 지점 — 상대 클라도 MultiplayerOpponentTurn에서 같은 자리에서 같은 횟수를 뽑는다.
             if (BattleUxFlags.ExecutionRandomTarget)
             {
-                CardInstance t_nextTarget = ExecutionRule.PickRandomTarget(_attacker, this.ctx.enemyField);
+                CardInstance t_nextTarget = ExecutionRule.PickRandomTarget(_attacker, this.ctx.enemyField.State);
                 if (t_nextTarget != null)
                 {
                     await UniTask.Delay((int)(GameTiming.Battle.OpponentExtraAttackDelay * 1000));

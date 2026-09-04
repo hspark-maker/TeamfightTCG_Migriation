@@ -46,12 +46,12 @@ public static class BattleFinisher
         if (_attacker == null || _defender == null || _attackerField == null || _defenderField == null)
             return;
 
-        if (!BattleOverForecast.CouldEnd(_attackerField, _defenderField,
+        if (!BattleOverForecast.CouldEnd(_attackerField.State, _defenderField.State,
                                          _attacker.HasKeyword(CardKeyword.Peerless)))
             return;
 
-        s_approachArmed = BattleOverForecast.WillEnd(_attacker, _defender, _attackerField, _defenderField,
-                                                     _preSelectedSplash, out _);
+        s_approachArmed = BattleOverForecast.WillEnd(_attacker, _defender, _attackerField.State, _defenderField.State,
+                                                     _preSelectedSplash, TurnState.LocalOwnerIndex, out _);
     }
 
     /// <summary>필드 모델이 없는 공격 애니메이션 테스터용 접근 연출 래치.</summary>
@@ -95,10 +95,10 @@ public static class BattleFinisher
     /// <summary>피해·사망 정리 직후, 이 공격이 판을 끝냈는지 기록한다. 공격 한 번마다 반드시 불린다
     /// (끝내지 않았으면 해제) — 안 그러면 지난 공격의 판정이 다음 타격에 새어 나온다.
     ///
-    /// <para><see cref="BattleField.IsEmpty"/>는 필드뿐 아니라 대기열까지 본다. 그래서 이 시점의 판정이
+    /// <para><see cref="BattleFieldState.IsEmpty"/>는 필드뿐 아니라 대기열까지 본다. 그래서 이 시점의 판정이
     /// 나중에 충원까지 끝난 뒤의 BattleLoop.Run 종료 판정과 같은 답을 낸다 — 충원은 대기열에서 꺼내
     /// 옮기는 것이라 "비었는가"를 바꾸지 않는다. 부활(불사)도 RemoveDead 안에서 이미 반영됐다.</para></summary>
-    public static void Arm(BattleField _attackerField, BattleField _defenderField)
+    public static void Arm(BattleFieldState _attackerField, BattleFieldState _defenderField)
     {
         s_loserOwner = NoOwner;
 

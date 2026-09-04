@@ -50,6 +50,7 @@ const deckValidation_1 = require("../deckValidation");
 const specBlobReader_1 = require("../specs/specBlobReader");
 const matchPairing_1 = require("../matchPairing");
 const synergyRules_1 = require("../synergyRules");
+const battleReplayCloud_1 = require("../battleReplayCloud");
 // 서버 재시뮬레이션 권위 스위치. 골든 벡터 검증 전까지 섀도(false)로 둔다.
 // 켜기 전 확인할 것: (1) C#/TS finalStateHash 일치 벡터, (2) Card 표에 maxHp·synergies·
 // defaultEvolutionStage 업로드 완료, (3) clientDivergence 실측률.
@@ -571,6 +572,10 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false }, asyn
             settledAt: firestore_1.FieldValue.serverTimestamp(), expiresAt }, { merge: true });
         return { status: "confirmed" };
     });
+    if (result.status === "confirmed") {
+        // 순수 HTTP 재생은 Firestore 트랜잭션 밖에서만 실행한다. 실패는 내부에서 기록하고 기존 정산을 유지한다.
+        await (0, battleReplayCloud_1.runCloudReplayShadow)(data.env, data.matchId);
+    }
     return result;
 });
 //# sourceMappingURL=submitMatchResult.js.map

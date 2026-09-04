@@ -40,6 +40,7 @@ import {
 import {readSpecRows} from "../specs/specBlobReader";
 import {SERVER_AUTHORITATIVE_RULESET_VERSION} from "../matchPairing";
 import {parseSynergyRulesCached} from "../synergyRules";
+import {runCloudReplayShadow} from "../battleReplayCloud";
 
 // 서버 재시뮬레이션 권위 스위치. 골든 벡터 검증 전까지 섀도(false)로 둔다.
 // 켜기 전 확인할 것: (1) C#/TS finalStateHash 일치 벡터, (2) Card 표에 maxHp·synergies·
@@ -557,5 +558,9 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
       settledAt: FieldValue.serverTimestamp(), expiresAt}, {merge: true});
     return {status: "confirmed"};
   });
+  if (result.status === "confirmed") {
+    // 순수 HTTP 재생은 Firestore 트랜잭션 밖에서만 실행한다. 실패는 내부에서 기록하고 기존 정산을 유지한다.
+    await runCloudReplayShadow(data.env, data.matchId);
+  }
   return result;
 });

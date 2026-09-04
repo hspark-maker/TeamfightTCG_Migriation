@@ -124,7 +124,7 @@ public class EnemyTurn : TurnBase
             using (BattleEventStream.CaptureScope t_events = BattleEventStream.BeginCapture())
             {
                 t_result = AttackProcessor.Execute(
-                    t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_preSelectedSplash);
+                    t_atk, t_def, this.ctx.enemyField.State, this.ctx.playerField.State, t_preSelectedSplash);
                 t_result.events = t_events.ToArray();
             }
 
@@ -160,7 +160,7 @@ public class EnemyTurn : TurnBase
     /// 꺼져 있으면(=대상을 직접 고르던 구 경로) AI는 고를 주체가 없으므로 EnemyAi로 폴백한다.</summary>
     CardInstance PickTargetFor(CardInstance _attacker, bool _executionChain)
         => _executionChain && BattleUxFlags.ExecutionRandomTarget
-            ? ExecutionRule.PickRandomTarget(_attacker, this.ctx.playerField)
+            ? ExecutionRule.PickRandomTarget(_attacker, this.ctx.playerField.State)
             : EnemyAi.PickTarget(this.ctx.playerField.GetValidTargets(_attacker));
 
     public override void OnExit()

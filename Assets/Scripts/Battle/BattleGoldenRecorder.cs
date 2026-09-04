@@ -196,7 +196,7 @@ public static class BattleGoldenRecorder
         s_document.commandCount = BattleCommandLog.Count;
         s_document.commandLogTruncated = BattleCommandLog.IsTruncated;
         s_document.checkpoints = s_checkpoints.ToArray();
-        s_document.finalStateHash = BattleStateHash.Compute(s_firstField, s_secondField).ToString("x16");
+        s_document.finalStateHash = BattleStateHash.Compute(s_firstField.State, s_secondField.State).ToString("x16");
         s_document.finalDrawCount = MatchRandom.DrawCount;
         s_document.remaining = new[] { Remaining(OwnerField(0)), Remaining(OwnerField(1)) };
 

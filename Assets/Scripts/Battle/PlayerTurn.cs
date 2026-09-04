@@ -509,7 +509,7 @@ public class PlayerTurn : TurnBase
         using (BattleEventStream.CaptureScope t_events = BattleEventStream.BeginCapture())
         {
             t_result = AttackProcessor.Execute(
-                _attacker, _defender, this.ctx.playerField, this.ctx.enemyField, t_preSelectedSplash);
+                _attacker, _defender, this.ctx.playerField.State, this.ctx.enemyField.State, t_preSelectedSplash);
             t_result.events = t_events.ToArray();
         }
 
@@ -550,7 +550,7 @@ public class PlayerTurn : TurnBase
             if (BattleUxFlags.ExecutionRandomTarget)
             {
                 CardInstance t_nextTarget = TutorialScriptedExecutionTarget(_attacker)
-                                         ?? ExecutionRule.PickRandomTarget(_attacker, this.ctx.enemyField);
+                                         ?? ExecutionRule.PickRandomTarget(_attacker, this.ctx.enemyField.State);
                 if (t_nextTarget != null)
                 {
                     // 연속 공격이 한 동작으로 뭉쳐 보이지 않게 상대 연속 공격과 같은 간격을 둔다.

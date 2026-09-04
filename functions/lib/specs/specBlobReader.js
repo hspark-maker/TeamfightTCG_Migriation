@@ -47,6 +47,10 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.BATTLE_REPLAY_SPEC_TABLES = void 0;
+exports.readSpecPins = readSpecPins;
+exports.fingerprintOfSpecPins = fingerprintOfSpecPins;
+exports.readPinnedSpecRows = readPinnedSpecRows;
 exports.specPayloadHash = specPayloadHash;
 exports.parseSpecPayload = parseSpecPayload;
 exports.readSpecRows = readSpecRows;
@@ -60,6 +64,9 @@ const CONTENT_MAJOR = 4;
 // 새 테이블 세대 배포에서는 실제로 해석 가능한 직전 세대를 함께 넣어 pointer 롤백을 허용한다.
 // content-version:supported
 const SUPPORTED_CONTENT_MAJORS = new Set([CONTENT_MAJOR]);
+exports.BATTLE_REPLAY_SPEC_TABLES = [
+    "Card", "SynergyDef", "SynergyTierDef", "SynergyEffectDef",
+];
 const cache = new Map();
 const indexCache = new Map();
 const INDEX_CACHE_TTL_MS = 30 * 1000;
@@ -111,6 +118,43 @@ async function readPublishedSpec(env, table) {
     if (published === undefined)
         throw new Error(`published content index has no ${table} entry`);
     return published;
+}
+/** 매치 생성 시점의 불변 릴리스 blob 포인터를 고정한다. 결과 재생은 현재 인덱스가 아니라 이 값을 읽는다. */
+async function readSpecPins(env, tables) {
+    const entries = await Promise.all(tables.map(async (table) => {
+        if (UNINDEXED_TABLES.has(table))
+            throw new Error(`unindexed spec cannot be pinned: ${table}`);
+        const published = await readPublishedSpec(env, table);
+        return [table, { ...published }];
+    }));
+    return Object.fromEntries(entries);
+}
+/** 클라이언트 SpecPayloadCodec.CombinedHash와 같은 식. 현재 전투 합의 지문은 Card pin 하나만 접는다. */
+function fingerprintOfSpecPins(env, pins, tables) {
+    let source = env;
+    for (const table of tables) {
+        const pin = pins[table];
+        if (pin == null || pin.payloadHash === "")
+            throw new Error(`spec pin missing: ${table}`);
+        source += `|${table}=${pin.payloadHash}`;
+    }
+    return (0, node_crypto_1.createHash)("sha256").update(source, "utf8").digest("hex");
+}
+/** 고정된 매치가 참조하는 불변 blob을 읽는다. 현재 `_index`는 의도적으로 조회하지 않는다. */
+async function readPinnedSpecRows(env, table, pin) {
+    const expectedPrefix = `envs/${env}/specs/`;
+    if (!pin.blobPath.startsWith(expectedPrefix) || pin.payloadHash === "") {
+        throw new Error(`invalid spec pin for ${table}`);
+    }
+    const key = `${env}/${table}/${pin.payloadHash}`;
+    const cached = cache.get(key);
+    if (cached !== undefined && cached.expiresAt === null && cached.payloadHash === pin.payloadHash) {
+        return cached.rows;
+    }
+    const read = await readFromBlob(env, table, pin.blobPath, pin.payloadHash);
+    const rows = sortById(read.rows);
+    cache.set(key, { payloadHash: read.payloadHash, rows, expiresAt: null });
+    return rows;
 }
 /**
  * 블롭 payload 해시. 업로더 `HashOf` 와 같은 규칙 — MD5 앞 8바이트를 hex 로.
