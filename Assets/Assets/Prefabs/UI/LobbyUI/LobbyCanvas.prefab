@@ -584,7 +584,7 @@ MonoBehaviour:
   focusHighlight: {fileID: 0}
   focusSpinSeconds: 6
   focusSpinClockwise: 1
-  focusSlideSeconds: 0.22
+  focusSlideSeconds: 0.35
 --- !u!1 &717023053973662377
 GameObject:
   m_ObjectHideFlags: 0
@@ -966,7 +966,7 @@ MonoBehaviour:
   defaultIndex: 2
   alertDotPrefab: {fileID: 4440091932380886368, guid: 062606a612d3c455291a417a3a1cae7d, type: 3}
   dragController: {fileID: 3668802067711513282}
-  contentSlideSeconds: 0.22
+  contentSlideSeconds: 0.35
 --- !u!114 &341202313527386194
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1714,7 +1714,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DeckTabController
   topBar: {fileID: 3695566182146272830}
-  topBarSlideSeconds: 0.22
+  topBarSlideSeconds: 0.35
   editor: {fileID: 4291585248263139027}
 --- !u!1 &2953879665294559399
 GameObject:

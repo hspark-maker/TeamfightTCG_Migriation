@@ -18,7 +18,7 @@ public class DeckTabController : LobbyTabPanel
 
     [Tooltip("상단 바가 위로 걷히고 도로 내려오는 시간(초). 0이면 연출 없이 즉시 껐다 켠다.\n"
            + "탭 콘텐츠 슬라이드와 한 박자로 읽히려면 LobbyTabController.contentSlideSeconds와 같은 값이어야 한다.")]
-    [SerializeField] float topBarSlideSeconds = 0.22f;
+    [SerializeField] float topBarSlideSeconds = 0.35f;
 
     [Tooltip("이 탭 안에 놓인 덱 편집 화면. 배선하면 풀을 거치지 않고 이 인스턴스를 직접 세운다.\n"
            + "그 인스턴스의 DeckEditController에는 hostEmbedded를 켜 두어야 한다.\n"

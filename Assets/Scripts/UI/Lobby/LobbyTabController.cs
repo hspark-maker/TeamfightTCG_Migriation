@@ -31,7 +31,11 @@ public class LobbyTabController : MonoBehaviour
     [Header("탭 전환 슬라이드")]
     [Tooltip("콘텐츠 패널이 좌우로 미끄러지는 시간(초). 0이면 즉시 교체.\n"
            + "하단 탭바 알약과 한 박자로 읽히려면 LobbyTabBarView.focusSlideSeconds와 같은 값이어야 한다.")]
-    [SerializeField] float contentSlideSeconds = 0.22f;
+    [SerializeField] float contentSlideSeconds = 0.35f;
+
+    // 나가는 패널과 들어오는 패널이 같은 거리를 같은 박자로 함께 움직인다 —
+    // 화면 폭을 통째로 건너므로 둘이 겹쳐 보이는 구간이 없고, 한 장의 넓은 띠를 가로지르는 것으로 읽힌다.
+    const Ease SLIDE_EASE = Ease.OutCubic;
 
     int m_currentIndex = -1;
 
@@ -222,7 +226,7 @@ public class LobbyTabController : MonoBehaviour
 
         t_root.DOKill();
         t_root.DOAnchorPosX(t_home - _direction * SlideDistance(t_root), contentSlideSeconds)
-              .SetEase(Ease.OutCubic)
+              .SetEase(SLIDE_EASE)
               .SetUpdate(true)   // timeScale이 눌려도 같은 속도로 돈다
               .SetLink(t_root.gameObject)
               .OnComplete(() =>
@@ -248,7 +252,7 @@ public class LobbyTabController : MonoBehaviour
         t_root.DOKill();
         t_root.anchoredPosition = new Vector2(t_home + _direction * SlideDistance(t_root), t_root.anchoredPosition.y);
         t_root.DOAnchorPosX(t_home, contentSlideSeconds)
-              .SetEase(Ease.OutCubic)
+              .SetEase(SLIDE_EASE)
               .SetUpdate(true)
               .SetLink(t_root.gameObject)
               .OnComplete(InvokePendingArrive);
