@@ -62,8 +62,8 @@ public class LobbyMatchLauncher : MonoBehaviour
 
             if (overlayHost != null)
                 Debug.LogError(
-                    "[LobbyMatchLauncher] overlayHost에 프리팹 에셋이 물려 있다 — 인스펙터에서 씬 인스턴스로 다시 배선할 것. "
-                  + "이번 실행은 계층에서 찾아 진행한다.", this);
+                    "[LobbyMatchLauncher] overlayHost points at a prefab asset — rewire it to the scene instance. "
+                  + "This run falls back to searching the hierarchy.", this);
 
             return m_overlayHost = transform.root.GetComponentInChildren<LobbyOverlayHost>(true);
         }
@@ -97,8 +97,8 @@ public class LobbyMatchLauncher : MonoBehaviour
                 if (t_canvas == null)
                 {
                     Debug.LogError(
-                        "[LobbyMatchLauncher] 런처가 캔버스 밖에 있어 매칭 셸을 세울 자리가 없다 — "
-                      + "로비 캔버스 자손으로 배선할 것.", this);
+                        "[LobbyMatchLauncher] Launcher lives outside a Canvas, so the matchmaking shell has no parent "
+                      + "— place it under the lobby canvas.", this);
                     return null;
                 }
                 // worldPositionStays를 끈다 — 켜 두면 프리팹의 월드 원점을 지키려고 로컬 좌표를 다시 계산하는데,
@@ -109,8 +109,8 @@ public class LobbyMatchLauncher : MonoBehaviour
                 if (m_matchShell == null)
                 {
                     Debug.LogError(
-                        "[LobbyMatchLauncher] 카탈로그의 MatchmakingRoot에 MatchmakingShell이 없다 — "
-                      + "카탈로그가 다른 프리팹을 물고 있다.", this);
+                        "[LobbyMatchLauncher] Catalog MatchmakingRoot has no MatchmakingShell "
+                      + "— the catalog points at a different prefab.", this);
                     Destroy(t_instance);
                 }
             }
@@ -223,7 +223,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         // 저작 덱이 비면 상대 없이 전투가 뜬다(DeckConfig.SetEnemyDeck은 null도 못 받는다) — 진입 단계에서 막는다.
         if (t_node.enemyDeckIds == null || t_node.enemyDeckIds.Count == 0)
         {
-            Debug.LogWarning($"[LobbyMatchLauncher] 모험 정점 '{t_node.nodeId}'에 상대 덱이 없어 진입을 막는다 — 저작 검증 필요.");
+            Debug.LogWarning($"[LobbyMatchLauncher] Adventure node '{t_node.nodeId}' has no opponent deck — entry blocked. Check authoring.");
             return;
         }
 
@@ -375,7 +375,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (t_runner == null)
         {
             // 여기까지 왔는데 러너가 없으면 매칭이 세운 멀티 플래그가 거짓이다 — 싱글로 되돌려 전투는 살린다.
-            Debug.LogError("[LobbyMatchLauncher] 멀티 진입인데 러너가 없다 — 싱글 경로로 전투를 연다.");
+            Debug.LogError("[LobbyMatchLauncher] Multiplayer entry without a network runner — falling back to the single-player path.");
             DeckConfig.ResetMode();
             LoadBattleScene();
             return;
@@ -482,7 +482,7 @@ public class LobbyMatchLauncher : MonoBehaviour
 
         if (DeckShell == null)
         {
-            Debug.LogWarning("[LobbyMatchLauncher] 덱 화면 미배선 — 대표 덱으로 전투에 진입한다.");
+            Debug.LogWarning("[LobbyMatchLauncher] Deck screen is not wired — entering battle with the selected deck.");
 
             // 넘어갈 화면이 없으니 매칭 화면은 여기서 스스로 내려간다(전환이 내려 줄 기회가 없다).
             m_matchShell?.Close();
@@ -571,7 +571,12 @@ public class LobbyMatchLauncher : MonoBehaviour
             return true;
         }
 
-        Debug.LogError("[LobbyMatchLauncher] 매칭 응답에 유효한 상대 덱이 없다 — 로컬 AI 덱으로 대체하지 않는다.");
+        // 실매칭은 상대 덱이 배틀 씬(SyncInitialDecks)에서 도착한다 — 이 시점에 비어 있는 것이 정상이다.
+        // 여기서 막으면 사람 상대를 구해 놓고 진입을 못 한다(PhotonRankedMatchmaker가 성립 시점에 이 플래그를 켠다).
+        if (DeckConfig.IsMultiplayer) return true;
+
+        Debug.LogError("[LobbyMatchLauncher] Matched opponent has no deck and this is not a multiplayer match "
+                     + "— refusing to substitute a local AI deck.");
         MatchOpponentHandoff.Clear();
         return false;
     }
@@ -629,7 +634,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         int t_slot = DeckSaveManager.SelectedSlot;
         if (t_slot < 0)
         {
-            Debug.LogWarning("[LobbyMatchLauncher] 출전할 유효 덱이 없다 — 전투를 시작하지 않는다.");
+            Debug.LogWarning("[LobbyMatchLauncher] No valid deck to bring — not starting the battle.");
 
             return false;
         }

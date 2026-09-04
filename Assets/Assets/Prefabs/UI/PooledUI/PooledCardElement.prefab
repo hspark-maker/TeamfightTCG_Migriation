@@ -661,8 +661,8 @@ MonoBehaviour:
     overlay: {fileID: 7700000000000000250}
   - keyword: 2
     overlay: {fileID: 7700000000000000260}
-  synergyBadgeStart: {x: 0.35975, y: 0.117}
-  synergyBadgeStep: {x: 0, y: -0.1575}
+  synergyBadgeStart: {x: 0.369048, y: 0.082258}
+  synergyBadgeStep: {x: 0, y: -0.157706}
   showName: 1
   showHp: 1
   showLevel: 0

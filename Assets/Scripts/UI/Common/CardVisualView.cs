@@ -65,10 +65,13 @@ public class CardVisualView : MonoBehaviour
     // 저작 픽셀값을 각 프리팹 rect로 나누면 세 프리팹이 같은 비율로 수렴한다:
     //   151/420 = 243.5/677 = 143.9/400 = 0.3596 · 65/558 = 105.2/900 = 70.2/600 = 0.1166
     //   step -88/558 = -141.8/900 = -94.5/600 = -0.1576
+    // 기본값의 출처는 키워드 아이콘과 같다 — CardUIView.prefab에 저작된 배지 슬롯 픽셀
+    // (155, 45.9 / 간격 88)을 설계 rect(420x558) 비율로 옮긴 값이다. 슬롯을 옮기면 여기와
+    // 슬롯 없는 프리팹(CardElement·PooledCardElement)의 저작값도 같이 고친다.
     [Tooltip("첫 배지(i=0) 자리. 배지 루트 rect 왼쪽아래(0,0)~오른쪽위(1,1) 비율.")]
-    [SerializeField] Vector2 synergyBadgeStart = new Vector2(0.3596f, 0.1166f);
+    [SerializeField] Vector2 synergyBadgeStart = new Vector2(155f / CardDesignWidth, 45.9f / CardDesignHeight);
     [Tooltip("배지 간 간격(루트 rect 비율. 아래로 쌓기라 y는 음수).")]
-    [SerializeField] Vector2 synergyBadgeStep  = new Vector2(0f, -0.1576f);
+    [SerializeField] Vector2 synergyBadgeStep  = new Vector2(0f, -88f / CardDesignHeight);
 
     [Header("표시 옵션")]
     // 작은 타일에서 요소를 끄기 위한 프리팹별 스위치. 호출부에 표시 분기를 만들지 않으려고 프리팹이 결정한다.
@@ -109,19 +112,22 @@ public class CardVisualView : MonoBehaviour
     // 카드 내부(Background)는 인게임과 같은 비율의 고정 크기 rect다(420x558). 칸 크기 차이는 UniformFitContent가
     // 배율로 흡수하므로 정적 요소는 프리팹 앵커에 박아두고, 코드가 계산할 것은 런타임 생성물의 자리뿐이다.
 
-    /// <summary>인게임 카드 한 장의 월드 크기 = Frame.png(1024x1361 @PPU100) × CardView Frame localScale 0.233245.
-    /// 인게임 프레임 스케일이 바뀌면 여기도 같이 바꿔야 로비 카드가 따라간다.</summary>
-    const float IngameCardWidth  = 2.388429f;
-    const float IngameCardHeight = 3.174464f;
+    /// <summary>카드 설계 rect. 카드 프리팹(CardUIView)의 Contents가 이 크기로 고정이고,
+    /// 아이콘 슬롯 좌표도 이 안의 픽셀로 저작돼 있다.</summary>
+    const float CardDesignWidth  = 420f;
+    const float CardDesignHeight = 558f;
 
-    // 인게임은 keywordIconsUseSynergySlot=true 경로를 타므로 기준은 synergyBadge* 가 아니라
-    // CardView의 keywordIconStart(-0.65,-1.14) / keywordIconStep(0.42,0)이다(CardDecorView.RefreshKeywordIcons).
-    const float KeywordIconStartX = 0.5f + -0.65f / IngameCardWidth;
-    const float KeywordIconStartY = 0.5f + -1.14f / IngameCardHeight;
-    const float KeywordIconStepX  =        0.42f / IngameCardWidth;
-    const float KeywordIconStepY  =        0f    / IngameCardHeight;
-    const float KeywordIconWidth  =        0.65f / IngameCardWidth;
-    const float KeywordIconHeight =        0.65f / IngameCardHeight;
+    // 아이콘 자리의 진실원은 **CardUIView.prefab에 저작된 슬롯**이다 — 덱편집·도감·상세창은 그 슬롯
+    // 경로(keywordIconSlots)를 타고, 슬롯이 없는 프리팹(팝업 CardElement 등)만 아래 값으로 만들어 놓는다.
+    // 그래서 두 경로가 같은 자리를 내야 한다: 값은 저작 슬롯 픽셀(87.2, 71.3 / 간격 73.85 / 크기 114.301)을
+    // 설계 rect 비율로 옮긴 사본이다. 슬롯을 옮기면 여기도 같이 고친다.
+    //
+    // 예전엔 인게임 CardView의 월드 좌표(-0.65,-1.14)를 카드 월드 크기로 나눠 썼는데, 그 값이 저작 슬롯과
+    // 갈라져 있어 슬롯 없는 프리팹에서만 아이콘 줄이 8~10px 밀려 보였다.
+    const float KeywordIconStartX = 87.2f   / CardDesignWidth;
+    const float KeywordIconStartY = 71.3f   / CardDesignHeight;
+    const float KeywordIconStepX  = 73.85f  / CardDesignWidth;
+    const float KeywordIconSizePx = 114.301f;
 
     Tween m_growthFlash;
 
@@ -500,13 +506,21 @@ public class CardVisualView : MonoBehaviour
     {
         if (_rect == null) return;
 
-        var t_center = new Vector2(KeywordIconStartX + KeywordIconStepX * _index,
-                                   KeywordIconStartY + KeywordIconStepY * _index);
-        var t_half   = new Vector2(KeywordIconWidth, KeywordIconHeight) * 0.5f;
+        var t_center = new Vector2(KeywordIconStartX + KeywordIconStepX * _index, KeywordIconStartY);
 
-        _rect.anchorMin        = t_center - t_half;
-        _rect.anchorMax        = t_center + t_half;
-        _rect.sizeDelta        = Vector2.zero;
+        // 자리는 비율 한 점, 크기는 픽셀이다. 비율 상자(anchorMin~Max)로 크기까지 잡으면 아이콘 루트의
+        // 가로세로 비가 설계 rect와 다른 화면에서 아이콘이 눌린다 — 롱프레스 팝업의 CardElement가 400x600이라
+        // 정사각 아이콘이 세로로 늘어나 있었다. 폭 비율로만 키워 정사각을 유지한다.
+        RectTransform t_root  = _rect.parent as RectTransform;
+        float         t_scale = t_root != null && t_root.rect.width > 0f
+            ? t_root.rect.width / CardDesignWidth
+            : 1f;
+        float t_size = KeywordIconSizePx * t_scale;
+
+        _rect.anchorMin        = t_center;
+        _rect.anchorMax        = t_center;
+        _rect.pivot            = new Vector2(0.5f, 0.5f);
+        _rect.sizeDelta        = new Vector2(t_size, t_size);
         _rect.anchoredPosition = Vector2.zero;
         _rect.localScale       = Vector3.one;
     }

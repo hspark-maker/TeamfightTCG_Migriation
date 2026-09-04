@@ -151,7 +151,7 @@ MonoBehaviour:
     initialRotation: {x: 0, y: 0, z: 0}
     lifetime: 1.5
     sortingOrder: 33
-    scale: 1
+    scale: 1.2
     alignToDirection: 0
     skipOnCounter: 0
     countByStrength: {x: 0, y: 0}
