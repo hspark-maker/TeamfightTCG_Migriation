@@ -10,14 +10,11 @@ public class RouletteSlotView : MonoBehaviour
 
     [SerializeField] TMP_Text amountText;
 
-    [Tooltip("잭팟 칸에만 켜지는 표식. 비워 두면 잭팟 칸도 다른 칸과 같은 모양으로 남는다.")]
-    [SerializeField] GameObject jackpotMark;
-
     [Tooltip("수량 표기 형식. 12,345 처럼 자리수 구분이 들어간다.")]
     [SerializeField] string amountFormat = "N0";
 
-    /// <summary>이 칸이 내줄 상품을 그린다.</summary>
-    public void Bind(ECurrencyType _currency, long _amount, bool _isJackpot)
+    /// <summary>이 칸이 내줄 상품을 그린다. 잭팟 여부는 판 그림이 저작으로 말한다 — 코드가 표식을 켜지 않는다.</summary>
+    public void Bind(ECurrencyType _currency, long _amount)
     {
         if (this.icon != null)
         {
@@ -26,8 +23,6 @@ public class RouletteSlotView : MonoBehaviour
         }
 
         if (this.amountText != null) this.amountText.text = _amount.ToString(this.amountFormat);
-
-        if (this.jackpotMark != null) this.jackpotMark.SetActive(_isJackpot);
     }
 
     /// <summary>당첨된 칸을 한 박 튀긴다. 판이 멈춘 뒤 어디에 섰는지를 칸 자신이 말한다.</summary>

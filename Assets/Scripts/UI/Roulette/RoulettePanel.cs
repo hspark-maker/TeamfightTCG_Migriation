@@ -34,27 +34,9 @@ public class RoulettePanel : PooledUIBase
 
     [SerializeField] CanvasGroup spinGroup;
 
-    [Header("문구")]
-    [Tooltip("판 이름. 비워 두면 저작 문구를 그대로 둡니다.")]
-    [SerializeField] TMP_Text titleText;
-
-    [Tooltip("1회 회전 비용 문구입니다. 보유량이 아니라 비용을 적습니다 — " +
-             "1단계는 티켓 0장으로 무제한 회전이라 보유량을 띄우면 영구 0이 노출됩니다.")]
-    [SerializeField] TMP_Text priceText;
-
-    [Tooltip("비용 문구 형식입니다. {0}=재화 이름, {1}=수량.")]
-    [SerializeField] string priceFormat = "{0} {1}장";
-
-    [Tooltip("잔액이 움직이지 않는다는 표식입니다. RouletteManager.IsLocalSource일 때만 켜집니다 — " +
-             "서버 소스가 꽂히면 스스로 꺼지므로 2단계에 걷어낼 코드가 없습니다.")]
-    [SerializeField] GameObject localModeBadge;
-
     [Header("연출")]
     [Tooltip("panel에는 프레임(Lucky_Spin)을 배선한다 — root를 물리면 전체화면 딤까지 함께 커진다.")]
     [SerializeField] PopupTransition transition = new PopupTransition();
-
-    [Tooltip("공용 ScreenDim(Full)에 요청할 암막 짙기.")]
-    [Range(0f, 1f)] [SerializeField] float dimAlpha = 0.72f;
 
     [Tooltip("결과가 즉시 와도 판이 이만큼은 돈다(밀리초). 손맛의 바닥이라 왕복이 이보다 길면 그냥 통과합니다.")]
     [SerializeField] int minSpinMs = 2500;
@@ -83,11 +65,8 @@ public class RoulettePanel : PooledUIBase
     {
         this.SetVisible(true);
 
-        // 회전 도중 닫힌 판은 칸과 어긋난 각도로 남아 있다 — 여는 순간 저작 자리로 되돌린다.
-        if (this.wheel != null) this.wheel.SnapToAuthored();
-
         this.BuildSlots();
-        this.RefreshChrome();
+        this.ApplySpinInteractable(!this.m_spinning);
 
         if (this.bulbRing != null) this.bulbRing.PlayIdle();
     }
@@ -124,9 +103,6 @@ public class RoulettePanel : PooledUIBase
 
         if (this.wheel != null) this.wheel.Stop();
         if (this.bulbRing != null) this.bulbRing.Stop();
-
-        // 안전망 — Close를 거치지 않고 꺼지면 공용 딤이 남는다.
-        ScreenDim.Hide(this);
 
         // 오버레이 자체가 꺼지는 경로(씬 정리 등)에서만 온다 — 열고 닫기로는 불리지 않는다.
         this.transition.HandleDisabled(this.ResolveTarget());
@@ -228,36 +204,14 @@ public class RoulettePanel : PooledUIBase
 
         for (int t_i = 0; t_i < this.slots.Length; t_i++)
         {
-            if (this.slots[t_i] == null) continue;
-
-            bool t_has = t_i < t_count;
-            this.slots[t_i].gameObject.SetActive(t_has);
-            if (!t_has) continue;
+            if (this.slots[t_i] == null || t_i >= t_count) continue;
 
             RouletteSlotDef t_def = t_defs[t_i];
-            this.slots[t_i].Bind(t_def.currency, t_def.amount, t_def.isJackpot);
+            this.slots[t_i].Bind(t_def.currency, t_def.amount);
         }
 
         if (t_count != this.slots.Length)
             Debug.LogWarning($"[RoulettePanel] 저작 칸 {this.slots.Length}개와 설정 칸 {t_count}개가 다르다 — 판 그림과 상품이 어긋난다.", this);
-    }
-
-    void RefreshChrome()
-    {
-        if (this.titleText != null)
-        {
-            string t_name = RouletteManager.DisplayName;
-            if (!string.IsNullOrEmpty(t_name)) this.titleText.text = t_name;
-        }
-
-        if (this.priceText != null)
-            this.priceText.text = string.Format(this.priceFormat,
-                                                CurrencyLook.NameOf(RouletteManager.PriceType),
-                                                RouletteManager.Price.ToString("N0"));
-
-        if (this.localModeBadge != null) this.localModeBadge.SetActive(RouletteManager.IsLocalSource);
-
-        this.ApplySpinInteractable(!this.m_spinning);
     }
 
     void ApplySpinInteractable(bool _interactable)
@@ -336,9 +290,7 @@ public class RoulettePanel : PooledUIBase
         // 저작본은 루트가 꺼진 채로 들어온다 — 여기서 켜 주지 않으면 하위 root만 토글돼 화면에 아무것도 뜨지 않는다.
         if (_visible && !this.gameObject.activeSelf) this.gameObject.SetActive(true);
 
-        // 암막은 공용 ScreenDim(Full)이 그린다 — 딤 노드는 알파 0으로 남아 뒤쪽 입력만 삼킨다.
-        if (_visible) ScreenDim.Show(this, this.dimAlpha, true, this.transition.OpenDuration);
-        else ScreenDim.Hide(this);
+        // 암막은 프리팹에 저작된 Panel이 그대로 그린다 — 공용 ScreenDim을 부르지 않는다.
 
         // 풀 계약(PooledUIBase.isShow). 열고 닫는 길이 여기 하나뿐이라 상태도 여기서만 쓴다.
         this.isShow = _visible;

@@ -11,7 +11,6 @@ public static class RouletteManager
     static RouletteConfig s_config;
     static IRouletteSpinSource s_source;
     static bool s_spinning;
-    static bool s_localSource;
 
     // SetSource로 명시적으로 꽂힌 소스가 있는가. 개발용 로컬 소스는 이 자리를 덮지 않는다 —
     // 초기화가 한 번 더 돌면(재시도) 2단계 서버 소스가 조용히 로컬로 되돌아간다.
@@ -20,15 +19,8 @@ public static class RouletteManager
     /// <summary>회전을 실제로 돌릴 수 있는가. 설정과 소스가 둘 다 서야 true다 — 로비 버튼 노출 판정이 이 값이다.</summary>
     public static bool IsAvailable => s_config != null && s_source != null;
 
-    /// <summary>지금 꽂힌 소스가 로컬 추첨인가. "잔액에 반영되지 않습니다" 배지의 유일한 근거다.</summary>
-    public static bool IsLocalSource => s_localSource;
-
-    public static string DisplayName => s_config != null ? s_config.DisplayName : string.Empty;
-
-    // 미설정이면 골드로 떨어뜨리지 않는다 — 비용 아이콘이 조용히 다른 재화로 그려진다.
-    public static ECurrencyType PriceType => s_config != null ? s_config.PriceType : ECurrencyType.RouletteTicket;
-
-    public static long Price => s_config != null ? s_config.Price : 0L;
+    // 판 이름·비용은 프리팹 저작이 그린다. 화면이 문구를 덮지 않으므로 여기서 내주는 표면도 두지 않는다
+    // — 2단계에 비용 표시가 필요해지면 그때 되살린다(저작값은 RouletteConfig 에 그대로 있다).
 
     public static IReadOnlyList<RouletteSlotDef> Slots
         => s_config != null ? s_config.Slots : Array.Empty<RouletteSlotDef>();
@@ -93,11 +85,7 @@ public static class RouletteManager
 
         // 명시적으로 꽂힌 소스는 건드리지 않는다 — 그 자리를 비우면 초기화가 다시 돌 때마다
         // 2단계 서버 소스가 개발용 로컬 소스로 갈린다.
-        if (!s_sourceInjected)
-        {
-            s_source = null;
-            s_localSource = false;
-        }
+        if (!s_sourceInjected) s_source = null;
 
         if (_config == null) return;
 
@@ -122,7 +110,6 @@ public static class RouletteManager
     public static void SetSource(IRouletteSpinSource _source)
     {
         s_source = _source;
-        s_localSource = IsLocal(_source);
         s_sourceInjected = true;
     }
 
@@ -133,7 +120,6 @@ public static class RouletteManager
         s_config = null;
         s_source = null;
         s_spinning = false;
-        s_localSource = false;
         s_sourceInjected = false;
     }
 
@@ -160,16 +146,6 @@ public static class RouletteManager
         if (t_runMode != EContentRunMode.Test) return;
 
         s_source = new LocalRouletteSpinSource(s_config);
-        s_localSource = true;
-#endif
-    }
-
-    static bool IsLocal(IRouletteSpinSource _source)
-    {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-        return _source is LocalRouletteSpinSource;
-#else
-        return false;
 #endif
     }
 }

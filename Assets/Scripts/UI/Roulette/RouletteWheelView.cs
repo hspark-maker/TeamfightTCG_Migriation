@@ -16,17 +16,18 @@ public class RouletteWheelView : MonoBehaviour
     [SerializeField] float pointerOffsetDeg = 0f;
 
     [Header("가속·등속")]
-    [Tooltip("멈춰 있던 판이 등속에 오르기까지 걸리는 시간입니다.")]
-    [SerializeField] float accelSeconds = 0.45f;
+    [Tooltip("멈춰 있던 판이 최고 속도에 오르기까지 걸리는 시간입니다. 짧게 두세요 — " +
+             "룰렛은 누르는 순간 이미 빠르게 돌고 있어야 하고, 긴 가속은 판이 굼떠 보입니다.")]
+    [SerializeField] float accelSeconds = 0.22f;
 
-    [Tooltip("등속 회전 속도(초당 도)입니다. 720이면 1초에 두 바퀴입니다.")]
-    [SerializeField] float cruiseSpeedDegPerSec = 720f;
+    [Tooltip("최고 회전 속도(초당 도)입니다. 1080이면 1초에 세 바퀴입니다.\n\n" +
+             "감속 시간이 이 값에서 파생됩니다 — 빠르게 둘수록 멈추는 데 걸리는 시간도 짧아집니다.")]
+    [SerializeField] float cruiseSpeedDegPerSec = 1080f;
 
     [Header("감속 정지")]
-    [Tooltip("결과가 온 뒤 멈추기까지 도는 바퀴 수입니다.")]
+    [Tooltip("결과가 온 뒤 멈추기까지 도는 바퀴 수입니다. 감속에 걸리는 시간은 저작하지 않습니다 — " +
+             "최고 속도에서 매끄럽게 이어지려면 시간이 거리에서 정해져야 하기 때문입니다(코드 참조).")]
     [SerializeField] int settleTurns = 3;
-
-    [SerializeField] float settleSeconds = 1.8f;
 
     [Tooltip("칸 정중앙에서 좌우로 흔들 최대 각도입니다. 칸 하나가 45도라 절반인 22.5도에 가까워지면 " +
              "옆 칸에 선 것으로 읽힙니다 — 그래서 코드가 16도로 상한을 겁니다.")]
@@ -39,19 +40,15 @@ public class RouletteWheelView : MonoBehaviour
     // 코드가 거는 지터 상한. 45도의 절반(22.5)에 가까워지면 옆 칸으로 읽힌다.
     const float MAX_JITTER_DEG = 16f;
 
-    // 프리팹 저작 각도. 잘린 회전으로 판이 아무 데나 서 있어도 여는 순간 여기로 되돌린다.
-    float m_authoredAngle;
+    // 계산된 감속 시간의 안전 범위. 저작을 극단으로 밀어도 한 프레임 급정지나 하염없는 표류가 되지 않게.
+    const float MIN_SETTLE_SECONDS = 0.8f;
+    const float MAX_SETTLE_SECONDS = 4.5f;
 
     // 이번 회전을 시작하기 직전의 각도. 거절·실패면 정확히 여기로 돌아온다("아무 일도 없었다").
+    // 판을 저작 각도로 되돌리지는 않는다 — 판이 어디에 서 있든 다음 회전은 그 자리에서 이어진다.
     float m_homeAngle;
 
     Tween m_spin;
-
-    void Awake()
-    {
-        this.m_authoredAngle = this.board != null ? this.board.localEulerAngles.z : 0f;
-        this.m_homeAngle = this.m_authoredAngle;
-    }
 
     void OnDisable() => this.KillSpin();
 
@@ -89,17 +86,6 @@ public class RouletteWheelView : MonoBehaviour
     public UniTask ReturnHomeAsync(CancellationToken _ct)
         => this.SettleToAsync(this.m_homeAngle, this.returnTurns, _ct);
 
-    /// <summary>프리팹 저작 각도로 즉시 되돌린다. 회전 도중 닫혀 판이 칸과 어긋난 채 남았을 때 쓴다.</summary>
-    public void SnapToAuthored()
-    {
-        this.KillSpin();
-
-        if (this.board == null) return;
-
-        this.board.localEulerAngles = new Vector3(0f, 0f, this.m_authoredAngle);
-        this.m_homeAngle = this.m_authoredAngle;
-    }
-
     /// <summary>회전을 걷는다. 판은 지금 각도에 그대로 남는다.</summary>
     public void Stop() => this.KillSpin();
 
@@ -114,12 +100,19 @@ public class RouletteWheelView : MonoBehaviour
 
         // 판은 시계방향(각도 감소)으로만 돈다 — 감속이 방향을 뒤집으면 되감기는 것으로 읽힌다.
         float t_delta = Mathf.Repeat(t_from - t_rest, 360f);
-        float t_target = t_from - t_delta - 360f * Mathf.Max(0, _turns);
+        float t_distance = t_delta + 360f * Mathf.Max(0, _turns);
+        float t_target = t_from - t_distance;
+
+        // 감속 시간은 저작이 아니라 거리에서 나온다. 등감속(OutQuad)의 시작 속도는 평균의 2배라
+        // T = 2D/v 여야 최고 속도에서 정확히 이어진다 — 이 식을 안 맞추면 감속으로 넘어가는 순간
+        // 판이 오히려 빨라진다(그 전에 쓰던 OutQuart는 시작 속도가 평균의 4배였다).
+        float t_speed = Mathf.Max(1f, this.cruiseSpeedDegPerSec);
+        float t_seconds = Mathf.Clamp(2f * t_distance / t_speed, MIN_SETTLE_SECONDS, MAX_SETTLE_SECONDS);
 
         // FastBeyond360이 아니면 최단호로 질러가 여러 바퀴가 통째로 사라진다.
         Tween t_settle = this.board
-            .DOLocalRotate(new Vector3(0f, 0f, t_target), Mathf.Max(0.01f, this.settleSeconds), RotateMode.FastBeyond360)
-            .SetEase(Ease.OutQuart)
+            .DOLocalRotate(new Vector3(0f, 0f, t_target), t_seconds, RotateMode.FastBeyond360)
+            .SetEase(Ease.OutQuad)
             .SetUpdate(true)
             .SetLink(this.board.gameObject, LinkBehaviour.KillOnDisable);
 
@@ -149,22 +142,4 @@ public class RouletteWheelView : MonoBehaviour
         this.m_spin = null;
     }
 
-#if UNITY_EDITOR
-    // 착수 직후 바늘 방향을 눈으로 검증하는 자리. 각도식이 틀리면 나머지가 전부 헛돈다.
-    void PreviewSlot(int _slotIndex)
-    {
-        if (this.board == null) return;
-
-        this.board.localEulerAngles = new Vector3(0f, 0f, Mathf.Repeat(45f * _slotIndex - this.pointerOffsetDeg, 360f));
-    }
-
-    [ContextMenu("PreviewSlot0")] void PreviewSlot0() => this.PreviewSlot(0);
-    [ContextMenu("PreviewSlot1")] void PreviewSlot1() => this.PreviewSlot(1);
-    [ContextMenu("PreviewSlot2")] void PreviewSlot2() => this.PreviewSlot(2);
-    [ContextMenu("PreviewSlot3")] void PreviewSlot3() => this.PreviewSlot(3);
-    [ContextMenu("PreviewSlot4")] void PreviewSlot4() => this.PreviewSlot(4);
-    [ContextMenu("PreviewSlot5")] void PreviewSlot5() => this.PreviewSlot(5);
-    [ContextMenu("PreviewSlot6")] void PreviewSlot6() => this.PreviewSlot(6);
-    [ContextMenu("PreviewSlot7")] void PreviewSlot7() => this.PreviewSlot(7);
-#endif
 }
