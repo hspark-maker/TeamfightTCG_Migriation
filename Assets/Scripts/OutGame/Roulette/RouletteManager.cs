@@ -22,8 +22,10 @@ public static class RouletteManager
     /// <summary>지금 꽂힌 추첨이 서버 판정인가. 개발용 로컬 추첨 배지의 유일한 근거다.</summary>
     public static bool IsServerBacked => s_source is ServerRouletteSpinSource;
 
-    // 판 이름·비용은 프리팹 저작이 그린다. 화면이 문구를 덮지 않으므로 여기서 내주는 표면도 두지 않는다
-    // — 비용의 진실원은 서버 구성 표이고 RouletteConfig.Price 는 낙관 표시용 사본이다.
+    /// <summary>회전 1회에 내는 재화. 어느 잔액이 움직여야 회전 가부가 흔들리는지 화면이 가리는 데 쓴다.</summary>
+    // 금액은 내주지 않는다 — 판 이름·비용 문구는 프리팹 저작이 그리고,
+    // 비용의 진실원은 서버 구성 표라 RouletteConfig.Price 는 낙관 표시용 사본일 뿐이다.
+    public static ECurrencyType PriceType => s_config != null ? s_config.PriceType : ECurrencyType.RouletteTicket;
 
     public static IReadOnlyList<RouletteSlotDef> Slots
         => s_config != null ? s_config.Slots : Array.Empty<RouletteSlotDef>();
