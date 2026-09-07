@@ -315,9 +315,15 @@ public static class CloudRunControl
         EditorApplication.update += Poll;
     }
 
+    /// <summary>
+    /// 긴 출력에서 **뒤쪽**을 남긴다. gcloud·Cloud Build 는 결정적인 사유를 마지막에 찍는다 —
+    /// 앞에서 자르면 이미지 pull 로그만 보이고 정작 `ERROR: ... not found` 가 잘려 나간다
+    /// (실제로 그 한 줄이 안 보여서 원인을 로그 조회로 따로 파야 했다).
+    /// </summary>
     static string Short(string _text)
     {
         if (string.IsNullOrEmpty(_text)) return "(출력 없음)";
-        return _text.Length <= 600 ? _text : _text.Substring(0, 600) + " …";
+        if (_text.Length <= 1200) return _text;
+        return "… " + _text.Substring(_text.Length - 1200);
     }
 }
