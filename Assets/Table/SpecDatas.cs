@@ -210,6 +210,38 @@ public partial class Mission
 }
 
 [GeneratorSpecData]
+public partial class PassLevel
+{
+    /// 행 고유번호
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 시즌 고유키
+    public string seasonId;
+    /// 레벨
+    public int level;
+    /// 누적 필요 경험치
+    public long requiredExp;
+}
+
+[GeneratorSpecData]
+public partial class PassSeason
+{
+    /// 행 고유번호
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 시즌 고유키
+    public string seasonId;
+    /// 표시 이름
+    public string displayName;
+    /// 시작 시각(ms)
+    public long startAtMs;
+    /// 종료 시각(ms)
+    public long endAtMs;
+    /// 최대 레벨
+    public int maxLevel;
+}
+
+[GeneratorSpecData]
 public partial class Roulette
 {
     /// 행 고유 번호(부여 후 변경 금지)

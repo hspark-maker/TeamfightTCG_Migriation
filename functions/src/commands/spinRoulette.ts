@@ -7,6 +7,8 @@ import {clientReceiptId, isClientReceiptId} from "../save/receiptId";
 import {canAfford, grant, spend} from "../currency/wallet";
 import {nextWallet} from "../currency/walletStore";
 import {mutateWallet} from "../currency/walletTransaction";
+import {EVENTS} from "../analytics/eventNames";
+import {recordEvent} from "../observability/analyticsEvent";
 import {drawRouletteSlot, resolveRouletteBoard, RouletteSlot} from "../roulette/rouletteDraw";
 import {MAX_ROULETTE_ID_LENGTH, readRouletteHeaderRow, readRouletteSlotRows} from "../roulette/rouletteSpecReader";
 
@@ -113,8 +115,9 @@ export const spinRoulette = onCall(async (request) => {
     logger.info("receipt replay",
       {uid, env, source: "spinRoulette", txId, rouletteId, rev: result.wallet.rev});
   } else {
-    logger.info("spinRoulette", {
-      uid, env, rouletteId, slotIndex: result.slotIndex,
+    recordEvent(EVENTS.rouletteSpun.name, {
+      uid, env, eventId: txId, sourceCommand: "spinRoulette", result: "success",
+      rouletteId, slotIndex: result.slotIndex,
       currency: result.gain.currency, amount: result.gain.amount,
       price: board.price, rev: result.wallet.rev,
       txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",

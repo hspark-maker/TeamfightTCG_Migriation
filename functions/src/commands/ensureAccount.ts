@@ -1,5 +1,7 @@
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
+import {EVENTS} from "../analytics/eventNames";
+import {recordEvent} from "../observability/analyticsEvent";
 import {
   ensureSaveDocument,
   isKnownEnv,
@@ -62,9 +64,8 @@ export const ensureAccount = onCall(async (request) => {
       starterSource: starter.source,
     });
   } else if (outcome.created) {
-    logger.info("ensureAccount granted", {
-      uid,
-      env,
+    recordEvent(EVENTS.accountCreated.name, {
+      uid, env, eventId: uid, sourceCommand: "ensureAccount", result: "success",
       revision: outcome.revision,
       // 지갑이 이미 있었다면 스타터 골드는 나가지 않았다 — 로그가 그것을 숨기면 안 된다.
       gold: outcome.walletCreated ? STARTER_GOLD : 0,

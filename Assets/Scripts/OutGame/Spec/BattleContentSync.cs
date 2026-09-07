@@ -98,15 +98,24 @@ public static class BattleContentSync
             // 목록에서 빠진 표는 채택이 통째로 버린다. 대조 로그로는 드러나지 않으므로 여기서 먼저 짚는다.
             SpecPayloadCodec.WarnUncoveredTables(SpecSource.Manager);
 
+            // 스냅샷이 아직 없으면(첫 실행·캐시 삭제) 로컬 표가 0개다 — 실패가 아니라 전량 수신 신호다.
+            // 내장본 폴백을 없앤 뒤로는 이 상태가 정상 경로에 들어왔다.
             var t_localTables = new List<SpecTablePayload>();
-            foreach (string t_tableName in SpecPayloadCodec.TableNames)
+            if (SpecSource.Manager == null)
             {
-                if (!SpecPayloadCodec.TryBuildLocalTable(SpecSource.Manager, t_tableName, out SpecTablePayload t_table, out string t_error))
+                Debug.Log($"[BattleContent] 로컬 스냅샷 없음({SpecSource.LastErrorCode ?? "-"}) — 전 표를 서버에서 받는다");
+            }
+            else
+            {
+                foreach (string t_tableName in SpecPayloadCodec.TableNames)
                 {
-                    Debug.LogError($"[BattleContent] 로컬 스냅샷 생성 실패 table={t_tableName}: {t_error}");
-                    return Verdict(EBattleContentGateResult.Blocked, $"로컬 표 '{t_tableName}' 생성 실패");
+                    if (!SpecPayloadCodec.TryBuildLocalTable(SpecSource.Manager, t_tableName, out SpecTablePayload t_table, out string t_error))
+                    {
+                        Debug.LogError($"[BattleContent] 로컬 스냅샷 생성 실패 table={t_tableName}: {t_error}");
+                        return Verdict(EBattleContentGateResult.Blocked, $"로컬 표 '{t_tableName}' 생성 실패");
+                    }
+                    t_localTables.Add(t_table);
                 }
-                t_localTables.Add(t_table);
             }
             string t_localFingerprint = SpecPayloadCodec.CombinedHash(t_envId, t_localTables);
 
@@ -115,7 +124,10 @@ public static class BattleContentSync
                 t_localLog.Append($"\n  {t_table.Table,-16} rows={t_table.Rows.Count,-5} hash={t_table.PayloadHash}");
             Debug.Log($"[BattleContent] 로컬 스냅샷 지문={t_localFingerprint} 전투지문={SpecSource.BattleFingerprint}{t_localLog}");
 
-            if (string.Equals(t_localFingerprint, s_lastLocalFingerprint, StringComparison.Ordinal) &&
+            bool t_noLocalSnapshot = t_localTables.Count == 0;
+            // 스냅샷이 없으면 TTL 로 서버 조회를 건너뛰면 안 된다 — 건너뛰는 순간 스펙 없이 진행된다.
+            if (!t_noLocalSnapshot &&
+                string.Equals(t_localFingerprint, s_lastLocalFingerprint, StringComparison.Ordinal) &&
                 DateTime.UtcNow - s_lastCheckUtc < CheckTtl)
                 return Verdict(EBattleContentGateResult.Current,
                                $"TTL 유효({(int)(DateTime.UtcNow - s_lastCheckUtc).TotalSeconds}초 전 대조) — 서버 조회 생략");
@@ -156,6 +168,9 @@ public static class BattleContentSync
                 t_compare.Append($"\n  {t_table.Table,-16} 로컬={t_table.PayloadHash} 서버={t_remoteText,-16} {(t_match ? "일치" : "불일치")}");
             }
             Debug.Log($"[BattleContent] 스냅샷 대조 env={t_envId} 불일치 {t_mismatch}/{t_localTables.Count}{t_compare}");
+
+            // 로컬이 아예 없으면 대조할 것도 없다 — 불일치 0으로 읽혀 "서버와 동일" 로 빠지면 스펙 없이 진행된다.
+            if (t_noLocalSnapshot) t_mismatch = SpecPayloadCodec.TableNames.Length;
 
             if (t_mismatch == 0)
             {
@@ -226,13 +241,14 @@ public static class BattleContentSync
         EBattleContentGateResult t_result = await CheckBeforeBattleAsync(false, _ct);
         if (t_result == EBattleContentGateResult.UpdatedRestartRequired)
         {
-            // Reload가 캐시를 못 믿고 내장본으로 떨어져도 예외는 나지 않는다 —
-            // 확인하지 않으면 서버와 다른 데이터로 초기화가 성공 처리된다.
+            // Reload 는 캐시를 못 믿어도 예외를 던지지 않고 코드만 남긴다 —
+            // 확인하지 않으면 스펙 없이 초기화가 성공 처리된다.
             string t_expected = s_adoptedFingerprint;
             SpecSource.Reload();
             if (!string.Equals(SpecSource.Fingerprint, t_expected, StringComparison.Ordinal))
                 throw new InvalidOperationException(
-                    $"내려받은 스냅샷을 채택하지 못했다: 기대={t_expected} 실제={SpecSource.Fingerprint} 원본={SpecSource.Origin}");
+                    $"내려받은 스냅샷을 채택하지 못했다({SpecSource.LastErrorCode ?? "-"}): 기대={t_expected} " +
+                    $"실제={SpecSource.Fingerprint} 원본={SpecSource.Origin} 사유={SpecSource.LastErrorDetail ?? "-"}");
             Debug.Log($"[BattleContent] 초기화 중 새 콘텐츠 스냅샷 채택 완료 지문={t_expected}");
             return;
         }
@@ -251,15 +267,21 @@ public static class BattleContentSync
         string _envId, RemoteSpecVector _before, List<SpecTablePayload> _localTables)
     {
         Dictionary<string, string> _beforeHashes = _before.Hashes;
+        var t_localByTable = new Dictionary<string, SpecTablePayload>(StringComparer.Ordinal);
+        foreach (SpecTablePayload t_local in _localTables) t_localByTable[t_local.Table] = t_local;
+
+        // 받을 목록은 로컬이 아니라 **동기화 목록(TableNames)** 에서 뽑는다 — 로컬 스냅샷이 없을 때
+        // 로컬 기준으로 뽑으면 받을 표가 0개가 되고, 아래 조립에서 "missing after download" 로 터진다.
         var t_byTable = new Dictionary<string, SpecTablePayload>(StringComparer.Ordinal);
         var t_stale = new List<string>();
-        foreach (SpecTablePayload t_local in _localTables)
+        foreach (string t_name in SpecPayloadCodec.TableNames)
         {
-            if (_beforeHashes.TryGetValue(t_local.Table, out string t_remoteHash) &&
+            if (t_localByTable.TryGetValue(t_name, out SpecTablePayload t_local) &&
+                _beforeHashes.TryGetValue(t_name, out string t_remoteHash) &&
                 string.Equals(t_local.PayloadHash, t_remoteHash, StringComparison.Ordinal))
-                t_byTable[t_local.Table] = t_local;
+                t_byTable[t_name] = t_local;
             else
-                t_stale.Add(t_local.Table);
+                t_stale.Add(t_name);
         }
 
         Task<SpecTablePayload>[] t_tasks = t_stale

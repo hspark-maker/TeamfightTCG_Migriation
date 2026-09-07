@@ -31,6 +31,15 @@ public sealed class SpecSheetPreloadStep : MainInitializer
 
     void InitializeRequiredSpecs(InitializationContext _context)
     {
+        // 스펙 진실원은 서버 스냅샷 하나다(내장본 폴백 없음). 동기화 뒤에도 못 세웠으면
+        // 여기서 코드와 함께 끊는다 — 이 뒤 축들은 표가 있다고 가정하고 돈다.
+        if (!SpecSource.IsReady)
+        {
+            FailRequiredSpec(_context, false,
+                $"스펙 스냅샷이 없다 {SpecSource.LastErrorCode ?? "SPEC-?"} — {SpecSource.LastErrorDetail ?? "사유 미상"}");
+            return;
+        }
+
         PackSpec.Init();
         AIDeckSpec.Init();
         RewardSpec.Init();

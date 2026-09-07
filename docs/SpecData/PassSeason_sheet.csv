@@ -1,0 +1,4 @@
+﻿행 고유번호,시즌 고유키,표시 이름,시작 시각(ms),종료 시각(ms),최대 레벨,메모
+id,seasonId,displayName,startAtMs,endAtMs,maxLevel,#memo
+int,string,string,long,long,int,string
+1,S1,시즌 1,1788206400000,1790798400000,10,2026-09-01 05:00 KST ~ 2026-10-01 05:00 KST

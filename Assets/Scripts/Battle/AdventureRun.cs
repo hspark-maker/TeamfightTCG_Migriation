@@ -1,3 +1,5 @@
+using UnityEngine;
+
 /// <summary>
 /// 모험 전투 런타임 단일 진실원. 싱글 경로 전용.
 /// 활성 시: 적 카드 레벨이 랭크가 아니라 정점 저작값으로 고정되고(초기화(InitializationRunner)의 EnemyGrowthProvider),
@@ -14,9 +16,12 @@ public static class AdventureRun
     /// <summary>이 정점의 고정 상대 카드 레벨(랭크 난이도를 대체한다).</summary>
     public static int AiCardLevel { get; private set; } = CardGrowth.BaseLevel;
 
+    /// <summary>이번 모험 전투의 챕터 배경. null이면 BattleScene 저작값을 유지한다.</summary>
+    public static Sprite BattleBackground { get; private set; }
+
     /// <summary>정점 전투 시작. 튜토리얼이 켜져 있으면 아무것도 세우지 않고 false —
     /// 두 모드가 겹치면 덱·셔플·입력 게이트 전 경로에서 튜토리얼이 이기므로 애초에 열지 않는다.</summary>
-    public static bool Begin(string _nodeId, int _aiCardLevel)
+    public static bool Begin(string _nodeId, int _aiCardLevel, Sprite _battleBackground)
     {
         if (TutorialConfig.IsActive) return false;
         if (string.IsNullOrEmpty(_nodeId)) return false;
@@ -24,6 +29,7 @@ public static class AdventureRun
         IsActive    = true;
         NodeId      = _nodeId;
         AiCardLevel = _aiCardLevel < CardGrowth.BaseLevel ? CardGrowth.BaseLevel : _aiCardLevel;
+        BattleBackground = _battleBackground;
         return true;
     }
 
@@ -32,5 +38,6 @@ public static class AdventureRun
         IsActive    = false;
         NodeId      = null;
         AiCardLevel = CardGrowth.BaseLevel;
+        BattleBackground = null;
     }
 }

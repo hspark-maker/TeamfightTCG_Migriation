@@ -93,3 +93,17 @@ int,string,string,int,string,string,long,string
 90,Mission,daily.completeBattle3,1,Currency,Gold,200,일일 전투 3회
 91,Mission,weekly.winRankedBattle5,1,Currency,Diamond,40,주간 랭크 승리 5회
 92,Mission,daily.claimReward1,1,Currency,Gold,100,일일 보상 수령 1회
+93,Mission,daily.destroyCards3,1,Currency,Gold,150,일일 카드 파괴 3장
+94,Mission,daily.triggerSynergy2,1,Currency,Gold,150,일일 시너지 발동 2회
+95,Mission,daily.triggerKeyword2,1,Currency,Gold,150,일일 키워드 발동 2회
+96,Mission,weekly.attackTimes50,1,Currency,Diamond,30,주간 공격 50회
+101,Pass,S1:1,1,Currency,Gold,200,시즌 1 무료 트랙 레벨 1
+102,Pass,S1:2,1,Currency,Gold,250,시즌 1 무료 트랙 레벨 2
+103,Pass,S1:3,1,Currency,Shard,50,시즌 1 무료 트랙 레벨 3
+104,Pass,S1:4,1,Currency,Gold,300,시즌 1 무료 트랙 레벨 4
+105,Pass,S1:5,1,Currency,Diamond,20,시즌 1 무료 트랙 레벨 5
+106,Pass,S1:6,1,Currency,Gold,400,시즌 1 무료 트랙 레벨 6
+107,Pass,S1:7,1,Currency,Shard,100,시즌 1 무료 트랙 레벨 7
+108,Pass,S1:8,1,Currency,Gold,500,시즌 1 무료 트랙 레벨 8
+109,Pass,S1:9,1,Currency,Diamond,30,시즌 1 무료 트랙 레벨 9
+110,Pass,S1:10,1,Currency,Diamond,50,시즌 1 무료 트랙 레벨 10

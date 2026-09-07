@@ -1,3 +1,5 @@
+using TeamfightTCG.BattleCore;
+
 
 // 추적(Trace): [AfterAttack] 하나로 두 단계를 다 처리한다.
 //  2단계 — 공격 후 살아남은 적에게 표식(Mark) 부여.
@@ -41,6 +43,8 @@ public class TraceSynergyEffect : SynergyEffect
             // 표시는 [6] 처치 단계로 미룬다 — 이 보상은 "죽였다"가 조건이라 ④가 아니다.
             // 여기서 그냥 내면 아직 서 있는(사망 연출 전) 적 앞에서 처치 보상 배너가 먼저 뜬다.
             // 규칙(bonusHp)은 위에서 이미 끝났고 담기는 건 순수 표시뿐이다.
+            BattleEventStream.Emit(new BattleEvent(BattleEventKind.SynergyFired,
+                _ctx.self.ownerIndex, _ctx.self.slotIndex));
             SynergyPresentationStream.Emit(new SynergyFirePlan
             {
                 self = _ctx.self,
@@ -55,6 +59,8 @@ public class TraceSynergyEffect : SynergyEffect
         if (this.grantMarkOnAttack && !t_wasMarked && _ctx.target.IsAlive)
         {
             _ctx.target.runtimeKeywords |= CardKeyword.Mark;
+            BattleEventStream.Emit(new BattleEvent(BattleEventKind.SynergyFired,
+                _ctx.self.ownerIndex, _ctx.self.slotIndex));
             SynergyPresentationStream.Emit(new TraceMarkPresentationPlan
             {
                 self = _ctx.self,

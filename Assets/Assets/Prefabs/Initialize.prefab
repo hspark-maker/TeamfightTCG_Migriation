@@ -23,6 +23,7 @@ GameObject:
   - component: {fileID: 1581884920793774154}
   - component: {fileID: 1581884920793774152}
   - component: {fileID: 1581884920793774153}
+  - component: {fileID: 1581884920793774160}
   m_Layer: 0
   m_Name: Initialize
   m_TagString: Untagged
@@ -76,6 +77,7 @@ MonoBehaviour:
   - {fileID: 1581884920793774150}
   - {fileID: 1581884920793774152}
   - {fileID: 1581884920793774153}
+  - {fileID: 1581884920793774160}
 --- !u!114 &1581884920793774142
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -170,6 +172,7 @@ MonoBehaviour:
   profileConfig: {fileID: 11400000, guid: 098146b7940589948afb63e709ac5357, type: 2}
   deckImageCatalog: {fileID: 11400000, guid: 20a3ae6097a4cb440ad35c4621cec66e, type: 2}
   rouletteConfig: {fileID: 11400000, guid: c79a047159501ef46a7e47fcabb63abf, type: 2}
+  emoteCatalog: {fileID: 11400000, guid: 0c1e5b7a94d3f2149a86c5d0e7b31f68, type: 2}
 --- !u!114 &1581884920793774147
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -308,6 +311,23 @@ MonoBehaviour:
   - SpecSync
   retryEntry: 0
   starterDeckPackId: StarterPack
+--- !u!114 &1581884920793774160
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2449901017464239670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a7c4e91d3b6f4d0e8c2a5f7b91d640ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MissionPreloadStep
+  initializerId: MissionPreload
+  required: 0
+  requiredIds:
+  - SaveDependentManagers
+  retryEntry: 0
 --- !u!1 &3392005005194032163
 GameObject:
   m_ObjectHideFlags: 0

@@ -39,6 +39,8 @@ const logger = __importStar(require("firebase-functions/logger"));
 const firestore_1 = require("firebase-admin/firestore");
 const firebaseApp_1 = require("../firebaseApp");
 const countedTransaction_1 = require("../observability/countedTransaction");
+const eventNames_1 = require("../analytics/eventNames");
+const analyticsEvent_1 = require("../observability/analyticsEvent");
 const deckValidation_1 = require("../deckValidation");
 const enhanceRules_1 = require("../growth/enhanceRules");
 const limitBreakTable_1 = require("../growth/limitBreakTable");
@@ -212,7 +214,7 @@ exports.lockDeck = (0, https_1.onCall)({ enforceAppCheck: false }, async (reques
     // 덱 잠금은 매치 문서 안에 산다 — 별도 matchLocks 컬렉션을 두면 같은 matchId 로 문서가 둘이 되고
     // seedHex·rulesetVersion·cardDataVersion 이 양쪽에 중복된다.
     const matchRef = firebaseApp_1.db.doc(`envs/${data.env}/matches/${data.matchId}`);
-    return (0, countedTransaction_1.withCountedTransaction)("lockDeck", async (tx) => {
+    const result = await (0, countedTransaction_1.withCountedTransaction)("lockDeck", async (tx) => {
         const matchSnapshot = await tx.get(matchRef);
         const saveSnapshot = await tx.get(saveRef);
         const lock = matchSnapshot.data();
@@ -414,5 +416,22 @@ exports.lockDeck = (0, https_1.onCall)({ enforceAppCheck: false }, async (reques
         });
         return { status, idempotent: false };
     });
+    // 거절 갈래의 반환에는 idempotent 필드 자체가 없다 — in 으로 좁혀야 컴파일이 선다.
+    // 재호출(폴링)은 idempotent:true 로 돌아오므로 승인 1건당 이벤트는 정확히 한 번이다.
+    const freshApproval = "idempotent" in result && result.idempotent === false;
+    if (freshApproval && result.status !== "rejected") {
+        (0, analyticsEvent_1.recordEvent)(eventNames_1.EVENTS.matchDeckLocked.name, {
+            uid,
+            env: data.env,
+            eventId: `${data.matchId}:${data.ownerIndex}`,
+            sourceCommand: "lockDeck",
+            result: result.status,
+            matchId: data.matchId,
+            ownerIndex: data.ownerIndex,
+            deckHash: data.deckHash,
+            cardCount: data.cardSnapshots.length,
+        });
+    }
+    return result;
 });
 //# sourceMappingURL=lockDeck.js.map

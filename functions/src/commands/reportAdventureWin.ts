@@ -1,6 +1,8 @@
 import {randomUUID} from "node:crypto";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
+import {EVENTS} from "../analytics/eventNames";
+import {recordEvent} from "../observability/analyticsEvent";
 import {
   isKnownEnv,
   mutateSave,
@@ -130,8 +132,8 @@ export const reportAdventureWin = onCall(async (request) => {
     logger.info("receipt replay",
       {uid, env, source: "reportAdventureWin", txId, revision: result.revision});
   } else {
-    logger.info("reportAdventureWin", {
-      uid, env, nodeId,
+    recordEvent(EVENTS.adventureNodeCompleted.name, {
+      uid, env, eventId: txId, sourceCommand: "reportAdventureWin", result: "success", nodeId,
       revision: result.revision,
       txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",
     });

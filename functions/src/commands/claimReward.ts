@@ -1,6 +1,8 @@
 import {FieldValue} from "firebase-admin/firestore";
 import {randomUUID} from "node:crypto";
 import {db} from "../firebaseApp";
+import {EVENTS} from "../analytics/eventNames";
+import {recordEvent} from "../observability/analyticsEvent";
 import {
   beginMissionBump,
   commitMissionBump,
@@ -461,7 +463,7 @@ export const claimReward = onCall(async (request) => {
       //
       // 진행도를 올리는 것은 이 명령뿐이다 — claimMission 은 ClaimReward 를 올리지 않는다.
       // 올리면 미션 수령이 미션을 낳는 자기참조가 된다.
-      commitMissionBump(transaction, missions, "ClaimReward", 1, FieldValue.serverTimestamp());
+      commitMissionBump(transaction, missions, EVENTS.rewardClaimed.missionKey, 1, FieldValue.serverTimestamp());
       missionState = missionResponse(missions.state, period);
 
       if (ownerType === "Rank") {
@@ -487,8 +489,9 @@ export const claimReward = onCall(async (request) => {
   if (replayed) {
     logger.info("receipt replay", {uid, env, source: "claimReward", txId, revision: result.revision});
   } else {
-    logger.info("claimReward", {
-      uid, env, ownerType, ownerId: specOwnerId,
+    recordEvent(EVENTS.rewardClaimed.name, {
+      uid, env, eventId: txId, sourceCommand: "claimReward", result: "success",
+      ownerType, ownerId: specOwnerId,
       granted: gains.map((gain) => `${gain.currency}+${gain.amount}`).join(","),
       droppedCount: dropped.length,
       revision: result.revision,

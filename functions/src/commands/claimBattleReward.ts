@@ -2,6 +2,8 @@ import {randomUUID} from "node:crypto";
 import {DocumentSnapshot, FieldValue} from "firebase-admin/firestore";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
+import {EVENTS} from "../analytics/eventNames";
+import {recordEvent} from "../observability/analyticsEvent";
 import {db} from "../firebaseApp";
 import {isKnownEnv, requireUid} from "../save/saveDocument";
 import {rejectDomain} from "../save/domainReject";
@@ -210,8 +212,9 @@ export const claimBattleReward = onCall(async (request) => {
     logger.info("receipt replay",
       {uid, env, source: "claimBattleReward", txId, matchId, rev: result.wallet.rev});
   } else {
-    logger.info("claimBattleReward", {
-      uid, env, won, remaining, matchId, currency, amount, rev: result.wallet.rev,
+    recordEvent(EVENTS.battleRewardClaimed.name, {
+      uid, env, eventId: txId, sourceCommand: "claimBattleReward", result: "success",
+      won, remaining, matchId, currency, amount, rev: result.wallet.rev,
       txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",
     });
   }

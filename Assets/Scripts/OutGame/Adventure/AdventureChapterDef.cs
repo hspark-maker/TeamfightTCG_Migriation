@@ -28,17 +28,20 @@ public struct AdventureChapterDef
              "비우면 그 챕터의 정점과 길이 통째로 안 나온다(에러).")]
     public GameObject tilePrefab;
 
+    [Tooltip("이 챕터 전투의 배경 그림. 비우면 BattleScene 저작 배경을 그대로 쓴다(진행에는 영향 없다).\n" +
+             "· Battle_BG의 비균등 스케일은 저작 배경 하나에 맞춰 굳어 있고 코드가 손대지 않는다 — " +
+             "같은 픽셀 크기·PPU로 저작해라. 다르면 그 스케일대로 늘어난다(런타임 경고가 뜬다).\n" +
+             "· 갈아끼우는 것은 모험 전투뿐이다. 랭크전·튜토리얼은 저작 배경 그대로다.")]
+    public Sprite battleBackground;
+
     [Tooltip("챕터 안 정점 목록. 리스트 순서 = 도전 순서이며, 앞 챕터 마지막 정점을 깨야 다음 챕터 첫 정점이 열린다. " +
              "0개면 완주 판정 모수가 없어 런타임에선 그냥 완주로 넘어간다 — 진행이 막히진 않지만 검증 오류다.")]
     public List<AdventureNodeDef> nodes;
 
-    [Tooltip("이 챕터를 여는 데 필요한 랭크 등급. 이 등급에 도달하기 전에는 챕터 전체가 잠기고 정점에 들어갈 수 없다.\n" +
-             "· 등급 순서는 브론즈 < 실버 < 골드 < 플래티넘 < 다이아몬드다(선언 순서가 곧 강함 순서).\n" +
-             "· 미저작(브론즈)은 사실상 항상 열림이다 — 아직 랭크에 오르지 못한 유저도 브론즈로 판정되기 때문이다. 첫 챕터는 반드시 브론즈로 둔다.\n" +
-             "· 챕터 순서대로 같거나 높게 저작해라. 앞 챕터보다 낮게 두면 뒤 챕터가 먼저 열려 여정의 순서가 뒤집힌다.\n" +
-             "· 한 번 저작한 값을 올리지 마라 — 이미 그 챕터를 진행하던 유저가 소급해서 막힌다(내리는 것은 안전하다).\n" +
-             "· 이미 깬 정점의 클리어 표식과 챕터 완주 보상은 잠겨도 회수되지 않는다.")]
-    public ERankGrade requiredGrade;
+    /// <summary>이 챕터를 여는 데 필요한 랭크 점수. **저작값이 아니라 AdventureChapter 표에서 채운다** —
+    /// 직렬화하지 않으므로 애셋에 남지 않고, 런타임 사본을 세울 때 서버 행의 requiredPoints 가 들어온다.
+    /// 잠금 판정의 진실원은 표다(<see cref="AdventureNodeSpec"/>).</summary>
+    [NonSerialized] public long requiredPoints;
 
     // 거짓이면 완주 보상을 수령할 수 없다 — 낙인을 남길 키가 없다
     public bool HasStableKey => !string.IsNullOrEmpty(this.chapterId);

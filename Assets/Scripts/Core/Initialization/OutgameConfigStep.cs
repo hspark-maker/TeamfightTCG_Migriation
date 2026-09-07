@@ -16,6 +16,7 @@ public sealed class OutgameConfigStep : MainInitializer
     [SerializeField] AdventureConfig adventureConfig;
     // 프로필 아바타·프레임 표 SO. 미배선이면 아바타·프레임 그림이 전부 프리팹 저작값 그대로 남는다.
     [SerializeField] ProfileConfig profileConfig;
+    [SerializeField] EmoteCatalog emoteCatalog;
     // 덱 대표 이미지 후보 SO. 미배선이면 신규 덱이 이미지 키를 못 받고 표시가 첫 카드 아트로 떨어진다.
     [SerializeField] DeckImageCatalog deckImageCatalog;
     // 룰렛 판 표현 SO. 값(비용·칸)은 Roulette·RouletteSlot 표가 덮고 여기선 사본의 바탕만 준다 — 미배선이면 룰렛만 꺼진다.
@@ -46,6 +47,7 @@ public sealed class OutgameConfigStep : MainInitializer
         }
         AdventureProgress.SetConfig(t_runtimeAdventure);
         ProfileManager.SetConfig(profileConfig);
+        ProfileManager.SetEmoteCatalog(emoteCatalog);
 
         // 표 값을 덮은 사본만 꽂는다 — 저작 SO를 그대로 꽂으면 화면이 서버와 다른 상품을 그린다.
         // 실패하면 아무것도 꽂지 않는다: 룰렛만 서지 않고(IsAvailable=false) 로비 버튼이 숨는다.

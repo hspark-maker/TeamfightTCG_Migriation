@@ -13,36 +13,70 @@ MonoBehaviour:
   m_Name: EmoteCatalog
   m_EditorClassIdentifier: Assembly-CSharp::EmoteCatalog
   entries:
-  - sprite: {fileID: -881465105, guid: dfc4a384019cc0346831aa24c26eeef5, type: 3}
+  - id: 1
+    sprite: {fileID: -881465105, guid: dfc4a384019cc0346831aa24c26eeef5, type: 3}
     clip: {fileID: 7400000, guid: 2050c077f07951d49a217a8008ac2122, type: 2}
-    label: Hi
-  - sprite: {fileID: -524654387, guid: f634b1bc11f239845982a6755c5a1537, type: 3}
+  - id: 2
+    sprite: {fileID: -524654387, guid: f634b1bc11f239845982a6755c5a1537, type: 3}
     clip: {fileID: 7400000, guid: 64e59eadaa5b423409e8dc19158be750, type: 2}
-    label: Dizzy
-  - sprite: {fileID: -80752865, guid: 13b68470fea4f7d4392f9ba97626b02b, type: 3}
+  - id: 3
+    sprite: {fileID: -80752865, guid: 13b68470fea4f7d4392f9ba97626b02b, type: 3}
     clip: {fileID: 7400000, guid: e5fe17b9b0936d64184af09419076987, type: 2}
-    label: Thanks
-  - sprite: {fileID: 51337476, guid: 9bd000808185c0242892dc3671455143, type: 3}
+  - id: 4
+    sprite: {fileID: 51337476, guid: 9bd000808185c0242892dc3671455143, type: 3}
     clip: {fileID: 7400000, guid: ebb4ac3d1e1ffa44d808a321b8e3e88a, type: 2}
-    label: Sad
-  - sprite: {fileID: -433437760, guid: ca481716380744f43a87fac7b0387aeb, type: 3}
+  - id: 5
+    sprite: {fileID: -433437760, guid: ca481716380744f43a87fac7b0387aeb, type: 3}
     clip: {fileID: 7400000, guid: ccdaf067d6e5ee54e92775b2d1a0febc, type: 2}
-    label: Angry
-  - sprite: {fileID: 21300000, guid: 27caff0c89cb558458639efe0b9d0695, type: 3}
+  - id: 6
+    sprite: {fileID: 21300000, guid: 27caff0c89cb558458639efe0b9d0695, type: 3}
     clip: {fileID: 0}
-    label: weirdCat
-  - sprite: {fileID: 1416332904, guid: 1a8f5653cf1705244a204951bfa824fc, type: 3}
+  - id: 7
+    sprite: {fileID: 1416332904, guid: 1a8f5653cf1705244a204951bfa824fc, type: 3}
     clip: {fileID: 7400000, guid: ada22603774e241408fe6c06838629aa, type: 2}
-    label: laugh
-  - sprite: {fileID: 21300000, guid: 45a42ab40de2220469b8c5c77227f35d, type: 3}
+  - id: 8
+    sprite: {fileID: 21300000, guid: 45a42ab40de2220469b8c5c77227f35d, type: 3}
     clip: {fileID: 0}
-    label: Pepe
-  - sprite: {fileID: 21300000, guid: de97b403d646b4c48a7d7386397f1aa9, type: 3}
+  - id: 9
+    sprite: {fileID: 21300000, guid: de97b403d646b4c48a7d7386397f1aa9, type: 3}
     clip: {fileID: 0}
-    label: KKang
+  - id: 10
+    sprite: {fileID: 21300000, guid: c8d1e1b07c872074db9cc13a90b1aa6c, type: 3}
+    clip: {fileID: 0}
+  - id: 11
+    sprite: {fileID: 21300000, guid: 67d2f12052a1ad5449285eca34104bec, type: 3}
+    clip: {fileID: 0}
+  - id: 12
+    sprite: {fileID: 21300000, guid: 63359f7d967af6141ba0c37bbe73329f, type: 3}
+    clip: {fileID: 0}
+  - id: 13
+    sprite: {fileID: 21300000, guid: 44f2de2ba973c8241918996cea961acc, type: 3}
+    clip: {fileID: 0}
+  - id: 14
+    sprite: {fileID: 21300000, guid: e8fb8ec18cd1ecc4eb69cfb9a0faf80d, type: 3}
+    clip: {fileID: 0}
+  - id: 15
+    sprite: {fileID: 21300000, guid: 46305d08117ac8e479e805af94920565, type: 3}
+    clip: {fileID: 0}
+  - id: 16
+    sprite: {fileID: 21300000, guid: 4dd91bf24f51a61468c60c45f0cb539c, type: 3}
+    clip: {fileID: 0}
+  - id: 17
+    sprite: {fileID: -801277098, guid: 6851db7f6d680024e9dbfeb5fb67fa7f, type: 3}
+    clip: {fileID: 7400000, guid: 9286cb8414952054d847975284e3ac63, type: 2}
+  - id: 18
+    sprite: {fileID: 791405735, guid: dd3eb56f17a37cd45bd231412232f070, type: 3}
+    clip: {fileID: 7400000, guid: df1ba7f71ab5f1741a785c7dcf35b301, type: 2}
+  - id: 19
+    sprite: {fileID: -1046682465, guid: 31ed5e03d497f784ba858e9795571e51, type: 3}
+    clip: {fileID: 7400000, guid: 1999d6e1c1e3c084b81d24f20d293ea5, type: 2}
+  - id: 20
+    sprite: {fileID: -1598917867, guid: ac05aad0be415e241a643e3f27170132, type: 3}
+    clip: {fileID: 7400000, guid: a2f698dbcfb5f0f4295bca0b2babd382, type: 2}
+  - id: 21
+    sprite: {fileID: 1496361464, guid: a3b5ef28dd56a5c4fae3bd8942e768cf, type: 3}
+    clip: {fileID: 7400000, guid: 7f21a8007f7fdc44ca58a3cf534faeb3, type: 2}
   showDuration: 2.5
-  fadeDuration: 0.3
-  popScale: 1.25
   peelInDuration: 1
   peelOutDuration: 1
   peelStartAmount: 0.5

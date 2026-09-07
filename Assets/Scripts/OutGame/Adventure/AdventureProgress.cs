@@ -131,13 +131,16 @@ public static class AdventureProgress
     public static bool TryGetChapter(int _chapterIndex, out AdventureChapterDef _chapter)
         => Config.TryGetChapter(_chapterIndex, out _chapter);
 
+    public static int ChapterIndexOfNode(int _nodeIndex) => Config.ChapterIndexOfNode(_nodeIndex);
+
     // 챕터가 랭크 미달로 통째로 잠겼는가. 진행 낙인과 무관한 파생값이라 정점 상태(StateOf)와 축이 다르다 —
     // 포인트가 오르면 저작을 건드리지 않아도 저절로 풀린다.
     public static bool IsChapterRankLocked(int _chapterIndex)
     {
         if (!Config.TryGetChapter(_chapterIndex, out AdventureChapterDef t_chapter)) return false;
 
-        return RankManager.CurrentGrade < t_chapter.requiredGrade;
+        // 문턱의 진실원은 AdventureChapter 표의 requiredPoints 다 — 등급이 아니라 점수로 잰다.
+        return RankManager.Points < t_chapter.requiredPoints;
     }
 
     // 정점이 속한 챕터가 랭크로 잠겼는가(정점 뷰가 챕터를 다시 세지 않게 하는 창구)
@@ -148,7 +151,8 @@ public static class AdventureProgress
     public static bool TryGetRequiredGrade(int _chapterIndex, out ERankGrade _grade)
     {
         bool t_found = Config.TryGetChapter(_chapterIndex, out AdventureChapterDef t_chapter);
-        _grade = t_found ? t_chapter.requiredGrade : default;
+        // 표는 점수만 준다 — 문구에 쓸 등급은 그 점수가 속한 티어에서 되짚는다(랭크 곡선이 진실원).
+        _grade = t_found ? RankManager.GetInfoAt(t_chapter.requiredPoints).Grade : default;
         return t_found;
     }
 

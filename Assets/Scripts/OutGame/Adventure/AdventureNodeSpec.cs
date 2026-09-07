@@ -65,10 +65,22 @@ public static class AdventureNodeSpec
             return false;
         }
 
+        if (!TryValidateGateOrder(t_rows, out _error)) return false;
+
         if (s_runtime != null) UnityEngine.Object.Destroy(s_runtime);
         AdventureConfig t_runtime = UnityEngine.Object.Instantiate(_authoredSkin);
         t_runtime.name = _authoredSkin.name + " (ServerSpec)";
         t_runtime.hideFlags = HideFlags.DontSave;
+
+        // 챕터 묶음·정점 순서·잠금 점수는 표가 정한다. 저작은 그림과 문구만 낸다.
+        var t_layout = new List<AdventureConfig.ServerLayoutRow>(t_rows.Count);
+        foreach (ParsedNode t_row in t_rows)
+            t_layout.Add(new AdventureConfig.ServerLayoutRow(t_row.ChapterId, t_row.NodeId, t_row.RequiredPoints));
+        if (!t_runtime.TryApplyServerLayout(t_layout, out _error))
+        {
+            UnityEngine.Object.Destroy(t_runtime);
+            return false;
+        }
 
         foreach (ParsedNode t_row in t_rows)
             if (!t_runtime.TrySetNodeBattleSpec(t_row.NodeId, t_row.EnemyDeck, t_row.AiCardLevel))
@@ -124,9 +136,48 @@ public static class AdventureNodeSpec
                 return false;
             }
 
-            _parsed.Add(new ParsedNode(t_row.nodeId, new List<int>(t_deck), t_row.aiCardLevel));
+            if (string.IsNullOrEmpty(t_row.chapterId))
+            {
+                _error = $"AdventureChapter '{t_row.nodeId}'의 chapterId가 비어 있다.";
+                return false;
+            }
+            if (t_row.requiredPoints < 0)
+            {
+                _error = $"AdventureChapter '{t_row.nodeId}'의 requiredPoints {t_row.requiredPoints}가 음수다.";
+                return false;
+            }
+
+            _parsed.Add(new ParsedNode(
+                t_row.chapterId, t_row.nodeId, new List<int>(t_deck), t_row.aiCardLevel, t_row.requiredPoints));
         }
 
+        return true;
+    }
+
+    /// <summary>챕터 잠금 점수가 뒤로 갈수록 낮아지지 않는지 본다 — 역행하면 뒤 챕터가 먼저 열려
+    /// 여정의 순서가 뒤집힌다. 첫 챕터는 0이어야 한다(랭크에 오르기 전 유저도 들어갈 수 있어야 한다).</summary>
+    static bool TryValidateGateOrder(List<ParsedNode> _rows, out string _error)
+    {
+        _error = null;
+        var t_seen = new List<string>();
+        long t_previous = -1;
+        foreach (ParsedNode t_row in _rows)
+        {
+            if (t_seen.Contains(t_row.ChapterId)) continue;
+            t_seen.Add(t_row.ChapterId);
+
+            if (t_seen.Count == 1 && t_row.RequiredPoints != 0)
+            {
+                _error = $"첫 챕터 '{t_row.ChapterId}'의 requiredPoints가 {t_row.RequiredPoints}다 — 0이어야 한다.";
+                return false;
+            }
+            if (t_row.RequiredPoints < t_previous)
+            {
+                _error = $"챕터 '{t_row.ChapterId}'의 requiredPoints {t_row.RequiredPoints}가 앞 챕터({t_previous})보다 낮다.";
+                return false;
+            }
+            t_previous = t_row.RequiredPoints;
+        }
         return true;
     }
 
@@ -139,15 +190,21 @@ public static class AdventureNodeSpec
 
     readonly struct ParsedNode
     {
+        public readonly string ChapterId;
         public readonly string NodeId;
         public readonly IReadOnlyList<int> EnemyDeck;
         public readonly int AiCardLevel;
+        public readonly long RequiredPoints;
 
-        public ParsedNode(string _nodeId, IReadOnlyList<int> _enemyDeck, int _aiCardLevel)
+        public ParsedNode(
+            string _chapterId, string _nodeId, IReadOnlyList<int> _enemyDeck,
+            int _aiCardLevel, long _requiredPoints)
         {
+            ChapterId = _chapterId;
             NodeId = _nodeId;
             EnemyDeck = _enemyDeck;
             AiCardLevel = _aiCardLevel;
+            RequiredPoints = _requiredPoints;
         }
     }
 }

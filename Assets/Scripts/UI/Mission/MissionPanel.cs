@@ -80,8 +80,10 @@ public class MissionPanel : PooledUIBase
         this.SetVisible(true);
         this.Rebuild();
 
-        // 조회는 던져만 둔다. 실패해도 캐시로 그린 화면은 그대로 남고, 성공하면 OnChanged 가 다시 그린다.
-        MissionCommands.RefreshAsync().Forget();
+        // 정상 경로의 조회는 초기화(MissionPreloadStep)가 이미 했다 — 열 때마다 왕복하지 않는다.
+        // 여기 조회는 그 왕복이 실패해 캐시가 빈 경우의 안전망뿐이다. 던져만 두므로 화면은 기다리지 않고,
+        // 응답이 오면 OnChanged 가 다시 그린다.
+        if (!MissionManager.IsReady) MissionCommands.RefreshAsync().Forget();
     }
 
     public void Close() => this.SetVisible(false);

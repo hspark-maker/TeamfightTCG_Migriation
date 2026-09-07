@@ -2,6 +2,8 @@ import {FieldValue} from "firebase-admin/firestore";
 import {randomUUID} from "node:crypto";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
+import {EVENTS} from "../analytics/eventNames";
+import {recordEvent} from "../observability/analyticsEvent";
 import {
   isKnownEnv,
   mutateSave,
@@ -23,6 +25,13 @@ import {
 } from "../missions/missionStore";
 import {missionPeriod} from "../missions/period";
 import {readSpecRows} from "../packs/packSpecReader";
+import {currentPassSeason, parsePassSeasons, PassSeasonDef} from "../pass/passSpec";
+import {
+  beginPassMutation,
+  commitPassExp,
+  passProgressResponse,
+  PassProgressResponse,
+} from "../pass/passStore";
 import {
   judgeRewardClaim as judgeSpecRewardClaim,
   parseRewardRows,
@@ -96,7 +105,27 @@ export const claimMission = onCall(async (request) => {
 
   // 스펙 읽기는 트랜잭션 밖에서 끝낸다. 재화 보상의 진실원은 Reward 표이고,
   // MissionDef 는 조건·표시·passExp 만 소유한다.
-  const rewardRows = parseRewardRows(await readSpecRows(env, "Reward"));
+  const [rawRewardRows, passSeasonRows] = await Promise.all([
+    readSpecRows(env, "Reward"),
+    // 표가 아직 발행되지 않은 상태(패스 출시 전)는 정상 경로다 — 미션 수령마다 error 를 찍으면
+    // 진짜 장애가 그 소음에 묻힌다. 저작이 깨진 경우(PASS_SPEC_INVALID)만 error 로 남긴다.
+    readSpecRows(env, "PassSeason").catch((error) => {
+      logger.warn("mission pass accrual skipped", {
+        uid, env, code: "PASS_SPEC_UNAVAILABLE", error: String(error),
+      });
+      return [];
+    }),
+  ]);
+  const rewardRows = parseRewardRows(rawRewardRows);
+  let activePassSeason: PassSeasonDef | null = null;
+  try {
+    activePassSeason = currentPassSeason(parsePassSeasons(passSeasonRows), Date.now());
+  } catch (error) {
+    // A broken or not-yet-published pass must not block the mission's currency reward.
+    logger.error("mission pass accrual skipped", {
+      uid, env, code: "PASS_SPEC_INVALID", error: String(error),
+    });
+  }
 
   // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
   const txId = clientReceiptId(request.data?.txId, randomUUID());
@@ -115,12 +144,16 @@ export const claimMission = onCall(async (request) => {
   let missionTarget = 0;
   let grantedCurrencies: CurrencyGain[] = [];
   let grantedPassExp = 0;
+  let passProgress: PassProgressResponse | undefined;
 
   const result = await mutateSave(env, uid, "claimMission", {kind: "client", txId},
     async (_current, transaction, wallet): Promise<SaveMutation> => {
       // 읽기가 콜백의 첫 줄이고, 아래 쓰기보다 앞이다(Firestore 트랜잭션 규칙).
       // beginMissionBump 이 기간 리셋까지 반영하므로, 어제 진행도로 오늘 보상을 타는 경로가 없다.
       const missions = await beginMissionBump(transaction, db, env, uid, period);
+      // Keep this read before commitMissionClaim and all other transaction writes.
+      const pass = activePassSeason === null ? undefined :
+        await beginPassMutation(transaction, db, env, uid, activePassSeason.seasonId);
 
       // 판정은 순수 모듈이 한다 — 여기서 다시 재면 테스트가 보는 규칙과 집행되는 규칙이 갈린다.
       const verdict = judgeMissionClaim(missionId, missions.state);
@@ -159,6 +192,10 @@ export const claimMission = onCall(async (request) => {
       // 깎으면 같은 이벤트를 세는 주간 미션이 함께 무너진다.
       commitMissionClaim(
         transaction, missions, mission.id, mission.passExp, FieldValue.serverTimestamp());
+      if (pass !== undefined) {
+        commitPassExp(transaction, pass, mission.passExp, FieldValue.serverTimestamp());
+        passProgress = passProgressResponse(pass.state);
+      }
       missionState = missionResponse(missions.state, period);
 
       // 세이브 슬롯은 하나도 건드리지 않는다. mutateSave 가 revision 만 올리고,
@@ -182,18 +219,20 @@ export const claimMission = onCall(async (request) => {
         granted: grantedCurrencies,
         grantedPassExp,
         missions: missionState,
+        pass: passProgress,
       };
     });
 
   if (replayed) {
     logger.info("receipt replay", {uid, env, source: "claimMission", txId, revision: result.revision});
   } else {
-    logger.info("claimMission", {
-      uid, env,
-      missionId, period: missionPeriodKind, event: missionEvent,
+    recordEvent(EVENTS.missionClaimed.name, {
+      uid, env, eventId: txId, sourceCommand: "claimMission", result: "success",
+      missionId, period: missionPeriodKind, missionEvent,
       progress, target: missionTarget,
       granted: grantedCurrencies.map((gain) => `${gain.currency}+${gain.amount}`).join(","),
       passExp: grantedPassExp,
+      passSeasonId: activePassSeason?.seasonId ?? null,
       revision: result.revision,
       txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",
     });

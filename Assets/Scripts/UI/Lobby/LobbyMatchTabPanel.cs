@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -27,6 +27,12 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     [Tooltip("룰렛을 여는 버튼. 잠김 룩(FeatureLockView)은 붙이지 않는다 — 룰렛 해금은 온보딩 축이라 아직 없다.")]
     [SerializeField] Button rouletteButton;
 
+    [Tooltip("일일·주간 미션을 여는 버튼. 잠금 축이 없어 항상 눌린다 — 목록이 비는 주기는 화면이 스스로 안내한다.")]
+    [SerializeField] Button missionButton;
+
+    [Tooltip("배틀패스를 여는 버튼. 시즌 공백기에도 눌린다 — 시즌이 없다는 것은 화면이 안내한다.")]
+    [SerializeField] Button passButton;
+
     [Header("모험")]
     [Tooltip("모험 맵으로 가는 버튼. 이동 자체는 LobbyRoot가 한다 — 탭 패널은 탭 이동을 모른다.")]
     [SerializeField] Button adventureButton;
@@ -44,6 +50,8 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (rankRewardButton != null) rankRewardButton.onClick.AddListener(OpenRankRewards);
         if (keywordGrowthButton != null) keywordGrowthButton.onClick.AddListener(OpenKeywordGrowth);
         if (rouletteButton != null) rouletteButton.onClick.AddListener(OpenRoulette);
+        if (missionButton != null) missionButton.onClick.AddListener(OpenMissions);
+        if (passButton != null) passButton.onClick.AddListener(OpenPass);
         if (adventureButton != null) adventureButton.onClick.AddListener(HandleAdventureRequested);
 
         if (playLabel != null) m_defaultPlayText = playLabel.text;
@@ -71,6 +79,8 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (rankRewardButton != null) rankRewardButton.onClick.RemoveListener(OpenRankRewards);
         if (keywordGrowthButton != null) keywordGrowthButton.onClick.RemoveListener(OpenKeywordGrowth);
         if (rouletteButton != null) rouletteButton.onClick.RemoveListener(OpenRoulette);
+        if (missionButton != null) missionButton.onClick.RemoveListener(OpenMissions);
+        if (passButton != null) passButton.onClick.RemoveListener(OpenPass);
         if (adventureButton != null) adventureButton.onClick.RemoveListener(HandleAdventureRequested);
 
         OutgameFeatureLock.OnChanged -= ApplyFeatureLocks;
@@ -133,6 +143,10 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     /// <summary>일일·주간 미션. 잠금 게이트가 없다 — 미션은 부가 기능이고, 목록이 비어도
     /// 화면이 스스로 안내한다(활성 미션이 현재 팩 개봉 축뿐이라 실제로 비는 주기가 있다).</summary>
     public void OpenMissions() => OpenPooled<MissionPanel>();
+
+    /// <summary>배틀패스. 미션과 같은 이유로 잠금 게이트가 없다 — 활성 시즌이 없으면
+    /// 화면이 그 사실을 그린다(빈 목록으로 두지 않는다).</summary>
+    public void OpenPass() => OpenPooled<PassPanel>();
 
     static void OpenPooled<T>() where T : PooledUIBase
     {

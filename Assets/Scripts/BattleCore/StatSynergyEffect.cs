@@ -1,3 +1,5 @@
+using TeamfightTCG.BattleCore;
+
 
 // 배선 데모용 선언형 효과: 생명력 가산 + 키워드 부여 + 피해 감소.
 // "효과=데이터로 추가"의 증명 에셋. 규칙은 CardInstance.ApplySynergy에 위임.
@@ -56,6 +58,8 @@ public class StatSynergyEffect : SynergyEffect
     void FireIfBonusHp(CardInstance _self, SynergyRuntime _synergy, BattleFieldState _field)
     {
         if (_self == null || this.bonusHp <= 0) return;
+        BattleEventStream.Emit(new BattleEvent(BattleEventKind.SynergyFired,
+            _self.ownerIndex, _self.slotIndex));
         SynergyPresentationStream.Emit(new SynergyFirePlan
         {
             self = _self,
@@ -68,6 +72,8 @@ public class StatSynergyEffect : SynergyEffect
     public override void OnAttacked(AttackedCtx _ctx)
     {
         if (_ctx.self == null || this.dmgReduction <= 0) return;   // 피해 감소가 없으면 피격과 무관한 스탯
+        BattleEventStream.Emit(new BattleEvent(BattleEventKind.SynergyFired,
+            _ctx.self.ownerIndex, _ctx.self.slotIndex));
         SynergyPresentationStream.Emit(new SynergyFirePlan
         {
             self = _ctx.self,

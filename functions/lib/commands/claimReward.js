@@ -37,6 +37,8 @@ exports.claimReward = void 0;
 const firestore_1 = require("firebase-admin/firestore");
 const node_crypto_1 = require("node:crypto");
 const firebaseApp_1 = require("../firebaseApp");
+const eventNames_1 = require("../analytics/eventNames");
+const analyticsEvent_1 = require("../observability/analyticsEvent");
 const missionStore_1 = require("../missions/missionStore");
 const period_1 = require("../missions/period");
 const https_1 = require("firebase-functions/v2/https");
@@ -381,7 +383,7 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
         //
         // 진행도를 올리는 것은 이 명령뿐이다 — claimMission 은 ClaimReward 를 올리지 않는다.
         // 올리면 미션 수령이 미션을 낳는 자기참조가 된다.
-        (0, missionStore_1.commitMissionBump)(transaction, missions, "ClaimReward", 1, firestore_1.FieldValue.serverTimestamp());
+        (0, missionStore_1.commitMissionBump)(transaction, missions, eventNames_1.EVENTS.rewardClaimed.missionKey, 1, firestore_1.FieldValue.serverTimestamp());
         missionState = (0, missionStore_1.missionResponse)(missions.state, period);
         if (ownerType === "Rank") {
             const rank = claimRankTier(current, tierIndex, requiredPoints, tierCount, context);
@@ -405,8 +407,9 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
         logger.info("receipt replay", { uid, env, source: "claimReward", txId, revision: result.revision });
     }
     else {
-        logger.info("claimReward", {
-            uid, env, ownerType, ownerId: specOwnerId,
+        (0, analyticsEvent_1.recordEvent)(eventNames_1.EVENTS.rewardClaimed.name, {
+            uid, env, eventId: txId, sourceCommand: "claimReward", result: "success",
+            ownerType, ownerId: specOwnerId,
             granted: gains.map((gain) => `${gain.currency}+${gain.amount}`).join(","),
             droppedCount: dropped.length,
             revision: result.revision,

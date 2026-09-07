@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 internal sealed class ReplayRequest
@@ -103,7 +104,8 @@ internal sealed record ReplayResponse(
     int[] Remaining,
     int[] DestroyedByOwner,
     string FinalStateHash,
-    int DrawCount)
+    int DrawCount,
+    ReplayStatsResponse? Stats)
 {
     public static ReplayResponse From(BattleReplayResult _result) => new(
         _result.Ok,
@@ -114,5 +116,31 @@ internal sealed record ReplayResponse(
         _result.Remaining,
         _result.DestroyedByOwner,
         _result.FinalStateHash.ToString("x16", CultureInfo.InvariantCulture),
-        _result.DrawCount);
+        _result.DrawCount,
+        ReplayStatsResponse.From(_result.Stats));
+}
+
+internal sealed record ReplayStatsResponse(
+    int[] AttacksByOwner,
+    int[] DamageDealtByOwner,
+    int[] HealedByOwner,
+    int[] SynergyFiredByOwner,
+    Dictionary<string, int>[] KeywordsByOwner,
+    int Turns)
+{
+    public static ReplayStatsResponse? From(BattleReplayStats? _stats)
+    {
+        if (_stats == null) return null;
+        return new ReplayStatsResponse(
+            _stats.AttacksByOwner,
+            _stats.DamageDealtByOwner,
+            _stats.HealedByOwner,
+            _stats.SynergyFiredByOwner,
+            new[]
+            {
+                _stats.KeywordsByOwner[0].ToDictionary(_pair => _pair.Key, _pair => _pair.Value),
+                _stats.KeywordsByOwner[1].ToDictionary(_pair => _pair.Key, _pair => _pair.Value),
+            },
+            _stats.Turns);
+    }
 }

@@ -1,6 +1,8 @@
 import {FieldValue} from "firebase-admin/firestore";
 import {randomUUID} from "node:crypto";
 import {db} from "../firebaseApp";
+import {EVENTS} from "../analytics/eventNames";
+import {recordEvent} from "../observability/analyticsEvent";
 import {
   beginMissionBump,
   commitMissionBump,
@@ -147,7 +149,8 @@ export const limitBreakCard = onCall(async (request) => {
       snackLeft = currentSnack - step.snackCost;
 
       // 진행도는 콜백 안에서 올린다 — 영수증 히트는 이 콜백을 건너뛰므로 재시도가 두 번 올리지 않는다.
-      commitMissionBump(transaction, missions, "LimitBreakCard", 1, FieldValue.serverTimestamp());
+      commitMissionBump(
+        transaction, missions, EVENTS.cardLimitBreakCompleted.missionKey, 1, FieldValue.serverTimestamp());
       missionState = missionResponse(missions.state, period);
 
       // 지갑 키를 싣지 않는다 — 간식은 지갑 재화가 아니라 cardGrowth 슬롯 안 값이다.
@@ -165,8 +168,9 @@ export const limitBreakCard = onCall(async (request) => {
   if (replayed) {
     logger.info("receipt replay", {uid, env, source: "limitBreakCard", txId, revision: result.revision});
   } else {
-    logger.info("limitBreakCard", {
-      uid, env, cardId, stage, hpGain, snackCost, snackLeft,
+    recordEvent(EVENTS.cardLimitBreakCompleted.name, {
+      uid, env, eventId: txId, sourceCommand: "limitBreakCard", result: "success",
+      cardId, stage, hpGain, snackCost, snackLeft,
       revision: result.revision,
       txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",
     });

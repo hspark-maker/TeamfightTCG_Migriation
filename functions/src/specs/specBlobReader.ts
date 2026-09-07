@@ -60,7 +60,10 @@ const INDEX_CACHE_TTL_MS = 30 * 1000;
  * 인덱스에 넣는 것이 정답이지만 그 전까지는 여기 명시된 표만 가변 블롭을 허용한다 —
  * 목록에 없는 미등재 표는 그대로 실패해야 새 표가 조용히 인덱스를 건너뛰는 것을 잡는다.
  */
-const UNINDEXED_TABLES = new Set<string>(["AdventureChapter"]);
+// 비어 있다 — 모든 표가 `_index` 로 공개된다. AdventureChapter 는 SO 저작을 따로 올리는 경로가 있어
+// 여기 있었지만, 그 경로를 지우고 시트(스펙 표) 하나로 합치면서 다른 표와 같은 규칙으로 돌아왔다.
+// 서버와 클라가 같은 발행본을 보게 하는 것이 이 목록을 비워 두는 이유다.
+const UNINDEXED_TABLES = new Set<string>();
 const UNINDEXED_CACHE_TTL_MS = 30 * 1000;
 
 async function readPublishedSpec(env: string, table: string): Promise<PublishedSpec> {

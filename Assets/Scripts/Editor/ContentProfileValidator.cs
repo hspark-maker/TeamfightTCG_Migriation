@@ -45,11 +45,12 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
     /// 비차단 경고를 별도로 담아준다.</summary>
     public static List<string> Collect(List<string> _warnings = null, EContentRunMode? _mode = null)
     {
-        // 시트를 새로 생성한 직후에도 검사가 낡은 스냅샷을 보지 않게 매번 다시 읽는다.
-        // SpecSource의 자동 리셋은 플레이 진입 훅뿐이라 에디터 세션에서는 안 돈다.
-        SpecSource.Reload();
-
+        // 검증 대상은 **지금 올리려는 저작본**이다 — 서버 스냅샷이 아니다.
+        // 런타임은 서버 스냅샷만 읽고 폴백이 없으므로(SpecSource), 에디터 도구는 저작본을 이름 불러 올린다.
+        // 시트를 새로 생성한 직후에도 낡은 스냅샷을 보지 않게 매번 다시 읽는 것도 겸한다.
         var t_errors = new List<string>();
+        if (!SpecSource.TryLoadLocalAuthoring(out string t_authoringError))
+            t_errors.Add($"저작본(SpecData.bytes)을 읽지 못했다: {t_authoringError}");
         // 테이블 세대 상수가 C#·content-version.json·서버 TS 세 곳에서 같은지 본다.
         // 앱 빌드 버전은 여기서 보지 않는다 — 테이블 세대와 묶여 있지 않다.
         if (!ContentVersionConsistency.TryValidate(out string t_versionError))

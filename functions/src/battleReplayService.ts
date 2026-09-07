@@ -15,6 +15,16 @@ export type BattleReplayOutcome = {
   destroyedByOwner: number[];
   finalStateHash: string;
   drawCount: number;
+  stats?: BattleReplayStats;
+};
+
+export type BattleReplayStats = {
+  attacksByOwner: number[];
+  damageDealtByOwner: number[];
+  healedByOwner: number[];
+  synergyFiredByOwner: number[];
+  keywordsByOwner: Record<string, number>[];
+  turns: number;
 };
 
 /**
@@ -155,8 +165,46 @@ function parseOutcome(data: Record<string, unknown>): BattleReplayOutcome | null
       !/^[0-9a-f]{16}$/i.test(finalStateHash)) {
     return null;
   }
+  const stats = parseReplayStats(data.stats);
   return {firstOwner, winnerOwner: winnerOwner as number, draw, remaining, destroyedByOwner,
-    finalStateHash, drawCount};
+    finalStateHash, drawCount, ...(stats == null ? {} : {stats})};
+}
+
+function parseReplayStats(raw: unknown): BattleReplayStats | null {
+  const data = objectRecord(raw);
+  if (data == null) return null;
+  const attacksByOwner = nonNegativePair(data.attacksByOwner);
+  const damageDealtByOwner = nonNegativePair(data.damageDealtByOwner);
+  const healedByOwner = nonNegativePair(data.healedByOwner);
+  const synergyFiredByOwner = nonNegativePair(data.synergyFiredByOwner);
+  const keywordsByOwner = keywordPairs(data.keywordsByOwner);
+  const turns = safeInteger(data.turns);
+  if (attacksByOwner == null || damageDealtByOwner == null || healedByOwner == null ||
+      synergyFiredByOwner == null || keywordsByOwner == null || turns == null || turns < 0) return null;
+  return {attacksByOwner, damageDealtByOwner, healedByOwner,
+    synergyFiredByOwner, keywordsByOwner, turns};
+}
+
+function nonNegativePair(raw: unknown): number[] | null {
+  const pair = numberPair(raw);
+  return pair != null && pair[0] >= 0 && pair[1] >= 0 ? pair : null;
+}
+
+function keywordPairs(raw: unknown): Record<string, number>[] | null {
+  if (!Array.isArray(raw) || raw.length !== 2) return null;
+  const result: Record<string, number>[] = [];
+  for (const value of raw) {
+    const record = objectRecord(value);
+    if (record == null) return null;
+    const parsed: Record<string, number> = {};
+    for (const [key, count] of Object.entries(record)) {
+      const integer = safeInteger(count);
+      if (key.length === 0 || key.length > 32 || integer == null || integer < 0) return null;
+      parsed[key] = integer;
+    }
+    result.push(parsed);
+  }
+  return result;
 }
 
 function transportReason(error: unknown): string {

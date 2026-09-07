@@ -39,6 +39,8 @@ const logger = __importStar(require("firebase-functions/logger"));
 const node_crypto_1 = require("node:crypto");
 const firestore_1 = require("firebase-admin/firestore");
 const firebaseApp_1 = require("../firebaseApp");
+const eventNames_1 = require("../analytics/eventNames");
+const analyticsEvent_1 = require("../observability/analyticsEvent");
 const missionStore_1 = require("../missions/missionStore");
 const period_1 = require("../missions/period");
 const saveDocument_1 = require("../save/saveDocument");
@@ -142,7 +144,7 @@ exports.enhanceCard = (0, https_1.onCall)(async (request) => {
         // 실패한 강화도 센다 — 재화는 이미 나갔고, 미션이 확률에 좌우되면 같은 횟수를 굴린 두 유저가
         // 서로 다른 진행도를 갖는다. 진행도는 "시도"의 축이다.
         // 이 쓰기는 위 grants 읽기보다 뒤여야 한다(Firestore 트랜잭션 규칙).
-        (0, missionStore_1.commitMissionBump)(transaction, missions, "EnhanceCard", 1, firestore_1.FieldValue.serverTimestamp());
+        (0, missionStore_1.commitMissionBump)(transaction, missions, eventNames_1.EVENTS.cardEnhanceResolved.missionKey, 1, firestore_1.FieldValue.serverTimestamp());
         missionState = (0, missionStore_1.missionResponse)(missions.state, period);
         return {
             slots: {
@@ -158,8 +160,9 @@ exports.enhanceCard = (0, https_1.onCall)(async (request) => {
         logger.info("receipt replay", { uid, env, source: "enhanceCard", txId, revision: result.revision });
     }
     else {
-        logger.info("enhanceCard", {
-            uid, env, cardId, outcome, level, currency, cost,
+        (0, analyticsEvent_1.recordEvent)(eventNames_1.EVENTS.cardEnhanceResolved.name, {
+            uid, env, eventId: txId, sourceCommand: "enhanceCard", result: outcome,
+            cardId, outcome, level, currency, cost,
             freeShotRequested, freeShotUsed,
             revision: result.revision,
             txIdSource: (0, receiptId_1.isClientReceiptId)(request.data?.txId) ? "client" : "server",

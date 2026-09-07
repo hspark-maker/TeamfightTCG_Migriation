@@ -38,6 +38,8 @@ const node_crypto_1 = require("node:crypto");
 const firestore_1 = require("firebase-admin/firestore");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
+const eventNames_1 = require("../analytics/eventNames");
+const analyticsEvent_1 = require("../observability/analyticsEvent");
 const firebaseApp_1 = require("../firebaseApp");
 const saveDocument_1 = require("../save/saveDocument");
 const domainReject_1 = require("../save/domainReject");
@@ -216,8 +218,9 @@ exports.claimBattleReward = (0, https_1.onCall)(async (request) => {
         logger.info("receipt replay", { uid, env, source: "claimBattleReward", txId, matchId, rev: result.wallet.rev });
     }
     else {
-        logger.info("claimBattleReward", {
-            uid, env, won, remaining, matchId, currency, amount, rev: result.wallet.rev,
+        (0, analyticsEvent_1.recordEvent)(eventNames_1.EVENTS.battleRewardClaimed.name, {
+            uid, env, eventId: txId, sourceCommand: "claimBattleReward", result: "success",
+            won, remaining, matchId, currency, amount, rev: result.wallet.rev,
             txIdSource: (0, receiptId_1.isClientReceiptId)(request.data?.txId) ? "client" : "server",
         });
     }

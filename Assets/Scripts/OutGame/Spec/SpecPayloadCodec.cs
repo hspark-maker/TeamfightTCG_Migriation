@@ -27,6 +27,7 @@ public static class SpecPayloadCodec
         "AccountLevel",
         "Roulette", "RouletteSlot",
         "AdventureChapter",
+        "PassSeason", "PassLevel",
     };
 
     /// <summary>
@@ -319,6 +320,7 @@ public static class SpecPayloadCodec
         "AccountLevel" => typeof(AccountLevel),
         "Roulette" => typeof(Roulette), "RouletteSlot" => typeof(RouletteSlot),
         "AdventureChapter" => typeof(AdventureChapter),
+        "PassSeason" => typeof(PassSeason), "PassLevel" => typeof(PassLevel),
         _ => null,
     };
 

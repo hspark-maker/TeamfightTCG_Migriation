@@ -3,6 +3,8 @@ import * as logger from "firebase-functions/logger";
 import {FieldValue} from "firebase-admin/firestore";
 import {randomInt, randomUUID} from "node:crypto";
 import {db} from "../firebaseApp";
+import {EVENTS} from "../analytics/eventNames";
+import {recordEvent} from "../observability/analyticsEvent";
 import {
   beginMissionBump,
   commitMissionBump,
@@ -150,7 +152,7 @@ export const openPack = onCall(async (request) => {
 
       // 진행도는 콜백 **안**에서 올린다 — mutateSave 는 영수증이 히트하면 이 콜백을 통째로 건너뛰므로,
       // 그 덕에 재시도가 진행도를 두 번 올리지 않는다. 콜백 밖으로 옮기면 그 보장이 사라진다.
-      commitMissionBump(transaction, missions, "OpenPack", 1, FieldValue.serverTimestamp());
+      commitMissionBump(transaction, missions, EVENTS.packOpened.missionKey, 1, FieldValue.serverTimestamp());
       missionState = missionResponse(missions.state, period);
 
       return {
@@ -171,8 +173,8 @@ export const openPack = onCall(async (request) => {
   if (replayed) {
     logger.info("receipt replay", {uid, env, source: "openPack", txId, revision: result.revision});
   } else {
-    logger.info("openPack", {
-      uid, env, packId,
+    recordEvent(EVENTS.packOpened.name, {
+      uid, env, eventId: txId, sourceCommand: "openPack", result: "success", packId,
       priceType: pack.priceType, price: pack.price,
       drawCount: pack.drawCount, uniqueDraw: pack.uniqueDraw, poolSize,
       drawn: drawn.map((card) => `${card.cardId}${card.isNew ? "+" : "="}`).join(","),

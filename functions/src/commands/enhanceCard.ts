@@ -3,6 +3,8 @@ import * as logger from "firebase-functions/logger";
 import {randomInt, randomUUID} from "node:crypto";
 import {FieldValue} from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
+import {EVENTS} from "../analytics/eventNames";
+import {recordEvent} from "../observability/analyticsEvent";
 import {
   beginMissionBump,
   commitMissionBump,
@@ -156,7 +158,7 @@ export const enhanceCard = onCall(async (request) => {
       // 실패한 강화도 센다 — 재화는 이미 나갔고, 미션이 확률에 좌우되면 같은 횟수를 굴린 두 유저가
       // 서로 다른 진행도를 갖는다. 진행도는 "시도"의 축이다.
       // 이 쓰기는 위 grants 읽기보다 뒤여야 한다(Firestore 트랜잭션 규칙).
-      commitMissionBump(transaction, missions, "EnhanceCard", 1, FieldValue.serverTimestamp());
+      commitMissionBump(transaction, missions, EVENTS.cardEnhanceResolved.missionKey, 1, FieldValue.serverTimestamp());
       missionState = missionResponse(missions.state, period);
 
       return {
@@ -174,8 +176,9 @@ export const enhanceCard = onCall(async (request) => {
   if (replayed) {
     logger.info("receipt replay", {uid, env, source: "enhanceCard", txId, revision: result.revision});
   } else {
-    logger.info("enhanceCard", {
-      uid, env, cardId, outcome, level, currency, cost,
+    recordEvent(EVENTS.cardEnhanceResolved.name, {
+      uid, env, eventId: txId, sourceCommand: "enhanceCard", result: outcome,
+      cardId, outcome, level, currency, cost,
       freeShotRequested, freeShotUsed,
       revision: result.revision,
       txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",

@@ -4,6 +4,8 @@ import {FieldValue, Timestamp} from "firebase-admin/firestore";
 import {randomBytes} from "node:crypto";
 import {db} from "../firebaseApp";
 import {withCountedTransaction} from "../observability/countedTransaction";
+import {EVENTS} from "../analytics/eventNames";
+import {recordEvent} from "../observability/analyticsEvent";
 import {
   joinPairing,
   MatchIdentity,
@@ -115,7 +117,7 @@ export const createMatch = onCall({enforceAppCheck: false}, async (request) => {
     seedHex: randomBytes(8).toString("hex"),
   };
 
-  return withCountedTransaction("createMatch", async (tx) => {
+  const result = await withCountedTransaction("createMatch", async (tx) => {
     const matchSnapshot = await tx.get(matchRef);
     const raw = matchSnapshot.data();
     const priorOwners = objectRecord(raw?.ownerIndexByUid) ?? {};
@@ -154,6 +156,7 @@ export const createMatch = onCall({enforceAppCheck: false}, async (request) => {
         rulesetVersion: raw.rulesetVersion as number,
         slot: data.ownerIndex,
         status: "paired",
+        analyticsEligible: false,
       };
     }
     const priorRecord = readPairingRecord(raw);
@@ -190,7 +193,9 @@ export const createMatch = onCall({enforceAppCheck: false}, async (request) => {
       priorRecord.participantUids.length === record.participantUids.length &&
       priorRecord.participantUids.every((participant, index) =>
         participant === record.participantUids[index]);
-    if (unchanged && priorOwner === data.ownerIndex) return response;
+    if (unchanged && priorOwner === data.ownerIndex) {
+      return {...response, analyticsEligible: false};
+    }
 
     const retainedSpecPins = (objectRecord(raw?.specPins) as Record<string, {blobPath: string; payloadHash: string}> | null) ??
       currentSpecPins;
@@ -232,6 +237,25 @@ export const createMatch = onCall({enforceAppCheck: false}, async (request) => {
       expectedParticipants: record.expectedParticipants,
       pairingKeyHash: pairingId,
     });
-    return response;
+    return {...response, analyticsEligible: priorRecord == null};
   });
+  if (result.analyticsEligible) {
+    recordEvent(EVENTS.matchCreated.name, {
+      uid,
+      env: data.env,
+      eventId: result.matchId,
+      sourceCommand: "createMatch",
+      result: result.status,
+      matchId: result.matchId,
+      mode: data.mode,
+      ownerIndex: data.ownerIndex,
+    });
+  }
+  return {
+    matchId: result.matchId,
+    seedHex: result.seedHex,
+    rulesetVersion: result.rulesetVersion,
+    slot: result.slot,
+    status: result.status,
+  };
 });

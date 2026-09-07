@@ -39,6 +39,8 @@ const logger = __importStar(require("firebase-functions/logger"));
 const firestore_1 = require("firebase-admin/firestore");
 const node_crypto_1 = require("node:crypto");
 const firebaseApp_1 = require("../firebaseApp");
+const eventNames_1 = require("../analytics/eventNames");
+const analyticsEvent_1 = require("../observability/analyticsEvent");
 const missionStore_1 = require("../missions/missionStore");
 const period_1 = require("../missions/period");
 const saveDocument_1 = require("../save/saveDocument");
@@ -140,7 +142,7 @@ exports.openPack = (0, https_1.onCall)(async (request) => {
         goldAfter = paid[pack.priceType];
         // 진행도는 콜백 **안**에서 올린다 — mutateSave 는 영수증이 히트하면 이 콜백을 통째로 건너뛰므로,
         // 그 덕에 재시도가 진행도를 두 번 올리지 않는다. 콜백 밖으로 옮기면 그 보장이 사라진다.
-        (0, missionStore_1.commitMissionBump)(transaction, missions, "OpenPack", 1, firestore_1.FieldValue.serverTimestamp());
+        (0, missionStore_1.commitMissionBump)(transaction, missions, eventNames_1.EVENTS.packOpened.missionKey, 1, firestore_1.FieldValue.serverTimestamp());
         missionState = (0, missionStore_1.missionResponse)(missions.state, period);
         return {
             slots: {
@@ -157,8 +159,8 @@ exports.openPack = (0, https_1.onCall)(async (request) => {
         logger.info("receipt replay", { uid, env, source: "openPack", txId, revision: result.revision });
     }
     else {
-        logger.info("openPack", {
-            uid, env, packId,
+        (0, analyticsEvent_1.recordEvent)(eventNames_1.EVENTS.packOpened.name, {
+            uid, env, eventId: txId, sourceCommand: "openPack", result: "success", packId,
             priceType: pack.priceType, price: pack.price,
             drawCount: pack.drawCount, uniqueDraw: pack.uniqueDraw, poolSize,
             drawn: drawn.map((card) => `${card.cardId}${card.isNew ? "+" : "="}`).join(","),

@@ -3,6 +3,8 @@ import * as logger from "firebase-functions/logger";
 import {randomUUID} from "node:crypto";
 import {FieldValue} from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
+import {EVENTS} from "../analytics/eventNames";
+import {recordEvent} from "../observability/analyticsEvent";
 import {
   isKnownEnv,
   mutateSave,
@@ -145,8 +147,9 @@ export const enhanceKeyword = onCall(async (request) => {
   if (replayed) {
     logger.info("receipt replay", {uid, env, source: "enhanceKeyword", txId, revision: result.revision});
   } else {
-    logger.info("enhanceKeyword", {
-      uid, env, keyword, level, currency, cost,
+    recordEvent(EVENTS.keywordEnhanced.name, {
+      uid, env, eventId: txId, sourceCommand: "enhanceKeyword", result: "success",
+      keyword, level, currency, cost,
       freeShotRequested, freeShotUsed,
       revision: result.revision,
       txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",

@@ -40,6 +40,10 @@ const node_crypto_1 = require("node:crypto");
 const firestore_1 = require("firebase-admin/firestore");
 const firebaseApp_1 = require("../firebaseApp");
 const countedTransaction_1 = require("../observability/countedTransaction");
+const eventNames_1 = require("../analytics/eventNames");
+const analyticsEvent_1 = require("../observability/analyticsEvent");
+const missionStore_1 = require("../missions/missionStore");
+const period_1 = require("../missions/period");
 const matchResult_1 = require("../matchResult");
 const payout_1 = require("../payout");
 const rewardTable_1 = require("../rewardTable");
@@ -275,6 +279,7 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
     }
     // 시너지 3표는 여기서 읽지 않는다 — 재생기가 매치 문서의 specPins 로 고정본을 직접 읽는다.
     // Functions 가 따로 읽으면 전투 도중 표가 재발행됐을 때 두 벌이 갈린다.
+    const period = (0, period_1.missionPeriod)(Date.now());
     const settle = async (tx, replay) => {
         const matchSnapshot = await tx.get(matchRef);
         const match = matchSnapshot.data();
@@ -534,6 +539,12 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
         }
         const missingSaveSnapshots = missingSaveRefs.length === 0 ? [] :
             await tx.getAll(...missingSaveRefs);
+        // 미션 문서는 payout 쓰기보다 먼저 전부 읽는다. 정산 트랜잭션의 pending -> confirmed 전이가
+        // matchId 멱등 게이트라 같은 제출을 다시 보내도 이 경로에는 재진입하지 않는다.
+        const missionBumps = [];
+        for (const entry of entries) {
+            missionBumps.push(await (0, missionStore_1.beginMissionBump)(tx, firebaseApp_1.db, data.env, entry.uid, period));
+        }
         // payoutState가 있는 사용자는 save 폴백을 쓰지 않으므로 그 칸은 비워 둔다.
         // rankState 스냅샷으로 메우면 폴백이 실제로 걸릴 때(문서는 있는데 currentPoints가 깨진 경우)
         // save가 아니라 payoutState에서 rank.points를 찾게 되어 멀쩡한 계정이 정산 실패로 튕긴다.
@@ -544,6 +555,9 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
         const settledAt = firestore_1.Timestamp.now();
         const payoutExpiresAt = firestore_1.Timestamp.fromMillis(settledAt.toMillis() + 180 * 24 * 60 * 60 * 1000);
         const payoutSummary = {};
+        // 통계용 승패 사본. 문서에는 payoutSummary 가 이미 담지만 거기서 되읽으면 타입이 unknown 이라
+        // 소비자마다 다시 좁혀야 한다 — 승패의 형태를 여기 한 번만 고정한다.
+        const settleOutcomes = [];
         for (let i = 0; i < entries.length; i++) {
             const entry = entries[i];
             const storedPoints = rankStateSnapshots[i].data()?.currentPoints;
@@ -601,6 +615,44 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
                 updatedAt: settledAt,
             }, { merge: true });
             payoutSummary[entry.uid] = { currency, rank, won };
+            settleOutcomes.push({
+                uid: entry.uid,
+                won,
+                draw,
+                rankBefore: rankBefore,
+                rankAfter: rank.after,
+            });
+        }
+        const replayStats = serverReplay?.ok === true ? serverReplay.outcome.stats : undefined;
+        const destroyedByOwner = serverReplay?.ok === true ? serverReplay.outcome.destroyedByOwner : undefined;
+        const missionNow = firestore_1.FieldValue.serverTimestamp();
+        for (let i = 0; i < entries.length; i++) {
+            const outcome = settleOutcomes[i];
+            const owner = ownerIndexByUid?.[entries[i].uid] ?? (solo ? 0 : -1);
+            const bump = missionBumps[i];
+            (0, missionStore_1.commitMissionBump)(tx, bump, eventNames_1.EVENTS.battleCompleted.missionKey, 1, missionNow);
+            if (!solo && outcome.won && serverReplay?.ok === true) {
+                (0, missionStore_1.commitMissionBump)(tx, bump, eventNames_1.EVENTS.rankedBattleWon.missionKey, 1, missionNow);
+            }
+            if (owner < 0 || owner > 1)
+                continue;
+            const destroyed = destroyedByOwner?.[owner] ?? 0;
+            const attacks = replayStats?.attacksByOwner[owner] ?? 0;
+            const synergies = replayStats?.synergyFiredByOwner[owner] ?? 0;
+            const keywords = replayStats == null ? 0 :
+                Object.values(replayStats.keywordsByOwner[owner] ?? {}).reduce((sum, count) => sum + count, 0);
+            if (destroyed > 0) {
+                (0, missionStore_1.commitMissionBump)(tx, bump, eventNames_1.EVENTS.battleCardsDestroyed.missionKey, destroyed, missionNow);
+            }
+            if (attacks > 0) {
+                (0, missionStore_1.commitMissionBump)(tx, bump, eventNames_1.EVENTS.battleAttacksPerformed.missionKey, attacks, missionNow);
+            }
+            if (synergies > 0) {
+                (0, missionStore_1.commitMissionBump)(tx, bump, eventNames_1.EVENTS.battleSynergiesTriggered.missionKey, synergies, missionNow);
+            }
+            if (keywords > 0) {
+                (0, missionStore_1.commitMissionBump)(tx, bump, eventNames_1.EVENTS.battleKeywordsTriggered.missionKey, keywords, missionNow);
+            }
         }
         // 클라 발산율의 유일한 조회 수단이다. 문서에만 쌓으면 집계할 방법이 없다.
         // simulateRules 가 false 여도 찍는다 — 로그가 아예 없으면 "재생이 실패했다"와
@@ -635,7 +687,11 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
             serverSimulation: persistableReplay(serverReplay), clientDivergence,
             replayUnavailable: firestore_1.FieldValue.delete(),
             settledAt: firestore_1.FieldValue.serverTimestamp(), expiresAt }, { merge: true });
-        return { kind: "done", value: { status: "confirmed" }, telemetry: {
+        return { kind: "done", value: { status: "confirmed" }, analytics: {
+                outcomes: settleOutcomes,
+                stats: replayStats,
+                destroyedByOwner,
+            }, telemetry: {
                 settled: 1,
                 replayOk: serverReplay?.ok === true ? 1 : 0,
                 replayFailed: serverReplay != null && !serverReplay.ok && !replayWasUnavailable ? 1 : 0,
@@ -651,8 +707,43 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
     for (let attempt = 0; attempt < SETTLE_ATTEMPTS; attempt++) {
         const outcome = await (0, countedTransaction_1.withCountedTransaction)("submitMatchResult", (tx) => settle(tx, replay));
         if (outcome.kind === "done") {
-            if (outcome.telemetry != null)
+            if (outcome.telemetry != null) {
                 await (0, battleReplayTelemetry_1.recordReplayDaily)(data.env, outcome.telemetry);
+            }
+            // 계측 델타가 있다고 정산된 것이 아니다 — 재생 불가로 pending 에 머문 갈래도 델타를 낸다
+            // (settled:0). 그 갈래에 이벤트를 내면 매치 하나가 완료로 잡히고, matchId 중복 제거가
+            // 나중에 오는 진짜 정산 행을 덮을 수 있다. 실제로 정산이 커밋된 경우에만 낸다.
+            if (outcome.telemetry != null && outcome.telemetry.settled > 0) {
+                // 제출자 몫의 승패. flagged 정산에는 payout 이 없어 outcomes 가 비고, 그때는 승패를 싣지 않는다
+                // — 모르는 것을 false 로 적으면 패배로 집계된다.
+                const mine = outcome.analytics?.outcomes.find((entry) => entry.uid === uid);
+                (0, analyticsEvent_1.recordEvent)(eventNames_1.EVENTS.battleCompleted.name, {
+                    uid,
+                    env: data.env,
+                    eventId: data.matchId,
+                    sourceCommand: "submitMatchResult",
+                    result: outcome.value.status,
+                    matchId: data.matchId,
+                    commandCount: data.commandCount,
+                    won: mine?.won ?? null,
+                    draw: mine?.draw ?? null,
+                    rankBefore: mine?.rankBefore ?? null,
+                    rankAfter: mine?.rankAfter ?? null,
+                    // 참가자 전원의 결말. 승률은 이 배열로 매치 1행에서 계산한다(참가자별 행이 따로 없다).
+                    outcomes: outcome.analytics?.outcomes ?? [],
+                    destroyedByOwner: outcome.analytics?.destroyedByOwner ?? null,
+                    attacksByOwner: outcome.analytics?.stats?.attacksByOwner ?? null,
+                    damageDealtByOwner: outcome.analytics?.stats?.damageDealtByOwner ?? null,
+                    healedByOwner: outcome.analytics?.stats?.healedByOwner ?? null,
+                    synergyFiredByOwner: outcome.analytics?.stats?.synergyFiredByOwner ?? null,
+                    keywordsByOwner: outcome.analytics?.stats?.keywordsByOwner ?? null,
+                    turns: outcome.analytics?.stats?.turns ?? null,
+                    replayOk: outcome.telemetry.replayOk,
+                    replayFailed: outcome.telemetry.replayFailed,
+                    replayUnavailable: outcome.telemetry.unavailable,
+                    divergent: outcome.telemetry.divergent,
+                });
+            }
             return outcome.value;
         }
         // 마지막 시도에서 또 need_replay 면 재생을 한 번 더 부를 이유가 없다 — 쓸 트랜잭션이 없다.

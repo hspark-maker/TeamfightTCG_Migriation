@@ -79,7 +79,6 @@ internal static class AdventureValidator
         var t_keys = new HashSet<string>();
 
         // 앞 챕터의 요구 등급. 여정이 뒤로 갈수록 낮아지면 순서가 뒤집힌다.
-        ERankGrade t_prevGrade = ERankGrade.Bronze;
 
         if (_chapters.Count == 0)
         {
@@ -90,6 +89,9 @@ internal static class AdventureValidator
         for (int t_i = 0; t_i < _chapters.Count; t_i++)
         {
             AdventureChapterDef t_chapter = _chapters[t_i];
+
+            if (t_chapter.battleBackground == null)
+                Debug.LogWarning($"[Adventure] 전투 배경 미저작(챕터 #{t_i} '{t_chapter.title}') — BattleScene 저작 배경을 그대로 쓴다.");
 
             if (!t_chapter.HasStableKey)
             {
@@ -114,19 +116,8 @@ internal static class AdventureValidator
                 Debug.LogWarning($"[Adventure] 완주 보상 미저작 (챕터 #{t_i} '{t_chapter.title}') — 완주해도 지급이 없다.");
             }
 
-            if (t_i == 0 && t_chapter.requiredGrade != ERankGrade.Bronze)
-            {
-                t_fault++;
-                Debug.LogError($"[Adventure] 첫 챕터의 requiredGrade가 {t_chapter.requiredGrade} (챕터 #{t_i} '{t_chapter.title}') — 랭크에 오르기 전 유저는 모험에 아예 못 들어간다.");
-            }
-
-            if (t_chapter.requiredGrade < t_prevGrade)
-            {
-                t_fault++;
-                Debug.LogWarning($"[Adventure] requiredGrade 역행 {t_prevGrade} → {t_chapter.requiredGrade} (챕터 #{t_i} '{t_chapter.title}') — 뒤 챕터가 먼저 열려 여정의 순서가 뒤집힌다.");
-            }
-
-            t_prevGrade = t_chapter.requiredGrade;
+            // 챕터 잠금 문턱은 AdventureChapter 표가 소유한다 — 첫 챕터 0, 역행 금지는
+            // AdventureNodeSpec.TryValidateGateOrder 가 런타임 채택 시점에 검사한다.
 
             // 챕터 띠의 보상 슬롯이 2칸이라 3줄부터는 앞칸만 뜬다(지급은 되지만 표시가 잘린다)
             int t_chapterRewards = SpecRewardCount(t_chapter.chapterId);

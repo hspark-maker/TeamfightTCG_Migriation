@@ -1,6 +1,8 @@
 import {randomUUID} from "node:crypto";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
+import {EVENTS} from "../analytics/eventNames";
+import {recordEvent} from "../observability/analyticsEvent";
 import {FieldValue} from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
 import {
@@ -122,8 +124,8 @@ export const grantTutorialCards = onCall(async (request) => {
     logger.info("receipt replay",
       {uid, env, source: "grantTutorialCards", txId, revision: result.revision});
   } else {
-    logger.info("grantTutorialCards", {
-      uid, env, packId,
+    recordEvent(EVENTS.tutorialCardsGranted.name, {
+      uid, env, eventId: txId, sourceCommand: "grantTutorialCards", result: "success", packId,
       // 이 팩을 이미 받은 계정이다 — 소유는 유니온이라 그대로 지나가고, 갈래를 로그로만 가른다.
       alreadyGranted,
       cardIds: cardIds.join(","),

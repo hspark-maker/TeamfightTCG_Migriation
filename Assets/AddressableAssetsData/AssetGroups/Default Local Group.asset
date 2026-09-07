@@ -56,6 +56,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 68b36cb830f92924791a391bd740bce1
+    m_Address: PassPanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8134ddc58443c3348a644266ea3669ec
     m_Address: DeckEditController
     m_ReadOnly: 0

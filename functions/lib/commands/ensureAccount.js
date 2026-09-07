@@ -36,6 +36,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ensureAccount = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
+const eventNames_1 = require("../analytics/eventNames");
+const analyticsEvent_1 = require("../observability/analyticsEvent");
 const saveDocument_1 = require("../save/saveDocument");
 const freshAccount_1 = require("../save/freshAccount");
 const starterCards_1 = require("../save/starterCards");
@@ -78,9 +80,8 @@ exports.ensureAccount = (0, https_1.onCall)(async (request) => {
         });
     }
     else if (outcome.created) {
-        logger.info("ensureAccount granted", {
-            uid,
-            env,
+        (0, analyticsEvent_1.recordEvent)(eventNames_1.EVENTS.accountCreated.name, {
+            uid, env, eventId: uid, sourceCommand: "ensureAccount", result: "success",
             revision: outcome.revision,
             // 지갑이 이미 있었다면 스타터 골드는 나가지 않았다 — 로그가 그것을 숨기면 안 된다.
             gold: outcome.walletCreated ? freshAccount_1.STARTER_GOLD : 0,

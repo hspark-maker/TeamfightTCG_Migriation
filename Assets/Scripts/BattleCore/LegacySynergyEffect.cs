@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using TeamfightTCG.BattleCore;
 
 // 유산 시너지(덱 2장↑ 활성). 턴시작/사망 트리거형 — 정적 스탯 없음.
 // 내 턴이 시작될 때마다 legacyStack+1. 파괴 시 legacyStack만큼 살아있는 아군(자신 제외) 전원 회복.
@@ -46,6 +47,8 @@ public class LegacySynergyEffect : SynergyEffect
         if (_ctx.self == null || !_ctx.self.IsAlive) return;
 
         _ctx.self.legacyStack += this.amount;
+        BattleEventStream.Emit(new BattleEvent(BattleEventKind.SynergyFired,
+            _ctx.self.ownerIndex, _ctx.self.slotIndex));
         SynergyPresentationStream.Emit(new LegacyTurnPresentationPlan
         {
             self = _ctx.self,
@@ -87,6 +90,8 @@ public class LegacySynergyEffect : SynergyEffect
             // 접촉 프레임(Drain)이 아니라 사망 배치(DrainDeaths)인 이유도 같다: 이건 이 카드가
             // 쓰러지며 남기는 것이라, 아직 멀쩡히 서 있는 카드에서 나가면 인과가 안 읽힌다.
             // 규칙(회복량·대상)은 위에서 이미 확정됐다 — 여기 담기는 건 순수 표시뿐이다.
+            BattleEventStream.Emit(new BattleEvent(BattleEventKind.SynergyFired,
+                _ctx.self.ownerIndex, _ctx.self.slotIndex));
             SynergyPresentationStream.Emit(new LegacyDeathPresentationPlan
             {
                 self = _ctx.self,

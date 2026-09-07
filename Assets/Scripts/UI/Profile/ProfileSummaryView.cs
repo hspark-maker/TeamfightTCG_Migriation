@@ -130,7 +130,7 @@ public class ProfileSummaryView : MonoBehaviour
         // 실수로 지우고 나간 경우에 지금 이름을 잃지 않도록 아예 저장을 건너뛴다.
         if (!string.IsNullOrWhiteSpace(_value))
         {
-            ProfileManager.Apply(_value, ProfileManager.AvatarId, ProfileManager.FrameId);
+            ProfileManager.Apply(_value, ProfileManager.AvatarId, ProfileManager.FrameId, ProfileManager.EmoteIds);
         }
 
         // Apply는 정제한 값이 지금과 같으면 통지 없이 돌아온다 — 잘려 나간 글자가 라벨에 반영되도록 직접 그린다.

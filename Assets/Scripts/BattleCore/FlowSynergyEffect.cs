@@ -1,3 +1,5 @@
+using TeamfightTCG.BattleCore;
+
 
 // 흐름 시너지(덱 4장↑ 활성). 순수 스폰 트리거형 — 정적 스탯 없음.
 // 흐름 카드가 등장할 때마다 field.FlowStack+1(무제한 성장, Cunning 재진입/사망 교체 refill 포함).
@@ -36,6 +38,8 @@ public class FlowSynergyEffect : SynergyEffect
         foreach (var t_card in _ctx.field.GetActiveCards())
             if (t_card != null && SynergyApplier.BelongsTo(t_card, _ctx.synergy))
                 t_card.flowBonus = _ctx.field.FlowStack;
+        BattleEventStream.Emit(new BattleEvent(BattleEventKind.SynergyFired,
+            _ctx.self.ownerIndex, _ctx.self.slotIndex));
         SynergyPresentationStream.Emit(new SynergyFirePlan
         {
             self = _ctx.self,
@@ -52,6 +56,8 @@ public class FlowSynergyEffect : SynergyEffect
     public override void OnBeforeAttack(BeforeAttackCtx _ctx)
     {
         if (_ctx.self == null || _ctx.self.flowBonus <= 0) return;
+        BattleEventStream.Emit(new BattleEvent(BattleEventKind.SynergyFired,
+            _ctx.self.ownerIndex, _ctx.self.slotIndex));
         SynergyPresentationStream.Emit(new FlowAttackPresentationPlan
         {
             self = _ctx.self,

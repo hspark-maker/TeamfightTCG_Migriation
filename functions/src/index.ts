@@ -22,4 +22,6 @@ export {limitBreakCard} from "./commands/limitBreakCard";
 export {spinRoulette} from "./commands/spinRoulette";
 export {getMissions} from "./commands/getMissions";
 export {claimMission} from "./commands/claimMission";
+export {getPass} from "./commands/getPass";
+export {claimPassReward} from "./commands/claimPassReward";
 export {getReplayDivergence} from "./commands/getReplayDivergence";

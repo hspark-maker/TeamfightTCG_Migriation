@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using TeamfightTCG.BattleCore;
 
 // 돌보미 시너지(덱 4장↑ 활성). 순수 스폰 트리거형 — 정적 스탯 없음.
 // 돌보미 카드가 전장에 나올 때, 필드의 모든 돌보미(자신 포함)에게 amount만큼 Heal + bonusHp 부여.
@@ -48,6 +49,8 @@ public class CaretakerSynergyEffect : SynergyEffect
         //
         // 회복 투사체(HealVfx)는 쓰지 않는다 — 돌보미는 날아가 닿는 그림이 아니라 전원이 동시에 돌봄을
         // 받는 그림이라 도착을 기다릴 대상이 없다.
+        BattleEventStream.Emit(new BattleEvent(BattleEventKind.SynergyFired,
+            _ctx.self.ownerIndex, _ctx.self.slotIndex));
         SynergyPresentationStream.Emit(new CaretakerPresentationPlan
         {
             self = _ctx.self,

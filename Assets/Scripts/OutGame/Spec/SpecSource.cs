@@ -2,8 +2,28 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 스펙시트(SpecData.bytes) 파싱 결과 한 벌. 시트를 읽는 축이 여럿이라 복호화·파싱을 여기서 1회만 한다.
-// 못 읽으면 Manager가 null로 남고, 각 조회 창구가 SO 인스펙터 값으로 폴백한다.
+/// <summary>스펙 로드 실패 사유. 로그의 <c>SPEC-#</c> 코드가 이 값이다 —
+/// 화면·리포트에서 이 코드만으로 어디서 끊겼는지 갈린다.</summary>
+public enum ESpecLoadError
+{
+    None = 0,
+    /// <summary>SPEC-1: 콘텐츠 프로필이 환경을 안 준다. 스냅샷은 환경별이라 조회 자체가 불가능하다.</summary>
+    NoEnvironment = 1,
+    /// <summary>SPEC-2: 로컬에 서버 스냅샷이 없다. 첫 실행에서는 정상이고, 동기화가 채운다.</summary>
+    NoSnapshot = 2,
+    /// <summary>SPEC-3: 스냅샷은 있는데 파싱이 안 된다(손상·형식 변경).</summary>
+    SnapshotParseFailed = 3,
+    /// <summary>SPEC-4: 스냅샷에서 지문을 계산하지 못했다(표 누락 등).</summary>
+    FingerprintFailed = 4,
+    /// <summary>SPEC-5: 재계산 지문이 봉투와 다르다(부분 기록·변조).</summary>
+    FingerprintMismatch = 5,
+    /// <summary>SPEC-6: 전투 지문(Card 표)만 실패. 스냅샷 자체는 유효하다.</summary>
+    BattleFingerprintFailed = 6,
+}
+
+// 서버 스펙 스냅샷 파싱 결과 한 벌. 시트를 읽는 축이 여럿이라 파싱을 여기서 1회만 한다.
+// **진실원은 서버 스냅샷뿐이다** — 내장본(SpecData.bytes) 폴백은 없다. 못 읽으면 Manager가 null로 남고
+// 사유는 LastError 코드로 드러난다.
 public static class SpecSource
 {
     static bool s_loaded;
@@ -11,11 +31,35 @@ public static class SpecSource
     static string s_fingerprint;
     static string s_battleFingerprint;
     static string s_origin;
+    static ESpecLoadError s_error;
+    static string s_errorDetail;
 
-    /// <summary>이번 세션이 물고 있는 스펙 원본 — "서버캐시" 또는 "내장본". 대조 로그의 기준점이다.</summary>
+    /// <summary>이번 세션이 물고 있는 스펙 원본 — "서버스냅샷" 또는 "없음". 대조 로그의 기준점이다.</summary>
     public static string Origin
     {
         get { EnsureLoaded(); return s_origin ?? "없음"; }
+    }
+
+    /// <summary>마지막 로드 실패 사유. 성공이면 <see cref="ESpecLoadError.None"/>.</summary>
+    public static ESpecLoadError LastError
+    {
+        get { EnsureLoaded(); return s_error; }
+    }
+
+    /// <summary>실패 코드에 붙는 사람이 읽는 설명(환경·지문 등). 성공이면 null.</summary>
+    public static string LastErrorDetail
+    {
+        get { EnsureLoaded(); return s_errorDetail; }
+    }
+
+    /// <summary>화면·리포트에 그대로 실을 수 있는 코드 문자열. 성공이면 null.</summary>
+    public static string LastErrorCode
+        => LastError == ESpecLoadError.None ? null : CodeOf(s_error);
+
+    /// <summary>스펙을 실제로 들고 있는가. false면 스펙을 읽는 축은 진행하면 안 된다.</summary>
+    public static bool IsReady
+    {
+        get { EnsureLoaded(); return s_manager != null; }
     }
 
     public static string Fingerprint
@@ -126,6 +170,53 @@ public static class SpecSource
         return t_result.AsReadOnly();
     }
 
+#if UNITY_EDITOR
+    /// <summary>에디터 도구 전용 — <b>저작본</b>(Assets/Resources/SpecData.bytes)을 스냅샷 자리에 올린다.
+    ///
+    /// <para>런타임의 진실원은 서버 스냅샷 하나이고 폴백이 없다. 그런데 업로드 전 검증은 성격이 반대다 —
+    /// 지금 올리려는 <b>로컬 표</b>가 규칙에 맞는지 봐야 하고, 그건 서버에 아직 없는 값이다.
+    /// 그래서 자동 폴백이 아니라 도구가 이름을 불러 쓰는 문으로 둔다(플레이 모드는 이 문을 쓰지 않는다).</para>
+    /// </summary>
+    /// <param name="_error">실패 사유(성공이면 null)</param>
+    /// <returns>저작본을 올렸으면 true</returns>
+    public static bool TryLoadLocalAuthoring(out string _error)
+    {
+        Clear();
+        s_loaded = true;   // 아래에서 세운 것을 EnsureLoaded 가 덮지 않게 잠근다.
+        _error = null;
+
+        string t_json = SpecDataResourceLoader.LoadSpecData();
+        if (string.IsNullOrEmpty(t_json))
+        {
+            _error = "SpecData 리소스를 못 읽었다(시트 적용 & CS 생성 후 임포터를 돌릴 것).";
+            Fail(ESpecLoadError.SnapshotParseFailed, _error);
+            return false;
+        }
+        if (!TryLoadManager(t_json, out SpecDataManager t_manager))
+        {
+            _error = "SpecData 파싱 실패(생성 리소스가 손상됐을 수 있다).";
+            Fail(ESpecLoadError.SnapshotParseFailed, _error);
+            return false;
+        }
+
+        s_manager = t_manager;
+        s_origin = "저작본";
+        s_error = ESpecLoadError.None;
+        s_errorDetail = null;
+
+        string t_envId = null;
+        try { t_envId = ContentProfileConfig.Active.CloudEnvId; }
+        catch (System.Exception) { }
+
+        // 지문은 있으면 좋고 없어도 검증을 막지 않는다 — 검증 대상은 표의 내용이지 지문이 아니다.
+        if (!string.IsNullOrEmpty(t_envId) &&
+            TryCombinedFingerprint(t_manager, t_envId, out string t_fingerprint, out _))
+            s_fingerprint = t_fingerprint;
+
+        return true;
+    }
+#endif
+
     /// <summary>파싱 스냅샷을 버리고 그 자리에서 다시 읽는다.
     /// 에디터 도구가 SpecData.bytes를 새로 만든 뒤 낡은 스냅샷으로 판정하지 않게 여는 문이다 —
     /// 플레이 진입 전까지는 <see cref="ResetRuntimeState"/>가 안 돌아 스냅샷이 세션 내내 남는다.</summary>
@@ -145,6 +236,32 @@ public static class SpecSource
         s_fingerprint = null;
         s_battleFingerprint = null;
         s_origin = null;
+        s_error = ESpecLoadError.None;
+        s_errorDetail = null;
+    }
+
+    static string CodeOf(ESpecLoadError _error) => "SPEC-" + (int)_error;
+
+    /// <summary>실패 코드를 남긴다. 코드는 로그 첫 토큰이라 검색·리포트가 이 한 줄만 보면 된다.</summary>
+    /// <param name="_error">사유 코드</param>
+    /// <param name="_detail">환경·지문 같은 판별 근거</param>
+    /// <param name="_asError">true면 LogError. 동기화 전 스냅샷 부재처럼 정상 경로는 false.</param>
+    /// <param name="_clearSnapshot">false면 이미 세운 스냅샷을 유지한다(전투 지문만 실패한 경우).</param>
+    static void Fail(ESpecLoadError _error, string _detail, bool _asError = true, bool _clearSnapshot = true)
+    {
+        s_error = _error;
+        s_errorDetail = _detail;
+        if (_clearSnapshot)
+        {
+            s_manager = null;
+            s_fingerprint = "nospec";
+            s_battleFingerprint = "nospec";
+            s_origin = "없음";
+        }
+
+        string t_line = $"[SpecSource] {CodeOf(_error)} {_error} — {_detail}";
+        if (_asError) Debug.LogError(t_line);
+        else Debug.Log(t_line);
     }
 
     static void EnsureLoaded()
@@ -156,7 +273,21 @@ public static class SpecSource
         try { t_envId = ContentProfileConfig.Active.CloudEnvId; }
         catch (System.Exception) { }
 
-        SpecDataManager t_manager = null;
+        if (string.IsNullOrEmpty(t_envId))
+        {
+            Fail(ESpecLoadError.NoEnvironment, "콘텐츠 프로필의 CloudEnvId 가 비었다.");
+            return;
+        }
+
+        // 스펙의 진실원은 서버 스냅샷 하나다 — 내장본 폴백은 없다.
+        // 폴백이 있으면 서버와 다른 표로 조용히 돌다가, 어긋남이 대전이나 정산에서야 드러난다.
+        if (!SpecSnapshotCache.TryLoad(t_envId, out string t_cachedJson, out string t_cachedFingerprint))
+        {
+            // 첫 실행이나 캐시 삭제 뒤의 정상 상태다 — 초기화의 SpecSyncStep 이 받아 채운다.
+            // 그 뒤에도 이 상태로 남아 있으면 스펙을 읽는 축이 각자 예외를 던진다.
+            Fail(ESpecLoadError.NoSnapshot, $"env={t_envId} 로컬 스냅샷 없음 — 서버 동기화 전이다.", _asError: false);
+            return;
+        }
 
         // 봉투에 적힌 지문을 그대로 믿으면 payload와 지문이 어긋난 캐시(부분 기록·손상·payload만 고친 파일)가
         // 그대로 통과해, **내가 들고 있는 데이터와 내가 주장하는 지문이 다른 상태**로 대전에 들어간다.
@@ -164,62 +295,38 @@ public static class SpecSource
         //
         // 이건 자기정합성 검사지 인증이 아니다 — 지문까지 같이 고쳐 쓰면 여기는 통과한다.
         // 조작 스펙을 실제로 막는 것은 서버 대조(BattleContentSync)와 상대와의 지문 대조(InitialDeck)다.
-        if (!string.IsNullOrEmpty(t_envId) &&
-            SpecSnapshotCache.TryLoad(t_envId, out string t_cachedJson, out string t_cachedFingerprint))
+        if (!TryLoadManager(t_cachedJson, out SpecDataManager t_manager))
         {
-            string t_recomputed = null;
-            string t_cacheError = "캐시 파싱 실패";
-            if (TryLoadManager(t_cachedJson, out SpecDataManager t_cachedManager)
-                && !TryCombinedFingerprint(t_cachedManager, t_envId, out t_recomputed, out t_cacheError))
-                t_recomputed = null;
-
-            if (t_recomputed != null && string.Equals(t_recomputed, t_cachedFingerprint, System.StringComparison.Ordinal))
-            {
-                t_manager = t_cachedManager;
-                s_fingerprint = t_recomputed;
-                s_origin = "서버캐시";
-            }
-            else
-            {
-                Debug.LogError("[SpecSource] 서버캐시를 신뢰할 수 없다 — 버리고 내장본으로 돈다. " +
-                               $"봉투={t_cachedFingerprint} 재계산={t_recomputed ?? "(실패: " + t_cacheError + ")"}");
-            }
+            Fail(ESpecLoadError.SnapshotParseFailed, $"env={t_envId} 봉투={t_cachedFingerprint} 캐시 파싱 실패.");
+            return;
         }
 
-        if (t_manager == null)
+        if (!TryCombinedFingerprint(t_manager, t_envId, out string t_recomputed, out string t_cacheError))
         {
-            string t_json = SpecDataResourceLoader.LoadSpecData();
-            if (string.IsNullOrEmpty(t_json))
-            {
-                Debug.LogWarning("[SpecSource] SpecData 리소스를 못 읽었다. 시트를 쓰는 축은 전부 SO 값으로 돈다.");
-                return;
-            }
-            if (!TryLoadManager(t_json, out t_manager))
-            {
-                Debug.LogWarning("[SpecSource] SpecData 파싱 실패. 시트를 쓰는 축은 전부 SO 값으로 돈다.");
-                return;
-            }
-            s_fingerprint = null;   // 캐시 경로에서 채웠더라도 원본이 바뀌었으니 다시 계산한다
-            s_origin = "내장본";
+            Fail(ESpecLoadError.FingerprintFailed, $"env={t_envId} 봉투={t_cachedFingerprint} {t_cacheError}");
+            return;
+        }
+
+        if (!string.Equals(t_recomputed, t_cachedFingerprint, System.StringComparison.Ordinal))
+        {
+            Fail(ESpecLoadError.FingerprintMismatch,
+                 $"env={t_envId} 봉투={t_cachedFingerprint} 재계산={t_recomputed}");
+            return;
         }
 
         s_manager = t_manager;
-        string t_error = null;
-        if (string.IsNullOrEmpty(s_fingerprint) && !string.IsNullOrEmpty(t_envId)
-            && !TryCombinedFingerprint(t_manager, t_envId, out s_fingerprint, out t_error))
-        {
-            s_fingerprint = "nospec";
-            // 지문이 nospec이면 멀티 InitialDeck 송신이 차단된다 — 조용히 넘기면 원인을 못 찾는다.
-            Debug.LogError($"[SpecSource] 지문 계산 실패: {t_error} — 멀티플레이가 차단된다.");
-            return;
-        }
-        if (!string.IsNullOrEmpty(t_envId))
+        s_fingerprint = t_recomputed;
+        s_origin = "서버스냅샷";
+        s_error = ESpecLoadError.None;
+        s_errorDetail = null;
+
         {
             const string t_battleTable = "Card";
             if (SpecPayloadCodec.TryBuildLocalTable(t_manager, t_battleTable, out SpecTablePayload t_battlePayload, out string t_battleError))
                 s_battleFingerprint = SpecPayloadCodec.CombinedHash(t_envId, new[] { t_battlePayload });
             else
-                Debug.LogError($"[SpecSource] 전투 지문 계산 실패 table={t_battleTable}: {t_battleError} — 멀티플레이가 차단된다.");
+                // 전투 지문만 못 세운 것이라 스냅샷 자체는 유효하다 — 코드만 남기고 진행한다.
+                Fail(ESpecLoadError.BattleFingerprintFailed, $"table={t_battleTable}: {t_battleError}", _clearSnapshot: false);
 
             // 에디터에서는 안 찍는다. 이 스냅샷은 static이라 도메인 리로드마다(=컴파일마다) 다시 서고,
             // 인스펙터 드로어(CardIdDrawer)가 첫 리페인트에 로드를 깨워 컴파일할 때마다 같은 줄이 쌓였다.

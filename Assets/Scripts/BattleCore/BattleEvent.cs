@@ -16,6 +16,7 @@ namespace TeamfightTCG.BattleCore
         ShieldChanged = 9,
         ShieldBroken = 10,
         Revive = 11,
+        KeywordFired = 12,
     }
 
     [Flags]

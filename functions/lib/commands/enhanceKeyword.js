@@ -39,6 +39,8 @@ const logger = __importStar(require("firebase-functions/logger"));
 const node_crypto_1 = require("node:crypto");
 const firestore_1 = require("firebase-admin/firestore");
 const firebaseApp_1 = require("../firebaseApp");
+const eventNames_1 = require("../analytics/eventNames");
+const analyticsEvent_1 = require("../observability/analyticsEvent");
 const saveDocument_1 = require("../save/saveDocument");
 const domainReject_1 = require("../save/domainReject");
 const receiptId_1 = require("../save/receiptId");
@@ -141,8 +143,9 @@ exports.enhanceKeyword = (0, https_1.onCall)(async (request) => {
         logger.info("receipt replay", { uid, env, source: "enhanceKeyword", txId, revision: result.revision });
     }
     else {
-        logger.info("enhanceKeyword", {
-            uid, env, keyword, level, currency, cost,
+        (0, analyticsEvent_1.recordEvent)(eventNames_1.EVENTS.keywordEnhanced.name, {
+            uid, env, eventId: txId, sourceCommand: "enhanceKeyword", result: "success",
+            keyword, level, currency, cost,
             freeShotRequested, freeShotUsed,
             revision: result.revision,
             txIdSource: (0, receiptId_1.isClientReceiptId)(request.data?.txId) ? "client" : "server",

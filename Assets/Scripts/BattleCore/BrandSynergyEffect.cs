@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using TeamfightTCG.BattleCore;
 
 // 낙인 시너지(덱 3/5장 활성). 순수 트리거형 — 정적 스탯 없음.
 // 공격 개시 직전, 공격자 필드의 라이브 아군 낙인 카드 수(공격자 포함) × 티어 배율만큼 방어자에게 선피해.
@@ -26,6 +27,8 @@ public class BrandSynergyEffect : SynergyEffect, IBeforeAttackPlanSource
         BrandAttackPlan t_plan = BuildPlan(_ctx);
         if (t_plan == null) return;
         t_plan.defender.TakeDamage(t_plan.totalDamage);
+        BattleEventStream.Emit(new BattleEvent(BattleEventKind.SynergyFired,
+            t_plan.self.ownerIndex, t_plan.self.slotIndex));
     }
 
     public ISynergyPresentationPlan CaptureBeforeAttackPlan(BeforeAttackCtx _ctx)

@@ -6,6 +6,10 @@ int,string,int,string,string,int,string,string,long,int,string
 3,weekly.openPack10,1,weekly,OpenPack,10,주간 팩 개봉,카드 팩을 10회 개봉하세요,50,1,현재 유일한 반복 가능 주간 축
 4,weekly.enhanceCard5,0,weekly,EnhanceCard,5,주간 강화,카드를 5회 강화하세요,50,2,반복 Shard 수급 추가 후 활성화
 5,weekly.limitBreakCard1,0,weekly,LimitBreakCard,1,한계 돌파,카드를 1회 한계 돌파하세요,50,3,간식 반복 수급 추가 후 활성화
-6,daily.completeBattle3,0,daily,CompleteBattle,3,일일 전투,전투를 3회 완료하세요,20,3,전투 서버 집계 연결 후 기간 경계에 활성화
-7,weekly.winRankedBattle5,0,weekly,WinRankedBattle,5,랭크 도전자,랭크 전투에서 5회 승리하세요,60,4,전투 서버 집계 연결 후 기간 경계에 활성화
+6,daily.completeBattle3,1,daily,CompleteBattle,3,일일 전투,전투를 3회 완료하세요,20,3,전투 서버 집계 연결 완료
+7,weekly.winRankedBattle5,1,weekly,WinRankedBattle,5,랭크 도전자,랭크 전투에서 5회 승리하세요,60,4,서버 재생 승패 집계 연결 완료
 8,daily.claimReward1,0,daily,ClaimReward,1,보상 수령,보상을 1회 수령하세요,10,4,유한 보상 문제와 owner 범위 확정 후 활성화
+9,daily.destroyCards3,1,daily,DestroyCards,3,카드 파괴,상대 카드를 3장 파괴하세요,15,5,서버 재생 파괴 수 집계
+10,daily.triggerSynergy2,1,daily,TriggerSynergy,2,시너지 발동,시너지를 2회 발동하세요,20,6,서버 재생 시너지 발동 집계
+11,daily.triggerKeyword2,1,daily,TriggerKeyword,2,키워드 발동,키워드를 2회 발동하세요,20,7,서버 재생 키워드 발동 집계
+12,weekly.attackTimes50,1,weekly,AttackTimes,50,주간 공격,공격을 50회 수행하세요,50,5,서버 재생 공격 명령 집계

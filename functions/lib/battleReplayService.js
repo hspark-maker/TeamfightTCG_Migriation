@@ -146,8 +146,48 @@ function parseOutcome(data) {
         !/^[0-9a-f]{16}$/i.test(finalStateHash)) {
         return null;
     }
+    const stats = parseReplayStats(data.stats);
     return { firstOwner, winnerOwner: winnerOwner, draw, remaining, destroyedByOwner,
-        finalStateHash, drawCount };
+        finalStateHash, drawCount, ...(stats == null ? {} : { stats }) };
+}
+function parseReplayStats(raw) {
+    const data = (0, payloadGuards_1.objectRecord)(raw);
+    if (data == null)
+        return null;
+    const attacksByOwner = nonNegativePair(data.attacksByOwner);
+    const damageDealtByOwner = nonNegativePair(data.damageDealtByOwner);
+    const healedByOwner = nonNegativePair(data.healedByOwner);
+    const synergyFiredByOwner = nonNegativePair(data.synergyFiredByOwner);
+    const keywordsByOwner = keywordPairs(data.keywordsByOwner);
+    const turns = (0, payloadGuards_1.safeInteger)(data.turns);
+    if (attacksByOwner == null || damageDealtByOwner == null || healedByOwner == null ||
+        synergyFiredByOwner == null || keywordsByOwner == null || turns == null || turns < 0)
+        return null;
+    return { attacksByOwner, damageDealtByOwner, healedByOwner,
+        synergyFiredByOwner, keywordsByOwner, turns };
+}
+function nonNegativePair(raw) {
+    const pair = numberPair(raw);
+    return pair != null && pair[0] >= 0 && pair[1] >= 0 ? pair : null;
+}
+function keywordPairs(raw) {
+    if (!Array.isArray(raw) || raw.length !== 2)
+        return null;
+    const result = [];
+    for (const value of raw) {
+        const record = (0, payloadGuards_1.objectRecord)(value);
+        if (record == null)
+            return null;
+        const parsed = {};
+        for (const [key, count] of Object.entries(record)) {
+            const integer = (0, payloadGuards_1.safeInteger)(count);
+            if (key.length === 0 || key.length > 32 || integer == null || integer < 0)
+                return null;
+            parsed[key] = integer;
+        }
+        result.push(parsed);
+    }
+    return result;
 }
 function transportReason(error) {
     if (error instanceof Error && error.name === "AbortError")

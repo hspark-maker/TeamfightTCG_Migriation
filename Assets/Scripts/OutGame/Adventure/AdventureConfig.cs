@@ -194,6 +194,90 @@ public class AdventureConfig : ScriptableObject
         m_built = true;
     }
 
+    /// <summary>서버 표가 정한 챕터·정점 배치. 이 애셋이 소유하는 것은 그림과 문구뿐이고,
+    /// 어느 챕터에 어떤 정점이 어떤 순서로 들어가는지와 잠금 점수는 표가 정한다.</summary>
+    internal readonly struct ServerLayoutRow
+    {
+        public readonly string ChapterId;
+        public readonly string NodeId;
+        public readonly long RequiredPoints;
+
+        public ServerLayoutRow(string _chapterId, string _nodeId, long _requiredPoints)
+        {
+            ChapterId = _chapterId;
+            NodeId = _nodeId;
+            RequiredPoints = _requiredPoints;
+        }
+    }
+
+    /// <summary>런타임 복제본의 챕터·정점 배치를 서버 표 순서로 다시 짓는다.
+    /// 그림·문구는 nodeId·chapterId 로 기존 저작에서 찾아 옮기고, 저작에만 있고 표에 없는 것은 버린다.
+    /// 저작 애셋에 부르면 안 된다 — 복제본 전용이다(<see cref="AdventureNodeSpec.TryBuildRuntime"/>).</summary>
+    internal bool TryApplyServerLayout(IReadOnlyList<ServerLayoutRow> _rows, out string _error)
+    {
+        _error = null;
+        if (_rows == null || _rows.Count == 0)
+        {
+            _error = "서버 배치 행이 비었다.";
+            return false;
+        }
+
+        var t_nodeByeId = new Dictionary<string, AdventureNodeDef>(StringComparer.Ordinal);
+        var t_chapterById = new Dictionary<string, AdventureChapterDef>(StringComparer.Ordinal);
+        foreach (AdventureChapterDef t_chapter in chapters)
+        {
+            if (t_chapter.HasStableKey) t_chapterById[t_chapter.chapterId] = t_chapter;
+            if (t_chapter.nodes == null) continue;
+            foreach (AdventureNodeDef t_node in t_chapter.nodes)
+                if (t_node.HasStableKey) t_nodeByeId[t_node.nodeId] = t_node;
+        }
+
+        // 챕터 순서는 표 행 순서(id 오름차순)의 첫 등장 순이다 — 표에 챕터 순서 열이 따로 없다.
+        var t_order = new List<string>();
+        var t_grouped = new Dictionary<string, List<AdventureNodeDef>>(StringComparer.Ordinal);
+        var t_points = new Dictionary<string, long>(StringComparer.Ordinal);
+        foreach (ServerLayoutRow t_row in _rows)
+        {
+            if (!t_nodeByeId.TryGetValue(t_row.NodeId, out AdventureNodeDef t_node))
+            {
+                _error = $"표의 정점 '{t_row.NodeId}'에 대응하는 저작(그림·문구)이 없다.";
+                return false;
+            }
+            if (!t_chapterById.ContainsKey(t_row.ChapterId))
+            {
+                _error = $"표의 챕터 '{t_row.ChapterId}'에 대응하는 저작이 없다.";
+                return false;
+            }
+            if (!t_grouped.TryGetValue(t_row.ChapterId, out List<AdventureNodeDef> t_list))
+            {
+                t_list = new List<AdventureNodeDef>();
+                t_grouped.Add(t_row.ChapterId, t_list);
+                t_order.Add(t_row.ChapterId);
+                t_points.Add(t_row.ChapterId, t_row.RequiredPoints);
+            }
+            else if (t_points[t_row.ChapterId] != t_row.RequiredPoints)
+            {
+                // 한 챕터 안에서 잠금 점수가 갈리면 어느 값이 챕터의 문턱인지 말할 수 없다.
+                _error = $"챕터 '{t_row.ChapterId}'의 requiredPoints 가 행마다 다르다.";
+                return false;
+            }
+            t_list.Add(t_node);
+        }
+
+        var t_rebuilt = new List<AdventureChapterDef>(t_order.Count);
+        foreach (string t_chapterId in t_order)
+        {
+            AdventureChapterDef t_chapter = t_chapterById[t_chapterId];
+            t_chapter.nodes = t_grouped[t_chapterId];
+            t_chapter.requiredPoints = t_points[t_chapterId];
+            t_rebuilt.Add(t_chapter);
+        }
+
+        chapters = t_rebuilt;
+        m_built = false;
+        return true;
+    }
+
     /// <summary>서버 스펙으로 만든 런타임 복제본에만 전투 수치를 주입한다.</summary>
     internal bool TrySetNodeBattleSpec(string _nodeId, IReadOnlyList<int> _enemyDeckIds, int _aiCardLevel)
     {

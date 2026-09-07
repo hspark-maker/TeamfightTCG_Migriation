@@ -41,7 +41,11 @@ public static class BattleReplay
             if (!TryBuildField(t_deck1, out BattleFieldState t_field1, out t_reason))
                 return BattleReplayResult.Fail(t_reason);
 
+            using (BattleEventStream.CaptureScope t_eventCapture = BattleEventStream.BeginCapture())
+            {
             var t_fields = new[] { t_field0, t_field1 };
+            var t_attacksByOwner = new[] { 0, 0 };
+            int t_turns = 0;
             int t_firstOwner = MatchRandom.Range(2);
             int t_activeTurn = 0;
             int t_activeOwner = t_firstOwner;
@@ -70,7 +74,8 @@ public static class BattleReplay
 
                 if (t_command.Kind == BattleCommandKind.Surrender)
                     return BattleReplayResult.Success(1 - t_command.ActorOwner, false, t_firstOwner,
-                        t_fields, t_checkpoints);
+                        t_fields, t_checkpoints,
+                        BattleReplayStats.Capture(t_eventCapture.Events, t_attacksByOwner, t_turns));
                 if (t_command.Kind == BattleCommandKind.AiTakeover)
                     return BattleReplayResult.Fail("ai_takeover_not_authoritative", t_firstOwner, t_fields, t_checkpoints);
                 if (t_command.Kind != BattleCommandKind.Attack)
@@ -103,6 +108,9 @@ public static class BattleReplay
                     if (t_command.B != t_expectedDerivedTarget)
                         return BattleReplayResult.Fail("derived_target_mismatch", t_firstOwner, t_fields, t_checkpoints);
                 }
+
+                t_attacksByOwner[t_command.ActorOwner]++;
+                if (!t_derived) t_turns++;
 
                 BattleFieldState t_own = t_fields[t_command.ActorOwner];
                 BattleFieldState t_enemy = t_fields[1 - t_command.ActorOwner];
@@ -168,7 +176,9 @@ public static class BattleReplay
 
             bool t_draw = t_remaining0 == 0 && t_remaining1 == 0;
             int t_winner = t_draw ? -1 : t_remaining0 > 0 ? 0 : 1;
-            return BattleReplayResult.Success(t_winner, t_draw, t_firstOwner, t_fields, t_checkpoints);
+            return BattleReplayResult.Success(t_winner, t_draw, t_firstOwner, t_fields, t_checkpoints,
+                BattleReplayStats.Capture(t_eventCapture.Events, t_attacksByOwner, t_turns));
+            }
         }
         catch (Exception _exception)
         {
@@ -295,11 +305,15 @@ public static class BattleReplay
 
         for (int i = 0; i < t_healers.Count; i++)
         {
+            bool t_fired = false;
             for (int j = 0; j < t_cards.Count; j++)
             {
                 if (!ReferenceEquals(t_cards[j], t_healers[i]))
-                    t_cards[j].Heal(1, _showEffect: false, _allowOverheal: true);
+                    t_fired |= t_cards[j].Heal(1, _showEffect: false, _allowOverheal: true) > 0;
             }
+            if (t_fired)
+                BattleEventStream.Emit(new BattleEvent(BattleEventKind.KeywordFired,
+                    t_healers[i].ownerIndex, t_healers[i].slotIndex, (int)CardKeyword.Healer));
         }
 
         for (int i = 0; i < t_cards.Count; i++)
@@ -392,6 +406,7 @@ public sealed class BattleReplayResult
     public int DrawCount { get; private set; }
     public IReadOnlyList<BattleReplayCheckpoint> Checkpoints { get; private set; }
         = Array.Empty<BattleReplayCheckpoint>();
+    public BattleReplayStats Stats { get; private set; }
 
     public static BattleReplayResult Fail(string _reason, int _firstOwner = -1,
         BattleFieldState[] _fields = null, IReadOnlyList<BattleReplayCheckpoint> _checkpoints = null)
@@ -409,7 +424,8 @@ public sealed class BattleReplayResult
     }
 
     public static BattleReplayResult Success(int _winnerOwner, bool _draw, int _firstOwner,
-        BattleFieldState[] _fields, IReadOnlyList<BattleReplayCheckpoint> _checkpoints)
+        BattleFieldState[] _fields, IReadOnlyList<BattleReplayCheckpoint> _checkpoints,
+        BattleReplayStats _stats = null)
     {
         var t_result = new BattleReplayResult
         {
@@ -419,6 +435,7 @@ public sealed class BattleReplayResult
             WinnerOwner = _winnerOwner,
             Draw = _draw,
             Checkpoints = _checkpoints ?? Array.Empty<BattleReplayCheckpoint>(),
+            Stats = _stats,
         };
         t_result.Capture(_fields);
         return t_result;
@@ -439,5 +456,65 @@ public sealed class BattleReplayResult
             _fields[0].FallenCards.Count,
         };
         FinalStateHash = BattleStateHash.Compute(_fields[0], _fields[1]);
+    }
+}
+
+public sealed class BattleReplayStats
+{
+    public int[] AttacksByOwner { get; private set; } = new[] { 0, 0 };
+    public int[] DamageDealtByOwner { get; private set; } = new[] { 0, 0 };
+    public int[] HealedByOwner { get; private set; } = new[] { 0, 0 };
+    public int[] SynergyFiredByOwner { get; private set; } = new[] { 0, 0 };
+    public IReadOnlyDictionary<string, int>[] KeywordsByOwner { get; private set; }
+        = new IReadOnlyDictionary<string, int>[]
+        {
+            new Dictionary<string, int>(),
+            new Dictionary<string, int>(),
+        };
+    public int Turns { get; private set; }
+
+    public static BattleReplayStats Capture(IReadOnlyList<BattleEvent> _events,
+        int[] _attacksByOwner, int _turns)
+    {
+        var t_damage = new[] { 0, 0 };
+        var t_healed = new[] { 0, 0 };
+        var t_synergy = new[] { 0, 0 };
+        var t_keywords = new[]
+        {
+            new Dictionary<string, int>(StringComparer.Ordinal),
+            new Dictionary<string, int>(StringComparer.Ordinal),
+        };
+        if (_events != null)
+        {
+            for (int i = 0; i < _events.Count; i++)
+            {
+                BattleEvent t_event = _events[i];
+                if (t_event.Kind == BattleEventKind.Damage &&
+                    t_event.SourceOwnerIndex >= 0 && t_event.SourceOwnerIndex <= 1)
+                    t_damage[t_event.SourceOwnerIndex] += Math.Max(0, t_event.Value);
+                else if (t_event.Kind == BattleEventKind.Heal &&
+                    t_event.OwnerIndex >= 0 && t_event.OwnerIndex <= 1)
+                    t_healed[t_event.OwnerIndex] += Math.Max(0, t_event.Value);
+                else if (t_event.Kind == BattleEventKind.SynergyFired &&
+                    t_event.OwnerIndex >= 0 && t_event.OwnerIndex <= 1)
+                    t_synergy[t_event.OwnerIndex]++;
+                else if (t_event.Kind == BattleEventKind.KeywordFired &&
+                    t_event.OwnerIndex >= 0 && t_event.OwnerIndex <= 1)
+                {
+                    string t_keyword = ((CardKeyword)t_event.Value).ToString();
+                    t_keywords[t_event.OwnerIndex].TryGetValue(t_keyword, out int t_count);
+                    t_keywords[t_event.OwnerIndex][t_keyword] = t_count + 1;
+                }
+            }
+        }
+        return new BattleReplayStats
+        {
+            AttacksByOwner = _attacksByOwner == null ? new[] { 0, 0 } : (int[])_attacksByOwner.Clone(),
+            DamageDealtByOwner = t_damage,
+            HealedByOwner = t_healed,
+            SynergyFiredByOwner = t_synergy,
+            KeywordsByOwner = new IReadOnlyDictionary<string, int>[] { t_keywords[0], t_keywords[1] },
+            Turns = Math.Max(0, _turns),
+        };
     }
 }

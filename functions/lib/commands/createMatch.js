@@ -8,6 +8,8 @@ const firestore_1 = require("firebase-admin/firestore");
 const node_crypto_1 = require("node:crypto");
 const firebaseApp_1 = require("../firebaseApp");
 const countedTransaction_1 = require("../observability/countedTransaction");
+const eventNames_1 = require("../analytics/eventNames");
+const analyticsEvent_1 = require("../observability/analyticsEvent");
 const matchPairing_1 = require("../matchPairing");
 const payloadGuards_1 = require("../match/payloadGuards");
 const specBlobReader_1 = require("../specs/specBlobReader");
@@ -96,7 +98,7 @@ exports.createMatch = (0, https_1.onCall)({ enforceAppCheck: false }, async (req
         matchId: (0, matchPairing_1.matchIdFromPairingKey)(data.pairingKey),
         seedHex: (0, node_crypto_1.randomBytes)(8).toString("hex"),
     };
-    return (0, countedTransaction_1.withCountedTransaction)("createMatch", async (tx) => {
+    const result = await (0, countedTransaction_1.withCountedTransaction)("createMatch", async (tx) => {
         const matchSnapshot = await tx.get(matchRef);
         const raw = matchSnapshot.data();
         const priorOwners = (0, payloadGuards_1.objectRecord)(raw?.ownerIndexByUid) ?? {};
@@ -135,6 +137,7 @@ exports.createMatch = (0, https_1.onCall)({ enforceAppCheck: false }, async (req
                 rulesetVersion: raw.rulesetVersion,
                 slot: data.ownerIndex,
                 status: "paired",
+                analyticsEligible: false,
             };
         }
         const priorRecord = readPairingRecord(raw);
@@ -165,8 +168,9 @@ exports.createMatch = (0, https_1.onCall)({ enforceAppCheck: false }, async (req
             priorRecord.matchId === record.matchId &&
             priorRecord.participantUids.length === record.participantUids.length &&
             priorRecord.participantUids.every((participant, index) => participant === record.participantUids[index]);
-        if (unchanged && priorOwner === data.ownerIndex)
-            return response;
+        if (unchanged && priorOwner === data.ownerIndex) {
+            return { ...response, analyticsEligible: false };
+        }
         const retainedSpecPins = (0, payloadGuards_1.objectRecord)(raw?.specPins) ??
             currentSpecPins;
         if ((0, specBlobReader_1.fingerprintOfSpecPins)(data.env, retainedSpecPins, ["Card"]) !== record.contentFingerprint) {
@@ -207,7 +211,26 @@ exports.createMatch = (0, https_1.onCall)({ enforceAppCheck: false }, async (req
             expectedParticipants: record.expectedParticipants,
             pairingKeyHash: pairingId,
         });
-        return response;
+        return { ...response, analyticsEligible: priorRecord == null };
     });
+    if (result.analyticsEligible) {
+        (0, analyticsEvent_1.recordEvent)(eventNames_1.EVENTS.matchCreated.name, {
+            uid,
+            env: data.env,
+            eventId: result.matchId,
+            sourceCommand: "createMatch",
+            result: result.status,
+            matchId: result.matchId,
+            mode: data.mode,
+            ownerIndex: data.ownerIndex,
+        });
+    }
+    return {
+        matchId: result.matchId,
+        seedHex: result.seedHex,
+        rulesetVersion: result.rulesetVersion,
+        slot: result.slot,
+        status: result.status,
+    };
 });
 //# sourceMappingURL=createMatch.js.map

@@ -235,7 +235,17 @@ public class LobbyMatchLauncher : MonoBehaviour
             return;
         }
 
-        if (!AdventureRun.Begin(t_node.nodeId, t_node.AiCardLevelOrBase)) return;
+        // 전투 배경은 챕터 저작값이라 여기서 확정해 실어 보낸다 — 배틀 씬은 OutGame을 참조하지 않으므로
+        // 저쪽에서 챕터를 되짚을 수 없다. 미저작이면 null 그대로 두고 씬 저작 배경을 쓴다.
+        Sprite t_battleBackground = null;
+        int t_chapterIndex = AdventureProgress.ChapterIndexOfNode(_nodeIndex);
+        if (AdventureProgress.TryGetChapter(t_chapterIndex, out AdventureChapterDef t_chapter))
+            t_battleBackground = t_chapter.battleBackground;
+        else
+            // 정점은 유효한데 챕터를 못 찾았다 = 평탄화 저작 결함이다. 배경만 빠지므로 진입은 막지 않는다.
+            Debug.LogWarning($"[LobbyMatchLauncher] 정점 '{t_node.nodeId}'(index {_nodeIndex})가 어느 챕터에도 속하지 않는다 — 전투 배경을 건너뛴다.", this);
+
+        if (!AdventureRun.Begin(t_node.nodeId, t_node.AiCardLevelOrBase, t_battleBackground)) return;
 
         var t_preset = new MatchOpponent(
             MatchProfile.OfAdventureNode(t_node.displayName, t_node.avatar), t_node.EnemyDeckIds);

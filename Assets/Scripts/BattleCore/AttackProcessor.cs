@@ -45,6 +45,18 @@ public static class AttackProcessor
         // 교활 스왑 여부. 와이어에서 온 값이 항상 우선(멀티 미러 보장).
         bool t_shouldSwap = t_cunning && (_forceCunningSwap ?? _attackerField.CanSwapWithWaiting(_attacker));
 
+        // 키워드 "발동" 은 **효과가 실제로 적용된 순간**만 센다(보유는 발동이 아니다).
+        // 소유자는 그 키워드를 가진 카드 쪽이다 — 발동 수는 owner 별로 집계되므로 여기서 뒤집히면
+        // 상대 미션이 오른다.
+        if (t_ranged && !_defender.HasKeyword(CardKeyword.Mark))
+            BattleEventStream.Emit(new BattleEvent(BattleEventKind.KeywordFired,
+                _attacker.ownerIndex, t_commandAttackerSlot, (int)CardKeyword.Ranged));
+        // 표식은 방어자의 키워드다 — 반격을 지운 그 순간이 발동이고, 공은 방어자 쪽에 있다.
+        if (t_markedCounter && !t_ranged)
+            BattleEventStream.Emit(new BattleEvent(BattleEventKind.KeywordFired,
+                _defender.ownerIndex, t_commandDefenderSlot, (int)CardKeyword.Mark,
+                _attacker.ownerIndex, t_commandAttackerSlot));
+
         // ---- 고정 시퀀스 (순서 변경 금지) ----
         int t_defenderHpBefore = _defender.hp + _defender.bonusHp;
         _defender.TakeDamage(t_atkDmg);
@@ -64,6 +76,13 @@ public static class AttackProcessor
             BattleEventStream.Emit(new BattleEvent(BattleEventKind.Damage,
                 _attacker.ownerIndex, t_commandAttackerSlot, t_actualCtrDmg,
                 _defender.ownerIndex, t_commandDefenderSlot, BattleEventFlags.Counter));
+        // 도발의 발동 지점. 도발은 두 가지 효과를 갖는데(대상 좁히기 · 반격 50%), 대상 좁히기는
+        // BattleRules.SelectableTargets 가 미리보기·AI 탐색에서도 불려 세면 부풀어 오른다.
+        // 그래서 공격 1회당 정확히 한 번만 서는 이 자리, 반격이 실제로 들어간 순간만 센다.
+        if (t_actualCtrDmg > 0 && _defender.HasKeyword(CardKeyword.Taunt))
+            BattleEventStream.Emit(new BattleEvent(BattleEventKind.KeywordFired,
+                _defender.ownerIndex, t_commandDefenderSlot, (int)CardKeyword.Taunt,
+                _attacker.ownerIndex, t_commandAttackerSlot));
 
         // ---- seam 2: ExtraTargets — 추가 대상 피해 ----
         CardInstance t_splash = null;
@@ -79,9 +98,13 @@ public static class AttackProcessor
                 t_splash.TakeDamage(t_splashDmg);
                 int t_actualSplashDmg = t_splashBefore - (t_splash.hp + t_splash.bonusHp);
                 if (t_actualSplashDmg > 0)
+                {
                     BattleEventStream.Emit(new BattleEvent(BattleEventKind.Damage,
                         t_splash.ownerIndex, t_splashSlot, t_actualSplashDmg,
                         _attacker.ownerIndex, t_commandAttackerSlot, BattleEventFlags.Splash));
+                    BattleEventStream.Emit(new BattleEvent(BattleEventKind.KeywordFired,
+                        _attacker.ownerIndex, t_commandAttackerSlot, (int)CardKeyword.Peerless));
+                }
             }
         }
 
@@ -135,6 +158,8 @@ public static class AttackProcessor
             BattleEventStream.Emit(new BattleEvent(BattleEventKind.Swap,
                 _attacker.ownerIndex, t_commandAttackerSlot, _sourceOwnerIndex: t_incoming.ownerIndex,
                 _sourceSlotIndex: t_incoming.slotIndex));
+            BattleEventStream.Emit(new BattleEvent(BattleEventKind.KeywordFired,
+                _attacker.ownerIndex, t_commandAttackerSlot, (int)CardKeyword.Cunning));
             // [SwappedOut] 패시브 → 시너지 순.
             var t_swapCtx = new SwapOutCtx(_attacker, t_incoming, _attackerField);
             SynergyRuleTriggers.SwappedOut(t_swapCtx);
@@ -150,6 +175,9 @@ public static class AttackProcessor
 
         // ---- 결과 조립 ----
         var t_result = MakeResult(_attacker, t_defKilled);
+        if (t_result.canAttackAgain)
+            BattleEventStream.Emit(new BattleEvent(BattleEventKind.KeywordFired,
+                _attacker.ownerIndex, t_commandAttackerSlot, (int)CardKeyword.Execution));
         t_result.damageDealt = t_actualAtkDmg; // 주 대상만(splash 합산 안 함 = v1). 트리거용
         t_result.enhanceDamage = t_enhanceDmg; // 강화 추가타는 따로 — 합산은 AttackResult.TotalDamage가 준다
         t_result.splashDefender = t_splash;
@@ -211,6 +239,8 @@ public static class AttackProcessor
                 // 유산 회복으로 살아난 카드는 부활 횟수를 소비하지 않는다(피닉시아가 유일한 겸용 카드).
                 if (!t_c.IsAlive && t_c.HasKeyword(CardKeyword.Immortal) && t_c.ReviveAtHalf())
                 {
+                    BattleEventStream.Emit(new BattleEvent(BattleEventKind.KeywordFired,
+                        t_c.ownerIndex, t_c.slotIndex, (int)CardKeyword.Immortal));
                     BattleEventStream.Emit(new BattleEvent(BattleEventKind.Revive,
                         t_c.ownerIndex, t_c.slotIndex));
                 }

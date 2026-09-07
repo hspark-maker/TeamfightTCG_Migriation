@@ -307,7 +307,11 @@ public class CardInstance
         DamageResolution t_result = ResolveDamage(
             _damage, this.hp, this.bonusHp, this.hasShield, t_hadInvincible);
         if (t_hadInvincible && !t_result.hasInvincible)
+        {
             this.runtimeKeywords &= ~CardKeyword.Invincible;
+            BattleEventStream.Emit(new BattleEvent(BattleEventKind.KeywordFired,
+                this.ownerIndex, this.slotIndex, (int)CardKeyword.Invincible));
+        }
         this.hasShield = t_result.hasShield;
         this.hp        = t_result.hp;
         this.bonusHp   = t_result.bonusHp;
