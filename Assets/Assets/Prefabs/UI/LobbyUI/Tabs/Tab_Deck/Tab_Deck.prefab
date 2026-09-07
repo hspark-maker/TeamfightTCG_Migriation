@@ -911,4 +911,4 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DeckTabController
   topBar: {fileID: 0}
-  topBarSlideSeconds: 0.22
+  topBarSlideSeconds: 0.35

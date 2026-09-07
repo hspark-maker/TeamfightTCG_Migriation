@@ -17,9 +17,9 @@ const {
 } = require("../lib/currency/walletStore.js");
 const {cacheableResponse} = require("../lib/save/receiptCache.js");
 
-const KEYS_SORTED = ["Diamond", "Energy", "Gold", "Shard"];
+const KEYS_SORTED = ["Diamond", "Energy", "Gold", "RouletteTicket", "Shard"];
 const NOW = "<serverTimestamp>";
-const ZERO = {Gold: 0, Diamond: 0, Energy: 0, Shard: 0};
+const ZERO = {Gold: 0, Diamond: 0, Energy: 0, Shard: 0, RouletteTicket: 0};
 
 const CLIENT_RECEIPT = {kind: "client", txId: "tx-1"};
 const BOOT_RECEIPT = {kind: "boot", txId: "walletCreate:migration"};
@@ -55,8 +55,8 @@ const receiptWrite = (tx) => tx.calls.find((call) => call.path !== "wallet");
 
 // ── 읽기: 문서가 없거나 깨져도 선다 ──────────────────────────────────────────
 assert.deepEqual(readWallet(snapshotOf(undefined)),
-  {rev: 0, balances: {Gold: 0, Diamond: 0, Energy: 0, Shard: 0}, paidBalances: {}},
-  "문서가 없으면 rev 0 · 4키 0 · 유상분 없음 — 여기서 던지면 미러가 순수 계약을 잃는다");
+  {rev: 0, balances: {Gold: 0, Diamond: 0, Energy: 0, Shard: 0, RouletteTicket: 0}, paidBalances: {}},
+  "문서가 없으면 rev 0 · 전 키 0 · 유상분 없음 — 여기서 던지면 미러가 순수 계약을 잃는다");
 
 assert.deepEqual(Object.keys(readWallet(snapshotOf({rev: 3, balances: {Gold: 5, Junk: 7}})).balances).sort(),
   KEYS_SORTED, "모르는 키는 버린다");
@@ -69,7 +69,7 @@ assert.equal(readWallet(snapshotOf({rev: "x", balances: {}})).rev, 0, "못 읽�
 assert.equal(readWallet(snapshotOf({rev: 2.7, balances: {}})).rev, 2, "rev 는 정수로 자른다");
 assert.equal(readWallet(snapshotOf({rev: 1, balances: {Gold: -5}})).balances.Gold, 0, "음수 잔액은 0");
 assert.equal(readWallet(snapshotOf({rev: 1, balances: {Gold: "x"}})).balances.Gold, 0, "못 읽는 잔액은 0");
-assert.equal(readWallet(snapshotOf({rev: 1})).balances.Gold, 0, "balances 가 없어도 4키가 선다");
+assert.equal(readWallet(snapshotOf({rev: 1})).balances.Gold, 0, "balances 가 없어도 전 키가 선다");
 
 // ── 읽기: 유상 사이드카 ──────────────────────────────────────────────────────
 assert.deepEqual(readWallet(snapshotOf({rev: 1, balances: {Gold: 50}})).paidBalances, {},
@@ -79,7 +79,7 @@ assert.deepEqual(readWallet(snapshotOf({rev: 1, balances: {Gold: 50}, paidBalanc
 assert.deepEqual(readWallet(snapshotOf({rev: 1, balances: {Gold: 50}, paidBalances: null})).paidBalances, {},
   "null 도 전부 무상");
 assert.deepEqual(readWallet(snapshotOf({rev: 1, balances: {Gold: 50}, paidBalances: {Gold: 20}})).paidBalances,
-  {Gold: 20}, "유상분은 쓰인 키만 남는다 — 4키로 채우지 않는다");
+  {Gold: 20}, "유상분은 쓰인 키만 남는다 — 전 키로 채우지 않는다");
 assert.deepEqual(readWallet(snapshotOf({rev: 1, balances: {Gold: 50}, paidBalances: {Gold: 80}})).paidBalances,
   {Gold: 50}, "유상분은 잔액을 넘지 못한다");
 assert.deepEqual(readWallet(snapshotOf({rev: 1, balances: {Gold: 50}, paidBalances: {Junk: 9}})).paidBalances, {},
@@ -92,7 +92,7 @@ assert.deepEqual(readWallet(snapshotOf({rev: 1, balances: {Gold: 50}, paidBalanc
     tx, fakeRef("wallet"), {Gold: 100}, "walletCreate:migration", BOOT_RECEIPT, undefined, NOW);
 
   assert.deepEqual(created,
-    {rev: 1, balances: {Gold: 100, Diamond: 0, Energy: 0, Shard: 0}, paidBalances: {}},
+    {rev: 1, balances: {Gold: 100, Diamond: 0, Energy: 0, Shard: 0, RouletteTicket: 0}, paidBalances: {}},
     "이관으로 선 지갑은 전부 무상이다");
   assert.equal(tx.calls.length, 2, "지갑 1회 + 영수증 1회");
 
@@ -109,8 +109,8 @@ assert.deepEqual(readWallet(snapshotOf({rev: 1, balances: {Gold: 50}, paidBalanc
   assert.equal(receipt.op, "set",
     "boot 는 set 이다 — create 면 지갑만 지워진 계정이 재생성에서 영구 실패한다");
   assert.equal(receipt.value.source, "walletCreate:migration");
-  assert.deepEqual(receipt.value.before, ZERO, "개설 직전 잔액은 4키 0 이다");
-  assert.deepEqual(receipt.value.changes, {Gold: 100, Diamond: 0, Energy: 0, Shard: 0});
+  assert.deepEqual(receipt.value.before, ZERO, "개설 직전 잔액은 전 키 0 이다");
+  assert.deepEqual(receipt.value.changes, {Gold: 100, Diamond: 0, Energy: 0, Shard: 0, RouletteTicket: 0});
   assert.equal(receipt.value.result, null, "result 가 undefined 면 null 로 실린다");
   assert.equal(receipt.value.storeReceipt, null, "스토어 영수증 자리는 IAP 착수 때 찬다");
 }
@@ -145,28 +145,28 @@ assert.deepEqual(readWallet(snapshotOf({rev: 1, balances: {Gold: 50}, paidBalanc
   assert.equal(receipt.value.rev, 9);
   assert.equal(receipt.value.result, JSON.stringify({opened: ["Card_A"]}),
     "result 는 JSON 문자열로 실린다 — 재시도가 그대로 돌려받는다");
-  assert.deepEqual(receipt.value.before, {Gold: CURRENCY_MAX - 5, Diamond: 3, Energy: 0, Shard: 0});
-  assert.deepEqual(receipt.value.after, {Gold: CURRENCY_MAX, Diamond: 0, Energy: 0, Shard: 0});
-  assert.deepEqual(receipt.value.changes, {Gold: 5, Diamond: -3, Energy: 0, Shard: 0},
+  assert.deepEqual(receipt.value.before, {Gold: CURRENCY_MAX - 5, Diamond: 3, Energy: 0, Shard: 0, RouletteTicket: 0});
+  assert.deepEqual(receipt.value.after, {Gold: CURRENCY_MAX, Diamond: 0, Energy: 0, Shard: 0, RouletteTicket: 0});
+  assert.deepEqual(receipt.value.changes, {Gold: 5, Diamond: -3, Energy: 0, Shard: 0, RouletteTicket: 0},
     "요청은 +999 였지만 상한에 잘려 실제는 +5 다 — 영수증은 실제를 적는다");
 }
 
 // ── nextWallet: 상태를 만드는 유일한 출구 ────────────────────────────────────
 {
-  const current = {rev: 4, balances: {Gold: 100, Diamond: 0, Energy: 0, Shard: 0}, paidBalances: {Gold: 30}};
+  const current = {rev: 4, balances: {Gold: 100, Diamond: 0, Energy: 0, Shard: 0, RouletteTicket: 0}, paidBalances: {Gold: 30}};
 
   const spent = nextWallet(current, {Gold: 90}, "enhanceCard");
   assert.equal(spent.next.rev, 5, "rev 는 여기서만 오른다 — writeWallet 은 받은 값을 그대로 싣는다");
   assert.equal(spent.source, "enhanceCard", "영수증의 source 는 명령 이름이다");
-  assert.deepEqual(spent.before, {Gold: 100, Diamond: 0, Energy: 0, Shard: 0});
-  assert.deepEqual(spent.changes, {Gold: -10, Diamond: 0, Energy: 0, Shard: 0},
-    "감소는 음수 · 무변화는 0 — 4키를 전부 싣는다");
+  assert.deepEqual(spent.before, {Gold: 100, Diamond: 0, Energy: 0, Shard: 0, RouletteTicket: 0});
+  assert.deepEqual(spent.changes, {Gold: -10, Diamond: 0, Energy: 0, Shard: 0, RouletteTicket: 0},
+    "감소는 음수 · 무변화는 0 — 전 키를 싣는다");
   assert.deepEqual(spent.next.paidBalances, {Gold: 30}, "무상분(70)에서 먼저 나가므로 유상분은 그대로다");
 
   assert.deepEqual(nextWallet(current, {Gold: 500}, "claimReward").changes,
-    {Gold: 400, Diamond: 0, Energy: 0, Shard: 0}, "지급은 양수 차분이다");
+    {Gold: 400, Diamond: 0, Energy: 0, Shard: 0, RouletteTicket: 0}, "지급은 양수 차분이다");
   assert.deepEqual(nextWallet(current, current.balances, "claimPayout").changes, ZERO,
-    "잔액이 그대로면 4키가 전부 0 이다");
+    "잔액이 그대로면 전 키가 0 이다");
 
   assert.deepEqual(nextWallet(current, {Gold: 30}, "enhanceCard").next.paidBalances, {Gold: 30},
     "무상분을 다 쓴 지점까지는 유상분이 온전하다");
@@ -179,7 +179,7 @@ assert.deepEqual(readWallet(snapshotOf({rev: 1, balances: {Gold: 50}, paidBalanc
   assert.deepEqual(
     nextWallet({rev: 1, balances: {}, paidBalances: {}}, {Gold: 10}, "claimReward").next.paidBalances, {},
     "유상분이 없으면 계속 빈 맵이다");
-  assert.deepEqual(Object.keys(spent.next.balances).sort(), KEYS_SORTED, "잔액은 4키로 정규화된다");
+  assert.deepEqual(Object.keys(spent.next.balances).sort(), KEYS_SORTED, "잔액은 전 키로 정규화된다");
 
   assert.deepEqual(current.paidBalances, {Gold: 30}, "입력 상태를 건드리지 않는다");
 }
@@ -199,7 +199,7 @@ assert.deepEqual(readWallet(snapshotOf({rev: 1, balances: {Gold: 50}, paidBalanc
   assert.equal(receipt.value.source, "claimPayout", "호출부가 넘긴 명령 이름이 그대로 실린다");
   assert.equal(receipt.value.rev, 7, "지갑 rev 는 오르지 않는다");
   assert.equal(receipt.value.txId, "tx-1");
-  assert.deepEqual(receipt.value.changes, ZERO, "움직인 것이 없으므로 4키가 전부 0 이다");
+  assert.deepEqual(receipt.value.changes, ZERO, "움직인 것이 없으므로 전 키가 0 이다");
   assert.deepEqual(receipt.value.before, receipt.value.after);
   assert.equal(receipt.value.result, JSON.stringify({acked: []}));
 }
@@ -228,7 +228,7 @@ assert.throws(() => readReceipt(snapshotOf({source: "openPack", result: "{not js
   const response = {
     revision: 12,
     updatedSlots: {ownership: {ownedIds: [1, 2, 3]}},
-    wallet: {rev: 9, balances: {Gold: 100, Diamond: 0, Energy: 0, Shard: 0}},
+    wallet: {rev: 9, balances: {Gold: 100, Diamond: 0, Energy: 0, Shard: 0, RouletteTicket: 0}},
     packId: "Pack_Basic",
   };
   const cached = cacheableResponse(response, response.updatedSlots);

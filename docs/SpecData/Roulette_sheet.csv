@@ -1,0 +1,4 @@
+﻿행 고유 번호(부여 후 변경 금지),판 고유 키(코드·RouletteSlot이 이 값으로 판을 찾는다. 부여 후 변경 금지),화면 제목에 쓰는 이름(표시용이라 언제든 고쳐도 된다),1회전 비용으로 낼 재화(Gold/Diamond/Energy/Shard/RouletteTicket),1회전 비용. 1 이상이어야 한다(0 이하면 서버가 판 전체를 거부한다),목록 정렬 순서(작을수록 앞. 판이 하나면 의미 없다)
+id,rouletteId,displayName,priceType,price,sortOrder
+int,string,string,string,long,int
+1,roulette_default,행운의 룰렛,RouletteTicket,1,0

@@ -59,7 +59,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f738d2467d384acbb037ea9aa350d874, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InitializationRunner
   initializeOnAwake: 1
   initializers:
@@ -91,6 +91,7 @@ MonoBehaviour:
   initializerId: RootLifecycle
   required: 1
   requiredIds: []
+  retryEntry: 0
 --- !u!114 &1581884920793774143
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -106,9 +107,44 @@ MonoBehaviour:
   initializerId: BattleConfig
   required: 1
   requiredIds: []
+  retryEntry: 0
   battleTimingConfig: {fileID: 11400000, guid: fa77fd9889cfb5d4e853ff6a2b266f22, type: 2}
   rankConfig: {fileID: 11400000, guid: 408410dc0be34c648afdaf57203b958c, type: 2}
   battleVfxLibrary: {fileID: 11400000, guid: 8b4aacde1cb67a54b8706abfa2954826, type: 2}
+--- !u!114 &1581884920793774144
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2449901017464239670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c5d0392a71b64f8ea6e3418d7cb52099, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ContentProfileStep
+  initializerId: ContentProfile
+  required: 1
+  requiredIds: []
+  retryEntry: 0
+--- !u!114 &1581884920793774145
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2449901017464239670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e18b6f4d20c34a7db95c2f61847ae3d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CardCatalogStep
+  initializerId: CardCatalog
+  required: 1
+  requiredIds:
+  - SpecSync
+  retryEntry: 0
+  synergyRegistry: {fileID: 11400000, guid: 0f17069139424ae7956455108c7f08a2, type: 2}
 --- !u!114 &1581884920793774146
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -123,7 +159,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::OutgameConfigStep
   initializerId: OutgameConfig
   required: 1
-  requiredIds: 
+  requiredIds:
   - CardCatalog
   - SpecSheetPreload
   retryEntry: 0
@@ -133,6 +169,7 @@ MonoBehaviour:
   adventureConfig: {fileID: 11400000, guid: ff32166a7a94716469f68bae386a7555, type: 2}
   profileConfig: {fileID: 11400000, guid: 098146b7940589948afb63e709ac5357, type: 2}
   deckImageCatalog: {fileID: 11400000, guid: 20a3ae6097a4cb440ad35c4621cec66e, type: 2}
+  rouletteConfig: {fileID: 11400000, guid: c79a047159501ef46a7e47fcabb63abf, type: 2}
 --- !u!114 &1581884920793774147
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -147,7 +184,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SpecSheetPreloadStep
   initializerId: SpecSheetPreload
   required: 1
-  requiredIds: 
+  requiredIds:
   - CardCatalog
   retryEntry: 0
 --- !u!114 &1581884920793774148
@@ -164,7 +201,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AssetPreloadKickStep
   initializerId: AssetPreloadKick
   required: 1
-  requiredIds: 
+  requiredIds:
   - CardCatalog
   retryEntry: 0
 --- !u!114 &1581884920793774149
@@ -181,7 +218,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BattleGrowthBridgeStep
   initializerId: BattleGrowthBridge
   required: 1
-  requiredIds: 
+  requiredIds:
   - OutgameConfig
   retryEntry: 0
 --- !u!114 &1581884920793774150
@@ -229,7 +266,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: da1aa621972ab9cfd80bfcd5aead9a8f, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SpecSyncStep
   initializerId: SpecSync
   required: 1
@@ -250,7 +287,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WaitAssetPreloadStep
   initializerId: WaitAssetPreload
   required: 1
-  requiredIds: 
+  requiredIds:
   - AssetPreloadKick
   retryEntry: 0
 --- !u!114 &1581884920793774153
@@ -267,42 +304,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SaveDependentManagersStep
   initializerId: SaveDependentManagers
   required: 1
-  requiredIds: 
+  requiredIds:
   - SpecSync
   retryEntry: 0
   starterDeckPackId: StarterPack
---- !u!114 &1581884920793774144
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2449901017464239670}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c5d0392a71b64f8ea6e3418d7cb52099, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ContentProfileStep
-  initializerId: ContentProfile
-  required: 1
-  requiredIds: []
---- !u!114 &1581884920793774145
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2449901017464239670}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e18b6f4d20c34a7db95c2f61847ae3d0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CardCatalogStep
-  initializerId: CardCatalog
-  required: 1
-  requiredIds: 
-  - SpecSync
-  synergyRegistry: {fileID: 11400000, guid: 0f17069139424ae7956455108c7f08a2, type: 2}
 --- !u!1 &3392005005194032163
 GameObject:
   m_ObjectHideFlags: 0
@@ -658,8 +663,6 @@ MonoBehaviour:
   config: {fileID: 11400000, guid: 354fc699ded8b7849ac32ab399efef7f, type: 2}
   outgameSoundBank: {fileID: 11400000, guid: 71d3c5a08e6b492fa04c7b18d2e6539f, type: 2}
   sfxPoolSize: 8
-  voiceBaseChance: 0.4
-  voiceChanceIncrement: 0.25
 --- !u!1 &8830170169402083151
 GameObject:
   m_ObjectHideFlags: 0

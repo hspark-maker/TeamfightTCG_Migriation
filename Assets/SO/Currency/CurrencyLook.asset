@@ -29,3 +29,7 @@ MonoBehaviour:
     icon: {fileID: 21300000, guid: cda3c083eb1073440b9c2f663dc1a5b8, type: 3}
     barIcon: {fileID: 21300000, guid: 73269c39e1ce6f94a85e6e35f2e4ecbe, type: 3}
     displayName: "\uAC15\uD654 \uC870\uAC01"
+  - type: 4
+    icon: {fileID: 21300000, guid: 3e42bc34e49be4b1187fcb5951f29aef, type: 3}
+    barIcon: {fileID: 21300000, guid: 3e42bc34e49be4b1187fcb5951f29aef, type: 3}
+    displayName: "\uB8F0\uB81B \uD2F0\uCF13"

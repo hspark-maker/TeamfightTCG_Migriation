@@ -18,19 +18,19 @@ exports.grant = grant;
 const currencyKeys_1 = require("./currencyKeys");
 const saveValues_1 = require("../save/saveValues");
 /**
- * 4키로 다시 짓는다. 부분 입력이면 빠진 키가 0 이고 모르는 키는 버린다.
+ * CURRENCY_KEYS 전 키로 다시 짓는다. 부분 입력이면 빠진 키가 0 이고 모르는 키는 버린다.
  * 지갑 문서 코덱(currency/walletStore)이 슬롯 밖에서도 같은 정규화를 써야 해서 공개한다.
  * @param {Balances} balances 잔액(부분·오염 가능)
- * @return {Balances} 4키 잔액
+ * @return {Balances} CURRENCY_KEYS 전 키 잔액
  */
 function normalizeBalances(balances) {
     return normalize(balances);
 }
 /**
- * 4키로 다시 짓는다. 부분 입력이면 빠진 키가 0 이고 **모르는 키는 버린다**
- * — 룰의 balances.hasOnly 가 정확히 4키를 요구하기 때문이다.
+ * CURRENCY_KEYS 전 키로 다시 짓는다. 부분 입력이면 빠진 키가 0 이고 **모르는 키는 버린다**
+ * — 지갑 문서에 정체 모를 키가 굳으면 클라가 못 읽는 잔액이 남는다(룰에 이 검사는 없다).
  * @param {Balances} balances 잔액(부분·오염 가능)
- * @return {Balances} 4키 잔액
+ * @return {Balances} CURRENCY_KEYS 전 키 잔액
  */
 function normalize(balances) {
     const next = {};
@@ -44,7 +44,7 @@ function normalize(balances) {
  * 재화 증감의 **유일한 산술 지점**. amount 는 부호가 있다(차감은 음수).
  * @param {Balances} balances 잔액
  * @param {CurrencyGain[]} changes 증감 목록
- * @return {Balances} 갱신된 4키 잔액
+ * @return {Balances} 갱신된 잔액
  */
 function changeBalances(balances, changes) {
     const next = normalize(balances);
@@ -58,7 +58,7 @@ function changeBalances(balances, changes) {
  * 세이브 문서의 currency 슬롯에서 잔액을 읽는다. v8 부터 잔액의 진실원은 지갑 문서라
  * 남은 호출자는 이관(currency/walletMigration) 하나뿐이다.
  * @param {unknown} currency 문서의 currency 슬롯
- * @return {Balances} 4키 잔액
+ * @return {Balances} CURRENCY_KEYS 전 키 잔액
  */
 function readBalances(currency) {
     var _a;

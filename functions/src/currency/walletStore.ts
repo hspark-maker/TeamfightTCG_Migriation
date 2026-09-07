@@ -68,7 +68,7 @@ export interface WalletUpdate {
   /** 영수증의 source. 명령 이름 또는 walletCreate:* 다. */
   readonly source: string;
   readonly before: Balances;
-  /** after − before. 4키 전부 싣는다(무변화는 0). */
+  /** after − before. CURRENCY_KEYS 전 키를 싣는다(무변화는 0). */
   readonly changes: Balances;
 }
 
@@ -124,7 +124,7 @@ function clampPaid(paid: Balances, balances: Balances): Balances {
  * "의도한 증감"과 "실제 증감"이 다를 수 있고, 영수증은 실제를 적어야 한다).
  * @param {Balances} before 이동 전 잔액
  * @param {Balances} after 이동 후 잔액
- * @return {Balances} 4키 증감(무변화는 0)
+ * @return {Balances} 키별 증감(무변화는 0)
  */
 function diffBalances(before: Balances, after: Balances): Balances {
   const changes: Balances = {};
@@ -187,7 +187,7 @@ export function receiptRef(wallet: DocumentReference, txId: string): DocumentRef
 }
 
 /**
- * 스냅샷에서 지갑을 읽는다. 문서가 없거나 필드가 깨져도 4키 0 · rev 0 으로 선다
+ * 스냅샷에서 지갑을 읽는다. 문서가 없거나 필드가 깨져도 전 키 0 · rev 0 으로 선다
  * — 판정은 호출부가 하고, 여기서 던지면 미러가 순수 계약을 잃는다.
  * @param {DocumentSnapshot} snapshot 지갑 문서 스냅샷
  * @return {WalletState} 지갑 상태

@@ -39,7 +39,7 @@ function parseClaimPayoutData(raw: unknown): ClaimPayoutData {
  * payout 문서에 **이미 적혀 있는** 지급액을 CurrencyGain 으로 읽는다. 다시 계산하지 않는다
  * — 금액의 근거는 submitMatchResult 가 확정 시점에 computeCurrencyPayout 으로 넣어 둔 값이고,
  * 여기서 표를 다시 읽으면 확정 뒤 표가 바뀐 만큼 지급이 갈린다.
- * 재화가 4키 밖이거나 수량이 0 이하면 null 이다(그 payout 은 낙인만 되고 크레딧이 없다).
+ * 재화가 CURRENCY_KEYS 밖이거나 수량이 0 이하면 null 이다(그 payout 은 낙인만 되고 크레딧이 없다).
  * @param {unknown} payout payout 문서 값
  * @return {CurrencyGain | null} 지급 한 건, 읽을 수 없으면 null
  */

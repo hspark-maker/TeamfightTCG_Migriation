@@ -61,6 +61,11 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     [SerializeField] Button            backButton;
     [SerializeField] DeckTabController tabController;
 
+    [Tooltip("호스트 계층에 직접 놓인 인스턴스인가.\n"
+           + "켜면 풀에 등록하지 않고 정렬도 올리지 않는다(로비 덱 탭).\n"
+           + "끄면 풀이 세우는 전체화면 오버레이로 동작한다(매치 덱 화면).")]
+    [SerializeField] bool hostEmbedded;
+
     [Header("편성 UI")]
     [SerializeField] DeckEditSlotView[]     slots;          // 크기 6
     [SerializeField] DeckEditCollectionGrid collectionGrid;
@@ -139,6 +144,9 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
 
     public bool IsOpen => m_mode != EDeckEditMode.None;
 
+    /// <summary>호스트 계층에 직접 놓인 인스턴스인가. 호스트가 자기 배선 실수를 잡는 데 쓴다.</summary>
+    public bool IsHostEmbedded => hostEmbedded;
+
     /// <summary>지금 편집 중인 저장 슬롯(신규 생성 중이거나 닫혀 있으면 -1).
     /// 하단 바로 덱을 갈아탄 사실은 이 값으로만 밖에 드러난다 — 호스트는 열 때 넘긴 좌표만 알고 있다.</summary>
     public int CurrentSlot => m_slotIndex;
@@ -155,12 +163,15 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     // 다시 주입해야 하면 호스트가 이 패널의 라이프사이클을 추적해야 한다.
     public void SetExitHandler(Action _onExit) => m_onExit = _onExit;
 
-    /// <summary>드래그 컨트롤러 주입. <b>프리팹이 자기 것을 들고 있으면 주입을 무시한다</b> —
-    /// 풀드 UI는 자기 캔버스(UiSortingOrder.PooledOverlay)에 살아서, 로비 캔버스(order 0)의 DragLayer를 주입받으면
-    /// 고스트가 패널 뒤로 깔린다. 프리팹 안에 레이어가 없는 경우(단독 테스트 씬)에만 주입이 먹는다.</summary>
+    /// <summary>드래그 컨트롤러 주입. <b>풀드 화면은 프리팹이 자기 것을 들고 있으면 주입을 무시한다</b> —
+    /// 자기 캔버스에 살아서 로비 캔버스의 DragLayer를 받으면 고스트가 패널 뒤로 깔린다.
+    /// 호스트 계층에 박힌 인스턴스는 반대다 — 자기 캔버스가 없어 주입받은 쪽이 이긴다.</summary>
     public void SetDragController(DeckEditDragController _controller)
     {
-        if (dragController == null && _controller != null) dragController = _controller;
+        if (_controller == null) return;
+        if (dragController != null && !hostEmbedded) return;
+
+        dragController = _controller;
     }
 
     // 이번 진입 요청. Open은 Show에서 돈다 — BeginEdit이 컬렉션 그리드를 세우므로 활성 상태여야 한다.
@@ -168,7 +179,8 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
 
     protected override void Awake()
     {
-        base.Awake();          // 풀 등록(UIPoolManager.RegisterUI)
+        // 풀은 타입 키 하나다 — 등록하면 매치 덱 화면이 로비 계층에 박힌 이 인스턴스를 빌려 간다.
+        if (!hostEmbedded) base.Awake();          // 풀 등록(UIPoolManager.RegisterUI)
 
         if (backButton != null)
         {
@@ -220,7 +232,8 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         // 로비 위에 깔려 하단 탭바까지 클릭을 먹는다 — 예전엔 호스트의 SetActive(false)가 매번 지웠지만
         // 그 책임이 풀로 옮겨간 지금은 "열 때만 켠다"를 여기서 불변식으로 박아야 한다.
         // 배선은 이 위에서 이미 끝났으므로 지금 꺼도 다음 열기에 그대로 살아 있다.
-        if (!this.isShow) gameObject.SetActive(false);
+        // 호스트 계층에 박힌 인스턴스는 켜고 끄는 주인이 호스트다 — 여기서 끄면 탭이 켜 준 화면을 도로 지운다.
+        if (!this.isShow && !hostEmbedded) gameObject.SetActive(false);
     }
 
     // _synergy가 null이면 강조 해제. 대상 카드는 살짝 커지고 나머지는 흐려진다.
@@ -277,7 +290,11 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         gameObject.SetActive(true);   // OnEnable이 여기서 돌아 소유 변경·해금 구독이 선다
         this.isShow = true;
 
-        LiftToOverlayLayer();
+        // 박힌 인스턴스는 호스트 계층의 정렬을 따른다 — 올리면 상단 바·탭 바 위로 튀어나온다.
+        // 드래그 고스트만은 올린다: 그러지 않으면 튜토리얼 게이트 딤 아래에서 끌린다.
+        if (hostEmbedded) LiftDragLayer();
+        else              LiftToOverlayLayer();
+
         ApplyHostChrome();
 
         if (this.m_request.isNew) OpenNew();
