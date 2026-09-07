@@ -75,6 +75,15 @@ public static class OutgameTutorialGuide
     // 성장을 처음부터 다시 보는 상태라 안내가 대주던 한 방도 되살린다(디버그 전용)
     public static void ResetFreeShotForDebug() => s_freeSpentStep = null;
 
+    /// <summary>되감기가 서버의 소진 표식(grants 문서)을 지운 직후. 클라 세션 표식과 서버 채택분을 함께 걷는다.</summary>
+    // 서버만 지우고 클라 캐시를 두면 부팅 읽기가 물어 둔 옛 값이 남아, 브리지의 통과 판정이
+    // "이미 소진했다"고 보고 강화 스텝을 그냥 넘긴다 — 그 챕터를 다시 볼 수 없게 된다.
+    public static void ResetFreeShotForRewind()
+    {
+        s_freeSpentStep = null;
+        TutorialGrantsCloud.ResetForRewind();
+    }
+
     /// <summary>지금 서 있는 스텝. 둘 다 돌고 있으면 트리거 쪽이다(클래스 주석 참고).
     /// 무료 한 방의 소진 표식처럼 "그 스텝 하나"를 식별해야 하는 쪽도 이 참조를 그대로 쓴다.</summary>
     public static bool TryGetCurrentStep(out TutorialStepDef _step)

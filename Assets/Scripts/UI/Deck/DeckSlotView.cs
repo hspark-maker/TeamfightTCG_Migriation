@@ -50,10 +50,10 @@ public class DeckSlotView : MonoBehaviour
         if (numberText != null)
         {
             numberText.gameObject.SetActive(true);
-            numberText.text = _displayNumber.ToString("00");   // 01, 02 …
+            numberText.text = _displayNumber.ToString();  
         }
 
-        if (nameText != null) nameText.text = _deckName;
+        if (nameText != null) nameText.enabled = false;
 
         if (previewImage != null)
         {
@@ -83,7 +83,10 @@ public class DeckSlotView : MonoBehaviour
         if (bannerObject != null) bannerObject.SetActive(false);
         if (numberText   != null) numberText.gameObject.SetActive(false);
         if (previewImage != null) previewImage.gameObject.SetActive(false);
-        if (nameText     != null) nameText.text = _enabled ? createLabel : fullLabel;
+        if (nameText != null) {  nameText.text=  _enabled ? createLabel : fullLabel;}
+
+        
+        
 
         SetInteractable(_enabled);
     }

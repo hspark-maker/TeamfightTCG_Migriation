@@ -122,7 +122,7 @@ export const enhanceKeyword = onCall(async (request) => {
       }
 
       if (grantsReference !== null && freeShot !== null) {
-        writeGrantUsed(transaction, grantsReference, FREE_SHOT_AXIS, freeShot, FieldValue.serverTimestamp());
+        writeGrantUsed(transaction, grantsReference, FREE_SHOT_AXIS, FieldValue.serverTimestamp());
       }
 
       level = step.level;

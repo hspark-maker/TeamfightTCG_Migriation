@@ -37,6 +37,8 @@ const {
   readGrants,
   hasFreeShot,
   writeGrantUsed,
+  readPackGrants,
+  writePackGranted,
 } = require("../lib/growth/tutorialGrants.js");
 
 // ── 실측 스펙 행 (envs/test 에서 확인한 저작 그대로) ─────────────────────────
@@ -213,14 +215,48 @@ assert.equal(parseCardEnhanceRule([{maxLevel: 4, baseSuccessPermille: -1}]).base
   assert.equal(hasFreeShot({enhanceCard: false, enhanceKeyword: true}, "enhanceKeyword"), false);
 
   const written = [];
-  const transaction = {set: (ref, value) => written.push({ref, value})};
-  writeGrantUsed(transaction, "ref", "enhanceCard", {enhanceCard: false, enhanceKeyword: true}, "now");
+  const transaction = {set: (ref, value, options) => written.push({ref, value, options})};
+  writeGrantUsed(transaction, "ref", "enhanceCard", "now");
   assert.deepEqual(written[0].value, {
     schemaVersion: GRANT_SCHEMA_VERSION,
     enhanceCard: true,
-    enhanceKeyword: true,
     updatedAt: "now",
-  }, "다른 축의 낙인을 지우지 않는다");
+  }, "자기 축만 쓴다 — 다른 축과 팩 낙인은 문서에 남겨 둔다");
+  assert.deepEqual(written[0].options, {merge: true},
+    "merge 가 빠지면 전체 set 이 되어 다른 축과 packs 를 지운다");
+}
+
+// ── 튜토리얼 무료 팩 지급 낙인(packs) ───────────────────────────────────────
+{
+  const snapshot = (data) => ({exists: data !== undefined, data: () => data});
+  const idsOf = (set) => [...set].sort();
+
+  assert.deepEqual(idsOf(readPackGrants(snapshot(undefined))), [],
+    "문서가 없으면 아무 팩도 안 받은 것 — 낙인을 못 읽었다고 지급을 막으면 온보딩이 멈춘다");
+  assert.deepEqual(idsOf(readPackGrants(snapshot({}))), []);
+  assert.deepEqual(idsOf(readPackGrants(snapshot({packs: "StarterPack"}))), [],
+    "맵이 아니면 빈 집합으로 읽는다");
+  assert.deepEqual(idsOf(readPackGrants(snapshot({packs: ["StarterPack"]}))), [],
+    "배열도 맵이 아니다");
+  assert.deepEqual(idsOf(readPackGrants(snapshot({packs: {StarterPack: true, KeywordDeck: false}}))),
+    ["StarterPack"], "true 인 것만 지급으로 본다");
+
+  const written = [];
+  const transaction = {set: (ref, value, options) => written.push({ref, value, options})};
+
+  assert.equal(writePackGranted(transaction, "ref", "KeywordDeck", "now"), true);
+  assert.deepEqual(written[0].value, {
+    schemaVersion: GRANT_SCHEMA_VERSION,
+    packs: {KeywordDeck: true},
+    updatedAt: "now",
+  }, "자기 packId 만 쓴다 — 형제 낙인은 merge 가 살린다");
+  assert.deepEqual(written[0].options, {merge: true});
+
+  // 예약 접두·경로 구분자는 필드명으로 못 쓴다 — 쓰기가 던지면 지급 트랜잭션이 통째로 말린다.
+  assert.equal(writePackGranted(transaction, "ref", "__proto__", "now"), false);
+  assert.equal(writePackGranted(transaction, "ref", "a/b", "now"), false);
+  assert.equal(writePackGranted(transaction, "ref", "", "now"), false);
+  assert.equal(written.length, 1, "건너뛴 packId 는 문서를 쓰지 않는다");
 }
 
 // ── 무료 한 방은 비용만 0으로 만든다(성공률은 그대로) ───────────────────────

@@ -121,7 +121,7 @@ exports.enhanceKeyword = (0, https_1.onCall)(async (request) => {
                 balance: balances[step.currency] });
         }
         if (grantsReference !== null && freeShot !== null) {
-            (0, tutorialGrants_1.writeGrantUsed)(transaction, grantsReference, FREE_SHOT_AXIS, freeShot, firestore_1.FieldValue.serverTimestamp());
+            (0, tutorialGrants_1.writeGrantUsed)(transaction, grantsReference, FREE_SHOT_AXIS, firestore_1.FieldValue.serverTimestamp());
         }
         level = step.level;
         currency = step.currency;

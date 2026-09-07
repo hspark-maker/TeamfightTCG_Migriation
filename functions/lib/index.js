@@ -1,12 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.limitBreakCard = exports.reportAdventureWin = exports.grantTutorialCards = exports.claimBattleReward = exports.enhanceKeyword = exports.enhanceCard = exports.claimPayout = exports.submitMatchResult = exports.verifyMatchTicket = exports.findAiMatch = exports.getRankSnapshot = exports.lockDeck = exports.createMatch = exports.claimReward = exports.openPack = exports.repairSaveSlots = exports.ensureWallet = exports.ensureAccount = exports.devRewindTutorial = exports.devBumpRevision = exports.ping = void 0;
+exports.limitBreakCard = exports.reportAdventureWin = exports.grantTutorialCards = exports.claimBattleReward = exports.enhanceKeyword = exports.enhanceCard = exports.claimPayout = exports.submitMatchResult = exports.verifyMatchTicket = exports.findAiMatch = exports.getRankSnapshot = exports.lockDeck = exports.createMatch = exports.claimReward = exports.openPack = exports.repairSaveSlots = exports.ensureWallet = exports.ensureAccount = exports.devResetSave = exports.devBumpRevision = exports.ping = void 0;
 var ping_1 = require("./commands/ping");
 Object.defineProperty(exports, "ping", { enumerable: true, get: function () { return ping_1.ping; } });
 var devBumpRevision_1 = require("./commands/devBumpRevision");
 Object.defineProperty(exports, "devBumpRevision", { enumerable: true, get: function () { return devBumpRevision_1.devBumpRevision; } });
-var devRewindTutorial_1 = require("./commands/devRewindTutorial");
-Object.defineProperty(exports, "devRewindTutorial", { enumerable: true, get: function () { return devRewindTutorial_1.devRewindTutorial; } });
+var devResetSave_1 = require("./commands/devResetSave");
+Object.defineProperty(exports, "devResetSave", { enumerable: true, get: function () { return devResetSave_1.devResetSave; } });
 var ensureAccount_1 = require("./commands/ensureAccount");
 Object.defineProperty(exports, "ensureAccount", { enumerable: true, get: function () { return ensureAccount_1.ensureAccount; } });
 var ensureWallet_1 = require("./commands/ensureWallet");

@@ -67,7 +67,9 @@ public static class OutgameTutorialRewind
     /// <summary>1단 — 서버에 아웃게임 세이브 초기화를 요청하고 예약 좌표를 심는다.
     /// <b>SaveDependentManagersStep.InstallOnce() 맨 앞</b>에서만 호출한다 —
     /// 클라우드 채택보다 앞서면 채택이 슬롯을 그대로 덮고, 매니저 Init()들이 슬롯 참조를 캐싱한 뒤면 반영되지 않는다.</summary>
-    // 미는 주체가 서버인 이유는 진행도의 단조성이다 — 클라가 세이브를 뒤로 쓸 수 있으면 보상 수령 표식을 비워 재수령이 뚫린다.
+    // 미는 주체가 서버인 이유는 슬롯 모양의 단일 진실원이다 — 첫실행 슬롯을 만드는 buildFreshAccountSlots 는
+    // 신규 계정에 ensureAccount 가 쓰는 바로 그 함수라, 클라가 사본을 들면 룰 픽스처와 모양이 갈린다.
+    // 좌표는 서버가 안 심는다(서버의 어떤 판정도 튜토리얼 좌표를 읽지 않는다) — 채택 뒤 클라가 찍는다.
     public static async UniTask ApplyWipeIfScheduled()
     {
         // 밀기는 새 예약(PREF_KEY)에만 반응한다 — 재생만 남은 상태를 여기서 다시 집으면 매 초기화 반복 와이프다.
@@ -78,42 +80,44 @@ public static class OutgameTutorialRewind
             // 슬롯 9개 채택은 이 창구가 한다(AdoptServerResult → AdoptServerSlots) — 클라가 따로 쓰거나 저장하지 않는다.
             // InvokeInitAsync는 Loading을 단언하는데 이 시점은 이미 Ready라 쓸 수 없다.
             await ServerSaveCommands.InvokeAsync<ServerCommandResult>(
-                "devRewindTutorial",
-                new
-                {
-                    env          = ContentProfileConfig.Active.CloudEnvId,
-                    chapterIndex = t_chapter,
-                    stepIndex    = t_step,
-                });
+                "devResetSave",
+                new { env = ContentProfileConfig.Active.CloudEnvId });
         }
         catch (Exception t_exception)
         {
             // QA 경로라 실패가 게임 진입을 막으면 안 된다. 예약을 남기면 매 부팅이 같은 왕복을 반복하면서 원인은 안 보이므로
             // 걷어내고 로그만 남긴다 — QA가 에디터 창에서 다시 예약하면 된다.
             Cancel();
-            Debug.LogError($"[TutorialRewind] 서버 되감기 실패 — 예약을 취소했다. 좌표 {t_chapter}-{t_step} · {t_exception.GetBaseException().Message}");
+            Debug.LogError($"[TutorialRewind] 서버 세이브 초기화 실패 — 예약을 취소했다. 좌표 {t_chapter}-{t_step} · {t_exception.GetBaseException().Message}");
             return;
         }
+
+        // 좌표는 서버가 아니라 여기서 찍는다. JumpForDebug가 StepId까지 시퀀스에서 맞춰 주므로
+        // 채택된 첫실행 슬롯의 stepId 0(앵커 없음)을 그대로 두는 것보다 정확하다.
+        // 이 API는 정지 감시 카운트와 OutgameFeatureLock 정지 판정도 함께 걷는다.
+        OutgameTutorialProgress.JumpForDebug(t_chapter, t_step);
 
         // 세이브 슬롯 밖에 사는 진행 흔적은 서버가 모른다 — 슬롯만 밀면 그 축이 이전 세션 값으로 남아
         // "되감았는데 그 연출만 안 나온다"가 된다(해금 연출 이력은 기기 로컬이라 슬롯 목록에 없다).
         AdventureUnlockSeenStore.Clear();
+
+        // 무료 한 방 표식은 서버가 지웠지만, 그 문서를 읽는 것은 이 스텝보다 앞선 클라우드 채택이다 —
+        // 캐시를 여기서 걷지 않으면 옛 "소진" 값이 남아 강화 스텝이 통과 판정에 걸려 그냥 넘어간다.
+        OutgameTutorialGuide.ResetFreeShotForRewind();
 
         // 밀기는 끝났다 — 예약을 재생 전용 키로 옮겨 다음 초기화가 세이브를 다시 밀지 않게 한다.
         LocalPrefs.DeleteKey(PREF_KEY);
         LocalPrefs.SetString(PREF_REPLAY_KEY, $"{t_chapter},{t_step}");
         LocalPrefs.Save();
 
-        // 정지 판정은 세이브 밖(static)이라 슬롯을 갈아도 남는다. 보통은 다음 초기화의 도메인 리로드가
-        // 알아서 내리므로 no-op이고, 리로드를 끈 에디터 세션에서만 실효가 있다 — 그 한 경우를 위한 방어다.
-        OutgameFeatureLock.ClearStall();
-
         // 잔액은 되돌지 않는다 — 지갑은 세이브 문서 밖이고 되돌리는 경로가 서버에도 없다. test env 전용이라 그 차이를 수용한다.
-        Debug.Log($"[TutorialRewind] 서버 세이브 초기화 — 좌표 {t_chapter}-{t_step}로 되감음(슬롯 전체 첫실행 · 해금 연출 이력 · 정지 판정 해제 · 잔액 유지).");
+        // 무료 한 방은 서버가 grants 문서를 지워 되살린다 — 신규 계정 잔액에 Shard·Energy가 없어 그것이 없으면 강화 챕터가 멈춘다.
+        Debug.Log($"[TutorialRewind] 서버 세이브 초기화 — 좌표 {t_chapter}-{t_step}로 되감음(슬롯 전체 첫실행 · 무료 한 방 부활 · 해금 연출 이력 · 정지 판정 해제 · 잔액 유지).");
     }
 
     /// <summary>2단 — 예약 좌표 직전까지의 <b>결정적인</b> 지급만 재생하고 예약을 소비한다.
-    /// <b>초기화 즉시 단계 끝(TutorialDataStep 뒤)</b>에서 호출한다(카탈로그·덱·성장·시퀀스가 모두 준비된 자리).
+    /// <b>SaveDependentManagersStep.InstallOnce() 끝</b>에서 호출한다 — 매니저 Init()과 덱 로드가 끝나
+    /// 카탈로그·덱·성장·시퀀스가 모두 준비된 자리다(1단과 같은 스텝이지만 반대쪽 끝이다).
     ///
     /// 씬을 뺏는 액션(AutoBattle·AutoPurchase·BattleEntry)은 실행하지 않는다 — 초기화 중에 화면을 넘겨받는다.
     /// 팩 드로우는 랜덤이라 재현할 수 없어 풀 전량을 준다.</summary>

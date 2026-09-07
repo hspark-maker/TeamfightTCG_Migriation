@@ -8,7 +8,10 @@ using UnityEngine;
 //
 // 세이브와 문서를 가른 이유는 지갑과 같다 — 소진 표식은 강화 트랜잭션 안에서 서버가 쓰므로
 // 세이브 revision을 올리지 않고, 세이브의 "정확히 +1" 단언에 태우면 그 자리에서 세션이 끊긴다.
-// 지갑과 다른 점은 rev 같은 단조 카운터가 없다는 것이다 — 표식은 한 번 켜지면 꺼지지 않아 늦은 응답 방어가 필요 없다.
+// 지갑과 다른 점은 rev 같은 단조 카운터가 없다는 것이다.
+//
+// 표식을 끄는 경로는 QA 되감기(devResetSave가 문서를 통째로 지운다) 하나뿐이고, 그 자리는
+// 초기화 중이라 읽기가 이미 끝난 뒤다 — 그래서 늦은 응답이 꺼진 표식을 되켜는 경합은 생기지 않는다.
 static class TutorialGrantsCloud
 {
     const string DOCUMENT_SUFFIX = "/grants/current";
@@ -49,6 +52,15 @@ static class TutorialGrantsCloud
         ClearMarks();
     }
 
+    /// <summary>되감기가 서버 문서를 지운 직후. 부팅 읽기가 물어 둔 소진 표식을 걷는다 —
+    /// 남겨 두면 무료 한 방이 부활했는데도 안내 브리지의 통과 판정이 강화 스텝을 그냥 넘겨
+    /// 그 챕터를 다시 볼 수 없다.</summary>
+    // 통지하지 않는 것은 ClearMarks와 같은 이유이고, 이 자리는 초기화 중이라 아직 구독자가 없다.
+    internal static void ResetForRewind()
+    {
+        ClearMarks();
+    }
+
     internal static void Shutdown()
     {
         ClearMarks();
@@ -84,7 +96,14 @@ static class TutorialGrantsCloud
                 return false;
             }
 
-            if (t_snapshot == null || !t_snapshot.Exists) return true;
+            // 문서 부재는 두 축 모두 미사용이다. 되감기가 문서를 지울 수 있게 된 뒤로는 여기서
+            // 표식을 걷어 줘야 세션 도중 재읽기가 꺼진 상태를 실제로 반영한다(안 걷으면 옛 값이 남는다).
+            if (t_snapshot == null || !t_snapshot.Exists)
+            {
+                s_hasDocument = false;
+                Adopt(false, false);
+                return true;
+            }
 
             // 깨진 필드는 미사용으로 선다 — 서버 readGrants와 같은 관대함이다.
             // 못 읽었다고 무료 한 방을 닫으면 낼 돈이 없는 신규 계정이 그 자리에서 멈춘다.
