@@ -11,8 +11,12 @@ using UnityEngine.UI;
 public class DeckStripView : MonoBehaviour
 {
     [SerializeField] Transform    content;      // HorizontalLayoutGroup + ContentSizeFitter(Horizontal=PreferredSize)
-    [SerializeField] DeckSlotView slotPrefab;   // MatchDeckStripCard.prefab (DeckCard.prefab 배리언트)
+    [SerializeField] DeckSlotView slotPrefab;   // DeckStripCard.prefab (DeckCard.prefab 배리언트)
     [SerializeField] ScrollRect   scroll;       // 옵션 — 선택 칸으로 스크롤을 맞출 때만 사용
+
+    [Tooltip("스크롤 밖에 고정된 신규 생성 칸. 배선하면 그것을 쓰고, 비우면 목록 맨 앞에 인스턴스로 만든다.\n"
+           + "반드시 content 바깥(스크롤 형제)에 두어야 한다 — 안에 두면 목록 재생성이 프리팹의 자식을 지운다.")]
+    [SerializeField] DeckSlotView createCell;
 
     readonly List<DeckSlotView> m_slots = new List<DeckSlotView>();
 
@@ -33,6 +37,14 @@ public class DeckStripView : MonoBehaviour
         Clear();
 
         if (content == null || slotPrefab == null) return;
+
+        // 저작 실수를 여기서 끊는다 — 아래 정리 루프가 content의 자식을 전부 파괴하므로,
+        // 생성 칸이 그 안에 있으면 두 번째 진입부터 사라진다(증상이 늦게 나와 추적이 어렵다).
+        if (createCell != null && createCell.transform.parent == content)
+        {
+            Debug.LogError($"[DeckStripView] createCell이 content 안에 저작됐다({name}) — 스크롤 바깥으로 옮겨야 한다. 이번에는 인스턴스 생성으로 대체한다.");
+            createCell = null;
+        }
 
         // 씬에 남은 목업 하드코딩 칸 제거.
         // Destroy는 프레임 끝에 반영되므로 먼저 SetActive(false)로 꺼야 이번 프레임 가로 배치에 끼지 않는다
@@ -74,6 +86,9 @@ public class DeckStripView : MonoBehaviour
     /// <summary>재빌드 없이 하이라이트만 옮긴다 — 재빌드는 스크롤 위치를 잃는다.</summary>
     public void SetSelected(int _slotIndex, bool _createSelected)
     {
+        // 저작 자식은 m_slots 밖이라 아래 루프가 닿지 않는다.
+        if (createCell != null) createCell.SetSelected(_createSelected);
+
         int t_hit = -1;
         for (int t_i = 0; t_i < m_slots.Count; t_i++)
         {
@@ -102,13 +117,27 @@ public class DeckStripView : MonoBehaviour
         m_slotIndices.Clear();
     }
 
-    // 맨 앞 신규 생성 칸. 만석이거나 아직 잠겨 있으면 자리는 지키되 눌리지 않는다(DeckListController.Build와 같은 규칙).
+    // 신규 생성 칸. 만석이거나 아직 잠겨 있으면 자리는 지키되 눌리지 않는다(DeckListController.Build와 같은 규칙).
     void BuildCreateCell(Action _onCreateClick)
     {
+        bool t_canCreate = !DeckSaveManager.IsFull && OutgameFeatureLock.IsUnlocked(EOutgameFeature.DeckCreate);
+
+        // 저작 자식은 목록에 등록하지 않는다 — Clear()가 m_slots를 통째로 Destroy하므로
+        // 넣는 순간 프리팹의 자식이 파괴되고, 풀드 인스턴스라 두 번째 진입부터 칸이 영영 사라진다.
+        if (createCell != null)
+        {
+            createCell.gameObject.SetActive(_onCreateClick != null);
+            if (_onCreateClick == null) return;
+
+            createCell.BindCreate(t_canCreate, _onCreateClick);
+            FeatureLockView.Attach(createCell.gameObject, EOutgameFeature.DeckCreate);
+            return;
+        }
+
         if (_onCreateClick == null) return;   // 신규 생성을 지원하지 않는 호스트
 
         var t_create = Instantiate(slotPrefab, content);
-        t_create.BindCreate(!DeckSaveManager.IsFull && OutgameFeatureLock.IsUnlocked(EOutgameFeature.DeckCreate), _onCreateClick);
+        t_create.BindCreate(t_canCreate, _onCreateClick);
 
         // BindCreate 뒤에 붙인다 — 그 안에서 꺼지는 자식들까지 흑백 대상으로 잡을 이유가 없다.
         FeatureLockView.Attach(t_create.gameObject, EOutgameFeature.DeckCreate);

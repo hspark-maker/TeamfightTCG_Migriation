@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -17,7 +18,21 @@ public class DeckEditCollectionGrid : MonoBehaviour
     [SerializeField] DeckEditCardTile tilePrefab;
     [SerializeField] GameObject       emptyHint;
 
+    [Tooltip("빈 목록 안내 문구. 배선하면 소유 0과 검색 무결과를 다른 문구로 가른다(미배선이면 저작 문구 그대로).")]
+    [SerializeField] TMP_Text emptyHintText;
+    [SerializeField, TextArea] string emptyOwnedMessage  = "소지한 카드가 없습니다.\n카드팩을 열어 카드를 모아보세요.";
+    [SerializeField, TextArea] string emptySearchMessage = "검색 결과가 없습니다.\n다른 이름으로 찾아보세요.";
+
     readonly List<DeckEditCardTile> m_tiles = new List<DeckEditCardTile>();
+
+    // m_tiles와 같은 순서로 카드 이름을 소문자로 눕혀 들고 있는다 — 타이핑 한 글자마다 스펙을 다시 조회하지 않으려는 캐시다.
+    readonly List<string> m_tileNames = new List<string>();
+
+    // 걸려 있는 검색어(없으면 null). Build가 목록을 다시 만들어도 이 값은 살아남아 재적용된다.
+    string m_filter;
+
+    // 튜토리얼이 지목한 카드. 검색어가 무엇이든 이 카드만은 목록에서 숨기지 않는다.
+    int m_anchorCard;
 
     GridLayoutGroup m_grid;
 
@@ -69,13 +84,58 @@ public class DeckEditCollectionGrid : MonoBehaviour
             var t_tile = Instantiate(tilePrefab, content);
             t_tile.Bind(t_card, _onDragRequest, _onClick);
             m_tiles.Add(t_tile);
+            m_tileNames.Add(NameOf(t_card));
         }
 
-        // 신규 유저는 소유 0으로 시작하므로(OwnershipManager.Init) 이 경로는 반드시 한 번은 탄다 — 옵션 취급 금지.
-        if (emptyHint != null) emptyHint.SetActive(m_tiles.Count == 0);
+        // 소유가 바뀌어 다시 그려도 걸려 있던 검색어가 풀리지 않게 여기서 재적용한다.
+        // 재적용을 호출측에 흩뿌리면 Build 호출처 두 곳 중 하나를 반드시 빠뜨린다.
+        // 신규 유저는 소유 0으로 시작하므로(OwnershipManager.Init) 빈 목록 경로는 반드시 한 번은 탄다 — 옵션 취급 금지.
+        ApplyFilter();
 
         // 이전 편집 세션의 스크롤 위치가 남아 첫 화면이 중간부터 보이는 것을 막는다.
         if (scrollRect != null) scrollRect.verticalNormalizedPosition = 1f;
+    }
+
+    /// <summary>카드 이름으로 목록을 거른다. 비우면(null·공백) 전부 다시 보인다.</summary>
+    public void SetNameFilter(string _query)
+    {
+        string t_next = string.IsNullOrWhiteSpace(_query) ? null : _query.Trim().ToLowerInvariant();
+
+        // 한글 입력은 조합 중에도 발화가 오므로 같은 값이 연달아 들어온다 — 여기서 끊으면 디바운스가 필요 없다.
+        if (t_next == m_filter) return;
+
+        m_filter = t_next;
+        ApplyFilter();
+
+        if (scrollRect != null) scrollRect.verticalNormalizedPosition = 1f;
+    }
+
+    // 타일을 다시 만들지 않고 표시 여부만 바꾼다 — GridLayoutGroup이 비활성 자식을 배치에서 빼 주므로 재배치는 공짜다.
+    void ApplyFilter()
+    {
+        int t_visible = 0;
+        for (int t_i = 0; t_i < m_tiles.Count; t_i++)
+        {
+            var t_tile = m_tiles[t_i];
+            if (t_tile == null) continue;
+
+            bool t_on = m_filter == null
+                     || (m_anchorCard > 0 && t_tile.Card == m_anchorCard)
+                     || m_tileNames[t_i].Contains(m_filter);
+
+            t_tile.gameObject.SetActive(t_on);
+            if (t_on) t_visible++;
+        }
+
+        if (emptyHint     != null) emptyHint.SetActive(t_visible == 0);
+        if (emptyHintText != null) emptyHintText.text = m_filter == null ? emptyOwnedMessage : emptySearchMessage;
+    }
+
+    static string NameOf(int _card)
+    {
+        return CardCatalog.TryGetSpec(_card, out var t_spec) && !string.IsNullOrEmpty(t_spec.DisplayName)
+               ? t_spec.DisplayName.ToLowerInvariant()
+               : string.Empty;
     }
 
     // _deck에 들어있는 카드 타일만 딤 처리. _deck이 null이면 전부 해제.
@@ -148,6 +208,13 @@ public class DeckEditCollectionGrid : MonoBehaviour
     /// 타일이 런타임 생성이라 프리팹에 TutorialAnchor를 저작할 수 없다 — AlbumCardSlotView와 같은 관용구다.</summary>
     public void ApplyTutorialAnchor(int _card)
     {
+        // 검색어가 안내 대상을 숨기는 것을 막는다 — 컨트롤러의 입력 잠금과 별개로 두는 2차 방어다.
+        if (m_anchorCard != _card)
+        {
+            m_anchorCard = _card;
+            if (m_filter != null) ApplyFilter();
+        }
+
         var t_tile = _card > 0 ? FindTile(_card) : null;
         if (t_tile == null)
         {
@@ -217,6 +284,10 @@ public class DeckEditCollectionGrid : MonoBehaviour
         }
 
         m_tiles.Clear();
+        m_tileNames.Clear();
+        m_anchorCard = 0;
+
+        // m_filter는 남긴다 — 소유 변경 재빌드(DeckEditController.OnOwnershipChanged)에서 검색어가 풀리면 안 된다.
     }
 
     static bool Contains(int[] _deck, int _card)

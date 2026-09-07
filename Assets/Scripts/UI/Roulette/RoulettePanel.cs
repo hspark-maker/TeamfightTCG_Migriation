@@ -55,16 +55,6 @@ public class RoulettePanel : PooledUIBase
              "Min Spin Ms 보다 넉넉히 길게 두세요. 그보다 짧으면 정상 회전에서도 도중에 잠금이 풀립니다.")]
     [SerializeField] int closeLockMaxMs = 8000;
 
-    [Tooltip("최고 상품으로 볼 확률의 상한입니다. 이 값보다 드문 칸에 강조 표식(RouletteSlotView의 Top Mark)이 켜집니다.\n\n" +
-             "확률은 (그 칸의 가중치 ÷ 전체 가중치 합)이고, 가중치의 진실원은 RouletteSlot 시트입니다. " +
-             "0.02면 2% 미만인 칸이 최고 상품입니다.\n\n" +
-             "⚠ 판정 축은 상품의 가치가 아니라 나오기 어려운 정도입니다. 재화 종류가 섞여 있어 수량으로는 " +
-             "칸끼리 견줄 수 없기 때문입니다(골드 1500과 다이아 300 중 무엇이 나은지 표만 보고는 알 수 없습니다). " +
-             "드문 칸에 값싼 상품을 저작하면 그 칸이 최고 상품으로 빛나므로, 가중치와 상품 가치를 같은 방향으로 저작하세요.\n\n" +
-             "조건을 만족하는 칸이 여럿이면 그 칸들이 모두 켜집니다 — 하나만 남기려면 둘째로 드문 칸의 확률보다 " +
-             "낮게 내리세요. 0으로 두면 어느 칸도 켜지지 않습니다.")]
-    [Range(0f, 0.2f)] [SerializeField] float topSlotRate = 0.02f;
-
     [Tooltip("획득 코인이 출발할 자리. 비워 두면 당첨된 칸에서 출발합니다.")]
     [SerializeField] RectTransform gainOrigin;
 
@@ -238,31 +228,16 @@ public class RoulettePanel : PooledUIBase
         IReadOnlyList<RouletteSlotDef> t_defs = RouletteManager.Slots;
         int t_count = t_defs != null ? t_defs.Count : 0;
 
-        // 합산 범위를 실제로 그릴 칸에 맞춘다 — 저작 칸이 모자란 판에서 분모만 커지면
-        // 모든 칸의 확률이 낮게 나와 엉뚱한 칸이 최고 상품으로 켜진다.
-        int t_drawn = Mathf.Min(this.slots.Length, t_count);
-
-        int t_weightSum = 0;
-        for (int t_i = 0; t_i < t_drawn; t_i++) t_weightSum += t_defs[t_i].EffectiveWeight;
-
         for (int t_i = 0; t_i < this.slots.Length; t_i++)
         {
             if (this.slots[t_i] == null || t_i >= t_count) continue;
 
             RouletteSlotDef t_def = t_defs[t_i];
-            this.slots[t_i].Bind(t_def.currency, t_def.amount, this.IsTopSlot(t_def, t_weightSum));
+            this.slots[t_i].Bind(t_def.currency, t_def.amount);
         }
 
         if (t_count != this.slots.Length)
             Debug.LogWarning($"[RoulettePanel] 저작 칸 {this.slots.Length}개와 설정 칸 {t_count}개가 다르다 — 판 그림과 상품이 어긋난다.", this);
-    }
-
-    // 최고 상품 판정. 표시 축이라 서버 판정과 갈릴 여지가 없다 — 어긋나도 강조 하나가 달라질 뿐이다.
-    bool IsTopSlot(RouletteSlotDef _def, int _weightSum)
-    {
-        if (_weightSum <= 0) return false;
-
-        return _def.EffectiveWeight / (float)_weightSum < this.topSlotRate;
     }
 
     // 낙관 홀드·응답 채택·디버그 지급이 전부 이 통지를 때리므로 회전 뒤에 따로 갱신하지 않는다.

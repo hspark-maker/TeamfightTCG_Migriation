@@ -17,9 +17,22 @@ public class DeckSlotView : MonoBehaviour
     [SerializeField] Button     deleteButton;  // Tile/DeleteButton — 덱 칸 전용, 편집 모드에서만 노출
     [SerializeField] GameObject selectedFrame; // Tile/SelectedFrame — 선택 표시(매치 가로 리스트 전용, 로비 목록은 미배선)
 
+    [Tooltip("선택했을 때 켜는 밑판. 테두리(selectedFrame)와 별개 축이라 한쪽만 저작해도 된다.")]
+    [SerializeField] GameObject selectedBackground;
+
     [Header("라벨")]
+    [Tooltip("덱 칸에 덱 이름을 보일 것인가.\n"
+           + "끄면 번호만 나온다(로비 2열 목록의 기본). 켜는 쪽은 이름을 받을 자리가 저작된 프리팹뿐이다.")]
+    [SerializeField] bool showDeckName;
+
     [SerializeField] string createLabel = "신규 생성";
     [SerializeField] string fullLabel   = "가득 참";
+
+    [Header("선택 시 글자색 (선택)")]
+    [Tooltip("켜면 선택 여부에 따라 번호·이름 색을 갈아끼운다. 끄면 프리팹 저작 색을 그대로 둔다.")]
+    [SerializeField] bool  tintTextOnSelect;
+    [SerializeField] Color normalTextColor   = Color.white;
+    [SerializeField] Color selectedTextColor = Color.white;
 
     // 클릭 시 돌려줄 저장 슬롯 인덱스. 화면 표시 번호(numberText)와 절대 같은 값이 아니다.
     int m_slotIndex = -1;
@@ -50,10 +63,14 @@ public class DeckSlotView : MonoBehaviour
         if (numberText != null)
         {
             numberText.gameObject.SetActive(true);
-            numberText.text = _displayNumber.ToString();  
+            numberText.text = _displayNumber.ToString();
         }
 
-        if (nameText != null) nameText.enabled = false;
+        if (nameText != null)
+        {
+            nameText.enabled = showDeckName;
+            if (showDeckName) nameText.text = _deckName ?? string.Empty;
+        }
 
         if (previewImage != null)
         {
@@ -83,10 +100,12 @@ public class DeckSlotView : MonoBehaviour
         if (bannerObject != null) bannerObject.SetActive(false);
         if (numberText   != null) numberText.gameObject.SetActive(false);
         if (previewImage != null) previewImage.gameObject.SetActive(false);
-        if (nameText != null) {  nameText.text=  _enabled ? createLabel : fullLabel;}
-
-        
-        
+        if (nameText != null)
+        {
+            // 같은 프리팹이 덱 칸 모드에서 이름을 꺼둘 수 있다 — 켜는 책임을 이 진입점이 직접 진다.
+            nameText.enabled = true;
+            nameText.text    = _enabled ? createLabel : fullLabel;
+        }
 
         SetInteractable(_enabled);
     }
@@ -100,11 +119,18 @@ public class DeckSlotView : MonoBehaviour
         deleteButton.gameObject.SetActive(_on && m_onDelete != null);
     }
 
-    // 선택 표시 토글. 목록을 재빌드하지 않고 이 칸의 테두리만 켜고 끈다
+    // 선택 표시 토글. 목록을 재빌드하지 않고 이 칸의 테두리·밑판·글자색만 갈아끼운다
     // (리스트가 이전 선택을 끄고 새 선택을 켜는 방식 — 재빌드는 스크롤 위치를 잃는다).
     public void SetSelected(bool _on)
     {
-        if (selectedFrame != null) selectedFrame.SetActive(_on);
+        if (selectedFrame      != null) selectedFrame.SetActive(_on);
+        if (selectedBackground != null) selectedBackground.SetActive(_on);
+
+        if (!tintTextOnSelect) return;
+
+        var t_color = _on ? selectedTextColor : normalTextColor;
+        if (numberText != null) numberText.color = t_color;
+        if (nameText   != null) nameText.color   = t_color;
     }
 
     public void SetInteractable(bool _on)
