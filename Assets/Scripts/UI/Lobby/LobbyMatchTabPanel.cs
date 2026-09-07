@@ -27,6 +27,11 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     [Tooltip("룰렛을 여는 버튼. 잠김 룩(FeatureLockView)은 붙이지 않는다 — 룰렛 해금은 온보딩 축이라 아직 없다.")]
     [SerializeField] Button rouletteButton;
 
+    [Tooltip("랭크 배지(RankInfo 안). 누르면 지금 등급의 승급 오버레이를 다시 본다 — 열람이라 랭크 값도 디렉터 상태도 건드리지 않는다.\n" +
+             "버튼 전이는 None으로 저작한다: 배지는 랭크 자체를 그리는 그림이라 눌림·비활성 틴트가 상태 오독을 부른다.\n" +
+             "언랭크 차단도 interactable이 아니라 핸들러가 한다 — 갱신 시점을 따로 둘 필요 없이 누른 순간 판정한다.")]
+    [SerializeField] Button rankBadgeButton;
+
     [Header("모험")]
     [Tooltip("모험 맵으로 가는 버튼. 이동 자체는 LobbyRoot가 한다 — 탭 패널은 탭 이동을 모른다.")]
     [SerializeField] Button adventureButton;
@@ -44,6 +49,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (rankRewardButton != null) rankRewardButton.onClick.AddListener(OpenRankRewards);
         if (keywordGrowthButton != null) keywordGrowthButton.onClick.AddListener(OpenKeywordGrowth);
         if (rouletteButton != null) rouletteButton.onClick.AddListener(OpenRoulette);
+        if (rankBadgeButton != null) rankBadgeButton.onClick.AddListener(ReplayRankPromote);
         if (adventureButton != null) adventureButton.onClick.AddListener(HandleAdventureRequested);
 
         if (playLabel != null) m_defaultPlayText = playLabel.text;
@@ -71,6 +77,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (rankRewardButton != null) rankRewardButton.onClick.RemoveListener(OpenRankRewards);
         if (keywordGrowthButton != null) keywordGrowthButton.onClick.RemoveListener(OpenKeywordGrowth);
         if (rouletteButton != null) rouletteButton.onClick.RemoveListener(OpenRoulette);
+        if (rankBadgeButton != null) rankBadgeButton.onClick.RemoveListener(ReplayRankPromote);
         if (adventureButton != null) adventureButton.onClick.RemoveListener(HandleAdventureRequested);
 
         OutgameFeatureLock.OnChanged -= ApplyFeatureLocks;
@@ -128,6 +135,28 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (!RouletteManager.IsAvailable) return;
 
         OpenPooled<RoulettePanel>();
+    }
+
+    /// <summary>지금 등급의 승급 연출을 다시 본다(열람). 랭크 값을 바꾸지 않고 디렉터도 거치지 않는다 —
+    /// OnAnyFinished를 기다리는 쪽(탭 문구·온보딩 브리지)이 열람을 정산으로 오인하면 안 된다.</summary>
+    public void ReplayRankPromote()
+    {
+        // 언랭크도 CurrentGrade가 Bronze를 돌려주므로 등급으로는 갈리지 않는다(PackUnlockRules와 같은 규율).
+        if (!RankManager.IsRanked) return;
+
+        // 안내 중에는 비켜선다 — 안내가 짠 순서에 전면 오버레이가 끼어든다.
+        if (OutgameTutorialRunner.IsRunning || TriggeredTutorialRunner.IsRunning) return;
+
+        // 정산 연출 중에는 막는다. Show가 앞 안무를 죽이며 디렉터의 덮임 통지를 앞당겨 발화시키고,
+        // 그쪽 대기가 열람 탭 한 번에 풀린다.
+        if (LobbyRankEffectDirector.Playing || RankPromoteOverlay.IsOpen) return;
+
+        if (!RankManager.TryGetTier(RankManager.TierIndex, out RankTier t_tier)) return;
+        if (!RankPromoteOverlay.TryGet(out RankPromoteOverlay t_overlay)) return;
+
+        // 시작 배지 없이 도달 연출만 — 열람은 "갈렸다"가 아니라 "이랬다"라 옛 배지 파열 두 박이 없다.
+        // 콜백 둘 다 null이 안전하다(Show와 OnTapped 모두 ?. 로 소비한다).
+        t_overlay.Show(RankTier.None, t_tier, EPromoteKind.FirstEntry, null, null, _browse: true);
     }
 
     /// <summary>일일·주간 미션. 잠금 게이트가 없다 — 미션은 부가 기능이고, 목록이 비어도

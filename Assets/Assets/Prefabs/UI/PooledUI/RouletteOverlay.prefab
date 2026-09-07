@@ -383,11 +383,11 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1522460477581570395}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 1, y: 1}
-  m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -76, y: -134}
+  m_AnchorMin: {x: 0.5, y: 0}
+  m_AnchorMax: {x: 0.5, y: 0}
+  m_AnchoredPosition: {x: 0, y: 100}
   m_SizeDelta: {x: 120, y: 120}
-  m_Pivot: {x: 0.5, y: 0.5}
+  m_Pivot: {x: 0.5, y: 0}
 --- !u!222 &3111954045758937467
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -864,7 +864,6 @@ MonoBehaviour:
   icon: {fileID: 3780635127155611470}
   amountText: {fileID: 8783125835334252340}
   amountFormat: N0
-  topMark: {fileID: 716847113065983162}
 --- !u!1 &1703210301660012631
 GameObject:
   m_ObjectHideFlags: 0
@@ -1169,7 +1168,6 @@ MonoBehaviour:
   icon: {fileID: 2453952351785648641}
   amountText: {fileID: 7321151611135486528}
   amountFormat: N0
-  topMark: {fileID: 3666293014978079219}
 --- !u!1 &2108190807923461187
 GameObject:
   m_ObjectHideFlags: 0
@@ -1453,7 +1451,6 @@ MonoBehaviour:
   icon: {fileID: 4759442893181034956}
   amountText: {fileID: 697151041862475217}
   amountFormat: N0
-  topMark: {fileID: 8621048007874262682}
 --- !u!1 &3000342218920545214
 GameObject:
   m_ObjectHideFlags: 0
@@ -1546,7 +1543,6 @@ MonoBehaviour:
   icon: {fileID: 7081896214868026730}
   amountText: {fileID: 1141743760675157662}
   amountFormat: N0
-  topMark: {fileID: 5843490688731511722}
 --- !u!1 &3141156580362201851
 GameObject:
   m_ObjectHideFlags: 0
@@ -2132,7 +2128,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
-  m_AnchoredPosition: {x: 0, y: 273}
+  m_AnchoredPosition: {x: 0, y: 450}
   m_SizeDelta: {x: 425.2604, y: 142.5312}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &3246216346496883984
@@ -2321,7 +2317,6 @@ MonoBehaviour:
   icon: {fileID: 743489885889928250}
   amountText: {fileID: 689580809292160225}
   amountFormat: N0
-  topMark: {fileID: 3872973730801837851}
 --- !u!1 &4953244916768853951
 GameObject:
   m_ObjectHideFlags: 0
@@ -2414,7 +2409,6 @@ MonoBehaviour:
   icon: {fileID: 5214604774260529688}
   amountText: {fileID: 8811911659216040986}
   amountFormat: N0
-  topMark: {fileID: 1115015488164914498}
 --- !u!1 &5628814912743642863
 GameObject:
   m_ObjectHideFlags: 0
@@ -2719,7 +2713,6 @@ MonoBehaviour:
   icon: {fileID: 1620347521158959198}
   amountText: {fileID: 2800332871861740163}
   amountFormat: N0
-  topMark: {fileID: 8286290786134512534}
 --- !u!1 &6046438809140043655
 GameObject:
   m_ObjectHideFlags: 0
@@ -3286,7 +3279,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
-  m_AnchoredPosition: {x: 5.4792, y: -316}
+  m_AnchoredPosition: {x: 5.4792, y: -460}
   m_SizeDelta: {x: 900.9584, y: 240.9304}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1510775421294918009
@@ -3695,7 +3688,6 @@ MonoBehaviour:
     closeToScale: 0.9
   minSpinMs: 2500
   closeLockMaxMs: 8000
-  topSlotRate: 0.02
   gainOrigin: {fileID: 0}
   gainPlayer: {fileID: 0}
 --- !u!225 &3750825765042041076
@@ -4251,7 +4243,6 @@ MonoBehaviour:
   icon: {fileID: 2043283539855361528}
   amountText: {fileID: 6385781297550092525}
   amountFormat: N0
-  topMark: {fileID: 1004514172570431286}
 --- !u!1 &8621048007874262682
 GameObject:
   m_ObjectHideFlags: 0

@@ -51,12 +51,14 @@ public static class UiSortingOrder
     /// 컨테이너 값을 내리는 것은 답이 아니다: 딤에 묻히면 안 되는 실패 팝업까지 함께 내려간다.</summary>
     public const int PooledOverlay = 300;
 
-    /// <summary>덱 화면이 떠 있는 동안의 로비 하단 탭바(LobbyTabBarView). 덱 편집 화면은 풀 오버레이
-    /// (<see cref="PooledOverlay"/>, 300)라 로비 캔버스(<see cref="Lobby"/>)에 있는 탭바를 덮는다 —
-    /// 그동안만 탭바를 이 층으로 올려 나가는 길을 남긴다(<see cref="LobbyTabController.LiftTabBar"/>가 되돌린다).
+    /// <summary>풀 오버레이가 떠 있는 동안 잠시 올려 두는 로비 셸의 바 — 하단 탭바(LobbyTabBarView)와 상단바(TopBar).
+    /// 풀에서 여는 화면은 <see cref="PooledOverlay"/>(300)라 로비 캔버스(<see cref="Lobby"/>)에 있는 바를 통째로 덮는다:
+    /// 덱 편집에서는 나가는 길(탭바)이, 룰렛에서는 재화 표시(상단바)가 사라진다.
+    /// 두 바가 같은 이유로 같은 층을 쓰며, 그 화면이 닫히면 반드시 되돌린다
+    /// (<see cref="LobbyTabController.LiftTabBar"/> · <see cref="LobbyShellBars.LiftTop"/>).
     ///
-    /// 풀(<see cref="Pool"/>, 400)보다는 아래다: 덱 화면 위에 뜨는 팝업·안내가 탭바에 묻히면 안 된다.</summary>
-    public const int LobbyTabBarLifted = 310;
+    /// 풀(<see cref="Pool"/>, 400)보다는 아래다: 그 화면 위에 뜨는 팝업·안내가 바에 묻히면 안 된다.</summary>
+    public const int LobbyBarsLifted = 310;
 
     /// <summary>매칭·대치 화면(MatchmakingRoot.prefab). 로비를 전부 덮는 전면 화면이라 로비(<see cref="Lobby"/>) 위지만,
     /// 진입이 막혔을 때 뜨는 안내는 이 화면 위에 서야 하므로 풀(<see cref="Pool"/>) 아래다 —

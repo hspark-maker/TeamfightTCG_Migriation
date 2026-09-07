@@ -71,7 +71,16 @@ public class RoulettePanel : PooledUIBase
     // 수명은 회전 1회에 매단다 — 패널 수명에 매달면 닫았다 다시 연 뒤 회전이 돌지 않는다.
     CancellationTokenSource m_spinCts;
 
+    // 풀 컨테이너에서 떨어져 나오려고 확보한 Canvas(LiftToOverlayLayer 참조)
+    Canvas m_sortingCanvas;
+
     public override void Initialization(UIData _data) { }
+
+    protected override void Awake()
+    {
+        base.Awake();
+        this.LiftToOverlayLayer();
+    }
 
     public override void Show() => this.Open();
 
@@ -81,6 +90,9 @@ public class RoulettePanel : PooledUIBase
     public void Open()
     {
         this.SetVisible(true);
+
+        // 이 판은 상단바를 덮는다 — 회전 비용과 보상이 곧 재화라 잔액이 보이는 채로 돌아야 한다.
+        LobbyShellBars.LiftTop(this, this.transform);
 
         this.BuildSlots();
         this.RefreshTicketText();
@@ -93,7 +105,11 @@ public class RoulettePanel : PooledUIBase
     public void Close()
     {
         this.CancelSpin();
+
         this.SetVisible(false);
+
+        // 판이 아직 페이드로 남아 있는 동안 상단바가 그 뒤로 사라지지 않게 퇴장이 끝난 뒤에 내린다.
+        LobbyShellBars.DropTopAfter(this, this.transition.CloseDuration);
     }
 
     void OnEnable()
@@ -121,6 +137,9 @@ public class RoulettePanel : PooledUIBase
     void OnDisable()
     {
         CurrencyManager.OnCurrencyChanged -= this.HandleCurrencyChanged;
+
+        // 안전망 — 씬 전환·풀 회수처럼 Close를 거치지 않는 길이 있다. 되돌리기의 정규 자리는 Close다.
+        LobbyShellBars.DropTop(this);
 
         this.CancelSpin();
 
@@ -368,6 +387,10 @@ public class RoulettePanel : PooledUIBase
 
         if (!_visible && this.bulbRing != null) this.bulbRing.Stop();
     }
+
+    // 풀 컨테이너(UiSortingOrder.Pool)에서 떨어져 나와 로비 오버레이 층에 내려앉는다(절차는 UiSortingOrder가 쥔다).
+    void LiftToOverlayLayer()
+        => this.m_sortingCanvas = UiSortingOrder.LiftNested(gameObject, UiSortingOrder.PooledOverlay);
 
     GameObject ResolveTarget() => this.root != null ? this.root : this.gameObject;
 }

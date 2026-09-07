@@ -14,6 +14,12 @@ public class RankRewardPanel : PooledUIBase
     // 표시 데이터는 RankRewardManager에서 스스로 당기므로 UIData가 필요 없다.
     public override void Initialization(UIData _data) { }
 
+    protected override void Awake()
+    {
+        base.Awake();
+        this.LiftToOverlayLayer();
+    }
+
     public override void Show() => this.Open();
 
     public override void Hide() => this.Close();
@@ -35,6 +41,9 @@ public class RankRewardPanel : PooledUIBase
 
     readonly List<RankRewardRowView> m_rows = new List<RankRewardRowView>();
 
+    // 풀 컨테이너에서 떨어져 나오려고 확보한 Canvas(LiftToOverlayLayer 참조)
+    Canvas m_sortingCanvas;
+
     // 행 생성 여부. 티어 수는 런타임 불변이라 최초 1회만 만들고 이후엔 Refresh로만 갱신한다.
     bool m_built;
 
@@ -50,6 +59,9 @@ public class RankRewardPanel : PooledUIBase
     {
         HideClaimPopup();
         this.SetVisible(false);
+
+        // 판이 아직 페이드로 남아 있는 동안 상단바가 그 뒤로 사라지지 않게 퇴장이 끝난 뒤에 내린다.
+        LobbyShellBars.DropTopAfter(this, this.transition.CloseDuration);
     }
 
     void OnEnable()
@@ -71,6 +83,9 @@ public class RankRewardPanel : PooledUIBase
         // 안전망 — Close를 거치지 않고 꺼지면 공용 딤이 남는다.
         ScreenDim.Hide(this);
 
+        // 같은 안전망. 이 뷰는 root만 토글하므로 열고 닫기로는 여기 오지 않는다 — 되돌리기의 정규 자리는 Close다.
+        LobbyShellBars.DropTop(this);
+
         // 오버레이 자체가 꺼지는 경로(씬 정리 등)에서만 온다 — 열고 닫기로는 불리지 않는다.
         this.transition.HandleDisabled(this.ResolveTarget());
     }
@@ -82,6 +97,9 @@ public class RankRewardPanel : PooledUIBase
         HideClaimPopup();
 
         this.SetVisible(true);
+
+        // 공용 딤이 상단바까지 덮는다 — 수령한 보상이 날아가 꽂히는 자리(재화 HUD)가 보이는 채로 둔다.
+        LobbyShellBars.LiftTop(this, this.transform);
 
         // 열 때마다 재생성하면 등장 첫 프레임에 20행 Destroy+Instantiate가 얹힌다 — 생성은 1회, 이후엔 표시만 갱신.
         if (this.m_built) this.RefreshRows();
@@ -193,6 +211,10 @@ public class RankRewardPanel : PooledUIBase
 
         this.transition.SetVisible(this.ResolveTarget(), _visible);
     }
+
+    // 풀 컨테이너(UiSortingOrder.Pool)에서 떨어져 나와 로비 오버레이 층에 내려앉는다(절차는 UiSortingOrder가 쥔다).
+    void LiftToOverlayLayer()
+        => this.m_sortingCanvas = UiSortingOrder.LiftNested(gameObject, UiSortingOrder.PooledOverlay);
 
     GameObject ResolveTarget() => this.root != null ? this.root : this.gameObject;
 }

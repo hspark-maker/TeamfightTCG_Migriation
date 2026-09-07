@@ -69,7 +69,7 @@ public class LobbyTabController : MonoBehaviour
 
         if (_lift)
         {
-            m_liftedTabBar = UiSortingOrder.LiftNested(tabBar.gameObject, UiSortingOrder.LobbyTabBarLifted);
+            m_liftedTabBar = UiSortingOrder.LiftNested(tabBar.gameObject, UiSortingOrder.LobbyBarsLifted);
             return;
         }
 
