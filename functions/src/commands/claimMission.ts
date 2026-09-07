@@ -11,22 +11,25 @@ import {
 import {rejectDomain} from "../save/domainReject";
 import {clientReceiptId, isClientReceiptId} from "../save/receiptId";
 import {db} from "../firebaseApp";
-import {grant} from "../currency/wallet";
+import {CurrencyGain, grant} from "../currency/wallet";
 import {nextWallet} from "../currency/walletStore";
-import {findMission, MAX_MISSION_ID_LENGTH, missionCatalog} from "../missions/catalog";
+import {MAX_MISSION_ID_LENGTH} from "../missions/catalog";
+import {judgeMissionClaim, MissionClaimReject} from "../missions/judgeMissionClaim";
 import {
   beginMissionBump,
   commitMissionClaim,
-  isClaimed,
-  progressOf,
+  missionResponse,
+  MissionResponse,
 } from "../missions/missionStore";
 import {missionPeriod} from "../missions/period";
+import {readSpecRows} from "../packs/packSpecReader";
+import {
+  judgeRewardClaim as judgeSpecRewardClaim,
+  parseRewardRows,
+} from "../rewardTable";
 
-/**
- * 도메인 거절 사유. **와이어 계약**이다 — 클라가 이 문자열을 그대로 대조한다.
- * 전부 permission-denied 로 나간다(save/domainReject): 수령 실패로 세션을 끊지 않는다.
- */
-type MissionClaimReject = "MissionNotFound" | "AlreadyClaimed" | "NotEligible";
+// 거절 사유(MissionClaimReject)는 순수 판정 모듈이 소유한다 — 판정과 사유가 갈리면
+// 한쪽만 늘어난다. 전부 permission-denied 로 나간다(save/domainReject): 수령 실패로 세션을 끊지 않는다.
 
 /**
  * 도메인 거절. 던지기와 로그는 save/domainReject 한 곳이고, 여기 남은 것은 사유 오타를 막는 타입 관문이다.
@@ -40,6 +43,31 @@ function reject(
   context: Record<string, unknown>,
 ): never {
   rejectDomain(reason, message, context);
+}
+
+/**
+ * 거절 사유별 로그 문구. 사유 코드만으로는 어느 값에 막혔는지 안 보인다.
+ * @param {MissionClaimReject} reason 사유 코드
+ * @param {string} missionId 미션 id
+ * @param {number} progress 현재 진행도
+ * @param {number} target 목표치
+ * @return {string} 설명
+ */
+function rejectMessage(
+  reason: MissionClaimReject, missionId: string, progress: number, target: number,
+): string {
+  switch (reason) {
+  case "MissionNotFound":
+    return `Mission '${missionId}' is not authored.`;
+  case "MissionDisabled":
+    return `Mission '${missionId}' is disabled by the catalog.`;
+  case "RewardNotFound":
+    return `Mission '${missionId}' has no authored reward.`;
+  case "AlreadyClaimed":
+    return `Mission '${missionId}' is already claimed.`;
+  default:
+    return `Mission '${missionId}' needs ${target}, has ${progress}.`;
+  }
 }
 
 /**
@@ -66,12 +94,9 @@ export const claimMission = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "missionId must be a non-empty string.");
   }
 
-  const mission = findMission(missionId);
-  if (mission === null) {
-    // 구 클라가 삭제된 미션을 수령하려는 경우다. 카탈로그가 진실원이므로 조용히 거절한다.
-    reject("MissionNotFound", `Mission '${missionId}' is not authored.`,
-      {uid, env, missionId, catalogSize: missionCatalog().length});
-  }
+  // 스펙 읽기는 트랜잭션 밖에서 끝낸다. 재화 보상의 진실원은 Reward 표이고,
+  // MissionDef 는 조건·표시·passExp 만 소유한다.
+  const rewardRows = parseRewardRows(await readSpecRows(env, "Reward"));
 
   // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
   const txId = clientReceiptId(request.data?.txId, randomUUID());
@@ -82,6 +107,14 @@ export const claimMission = onCall(async (request) => {
   // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
   let replayed = true;
   let progress = 0;
+  let missionState: MissionResponse | undefined;
+  // 콜백이 확정한 값. 객체 참조로 들고 있으면 TS 가 콜백 밖에서 null 로 좁혀 버리므로
+  // openPack 의 drawn·goldBefore 와 같은 관용구로 원시값만 뺀다.
+  let missionPeriodKind = "";
+  let missionEvent = "";
+  let missionTarget = 0;
+  let grantedCurrencies: CurrencyGain[] = [];
+  let grantedPassExp = 0;
 
   const result = await mutateSave(env, uid, "claimMission", {kind: "client", txId},
     async (_current, transaction, wallet): Promise<SaveMutation> => {
@@ -89,32 +122,67 @@ export const claimMission = onCall(async (request) => {
       // beginMissionBump 이 기간 리셋까지 반영하므로, 어제 진행도로 오늘 보상을 타는 경로가 없다.
       const missions = await beginMissionBump(transaction, db, env, uid, period);
 
-      // Claimed 검사가 달성 검사보다 먼저다(claimReward 와 같은 순서) — 목표가 나중에 올라가도
-      // 이미 받은 보상이 "미달성"으로 되돌아가 재수령 창구가 열리면 안 된다.
-      if (isClaimed(missions.state, mission.id)) {
-        reject("AlreadyClaimed", `Mission '${mission.id}' is already claimed.`,
-          {uid, env, missionId: mission.id, period: mission.period});
+      // 판정은 순수 모듈이 한다 — 여기서 다시 재면 테스트가 보는 규칙과 집행되는 규칙이 갈린다.
+      const verdict = judgeMissionClaim(missionId, missions.state);
+      progress = verdict.progress;
+      if (!verdict.allow) {
+        reject(verdict.reason, rejectMessage(verdict.reason, missionId, verdict.progress,
+          verdict.mission?.target ?? 0),
+        {uid, env, missionId, progress: verdict.progress, target: verdict.mission?.target ?? 0});
       }
 
-      progress = progressOf(missions.state, mission);
-      if (progress < mission.target) {
-        reject("NotEligible", `Mission '${mission.id}' needs ${mission.target}, has ${progress}.`,
-          {uid, env, missionId: mission.id, progress, target: mission.target});
+      const mission = verdict.mission;
+      const rewardJudgement = judgeSpecRewardClaim(rewardRows, "Mission", mission.id);
+      if (rewardJudgement.dropped.length > 0) {
+        logger.warn("mission reward rows dropped", {
+          uid, env, missionId, dropped: rewardJudgement.dropped,
+        });
+      }
+      if (!rewardJudgement.allow) {
+        // 사유를 뭉개지 않는다(claimReward 와 같은 정책) — 표를 통째로 못 읽은 것(NotEligible)과
+        // 그 미션에만 보상이 없는 것(RewardNotFound)은 운영이 할 일이 다르다.
+        // 전자는 배포/업로드 사고이고 후자는 저작 누락이다.
+        reject(rewardJudgement.reason,
+          rewardJudgement.specEmpty ?
+            "Mission reward spec is unreadable." :
+            `No reward is authored for Mission/${missionId}.`,
+          {uid, env, missionId, specEmpty: rewardJudgement.specEmpty});
       }
 
-      // 낙인만 찍는다 — 카운터를 깎지 않는다. 깎으면 같은 이벤트를 세는 주간 미션이 함께 무너진다.
-      commitMissionClaim(transaction, missions, mission.id, FieldValue.serverTimestamp());
+      missionPeriodKind = mission.period;
+      missionEvent = mission.event;
+      missionTarget = mission.target;
+      grantedCurrencies = rewardJudgement.gains;
+      grantedPassExp = mission.passExp;
+
+      // 낙인과 패스 경험치를 함께 찍는다 — 카운터는 깎지 않는다.
+      // 깎으면 같은 이벤트를 세는 주간 미션이 함께 무너진다.
+      commitMissionClaim(
+        transaction, missions, mission.id, mission.passExp, FieldValue.serverTimestamp());
+      missionState = missionResponse(missions.state, period);
 
       // 세이브 슬롯은 하나도 건드리지 않는다. mutateSave 가 revision 만 올리고,
       // 그 쓰기가 영수증의 근거가 된다.
+      //
+      // 줄 재화가 없으면 지갑을 아예 쓰지 않는다(claimReward 와 같은 정책) — 패스 경험치만 주는
+      // 미션이 빈 지급으로 지갑 rev 만 올리면 클라가 달라진 것 없는 잔액을 채택한다.
+      const currencies = rewardJudgement.gains;
       return {
         slots: {},
-        wallet: nextWallet(wallet, grant(wallet.balances, mission.reward), "claimMission"),
+        wallet: currencies.length === 0 ?
+          undefined :
+          nextWallet(wallet, grant(wallet.balances, currencies), "claimMission"),
       };
     },
     (adopted) => {
       replayed = false;
-      return {...adopted, missionId: mission.id, granted: mission.reward};
+      return {
+        ...adopted,
+        missionId,
+        granted: grantedCurrencies,
+        grantedPassExp,
+        missions: missionState,
+      };
     });
 
   if (replayed) {
@@ -122,9 +190,10 @@ export const claimMission = onCall(async (request) => {
   } else {
     logger.info("claimMission", {
       uid, env,
-      missionId: mission.id, period: mission.period, event: mission.event,
-      progress, target: mission.target,
-      granted: mission.reward.map((gain) => `${gain.currency}+${gain.amount}`).join(","),
+      missionId, period: missionPeriodKind, event: missionEvent,
+      progress, target: missionTarget,
+      granted: grantedCurrencies.map((gain) => `${gain.currency}+${gain.amount}`).join(","),
+      passExp: grantedPassExp,
       revision: result.revision,
       txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",
     });

@@ -12,6 +12,9 @@
 /** 리셋 기준 시간대. 한국 기준 서비스라 UTC 가 아니라 KST 로 자른다. */
 const KST_OFFSET_MINUTES = 9 * 60;
 
+/** 기획상 리셋 시각대. 계산은 고정 오프셋이지만 운영 계약은 IANA 이름으로 남긴다. */
+export const MISSION_TIME_ZONE = "Asia/Seoul";
+
 /**
  * 하루가 갈리는 시각(KST). 자정이 아니라 새벽 5시다 — 자정에 자르면 밤에 노는 유저가
  * 플레이 도중 미션이 갈아엎히는 것을 본다.

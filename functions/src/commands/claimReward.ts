@@ -1,7 +1,12 @@
 import {FieldValue} from "firebase-admin/firestore";
 import {randomUUID} from "node:crypto";
 import {db} from "../firebaseApp";
-import {beginMissionBump, commitMissionBump} from "../missions/missionStore";
+import {
+  beginMissionBump,
+  commitMissionBump,
+  missionResponse,
+  MissionResponse,
+} from "../missions/missionStore";
 import {missionPeriod} from "../missions/period";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
@@ -437,6 +442,7 @@ export const claimReward = onCall(async (request) => {
   // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
   // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
   let replayed = true;
+  let missionState: MissionResponse | undefined;
 
   const result = await mutateSave(env, uid, "claimReward", {kind: "client", txId},
     async (current, transaction, wallet): Promise<SaveMutation> => {
@@ -456,6 +462,7 @@ export const claimReward = onCall(async (request) => {
       // 진행도를 올리는 것은 이 명령뿐이다 — claimMission 은 ClaimReward 를 올리지 않는다.
       // 올리면 미션 수령이 미션을 낳는 자기참조가 된다.
       commitMissionBump(transaction, missions, "ClaimReward", 1, FieldValue.serverTimestamp());
+      missionState = missionResponse(missions.state, period);
 
       if (ownerType === "Rank") {
         const rank = claimRankTier(current, tierIndex, requiredPoints, tierCount, context);
@@ -474,7 +481,7 @@ export const claimReward = onCall(async (request) => {
     },
     (adopted) => {
       replayed = false;
-      return {...adopted, granted: gains};
+      return {...adopted, granted: gains, missions: missionState};
     });
 
   if (replayed) {

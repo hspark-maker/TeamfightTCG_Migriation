@@ -1,14 +1,18 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.limitBreakCard = exports.reportAdventureWin = exports.grantTutorialCards = exports.claimBattleReward = exports.enhanceKeyword = exports.enhanceCard = exports.claimPayout = exports.submitMatchResult = exports.verifyMatchTicket = exports.findAiMatch = exports.getRankSnapshot = exports.lockDeck = exports.createMatch = exports.claimReward = exports.openPack = exports.ensureWallet = exports.ensureAccount = exports.devBumpRevision = exports.ping = void 0;
+exports.claimMission = exports.getMissions = exports.limitBreakCard = exports.reportAdventureWin = exports.grantTutorialCards = exports.claimBattleReward = exports.enhanceKeyword = exports.enhanceCard = exports.claimPayout = exports.submitMatchResult = exports.verifyMatchTicket = exports.findAiMatch = exports.getRankSnapshot = exports.lockDeck = exports.createMatch = exports.claimReward = exports.openPack = exports.repairSaveSlots = exports.ensureWallet = exports.ensureAccount = exports.devRewindTutorial = exports.devBumpRevision = exports.ping = void 0;
 var ping_1 = require("./commands/ping");
 Object.defineProperty(exports, "ping", { enumerable: true, get: function () { return ping_1.ping; } });
 var devBumpRevision_1 = require("./commands/devBumpRevision");
 Object.defineProperty(exports, "devBumpRevision", { enumerable: true, get: function () { return devBumpRevision_1.devBumpRevision; } });
+var devRewindTutorial_1 = require("./commands/devRewindTutorial");
+Object.defineProperty(exports, "devRewindTutorial", { enumerable: true, get: function () { return devRewindTutorial_1.devRewindTutorial; } });
 var ensureAccount_1 = require("./commands/ensureAccount");
 Object.defineProperty(exports, "ensureAccount", { enumerable: true, get: function () { return ensureAccount_1.ensureAccount; } });
 var ensureWallet_1 = require("./commands/ensureWallet");
 Object.defineProperty(exports, "ensureWallet", { enumerable: true, get: function () { return ensureWallet_1.ensureWallet; } });
+var repairSaveSlots_1 = require("./commands/repairSaveSlots");
+Object.defineProperty(exports, "repairSaveSlots", { enumerable: true, get: function () { return repairSaveSlots_1.repairSaveSlots; } });
 var openPack_1 = require("./commands/openPack");
 Object.defineProperty(exports, "openPack", { enumerable: true, get: function () { return openPack_1.openPack; } });
 var claimReward_1 = require("./commands/claimReward");
@@ -39,4 +43,8 @@ var reportAdventureWin_1 = require("./commands/reportAdventureWin");
 Object.defineProperty(exports, "reportAdventureWin", { enumerable: true, get: function () { return reportAdventureWin_1.reportAdventureWin; } });
 var limitBreakCard_1 = require("./commands/limitBreakCard");
 Object.defineProperty(exports, "limitBreakCard", { enumerable: true, get: function () { return limitBreakCard_1.limitBreakCard; } });
+var getMissions_1 = require("./commands/getMissions");
+Object.defineProperty(exports, "getMissions", { enumerable: true, get: function () { return getMissions_1.getMissions; } });
+var claimMission_1 = require("./commands/claimMission");
+Object.defineProperty(exports, "claimMission", { enumerable: true, get: function () { return claimMission_1.claimMission; } });
 //# sourceMappingURL=index.js.map

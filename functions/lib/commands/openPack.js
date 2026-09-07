@@ -36,7 +36,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.openPack = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
+const firestore_1 = require("firebase-admin/firestore");
 const node_crypto_1 = require("node:crypto");
+const firebaseApp_1 = require("../firebaseApp");
+const missionStore_1 = require("../missions/missionStore");
+const period_1 = require("../missions/period");
 const saveDocument_1 = require("../save/saveDocument");
 const cardCatalog_1 = require("../packs/cardCatalog");
 const packDraw_1 = require("../packs/packDraw");
@@ -100,12 +104,18 @@ exports.openPack = (0, https_1.onCall)(async (request) => {
     let goldBefore = 0;
     let goldAfter = 0;
     let poolSize = 0;
+    let missionState;
     // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
     // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
     let replayed = true;
     // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
     const txId = (0, receiptId_1.clientReceiptId)(request.data?.txId, (0, node_crypto_1.randomUUID)());
-    const result = await (0, saveDocument_1.mutateSave)(env, uid, "openPack", { kind: "client", txId }, (current, _transaction, wallet) => {
+    // 기간은 여기서 **한 번만** 잰다 — 트랜잭션 콜백은 재실행되므로 그 안에서 재면
+    // 경계에 걸린 호출이 어느 기간에 실릴지가 재실행 운에 달린다.
+    const period = (0, period_1.missionPeriod)(Date.now());
+    const result = await (0, saveDocument_1.mutateSave)(env, uid, "openPack", { kind: "client", txId }, async (current, transaction, wallet) => {
+        // 미션 읽기가 콜백의 첫 줄이다 — 아래 쓰기보다 반드시 앞이어야 한다(Firestore 트랜잭션 규칙).
+        const missions = await (0, missionStore_1.beginMissionBump)(transaction, firebaseApp_1.db, env, uid, period);
         // 트랜잭션이 재실행되면 이전 추첨을 버리고 다시 뽑는다 — 잔액·소유와 정합해야 한다.
         const points = Number(current.rank?.points ?? 0);
         const grade = (0, rankGrade_1.gradeOf)(thresholds, points);
@@ -128,6 +138,10 @@ exports.openPack = (0, https_1.onCall)(async (request) => {
         const paid = (0, wallet_1.spend)(balances, pack.priceType, pack.price);
         goldBefore = balances[pack.priceType];
         goldAfter = paid[pack.priceType];
+        // 진행도는 콜백 **안**에서 올린다 — mutateSave 는 영수증이 히트하면 이 콜백을 통째로 건너뛰므로,
+        // 그 덕에 재시도가 진행도를 두 번 올리지 않는다. 콜백 밖으로 옮기면 그 보장이 사라진다.
+        (0, missionStore_1.commitMissionBump)(transaction, missions, "OpenPack", 1, firestore_1.FieldValue.serverTimestamp());
+        missionState = (0, missionStore_1.missionResponse)(missions.state, period);
         return {
             slots: {
                 ownership: (0, packSlots_1.buildOwnershipSlot)(owned, drawn),
@@ -137,7 +151,7 @@ exports.openPack = (0, https_1.onCall)(async (request) => {
         };
     }, (adopted) => {
         replayed = false;
-        return { ...adopted, packId, cards: drawn, refundType: pack.refundType };
+        return { ...adopted, packId, cards: drawn, refundType: pack.refundType, missions: missionState };
     });
     if (replayed) {
         logger.info("receipt replay", { uid, env, source: "openPack", txId, revision: result.revision });

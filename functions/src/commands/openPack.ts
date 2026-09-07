@@ -3,7 +3,12 @@ import * as logger from "firebase-functions/logger";
 import {FieldValue} from "firebase-admin/firestore";
 import {randomInt, randomUUID} from "node:crypto";
 import {db} from "../firebaseApp";
-import {beginMissionBump, commitMissionBump} from "../missions/missionStore";
+import {
+  beginMissionBump,
+  commitMissionBump,
+  missionResponse,
+  MissionResponse,
+} from "../missions/missionStore";
 import {missionPeriod} from "../missions/period";
 import {
   isKnownEnv,
@@ -96,6 +101,7 @@ export const openPack = onCall(async (request) => {
   let goldBefore = 0;
   let goldAfter = 0;
   let poolSize = 0;
+  let missionState: MissionResponse | undefined;
   // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
   // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
   let replayed = true;
@@ -145,6 +151,7 @@ export const openPack = onCall(async (request) => {
       // 진행도는 콜백 **안**에서 올린다 — mutateSave 는 영수증이 히트하면 이 콜백을 통째로 건너뛰므로,
       // 그 덕에 재시도가 진행도를 두 번 올리지 않는다. 콜백 밖으로 옮기면 그 보장이 사라진다.
       commitMissionBump(transaction, missions, "OpenPack", 1, FieldValue.serverTimestamp());
+      missionState = missionResponse(missions.state, period);
 
       return {
         slots: {
@@ -158,7 +165,7 @@ export const openPack = onCall(async (request) => {
     },
     (adopted) => {
       replayed = false;
-      return {...adopted, packId, cards: drawn, refundType: pack.refundType};
+      return {...adopted, packId, cards: drawn, refundType: pack.refundType, missions: missionState};
     });
 
   if (replayed) {

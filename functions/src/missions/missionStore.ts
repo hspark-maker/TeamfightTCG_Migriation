@@ -28,7 +28,6 @@ import type {
 import {
   MISSION_ID_PREFIX,
   MissionDef,
-  MissionEvent,
   MissionPeriodKind,
 } from "./catalog";
 import type {MissionPeriod} from "./period";
@@ -39,17 +38,30 @@ export const MISSION_SCHEMA_VERSION = 1;
 /** 카운터 한 축의 상한. 저작 실수나 폭주가 있어도 문서가 무한히 커지지 않게 자른다. */
 const COUNTER_MAX = 1000000;
 
+/** 패스 경험치 상한. 같은 이유의 안전망이고, 패스가 붙을 때 실제 곡선이 이 아래여야 한다. */
+const PASS_EXP_MAX = 100000000;
+
 /** 미션 문서의 값. 문서가 없으면 이 모양의 빈 상태로 선다. */
 export interface MissionState {
-  dailyPeriod: string;
-  weeklyPeriod: string;
-  /** 일일 카운터. 키는 MissionEvent 문자열. */
-  daily: Record<string, number>;
-  weekly: Record<string, number>;
-  /** 수령 낙인. `daily.` / `weekly.` 접두사로 리셋 축이 갈린다. */
-  claimed: string[];
+  dailyKey: string;
+  weeklyKey: string;
+  /** `daily.<event>` / `weekly.<event>` 키를 쓰는 단일 진행도 맵. */
+  progress: Record<string, number>;
+  /** 미션 id별 수령 낙인. */
+  claimed: Record<string, boolean>;
   /** 배틀패스는 이번 범위 밖이다 — 자리만 두고 아무도 올리지 않는다. */
-  battlePassXp: number;
+  passExp: number;
+}
+
+/** 기존 커맨드 응답에 선택 필드로 싣는 미션 상태. serverTimestamp는 문서에만 쓴다. */
+export interface MissionResponse {
+  dailyKey: string;
+  weeklyKey: string;
+  progress: Record<string, number>;
+  claimed: Record<string, boolean>;
+  passExp: number;
+  dailyResetAtMs: number;
+  weeklyResetAtMs: number;
 }
 
 /** 콜백 맨 앞에서 읽어 둔 상태. 쓰기는 이 손잡이로만 한다. */
@@ -89,21 +101,67 @@ function readCounters(value: unknown): Record<string, number> {
 }
 
 /**
- * 낙인 목록을 안전하게 읽는다. 빈 값·비문자열·중복은 버리고 순서는 보존한다.
- * @param {unknown} value 문서의 리스트 값
- * @return {string[]} 정리된 낙인
+ * boolean 낙인 맵을 안전하게 읽는다. 이전 실험 스키마의 문자열 배열도 같은 맵으로 접는다.
+ * @param {unknown} value 문서의 맵 또는 레거시 리스트 값
+ * @return {Record<string, boolean>} 정리된 낙인
  */
-function readClaimed(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-
-  const seen = new Set<string>();
-  for (const entry of value) {
-    if (typeof entry !== "string") continue;
-    const key = entry.trim();
-    if (key.length === 0) continue;
-    seen.add(key);
+function readClaimed(value: unknown): Record<string, boolean> {
+  const claimed: Record<string, boolean> = {};
+  // 1차 구현이 배포된 적이 있어도 새 스키마로 안전하게 접을 수 있게 배열을 한동안 읽어 준다.
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      if (typeof entry !== "string" || entry.trim().length === 0) continue;
+      claimed[entry.trim()] = true;
+    }
+    return claimed;
   }
-  return [...seen];
+  if (value === null || typeof value !== "object") return claimed;
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (key.trim().length > 0 && raw === true) claimed[key] = true;
+  }
+  return claimed;
+}
+
+/**
+ * 진행도 맵의 키. 주기 접두사를 붙이는 자리는 여기 하나다 — 이 규칙이 흩어지면
+ * bump 가 쓰는 키와 조회·리셋이 보는 키가 조용히 갈린다(진행도가 영영 0으로 보인다).
+ *
+ * 집계기 호출부는 이 함수를 모른다. 스펙대로 `bump(uid, "OpenPack", 1)` 만 넘긴다.
+ * @param {MissionPeriodKind} kind 주기
+ * @param {string} event 이벤트 문자열
+ * @return {string} `daily.OpenPack` 모양의 키
+ */
+export function progressKey(kind: MissionPeriodKind, event: string): string {
+  return MISSION_ID_PREFIX[kind] + event;
+}
+
+/**
+ * 이 키가 그 주기 축에 속하는가. 진행도 키와 미션 id 가 같은 접두사를 쓰므로
+ * 리셋 필터는 둘 다 이 판정 하나로 거른다.
+ * @param {string} key 진행도 키 또는 미션 id
+ * @param {MissionPeriodKind} kind 주기
+ * @return {boolean} 그 주기 축이면 true
+ */
+function belongsTo(key: string, kind: MissionPeriodKind): boolean {
+  return key.startsWith(MISSION_ID_PREFIX[kind]);
+}
+
+/**
+ * 접두사 없는 옛 주기별 맵을 새 단일 진행도 맵으로 접는다.
+ * @param {Record<string, number>} current 지금까지 접은 진행도
+ * @param {MissionPeriodKind} prefix 옛 맵의 주기
+ * @param {unknown} legacy 옛 문서의 daily/weekly 맵
+ * @return {Record<string, number>} 접두사가 붙은 진행도
+ */
+function prefixedProgress(
+  current: Record<string, number>, prefix: MissionPeriodKind, legacy: unknown,
+): Record<string, number> {
+  const result = {...current};
+  for (const [event, count] of Object.entries(readCounters(legacy))) {
+    const key = progressKey(prefix, event);
+    if (result[key] === undefined) result[key] = count;
+  }
+  return result;
 }
 
 /**
@@ -114,13 +172,18 @@ function readClaimed(value: unknown): string[] {
  */
 export function readMissions(snapshot: DocumentSnapshot): MissionState {
   const data = snapshot.exists ? snapshot.data() : undefined;
+  let progress = readCounters(data?.progress);
+  progress = prefixedProgress(progress, "daily", data?.daily);
+  progress = prefixedProgress(progress, "weekly", data?.weekly);
   return {
-    dailyPeriod: typeof data?.dailyPeriod === "string" ? data.dailyPeriod : "",
-    weeklyPeriod: typeof data?.weeklyPeriod === "string" ? data.weeklyPeriod : "",
-    daily: readCounters(data?.daily),
-    weekly: readCounters(data?.weekly),
+    dailyKey: typeof data?.dailyKey === "string" ? data.dailyKey :
+      typeof data?.dailyPeriod === "string" ? data.dailyPeriod : "",
+    weeklyKey: typeof data?.weeklyKey === "string" ? data.weeklyKey :
+      typeof data?.weeklyPeriod === "string" ? data.weeklyPeriod : "",
+    progress,
     claimed: readClaimed(data?.claimed),
-    battlePassXp: Number.isInteger(data?.battlePassXp) ? Number(data?.battlePassXp) : 0,
+    passExp: Number.isInteger(data?.passExp) ? Number(data?.passExp) :
+      Number.isInteger(data?.battlePassXp) ? Number(data?.battlePassXp) : 0,
   };
 }
 
@@ -135,8 +198,8 @@ export function readMissions(snapshot: DocumentSnapshot): MissionState {
  * @return {MissionState} 리셋을 반영한 상태(입력을 변형하지 않는다)
  */
 export function applyPeriodReset(state: MissionState, period: MissionPeriod): MissionState {
-  const dailyStale = state.dailyPeriod !== period.daily;
-  const weeklyStale = state.weeklyPeriod !== period.weekly;
+  const dailyStale = state.dailyKey !== period.daily;
+  const weeklyStale = state.weeklyKey !== period.weekly;
   if (!dailyStale && !weeklyStale) return state;
 
   const dropped = new Set<MissionPeriodKind>();
@@ -144,17 +207,13 @@ export function applyPeriodReset(state: MissionState, period: MissionPeriod): Mi
   if (weeklyStale) dropped.add("weekly");
 
   return {
-    dailyPeriod: period.daily,
-    weeklyPeriod: period.weekly,
-    daily: dailyStale ? {} : state.daily,
-    weekly: weeklyStale ? {} : state.weekly,
-    claimed: state.claimed.filter((key) => {
-      for (const kind of dropped) {
-        if (key.startsWith(MISSION_ID_PREFIX[kind])) return false;
-      }
-      return true;
-    }),
-    battlePassXp: state.battlePassXp,
+    dailyKey: period.daily,
+    weeklyKey: period.weekly,
+    progress: Object.fromEntries(Object.entries(state.progress).filter(
+      ([key]) => ![...dropped].some((kind) => belongsTo(key, kind)))),
+    claimed: Object.fromEntries(Object.entries(state.claimed).filter(
+      ([key]) => ![...dropped].some((kind) => belongsTo(key, kind)))),
+    passExp: state.passExp,
   };
 }
 
@@ -192,12 +251,11 @@ export async function beginMissionBump(
 function write(transaction: Transaction, bump: MissionBump, now: unknown): void {
   transaction.set(bump.ref, {
     schemaVersion: MISSION_SCHEMA_VERSION,
-    dailyPeriod: bump.period.daily,
-    weeklyPeriod: bump.period.weekly,
-    daily: bump.state.daily,
-    weekly: bump.state.weekly,
+    dailyKey: bump.period.daily,
+    weeklyKey: bump.period.weekly,
+    progress: bump.state.progress,
     claimed: bump.state.claimed,
-    battlePassXp: bump.state.battlePassXp,
+    passExp: bump.state.passExp,
     updatedAt: now,
   });
 }
@@ -208,7 +266,7 @@ function write(transaction: Transaction, bump: MissionBump, now: unknown): void 
  * 일일·주간을 함께 올린다 — 같은 행동이 두 주기에 다 잡히는 것이 미션의 정의다.
  * @param {Transaction} transaction 진행 중인 트랜잭션
  * @param {MissionBump} bump beginMissionBump 가 만든 손잡이
- * @param {MissionEvent} event 올릴 이벤트
+ * @param {string} event 올릴 이벤트 문자열
  * @param {number} amount 증가량(1 이상)
  * @param {unknown} now 서버 시각(FieldValue.serverTimestamp())
  * @return {void}
@@ -216,13 +274,15 @@ function write(transaction: Transaction, bump: MissionBump, now: unknown): void 
 export function commitMissionBump(
   transaction: Transaction,
   bump: MissionBump,
-  event: MissionEvent,
+  event: string,
   amount: number,
   now: unknown,
 ): void {
   const step = Number.isInteger(amount) && amount > 0 ? amount : 1;
-  bump.state.daily[event] = Math.min((bump.state.daily[event] ?? 0) + step, COUNTER_MAX);
-  bump.state.weekly[event] = Math.min((bump.state.weekly[event] ?? 0) + step, COUNTER_MAX);
+  for (const kind of ["daily", "weekly"] as const) {
+    const key = progressKey(kind, event);
+    bump.state.progress[key] = Math.min((bump.state.progress[key] ?? 0) + step, COUNTER_MAX);
+  }
   write(transaction, bump, now);
 }
 
@@ -232,6 +292,7 @@ export function commitMissionBump(
  * @param {Transaction} transaction 진행 중인 트랜잭션
  * @param {MissionBump} bump 손잡이
  * @param {string} missionId 수령한 미션 id
+ * @param {number} passExp 이번 수령으로 붙는 패스 경험치(0 이면 안 붙는다)
  * @param {unknown} now 서버 시각(FieldValue.serverTimestamp())
  * @return {void}
  */
@@ -239,9 +300,14 @@ export function commitMissionClaim(
   transaction: Transaction,
   bump: MissionBump,
   missionId: string,
+  passExp: number,
   now: unknown,
 ): void {
-  if (!bump.state.claimed.includes(missionId)) bump.state.claimed.push(missionId);
+  bump.state.claimed[missionId] = true;
+  // 패스 경험치는 지갑이 아니라 이 문서에 쌓인다 — 낙인과 같은 트랜잭션이어야
+  // "수령은 됐는데 경험치는 안 붙은" 상태가 저장되지 않는다.
+  const gain = Number.isInteger(passExp) && passExp > 0 ? passExp : 0;
+  bump.state.passExp = Math.min(bump.state.passExp + gain, PASS_EXP_MAX);
   write(transaction, bump, now);
 }
 
@@ -252,8 +318,7 @@ export function commitMissionClaim(
  * @return {number} 누적 횟수
  */
 export function progressOf(state: MissionState, mission: MissionDef): number {
-  const counters = mission.period === "daily" ? state.daily : state.weekly;
-  return counters[mission.event] ?? 0;
+  return state.progress[progressKey(mission.period, mission.event)] ?? 0;
 }
 
 /**
@@ -263,5 +328,26 @@ export function progressOf(state: MissionState, mission: MissionDef): number {
  * @return {boolean} 수령했으면 true
  */
 export function isClaimed(state: MissionState, missionId: string): boolean {
-  return state.claimed.includes(missionId);
+  return state.claimed[missionId] === true;
+}
+
+/**
+ * 커맨드 응답과 조회 응답이 공유하는 현재 미션 상태 봉투.
+ *
+ * 맵을 복사해서 낸다 — 손잡이의 상태는 이 뒤에도 변형될 수 있는데, 참조를 그대로 실으면
+ * 응답이 나중 변형을 따라간다.
+ * @param {MissionState} state 리셋·bump 까지 반영한 상태
+ * @param {MissionPeriod} period 이번 호출의 기간
+ * @return {MissionResponse} 응답에 실을 상태 봉투
+ */
+export function missionResponse(state: MissionState, period: MissionPeriod): MissionResponse {
+  return {
+    dailyKey: period.daily,
+    weeklyKey: period.weekly,
+    progress: {...state.progress},
+    claimed: {...state.claimed},
+    passExp: state.passExp,
+    dailyResetAtMs: period.dailyResetAtMs,
+    weeklyResetAtMs: period.weeklyResetAtMs,
+  };
 }
