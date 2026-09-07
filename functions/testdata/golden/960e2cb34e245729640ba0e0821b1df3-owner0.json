@@ -1,0 +1,310 @@
+{
+    "schemaVersion": 3,
+    "rulesetVersion": 2,
+    "contentFingerprint": "e3832f279a2db1b32be02787c5312790b3e72ccb0078afde06b781e96dcd28bc",
+    "capturedAtUtc": "2026-09-07T03:27:32.7714488Z",
+    "unityVersion": "6000.3.10f1",
+    "mode": "solo",
+    "eligible": true,
+    "exclusionReason": "",
+    "matchId": "960e2cb34e245729640ba0e0821b1df3",
+    "seedHex": "5cacc59fc38e4b26",
+    "firstOwner": 0,
+    "decks": [
+        {
+            "ownerIndex": 0,
+            "cards": [
+                {
+                    "cardId": 13,
+                    "level": 4,
+                    "hpBonus": 12,
+                    "evolutionStage": 2,
+                    "unlockedKeywords": 4,
+                    "synergyUnlocked": true
+                },
+                {
+                    "cardId": 14,
+                    "level": 4,
+                    "hpBonus": 12,
+                    "evolutionStage": 2,
+                    "unlockedKeywords": 2,
+                    "synergyUnlocked": true
+                },
+                {
+                    "cardId": 22,
+                    "level": 4,
+                    "hpBonus": 13,
+                    "evolutionStage": 2,
+                    "unlockedKeywords": 8,
+                    "synergyUnlocked": true
+                },
+                {
+                    "cardId": 25,
+                    "level": 4,
+                    "hpBonus": 12,
+                    "evolutionStage": 2,
+                    "unlockedKeywords": 4,
+                    "synergyUnlocked": true
+                },
+                {
+                    "cardId": 38,
+                    "level": 4,
+                    "hpBonus": 13,
+                    "evolutionStage": 2,
+                    "unlockedKeywords": 4,
+                    "synergyUnlocked": true
+                },
+                {
+                    "cardId": 40,
+                    "level": 4,
+                    "hpBonus": 14,
+                    "evolutionStage": 2,
+                    "unlockedKeywords": 512,
+                    "synergyUnlocked": true
+                }
+            ],
+            "boardOrder": [
+                13,
+                40,
+                25,
+                14,
+                38,
+                22
+            ]
+        },
+        {
+            "ownerIndex": 1,
+            "cards": [
+                {
+                    "cardId": 4,
+                    "level": 1,
+                    "hpBonus": 0,
+                    "evolutionStage": 0,
+                    "unlockedKeywords": 0,
+                    "synergyUnlocked": false
+                },
+                {
+                    "cardId": 11,
+                    "level": 1,
+                    "hpBonus": 0,
+                    "evolutionStage": 0,
+                    "unlockedKeywords": 0,
+                    "synergyUnlocked": false
+                },
+                {
+                    "cardId": 26,
+                    "level": 1,
+                    "hpBonus": 0,
+                    "evolutionStage": 0,
+                    "unlockedKeywords": 0,
+                    "synergyUnlocked": false
+                },
+                {
+                    "cardId": 28,
+                    "level": 1,
+                    "hpBonus": 0,
+                    "evolutionStage": 0,
+                    "unlockedKeywords": 0,
+                    "synergyUnlocked": false
+                },
+                {
+                    "cardId": 29,
+                    "level": 1,
+                    "hpBonus": 0,
+                    "evolutionStage": 0,
+                    "unlockedKeywords": 0,
+                    "synergyUnlocked": false
+                },
+                {
+                    "cardId": 30,
+                    "level": 1,
+                    "hpBonus": 0,
+                    "evolutionStage": 0,
+                    "unlockedKeywords": 0,
+                    "synergyUnlocked": false
+                }
+            ],
+            "boardOrder": [
+                29,
+                4,
+                26,
+                28,
+                30,
+                11
+            ]
+        }
+    ],
+    "cardSpecs": [
+        {
+            "id": 4,
+            "maxHp": 4,
+            "keywords": 0,
+            "keywordUnlockLevel": 0,
+            "defaultEvolutionStage": 0,
+            "synergies": [
+                "Data_Synergy_Caretaker"
+            ],
+            "hp2": 5,
+            "hp3": 4,
+            "hp4": 3
+        },
+        {
+            "id": 11,
+            "maxHp": 5,
+            "keywords": 0,
+            "keywordUnlockLevel": 0,
+            "defaultEvolutionStage": 0,
+            "synergies": [
+                "Data_Synergy_Legacy"
+            ],
+            "hp2": 5,
+            "hp3": 3,
+            "hp4": 4
+        },
+        {
+            "id": 13,
+            "maxHp": 4,
+            "keywords": 4,
+            "keywordUnlockLevel": 2,
+            "defaultEvolutionStage": 0,
+            "synergies": [
+                "Data_Synergy_Predator"
+            ],
+            "hp2": 4,
+            "hp3": 4,
+            "hp4": 4
+        },
+        {
+            "id": 14,
+            "maxHp": 5,
+            "keywords": 2,
+            "keywordUnlockLevel": 2,
+            "defaultEvolutionStage": 0,
+            "synergies": [
+                "Data_Synergy_Predator"
+            ],
+            "hp2": 3,
+            "hp3": 4,
+            "hp4": 5
+        },
+        {
+            "id": 22,
+            "maxHp": 5,
+            "keywords": 8,
+            "keywordUnlockLevel": 2,
+            "defaultEvolutionStage": 0,
+            "synergies": [
+                "Data_Synergy_Scale"
+            ],
+            "hp2": 4,
+            "hp3": 4,
+            "hp4": 5
+        },
+        {
+            "id": 25,
+            "maxHp": 5,
+            "keywords": 4,
+            "keywordUnlockLevel": 2,
+            "defaultEvolutionStage": 0,
+            "synergies": [
+                "Data_Synergy_Flow"
+            ],
+            "hp2": 4,
+            "hp3": 4,
+            "hp4": 4
+        },
+        {
+            "id": 26,
+            "maxHp": 6,
+            "keywords": 0,
+            "keywordUnlockLevel": 0,
+            "defaultEvolutionStage": 0,
+            "synergies": [
+                "Data_Synergy_Flow"
+            ],
+            "hp2": 5,
+            "hp3": 4,
+            "hp4": 3
+        },
+        {
+            "id": 28,
+            "maxHp": 5,
+            "keywords": 0,
+            "keywordUnlockLevel": 0,
+            "defaultEvolutionStage": 0,
+            "synergies": [],
+            "hp2": 5,
+            "hp3": 4,
+            "hp4": 3
+        },
+        {
+            "id": 29,
+            "maxHp": 2,
+            "keywords": 0,
+            "keywordUnlockLevel": 0,
+            "defaultEvolutionStage": 0,
+            "synergies": [],
+            "hp2": 5,
+            "hp3": 5,
+            "hp4": 3
+        },
+        {
+            "id": 30,
+            "maxHp": 4,
+            "keywords": 0,
+            "keywordUnlockLevel": 0,
+            "defaultEvolutionStage": 0,
+            "synergies": [],
+            "hp2": 5,
+            "hp3": 4,
+            "hp4": 3
+        },
+        {
+            "id": 38,
+            "maxHp": 5,
+            "keywords": 4,
+            "keywordUnlockLevel": 2,
+            "defaultEvolutionStage": 0,
+            "synergies": [
+                "Data_Synergy_Bulk"
+            ],
+            "hp2": 6,
+            "hp3": 4,
+            "hp4": 3
+        },
+        {
+            "id": 40,
+            "maxHp": 6,
+            "keywords": 512,
+            "keywordUnlockLevel": 2,
+            "defaultEvolutionStage": 0,
+            "synergies": [
+                "Data_Synergy_Legacy",
+                "Data_Synergy_Trace"
+            ],
+            "hp2": 3,
+            "hp3": 5,
+            "hp4": 6
+        }
+    ],
+    "commandLog": "AAABAAECAAABAAEAAAEAAgIAAQAAAQAgAwABAAABACIEAAEAAAEAIgUAAQAAAQAgBgABAAABACE=",
+    "commandLogHash": "13ee44d84936dece06db12d9073044301872baaafb634a15597dd82ea759f91e",
+    "commandCount": 7,
+    "commandLogTruncated": false,
+    "checkpoints": [
+        {
+            "turn": 1,
+            "actingOwner": 0,
+            "stateHash": "78b768dd803c68c3",
+            "drawCount": 6
+        }
+    ],
+    "finalStateHash": "78b768dd803c68c3",
+    "finalDrawCount": 6,
+    "remaining": [
+        5,
+        0
+    ],
+    "winnerOwner": 0,
+    "draw": false
+}

@@ -123,32 +123,18 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
         // 공격 결정 브로드캐스트
         NetworkGameController.Instance?.SendAttack(_attacker.slotIndex, _defender.slotIndex, t_cunningSwap);
 
-        CardView t_attackerView = this.ctx.playerFieldView.GetSlotView(_attacker.slotIndex);
-        CardView t_defenderView = this.ctx.enemyFieldView.GetSlotView(_defender.slotIndex);
-
-        var (t_preSelectedSplash, t_splashView) = AttackFlow.PreSelectSplash(
-            _attacker, _defender, this.ctx.enemyField, this.ctx.enemyFieldView);
-
         bool t_derivedCommand = BattleUxFlags.ExecutionRandomTarget && ReferenceEquals(this.forcedAttacker, _attacker);
 
-        await AttackFlow.RunBeforeAttack(_attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
-                                         t_preSelectedSplash);   // 낙인 선피해(Execute 전 원자)
-
-        AttackResult t_result;
-        using (BattleEventStream.CaptureScope t_events = BattleEventStream.BeginCapture())
-        {
-            t_result = AttackProcessor.Execute(
-                _attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
-                t_preSelectedSplash, t_cunningSwap, t_derivedCommand);
-            t_result.events = t_events.ToArray();
-        }
-
-        await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
-            t_result.events,
-            () => AttackFlow.RunAfterAttackPhase(t_attackerView, _attacker, _defender, this.ctx.playerField, this.ctx.enemyField, t_result));
-
-        // 교활 퇴장은 보충 **전**에 — 슬롯 뷰가 아직 물러나는 카드를 그리고 있는 동안만 가능하다.
-        await AttackFlow.PlayCunningSwap(this.ctx.playerFieldView, t_attackerView, t_result);
+        // 멀티는 교활 스왑을 와이어 값으로 고정한다 — 재계산하면 미러 쪽과 갈린다.
+        AttackFlow.AttackOutcome t_attack = await AttackFlow.RunOneAttack(new AttackFlow.AttackRequest(
+            _attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
+            this.ctx.playerFieldView, this.ctx.enemyFieldView,
+            t_cunningSwap, t_derivedCommand));
+        AttackResult t_result = t_attack.Result;
+        CardView t_attackerView = t_attack.AttackerView;
+        CardView t_defenderView = t_attack.DefenderView;
+        CardInstance t_preSelectedSplash = t_attack.Splash;
+        CardView t_splashView = t_attack.SplashView;
 
         // 내 field만 로컬 채움 + 브로드캐스트
         List<CardInstance> t_playerPlaced = this.ctx.playerField.FillEmptySlots();
@@ -202,7 +188,7 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
         // "상대 보충분이 도착했는가"가 회선 속도에 좌우돼 정상 경기에서도 지문이 갈린다.
         // 배리어를 통과하고 양쪽 보충이 모두 끝난 이 지점은 두 클라가 반드시 같은 보드다.
         // 이 지문은 **다음 배리어**에 실려 나간다(순번도 그때 것으로 맞춰진다).
-        NetworkGameController.Instance?.StageStateHash(this.ctx.playerField, this.ctx.enemyField);
+        NetworkGameController.Instance?.StageStateHash(this.ctx.playerField.State, this.ctx.enemyField.State);
 
         if (t_result.canAttackAgain && this.ctx.enemyField.IsEmpty)
         {
@@ -224,8 +210,8 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
             // MatchRandom 소비 지점 — 상대 클라도 MultiplayerOpponentTurn에서 같은 자리에서 같은 횟수를 뽑는다.
             if (BattleUxFlags.ExecutionRandomTarget)
             {
-                CardInstance t_nextTarget = ExecutionRule.PickRandomTarget(_attacker, this.ctx.enemyField);
-                if (t_nextTarget != null)
+                if (ExecutionRule.TryPickNext(
+                        in t_result, _attacker, this.ctx.enemyField.State, out CardInstance t_nextTarget))
                 {
                     await UniTask.Delay((int)(GameTiming.Battle.OpponentExtraAttackDelay * 1000));
                     ExecuteAttackAsync(_attacker, t_nextTarget).Forget();

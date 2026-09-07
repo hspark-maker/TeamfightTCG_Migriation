@@ -50,7 +50,7 @@ public static class SynergyEmblemVfx
     /// 낙인 선피해처럼 전원이 함께 일하는 효과는 발동 주체 한 장만 빛나면 그림과 어긋난다.
     /// 반환값 = 실제로 띄웠는가(연출이 끝나길 기다릴지 호출부가 판단하는 근거).
     /// 순수 연출이라 결정론과 무관하다(상태·RNG 무접촉).</summary>
-    public static bool PlayTriggered(CardInstance _self, SynergyData _synergy, BattleField _field)
+    public static bool PlayTriggered(CardInstance _self, SynergyData _synergy, BattleFieldState _field)
     {
         SynergyEmblemEntry t_entry = EntryOf(_synergy, SynergyEmblemTiming.Triggered);
         if (t_entry == null) return false;

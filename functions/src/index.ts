@@ -20,3 +20,4 @@ export {grantTutorialCards} from "./commands/grantTutorialCards";
 export {reportAdventureWin} from "./commands/reportAdventureWin";
 export {limitBreakCard} from "./commands/limitBreakCard";
 export {spinRoulette} from "./commands/spinRoulette";
+export {getReplayDivergence} from "./commands/getReplayDivergence";

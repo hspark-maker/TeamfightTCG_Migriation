@@ -24,6 +24,7 @@ public partial class ReleaseManagerWindow : EditorWindow
     {
         Release,
         Data,
+        Auth,
     }
 
     Tab selectedTab;
@@ -46,10 +47,11 @@ public partial class ReleaseManagerWindow : EditorWindow
 
     void OnEnable()
     {
-        this.selectedTab = (Tab)Mathf.Clamp(EditorPrefs.GetInt(PREF_TAB, 0), 0, 1);
+        this.selectedTab = (Tab)Mathf.Clamp(EditorPrefs.GetInt(PREF_TAB, 0), 0, (int)Tab.Auth);
         Revalidate();
         EnableDataTab();
         EnableVersionManagement();
+        EnableBattleReplayManagement();
     }
 
     void OnDisable()
@@ -66,9 +68,11 @@ public partial class ReleaseManagerWindow : EditorWindow
             return;
         }
 
+        // 로그인 상태는 SpecAdminAuth 하나가 들고 있다 — 그리는 자리도 로그인 탭 하나다.
+        // 기능 탭은 DrawAdminAuthStatus 로 "지금 쓸 수 있는지"만 알린다.
         this.selectedTab = (Tab)GUILayout.Toolbar(
             (int)this.selectedTab,
-            new[] { "릴리즈", "데이터" },
+            new[] { "릴리즈", "데이터", AdminReady ? "로그인 ●" : "로그인" },
             GUILayout.Height(26));
 
         if (this.selectedTab == Tab.Data)
@@ -77,10 +81,19 @@ public partial class ReleaseManagerWindow : EditorWindow
             return;
         }
 
+        if (this.selectedTab == Tab.Auth)
+        {
+            DrawAuthTab();
+            return;
+        }
+
         this.scroll = EditorGUILayout.BeginScrollView(this.scroll);
         DrawModeSection();
+        // 아래 두 섹션이 다 admin 을 요구한다 — 안내는 탭당 한 번만 그린다.
+        DrawAdminAuthStatus();
         DrawVersionManagementSection();
         DrawValidationSection();
+        DrawBattleReplayManagementSection();
         DrawReport();
         EditorGUILayout.EndScrollView();
     }

@@ -129,6 +129,7 @@ public static class CardCatalog
     sealed class CatalogSynergyRuleProvider : ISynergyRuleProvider
     {
         public bool ContainsCard(int _cardId) => CardCatalog.Contains(_cardId);
+        public CardSpec SpecOf(int _cardId) => CardCatalog.RequireSpec(_cardId);
         public IReadOnlyList<string> SynergyIdsOf(int _cardId) => CardCatalog.RequireSynergyIds(_cardId);
         public IReadOnlyList<SynergyTier> TiersOf(string _synergyId) => CardCatalog.RequireSynergyTiers(_synergyId);
     }

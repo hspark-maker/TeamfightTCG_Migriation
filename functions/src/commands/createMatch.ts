@@ -12,6 +12,12 @@ import {
   pairingDocumentId,
 } from "../matchPairing";
 import {HEX_16, HEX_32, HEX_64, objectRecord, safeInteger} from "../match/payloadGuards";
+import {
+  BATTLE_REPLAY_SPEC_TABLES,
+  fingerprintOfSpecPins,
+  readSpecPins,
+  SpecPins,
+} from "../specs/specBlobReader";
 
 const PAIRING_KEY = /^[A-Za-z0-9_-]{1,128}$/;
 
@@ -93,6 +99,13 @@ export const createMatch = onCall({enforceAppCheck: false}, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "authentication required");
   const data = parseCreateMatchData(request.data);
+  let currentSpecPins: SpecPins;
+  try {
+    currentSpecPins = await readSpecPins(data.env, BATTLE_REPLAY_SPEC_TABLES);
+  } catch (error) {
+    logger.error("battle_replay_spec_pin_failed", {env: data.env, error});
+    throw new HttpsError("unavailable", "battle replay specs are unavailable");
+  }
   const pairingId = pairingDocumentId(data.pairingKey);
   // 매치 문서 하나가 페어링 레코드까지 겸한다 — id 를 pairingKey 에서 파생해야 두 클라가
   // 같은 문서를 집는다. 시드는 이 값과 무관한 별도 난수라 예측 가능성이 옮겨가지 않는다.
@@ -179,6 +192,11 @@ export const createMatch = onCall({enforceAppCheck: false}, async (request) => {
         participant === record.participantUids[index]);
     if (unchanged && priorOwner === data.ownerIndex) return response;
 
+    const retainedSpecPins = (objectRecord(raw?.specPins) as Record<string, {blobPath: string; payloadHash: string}> | null) ??
+      currentSpecPins;
+    if (fingerprintOfSpecPins(data.env, retainedSpecPins, ["Card"]) !== record.contentFingerprint) {
+      throw new HttpsError("failed-precondition", "content_fingerprint_mismatch");
+    }
     tx.set(matchRef, {
       matchId: record.matchId,
       env: data.env,
@@ -189,6 +207,8 @@ export const createMatch = onCall({enforceAppCheck: false}, async (request) => {
       seedHex: record.seedHex,
       rulesetVersion: record.rulesetVersion,
       cardDataVersion: record.contentFingerprint,
+      // 기존 pairing 문서는 최초 생성자가 고정한 규칙 blob을 유지한다. 두 번째 참가자가 새 릴리스로 덮지 않는다.
+      specPins: retainedSpecPins,
       participantUids: record.participantUids,
       expectedParticipants: record.expectedParticipants,
       mode: data.mode,

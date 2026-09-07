@@ -22,6 +22,7 @@ public class MultiplayerOpponentTurn : TurnBase
     {
         await UniTask.Delay((int)(GameTiming.Battle.OpponentTurnStartDelay * 1000));
         CardInstance t_takeoverAttacker = null;
+        CardInstance t_takeoverTarget = null;
         CardInstance t_executionAttacker = null;
 
         // 수신 공격의 규칙 검증(도발)을 건너뛰어야 하는 경우를 구분하는 플래그.
@@ -46,10 +47,10 @@ public class MultiplayerOpponentTurn : TurnBase
 
             if (DeckConfig.AiTakeover && t_takeoverAttacker != null)
             {
-                // 처형 재공격 대상의 단일 진실원은 ExecutionRule이다 — 도발을 무시하고 살아 있는 적 전부에서
-                // 뽑는 그 규칙을 AI 인수 후에도 그대로 쓴다(EnemyTurn.PickTargetFor와 동형).
+                // 자동 대상은 직전 공격 직후 ExecutionRule로 이미 확정했다. 여기서 다시 뽑으면
+                // AI 인수 순간부터 RNG를 두 번 소비하므로 저장한 대상을 그대로 쓴다.
                 CardInstance t_target = BattleUxFlags.ExecutionRandomTarget
-                    ? ExecutionRule.PickRandomTarget(t_takeoverAttacker, this.ctx.playerField)
+                    ? t_takeoverTarget
                     : EnemyAi.PickTarget(this.ctx.playerField.GetValidTargets(t_takeoverAttacker));
                 if (!t_takeoverAttacker.IsAlive || t_target == null) return;
 
@@ -59,6 +60,7 @@ public class MultiplayerOpponentTurn : TurnBase
                 t_defenderSlot = t_target.slotIndex;
                 t_cunningSwap = null;   // 와이어 값 없음 — EnemyTurn과 동형으로 로컬 판정(교활 스왑 유지)
                 t_takeoverAttacker = null;
+                t_takeoverTarget = null;
             }
             else
             {
@@ -110,31 +112,16 @@ public class MultiplayerOpponentTurn : TurnBase
                 return;
             }
 
-            CardView t_attackerView = this.ctx.enemyFieldView.GetSlotView(t_atk.slotIndex);
-            CardView t_defenderView = this.ctx.playerFieldView.GetSlotView(t_def.slotIndex);
-
-            var (t_preSelectedSplash, t_splashView) = AttackFlow.PreSelectSplash(
-                t_atk, t_def, this.ctx.playerField, this.ctx.playerFieldView);
-
-
-            await AttackFlow.RunBeforeAttack(t_atk, t_def, this.ctx.enemyField, this.ctx.playerField,
-                                             t_preSelectedSplash);   // 낙인 선피해(Execute 전 원자)
-
-            AttackResult t_result;
-            using (BattleEventStream.CaptureScope t_events = BattleEventStream.BeginCapture())
-            {
-                t_result = AttackProcessor.Execute(
-                    t_atk, t_def, this.ctx.enemyField, this.ctx.playerField,
-                    t_preSelectedSplash, t_cunningSwap, t_ruleBackstopOff);
-                t_result.events = t_events.ToArray();
-            }
-
-            await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
-                t_result.events,
-                () => AttackFlow.RunAfterAttackPhase(t_attackerView, t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_result));
-
-            // 교활 퇴장은 보충 **전**에 — 슬롯 뷰가 아직 물러나는 카드를 그리고 있는 동안만 가능하다.
-            await AttackFlow.PlayCunningSwap(this.ctx.enemyFieldView, t_attackerView, t_result);
+            // 수신 공격이라 교활 스왑도 derived 도 와이어 값이 진실원이다(로컬 재계산 금지).
+            AttackFlow.AttackOutcome t_outcome = await AttackFlow.RunOneAttack(new AttackFlow.AttackRequest(
+                t_atk, t_def, this.ctx.enemyField, this.ctx.playerField,
+                this.ctx.enemyFieldView, this.ctx.playerFieldView,
+                t_cunningSwap, t_ruleBackstopOff));
+            AttackResult t_result = t_outcome.Result;
+            CardView t_attackerView = t_outcome.AttackerView;
+            CardView t_defenderView = t_outcome.DefenderView;
+            CardInstance t_preSelectedSplash = t_outcome.Splash;
+            CardView t_splashView = t_outcome.SplashView;
 
             // 내 field만 로컬 채움 + 브로드캐스트
             List<CardInstance> t_playerPlaced = this.ctx.playerField.FillEmptySlots();
@@ -183,32 +170,39 @@ public class MultiplayerOpponentTurn : TurnBase
 
             // divergence 카나리아 스냅샷. MultiplayerPlayerTurn과 **정확히 같은 지점**이어야 한다
             // (배리어 통과 + 양쪽 보충 완료 직후). 인자 순서는 무관하다 — BattleStateHash가 OwnerIndex로 정렬한다.
-            NetworkGameController.Instance?.StageStateHash(this.ctx.playerField, this.ctx.enemyField);
+            NetworkGameController.Instance?.StageStateHash(this.ctx.playerField.State, this.ctx.enemyField.State);
 
             // 내 카드 전멸 → CheckGameOver에 위임 (Execution 데드락 방지)
             if (this.ctx.playerField.IsEmpty) break;
 
-            if (t_result.canAttackAgain && t_atk.IsAlive)
+            if (t_result.canAttackAgain)
             {
                 // 다음 바퀴는 처형 재공격이다. 무작위 대상 모드일 때만 백스톱을 끈다 —
                 // 그 모드에서만 송신측이 ExecutionRule(도발 무시)로 대상을 뽑기 때문이다.
                 // 수동 재선택 모드면 송신측이 HandleCardViewAttack의 규칙 검사를 거치므로 백스톱을 유지한다.
                 t_executionFollowUp = BattleUxFlags.ExecutionRandomTarget;
                 t_executionAttacker = t_atk;
-                if (DeckConfig.AiTakeover)
+                if (BattleUxFlags.ExecutionRandomTarget)
                 {
-                    // EnemyTurn과 동일하게 처형 공격자는 유지하고 타깃만 AI 규칙으로 다시 고른다.
-                    t_takeoverAttacker = t_atk;
+                    // 송신측과 같은 순간 같은 횟수로 뽑는다. 원격이면 값은 버리고,
+                    // AI 인수 상태면 다음 바퀴가 다시 뽑지 않도록 함께 보관한다.
+                    if (!ExecutionRule.TryPickNext(
+                            in t_result, t_atk, this.ctx.playerField.State, out CardInstance t_nextTarget))
+                        break;
+                    if (DeckConfig.AiTakeover)
+                    {
+                        t_takeoverAttacker = t_atk;
+                        t_takeoverTarget = t_nextTarget;
+                    }
                 }
-
-                // **결정론 정렬**: 공격한 쪽(MultiplayerPlayerTurn)은 여기서 처형 대상을 MatchRandom으로 뽑는다.
-                // 실제 대상은 곧 도착할 공격 RPC로 받으므로 그 값 자체는 버리지만, 뽑는 행위를 빼면
-                // 스트림 소비 횟수가 한 번 어긋나 그 순간부터 양측 랜덤이 영구히 갈린다.
-                else if (BattleUxFlags.ExecutionRandomTarget)
+                else if (!t_atk.IsAlive)
                 {
-                    // 결과가 null이면 송신측도 **공격 RPC를 보내지 않고 턴을 닫는다**(MultiplayerPlayerTurn).
-                    // 그 경우까지 다음 RPC를 기다리면 오지 않을 패킷을 기다리다 상한 초과로 무효 경기가 된다.
-                    if (ExecutionRule.PickRandomTarget(t_atk, this.ctx.playerField) == null) break;
+                    break;
+                }
+                else if (DeckConfig.AiTakeover)
+                {
+                    // 수동 재선택 모드의 AI 인수는 기존 EnemyAi 대상 규칙을 다음 바퀴에 적용한다.
+                    t_takeoverAttacker = t_atk;
                 }
 
                 await UniTask.Delay((int)(GameTiming.Battle.OpponentExtraAttackDelay * 1000));

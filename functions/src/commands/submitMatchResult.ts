@@ -6,6 +6,7 @@ import {
   DocumentSnapshot,
   FieldValue,
   Timestamp,
+  Transaction,
 } from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
 import {withCountedTransaction} from "../observability/countedTransaction";
@@ -29,34 +30,59 @@ import {
   validateBattleCommands,
 } from "../battleCommand";
 import {HEX_16, HEX_32, HEX_64, objectRecord, safeInteger} from "../match/payloadGuards";
-import {simulateBattle, BattleSimulationResult} from "../battleSimulation";
 import {
   buildAiDeckSnapshots,
-  CardSnapshot,
   CardSpecForValidation,
   computeDeckHash,
   parseCardSpecRow,
 } from "../deckValidation";
 import {readSpecRows} from "../specs/specBlobReader";
 import {SERVER_AUTHORITATIVE_RULESET_VERSION} from "../matchPairing";
-import {parseSynergyRulesCached} from "../synergyRules";
+import {
+  BattleReplayOutcome,
+  callBattleReplay,
+  parseSpecPins,
+  ReplayRequestPayload,
+  ReplayVerdict,
+} from "../battleReplayService";
+import {isBattleReplayEnabled} from "../battleReplayConfig";
+import {recordReplayDaily, ReplayDailyDelta} from "../battleReplayTelemetry";
 
-// 서버 재시뮬레이션 권위 스위치. 골든 벡터 검증 전까지 섀도(false)로 둔다.
-// 켜기 전 확인할 것: (1) C#/TS finalStateHash 일치 벡터, (2) Card 표에 maxHp·synergies·
-// defaultEvolutionStage 업로드 완료, (3) clientDivergence 실측률.
-const SERVER_SIMULATION_AUTHORITATIVE = false;
+// 서버 재생 권위 스위치. true = 승패·잔존의 진실원이 Cloud Run 재생(C# BattleCore)이다.
+// 켠 근거: Tools/BattleCoreGolden 이 functions/testdata/golden 코퍼스로 finalStateHash·체크포인트
+// 일치를 강제한다. 끄면 두 클라 합의(decideMatch)로 즉시 되돌아간다 — 롤백 레버는 이 한 줄이다.
+const SERVER_SIMULATION_AUTHORITATIVE = true;
 
-// 턴별 체크포인트는 골든 대조용 진단 데이터다 — 매치 문서에 영속할 이유가 없다.
-// 명령 상한이 1024라 수백 엔트리가 붙을 수 있고, 같은 문서에 이미 두 클라의 base64 명령 로그가 들어 있다.
-function persistableSimulation(_result: BattleSimulationResult | null): unknown {
-  if (_result == null) return null;
-  const rest: Record<string, unknown> = {..._result};
-  delete rest.checkpoints;
-  // 재생 실패면 winnerOwner/remaining/finalStateHash/drawCount 가 undefined 다.
-  // Firestore 는 undefined 를 거부하므로(문서 쓰기 전체가 실패한다) 아예 키를 뺀다.
-  for (const key of Object.keys(rest)) if (rest[key] === undefined) delete rest[key];
-  return rest;
+/** 재생 호출 결과를 매치 문서에 남기는 형태. 실패는 사유만 남는다. */
+type ServerReplay =
+  | {ok: true; outcome: BattleReplayOutcome}
+  | {ok: false; reason: string};
+
+function persistableReplay(_replay: ServerReplay | null): unknown {
+  if (_replay == null) return null;
+  if (!_replay.ok) return {ok: false, reason: _replay.reason};
+  return {ok: true, ..._replay.outcome};
 }
+
+/**
+ * 재생 요청 지문. 트랜잭션 밖에서 받아 온 재생 결과가 **지금 트랜잭션이 보는 입력**의
+ * 것인지 확인하는 유일한 수단이다. 지문이 다르면 그 결과를 쓰지 않고 다시 받아 온다.
+ * @param {ReplayRequestPayload} _request 재생 서비스로 보낼 요청 본문
+ * @return {string} 요청 직렬화의 sha256
+ */
+function replayFingerprint(_request: ReplayRequestPayload): string {
+  return createHash("sha256").update(JSON.stringify(_request)).digest("hex");
+}
+
+type CachedReplay = {fingerprint: string; verdict: ReplayVerdict};
+type SettleOutcome =
+  | {kind: "done"; value: {status: string; reason?: unknown}; telemetry?: ReplayDailyDelta}
+  | {kind: "need_replay"; fingerprint: string; request: ReplayRequestPayload};
+
+// 트랜잭션 → 재생 → 트랜잭션. 두 번째 트랜잭션에서 지문이 또 어긋나면(동시 제출로 입력이
+// 바뀌었다) 아무것도 쓰지 않고 unavailable 로 내려 클라 재시도에 맡긴다.
+// 늘리지 마라 — 재생 호출은 최악 40초라 onCall 시간 예산이 곱으로 늘어난다.
+const SETTLE_ATTEMPTS = 2;
 
 const SUBMISSION_DEADLINE_MS = 120_000;
 
@@ -215,13 +241,17 @@ function parseSubmitData(raw: unknown): SubmitData {
 }
 
 
-export const submitMatchResult = onCall({enforceAppCheck: false}, async (request) => {
+// 기본 60초로는 재생 왕복(최악 40초) + 트랜잭션 2회를 못 견딘다.
+export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds: 120}, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "authentication required");
   const data = parseSubmitData(request.data);
   if (data.seedSource !== "server") {
     throw new HttpsError("failed-precondition", "legacy match results are not authoritative");
   }
+  // 토글은 트랜잭션 밖에서 제출당 한 번만 읽는다. off면 Cloud Run 호출 자체를 생략해
+  // 대역폭·인스턴스 사용을 멈추고 기존 두 클라이언트 합의 경로로 되돌아간다.
+  const replayEnabled = await isBattleReplayEnabled(data.env);
   const matchRef = db.doc(`envs/${data.env}/matches/${data.matchId}`);
   const cardTable = "Card";
   // 표 3개를 블롭으로 읽는다 — 행 문서를 훑으면 제출 1건마다 행 수만큼(Reward 85 · Card 41 …) 과금된다.
@@ -229,7 +259,6 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
   // 여기서 다시 캐시하지 마라 — TTL 이 두 벌이 되고 clearSpecCache 로 비워도 이쪽이 옛 값을 계속 준다.
   let rewardRows;
   let rankRows;
-  let synergyRules: ReturnType<typeof parseSynergyRulesCached> | null = null;
   const cardSpecs = new Map<number, CardSpecForValidation>();
   try {
     const [rewardSpecRows, rankSpecRows, cardSpecRows] = await Promise.all([
@@ -251,20 +280,10 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
     throw new HttpsError("unavailable", "payout specs are unavailable");
   }
 
-  try {
-    const [synergyDefRows, synergyTierRows, synergyEffectRows] = await Promise.all([
-      readSpecRows(data.env, "SynergyDef"),
-      readSpecRows(data.env, "SynergyTierDef"),
-      readSpecRows(data.env, "SynergyEffectDef"),
-    ]);
-    synergyRules = parseSynergyRulesCached(synergyDefRows, synergyTierRows, synergyEffectRows);
-  } catch (error) {
-    // 구 ruleset 정산은 시너지 재생 데이터와 무관하다. 섀도에서는 실패를 기록만 하고,
-    // 권위 ruleset에서는 simulateBattle의 synergy_rules_missing이 정산을 fail-closed 한다.
-    logger.error("synergy_spec_invalid", {env: data.env, error});
-  }
+  // 시너지 3표는 여기서 읽지 않는다 — 재생기가 매치 문서의 specPins 로 고정본을 직접 읽는다.
+  // Functions 가 따로 읽으면 전투 도중 표가 재발행됐을 때 두 벌이 갈린다.
 
-  const result = await withCountedTransaction("submitMatchResult", async (tx) => {
+  const settle = async (tx: Transaction, replay: CachedReplay | null): Promise<SettleOutcome> => {
     const matchSnapshot = await tx.get(matchRef);
     const match = matchSnapshot.data() as Record<string, unknown> | undefined;
     if (data.seedSource === "server") {
@@ -276,7 +295,7 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
     }
     const status = typeof match?.status === "string" ? match.status : "pending";
     if (status !== "pending") {
-      return {status, reason: match?.reason ?? null};
+      return {kind: "done", value: {status, reason: match?.reason ?? null}};
     }
 
     const submissions = {...(match?.submissions as Record<string, Submission> | undefined)};
@@ -326,11 +345,14 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
 
     const rawRulesetVersion = match?.rulesetVersion;
     const rulesetVersion = Number.isInteger(rawRulesetVersion) ? rawRulesetVersion as number : 0;
-    // 서버 재시뮬레이션은 ruleset 2부터 **돌지만**, 그 결과로 정산할지는 이 스위치가 정한다.
-    // false = 섀도: 결과를 문서에 기록만 하고 승패·지급은 기존 두 클라 합의(decideMatch)가 소유한다.
-    // C#/TS 골든 벡터로 finalStateHash 일치가 증명되기 전에는 true 로 올리지 마라 —
-    // 리졸버가 한 곳만 틀려도 실제 승자가 패배 정산(골드 flat + 랭크 감점)을 받는다.
-    const simulateRules = rulesetVersion >= SERVER_AUTHORITATIVE_RULESET_VERSION;
+    // 재생을 부를지 여부. 셋 다 참이어야 부른다:
+    //   replayEnabled  = 운영 토글(envs/{env}/config/battleReplay). 꺼지면 호출 자체를 생략해
+    //                    Cloud Run 대역폭이 0이 되고, 정산은 두 클라 합의(decideMatch)로 후퇴한다.
+    //   rulesetVersion = 재생기가 아는 규칙 세대(2 이상)
+    //   SERVER_SIMULATION_AUTHORITATIVE = 배포로만 되돌리는 코드 킬스위치
+    // **토글이 꺼진 동안은 승패 진실원이 클라 합의다** — 치트 방어가 낮아진 상태이므로
+    // 릴리즈 관리 창의 경고를 무시하고 오래 꺼 두지 마라.
+    const simulateRules = replayEnabled && rulesetVersion >= SERVER_AUTHORITATIVE_RULESET_VERSION;
     const authoritativeRules = SERVER_SIMULATION_AUTHORITATIVE && simulateRules;
     const nowMs = Timestamp.now().toMillis();
     const decision = solo ?
@@ -350,22 +372,34 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
     if (decision.status === "pending") {
       tx.set(matchRef, {status: "pending", submissions, createdAt, expiresAt,
         deadlineAt: Timestamp.fromMillis(createdAt.toMillis() + SUBMISSION_DEADLINE_MS)}, {merge: true});
-      return {status: "pending"};
+      return {kind: "done", value: {status: "pending"}};
     }
     if (decision.status === "flagged") {
       tx.set(matchRef, {status: "flagged", reason: decision.reason, submissions,
+        replayUnavailable: FieldValue.delete(),
         settledAt: FieldValue.serverTimestamp(), expiresAt}, {merge: true});
-      return {status: "flagged", reason: decision.reason};
+      return {kind: "done", value: {status: "flagged", reason: decision.reason}, telemetry: {
+        settled: 1, replayOk: 0, replayFailed: 0, unavailable: 0,
+        divergent: 0, outcomeMismatch: 0, hashMismatch: 0,
+      }};
     }
 
-    let serverSimulation: BattleSimulationResult | null = null;
+    let serverReplay: ServerReplay | null = null;
     let clientDivergence: Record<string, unknown> | null = null;
     let ownerIndexByUid: Record<string, number> | null = null;
+    let replayWasUnavailable = false;
+    let outcomeMismatch = false;
+    let hashMismatch = false;
     if (simulateRules) {
       const seedHex = match?.seedHex;
+      const specPins = parseSpecPins(data.env, match?.specPins);
+      // 지문은 클라 제출이 아니라 매치 문서의 값을 쓴다 — 재생기가 specPins 로 읽는 표와
+      // 같은 세대인지 검사하는 값이라, 제출값을 넣으면 클라가 검사를 통과시킬 수 있다.
+      const contentFingerprint = typeof match?.cardDataVersion === "string" ? match.cardDataVersion : null;
       if (!Array.isArray(participantUids) || participantUids.length !== expectedParticipants ||
-          typeof seedHex !== "string" || approvals == null) {
-        serverSimulation = {ok: false, reason: "server_match_contract_missing"};
+          typeof seedHex !== "string" || approvals == null ||
+          specPins == null || contentFingerprint == null) {
+        serverReplay = {ok: false, reason: "server_match_contract_missing"};
       } else {
         const decks: unknown[] = [null, null];
         ownerIndexByUid = {};
@@ -384,49 +418,88 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
           }
         }
         const commandLog = entries[0].commandLog ?? "";
+        const boardOrder = entries[0].boardOrder;
         if (!Array.isArray(decks[0]) || !Array.isArray(decks[1]) ||
-            (entries[0].commandLogVersion ?? 0) !== 1 || entries[0].commandLogTruncated) {
-          serverSimulation = {ok: false, reason: "server_replay_input_missing"};
+            (entries[0].commandLogVersion ?? 0) !== 1 || entries[0].commandLogTruncated ||
+            boardOrder == null) {
+          serverReplay = {ok: false, reason: "server_replay_input_missing"};
         } else {
           // 보드 순서는 클라가 실어 보낸 값이다 — 서버는 시드로 재현할 수 없다.
           // 두 제출이 같은 값을 냈는지는 authoritativeInputsAgree(board_order_mismatch)가 이미 걸렀다.
-          serverSimulation = simulateBattle({
+          const replayRequest: ReplayRequestPayload = {
+            env: data.env,
+            rulesetVersion,
+            contentFingerprint,
+            specPins,
             seedHex,
-            decks: [decks[0] as CardSnapshot[], decks[1] as CardSnapshot[]],
-            specs: cardSpecs,
-            synergyRules,
+            decks: [
+              {ownerIndex: 0, cards: decks[0] as unknown[], boardOrder: boardOrder.owner0},
+              {ownerIndex: 1, cards: decks[1] as unknown[], boardOrder: boardOrder.owner1},
+            ],
             commandLog,
-            boardOrders: entries[0].boardOrder == null ? undefined :
-              [entries[0].boardOrder.owner0, entries[0].boardOrder.owner1],
-          });
+          };
+          const fingerprint = replayFingerprint(replayRequest);
+          if (replay == null || replay.fingerprint !== fingerprint) {
+            // 재생은 HTTP 호출이라 트랜잭션 안에서 돌릴 수 없다. **아무것도 쓰지 않고** 물러난 뒤
+            // 바깥에서 재생을 받아 같은 입력으로 다시 들어온다(2단계 흐름).
+            return {kind: "need_replay", fingerprint, request: replayRequest};
+          }
+          const verdict = replay.verdict;
+          replayWasUnavailable = verdict.kind === "unavailable";
+          if (verdict.kind === "unavailable" && authoritativeRules) {
+            // 재생기에 닿지 못했다. 여기서 클라 합의로 되돌아가면 권위 전환의 의미가 없고,
+            // flagged 로 닫으면 서비스 장애가 멀쩡한 플레이어의 보상을 지운다 — 제출만 보존하고 연다.
+            // 되밀어 줄 서버 주체가 없어 클라 재제출까지 pending 으로 남는다(replayUnavailable 로 조회).
+            logger.error("battle_replay_unavailable", {
+              matchId: data.matchId, env: data.env, reason: verdict.reason,
+            });
+            tx.set(matchRef, {status: "pending", submissions, createdAt, expiresAt,
+              deadlineAt: Timestamp.fromMillis(createdAt.toMillis() + SUBMISSION_DEADLINE_MS),
+              replayUnavailable: {reason: verdict.reason, at: FieldValue.serverTimestamp()}},
+            {merge: true});
+            return {kind: "done", value: {status: "pending"}, telemetry: {
+              settled: 0, replayOk: 0, replayFailed: 0, unavailable: 1,
+              divergent: 0, outcomeMismatch: 0, hashMismatch: 0,
+            }};
+          }
+          // 섀도(권위 스위치 off)에서는 재생 실패가 정산을 막지 않는다 — 기록만 하고
+          // 기존 합의 경로(decideMatch)로 계속 간다. 롤백 레버가 실제로 작동하려면 여기가 필요하다.
+          serverReplay = verdict.kind === "ok" ?
+            {ok: true, outcome: verdict.outcome} :
+            {ok: false, reason: verdict.reason};
         }
       }
-      const simulationReason = serverSimulation.ok ? null : serverSimulation.reason ?? "unknown";
-      // 섀도에서는 재생 실패가 정산을 막지 않는다 — 기록만 하고 기존 합의 경로로 계속 간다.
-      if (simulationReason != null && authoritativeRules) {
-        const reason = `server_simulation_${simulationReason}`;
+      const replayReason = serverReplay.ok ? null : serverReplay.reason;
+      if (replayReason != null && authoritativeRules) {
+        const reason = `server_simulation_${replayReason}`;
         tx.set(matchRef, {status: "flagged", reason, submissions,
-          serverSimulation: persistableSimulation(serverSimulation),
+          serverSimulation: persistableReplay(serverReplay),
+          replayUnavailable: FieldValue.delete(),
           settledAt: FieldValue.serverTimestamp(), expiresAt}, {merge: true});
-        return {status: "flagged", reason};
+        return {kind: "done", value: {status: "flagged", reason}, telemetry: {
+          settled: 1, replayOk: 0, replayFailed: 1, unavailable: 0,
+          divergent: 0, outcomeMismatch: 0, hashMismatch: 0,
+        }};
       }
       const outcomeMismatches: string[] = [];
-      if (serverSimulation.ok) {
+      if (serverReplay.ok) {
+        const outcome = serverReplay.outcome;
         for (const entry of entries) {
           const owner = ownerIndexByUid?.[entry.uid] ?? -1;
-          if (owner < 0 || entry.won !== (serverSimulation.winnerOwner === owner) ||
-            entry.myRemaining !== serverSimulation.remaining?.[owner] ||
-            entry.opponentRemaining !== serverSimulation.remaining?.[1 - owner]) {
+          if (owner < 0 || entry.won !== (outcome.winnerOwner === owner) ||
+            entry.myRemaining !== outcome.remaining[owner] ||
+            entry.opponentRemaining !== outcome.remaining[1 - owner]) {
             outcomeMismatches.push(entry.uid);
           }
         }
+        outcomeMismatch = outcomeMismatches.length > 0;
       }
-      // 재생이 실패했으면 "클라와 다르다"가 아니라 "대조를 못 했다"다. 둘을 섞으면 섀도 실측이
+      // 재생이 실패했으면 "클라와 다르다"가 아니라 "대조를 못 했다"다. 둘을 섞으면 실측이
       // 실패율과 발산율을 구분하지 못한다. Firestore 는 undefined 를 거부하므로 전부 null 로 접는다.
-      if (!serverSimulation.ok) {
+      if (!serverReplay.ok) {
         clientDivergence = {
           compared: false,
-          reason: simulationReason ?? "unknown",
+          reason: replayReason ?? "unknown",
           submittedStateHash: entries[0].finalStateHash ?? null,
           serverStateHash: null,
           outcomeMismatchUids: [],
@@ -434,15 +507,17 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
       } else {
         // **finalStateHash 와 비교하면 안 된다** — 그건 마지막으로 두 클라가 합의한 해시라
         // 전투가 끝난 턴의 상태를 담지 못한다(끝 턴은 교환 기회가 없다).
-        // endStateHash 가 서버 재시뮬과 같은 시점·같은 계산이다. 없으면(구 클라) 해시 대조를 건너뛴다.
+        // endStateHash 가 서버 재생과 같은 시점·같은 계산이다. 없으면(구 클라) 해시 대조를 건너뛴다.
         const clientEnd = entries[0].endStateHash ?? null;
-        const hashDiffers = clientEnd != null && serverSimulation.finalStateHash !== clientEnd;
+        const hashDiffers = clientEnd != null &&
+          serverReplay.outcome.finalStateHash.toLowerCase() !== clientEnd.toLowerCase();
+        hashMismatch = hashDiffers;
         if (hashDiffers || outcomeMismatches.length > 0) {
           clientDivergence = {
             compared: true,
             reason: clientEnd == null ? "end_state_hash_absent" : null,
             submittedStateHash: clientEnd,
-            serverStateHash: serverSimulation.finalStateHash ?? null,
+            serverStateHash: serverReplay.outcome.finalStateHash,
             outcomeMismatchUids: outcomeMismatches,
           };
         }
@@ -491,12 +566,14 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
         throw new HttpsError("failed-precondition", "rank baseline does not match server save");
       }
       const owner = ownerIndexByUid?.[entry.uid] ?? -1;
-      const authoritative = authoritativeRules && serverSimulation?.ok === true && owner >= 0;
-      // 권위 모드에서는 서버 시뮬의 판정을 쓰고, 섀도에서는 클라 신고를 쓴다.
-      const draw = authoritative ? serverSimulation?.draw === true : entry.draw ?? false;
+      // 권위 모드에서는 서버 재생의 판정을 쓰고, 구 ruleset(섀도)에서는 클라 신고를 쓴다.
+      const replayOutcome = authoritativeRules && serverReplay?.ok === true && owner >= 0 ?
+        serverReplay.outcome : null;
+      const draw = replayOutcome != null ? replayOutcome.draw : entry.draw ?? false;
       const won = draw ? false :
-        authoritative ? serverSimulation?.winnerOwner === owner : entry.won;
-      const survivorCount = authoritative ? serverSimulation?.remaining?.[owner] ?? entry.myRemaining : entry.myRemaining;
+        replayOutcome != null ? replayOutcome.winnerOwner === owner : entry.won;
+      const survivorCount = replayOutcome != null ?
+        replayOutcome.remaining[owner] ?? entry.myRemaining : entry.myRemaining;
       let currency;
       let rank;
       try {
@@ -532,30 +609,66 @@ export const submitMatchResult = onCall({enforceAppCheck: false}, async (request
       payoutSummary[entry.uid] = {currency, rank, won};
     }
 
-    // 정산은 서버가 한다(보상·랭크 계산 + payout 문서 작성). 다만 승패 판정의 진실원은
-    // 아직 두 클라 합의다 — 재시뮬 결과는 SERVER_SIMULATION_AUTHORITATIVE 가 켜질 때만 승격된다.
-    // 섀도 실측의 유일한 조회 수단이다. 문서에만 쌓으면 발산율을 집계할 방법이 없어
-    // 권위 전환(SERVER_SIMULATION_AUTHORITATIVE) 시점을 정할 근거가 생기지 않는다.
-    // simulateRules 가 false 여도 찍는다 — 로그가 아예 없으면 "재시뮬이 실패했다"와
-    // "재시뮬 대상이 아니었다"를 구분할 수 없고, 그 둘은 원인도 조치도 다르다.
-    logger.info("shadow_compare", {
+    // 클라 발산율의 유일한 조회 수단이다. 문서에만 쌓으면 집계할 방법이 없다.
+    // simulateRules 가 false 여도 찍는다 — 로그가 아예 없으면 "재생이 실패했다"와
+    // "재생 대상이 아니었다"를 구분할 수 없고, 그 둘은 원인도 조치도 다르다.
+    const replayDivergent = outcomeMismatch || hashMismatch;
+    if (replayDivergent) {
+      logger.error("battle_replay_divergence", {
+        matchId: data.matchId,
+        env: data.env,
+        outcomeMismatch,
+        hashMismatch,
+        divergence: clientDivergence,
+      });
+    }
+    logger.info("replay_compare", {
       matchId: data.matchId,
       env: data.env,
       rulesetVersion,
       simulateRules,
-      simulated: serverSimulation?.ok === true,
-      reason: serverSimulation?.ok === true ? null : serverSimulation?.reason ?? "not_run",
-      divergent: clientDivergence != null,
+      authoritative: authoritativeRules,
+      replayed: serverReplay?.ok === true,
+      reason: serverReplay?.ok === true ? null : serverReplay?.reason ?? "not_run",
+      divergent: replayDivergent,
       divergence: clientDivergence,
     });
     logger.info("match_settled", {
       matchId: data.matchId, env: data.env, status: "confirmed",
       uids: entries.map((entry) => entry.uid),
     });
+    // 장애 흔적을 지운다 — 남겨 두면 정상 정산된 매치가 미정산 조회에 계속 걸린다.
     tx.set(matchRef, {status: "confirmed", submissions, payouts: payoutSummary,
-      serverSimulation: persistableSimulation(serverSimulation), clientDivergence,
+      serverSimulation: persistableReplay(serverReplay), clientDivergence,
+      replayUnavailable: FieldValue.delete(),
       settledAt: FieldValue.serverTimestamp(), expiresAt}, {merge: true});
-    return {status: "confirmed"};
-  });
-  return result;
+    return {kind: "done", value: {status: "confirmed"}, telemetry: {
+      settled: 1,
+      replayOk: serverReplay?.ok === true ? 1 : 0,
+      replayFailed: serverReplay != null && !serverReplay.ok && !replayWasUnavailable ? 1 : 0,
+      unavailable: replayWasUnavailable ? 1 : 0,
+      divergent: replayDivergent ? 1 : 0,
+      outcomeMismatch: outcomeMismatch ? 1 : 0,
+      hashMismatch: hashMismatch ? 1 : 0,
+    }};
+  };
+
+  // 재생은 HTTP 호출이라 Firestore 트랜잭션 안에서 돌릴 수 없다. 트랜잭션이 "이 입력의 재생이
+  // 필요하다"고 지문과 함께 물러나면, 여기서 받아 와 같은 입력으로 다시 들어간다.
+  let replay: CachedReplay | null = null;
+  for (let attempt = 0; attempt < SETTLE_ATTEMPTS; attempt++) {
+    const outcome = await withCountedTransaction("submitMatchResult",
+      (tx: Transaction) => settle(tx, replay));
+    if (outcome.kind === "done") {
+      if (outcome.telemetry != null) await recordReplayDaily(data.env, outcome.telemetry);
+      return outcome.value;
+    }
+    // 마지막 시도에서 또 need_replay 면 재생을 한 번 더 부를 이유가 없다 — 쓸 트랜잭션이 없다.
+    if (attempt + 1 >= SETTLE_ATTEMPTS) break;
+    replay = {fingerprint: outcome.fingerprint, verdict: await callBattleReplay(outcome.request)};
+  }
+  // 지문이 계속 어긋난다 = 재생 입력이 매번 바뀐다(동시 제출 경합). 아무것도 쓰지 않았으므로
+  // 제출은 그대로 다시 보낼 수 있다.
+  logger.error("battle_replay_fingerprint_unstable", {matchId: data.matchId, env: data.env});
+  throw new HttpsError("unavailable", "battle replay could not be resolved");
 });

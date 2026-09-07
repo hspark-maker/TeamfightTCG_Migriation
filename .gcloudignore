@@ -1,0 +1,53 @@
+# gcloud builds submit 이 업로드하는 빌드 컨텍스트 범위.
+#
+# 이 저장소는 추적 파일만 5.8GB(9만여 개)라 그대로 올리면 업로드가 사실상 불가능하다.
+# Services/BattleReplay/Dockerfile 이 실제로 COPY 하는 것과 골든 게이트(cloudbuild.yaml)가
+# 읽는 데이터만 남긴다 — 합쳐 1MB 미만이다.
+#
+# ⚠ .gcloudignore 가 있으면 gcloud 는 .gitignore 를 보지 않는다. 빌드에 새 경로가 필요해지면
+#   여기에 !규칙을 추가해야 한다. 안 그러면 컨테이너 안에서 "파일 없음"으로만 드러난다.
+#
+# 형식은 .gitignore 와 같다. 제외된 디렉터리 안쪽은 다시 포함할 수 없으므로
+# 상위 디렉터리를 한 단계씩 되살린 뒤 대상만 여는 순서를 지킨다.
+
+# 1) 전부 제외
+*
+
+# 2) 규칙 코어 (BattleCore.csproj 가 링크하는 소스)
+!Assets/
+Assets/*
+!Assets/Scripts/
+Assets/Scripts/*
+!Assets/Scripts/BattleCore/
+!Assets/Scripts/BattleCore/**
+
+# 3) 서비스 (Dockerfile · csproj · 소스)
+!Services/
+Services/*
+!Services/BattleReplay/
+!Services/BattleReplay/**
+
+# 4) 프로젝트 파일과 골든 러너
+!Tools/
+Tools/*
+!Tools/BattleCore/
+!Tools/BattleCore/**
+!Tools/BattleCoreGolden/
+!Tools/BattleCoreGolden/**
+
+# 5) 골든 벡터 (cloudbuild 의 회귀 게이트 입력)
+!functions/
+functions/*
+!functions/testdata/
+functions/testdata/*
+!functions/testdata/golden/
+!functions/testdata/golden/**
+
+# 6) 시너지 스펙 CSV (골든 러너가 규칙 provider 를 만들 때 읽는다)
+!docs/
+docs/*
+!docs/SpecData/
+!docs/SpecData/**
+
+# Unity 메타는 빌드에 불필요하다
+*.meta

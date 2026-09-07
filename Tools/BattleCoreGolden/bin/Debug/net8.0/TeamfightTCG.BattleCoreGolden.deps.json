@@ -1,0 +1,39 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "TeamfightTCG.BattleCoreGolden/1.0.0": {
+        "dependencies": {
+          "TeamfightTCG.BattleCore": "1.0.0"
+        },
+        "runtime": {
+          "TeamfightTCG.BattleCoreGolden.dll": {}
+        }
+      },
+      "TeamfightTCG.BattleCore/1.0.0": {
+        "runtime": {
+          "TeamfightTCG.BattleCore.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "TeamfightTCG.BattleCoreGolden/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "TeamfightTCG.BattleCore/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

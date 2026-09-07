@@ -1,23 +1,17 @@
-using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
-
-public interface IBeforeAttackPresentation
-{
-    // ★ 규칙 적용 전에 호출된다. 피해 전 체력처럼 표시용 선행 스냅샷만 캡처한다.
-    Func<UniTask> CaptureBeforeAttackPresentation(BeforeAttackCtx _ctx);
-}
-
-public interface IAfterAttackPresentation
-{
-    // ★ 규칙 적용 전에 호출된다. 효과 인스턴스에는 캡처 상태를 저장하지 않는다.
-    Func<UniTask> CaptureAfterAttackPresentation(AfterAttackCtx _ctx);
-}
 
 // 외부 전투 코드가 보는 facade. 규칙은 SynergyRuleTriggers, Unity 표시는 이 타입이 소유한다.
 public static class SynergyTriggers
 {
-    public static bool Fire(CardInstance _self, SynergyRuntime _synergy, BattleField _field = null)
+    [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void InstallPresentationStream()
+    {
+        SynergyPresentationStream.Published -= OnPresentationPublished;
+        SynergyPresentationStream.Published += OnPresentationPublished;
+    }
+
+    public static bool Fire(CardInstance _self, SynergyRuntime _synergy, BattleFieldState _field = null)
     {
         if (_self == null || _synergy == null) return false;
         if (!CardCatalog.TryGetSynergyData(_synergy, out SynergyData t_presentation))
@@ -29,7 +23,7 @@ public static class SynergyTriggers
         if (BattlePresentationQueue.IsDeferring)
         {
             CardInstance t_self = _self;
-            BattleField t_field = _field;
+            BattleFieldState t_field = _field;
             BattlePresentationQueue.Run(() => Present(t_self, t_presentation, t_field));
             return false;
         }
@@ -37,7 +31,7 @@ public static class SynergyTriggers
         return Present(_self, t_presentation, _field);
     }
 
-    static bool Present(CardInstance _self, SynergyData _synergy, BattleField _field)
+    static bool Present(CardInstance _self, SynergyData _synergy, BattleFieldState _field)
     {
         if (_self == null || _synergy == null) return false;
         CardView.GetView(_self)?.PopSynergyBadge(_synergy);
@@ -57,16 +51,16 @@ public static class SynergyTriggers
 
     public static async UniTask BeforeAttack(BeforeAttackCtx _ctx)
     {
-        var t_presentations = new List<Func<UniTask>>();
+        var t_presentations = new List<ISynergyPresentationPlan>();
         SynergyRuleTriggers.BeforeAttack(_ctx, (t_effect, t_effectCtx) =>
         {
-            if (!(t_effect is IBeforeAttackPresentation t_presenter)) return;
-            Func<UniTask> t_presentation = t_presenter.CaptureBeforeAttackPresentation(t_effectCtx);
-            if (t_presentation != null) t_presentations.Add(t_presentation);
+            if (!(t_effect is IBeforeAttackPlanSource t_source)) return;
+            ISynergyPresentationPlan t_plan = t_source.CaptureBeforeAttackPlan(t_effectCtx);
+            if (t_plan != null) t_presentations.Add(t_plan);
         });
 
-        foreach (Func<UniTask> t_presentation in t_presentations)
-            await t_presentation();
+        foreach (ISynergyPresentationPlan t_plan in t_presentations)
+            await PlayPresentation(t_plan);
     }
 
     public static void Attacked(AttackedCtx _ctx) => SynergyRuleTriggers.Attacked(_ctx);
@@ -78,16 +72,132 @@ public static class SynergyTriggers
 
     public static async UniTask AfterAttack(AfterAttackCtx _ctx)
     {
-        var t_presentations = new List<Func<UniTask>>();
+        var t_presentations = new List<ISynergyPresentationPlan>();
         SynergyRuleTriggers.AfterAttack(_ctx, (t_effect, t_effectCtx) =>
         {
-            if (!(t_effect is IAfterAttackPresentation t_presenter)) return;
-            Func<UniTask> t_presentation = t_presenter.CaptureAfterAttackPresentation(t_effectCtx);
-            if (t_presentation != null) t_presentations.Add(t_presentation);
+            if (!(t_effect is IAfterAttackPlanSource t_source)) return;
+            ISynergyPresentationPlan t_plan = t_source.CaptureAfterAttackPlan(t_effectCtx);
+            if (t_plan != null) t_presentations.Add(t_plan);
         });
 
-        foreach (Func<UniTask> t_presentation in t_presentations)
-            await t_presentation();
+        foreach (ISynergyPresentationPlan t_plan in t_presentations)
+            await PlayPresentation(t_plan);
+    }
+
+    static UniTask PlayPresentation(ISynergyPresentationPlan _plan)
+    {
+        if (_plan is BrandAttackPlan t_brand) return BrandSynergyPresentation.Play(t_brand);
+        if (_plan is PredatorDrainPlan t_predator) return PredatorSynergyPresentation.Play(t_predator);
+        return UniTask.CompletedTask;
+    }
+
+    static void OnPresentationPublished(ISynergyPresentationPlan _plan)
+    {
+        switch (_plan)
+        {
+            case SynergyFirePlan t_fire:
+                PresentFire(t_fire);
+                break;
+            case FlowAttackPresentationPlan t_flow:
+                PresentFlowAttack(t_flow);
+                break;
+            case CaretakerPresentationPlan t_caretaker:
+                PresentCaretaker(t_caretaker);
+                break;
+            case LegacyTurnPresentationPlan t_legacyTurn:
+                PresentLegacyTurn(t_legacyTurn);
+                break;
+            case LegacyDeathPresentationPlan t_legacyDeath:
+                PresentLegacyDeath(t_legacyDeath);
+                break;
+            case TraceMarkPresentationPlan t_trace:
+                PresentTraceMark(t_trace);
+                break;
+        }
+    }
+
+    static void PresentFire(SynergyFirePlan _plan)
+    {
+        if (_plan == null) return;
+        System.Action t_show = () => Fire(_plan.self, _plan.synergy, _plan.field);
+        switch (_plan.timing)
+        {
+            case SynergyPresentationTiming.OnDeath:
+                BattlePresentationQueue.RunOnDeath(t_show);
+                break;
+            case SynergyPresentationTiming.OnKill:
+                BattlePresentationQueue.RunOnKill(t_show);
+                break;
+            default:
+                t_show();
+                break;
+        }
+    }
+
+    static void PresentFlowAttack(FlowAttackPresentationPlan _plan)
+    {
+        if (_plan == null) return;
+        Fire(_plan.self, _plan.synergy, _plan.field);
+        if (CardCatalog.TryGetSynergyData(_plan.synergy, out SynergyData t_presentation))
+            SynergyVfx.PlayFlowWind(_plan.self, _plan.field,
+                t_presentation.vfx as FlowSynergyVfxConfig);
+    }
+
+    static void PresentCaretaker(CaretakerPresentationPlan _plan)
+    {
+        if (_plan == null || _plan.self == null) return;
+
+        var t_shots = new List<(CardView view, CardInstance card, int amount)>();
+        if (_plan.targets != null)
+        {
+            foreach (SynergyHealTarget t_target in _plan.targets)
+            {
+                CardView t_view = CardView.GetView(t_target.card);
+                if (t_view != null) t_shots.Add((t_view, t_target.card, t_target.amount));
+            }
+        }
+
+        CardLandingPresentation.Enqueue(_plan.self, () =>
+        {
+            Fire(_plan.self, _plan.synergy, _plan.field);
+            foreach (var (t_view, t_card, t_amount) in t_shots)
+            {
+                if (t_view == null || t_view.BoundCard != t_card) continue;
+                t_view.PlayHealEffect(t_amount, _consumeDeferred: true);
+            }
+        });
+    }
+
+    static void PresentLegacyTurn(LegacyTurnPresentationPlan _plan)
+    {
+        if (_plan == null) return;
+        Fire(_plan.self, _plan.synergy, _plan.field);
+        if (CardCatalog.TryGetSynergyData(_plan.synergy, out SynergyData t_presentation))
+            LegacyCrownVfx.Show(_plan.self, t_presentation);
+    }
+
+    static void PresentLegacyDeath(LegacyDeathPresentationPlan _plan)
+    {
+        if (_plan == null || _plan.healed == null || _plan.healed.Count == 0) return;
+        BattlePresentationQueue.RunOnDeath(() =>
+        {
+            Fire(_plan.self, _plan.synergy, _plan.field);
+            if (CardCatalog.TryGetSynergyData(_plan.synergy, out SynergyData t_presentation))
+                LegacyCrownVfx.PlayHealTrails(
+                    _plan.self, _plan.healed, _plan.amount, t_presentation);
+        });
+    }
+
+    static void PresentTraceMark(TraceMarkPresentationPlan _plan)
+    {
+        if (_plan == null) return;
+        Fire(_plan.self, _plan.synergy, _plan.field);
+        CardCatalog.TryGetSynergyData(_plan.synergy, out SynergyData t_presentation);
+        if (!(t_presentation?.vfx is TraceSynergyVfxConfig t_vfx) || t_vfx.mark.prefab == null) return;
+
+        CardView t_view = CardView.GetView(_plan.target);
+        if (t_view == null) return;
+        BattleVfx.Play(t_vfx.mark, t_view.SlotPosition, t_view.VfxSortingLayerId);
     }
 
     public static void BoardChanged(BoardCtx _ctx) => SynergyRuleTriggers.BoardChanged(_ctx);

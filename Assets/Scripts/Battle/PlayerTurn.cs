@@ -491,34 +491,24 @@ public class PlayerTurn : TurnBase
     {
         TurnState.InputAllowed = false;
 
+        // 처형 재공격인가. forcedAttacker 가 곧 "처형 연쇄 진행 중" 표식이라(재공격 직전에 세우고
+        // 연쇄가 끝나면 지운다) EnemyTurn 의 t_forcedAttacker 판정과 같은 축이다.
+        // **명령 로그에 이 값을 실어야 한다** — 서버 재생기는 canAttackAgain 뒤에 derived 명령이
+        // 오기를 기대하고, 빠지면 매치를 missing_derived_attack 으로 무효 처리한다.
+        // await 전에 잡는다: 연출 중에 값이 바뀌면 같은 공격이 다른 종류로 기록된다.
+        bool t_derivedCommand = this.forcedAttacker != null;
+
         // 튜토리얼: 공격 연출 동안 안내 힌트(배너·탭힌트·하이라이트·포인터·dim) 전부 숨김. 다음 스텝에서 재표시.
         EndGuidedFreeSelect();   // 공격이 나갔으면 이번 선택 안내는 끝 — 연출 중 무장 통지에 반응하지 않게
         if (TutorialConfig.IsActive) TutorialOverlayUI.Instance?.Clear();
 
-        CardView t_attackerView = this.ctx.playerFieldView.GetSlotView(_attacker.slotIndex);
-        CardView t_defenderView = this.ctx.enemyFieldView.GetSlotView(_defender.slotIndex);
-
-        var (t_preSelectedSplash, t_splashView) = AttackFlow.PreSelectSplash(
-            _attacker, _defender, this.ctx.enemyField, this.ctx.enemyFieldView);
-
-
-        await AttackFlow.RunBeforeAttack(_attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
-                                         t_preSelectedSplash);   // 낙인 선피해(Execute 전 원자)
-
-        AttackResult t_result;
-        using (BattleEventStream.CaptureScope t_events = BattleEventStream.BeginCapture())
-        {
-            t_result = AttackProcessor.Execute(
-                _attacker, _defender, this.ctx.playerField, this.ctx.enemyField, t_preSelectedSplash);
-            t_result.events = t_events.ToArray();
-        }
-
-        await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
-            t_result.events,
-            () => AttackFlow.RunAfterAttackPhase(t_attackerView, _attacker, _defender, this.ctx.playerField, this.ctx.enemyField, t_result));
-
-        // 교활 퇴장은 보충 **전**에 — 슬롯 뷰가 아직 물러나는 카드를 그리고 있는 동안만 가능하다.
-        await AttackFlow.PlayCunningSwap(this.ctx.playerFieldView, t_attackerView, t_result);
+        // 솔로는 미러가 없어 교활 스왑을 로컬 재계산에 맡긴다(_forceCunningSwap: null).
+        AttackFlow.AttackOutcome t_attack = await AttackFlow.RunOneAttack(new AttackFlow.AttackRequest(
+            _attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
+            this.ctx.playerFieldView, this.ctx.enemyFieldView,
+            _forceCunningSwap: null, _derivedCommand: t_derivedCommand));
+        AttackResult t_result = t_attack.Result;
+        CardView t_attackerView = t_attack.AttackerView;
 
         await this.ctx.FillAndAnimate();
 
@@ -549,9 +539,12 @@ public class PlayerTurn : TurnBase
             // 대상만 갈린다: 스크립트가 이 공격자의 다음 타깃을 지정해 뒀으면 그걸, 아니면 무작위.
             if (BattleUxFlags.ExecutionRandomTarget)
             {
-                CardInstance t_nextTarget = TutorialScriptedExecutionTarget(_attacker)
-                                         ?? ExecutionRule.PickRandomTarget(_attacker, this.ctx.enemyField);
-                if (t_nextTarget != null)
+                // 튜토리얼 지정 대상은 기존처럼 RNG를 소비하지 않는다. 지정이 없을 때만 게임·재생기
+                // 공통 계약으로 canAttackAgain/생존/대상 존재를 함께 판정한다.
+                CardInstance t_nextTarget = TutorialScriptedExecutionTarget(_attacker);
+                bool t_hasNext = t_nextTarget != null ||
+                    ExecutionRule.TryPickNext(in t_result, _attacker, this.ctx.enemyField.State, out t_nextTarget);
+                if (t_hasNext)
                 {
                     // 연속 공격이 한 동작으로 뭉쳐 보이지 않게 상대 연속 공격과 같은 간격을 둔다.
                     await UniTask.Delay((int)(GameTiming.Battle.OpponentExtraAttackDelay * 1000));

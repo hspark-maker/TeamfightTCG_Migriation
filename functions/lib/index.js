@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.spinRoulette = exports.limitBreakCard = exports.reportAdventureWin = exports.grantTutorialCards = exports.claimBattleReward = exports.enhanceKeyword = exports.enhanceCard = exports.claimPayout = exports.submitMatchResult = exports.verifyMatchTicket = exports.findAiMatch = exports.getRankSnapshot = exports.lockDeck = exports.createMatch = exports.claimReward = exports.openPack = exports.repairSaveSlots = exports.ensureWallet = exports.ensureAccount = exports.devResetSave = exports.devBumpRevision = exports.ping = void 0;
+exports.getReplayDivergence = exports.spinRoulette = exports.limitBreakCard = exports.reportAdventureWin = exports.grantTutorialCards = exports.claimBattleReward = exports.enhanceKeyword = exports.enhanceCard = exports.claimPayout = exports.submitMatchResult = exports.verifyMatchTicket = exports.findAiMatch = exports.getRankSnapshot = exports.lockDeck = exports.createMatch = exports.claimReward = exports.openPack = exports.repairSaveSlots = exports.ensureWallet = exports.ensureAccount = exports.devResetSave = exports.devBumpRevision = exports.ping = void 0;
 var ping_1 = require("./commands/ping");
 Object.defineProperty(exports, "ping", { enumerable: true, get: function () { return ping_1.ping; } });
 var devBumpRevision_1 = require("./commands/devBumpRevision");
@@ -45,4 +45,6 @@ var limitBreakCard_1 = require("./commands/limitBreakCard");
 Object.defineProperty(exports, "limitBreakCard", { enumerable: true, get: function () { return limitBreakCard_1.limitBreakCard; } });
 var spinRoulette_1 = require("./commands/spinRoulette");
 Object.defineProperty(exports, "spinRoulette", { enumerable: true, get: function () { return spinRoulette_1.spinRoulette; } });
+var getReplayDivergence_1 = require("./commands/getReplayDivergence");
+Object.defineProperty(exports, "getReplayDivergence", { enumerable: true, get: function () { return getReplayDivergence_1.getReplayDivergence; } });
 //# sourceMappingURL=index.js.map

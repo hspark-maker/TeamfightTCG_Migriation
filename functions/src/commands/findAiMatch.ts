@@ -10,7 +10,12 @@ import {parseRankGradeRows, resolveTierIndex} from "../payout";
 import {HEX_16, HEX_32, HEX_64, objectRecord, safeInteger} from "../match/payloadGuards";
 import {clientReceiptId} from "../save/receiptId";
 import {isKnownEnv, requireUid, saveDocument} from "../save/saveDocument";
-import {readSpecRows} from "../specs/specBlobReader";
+import {
+  BATTLE_REPLAY_SPEC_TABLES,
+  fingerprintOfSpecPins,
+  readSpecPins,
+  readSpecRows,
+} from "../specs/specBlobReader";
 
 const DECK_SIZE = 6;
 
@@ -143,6 +148,10 @@ export const findAiMatch = onCall(async (request) => {
       return {revision: 0, deck: draw.deck, cardLevel: draw.cardLevel};
     }
     const authoredData: AuthoredFindAiMatchData = data;
+    const specPins = await readSpecPins(authoredData.env, BATTLE_REPLAY_SPEC_TABLES);
+    if (fingerprintOfSpecPins(authoredData.env, specPins, ["Card"]) !== authoredData.contentFingerprint) {
+      throw new HttpsError("failed-precondition", "content_fingerprint_mismatch");
+    }
 
     // 같은 txId 재시도는 같은 문서를 읽는다. callable 응답 유실 뒤 클라가 재시도해도
     // AI 덱·시드·보드 순서가 바뀐 유령 매치를 하나 더 만들지 않는다.
@@ -172,6 +181,7 @@ export const findAiMatch = onCall(async (request) => {
         seedHex,
         rulesetVersion: SERVER_RULESET_VERSION,
         cardDataVersion: authoredData.contentFingerprint,
+        specPins,
         participantUids: [uid],
         expectedParticipants: 1,
         mode: "solo",

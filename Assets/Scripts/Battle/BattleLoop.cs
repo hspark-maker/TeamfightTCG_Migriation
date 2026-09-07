@@ -90,14 +90,14 @@ public sealed class BattleLoop
                 t_card.justSpawned = false;
                 continue;
             }
-            await SynergyTriggers.TurnBegan(new TurnCtx(t_card, _field));
+            await SynergyTriggers.TurnBegan(new TurnCtx(t_card, _field.State));
         }
     }
 
     void EndTurn(BattleField _field)
     {
         foreach (CardInstance t_card in _field.GetActiveCards())
-            SynergyTriggers.TurnEnded(new TurnCtx(t_card, _field));
+            SynergyTriggers.TurnEnded(new TurnCtx(t_card, _field.State));
 
         BattleField t_opposite = ReferenceEquals(_field, rules.playerField)
             ? rules.enemyField : rules.playerField;

@@ -23,6 +23,7 @@ public class EnemyTurn : TurnBase
         await UniTask.Delay((int)(GameTiming.Battle.EnemyTurnStartDelay * 1000));
 
         CardInstance t_forcedAttacker = null;
+        CardInstance t_forcedTarget = null;
 
         while (true)
         {
@@ -54,7 +55,7 @@ public class EnemyTurn : TurnBase
                     // 자유공격: 슬롯 무지정 → AI가 결정론으로 공격자·타깃 선택.
                     // 공격자 규칙은 EnemyAi, 처형 재공격 대상 규칙은 ExecutionRule(PickTargetFor 참조).
                     t_atk = t_forcedAttacker != null ? t_forcedAttacker : EnemyAi.PickAttacker(t_attackers);
-                    t_def = PickTargetFor(t_atk, _executionChain: t_forcedAttacker != null);
+                    t_def = t_forcedTarget ?? PickTargetFor(t_atk, _executionChain: t_forcedAttacker != null);
                 }
                 else
                 {
@@ -89,7 +90,7 @@ public class EnemyTurn : TurnBase
                 t_atk = t_forcedAttacker != null
                     ? t_forcedAttacker
                     : EnemyAi.PickAttacker(t_attackers);
-                t_def = PickTargetFor(t_atk, _executionChain: t_forcedAttacker != null);
+                t_def = t_forcedTarget ?? PickTargetFor(t_atk, _executionChain: t_forcedAttacker != null);
             }
 
             // 타깃은 공격자 확정 후 다시 뽑는다(GetValidTargets(t_atk) = 지정 타깃·도발이 이 공격자 기준).
@@ -113,27 +114,11 @@ public class EnemyTurn : TurnBase
                 TutorialOverlayUI.Instance.Clear();
             }
 
-            var (t_preSelectedSplash, t_splashView) = AttackFlow.PreSelectSplash(
-                t_atk, t_def, this.ctx.playerField, this.ctx.playerFieldView);
-
-
-            await AttackFlow.RunBeforeAttack(t_atk, t_def, this.ctx.enemyField, this.ctx.playerField,
-                                             t_preSelectedSplash);   // 낙인 선피해(Execute 전 원자)
-
-            AttackResult t_result;
-            using (BattleEventStream.CaptureScope t_events = BattleEventStream.BeginCapture())
-            {
-                t_result = AttackProcessor.Execute(
-                    t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_preSelectedSplash);
-                t_result.events = t_events.ToArray();
-            }
-
-            await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
-                t_result.events,
-                () => AttackFlow.RunAfterAttackPhase(t_attackerView, t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_result));
-
-            // 교활 퇴장은 보충 **전**에 — 슬롯 뷰가 아직 물러나는 카드를 그리고 있는 동안만 가능하다.
-            await AttackFlow.PlayCunningSwap(this.ctx.enemyFieldView, t_attackerView, t_result);
+            // t_forcedAttacker 는 처형 연쇄 진행 표식이다(_executionChain 판정과 같은 축).
+            AttackResult t_result = (await AttackFlow.RunOneAttack(new AttackFlow.AttackRequest(
+                t_atk, t_def, this.ctx.enemyField, this.ctx.playerField,
+                this.ctx.enemyFieldView, this.ctx.playerFieldView,
+                _forceCunningSwap: null, _derivedCommand: t_forcedAttacker != null))).Result;
 
             await this.ctx.FillAndAnimate();
 
@@ -141,9 +126,20 @@ public class EnemyTurn : TurnBase
             if (TutorialConfig.IsActive && t_scriptedSlots)
                 TutorialConfig.SyncBoardBaseline(this.ctx.playerField, this.ctx.enemyField);
 
-            if (t_result.canAttackAgain && t_atk.IsAlive)
+            // 결과 제출형 솔로의 자동 처형은 재생기와 같은 자리에서 다음 대상을 확정한다.
+            // 튜토리얼은 저작된 다음 공격 대상이 RNG보다 우선이므로 기존 다음-바퀴 선택을 보존한다.
+            if (!TutorialConfig.IsActive && BattleUxFlags.ExecutionRandomTarget &&
+                ExecutionRule.TryPickNext(in t_result, t_atk, this.ctx.playerField.State, out CardInstance t_nextTarget))
             {
                 t_forcedAttacker = t_atk;
+                t_forcedTarget = t_nextTarget;
+                await UniTask.Delay((int)(GameTiming.Battle.EnemyExtraAttackDelay * 1000));
+            }
+            else if ((TutorialConfig.IsActive || !BattleUxFlags.ExecutionRandomTarget) &&
+                     t_result.canAttackAgain && t_atk.IsAlive)
+            {
+                t_forcedAttacker = t_atk;
+                t_forcedTarget = null;
                 await UniTask.Delay((int)(GameTiming.Battle.EnemyExtraAttackDelay * 1000));
             }
             else
@@ -160,7 +156,7 @@ public class EnemyTurn : TurnBase
     /// 꺼져 있으면(=대상을 직접 고르던 구 경로) AI는 고를 주체가 없으므로 EnemyAi로 폴백한다.</summary>
     CardInstance PickTargetFor(CardInstance _attacker, bool _executionChain)
         => _executionChain && BattleUxFlags.ExecutionRandomTarget
-            ? ExecutionRule.PickRandomTarget(_attacker, this.ctx.playerField)
+            ? ExecutionRule.PickRandomTarget(_attacker, this.ctx.playerField.State)
             : EnemyAi.PickTarget(this.ctx.playerField.GetValidTargets(_attacker));
 
     public override void OnExit()
