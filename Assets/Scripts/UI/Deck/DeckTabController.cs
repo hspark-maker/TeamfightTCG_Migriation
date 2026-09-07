@@ -64,11 +64,12 @@ public class DeckTabController : LobbyTabPanel
                          + "DeckEditPanel 인스턴스의 DeckEditController에서 켤 것.", this.editor);
 
         OpenEditorForResolvedSlot();
-        SetTopBarHidden(true);
     }
 
-    // 상단 바는 떠나는 것이 확정된 순간 되돌린다 — OnDisable은 슬라이드가 끝난 뒤라 한 박자 늦다.
-    public override void OnLeave() => SetTopBarHidden(false);
+    // 상단 바는 콘텐츠 슬라이드와 같은 프레임에 여닫는다 — OnEnable·OnLeave 자리는 탭을 켜는 비용이
+    // 몰리는 프레임이라, 거기서 띄우면 이 트윈만 첫 박자를 건너뛴 채 혼자 튄다.
+    // (OnDisable의 복귀는 탭 전환을 거치지 않는 경로의 안전망으로 남겨 둔다.)
+    public override void OnSlideBegin(bool _entering) => SetTopBarHidden(_entering);
 
     // 탭 전환이 아닌 경로(로비 캔버스 비활성·씬 전환)로 덱 탭이 꺼지면 CloseEditor를 거치지 않는다 →
     // 가드가 셸에 남아 이후 모든 탭 전환이 죽은 편집기에게 넘어가고, 풀 캔버스의 편집 화면이 다른 탭 위에 남는다.

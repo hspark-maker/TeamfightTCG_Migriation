@@ -14,6 +14,12 @@ public class LobbyTabPanel : MonoBehaviour
 
     public virtual void OnEnter() { }
 
+    /// <summary>전환 연출이 출발하는 프레임에 불린다(연출이 없으면 즉시). 들어오는 탭은 true, 떠나는 탭은 false를 받는다.
+    ///
+    /// <para>자기 연출은 <see cref="OnEnter"/>나 OnEnable이 아니라 여기서 시작해야 한다 —
+    /// 그 자리는 탭을 켜는 비용이 몰리는 프레임이라, 거기서 띄운 트윈은 첫 박자를 건너뛴 채로 보인다.</para></summary>
+    public virtual void OnSlideBegin(bool _entering) { }
+
     /// <summary>탭 전환 연출까지 끝나 제자리에 선 뒤에 불린다(연출이 없으면 <see cref="OnEnter"/> 직후).
     /// 화면 좌표를 재는 일은 OnEnter가 아니라 여기서 한다 — 그때는 패널이 아직 화면 밖이다.</summary>
     public virtual void OnSettled() { }
