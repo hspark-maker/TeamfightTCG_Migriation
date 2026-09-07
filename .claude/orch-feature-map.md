@@ -25,7 +25,7 @@
 ## 사운드 (`Audio/`)
 
 - 재생 진입점: 싱글턴 `Audio/SoundManager.Instance` — BGM `SoundManager.PlayBGM` · `SoundManager.StopBGM` · `SoundManager.SetBGMPitch` · `SoundManager.SetBGMVolume` · 효과음 `SoundManager.PlaySFX` · `SoundManager.PlayRandom` · `SoundManager.PlayCue` · `SoundManager.SetSFXVolume`
-- 전투 훅: `SoundManager.PlayHit` · `SoundManager.PlayDeath` · `SoundManager.PlayTurnChange` · `SoundManager.PlayCinemaEnter` · `SoundManager.PlayPassive` · `SoundManager.PlayDealCard`
+- 전투 훅: `SoundManager.PlayHit` · `SoundManager.PlayDeath` · `SoundManager.PlayTurnChange` · `SoundManager.PlayCinemaEnter` · `SoundManager.PlayDealCard`
 - 데이터·식별자: `SoundConfig` · `SoundBank` (`SoundCueEntry`) · 아웃게임 사운드 열거 `EOutgameSound` · UI 클릭 `UIClickSound` (`SoundManager.PlayUIClick`)
 
 ## 전투 — 턴·공격 순서 (`Battle/`, 53파일 8,129줄)
@@ -33,7 +33,7 @@
 - 턴 루프: `TurnRunner` · `TurnBase` · `PlayerTurn` · `EnemyTurn` (`EnemyAi`) · `TurnContext` · `TurnState` (`InputGesture`) · `TurnEvents` · `TurnThinkTimer`
 - 공격 실행: `AttackProcessor` · `AttackSequence` · `AttackFlow` (BeforeAttack / Attacked / AfterAttack 훅) · `Battle/Attack/AttackPreview` · `Battle/Attack/AttackResult`
 - 훅 컨텍스트 (`BattleTimings` 안 struct): `BeforeAttackCtx` · `AttackedCtx` · `DamageDealtCtx` · `DeathCtx` · `SwapOutCtx` · `AfterAttackCtx` · `TurnCtx` · `BoardCtx` · `SpawnCtx` · `DeckCtx`
-- 효과 훅 베이스: `BattleEffect` (`BattleEffect.OnLethal` / `BattleEffect.OnRemoved`) — 시너지·패시브가 여기 붙는다
+- 효과 훅 베이스: `BattleEffect` (`BattleEffect.OnLethal` / `BattleEffect.OnRemoved`) — 시너지 효과가 여기 붙는다
 - 보드·대상: `BattleField` · `TargetFilter` · `BattleResultBeat` · 공격 튜닝 `NormalTuning` · `PeerlessTuning`
 - 규칙·판정: `BattleRules` · `ExecutionRule` · `BattleOverForecast` · `BattleFinisher` · `BattleCleanup`
 - AI 카드 레벨 배선: `GameInitializer.EnemyGrowthProvider` · `GameInitializer.BaseGrowthProvider` · `GameInitializer.GrowthAtLevelProvider` 를 `OutGame/Growth/BattleGrowthBridge` 가 주입한다(스텝은 `Core/Initialization/BattleGrowthBridgeStep`) — 실제 레벨은 모험 정점 값(서버 AdventureChapter.aiCardLevel 표 값 → `AdventureNodeSpec` → `AdventureRun.AiCardLevel`)일 때만 오르고 그 밖에는 `CardGrowth.BaseLevel` 고정이다(랭크 티어 곡선 축은 제거됨 · 배선 `Core/Initialization/BattleGrowthBridgeStep.EnemyCardLevel`), 스탯은 `CardGrowthManager.GrowthAtLevel` · `CardGrowth.BaseLevel`
@@ -44,11 +44,11 @@
 
 ## 시너지 (`Battle/Synergy/`, 15파일 995줄)
 
-- 한글 시너지명 ↔ 코드 이름: 덩치=Bulk · 돌보미=Caretaker · 포식자=Predator · 흐름=Flow · 유산=Legacy · 수호자=Guardian · 비늘=Scale · 낙인=Brand · 언데드=Undead. 데이터는 Assets/SO/Synergies/Data_Synergy_\*.asset (지도 범위 밖), 스탯형(덩치·비늘)은 `StatSynergyEffect` 가 처리한다
+- 한글 시너지명 ↔ 코드 이름: 덩치=Bulk · 돌보미=Caretaker · 포식자=Predator · 흐름=Flow · 유산=Legacy · 비늘=Scale · 낙인=Brand · 추적=Trace. 데이터는 `docs/SpecData/Synergy*_sheet.csv` 이며, 스탯형(덩치·비늘)은 `StatSynergyEffect` 가 처리한다
 - 적용 지점: `SynergyApplier.ApplyAll` — 공격 계산에는 `CardInstance.AttackDamage` / `CardInstance.ApplySynergy` 경유로 반영
 - 트리거: `SynergyTriggers` (DamageDealt / Attacked / Lethal / SwappedOut)
 - 해석·진행도: `SynergyResolver` · `SynergyProgress` · `ActiveSynergy` · `SynergyText`
-- 개별 효과: `StatSynergyEffect` · `FlowSynergyEffect` · `BrandSynergyEffect` · `GuardianSynergyEffect` · `CaretakerSynergyEffect` · `PredatorSynergyEffect` · `UndeadSynergyEffect` · `LegacySynergyEffect` (왕관 스택 연출 `LegacyCrownVfx` · 배선 `LegacySynergyVfxConfig`) (공통 `SynergyEffect`)
+- 개별 효과: `StatSynergyEffect` · `FlowSynergyEffect` · `BrandSynergyEffect` · `CaretakerSynergyEffect` · `PredatorSynergyEffect` · `TraceSynergyEffect` · `LegacySynergyEffect` (왕관 스택 연출 `LegacyCrownVfx` · 배선 `LegacySynergyVfxConfig`) (공통 `SynergyEffect`)
 - 엠블럼·연출: `SynergyEmblemSpec` · `SynergyEmblemVfx` · `SynergyEmblemEntry` · `SynergyVfx` · `PopEmblem` · `RiseAndShakeEmblem` · `DropAndShineEmblem` · `StackUpEmblem` · `PrefabEmblem` · `ParticleEmblem` · `JointGap`
 - Vfx 설정·라이브러리: `SynergyVfxConfig` · `FlowSynergyVfxConfig` · `SwarmSynergyVfxConfig` · `EmblemOnlySynergyVfxConfig` · `BattleVfxLibrary` · `VfxEntry` · `VfxHandle` · `VfxStrengthScaler` · `CunningVfx` · `SwarmVfx`
 - 회복: `HealerEffect` · `HealVfx` — 트레일 잔상 `BattleTimingConfig.HealTrailLinger`
@@ -59,7 +59,7 @@
 
 - 런타임 인스턴스: `CardInstance` (스탯·데미지 계산의 단일 지점)
 - 한글 키워드 ↔ `CardKeyword` 값: 원거리=Ranged · 무쌍=Peerless · 처형=Execution · 도발=Taunt · 교활=Cunning · 표식=Mark · 힐러=Healer · 무적=Invincible · 추가생명력=BonusHp
-- 키워드·패시브 기반: `CardKeyword` · `CardPassive` · `KeywordIconConfig` (`KeywordIcon` · `Entry`)
+- 키워드 기반: `CardKeyword` · `KeywordIconConfig` (`KeywordIcon` · `Entry`)
 - 등급: `ECardGrade`
 - 데이터 원본: 표 기반 `CardSpec` (진화 최대 단계 상수 포함) · 주소 기반 아트 로드 `CardArtCache` · 진화 단계는 `CardGrowth.EvolutionStage`
 - 시너지 데이터: `SynergyData` · `SynergyTier` · `SynergyEmblemScope`
@@ -152,8 +152,8 @@
 - 입력·카드: `CardInputController` · `CardView` · `CardAnimator` · `CardFaceFlipper` · `CardDecorView` · `WeaponAnimSpec` · `CardFadeAlpha`
 - 보드·카메라: `BattleBoardView` · `BattleFieldView` · `BattleCamera` · `BattleCameraFit` · `BattleSelection`
 - 턴 표시: `TurnBannerUI` · `TurnTimerUI` · `TurnSideTint` · `ActionPanel` · `CoinFlipUI` · `MulliganOverlayUI`
-- 결과·기타: `GameResultPopup` · `DeckPileUI` · `EffectNotifyUI` · `SurvivorGoldFlight` · `BattleUxFlags`
-- 감정표현(`UI/Battle/Emote/`): 표시 단일 창구 `EmoteDirector` (플레이어·AI·상대 클라가 모두 여기로) · 목록 `EmoteCatalog` (`EmoteEntry`) · 선택 표 `EmotePickerUI` · 스티커 `EmoteStickerView` · `ScreenDim` · `EDimLayer` · `KeywordFrame` · `WeaponAnimSpec` · `EffectNotifyData`
+- 결과·기타: `GameResultPopup` · `DeckPileUI` · `SurvivorGoldFlight` · `BattleUxFlags`
+- 감정표현(`UI/Battle/Emote/`): 표시 단일 창구 `EmoteDirector` (플레이어·AI·상대 클라가 모두 여기로) · 목록 `EmoteCatalog` (`EmoteEntry`) · 선택 표 `EmotePickerUI` · 스티커 `EmoteStickerView` · `ScreenDim` · `EDimLayer` · `KeywordFrame` · `WeaponAnimSpec`
 
 ## 공용 UI·연출 (`UI/Common/`, `UI/UIManager/`, `UI/Lobby/`)
 

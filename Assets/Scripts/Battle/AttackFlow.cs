@@ -14,7 +14,7 @@ public static class AttackFlow
         BattleField _defenderField, BattleFieldView _defenderFieldView)
     {
         if (!_attacker.HasKeyword(CardKeyword.Peerless)) return (null, null);
-        CardInstance t_splash = AttackProcessor.PreSelectSplash(_defender.slotIndex, _defenderField);
+        CardInstance t_splash = AttackProcessor.PreSelectSplash(_defender.slotIndex, _defenderField.State);
         CardView t_view = t_splash != null ? _defenderFieldView.GetSlotView(t_splash.slotIndex) : null;
         return (t_splash, t_view);
     }
@@ -28,36 +28,11 @@ public static class AttackFlow
     {
         BattleFinisher.ArmApproach(null, null, null, null);   // 이전 공격의 미소비 래치 제거
         if (!_attacker.IsAlive) return;
-        var t_ctx = new BeforeAttackCtx(_attacker, _defender, _attackerField, _defenderField);
+        var t_ctx = new BeforeAttackCtx(_attacker, _defender, _attackerField.State, _defenderField.State);
         await SynergyTriggers.BeforeAttack(t_ctx);
         // 낙인 선피해가 반영된 **최신 보드**에서 전투 종료를 예측한다 — 선피해로 이미 hp 0이 된 카드가
         // 슬롯에 남아 있는 상태라, 여기보다 앞에서 계산하면 그 피해를 빼먹는다.
         BattleFinisher.ArmApproach(_attacker, _defender, _attackerField, _defenderField, _preSelectedSplash);
-    }
-
-    /// <summary>[Attacked] 피격 시 방어자 트리거 발동(패시브 OnAttacked + 시너지 OnAttacked).
-    /// 양쪽 다 동기 void — AttackProcessor의 counter 해결 직후 치사 래치 전에 인라인 완결(hp 기준시점 통일).</summary>
-    public static void RunAttacked(
-        CardInstance _defender, CardInstance _attacker,
-        BattleField _defenderField, BattleField _attackerField)
-    {
-        var t_ctx = new AttackedCtx(_defender, _attacker, _defenderField, _attackerField);
-        SynergyTriggers.Attacked(t_ctx);
-    }
-
-    /// <summary>[Attacked] 무쌍 광역 피해를 맞은 카드의 **시너지** 트리거만 발동.
-    /// 광역도 공격 직격(비늘 감소 대상)이라 주 대상과 같은 시너지가 일하는데,
-    /// 그 발동이 화면에 안 뜨면 "무쌍만 시너지가 없는" 그림이 된다.
-    ///
-    /// **패시브(가시 반격 등)는 일부러 뺐다** — 반격은 주 대상 1장 규칙이고, 여기서 같이 돌리면
-    /// 무쌍이 반격을 두 번 맞는 규칙 변경이 된다(연출 수정이 밸런스를 건드리는 자리).
-    /// 주 대상 RunAttacked와 같은 지점에서 동기 인라인 완결 — 치사 래치 전(hp 기준시점 통일).</summary>
-    public static void RunSplashAttacked(
-        CardInstance _splash, CardInstance _attacker,
-        BattleField _defenderField, BattleField _attackerField)
-    {
-        if (_splash == null) return;
-        SynergyTriggers.Attacked(new AttackedCtx(_splash, _attacker, _defenderField, _attackerField));
     }
 
     /// <summary>[AfterAttack] 공격 직후 공격자 패시브 + 시너지 발동. 처치 판정은 ctx.defenderKilled(구 OnKill 게이트와 동일 소스).</summary>
@@ -66,7 +41,7 @@ public static class AttackFlow
         BattleField _attackerField, BattleField _defenderField, AttackResult _result)
     {
         if (!_attacker.IsAlive) return;
-        var t_ctx = new AfterAttackCtx(_attacker, _defender, _attackerField, _defenderField,
+        var t_ctx = new AfterAttackCtx(_attacker, _defender, _attackerField.State, _defenderField.State,
                                        _result.damageDealt, _result.defenderKilled);
         // 시너지 공격-후 트리거(포식자 회복 등). 패시브 발화 직후, 생존 가드 이후.
         await SynergyTriggers.AfterAttack(t_ctx);

@@ -1,0 +1,59 @@
+using System.Collections.Generic;
+
+// SynergyState를 실제 CardInstance들에 적용한다. 배틀 init 시 1회 호출(호출부는 다른 층 담당).
+// 규칙은 CardInstance에 위임(ApplySynergy/ClearSynergy) — 여기서 스탯 공식 재구현 금지.
+public static class SynergyApplier
+{
+    public static void ApplyAll(SynergyState state, IEnumerable<CardInstance> cards)
+    {
+        if (cards == null) return;
+
+        // 리스트로 고정(멱등 초기화 + 다중 순회를 위해)
+        var t_cards = new List<CardInstance>();
+        foreach (var t_card in cards)
+        {
+            if (t_card == null) continue;
+            t_card.ClearSynergy();  // 재적용해도 누적되지 않도록 재설정
+            t_cards.Add(t_card);
+        }
+
+        if (state == null) return;
+
+        foreach (var t_active in state.Active)
+        {
+            if (t_active?.Tier?.effects == null) continue;
+
+            foreach (var t_card in t_cards)
+            {
+                if (!BelongsTo(t_card, t_active.Runtime)) continue;
+
+                foreach (var t_effect in t_active.Tier.effects)
+                {
+                    if (t_effect == null) continue;
+                    // [DeckResolved] ClearSynergy 선행 → 멱등. ctx.synergy = 이 발화를 일으킨 시너지.
+                    t_effect.OnDeckResolved(new DeckCtx(t_card, state, t_active.Runtime));
+                }
+            }
+        }
+    }
+
+    // 카드가 해당 시너지 소속인지(정규화된 논리 ID가 카드의 시너지 ID 목록에 있는지).
+    // 목록에 중복 나열돼도 존재 여부만 보므로 카드당 1회 판정 → effect 이중적용 없음.
+    // 표현 에셋(SynergyData)을 받는 오버로드는 두지 않는다 — 규칙이 SO를 알면 BattleCore로 못 옮긴다.
+    // 표현 쪽에서 부를 때는 `BelongsTo(card, data?.SynergyId)`로 ID를 넘겨라.
+    public static bool BelongsTo(CardInstance _card, SynergyRuntime _synergy)
+    {
+        return _synergy != null && BelongsTo(_card, _synergy.SynergyId);
+    }
+
+    public static bool BelongsTo(CardInstance _card, string _synergyId)
+    {
+        if (_card == null || !_card.synergyEnabled || string.IsNullOrEmpty(_synergyId)) return false;
+        if (!SynergyRuleProvider.TryGetCurrent(out ISynergyRuleProvider t_provider)) return false;
+        if (!t_provider.ContainsCard(_card.cardId)) return false;
+        IReadOnlyList<string> t_synergyIds = t_provider.SynergyIdsOf(_card.cardId);
+        for (int i = 0; i < t_synergyIds.Count; i++)
+            if (string.Equals(t_synergyIds[i], _synergyId, System.StringComparison.Ordinal)) return true;
+        return false;
+    }
+}

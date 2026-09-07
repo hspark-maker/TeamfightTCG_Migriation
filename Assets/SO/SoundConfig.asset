@@ -23,5 +23,4 @@ MonoBehaviour:
   turnChangeClips:
   - {fileID: 8300000, guid: 10b13c7155b95ad43bf752689cb15e26, type: 3}
   cinemaEnterClips: []
-  passiveClips: []
   sfxVolume: 1

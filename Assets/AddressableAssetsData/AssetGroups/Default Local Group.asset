@@ -15,12 +15,6 @@ MonoBehaviour:
   m_GroupName: Default Local Group
   m_GUID: 14d31794b2ffd944c93f9d90b507687b
   m_SerializeEntries:
-  - m_GUID: 033413085f3b87a42920a62c5ea7462c
-    m_Address: EffectNotifyUI
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - UIPrefab
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 1538dcd081334f64ebf7f0e6803135a0
     m_Address: RankPromoteOverlay
     m_ReadOnly: 0

@@ -1,0 +1,12 @@
+C:\Users\cookapps\TeamfightTCG_Migriation\Tools\BattleCore\bin\Release\net8.0\TeamfightTCG.BattleCore.deps.json
+C:\Users\cookapps\TeamfightTCG_Migriation\Tools\BattleCore\bin\Release\net8.0\TeamfightTCG.BattleCore.dll
+C:\Users\cookapps\TeamfightTCG_Migriation\Tools\BattleCore\bin\Release\net8.0\TeamfightTCG.BattleCore.pdb
+C:\Users\cookapps\TeamfightTCG_Migriation\Tools\BattleCore\obj\Release\net8.0\TeamfightTCG.BattleCore.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\cookapps\TeamfightTCG_Migriation\Tools\BattleCore\obj\Release\net8.0\TeamfightTCG.BattleCore.AssemblyInfoInputs.cache
+C:\Users\cookapps\TeamfightTCG_Migriation\Tools\BattleCore\obj\Release\net8.0\TeamfightTCG.BattleCore.AssemblyInfo.cs
+C:\Users\cookapps\TeamfightTCG_Migriation\Tools\BattleCore\obj\Release\net8.0\TeamfightTCG.BattleCore.csproj.CoreCompileInputs.cache
+C:\Users\cookapps\TeamfightTCG_Migriation\Tools\BattleCore\obj\Release\net8.0\TeamfightTCG.BattleCore.sourcelink.json
+C:\Users\cookapps\TeamfightTCG_Migriation\Tools\BattleCore\obj\Release\net8.0\TeamfightTCG.BattleCore.dll
+C:\Users\cookapps\TeamfightTCG_Migriation\Tools\BattleCore\obj\Release\net8.0\refint\TeamfightTCG.BattleCore.dll
+C:\Users\cookapps\TeamfightTCG_Migriation\Tools\BattleCore\obj\Release\net8.0\TeamfightTCG.BattleCore.pdb
+C:\Users\cookapps\TeamfightTCG_Migriation\Tools\BattleCore\obj\Release\net8.0\ref\TeamfightTCG.BattleCore.dll

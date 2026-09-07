@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.claimMission = exports.getMissions = exports.limitBreakCard = exports.reportAdventureWin = exports.grantTutorialCards = exports.claimBattleReward = exports.enhanceKeyword = exports.enhanceCard = exports.claimPayout = exports.submitMatchResult = exports.verifyMatchTicket = exports.findAiMatch = exports.getRankSnapshot = exports.lockDeck = exports.createMatch = exports.claimReward = exports.openPack = exports.repairSaveSlots = exports.ensureWallet = exports.ensureAccount = exports.devRewindTutorial = exports.devBumpRevision = exports.ping = void 0;
+exports.getReplayDivergence = exports.claimMission = exports.getMissions = exports.limitBreakCard = exports.reportAdventureWin = exports.grantTutorialCards = exports.claimBattleReward = exports.enhanceKeyword = exports.enhanceCard = exports.claimPayout = exports.submitMatchResult = exports.verifyMatchTicket = exports.findAiMatch = exports.getRankSnapshot = exports.lockDeck = exports.createMatch = exports.claimReward = exports.openPack = exports.repairSaveSlots = exports.ensureWallet = exports.ensureAccount = exports.devRewindTutorial = exports.devBumpRevision = exports.ping = void 0;
 var ping_1 = require("./commands/ping");
 Object.defineProperty(exports, "ping", { enumerable: true, get: function () { return ping_1.ping; } });
 var devBumpRevision_1 = require("./commands/devBumpRevision");
@@ -47,4 +47,6 @@ var getMissions_1 = require("./commands/getMissions");
 Object.defineProperty(exports, "getMissions", { enumerable: true, get: function () { return getMissions_1.getMissions; } });
 var claimMission_1 = require("./commands/claimMission");
 Object.defineProperty(exports, "claimMission", { enumerable: true, get: function () { return claimMission_1.claimMission; } });
+var getReplayDivergence_1 = require("./commands/getReplayDivergence");
+Object.defineProperty(exports, "getReplayDivergence", { enumerable: true, get: function () { return getReplayDivergence_1.getReplayDivergence; } });
 //# sourceMappingURL=index.js.map

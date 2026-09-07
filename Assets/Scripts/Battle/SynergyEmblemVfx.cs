@@ -38,9 +38,9 @@ public static class SynergyEmblemVfx
 
         foreach (ActiveSynergy t_active in _state.Active)
         {
-            SynergyData t_synergy = t_active?.Synergy;
-            if (t_synergy == null) continue;
-            if (!SynergyApplier.BelongsTo(_card, t_synergy)) continue;
+            if (t_active?.Runtime == null ||
+                !CardCatalog.TryGetSynergyData(t_active.Runtime, out SynergyData t_synergy)) continue;
+            if (!SynergyApplier.BelongsTo(_card, t_synergy?.SynergyId)) continue;
             // 무엇을 띄울지는 연출 에셋이 답한다(기본 = 엠블럼 줄, 흐름 = 바람). 여기 타입 분기를 두지 마라.
             if (t_synergy.vfx != null) t_synergy.vfx.PlayPlaced(_view, _card, t_synergy);
         }
@@ -50,7 +50,7 @@ public static class SynergyEmblemVfx
     /// 낙인 선피해처럼 전원이 함께 일하는 효과는 발동 주체 한 장만 빛나면 그림과 어긋난다.
     /// 반환값 = 실제로 띄웠는가(연출이 끝나길 기다릴지 호출부가 판단하는 근거).
     /// 순수 연출이라 결정론과 무관하다(상태·RNG 무접촉).</summary>
-    public static bool PlayTriggered(CardInstance _self, SynergyData _synergy, BattleField _field)
+    public static bool PlayTriggered(CardInstance _self, SynergyData _synergy, BattleFieldState _field)
     {
         SynergyEmblemEntry t_entry = EntryOf(_synergy, SynergyEmblemTiming.Triggered);
         if (t_entry == null) return false;
@@ -61,7 +61,7 @@ public static class SynergyEmblemVfx
             foreach (CardInstance t_card in _field.GetActiveCards())
             {
                 if (t_card == null || !t_card.IsAlive) continue;
-                if (!SynergyApplier.BelongsTo(t_card, _synergy)) continue;
+                if (!SynergyApplier.BelongsTo(t_card, _synergy?.SynergyId)) continue;
 
                 // 뷰가 없는 시점(InitializeViews 이전)에도 규칙이 Fire를 걸 수 있다 — 몸짓은 뷰 자리를
                 // 읽어야 만들어지므로 여기서 걸러낸다(단일 대상 경로와 같은 가드).

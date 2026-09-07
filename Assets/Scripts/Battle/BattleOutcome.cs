@@ -91,7 +91,7 @@ public sealed class BattleOutcome
         int t_opponentRemaining = rules.enemyField.GetActiveCards().Count + rules.enemyField.WaitingCount;
         // 서버 재시뮬이 대조할 종료 시점 해시. 골든 레코더와 **같은 계산·같은 시점**이어야 한다 —
         // 다르면 규칙이 맞아도 발산으로 보고된다(실제로 그랬다).
-        ulong t_endStateHash = BattleStateHash.Compute(rules.playerField, rules.enemyField);
+        ulong t_endStateHash = BattleStateHash.Compute(rules.playerField.State, rules.enemyField.State);
         MatchResultSubmission.TryEnqueue(_won, _remaining, t_opponentRemaining, _rankPointsBefore,
             _reason == EMatchEndReason.Draw, t_endStateHash);
     }

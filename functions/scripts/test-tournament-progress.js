@@ -1,4 +1,4 @@
-// reportTournamentWin 의 해금 판정 회귀. 에뮬레이터 없이 lib/ 를 직접 require 한다
+// reportAdventureWin 의 해금 판정 회귀. 에뮬레이터 없이 lib/ 를 직접 require 한다
 // (test-tutorial-grant.js 관용구).
 //
 // 여기서 지키는 것은 네 가지다.
@@ -14,9 +14,9 @@ const {
   judgeNodeUnlock,
   parseChapterNodeRows,
   readNodeIdList,
-} = require("../lib/tournamentTable.js");
+} = require("../lib/adventureTable.js");
 
-// TournamentChapter 한 줄. 실제 시트의 컬럼 이름 그대로다
+// AdventureChapter 한 줄. 실제 시트의 컬럼 이름 그대로다
 // (id | chapterId | nodeId | order | prevNodeId | requiredPoints).
 const row = (id, chapterId, nodeId, order, prevNodeId, requiredPoints = 0) =>
   ({id, chapterId, nodeId, order, prevNodeId, requiredPoints});
@@ -141,4 +141,4 @@ const cleared = (...ids) => new Set(ids);
   assert.deepEqual(readNodeIdList(["x".repeat(64)]), ["x".repeat(64)]);
 }
 
-console.log("test-tournament-progress: ok");
+console.log("test-Adventure-progress: ok");

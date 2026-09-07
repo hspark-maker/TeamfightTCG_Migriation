@@ -18,14 +18,10 @@ public static class BattleSelection
     static CardView s_selectedAttacker;   // 탭 공격(제스처3)으로 무장된 공격자. null=미무장.
     static CardView s_notifiedArmed;      // 마지막으로 통지한 무장 상태(중복 통지 억제)
     static List<CardView> s_previewTargets;   // 무장 시 HP 프리뷰를 켠 타겟들(해제 시 끄기용).
-    static bool s_tauntNoticeShown;   // 이번 무장에서 도발 차단 안내를 이미 띄웠나(연타 배너 스팸 방지).
 
     /// <summary>지금 탭으로 무장된 공격자(없으면 null). 튜토리얼이 "이미 무장돼 있는가"를 먼저 확인해
     /// <see cref="OnAttackerArmed"/> 구독만 걸고 영영 기다리는 상황을 피한다.</summary>
     public static CardView SelectedAttacker => s_selectedAttacker;
-
-    /// <summary>이번 조준에서 도발 차단 안내를 이미 띄웠나(읽기 전용 — 세우는 건 <see cref="MarkTauntNoticeShown"/>).</summary>
-    public static bool TauntNoticeShown => s_tauntNoticeShown;
 
     static void NotifyArmed(CardView _armed)
     {
@@ -72,12 +68,6 @@ public static class BattleSelection
         if (_notify) NotifyArmed(null);
     }
 
-    /// <summary>이번 조준(드래그 진입/탭 무장)에서 도발 안내를 다시 1회 허용.</summary>
-    public static void ResetTauntNotice() => s_tauntNoticeShown = false;
-
-    /// <summary>도발 안내를 띄웠음을 기록 — 이번 조준 동안 배너가 연타로 반복되지 않게.</summary>
-    public static void MarkTauntNoticeShown() => s_tauntNoticeShown = true;
-
     /// <summary>전투 종료 리셋. 호출 지점은 CardView.Cleanup() 하나뿐(BattleCleanup.Run이 그걸 부른다).
     /// 이벤트 구독까지 전부 끊는다 — 다음 전투가 죽은 구독자에게 통지하지 않게.</summary>
     public static void Cleanup()
@@ -87,6 +77,5 @@ public static class BattleSelection
         s_selectedAttacker = null;
         s_notifiedArmed    = null;
         s_previewTargets   = null;
-        s_tauntNoticeShown = false;
     }
 }

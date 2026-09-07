@@ -188,6 +188,25 @@ service cloud.firestore {
       }
     }
 
+    // ── 서버 전투 재생 운영 설정 ─────────────────────────────────────────
+    // Functions(Admin SDK)는 이 문서를 60초 캐시해 Cloud Run 호출 여부를 정한다.
+    // 문서가 없으면 off다. 릴리즈 관리 창만 직접 읽고 쓰므로 admin으로 한정한다.
+    match /envs/{envId}/config/{docId} {
+      allow read, write: if isAdmin() && isKnownEnv(envId) && docId == 'battleReplay';
+    }
+
+    // ── 서버 전투 재생 일별 집계 ─────────────────────────────────────────
+    // 카운터 쓰기는 Functions Admin SDK 전용이고, 운영자는 릴리즈 관리 창에서 읽는다.
+    match /envs/{envId}/telemetry/{telemetryId} {
+      allow read: if isAdmin() && isKnownEnv(envId) && telemetryId == 'replayDaily';
+      allow write: if false;
+
+      match /days/{dayId} {
+        allow read: if isAdmin() && isKnownEnv(envId) && telemetryId == 'replayDaily';
+        allow write: if false;
+      }
+    }
+
     // ── 매치 결과 ──────────────────────────────────────────────────────
     // 서버(Admin SDK)만 쓴다. Admin SDK 는 이 규칙을 우회하므로 여기서는 전면 거부가 맞다.
     // 클라이언트는 결과를 직접 쓰지 못하고 Callable 을 거쳐야 한다.

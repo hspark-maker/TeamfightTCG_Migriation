@@ -1,6 +1,14 @@
 # Compiled JavaScript files
 lib/**/*.js
 lib/**/*.js.map
+!lib/battleReplayService.js
+!lib/battleReplayService.js.map
+!lib/battleReplayConfig.js
+!lib/battleReplayConfig.js.map
+!lib/battleReplayTelemetry.js
+!lib/battleReplayTelemetry.js.map
+!lib/commands/findAiMatch.js
+!lib/commands/findAiMatch.js.map
 
 # TypeScript v1 declaration files
 typings/

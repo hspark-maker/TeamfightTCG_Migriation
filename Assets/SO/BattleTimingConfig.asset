@@ -93,8 +93,6 @@ MonoBehaviour:
   resultBeatLoseRatio: 0.7
   resultBeatAfterFinish: 0.12
   mulliganNoticeHold: 1
-  effectNotifyDisplay: 0.83
-  effectNotifySlide: 0.17
   enemyTurnStartDelay: 0.67
   enemyExtraAttackDelay: 0.33
   opponentTurnStartDelay: 0.42

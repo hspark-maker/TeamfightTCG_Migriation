@@ -114,7 +114,7 @@ abstract class SynergyDemoScript : IUnlockDemoScript
 
         var t_active = new ActiveSynergy
         {
-            Synergy   = _synergy,
+            Runtime   = new SynergyRuntime(_synergy.SynergyId),
             Count     = UnlockDemoNumbers.SYNERGY_SHOW_COUNT,
             TierIndex = 0,
             Tier      = t_tier,

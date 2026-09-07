@@ -40,7 +40,6 @@ public static class SafeAreaInstaller
         new("Assets/Assets/Prefabs/UI/PooledUI/SimpleYNPopup.prefab", "Contents", "TitleText", "YesButton", "NoButton"),
         new("Assets/Assets/Prefabs/UI/PooledUI/PooledCardElement.prefab", "", "CardElement"),
         new("Assets/Assets/Prefabs/UI/PooledUI/AdventureNodePopup.prefab", "Contents", "Panel"),
-        new("Assets/Assets/Prefabs/UI/PooledUI/EffectNotifyUI.prefab", "", "Contents"),
         new("Assets/Assets/Prefabs/UI/PooledUI/RankRewardOverlay.prefab", "Root", "Panel"),
         new("Assets/Assets/Prefabs/UI/PooledUI/KeywordGrowthOverlay.prefab", "Root", "Panel"),
         new("Assets/Assets/Prefabs/UI/PooledUI/SettingUI.prefab", "Contents", "Panel"),

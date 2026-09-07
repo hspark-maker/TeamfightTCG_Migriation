@@ -21,3 +21,4 @@ export {reportAdventureWin} from "./commands/reportAdventureWin";
 export {limitBreakCard} from "./commands/limitBreakCard";
 export {getMissions} from "./commands/getMissions";
 export {claimMission} from "./commands/claimMission";
+export {getReplayDivergence} from "./commands/getReplayDivergence";

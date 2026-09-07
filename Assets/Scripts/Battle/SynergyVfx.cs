@@ -16,7 +16,7 @@ public static class SynergyVfx
     /// 중앙에 띄우면 어느 카드 때문에 떴는지 화면에서 읽히지 않는다(스택만 커 보인다).
     ///
     /// 스택은 필드가 세는 값을 그대로 쓴다(연출이 따로 세지 않는다) — 쌓일수록 바람이 커진다.</summary>
-    public static void PlayFlowWind(CardInstance _card, BattleField _field, FlowSynergyVfxConfig _vfx)
+    public static void PlayFlowWind(CardInstance _card, BattleFieldState _field, FlowSynergyVfxConfig _vfx)
     {
         if (_card == null || _field == null) return;
         PlayFlowWind(CardView.GetView(_card), _vfx, _field.FlowStack);

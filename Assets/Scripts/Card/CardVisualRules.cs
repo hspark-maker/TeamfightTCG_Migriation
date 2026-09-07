@@ -228,12 +228,13 @@ public static class CardVisualRules
         return t_tags;
     }
 
-    /// <summary>활성 = 확정 스냅샷 Active에 해당 SynergyData가 참조로 존재하는지. 카운트/티어 재계산 없음.</summary>
+    /// <summary>활성 = 확정 스냅샷 Active에 해당 시너지 ID가 존재하는지. 카운트/티어 재계산 없음.</summary>
     public static bool IsSynergyActive(SynergyState _state, SynergyData _tag)
     {
         if (_state == null || _tag == null) return false;
         foreach (ActiveSynergy t_a in _state.Active)
-            if (t_a.Synergy == _tag) return true;
+            if (t_a?.Runtime != null &&
+                string.Equals(t_a.Runtime.SynergyId, _tag.SynergyId, System.StringComparison.Ordinal)) return true;
         return false;
     }
 
@@ -245,7 +246,8 @@ public static class CardVisualRules
         if (_state != null)
         {
             foreach (ActiveSynergy t_a in _state.Active)
-                if (t_a.Synergy == _tag)
+                if (t_a?.Runtime != null &&
+                    string.Equals(t_a.Runtime.SynergyId, _tag.SynergyId, System.StringComparison.Ordinal))
                     return t_a.Tier != null ? t_a.Tier.requiredCount : 0;
         }
         // 비활성: 정의된 티어 중 최고 requiredCount.

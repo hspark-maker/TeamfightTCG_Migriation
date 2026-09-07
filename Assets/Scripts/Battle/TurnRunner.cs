@@ -458,7 +458,7 @@ public class TurnRunner : MonoBehaviour
     /// 여기서 접는 방식을 따로 두면 로그 해시와 실제로 교환하는 해시가 갈려 대조가 무의미해진다.</summary>
     void LogDeterminismHash(int _actingOwner)
     {
-        ulong t_hash = BattleStateHash.Compute(this.playerField, this.enemyField);
+        ulong t_hash = BattleStateHash.Compute(this.playerField.State, this.enemyField.State);
         BattleGoldenRecorder.RecordCheckpoint(TurnCount, _actingOwner, t_hash);
         Debug.Log($"[Hash] turn={TurnCount} owner={_actingOwner} board=0x{t_hash:X16} draws={MatchRandom.DrawCount}");
     }

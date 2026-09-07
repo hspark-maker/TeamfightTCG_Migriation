@@ -69,7 +69,6 @@ public class CardView : MonoBehaviour
 
     [Header("Highlight / Glow")]
     [SerializeField] SpriteRenderer selectedHighlight;
-    [SerializeField] ParticleSystem passiveGlowSystem;
     [SerializeField] float targetFocusScale = 1.15f;   // 드래그 조준 시 타겟 적 카드 확대 배율.
     [SerializeField] float targetFocusDur   = 0.15f;
 
@@ -188,8 +187,7 @@ public class CardView : MonoBehaviour
         this.synergyBadgeXPos,
         this.synergyBadgeYStart,
         this.synergyBadgeYStep,
-        this.synergyMaxBadges,
-        this.passiveGlowSystem);
+        this.synergyMaxBadges);
 
     Color hpTextOriginalColor;
 
@@ -755,11 +753,8 @@ public class CardView : MonoBehaviour
 
     // ── 장식 계층(키워드 아이콘·프레임 장식·시너지 배지·글로우) 위임 셰임 ─────────
     // 실제 구현은 CardDecorView가 소유한다. 아래는 기존 호출부
-    // (SynergyTriggers / CardPassive / AttackSequence / AttackFlow / HealerEffect / VfxDebugWindow /
+    // (SynergyTriggers / AttackSequence / AttackFlow / HealerEffect / VfxDebugWindow /
     //  CardInputController)를 위한 전달일 뿐이다.
-
-    // TODO: 호출부 이관 후 삭제
-    public UniTask PlayPassiveGlow() => Decor.PlayPassiveGlow();
 
     // ── 입력 컨트롤러 전용 노출 2개 ──────────────────────────────────────
     // 롱프레스가 "누른 지점 아래에 시너지 배지가 있나 / 그 시너지를 몇 장 갖고 있나"를 물어야 해서 열어둔다.
