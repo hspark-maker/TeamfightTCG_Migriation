@@ -43,6 +43,13 @@ namespace TeamfightTCG.BattleCore
             return Mix(t_seed + GoldenGamma);
         }
 
+        /// <summary>AI 의사결정 전용 스트림의 시드. 덱 시드와 다른 상수를 써서 두 스트림이 겹치지 않는다.</summary>
+        public static ulong DeriveAiSeed(ulong _initialSeed)
+        {
+            ulong t_seed = _initialSeed ^ 0x9E3779B97F4A7C15UL;
+            return Mix(t_seed + GoldenGamma);
+        }
+
         static ulong NormalizeSeed(ulong _seed) => _seed == 0 ? GoldenGamma : _seed;
 
         static ulong Mix(ulong _value)

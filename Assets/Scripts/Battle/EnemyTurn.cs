@@ -114,31 +114,11 @@ public class EnemyTurn : TurnBase
                 TutorialOverlayUI.Instance.Clear();
             }
 
-            var (t_preSelectedSplash, t_splashView) = AttackFlow.PreSelectSplash(
-                t_atk, t_def, this.ctx.playerField, this.ctx.playerFieldView);
-
-
-            await AttackFlow.RunBeforeAttack(t_atk, t_def, this.ctx.enemyField, this.ctx.playerField,
-                                             t_preSelectedSplash);   // 낙인 선피해(Execute 전 원자)
-
-            AttackResult t_result;
-            using (BattleEventStream.CaptureScope t_events = BattleEventStream.BeginCapture())
-            {
-                // t_forcedAttacker 는 처형 연쇄 진행 표식이다(_executionChain 판정과 같은 축).
-                // 서버 재생기가 canAttackAgain 뒤에 derived 명령을 기대하므로 로그에 실어야 한다 —
-                // 빠지면 그 매치는 missing_derived_attack 으로 무효 처리된다.
-                t_result = AttackProcessor.Execute(
-                    t_atk, t_def, this.ctx.enemyField.State, this.ctx.playerField.State, t_preSelectedSplash,
-                    _forceCunningSwap: null, _derivedCommand: t_forcedAttacker != null);
-                t_result.events = t_events.ToArray();
-            }
-
-            await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
-                t_result.events,
-                () => AttackFlow.RunAfterAttackPhase(t_attackerView, t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_result));
-
-            // 교활 퇴장은 보충 **전**에 — 슬롯 뷰가 아직 물러나는 카드를 그리고 있는 동안만 가능하다.
-            await AttackFlow.PlayCunningSwap(this.ctx.enemyFieldView, t_attackerView, t_result);
+            // t_forcedAttacker 는 처형 연쇄 진행 표식이다(_executionChain 판정과 같은 축).
+            AttackResult t_result = (await AttackFlow.RunOneAttack(new AttackFlow.AttackRequest(
+                t_atk, t_def, this.ctx.enemyField, this.ctx.playerField,
+                this.ctx.enemyFieldView, this.ctx.playerFieldView,
+                _forceCunningSwap: null, _derivedCommand: t_forcedAttacker != null))).Result;
 
             await this.ctx.FillAndAnimate();
 

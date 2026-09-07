@@ -20,9 +20,13 @@ public static class CloudRunControl
 {
     public const string SERVICE = "battle-replay";
     public const string REGION  = "asia-northeast3";
+    public const string BUILD_CONFIG = "Services/BattleReplay/cloudbuild.yaml";
 
-    /// <summary>변경 명령은 이 시간을 넘기면 죽인다. 조회는 훨씬 빨리 끝난다.</summary>
+    /// <summary>조회·최소 인스턴스 변경용. 이 시간을 넘기면 죽인다.</summary>
     const int TIMEOUT_SECONDS = 180;
+
+    /// <summary>빌드+배포용. 저장소 업로드 → 골든 게이트 → docker build → Cloud Run 배포를 다 포함한다.</summary>
+    const int DEPLOY_TIMEOUT_SECONDS = 1800;
 
     public sealed class Result
     {
@@ -87,18 +91,98 @@ public static class CloudRunControl
 
     // ── 명령 ───────────────────────────────────────────────────────────────
 
-    /// <summary>최소 인스턴스와 서비스 URL 을 읽는다. 읽기 전용이라 확인 절차가 필요 없다.</summary>
+    /// <summary>최소 인스턴스 · 서비스 URL · **지금 떠 있는 이미지**를 읽는다. 읽기 전용이다.
+    /// 이미지 태그가 배포본과 저장소의 드리프트를 보는 유일한 창이다.</summary>
     public static void Describe(string _projectId, Action<Result> _onDone)
     {
         Run($"run services describe {SERVICE} --project {_projectId} --region {REGION} " +
-            "--format \"value(spec.template.metadata.annotations['autoscaling.knative.dev/minScale'],status.url)\"",
-            _onDone);
+            "--format \"value(spec.template.metadata.annotations['autoscaling.knative.dev/minScale']," +
+            "status.url,spec.template.spec.containers[0].image)\"",
+            TIMEOUT_SECONDS, null, _onDone);
     }
 
     /// <summary>최소 인스턴스를 바꾼다. 0 이면 유휴 과금이 멈추고 대신 콜드 스타트를 감수한다.</summary>
     public static void SetMinInstances(string _projectId, int _min, Action<Result> _onDone)
     {
-        Run($"run services update {SERVICE} --project {_projectId} --region {REGION} --min {_min}", _onDone);
+        Run($"run services update {SERVICE} --project {_projectId} --region {REGION} --min {_min}",
+            TIMEOUT_SECONDS, null, _onDone);
+    }
+
+    /// <summary>
+    /// 재생 서비스를 빌드해 배포한다. <see cref="BUILD_CONFIG"/> 가 골든 게이트를 먼저 돌리므로
+    /// **규칙이 갈리면 이미지 자체가 안 만들어진다** — 배포 가능한 상태만 배포된다.
+    ///
+    /// <para>빌드 컨텍스트는 저장소 루트지만 <c>.gcloudignore</c> 가 BattleCore·서비스·골든만 남겨
+    /// 실제 업로드는 1MB 미만이다. 그 파일에 없는 경로가 새로 필요해지면 컨테이너 안에서
+    /// "파일 없음"으로만 드러나니 같이 고쳐야 한다.</para>
+    /// </summary>
+    public static void BuildAndDeploy(string _projectId, string _tag, string _repoRoot, Action<Result> _onDone)
+    {
+        Run($"builds submit --project {_projectId} --config {BUILD_CONFIG} " +
+            $"--substitutions _TAG={_tag},_DEPLOY=true .",
+            DEPLOY_TIMEOUT_SECONDS, _repoRoot, _onDone);
+    }
+
+    /// <summary>배포 태그에 쓸 소스 신원. git 이 없거나 실패하면 false.</summary>
+    public static bool TryGetSourceTag(string _repoRoot, out string _tag, out bool _dirty, out string _error)
+    {
+        _tag = null;
+        _dirty = false;
+        if (!TryRunGit(_repoRoot, "rev-parse --short HEAD", out string t_sha, out _error)) return false;
+        t_sha = t_sha.Trim();
+        if (t_sha.Length == 0) { _error = "git rev-parse 가 빈 값을 냈다."; return false; }
+
+        // 재생 결과에 영향을 주는 경로만 본다 — 클라·에셋 변경까지 dirty 로 잡으면 항상 dirty 다.
+        if (!TryRunGit(_repoRoot,
+                "status --porcelain -- Assets/Scripts/BattleCore Tools/BattleCore Services/BattleReplay",
+                out string t_status, out _error)) return false;
+        _dirty = t_status.Trim().Length > 0;
+        _tag = _dirty ? t_sha + "-dirty" : t_sha;
+        return true;
+    }
+
+    static bool TryRunGit(string _repoRoot, string _arguments, out string _output, out string _error)
+    {
+        _output = null;
+        _error = null;
+        try
+        {
+            using var t_process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "git",
+                    Arguments = _arguments,
+                    WorkingDirectory = _repoRoot,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                },
+            };
+            t_process.Start();
+            _output = t_process.StandardOutput.ReadToEnd();
+            string t_stderr = t_process.StandardError.ReadToEnd();
+            // git 은 수 밀리초에 끝난다. 그래도 멎으면 창을 잠그느니 포기한다.
+            if (!t_process.WaitForExit(10_000))
+            {
+                try { t_process.Kill(); } catch (Exception) { /* 이미 끝남 */ }
+                _error = "git 이 응답하지 않는다.";
+                return false;
+            }
+            if (t_process.ExitCode != 0)
+            {
+                _error = $"git 실패 (exit {t_process.ExitCode}): {Short(t_stderr)}";
+                return false;
+            }
+            return true;
+        }
+        catch (Exception t_exception)
+        {
+            _error = "git 실행 실패: " + t_exception.Message;
+            return false;
+        }
     }
 
     /// <summary>
@@ -129,7 +213,7 @@ public static class CloudRunControl
 
     public static bool IsBusy { get; private set; }
 
-    static void Run(string _arguments, Action<Result> _onDone)
+    static void Run(string _arguments, int _timeoutSeconds, string _workingDirectory, Action<Result> _onDone)
     {
         if (IsBusy)
         {
@@ -150,6 +234,7 @@ public static class CloudRunControl
             Arguments = $"/c \"\"{t_gcloud}\" {_arguments}\"",
             UseShellExecute = false,
             CreateNoWindow = true,
+            WorkingDirectory = _workingDirectory ?? string.Empty,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             StandardOutputEncoding = Encoding.UTF8,
@@ -178,7 +263,7 @@ public static class CloudRunControl
         }
 
         IsBusy = true;
-        double t_deadline = EditorApplication.timeSinceStartup + TIMEOUT_SECONDS;
+        double t_deadline = EditorApplication.timeSinceStartup + _timeoutSeconds;
 
         void Poll()
         {
@@ -189,7 +274,7 @@ public static class CloudRunControl
                 Finish(new Result
                 {
                     Ok = false,
-                    Error = $"gcloud 명령이 {TIMEOUT_SECONDS}초를 넘겨 중단했다. Cloud Run 콘솔에서 실제 반영 여부를 확인할 것.",
+                    Error = $"gcloud 명령이 {_timeoutSeconds}초를 넘겨 중단했다. Cloud Run 콘솔에서 실제 반영 여부를 확인할 것.",
                 });
                 return;
             }

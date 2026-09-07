@@ -17,6 +17,8 @@ const files = fs.existsSync(goldenRoot) ? fs.readdirSync(goldenRoot)
   .filter((name) => name.endsWith(".json")).sort() : [];
 
 let eligibleCount = 0;
+// 모드별 집계. 솔로 경로가 오래 검증 밖이었던 이유가 "코퍼스에 솔로가 없다"를 아무도 못 봤기 때문이다.
+const eligibleByMode = new Map();
 const skipped = [];
 
 for (const file of files) {
@@ -54,6 +56,9 @@ for (const file of files) {
   }
   assert.match(golden.finalStateHash, /^[0-9a-f]{16}$/, `${file}: finalStateHash`);
   assert.ok(Array.isArray(golden.remaining) && golden.remaining.length === 2, `${file}: remaining`);
+  // mode 는 나중에 들어온 필드다. 없는 구 벡터는 멀티 캡처뿐이던 시절 것이다.
+  const mode = typeof golden.mode === "string" && golden.mode !== "" ? golden.mode : "multiplayer(legacy)";
+  eligibleByMode.set(mode, (eligibleByMode.get(mode) ?? 0) + 1);
   eligibleCount++;
 }
 
@@ -61,4 +66,9 @@ for (const line of skipped) console.log(`  skip ${line}`);
 if (process.env.REQUIRE_BATTLE_GOLDENS === "1") {
   assert.ok(eligibleCount >= 12, `expected at least 12 eligible goldens, got ${eligibleCount}`);
 }
-console.log(`battle golden corpus ok (eligible ${eligibleCount} / files ${files.length})`);
+const modeSummary = [...eligibleByMode.entries()].map(([mode, n]) => `${mode} ${n}`).join(", ") || "none";
+console.log(`battle golden corpus ok (eligible ${eligibleCount} / files ${files.length}) — ${modeSummary}`);
+if (!eligibleByMode.has("solo")) {
+  console.log("  주의: 솔로 벡터가 0개다. PlayerTurn/EnemyTurn 경로는 골든 회귀 그물 밖이다 " +
+    "(BATTLE_GOLDEN_CAPTURE=1 로 솔로 매치를 캡처할 것).");
+}

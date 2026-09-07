@@ -438,7 +438,9 @@ public class TurnRunner : MonoBehaviour
             () => this.forcedEnd,
             t_owner =>
             {
-                if (DeckConfig.IsMultiplayer) LogDeterminismHash(t_owner);
+                // 골든 캡처는 솔로도 대상이다(결과 제출형 매치). 캡처 중이면 모드와 무관하게 남긴다 —
+                // 체크포인트가 없으면 재생기가 만든 것만 남아 "extra checkpoint" 로 떨어진다.
+                if (DeckConfig.IsMultiplayer || BattleGoldenRecorder.IsCapturing) LogDeterminismHash(t_owner);
             },
             BattleResultBeat.AbortFinish,
             t_count =>

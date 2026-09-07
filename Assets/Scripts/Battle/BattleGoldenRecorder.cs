@@ -154,6 +154,10 @@ public static class BattleGoldenRecorder
         }
     }
 
+    /// <summary>이 판을 실제로 캡처하고 있는가. 턴 루프가 체크포인트를 남길지 정하는 데 쓴다 —
+    /// 체크포인트가 없으면 재생 불일치가 "최종 해시가 다르다"까지만 보이고 어느 턴에서 갈렸는지 못 짚는다.</summary>
+    public static bool IsCapturing => s_document != null;
+
     public static void RecordCheckpoint(int _turn, int _actingOwner, ulong _stateHash)
     {
         if (s_document == null) return;
@@ -211,7 +215,11 @@ public static class BattleGoldenRecorder
         s_document.finalDrawCount = MatchRandom.DrawCount;
         s_document.remaining = new[] { Remaining(OwnerField(0)), Remaining(OwnerField(1)) };
 
-        int t_localOwner = MultiplayerTurnRunner.Instance?.MyOwnerIndex ?? TurnState.LocalOwnerIndex;
+        // 멀티가 아니면 MyOwnerIndex 가 -1 이라 그대로 쓰면 파일명·winnerOwner 가 전부 망가진다
+        // (실측: 68730c02...-owner-1.json, winnerOwner=-1). 결과 제출형 솔로는 서버가 ownerIndex 0 으로 고정한다.
+        int t_localOwner = DeckConfig.IsMultiplayer
+            ? MultiplayerTurnRunner.Instance?.MyOwnerIndex ?? TurnState.LocalOwnerIndex
+            : 0;
         s_document.draw = _draw;
         s_document.winnerOwner = _draw ? -1 : _localWon ? t_localOwner : 1 - t_localOwner;
 

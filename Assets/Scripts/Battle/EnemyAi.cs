@@ -16,7 +16,7 @@ using UnityEngine;
 /// 이 게임에서 공격력은 곧 현재 체력이다(<see cref="CardInstance.AttackDamage"/>) — 체력 가중치는
 /// 생존력이자 화력 가중치다. 유일한 예외인 도발(체력의 절반)은 그래서 키워드 계층에서 뺐다.
 ///
-/// 결정론: 랜덤은 <see cref="MatchRandom"/>만 쓰고, 공격자 1회 선택당 **정확히 1회** 소비한다
+/// 결정론: 랜덤은 <see cref="MatchRandom.AiRange"/>(AI 전용 파생 스트림)만 쓰고, 공격자 1회 선택당 **정확히 1회** 소비한다
 /// (계층이 어디로 갈리든 소비 횟수는 같다). 룰렛은 후보 리스트 순서(슬롯 오름차순)를 그대로 훑는다.
 /// 타깃 선택은 랜덤을 아예 소비하지 않는다(동점은 슬롯 오름차순으로 깬다).
 /// </summary>
@@ -148,7 +148,9 @@ public static class EnemyAi
         // 후보가 전부 null이거나 전부 죽은 경우에만 성립. 랜덤을 소비하지 않고 빠진다(뽑을 대상 자체가 없다).
         if (t_total <= 0) return null;
 
-        int t_roll = MatchRandom.Range(t_total);
+        // **공용 스트림이 아니라 AI 전용 스트림이다.** 서버 재생기는 AI 선택을 재현하지 않으므로
+        // 여기서 공용 스트림을 소비하면 그 뒤 처형 대상·무쌍 광역이 재생기와 전부 갈린다.
+        int t_roll = MatchRandom.AiRange(t_total);
         CardInstance t_last = null;
         for (int i = 0; i < _candidates.Count; i++)
         {

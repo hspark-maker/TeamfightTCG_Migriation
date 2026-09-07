@@ -19,6 +19,15 @@ public partial class ReleaseManagerWindow
     // Cloud Run 실측 상태. gcloud 로 읽기 전에는 알 수 없어서 "모름"과 "0" 을 구분해 둔다.
     string replayMinScale;
     string replayServiceUrl;
+    /// <summary>지금 떠 있는 이미지. 태그가 저장소 소스와 다르면 서버가 옛 규칙으로 판정 중이라는 뜻이다.</summary>
+    string replayDeployedImage;
+
+    // 저장소 소스 태그. git 프로세스를 띄우므로 **OnGUI 마다 부르면 안 된다** —
+    // 창을 열 때와 상태 조회·배포 직후에만 갱신한다.
+    string replaySourceTag;
+    bool   replaySourceDirty;
+    string replaySourceError;
+
     string replayCloudError;
     bool   replayCloudNeedsLogin;
     string replayCloudBusy;
@@ -33,6 +42,8 @@ public partial class ReleaseManagerWindow
         this.replayNote = string.Empty;
         this.replayMinScale = null;
         this.replayServiceUrl = null;
+        this.replayDeployedImage = null;
+        RefreshSourceTag();
         this.replayCloudError = null;
         this.replayCloudNeedsLogin = false;
         this.replayCloudBusy = null;
@@ -192,6 +203,7 @@ public partial class ReleaseManagerWindow
             this.replayMinScale.Length == 0 ? "0 (미설정 = 유휴 과금 없음)" : this.replayMinScale);
         if (!string.IsNullOrEmpty(this.replayServiceUrl))
             EditorGUILayout.LabelField("서비스 URL", this.replayServiceUrl);
+        DrawDeployRow();
 
         if (!string.IsNullOrEmpty(this.replayCloudBusy))
             EditorGUILayout.HelpBox(this.replayCloudBusy, MessageType.Info);
@@ -250,6 +262,7 @@ public partial class ReleaseManagerWindow
             string[] t_parts = (_result.StdOut ?? string.Empty).Trim().Split('\t');
             this.replayMinScale = t_parts.Length > 0 ? t_parts[0].Trim() : string.Empty;
             this.replayServiceUrl = t_parts.Length > 1 ? t_parts[1].Trim() : null;
+            this.replayDeployedImage = t_parts.Length > 2 ? t_parts[2].Trim() : null;
         }
         Repaint();
     }
@@ -276,6 +289,100 @@ public partial class ReleaseManagerWindow
             if (_result.Ok)
             {
                 this.replayReport = $"Cloud Run 최소 인스턴스를 {_min} 로 바꿨습니다.";
+                RunCloudRunDescribe();
+            }
+            Repaint();
+        });
+        Repaint();
+    }
+
+    /// <summary>저장소 루트. gcloud builds submit 의 컨텍스트(`.`)가 여기여야 한다.</summary>
+    static string RepoRoot => System.IO.Path.GetFullPath(
+        System.IO.Path.Combine(Application.dataPath, ".."));
+
+    /// <summary>배포본과 저장소가 갈렸는지 한 줄로 보여 준다. 이 창이 없어서
+    /// "클라만 새 규칙, 서버는 옛 규칙" 상태를 며칠 모르고 지나쳤다.</summary>
+    void DrawDeployRow()
+    {
+        bool t_hasTag = !string.IsNullOrEmpty(this.replaySourceTag);
+        string t_sourceTag = this.replaySourceTag;
+        bool t_dirty = this.replaySourceDirty;
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUILayout.LabelField("배포 이미지",
+                string.IsNullOrEmpty(this.replayDeployedImage) ? "(조회 안 함)" : TagOf(this.replayDeployedImage));
+            if (GUILayout.Button("소스 태그 갱신", GUILayout.Width(110))) RefreshSourceTag();
+        }
+        EditorGUILayout.LabelField("저장소 소스",
+            t_hasTag ? t_sourceTag : this.replaySourceError ?? "(git 조회 실패)");
+
+        if (t_hasTag && !string.IsNullOrEmpty(this.replayDeployedImage))
+        {
+            string t_deployedTag = TagOf(this.replayDeployedImage);
+            if (t_deployedTag != t_sourceTag)
+            {
+                EditorGUILayout.HelpBox(
+                    "배포본과 저장소 소스가 다릅니다. 서버는 지금 옛 BattleCore로 판정 중일 수 있습니다 — " +
+                    "전투 규칙을 고쳤다면 재배포해야 클라와 같은 기준이 됩니다.",
+                    MessageType.Warning);
+            }
+        }
+        if (t_dirty)
+        {
+            EditorGUILayout.HelpBox(
+                "BattleCore·재생 서비스에 커밋 안 된 변경이 있습니다(-dirty 태그). " +
+                "배포하면 어느 커밋에서 나온 이미지인지 추적할 수 없습니다.",
+                MessageType.Warning);
+        }
+
+        using (new EditorGUI.DisabledScope(CloudRunControl.IsBusy || !t_hasTag))
+        {
+            if (GUILayout.Button("빌드 + 배포 (골든 게이트 포함)", GUILayout.Height(26)))
+                RunCloudRunDeploy(t_sourceTag, t_dirty);
+        }
+    }
+
+    /// <summary>`asia-…/battle-replay:abc1234` 에서 태그만. 다이제스트 고정(@sha256:)이면 앞 12자만 보인다.</summary>
+    static string TagOf(string _image)
+    {
+        if (string.IsNullOrEmpty(_image)) return "-";
+        int t_at = _image.IndexOf('@');
+        if (t_at >= 0) return _image.Substring(t_at + 1, System.Math.Min(19, _image.Length - t_at - 1));
+        int t_colon = _image.LastIndexOf(':');
+        return t_colon >= 0 ? _image.Substring(t_colon + 1) : _image;
+    }
+
+    void RefreshSourceTag()
+    {
+        if (!CloudRunControl.TryGetSourceTag(RepoRoot, out this.replaySourceTag,
+                out this.replaySourceDirty, out this.replaySourceError))
+            this.replaySourceTag = null;
+    }
+
+    void RunCloudRunDeploy(string _tag, bool _dirty)
+    {
+        if (!EditorUtility.DisplayDialog("재생 서비스 빌드 + 배포",
+                $"{CloudRunControl.SERVICE} ({CloudRunControl.REGION}) 을 태그 {_tag} 로 빌드해 배포합니다.\n\n" +
+                "빌드가 골든 코퍼스를 먼저 재생합니다 — 규칙이 갈리면 이미지가 만들어지지 않고 배포도 안 됩니다.\n" +
+                "live·test 가 같은 서비스를 공유하므로 두 환경에 함께 적용됩니다.\n" +
+                (_dirty ? "\n⚠ 커밋 안 된 변경이 포함됩니다.\n" : "\n") +
+                "수 분 걸립니다.",
+                "빌드 + 배포", "취소"))
+            return;
+
+        this.replayCloudBusy = $"빌드 + 배포 중... 태그 {_tag} (골든 게이트 → 이미지 → Cloud Run, 수 분)";
+        this.replayCloudError = null;
+        CloudRunControl.BuildAndDeploy(this.replayProjectId, _tag, RepoRoot, _result =>
+        {
+            if (this == null) return;
+            this.replayCloudBusy = null;
+            this.replayCloudError = _result.Error;
+            this.replayCloudNeedsLogin = _result.NeedsLogin;
+            if (_result.Ok)
+            {
+                this.replayReport = $"재생 서비스를 태그 {_tag} 로 배포했습니다. 새 revision 은 스펙 파싱 캐시가 비어 첫 요청이 느립니다.";
+                RefreshSourceTag();
                 RunCloudRunDescribe();
             }
             Repaint();

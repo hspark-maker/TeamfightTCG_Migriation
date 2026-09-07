@@ -502,31 +502,13 @@ public class PlayerTurn : TurnBase
         EndGuidedFreeSelect();   // 공격이 나갔으면 이번 선택 안내는 끝 — 연출 중 무장 통지에 반응하지 않게
         if (TutorialConfig.IsActive) TutorialOverlayUI.Instance?.Clear();
 
-        CardView t_attackerView = this.ctx.playerFieldView.GetSlotView(_attacker.slotIndex);
-        CardView t_defenderView = this.ctx.enemyFieldView.GetSlotView(_defender.slotIndex);
-
-        var (t_preSelectedSplash, t_splashView) = AttackFlow.PreSelectSplash(
-            _attacker, _defender, this.ctx.enemyField, this.ctx.enemyFieldView);
-
-
-        await AttackFlow.RunBeforeAttack(_attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
-                                         t_preSelectedSplash);   // 낙인 선피해(Execute 전 원자)
-
-        AttackResult t_result;
-        using (BattleEventStream.CaptureScope t_events = BattleEventStream.BeginCapture())
-        {
-            t_result = AttackProcessor.Execute(
-                _attacker, _defender, this.ctx.playerField.State, this.ctx.enemyField.State, t_preSelectedSplash,
-                _forceCunningSwap: null, _derivedCommand: t_derivedCommand);
-            t_result.events = t_events.ToArray();
-        }
-
-        await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
-            t_result.events,
-            () => AttackFlow.RunAfterAttackPhase(t_attackerView, _attacker, _defender, this.ctx.playerField, this.ctx.enemyField, t_result));
-
-        // 교활 퇴장은 보충 **전**에 — 슬롯 뷰가 아직 물러나는 카드를 그리고 있는 동안만 가능하다.
-        await AttackFlow.PlayCunningSwap(this.ctx.playerFieldView, t_attackerView, t_result);
+        // 솔로는 미러가 없어 교활 스왑을 로컬 재계산에 맡긴다(_forceCunningSwap: null).
+        AttackFlow.AttackOutcome t_attack = await AttackFlow.RunOneAttack(new AttackFlow.AttackRequest(
+            _attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
+            this.ctx.playerFieldView, this.ctx.enemyFieldView,
+            _forceCunningSwap: null, _derivedCommand: t_derivedCommand));
+        AttackResult t_result = t_attack.Result;
+        CardView t_attackerView = t_attack.AttackerView;
 
         await this.ctx.FillAndAnimate();
 

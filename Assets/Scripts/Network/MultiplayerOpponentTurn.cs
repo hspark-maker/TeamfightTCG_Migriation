@@ -112,31 +112,16 @@ public class MultiplayerOpponentTurn : TurnBase
                 return;
             }
 
-            CardView t_attackerView = this.ctx.enemyFieldView.GetSlotView(t_atk.slotIndex);
-            CardView t_defenderView = this.ctx.playerFieldView.GetSlotView(t_def.slotIndex);
-
-            var (t_preSelectedSplash, t_splashView) = AttackFlow.PreSelectSplash(
-                t_atk, t_def, this.ctx.playerField, this.ctx.playerFieldView);
-
-
-            await AttackFlow.RunBeforeAttack(t_atk, t_def, this.ctx.enemyField, this.ctx.playerField,
-                                             t_preSelectedSplash);   // 낙인 선피해(Execute 전 원자)
-
-            AttackResult t_result;
-            using (BattleEventStream.CaptureScope t_events = BattleEventStream.BeginCapture())
-            {
-                t_result = AttackProcessor.Execute(
-                    t_atk, t_def, this.ctx.enemyField.State, this.ctx.playerField.State,
-                    t_preSelectedSplash, t_cunningSwap, t_ruleBackstopOff);
-                t_result.events = t_events.ToArray();
-            }
-
-            await AttackSequence.Play(t_attackerView, t_defenderView, t_splashView,
-                t_result.events,
-                () => AttackFlow.RunAfterAttackPhase(t_attackerView, t_atk, t_def, this.ctx.enemyField, this.ctx.playerField, t_result));
-
-            // 교활 퇴장은 보충 **전**에 — 슬롯 뷰가 아직 물러나는 카드를 그리고 있는 동안만 가능하다.
-            await AttackFlow.PlayCunningSwap(this.ctx.enemyFieldView, t_attackerView, t_result);
+            // 수신 공격이라 교활 스왑도 derived 도 와이어 값이 진실원이다(로컬 재계산 금지).
+            AttackFlow.AttackOutcome t_outcome = await AttackFlow.RunOneAttack(new AttackFlow.AttackRequest(
+                t_atk, t_def, this.ctx.enemyField, this.ctx.playerField,
+                this.ctx.enemyFieldView, this.ctx.playerFieldView,
+                t_cunningSwap, t_ruleBackstopOff));
+            AttackResult t_result = t_outcome.Result;
+            CardView t_attackerView = t_outcome.AttackerView;
+            CardView t_defenderView = t_outcome.DefenderView;
+            CardInstance t_preSelectedSplash = t_outcome.Splash;
+            CardView t_splashView = t_outcome.SplashView;
 
             // 내 field만 로컬 채움 + 브로드캐스트
             List<CardInstance> t_playerPlaced = this.ctx.playerField.FillEmptySlots();

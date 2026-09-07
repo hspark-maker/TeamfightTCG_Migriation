@@ -30,6 +30,8 @@ public static class MatchRandom
     sealed class RandomContext
     {
         public DeterministicRandom Stream;
+        /// <summary>AI 의사결정 전용. 공용 Stream 과 분리돼 있다 — 아래 AiRange 주석 참조.</summary>
+        public DeterministicRandom AiStream;
         public ulong InitialSeed;
     }
 
@@ -71,7 +73,25 @@ public static class MatchRandom
     {
         var t_context = new RandomContext { InitialSeed = _seed };
         t_context.Stream.Seed(_seed);
+        t_context.AiStream.Seed(DeterministicRandom.DeriveAiSeed(_seed));
         return t_context;
+    }
+
+    /// <summary>
+    /// AI 의사결정용 난수. **공용 스트림을 소비하지 않는다.**
+    ///
+    /// <para>서버 재생기(<see cref="BattleReplay"/>)는 명령 로그에서 공격자·대상을 읽을 뿐 AI 선택을
+    /// 재현하지 않는다. AI 가 공용 스트림을 한 번이라도 소비하면 그 순간부터 클라와 재생기의 소비
+    /// 횟수가 어긋나 처형 대상·무쌍 광역이 전부 다른 값으로 갈린다(실측: 솔로 판에서 클라 6회 대
+    /// 재생기 5회 — `derived_target_mismatch`). 덱 셔플이 파생 스트림을 쓰는 이유와 같다.</para>
+    /// </summary>
+    public static int AiRange(int _maxExclusive)
+    {
+        if (_maxExclusive <= 1) return 0;
+        if (!IsSeeded)
+            BattleRuleBridge.LogError?.Invoke(
+                "[MatchRandom] AI 스트림을 시드 전에 소비했다 — 시드 지점(GameInitializer)보다 앞선 호출이 있다.");
+        return Current.AiStream.Range(_maxExclusive);
     }
 
     /// <summary>프로세스 전역 시드. 한 번에 한 판만 도는 쪽(Unity 전투)이 쓴다.</summary>
