@@ -60,6 +60,10 @@ public sealed class BattleGoldenDocument
     public string contentFingerprint;
     public string capturedAtUtc;
     public string unityVersion;
+    /// <summary>"multiplayer" | "solo". 어느 턴 드라이버가 이 로그를 만들었는지 —
+    /// 코퍼스가 한쪽 모드만 담고 있는지 파일만 보고 알 수 있어야 한다(솔로 경로가
+    /// 여태 검증 밖이었던 이유가 정확히 이걸 못 봤기 때문이다).</summary>
+    public string mode;
     public bool eligible;
     public string exclusionReason;
     public string matchId;
@@ -82,7 +86,7 @@ public sealed class BattleGoldenDocument
     public bool draw;
 }
 
-/// <summary>에디터에서 실제 멀티 규칙 실행 결과를 서버 재생용 골든 JSON으로 기록한다.</summary>
+/// <summary>에디터에서 실제 멀티 및 결과 제출형 솔로 규칙 실행 결과를 서버 재생용 골든 JSON으로 기록한다.</summary>
 public static class BattleGoldenRecorder
 {
     const string EditorPrefKey = "battle.golden.capture.enabled";
@@ -110,11 +114,15 @@ public static class BattleGoldenRecorder
     public static void Begin(BattleField _firstField, BattleField _secondField, int _firstOwner)
     {
         Reset();
-        if (!Enabled || !DeckConfig.IsMultiplayer || _firstField == null || _secondField == null) return;
+        bool t_multiplayer = DeckConfig.IsMultiplayer;
+        bool t_serverReplayMatch = t_multiplayer || SoloMatchHandoff.UsesResultSubmission;
+        if (!Enabled || !t_serverReplayMatch || _firstField == null || _secondField == null) return;
 
         try
         {
-            int t_rulesetVersion = MultiplayerTurnRunner.Instance?.RulesetVersion ?? 0;
+            int t_rulesetVersion = t_multiplayer
+                ? MultiplayerTurnRunner.Instance?.RulesetVersion ?? 0
+                : SoloMatchHandoff.RulesetVersion;
             if (t_rulesetVersion <= 0) return;
 
             s_firstField = _firstField;
@@ -127,9 +135,12 @@ public static class BattleGoldenRecorder
                 contentFingerprint = SpecSource.BattleFingerprint?.ToLowerInvariant() ?? string.Empty,
                 capturedAtUtc = DateTime.UtcNow.ToString("O"),
                 unityVersion = Application.unityVersion,
+                mode = t_multiplayer ? "multiplayer" : "solo",
                 eligible = !TutorialConfig.IsActive,
                 exclusionReason = TutorialConfig.IsActive ? "tutorial_rng_contract" : string.Empty,
-                matchId = MultiplayerTurnRunner.Instance?.MatchId ?? string.Empty,
+                matchId = t_multiplayer
+                    ? MultiplayerTurnRunner.Instance?.MatchId ?? string.Empty
+                    : SoloMatchHandoff.MatchId ?? string.Empty,
                 seedHex = ResolveSeedHex(),
                 firstOwner = _firstOwner,
                 decks = t_decks,
@@ -292,7 +303,9 @@ public static class BattleGoldenRecorder
 
     static string ResolveSeedHex()
     {
-        string t_serverSeed = MultiplayerTurnRunner.Instance?.SeedHex;
+        string t_serverSeed = DeckConfig.IsMultiplayer
+            ? MultiplayerTurnRunner.Instance?.SeedHex
+            : SoloMatchHandoff.SeedHex;
         return string.IsNullOrWhiteSpace(t_serverSeed)
             ? MatchRandom.InitialSeed.ToString("x16") : t_serverSeed.ToLowerInvariant();
     }

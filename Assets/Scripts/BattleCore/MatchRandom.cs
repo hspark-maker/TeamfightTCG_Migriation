@@ -33,42 +33,69 @@ public static class MatchRandom
         public ulong InitialSeed;
     }
 
-    static readonly AsyncLocal<RandomContext> s_context = new AsyncLocal<RandomContext>();
+    // 슬롯이 둘인 이유는 SynergyRuleProvider 와 같다.
+    //   전역   = Unity 런타임. 시드 시점과 소비 시점이 프레임·씬을 건너뛴다. AsyncLocal 로는 못 버틴다 —
+    //            Firebase 콜백이 UnitySynchronizationContext 로 돌아올 때 ExecutionContext 가 복원되면서
+    //            그 뒤에 심은 AsyncLocal 값이 지워진다. 지워진 채 소비하면 예외가 아니라 **다른 난수**가
+    //            나가므로(아래 Current 가 빈 컨텍스트를 새로 만든다) 조용한 divergence 가 된다.
+    //   흐름   = Cloud Run 재생 서비스. 요청마다 시드가 다르고 동시에 돈다. 전역을 쓰면 서로 덮어쓴다.
+    // 조회는 흐름이 전역보다 우선한다.
+    static RandomContext s_global;
+    static readonly AsyncLocal<RandomContext> s_scoped = new AsyncLocal<RandomContext>();
+
+    static RandomContext Active => s_scoped.Value ?? s_global;
 
     static RandomContext Current
     {
         get
         {
-            RandomContext t_context = s_context.Value;
+            RandomContext t_context = Active;
             if (t_context != null) return t_context;
+            // 시드 없이 소비한 경우다(NextU64 가 이미 오류를 남겼다). 흐름 슬롯이 비어 있으니
+            // 전역에 만든다 — 서버는 진입에서 반드시 SeedScoped 하므로 여기로 오지 않는다.
             t_context = new RandomContext();
-            s_context.Value = t_context;
+            s_global = t_context;
             return t_context;
         }
     }
 
-    public static bool IsSeeded => s_context.Value != null && s_context.Value.Stream.IsSeeded;
-    public static ulong InitialSeed => s_context.Value?.InitialSeed ?? 0;
+    public static bool IsSeeded => Active != null && Active.Stream.IsSeeded;
+    public static ulong InitialSeed => Active?.InitialSeed ?? 0;
 
     /// <summary>스트림 전진 횟수. Range(n)은 n&lt;=1이면 전진하지 않으므로 이 값이 곧 '실제 소비 횟수'.
     /// 양 클라가 같은 시점에 같은 값이어야 함 — 어긋나면 그 순간부터 영구 divergence.
     /// 테스트 assert용 + 멀티 desync 카나리아용(현재 divergence 탐지 수단이 이것뿐).</summary>
-    public static int DrawCount => s_context.Value?.Stream.DrawCount ?? 0;
+    public static int DrawCount => Active?.Stream.DrawCount ?? 0;
 
-    public static void Seed(ulong _seed)
+    static RandomContext NewContext(ulong _seed)
     {
         var t_context = new RandomContext { InitialSeed = _seed };
         t_context.Stream.Seed(_seed);
-        s_context.Value = t_context;
+        return t_context;
     }
+
+    /// <summary>프로세스 전역 시드. 한 번에 한 판만 도는 쪽(Unity 전투)이 쓴다.</summary>
+    public static void Seed(ulong _seed)
+    {
+        s_global = NewContext(_seed);
+        s_scoped.Value = null;
+    }
+
+    /// <summary>지금 호출 흐름에만 시드. 서로 다른 시드로 동시에 도는 쪽(재생 서비스)이 쓴다.</summary>
+    public static void SeedScoped(ulong _seed) => s_scoped.Value = NewContext(_seed);
 
     /// <summary>싱글플레이용 로컬 랜덤 시드.</summary>
     public static void SeedRandomLocal() => Seed(ReadU64(NewNonce()));
 
+    /// <summary>전역·흐름 슬롯을 모두 비운다.</summary>
     public static void Reset()
     {
-        s_context.Value = null;
+        s_global = null;
+        s_scoped.Value = null;
     }
+
+    /// <summary>흐름 슬롯만 비운다. 요청 종료 시 서버가 쓴다.</summary>
+    public static void ResetScoped() => s_scoped.Value = null;
 
     /// <summary>공유 전투 RNG의 DrawCount를 소비하지 않는 owner별 독립 셔플 스트림.</summary>
     public static DerivedStream DeriveDeckStream(int _ownerIndex)

@@ -19,3 +19,4 @@ export {claimBattleReward} from "./commands/claimBattleReward";
 export {grantTutorialCards} from "./commands/grantTutorialCards";
 export {reportAdventureWin} from "./commands/reportAdventureWin";
 export {limitBreakCard} from "./commands/limitBreakCard";
+export {getReplayDivergence} from "./commands/getReplayDivergence";

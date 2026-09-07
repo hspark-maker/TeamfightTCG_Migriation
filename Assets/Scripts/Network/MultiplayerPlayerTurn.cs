@@ -224,8 +224,8 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
             // MatchRandom 소비 지점 — 상대 클라도 MultiplayerOpponentTurn에서 같은 자리에서 같은 횟수를 뽑는다.
             if (BattleUxFlags.ExecutionRandomTarget)
             {
-                CardInstance t_nextTarget = ExecutionRule.PickRandomTarget(_attacker, this.ctx.enemyField.State);
-                if (t_nextTarget != null)
+                if (ExecutionRule.TryPickNext(
+                        in t_result, _attacker, this.ctx.enemyField.State, out CardInstance t_nextTarget))
                 {
                     await UniTask.Delay((int)(GameTiming.Battle.OpponentExtraAttackDelay * 1000));
                     ExecuteAttackAsync(_attacker, t_nextTarget).Forget();

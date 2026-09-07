@@ -48,15 +48,17 @@ app.MapPost("/v1/battle/replay", async (
 
     try
     {
-        SynergyRuleProvider.Install(t_rules);
+        // 요청마다 specPins 가 달라 규칙 객체가 다르다. 전역 슬롯(Install)에 심으면 동시 요청이
+        // 서로 덮어써서 다른 판의 규칙으로 재생한다 — 여기서는 흐름 한정만 쓴다.
+        SynergyRuleProvider.InstallScoped(t_rules);
         BattleReplayResult t_result = BattleReplay.Run(t_input!);
         ReplayResponse t_response = ReplayResponse.From(t_result);
         return t_result.Ok ? Results.Ok(t_response) : Results.UnprocessableEntity(t_response);
     }
     finally
     {
-        SynergyRuleProvider.Reset();
-        MatchRandom.Reset();
+        SynergyRuleProvider.ResetScoped();
+        MatchRandom.ResetScoped();
     }
 });
 

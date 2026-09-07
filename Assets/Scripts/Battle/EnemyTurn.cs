@@ -23,6 +23,7 @@ public class EnemyTurn : TurnBase
         await UniTask.Delay((int)(GameTiming.Battle.EnemyTurnStartDelay * 1000));
 
         CardInstance t_forcedAttacker = null;
+        CardInstance t_forcedTarget = null;
 
         while (true)
         {
@@ -54,7 +55,7 @@ public class EnemyTurn : TurnBase
                     // 자유공격: 슬롯 무지정 → AI가 결정론으로 공격자·타깃 선택.
                     // 공격자 규칙은 EnemyAi, 처형 재공격 대상 규칙은 ExecutionRule(PickTargetFor 참조).
                     t_atk = t_forcedAttacker != null ? t_forcedAttacker : EnemyAi.PickAttacker(t_attackers);
-                    t_def = PickTargetFor(t_atk, _executionChain: t_forcedAttacker != null);
+                    t_def = t_forcedTarget ?? PickTargetFor(t_atk, _executionChain: t_forcedAttacker != null);
                 }
                 else
                 {
@@ -89,7 +90,7 @@ public class EnemyTurn : TurnBase
                 t_atk = t_forcedAttacker != null
                     ? t_forcedAttacker
                     : EnemyAi.PickAttacker(t_attackers);
-                t_def = PickTargetFor(t_atk, _executionChain: t_forcedAttacker != null);
+                t_def = t_forcedTarget ?? PickTargetFor(t_atk, _executionChain: t_forcedAttacker != null);
             }
 
             // 타깃은 공격자 확정 후 다시 뽑는다(GetValidTargets(t_atk) = 지정 타깃·도발이 이 공격자 기준).
@@ -123,8 +124,12 @@ public class EnemyTurn : TurnBase
             AttackResult t_result;
             using (BattleEventStream.CaptureScope t_events = BattleEventStream.BeginCapture())
             {
+                // t_forcedAttacker 는 처형 연쇄 진행 표식이다(_executionChain 판정과 같은 축).
+                // 서버 재생기가 canAttackAgain 뒤에 derived 명령을 기대하므로 로그에 실어야 한다 —
+                // 빠지면 그 매치는 missing_derived_attack 으로 무효 처리된다.
                 t_result = AttackProcessor.Execute(
-                    t_atk, t_def, this.ctx.enemyField.State, this.ctx.playerField.State, t_preSelectedSplash);
+                    t_atk, t_def, this.ctx.enemyField.State, this.ctx.playerField.State, t_preSelectedSplash,
+                    _forceCunningSwap: null, _derivedCommand: t_forcedAttacker != null);
                 t_result.events = t_events.ToArray();
             }
 
@@ -141,9 +146,20 @@ public class EnemyTurn : TurnBase
             if (TutorialConfig.IsActive && t_scriptedSlots)
                 TutorialConfig.SyncBoardBaseline(this.ctx.playerField, this.ctx.enemyField);
 
-            if (t_result.canAttackAgain && t_atk.IsAlive)
+            // 결과 제출형 솔로의 자동 처형은 재생기와 같은 자리에서 다음 대상을 확정한다.
+            // 튜토리얼은 저작된 다음 공격 대상이 RNG보다 우선이므로 기존 다음-바퀴 선택을 보존한다.
+            if (!TutorialConfig.IsActive && BattleUxFlags.ExecutionRandomTarget &&
+                ExecutionRule.TryPickNext(in t_result, t_atk, this.ctx.playerField.State, out CardInstance t_nextTarget))
             {
                 t_forcedAttacker = t_atk;
+                t_forcedTarget = t_nextTarget;
+                await UniTask.Delay((int)(GameTiming.Battle.EnemyExtraAttackDelay * 1000));
+            }
+            else if ((TutorialConfig.IsActive || !BattleUxFlags.ExecutionRandomTarget) &&
+                     t_result.canAttackAgain && t_atk.IsAlive)
+            {
+                t_forcedAttacker = t_atk;
+                t_forcedTarget = null;
                 await UniTask.Delay((int)(GameTiming.Battle.EnemyExtraAttackDelay * 1000));
             }
             else

@@ -12,6 +12,18 @@ using System.Collections.Generic;
 /// 뽑은 값을 쓰지 않지만, 소비 자체는 반드시 같이 한다(그쪽 호출부 주석 참조).</para></summary>
 public static class ExecutionRule
 {
+    /// <summary>공격 결과가 처형 재공격을 허용하고 공격자·대상이 아직 유효하면 다음 대상을 뽑는다.
+    /// 게임 드라이버와 헤드리스 재생기가 이 계약을 함께 써야 derived 명령 기대치와 RNG 소비가 갈리지 않는다.
+    /// 실패하면 RNG를 소비하지 않는다.</summary>
+    public static bool TryPickNext(in AttackResult _result, CardInstance _attacker,
+        BattleFieldState _targetField, out CardInstance _target)
+    {
+        _target = null;
+        if (!_result.canAttackAgain) return false;
+        _target = PickRandomTarget(_attacker, _targetField);
+        return _target != null;
+    }
+
     /// <summary>재공격 대상 하나를 무작위로. 칠 카드가 없으면 null(= 재공격 불가, 턴 종료).
     ///
     /// <b>도발을 무시한다.</b> 후보는 살아 있는 적 전부(<see cref="BattleFieldState.GetActiveCards"/>)다 —

@@ -10,7 +10,7 @@
 `docs/OutGamePlan/SERVER_AUTHORITY_AUDIT.md`(2026-08-28 실측)는 "명령 층은 대부분 서버로 넘어갔으나 규칙 층이 아직 클라 쓰기를 막지 않는다"고 판정했다. 그 뒤로 브랜치가 움직였고, 이번에 재실측해 **감사 문서 두 곳을 정정**했다.
 
 - **C7(룰 `hasOnly` 15키→14키 · currency 블록 제거)은 이미 끝나 있다.** `firestore.rules:48-53` 이 이미 14키이고 하네스 `13c` 도 `assertFails` 로 뒤집혀 있다(C6.5 시점, `8edb278f2`). 남은 C7 은 감사 문서가 별도로 짚은 **슬롯 동결(`affectedKeys`)** 뿐이고 그건 여전히 레포 전체 0건.
-- **서버 전투 재시뮬레이터가 새로 들어왔다**(`functions/src/battleSimulation.ts` 475줄 + 골든 15케이스, `0702181d4`). 다만 `submitMatchResult.ts:34` 의 `SERVER_SIMULATION_AUTHORITATIVE = false` 로 **섀도 모드**라 승패 진실원은 여전히 두 클라 제출 합의다.
+- **서버 전투 재생이 권위로 전환됐다**. 리졸버는 Unity 와 같은 C# `Assets/Scripts/BattleCore` 한 벌뿐이고, Cloud Run `Services/BattleReplay` 가 그것을 실행한다. TS 사본(`functions/src/battleSimulation.ts` · `synergyRules.ts`)은 삭제했다. `submitMatchResult.ts` 의 `SERVER_SIMULATION_AUTHORITATIVE = true` 이며, ruleset 2 이상 매치의 승패·잔존 진실원은 재생 결과다(두 클라 합의 `decideMatch` 는 구 ruleset 전용으로 남았다). 골든 대조는 `npm run test:battle-golden` (`Tools/BattleCoreGolden` 러너)이 강제한다.
 
 **이 로드맵의 범위 결정(사용자 확정)**
 
@@ -196,7 +196,7 @@
 | **`profile` 슬롯** | `IsAvatarOwned`/`IsFrameOwned` 가 무조건 `true` 라 소유 개념 자체가 없고 유상 아이템도 없다 — 현재 이득 0. **아바타·프레임이 유상화되는 시점에 재검토**(그때는 소유 판정이 곧 결제 검증이다). 닉네임 금칙어·길이 검사가 클라에만 있는 것은 별건 백로그 |
 | **`tutorial` 진행 낙인** | 완주 낙인은 기능 잠금 해제만 하고 경제에 닿지 않는다. **단 튜토리얼 카드 지급은 `ownership` 슬롯이라 P2 로 이관한다** |
 | **싱글 랭크 `rank.points`** | 전투 범위 밖(사용자 확정). **이 로드맵이 끝나도 남는 가장 큰 자기신고 축**이다 — `openPack` 랭크 잠금 · `claimReward(Rank)` 티어 자격 · 모험 `requiredGrade` 가 전부 이 값을 읽는다 |
-| **멀티 시뮬 권위 전환** | 전투 범위 밖. 섀도 로그(`shadow_compare`)는 계속 쌓이므로 다음 로드맵 착수 시 발산율 실측이 준비돼 있다 |
+| **멀티 시뮬 권위 전환** | 완료. 발산 실측은 `replay_compare` 로그와 매치 문서 `clientDivergence` 로 계속 쌓인다 |
 | **매치메이킹** | `FakeMatchmaker` 가 상대를 고르지만 실 PvP 자격 산정이 아니다 |
 | **`RankManager.PreviewBattleResult` 이중구현** | 권위 문제가 아니라 중복 코드. `refactor-backlog` 로 |
 | **`RankGrade` 드리프트** | 클라는 `RankConfig.asset`, 서버는 `RankGrade` 표를 본다. `rank` 가 클라 소유로 남는 한 갈릴 여지가 있다 — 관측 항목으로만 남긴다 |

@@ -43,9 +43,8 @@ public partial class ReleaseManagerWindow
             t_hasEnv ? $"{FirebaseRootPath.Environment(t_envId)}/specs/_index" : "(환경 프로필 없음)");
         if (!t_hasEnv) EditorGUILayout.HelpBox(t_envError, MessageType.Error);
 
-        DrawAdminAuth();
 
-        using (new EditorGUI.DisabledScope(!t_hasEnv || !SpecAdminAuth.IsSignedIn))
+        using (new EditorGUI.DisabledScope(!t_hasEnv || !AdminReady))
         {
             if (GUILayout.Button("서버 버전 새로고침", GUILayout.Height(26)))
                 RefreshVersionIndex(t_envId);

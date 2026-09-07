@@ -25,9 +25,9 @@ public static class AttackProcessor
 {
     public static AttackResult Execute(CardInstance _attacker, CardInstance _defender,
         BattleFieldState _attackerField, BattleFieldState _defenderField,
-        CardInstance _preSelectedSplash = null,
-        bool? _forceCunningSwap = null,
-        bool _derivedCommand = false)
+        CardInstance _preSelectedSplash,
+        bool? _forceCunningSwap,
+        bool _derivedCommand)
     {
         // ---- Snapshot: 전부 피해 적용 '전' 값. 이후 단계는 읽기만 한다(반격 동시해결 규칙). ----
         int t_commandAttackerSlot = _attacker.slotIndex;

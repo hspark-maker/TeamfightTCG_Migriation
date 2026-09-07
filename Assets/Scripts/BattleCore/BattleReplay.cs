@@ -29,7 +29,8 @@ public static class BattleReplay
 
         try
         {
-            MatchRandom.Seed(_input.Seed);
+            // 재생은 동시 요청을 받는 서비스에서도 돈다 — 전역 시드를 쓰면 요청끼리 스트림을 덮어쓴다.
+            MatchRandom.SeedScoped(_input.Seed);
             BattleReplayDeck t_deck0 = FindDeck(_input.Decks, 0);
             BattleReplayDeck t_deck1 = FindDeck(_input.Decks, 1);
             if (t_deck0 == null || t_deck1 == null)
@@ -141,13 +142,12 @@ public static class BattleReplay
                 FillEmptySlots(t_field0);
                 FillEmptySlots(t_field1);
 
-                t_expectedDerived = t_attack.canAttackAgain;
                 t_expectedDerivedTarget = -1;
+                t_expectedDerived = ExecutionRule.TryPickNext(
+                    in t_attack, t_attacker, t_enemy, out CardInstance t_target);
                 if (t_expectedDerived)
                 {
-                    CardInstance t_target = ExecutionRule.PickRandomTarget(t_attacker, t_enemy);
-                    if (t_target == null) t_expectedDerived = false;
-                    else t_expectedDerivedTarget = t_target.slotIndex;
+                    t_expectedDerivedTarget = t_target.slotIndex;
                 }
 
                 if (!t_expectedDerived)

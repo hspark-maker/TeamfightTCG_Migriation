@@ -31,6 +31,9 @@ public static class SoloMatchHandoff
 
     public static bool HasValue => s_hasValue;
     public static string MatchId => s_matchId;
+    /// <summary>골든 캡처용 비소비 조회. 시드 적용 여부와 무관하게 서버가 발급한 판 신원을 보존한다.</summary>
+    public static string SeedHex => s_seedHex;
+    public static int RulesetVersion => s_rulesetVersion;
     /// <summary>이 판의 결과를 <c>submitMatchResult</c> 로 확정하는가. 협상 값만 보지 않고 <b>제출 증거가
     /// 다 모였는지</b>까지 본다 — 증거가 비면 제출이 실패하는데 로컬 랭크·구 지급 경로는 이미 꺼져 있어
     /// 랭크도 보상도 없이 판이 사라진다.</summary>

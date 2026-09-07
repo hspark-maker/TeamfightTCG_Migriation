@@ -5,6 +5,8 @@ internal sealed class ReplayRequest
 {
     public const int SupportedRulesetVersion = 2;
 
+    // 이 서비스는 덱을 구성하거나 성장치를 계산하지 않는다. 호출자가 카드별 성장 스냅샷과
+    // 보드 순서까지 확정한 owner 0/1 덱 두 벌을 보내며, 여기서는 그 입력으로 재생만 한다.
     public string Env { get; set; } = string.Empty;
     public int RulesetVersion { get; set; }
     public string ContentFingerprint { get; set; } = string.Empty;
