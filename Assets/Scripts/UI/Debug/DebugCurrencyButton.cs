@@ -12,4 +12,6 @@ public class DebugCurrencyButton : MonoBehaviour
     public void GrantEnergy()  => OutgameDebugActions.GrantEnergy();
 
     public void GrantShard()   => OutgameDebugActions.GrantShard();
+
+    public void GrantRouletteTicket() => OutgameDebugActions.GrantRouletteTicket();
 }

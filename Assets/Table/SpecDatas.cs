@@ -184,6 +184,44 @@ public partial class Reward
 }
 
 [GeneratorSpecData]
+public partial class Roulette
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 판 고유 키(코드·RouletteSlot이 이 값으로 판을 찾는다. 부여 후 변경 금지)
+    public string rouletteId;
+    /// 화면 제목에 쓰는 이름(표시용이라 언제든 고쳐도 된다)
+    public string displayName;
+    /// 1회전 비용으로 낼 재화(Gold/Diamond/Energy/Shard/RouletteTicket)
+    public string priceType;
+    /// 1회전 비용. 1 이상이어야 한다(0 이하면 서버가 판 전체를 거부한다)
+    public long price;
+    /// 목록 정렬 순서(작을수록 앞. 판이 하나면 의미 없다)
+    public int sortOrder;
+}
+
+[GeneratorSpecData]
+public partial class RouletteSlot
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// Roulette.rouletteId 참조
+    public string rouletteId;
+    /// 판 위의 자리(0=12시
+    public int slotIndex;
+    /// 시계방향으로 1~7). 판 그림이 8쐐기라 한 판에 0~7이 정확히 한 번씩 있어야 한다""
+    public string rewardType;
+    /// 보상 종류. 지금은 Currency만 쓴다(다른 값은 서버가 그 행을 버린다)
+    public string rewardId;
+    /// 주는 재화(Gold/Diamond/Energy/Shard). 룰렛 티켓은 넣을 수 없다 — 회전이 스스로를 재생산한다
+    public long amount;
+    /// 주는 수량. 1 이상이어야 한다(0 이하면 서버가 그 행을 버린다)
+    public int weight;
+}
+
+[GeneratorSpecData]
 public partial class CardEnhance
 {
     /// 행 고유 번호(부여 후 변경 금지)

@@ -18,7 +18,7 @@ public sealed class OutgameConfigStep : MainInitializer
     [SerializeField] ProfileConfig profileConfig;
     // 덱 대표 이미지 후보 SO. 미배선이면 신규 덱이 이미지 키를 못 받고 표시가 첫 카드 아트로 떨어진다.
     [SerializeField] DeckImageCatalog deckImageCatalog;
-    // 룰렛 판 저작 SO. 미배선이거나 저작에 결함이 있으면 룰렛이 열리지 않는다(로비 버튼 미표시) — 나머지 기능은 정상이다.
+    // 룰렛 판 표현 SO. 값(비용·칸)은 Roulette·RouletteSlot 표가 덮고 여기선 사본의 바탕만 준다 — 미배선이면 룰렛만 꺼진다.
     [SerializeField] RouletteConfig rouletteConfig;
 
     public override UniTask Initialize(InitializationContext _context)
@@ -47,8 +47,12 @@ public sealed class OutgameConfigStep : MainInitializer
         AdventureProgress.SetConfig(t_runtimeAdventure);
         ProfileManager.SetConfig(profileConfig);
 
-        // 곁가지 컨텐츠라 실패해도 초기화를 세우지 않는다 — 결함은 SetConfig 안의 Validate가 LogError로 드러낸다.
-        RouletteManager.SetConfig(rouletteConfig);
+        // 표 값을 덮은 사본만 꽂는다 — 저작 SO를 그대로 꽂으면 화면이 서버와 다른 상품을 그린다.
+        // 실패하면 아무것도 꽂지 않는다: 룰렛만 서지 않고(IsAvailable=false) 로비 버튼이 숨는다.
+        if (RouletteSpec.TryBuildRuntime(rouletteConfig, out RouletteConfig t_runtimeRoulette, out string t_rouletteError))
+            RouletteManager.SetConfig(t_runtimeRoulette);
+        else
+            Debug.LogError($"[OutgameConfig] 룰렛 판을 세우지 못했다 — 룰렛만 꺼진다. {t_rouletteError}");
 
         // 신규 덱 저장 시 여기서 대표 이미지 키를 뽑는다.
         DeckImages.SetSource(deckImageCatalog);

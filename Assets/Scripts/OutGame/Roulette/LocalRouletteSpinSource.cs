@@ -14,7 +14,7 @@ public sealed class LocalRouletteSpinSource : IRouletteSpinSource
         m_config = _config;
     }
 
-    // 인위적 지연을 넣지 않는다 — 2단계에서 진짜 왕복 지연이 붙었을 때 연출이 견디는지가 그때 드러나야 한다.
+    // 인위적 지연을 넣지 않는다 — 지연을 견디는지는 서버 소스의 진짜 왕복에서 드러나야 한다.
     public UniTask<RouletteSpinOutcome> SpinAsync(CancellationToken _ct)
     {
         if (_ct.IsCancellationRequested) return UniTask.FromResult(RouletteSpinOutcome.CreateFailure(ERouletteSpinResult.Canceled));
@@ -40,7 +40,7 @@ public sealed class LocalRouletteSpinSource : IRouletteSpinSource
             t_roll -= t_slot.EffectiveWeight;
             if (t_roll >= 0) continue;
 
-            return UniTask.FromResult(RouletteSpinOutcome.CreateSuccess(t_i, t_slot.currency, t_slot.amount, t_slot.isJackpot));
+            return UniTask.FromResult(RouletteSpinOutcome.CreateSuccess(t_i, t_slot.currency, t_slot.amount));
         }
 
         return UniTask.FromResult(RouletteSpinOutcome.CreateFailure(ERouletteSpinResult.EmptyPool));

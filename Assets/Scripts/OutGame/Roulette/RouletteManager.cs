@@ -5,7 +5,7 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 룰렛의 static 창구. 저작(RouletteConfig)과 판정(IRouletteSpinSource)을 갈라 쥔다.
-// 1단계는 티켓 차감도 재화 지급도 하지 않는다 — 잔액의 진실원이 서버 지갑 문서라 클라에 더하는 경로가 없다.
+// 판정의 진실원은 서버 spinRoulette 이다 — 티켓 차감도 재화 지급도 응답 채택이 하고, 클라는 그것을 비출 뿐이다.
 public static class RouletteManager
 {
     static RouletteConfig s_config;
@@ -13,14 +13,17 @@ public static class RouletteManager
     static bool s_spinning;
 
     // SetSource로 명시적으로 꽂힌 소스가 있는가. 개발용 로컬 소스는 이 자리를 덮지 않는다 —
-    // 초기화가 한 번 더 돌면(재시도) 2단계 서버 소스가 조용히 로컬로 되돌아간다.
+    // 초기화가 한 번 더 돌면(재시도) 서버 소스가 조용히 로컬로 갈린다.
     static bool s_sourceInjected;
 
     /// <summary>회전을 실제로 돌릴 수 있는가. 설정과 소스가 둘 다 서야 true다 — 로비 버튼 노출 판정이 이 값이다.</summary>
     public static bool IsAvailable => s_config != null && s_source != null;
 
+    /// <summary>지금 꽂힌 추첨이 서버 판정인가. 개발용 로컬 추첨 배지의 유일한 근거다.</summary>
+    public static bool IsServerBacked => s_source is ServerRouletteSpinSource;
+
     // 판 이름·비용은 프리팹 저작이 그린다. 화면이 문구를 덮지 않으므로 여기서 내주는 표면도 두지 않는다
-    // — 2단계에 비용 표시가 필요해지면 그때 되살린다(저작값은 RouletteConfig 에 그대로 있다).
+    // — 비용의 진실원은 서버 구성 표이고 RouletteConfig.Price 는 낙관 표시용 사본이다.
 
     public static IReadOnlyList<RouletteSlotDef> Slots
         => s_config != null ? s_config.Slots : Array.Empty<RouletteSlotDef>();
@@ -33,14 +36,16 @@ public static class RouletteManager
         return false;
     }
 
-    /// <summary>회전 가능 여부의 낙관 검사. 티켓 잔액은 보지 않는다 — 1단계는 티켓 0장으로 무제한 회전이 기획값이다
-    /// (2단계에 CanAfford 한 줄이 붙고 <see cref="ERouletteSpinResult.InsufficientTicket"/> 로 떨어진다).</summary>
+    /// <summary>회전 가능 여부의 낙관 검사. 티켓 잔액은 표시값 기준이라,
+    /// 앞선 회전의 왕복이 아직 안 끝났으면 그 낙관 차감이 여기서 자동으로 막는다. 최종 판정은 언제나 서버다.</summary>
     public static ERouletteSpinResult Precheck()
     {
         if (!IsAvailable) return ERouletteSpinResult.NotConfigured;
 
         // 앞선 회전이 아직 안 끝났다 — 화면이 "지금은 돌릴 수 없다"로 접는 갈래라 서버 거절과 같은 코드를 쓴다.
         if (s_spinning) return ERouletteSpinResult.Rejected;
+
+        if (!CurrencyManager.CanAfford(s_config.PriceType, s_config.Price)) return ERouletteSpinResult.InsufficientTicket;
 
         return ERouletteSpinResult.Success;
     }
@@ -61,7 +66,7 @@ public static class RouletteManager
             if (!TryGetSlot(t_outcome.SlotIndex, out _))
             {
                 Debug.LogError($"[RouletteManager] 결과 칸 {t_outcome.SlotIndex}이(가) 판에 없다 — 저작과 판정이 어긋났다.");
-                return RouletteSpinOutcome.CreateFailure(ERouletteSpinResult.Rejected);
+                return RouletteSpinOutcome.CreateFailure(ERouletteSpinResult.RewardUnreadable);
             }
 
             return t_outcome;
@@ -84,7 +89,7 @@ public static class RouletteManager
         s_config = null;
 
         // 명시적으로 꽂힌 소스는 건드리지 않는다 — 그 자리를 비우면 초기화가 다시 돌 때마다
-        // 2단계 서버 소스가 개발용 로컬 소스로 갈린다.
+        // 서버 소스가 개발용 로컬 소스로 갈린다.
         if (!s_sourceInjected) s_source = null;
 
         if (_config == null) return;
@@ -105,13 +110,29 @@ public static class RouletteManager
         BuildSource();
     }
 
-    /// <summary>추첨 소스 교체 창구(2단계 서버 소스·테스트 대역). null이면 <see cref="IsAvailable"/> 가 false로 떨어진다.
+    /// <summary>추첨 소스 교체 창구(테스트 대역·개발용 로컬 추첨). null이면 <see cref="IsAvailable"/> 가 false로 떨어진다.
     /// 한 번 꽂으면 이후 <see cref="SetConfig"/> 가 덮지 않는다.</summary>
     public static void SetSource(IRouletteSpinSource _source)
     {
         s_source = _source;
         s_sourceInjected = true;
     }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    /// <summary>서버가 없는 동안 회전 안무를 만지기 위해 로컬 추첨으로 갈아끼운다(되돌리려면 씬을 다시 켠다).
+    /// 잔액은 움직이지 않으므로 이 상태의 화면은 실제 지급과 다르다.</summary>
+    // 설정을 밖으로 내주지 않으려고 매니저 쪽에 둔다 — 로컬 소스 생성자가 RouletteConfig 를 요구한다.
+    public static void UseLocalSourceForDebug()
+    {
+        if (s_config == null)
+        {
+            Debug.LogWarning("[RouletteManager] 설정이 아직 서지 않아 로컬 추첨을 꽂지 못했다.");
+            return;
+        }
+
+        SetSource(new LocalRouletteSpinSource(s_config));
+    }
+#endif
 
     // 도메인 리로드를 끈 에디터에서 이전 플레이의 s_spinning이 살아남으면 두 번째 플레이의 첫 회전이 잠긴다.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -123,29 +144,13 @@ public static class RouletteManager
         s_sourceInjected = false;
     }
 
-    // #if 밖에서는 소스가 null로 남는다. 폴백이 없는 것이 설계다 — 출시 빌드에서 룰렛 진입 자체가 닫힌다.
+    // 정상 상태는 언제나 서버다. test/live 는 ContentProfileConfig.Active.CloudEnvId 가 가른다 —
+    // 다른 모든 서버 명령과 같은 축이라 여기서 실행 모드를 한 번 더 가르지 않는다.
     static void BuildSource()
     {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-        // 누가 소스를 이미 꽂았으면 개발용으로 갈아치우지 않는다.
+        // 누가 소스를 이미 꽂았으면 갈아치우지 않는다.
         if (s_sourceInjected) return;
 
-        // DEVELOPMENT_BUILD 만으로는 Live 프로파일로 켠 개발 빌드를 못 막는다.
-        // Active는 프로파일 애셋이 없으면 던지는 게터라, 룰렛 하나 때문에 초기화가 죽지 않게 감싼다.
-        EContentRunMode t_runMode;
-        try
-        {
-            t_runMode = ContentProfileConfig.Active.RunMode;
-        }
-        catch (Exception t_exception)
-        {
-            Debug.LogWarning($"[RouletteManager] 실행 프로파일을 못 읽어 로컬 추첨을 꽂지 않는다 — {t_exception.Message}");
-            return;
-        }
-
-        if (t_runMode != EContentRunMode.Test) return;
-
-        s_source = new LocalRouletteSpinSource(s_config);
-#endif
+        s_source = new ServerRouletteSpinSource(s_config);
     }
 }

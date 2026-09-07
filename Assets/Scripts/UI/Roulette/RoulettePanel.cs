@@ -9,7 +9,7 @@ using UnityEngine.UI;
 // 풀(UIPoolManager)이 수명을 쥔다 — 규약은 RankRewardPanel·KeywordGrowthPanel과 같다.
 //
 // 멈출 칸도 상품도 이 화면이 정하지 않는다. 결과값이 칸 번호와 상품을 함께 운반하고,
-// 여기서 저작 표를 되읽지 않으므로 2단계에서 서버 표와 클라 저작이 어긋나도 연출이 실지급과 갈리지 않는다.
+// 여기서 저작 표를 되읽지 않으므로 서버 블롭과 클라 저작이 어긋나도 연출이 실지급과 갈리지 않는다.
 public class RoulettePanel : PooledUIBase
 {
     [Tooltip("켜고 끌 대상(딤 + 패널). 미배선이면 자기 gameObject를 토글한다.")]
@@ -21,6 +21,12 @@ public class RoulettePanel : PooledUIBase
     [SerializeField] RouletteSlotView[] slots;
 
     [SerializeField] RouletteBulbRing bulbRing;
+
+    [Tooltip("보유 티켓 수를 그릴 자리입니다. 비워 두면 아무것도 그리지 않습니다.")]
+    [SerializeField] TMP_Text ticketText;
+
+    [Tooltip("개발용 로컬 추첨으로 도는 중임을 알리는 표식입니다. 서버 판정이면 자동으로 꺼집니다.")]
+    [SerializeField] GameObject localModeBadge;
 
     [Header("버튼")]
     [SerializeField] Button spinButton;
@@ -66,8 +72,10 @@ public class RoulettePanel : PooledUIBase
         this.SetVisible(true);
 
         this.BuildSlots();
+        this.RefreshTicketText();
         this.ApplySpinInteractable(!this.m_spinning);
 
+        if (this.localModeBadge != null) this.localModeBadge.SetActive(!RouletteManager.IsServerBacked);
         if (this.bulbRing != null) this.bulbRing.PlayIdle();
     }
 
@@ -95,10 +103,14 @@ public class RoulettePanel : PooledUIBase
             this.dimButton.onClick.RemoveAllListeners();
             this.dimButton.onClick.AddListener(this.Close);
         }
+
+        CurrencyManager.OnCurrencyChanged += this.HandleCurrencyChanged;
     }
 
     void OnDisable()
     {
+        CurrencyManager.OnCurrencyChanged -= this.HandleCurrencyChanged;
+
         this.CancelSpin();
 
         if (this.wheel != null) this.wheel.Stop();
@@ -167,12 +179,6 @@ public class RoulettePanel : PooledUIBase
 
             this.PlayWinPunch(t_outcome.SlotIndex);
 
-            if (t_outcome.IsJackpot && this.bulbRing != null)
-            {
-                await this.bulbRing.PlayJackpotAsync(t_token);
-                if (this == null) return;
-            }
-
             this.PlayGainEffect(t_outcome);
         }
         finally
@@ -214,6 +220,21 @@ public class RoulettePanel : PooledUIBase
             Debug.LogWarning($"[RoulettePanel] 저작 칸 {this.slots.Length}개와 설정 칸 {t_count}개가 다르다 — 판 그림과 상품이 어긋난다.", this);
     }
 
+    // 낙관 홀드·응답 채택·디버그 지급이 전부 이 통지를 때리므로 회전 뒤에 따로 갱신하지 않는다.
+    void HandleCurrencyChanged(ECurrencyType _type, long _balance)
+    {
+        if (_type != ECurrencyType.RouletteTicket) return;
+
+        this.RefreshTicketText();
+    }
+
+    void RefreshTicketText()
+    {
+        if (this.ticketText == null) return;
+
+        this.ticketText.text = $"티켓 {CurrencyManager.GetBalance(ECurrencyType.RouletteTicket):N0}";
+    }
+
     void ApplySpinInteractable(bool _interactable)
     {
         bool t_on = _interactable && RouletteManager.IsAvailable;
@@ -229,8 +250,7 @@ public class RoulettePanel : PooledUIBase
         if (this.slots[_slotIndex] != null) this.slots[_slotIndex].PlayWinPunch();
     }
 
-    // 1단계는 잔액이 움직이지 않는다 — 롤업이 (잔액 − 획득량) → 잔액으로 세므로 그림은 정상이고,
-    // 끝값이 시작값과 같다는 사실은 로컬 배지가 덮는다.
+    // 잔액은 서버 응답 채택이 이미 갈아끼웠다 — 롤업이 (잔액 − 획득량) → 잔액으로 세므로 끝값이 곧 실제 지급 뒤 잔액이다.
     void PlayGainEffect(RouletteSpinOutcome _outcome)
     {
         CurrencyGainEffectPlayer t_player = this.gainPlayer;
@@ -256,7 +276,7 @@ public class RoulettePanel : PooledUIBase
 
         if (_result == ERouletteSpinResult.NetworkFailed)
         {
-            NetworkFailurePopup.Show("룰렛 회전이 끝나지 못했습니다.");
+            NetworkFailurePopup.Show("회전 결과를 확인하지 못했습니다.");
             return;
         }
 
@@ -272,9 +292,10 @@ public class RoulettePanel : PooledUIBase
     {
         switch (_result)
         {
-            case ERouletteSpinResult.InsufficientTicket: return "룰렛 티켓이 부족합니다.";
+            case ERouletteSpinResult.InsufficientTicket: return "룰렛 티켓이 부족합니다.\n티켓 획득처는 준비 중입니다.";
+            case ERouletteSpinResult.RewardUnreadable:   return "보상은 지급되었습니다.\n결과를 그리지 못했으니 잔액을 확인해 주세요.";
             case ERouletteSpinResult.Rejected:           return "회전이 거절되었습니다.\n잠시 후 다시 시도해 주세요.";
-            case ERouletteSpinResult.RouletteNotFound:   return "룰렛을 찾을 수 없습니다.\n잠시 후 다시 시도해 주세요.";
+            case ERouletteSpinResult.RouletteNotFound:   return "룰렛을 준비하지 못했습니다.\n잠시 후 다시 시도해 주세요.";
             default:                                     return "지금은 룰렛을 돌릴 수 없습니다.";
         }
     }

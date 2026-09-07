@@ -20,32 +20,24 @@ MonoBehaviour:
   - currency: 1
     amount: 300
     weight: 1
-    isJackpot: 1
   - currency: 0
     amount: 500
     weight: 25
-    isJackpot: 0
   - currency: 2
     amount: 10
     weight: 18
-    isJackpot: 0
   - currency: 0
     amount: 1500
     weight: 12
-    isJackpot: 0
   - currency: 3
     amount: 20
     weight: 20
-    isJackpot: 0
   - currency: 0
     amount: 800
     weight: 18
-    isJackpot: 0
   - currency: 1
     amount: 30
     weight: 10
-    isJackpot: 0
   - currency: 3
     amount: 50
     weight: 8
-    isJackpot: 0

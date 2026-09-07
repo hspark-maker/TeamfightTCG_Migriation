@@ -17,7 +17,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &8065184820200711831
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2908,7 +2908,7 @@ GameObject:
   - component: {fileID: 3356139422006197182}
   - component: {fileID: 256015280535219795}
   m_Layer: 0
-  m_Name: TimeText
+  m_Name: TicketText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2961,7 +2961,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "12\uC2DC\uAC04 30\uBD84"
+  m_text: "\uD2F0\uCF13 0"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 24b4aa79c7c8fee41b59a42f8ae762ec, type: 2}
   m_sharedMaterial: {fileID: -4999335185947324146, guid: 24b4aa79c7c8fee41b59a42f8ae762ec, type: 2}
@@ -3179,6 +3179,8 @@ MonoBehaviour:
   - {fileID: 2236070629673313386}
   - {fileID: 4394923767275840459}
   bulbRing: {fileID: 6071151099764379348}
+  ticketText: {fileID: 256015280535219795}
+  localModeBadge: {fileID: 277350112354003434}
   spinButton: {fileID: 4012882935507369983}
   closeButton: {fileID: 3641857269456091151}
   dimButton: {fileID: 6400537912322915301}
@@ -3305,11 +3307,6 @@ MonoBehaviour:
   offSprite: {fileID: 21300000, guid: 16c5e95186626b5469de68a0eaa13e7b, type: 3}
   offAlpha: 1
   idleInterval: 0.45
-  blinkCount: 3
-  blinkInterval: 0.12
-  chaseTurns: 2
-  chaseStep: 0.05
-  holdSeconds: 1.2
 --- !u!1 &7760273177584824114
 GameObject:
   m_ObjectHideFlags: 0

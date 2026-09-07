@@ -8,15 +8,15 @@ const {migrateFromSaveSlot} = require("../lib/currency/walletMigration.js");
 // 호출부가 FieldValue.delete() 를 넘기는 자리. 값의 정체는 이 모듈의 관심이 아니다.
 const DELETE = "<FieldValue.delete()>";
 const SCHEMA = 8;
-const ZERO = {Gold: 0, Diamond: 0, Energy: 0, Shard: 0};
+const ZERO = {Gold: 0, Diamond: 0, Energy: 0, Shard: 0, RouletteTicket: 0};
 
 // ── 잔액 보존 ────────────────────────────────────────────────────────────────
 {
   const result = migrateFromSaveSlot(
-    {schemaVersion: 7, currency: {balances: {Gold: 1200, Diamond: 30, Energy: 5, Shard: 2}}},
+    {schemaVersion: 7, currency: {balances: {Gold: 1200, Diamond: 30, Energy: 5, Shard: 2, RouletteTicket: 0}}},
     DELETE, SCHEMA);
 
-  assert.deepEqual(result.balances, {Gold: 1200, Diamond: 30, Energy: 5, Shard: 2},
+  assert.deepEqual(result.balances, {Gold: 1200, Diamond: 30, Energy: 5, Shard: 2, RouletteTicket: 0},
     "이관은 잔액을 한 푼도 바꾸지 않는다");
   assert.deepEqual(result.slotPatch, {currency: DELETE, schemaVersion: SCHEMA},
     "세이브 쪽은 currency 삭제 + 스키마 승급 둘뿐이다");
@@ -45,15 +45,15 @@ for (const [label, slot] of [
   ["못 읽는 값", {balances: {Gold: "x", Diamond: null}}],
 ]) {
   const result = migrateFromSaveSlot(slot === undefined ? {} : {currency: slot}, DELETE, SCHEMA);
-  assert.deepEqual(result.balances, ZERO, `${label} 이면 4키 0 으로 선다`);
+  assert.deepEqual(result.balances, ZERO, `${label} 이면 전 키 0 으로 선다`);
 }
 
-// ── 모르는 키는 버리고 빠진 키는 0 으로 채운다(룰 hasOnly 대응) ─────────────
+// ── 모르는 키는 버리고 빠진 키는 0 으로 채운다 ──────────────────────────────
 {
   const result = migrateFromSaveSlot({currency: {balances: {Gold: 7, Junk: 999}}}, DELETE, SCHEMA);
 
-  assert.deepEqual(Object.keys(result.balances).sort(), ["Diamond", "Energy", "Gold", "Shard"],
-    "지갑 문서도 정확히 4키여야 한다");
+  assert.deepEqual(Object.keys(result.balances).sort(), ["Diamond", "Energy", "Gold", "RouletteTicket", "Shard"],
+    "지갑 문서도 CURRENCY_KEYS 전 키를 든다");
   assert.equal(result.balances.Gold, 7);
   assert.equal(result.balances.Diamond, 0, "빠진 키는 0");
 }

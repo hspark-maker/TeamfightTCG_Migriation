@@ -9,6 +9,6 @@ internal sealed class WalletPatch
     // 단조 증가만 보장된다 — 세이브 revision과 달리 "정확히 +1"은 계약이 아니다(클라가 모르는 정당한 쓰기가 있다).
     [JsonProperty("rev")] public long Rev { get; set; }
 
-    // 항상 4키(Gold·Diamond·Energy·Shard). 빠진 키는 채택이 0으로 읽는다.
+    // 키는 ECurrencyType 이름이다. 서버가 아는 키를 다 보내지만 개수는 계약이 아니다 — 빠진 키는 채택이 0으로 읽는다.
     [JsonProperty("balances")] public Dictionary<string, long> Balances { get; set; }
 }

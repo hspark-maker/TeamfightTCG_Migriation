@@ -274,7 +274,7 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
       // set 이 아니라 create 다 — 이 트랜잭션 밖에서 ensureWallet 이 먼저 지갑을 세웠으면
       // 재실행되어 그쪽 이관 잔액을 0 으로 덮어쓰는 것을 막는다.
       // 지갑이 없어 개설과 이동이 한 트랜잭션에 겹쳤다 — 영수증은 돈을 움직인 명령을 적는다.
-      // 개설 사실은 rev 1 · before 4키 0 으로 읽힌다.
+      // 개설 사실은 rev 1 · before 전 키 0 으로 읽힌다.
       createWallet(
         transaction,
         walletReference,

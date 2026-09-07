@@ -13,7 +13,7 @@ public class RouletteSlotView : MonoBehaviour
     [Tooltip("수량 표기 형식. 12,345 처럼 자리수 구분이 들어간다.")]
     [SerializeField] string amountFormat = "N0";
 
-    /// <summary>이 칸이 내줄 상품을 그린다. 잭팟 여부는 판 그림이 저작으로 말한다 — 코드가 표식을 켜지 않는다.</summary>
+    /// <summary>이 칸이 내줄 상품을 그린다. 칸을 꾸미는 장식은 판 그림이 저작으로 말한다 — 코드가 표식을 켜지 않는다.</summary>
     public void Bind(ECurrencyType _currency, long _amount)
     {
         if (this.icon != null)
