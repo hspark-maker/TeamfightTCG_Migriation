@@ -77,6 +77,8 @@ public static partial class SpecFirestoreUploader
         public FirestoreIntegerValue nextMinor;
         public FirestoreIntegerValue minAppMajor;
         public FirestoreStringValue contentVersion;
+        public FirestoreStringValue noticeTitle;
+        public FirestoreStringValue noticeBody;
         public FirestoreArrayField history;
     }
     [Serializable] sealed class IndexDocument
@@ -90,6 +92,8 @@ public static partial class SpecFirestoreUploader
         public FirestoreIntegerValue minor;
         public FirestoreIntegerValue minAppMajor;
         public FirestoreStringValue contentVersion;
+        public FirestoreStringValue noticeTitle;
+        public FirestoreStringValue noticeBody;
         public FirestoreStringValue publishedAt;
         public FirestoreStringValue publishedBy;
         public FirestoreStringValue tablesJson;
@@ -177,7 +181,10 @@ public static partial class SpecFirestoreUploader
     /// 현재 표 메타 전체를 하나의 콘텐츠 minor로 묶어 공개한다. 표 업로드가 모두 성공한 뒤 마지막에만 호출한다.
     /// `_index` 교체가 실제 배포 시점이며, 기존 표별 메타 경로는 구클라이언트 폴백을 위해 유지한다.
     /// </summary>
-    public static string PublishIndex(string _envId, out string _error)
+    /// <param name="_noticeBody">비우면 이번 공개에 사용자 공지가 붙지 않는다. 공지 없는 공개를 실수로
+    /// 내지 않도록 인자를 생략할 수 있는 오버로드는 두지 않는다 — 호출부가 매번 명시하게 한다.</param>
+    public static string PublishIndex(
+        string _envId, string _noticeTitle, string _noticeBody, out string _error)
     {
         _error = null;
         if (!SpecAdminAuth.IsSignedIn || !SpecAdminAuth.HasAdminClaim)
@@ -231,6 +238,7 @@ public static partial class SpecFirestoreUploader
         string t_body = BuildIndexCommitJson(
             t_projectId, _envId, t_minor, t_revisions, t_hashes, t_snapshots,
             AppendHistory(t_history, ContentVersion.Format(ContentVersion.Major, t_minor)),
+            (_noticeTitle ?? string.Empty).Trim(), (_noticeBody ?? string.Empty).Trim(),
             t_updateTime, t_existsIndex);
         if (Encoding.UTF8.GetByteCount(t_body) > MAX_COMMIT_BYTES)
         {
@@ -307,6 +315,7 @@ public static partial class SpecFirestoreUploader
             return null;
         if (!TryBuildReleaseValues(t_release, t_targetMajor, t_targetMinor,
                                    out int t_minAppMajor, out string t_contentVersion,
+                                   out string t_noticeTitle, out string t_noticeBody,
                                    out string t_tablesJson, out _error))
             return null;
         if (t_nextMinor <= t_targetMinor)
@@ -317,7 +326,8 @@ public static partial class SpecFirestoreUploader
 
         string t_body = BuildRollbackCommitJson(
             t_projectId, _envId, t_targetMajor, t_targetMinor, t_nextMinor,
-            t_minAppMajor, t_contentVersion, t_tablesJson, t_history, t_updateTime);
+            t_minAppMajor, t_contentVersion, t_noticeTitle, t_noticeBody,
+            t_tablesJson, t_history, t_updateTime);
         if (Encoding.UTF8.GetByteCount(t_body) > MAX_COMMIT_BYTES)
         {
             _error = "콘텐츠 롤백 commit이 Firestore 크기 한도를 넘는다.";
@@ -862,10 +872,14 @@ public static partial class SpecFirestoreUploader
 
     static bool TryBuildReleaseValues(
         ReleaseIndexFields _fields, int _expectedMajor, long _expectedMinor,
-        out int _minAppMajor, out string _contentVersion, out string _tablesJson, out string _error)
+        out int _minAppMajor, out string _contentVersion,
+        out string _noticeTitle, out string _noticeBody,
+        out string _tablesJson, out string _error)
     {
         _minAppMajor = 0;
         _contentVersion = _fields?.contentVersion?.stringValue;
+        _noticeTitle = _fields?.noticeTitle?.stringValue ?? string.Empty;
+        _noticeBody = _fields?.noticeBody?.stringValue ?? string.Empty;
         _tablesJson = _fields?.tablesJson?.stringValue;
         _error = null;
         if (!int.TryParse(_fields?.major?.integerValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out int t_major) ||
@@ -944,7 +958,8 @@ public static partial class SpecFirestoreUploader
 
     static string BuildRollbackCommitJson(
         string _projectId, string _envId, int _major, long _minor, long _nextMinor,
-        int _minAppMajor, string _contentVersion, string _tablesJson,
+        int _minAppMajor, string _contentVersion, string _noticeTitle, string _noticeBody,
+        string _tablesJson,
         List<string> _history, string _updateTime)
     {
         var t_builder = new StringBuilder(4096);
@@ -957,6 +972,10 @@ public static partial class SpecFirestoreUploader
         t_builder.Append(",\"minAppMajor\":{\"integerValue\":\"").Append(_minAppMajor).Append("\"}");
         t_builder.Append(",\"contentVersion\":{\"stringValue\":");
         AppendJsonString(t_builder, _contentVersion);
+        t_builder.Append("},\"noticeTitle\":{\"stringValue\":");
+        AppendJsonString(t_builder, _noticeTitle);
+        t_builder.Append("},\"noticeBody\":{\"stringValue\":");
+        AppendJsonString(t_builder, _noticeBody);
         t_builder.Append("},\"history\":{\"arrayValue\":{\"values\":[");
         for (int i = 0; i < _history.Count; i++)
         {
@@ -985,6 +1004,7 @@ public static partial class SpecFirestoreUploader
         Dictionary<string, long> _revisions, Dictionary<string, string> _hashes,
         Dictionary<string, TableSnapshot> _snapshots,
         List<string> _history,
+        string _noticeTitle, string _noticeBody,
         string _updateTime, bool _exists)
     {
         var t_builder = new StringBuilder(4096);
@@ -1014,6 +1034,10 @@ public static partial class SpecFirestoreUploader
         t_builder.Append(",\"minAppMajor\":{\"integerValue\":\"").Append(ContentVersion.MinAppMajor).Append("\"}");
         t_builder.Append(",\"contentVersion\":{\"stringValue\":");
         AppendJsonString(t_builder, t_version);
+        t_builder.Append("},\"noticeTitle\":{\"stringValue\":");
+        AppendJsonString(t_builder, _noticeTitle);
+        t_builder.Append("},\"noticeBody\":{\"stringValue\":");
+        AppendJsonString(t_builder, _noticeBody);
         t_builder.Append("},\"publishedAt\":{\"stringValue\":");
         AppendJsonString(t_builder, DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
         t_builder.Append("},\"publishedBy\":{\"stringValue\":");
@@ -1033,6 +1057,10 @@ public static partial class SpecFirestoreUploader
         t_builder.Append(",\"minAppMajor\":{\"integerValue\":\"").Append(ContentVersion.MinAppMajor).Append("\"}");
         t_builder.Append(",\"contentVersion\":{\"stringValue\":");
         AppendJsonString(t_builder, t_version);
+        t_builder.Append("},\"noticeTitle\":{\"stringValue\":");
+        AppendJsonString(t_builder, _noticeTitle);
+        t_builder.Append("},\"noticeBody\":{\"stringValue\":");
+        AppendJsonString(t_builder, _noticeBody);
         t_builder.Append("},\"history\":{\"arrayValue\":{\"values\":[");
         for (int i = 0; i < _history.Count; i++)
         {

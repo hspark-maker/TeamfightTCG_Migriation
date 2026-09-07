@@ -28,6 +28,22 @@ public static class SpecSnapshotCache
     public static bool TryLoad(string _envId, out string _payload, out string _fingerprint)
         => TryLoad(_envId, out _payload, out _fingerprint, out _, out _);
 
+    /// <summary>공지 판정처럼 내용 전체가 필요 없는 곳에서 현재 채택한 콘텐츠 버전만 읽는다.</summary>
+    public static bool TryGetContentVersion(string _envId, out int _contentMajor, out long _contentMinor)
+    {
+        _contentMajor = 0;
+        _contentMinor = -1;
+        CacheEnvelope t_cache = LocalData.Default.Load<CacheEnvelope>(PathOf(_envId));
+        if (t_cache == null || t_cache.schemaVersion != CacheFormatVersion ||
+            !string.Equals(t_cache.envId, _envId, StringComparison.Ordinal) ||
+            !ContentVersion.IsSupportedMajor(t_cache.contentMajor) || t_cache.contentMinor < 0)
+            return false;
+
+        _contentMajor = t_cache.contentMajor;
+        _contentMinor = t_cache.contentMinor;
+        return true;
+    }
+
     public static bool TryLoad(
         string _envId, out string _payload, out string _fingerprint,
         out int _contentMajor, out long _contentMinor)

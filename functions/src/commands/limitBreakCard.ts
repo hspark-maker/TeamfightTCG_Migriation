@@ -1,4 +1,13 @@
+import {FieldValue} from "firebase-admin/firestore";
 import {randomUUID} from "node:crypto";
+import {db} from "../firebaseApp";
+import {
+  beginMissionBump,
+  commitMissionBump,
+  missionResponse,
+  MissionResponse,
+} from "../missions/missionStore";
+import {missionPeriod} from "../missions/period";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {
@@ -94,14 +103,20 @@ export const limitBreakCard = onCall(async (request) => {
   let hpGain = 0;
   let snackCost = 0;
   let snackLeft = 0;
+  let missionState: MissionResponse | undefined;
   // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
   // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
   let replayed = true;
   // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
   const txId = clientReceiptId(request.data?.txId, randomUUID());
 
+  // 기간은 여기서 한 번만 잰다 — 콜백은 재실행되므로 그 안에서 재면 경계에 걸린 호출이 흔들린다.
+  const period = missionPeriod(Date.now());
+
   const result = await mutateSave(env, uid, "limitBreakCard", {kind: "client", txId},
-    (current): SaveMutation => {
+    async (current, transaction): Promise<SaveMutation> => {
+      // 미션 읽기가 콜백의 첫 줄이다 — 아래 쓰기보다 반드시 앞이어야 한다(Firestore 트랜잭션 규칙).
+      const missions = await beginMissionBump(transaction, db, env, uid, period);
       // 트랜잭션이 재실행되면 이전 판정을 버리고 다시 잰다 — 간식·단계와 정합해야 한다.
       // 소유 게이트는 클라 TryGetNextLimitBreakStep 과 같은 자리다. 빼면 세이브에 진행도만
       // 남은 미소유 카드에 체력이 붙는다.
@@ -131,6 +146,10 @@ export const limitBreakCard = onCall(async (request) => {
       snackCost = step.snackCost;
       snackLeft = currentSnack - step.snackCost;
 
+      // 진행도는 콜백 안에서 올린다 — 영수증 히트는 이 콜백을 건너뛰므로 재시도가 두 번 올리지 않는다.
+      commitMissionBump(transaction, missions, "LimitBreakCard", 1, FieldValue.serverTimestamp());
+      missionState = missionResponse(missions.state, period);
+
       // 지갑 키를 싣지 않는다 — 간식은 지갑 재화가 아니라 cardGrowth 슬롯 안 값이다.
       return {
         slots: {
@@ -140,7 +159,7 @@ export const limitBreakCard = onCall(async (request) => {
     },
     (adopted) => {
       replayed = false;
-      return {...adopted, stage, hpGain, snackCost, snackLeft};
+      return {...adopted, stage, hpGain, snackCost, snackLeft, missions: missionState};
     });
 
   if (replayed) {

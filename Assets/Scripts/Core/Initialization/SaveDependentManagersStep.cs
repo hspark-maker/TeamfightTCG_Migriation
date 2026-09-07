@@ -42,6 +42,10 @@ public sealed class SaveDependentManagersStep : MainInitializer
         // 전역 터치 이펙트도 워처와 같은 상시 오버레이다 — 자체 멱등이라 재시도 경로에서도 무조건 호출한다.
         TouchEffectOverlay.Install();
 
+        // 막지 않는 버전 안내(권장 업데이트·공지). 차단은 초기화에서 이미 끊겼으므로 여기 오지 않는다.
+        // 자체 멱등이고, 띄울 것이 없으면 아무것도 하지 않는다.
+        AppUpdateNoticeWatcher.Install();
+
         GameInitialization.MarkReady();
     }
 

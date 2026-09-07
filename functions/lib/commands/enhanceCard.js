@@ -39,6 +39,8 @@ const logger = __importStar(require("firebase-functions/logger"));
 const node_crypto_1 = require("node:crypto");
 const firestore_1 = require("firebase-admin/firestore");
 const firebaseApp_1 = require("../firebaseApp");
+const missionStore_1 = require("../missions/missionStore");
+const period_1 = require("../missions/period");
 const saveDocument_1 = require("../save/saveDocument");
 const domainReject_1 = require("../save/domainReject");
 const receiptId_1 = require("../save/receiptId");
@@ -94,12 +96,18 @@ exports.enhanceCard = (0, https_1.onCall)(async (request) => {
     let currency = "";
     let cost = 0;
     let freeShotUsed = false;
+    let missionState;
     // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
     // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
     let replayed = true;
     // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
     const txId = (0, receiptId_1.clientReceiptId)(request.data?.txId, (0, node_crypto_1.randomUUID)());
+    // 기간은 여기서 한 번만 잰다 — 콜백은 재실행되므로 그 안에서 재면 경계에 걸린 호출이 흔들린다.
+    const period = (0, period_1.missionPeriod)(Date.now());
     const result = await (0, saveDocument_1.mutateSave)(env, uid, "enhanceCard", { kind: "client", txId }, async (current, transaction, wallet) => {
+        // 미션 읽기가 콜백의 첫 줄이다. 아래 grants 읽기와는 둘 다 읽기라 순서를 다투지 않지만,
+        // 미션 **쓰기**는 그 grants 읽기보다 뒤여야 해서 콜백 맨 끝으로 갈라 두었다.
+        const missions = await (0, missionStore_1.beginMissionBump)(transaction, firebaseApp_1.db, env, uid, period);
         // 트랜잭션이 재실행되면 이전 판정을 버리고 다시 굴린다 — 잔액·레벨과 정합해야 한다.
         const entries = (0, cardGrowth_1.readGrowthEntries)(current.cardGrowth);
         const currentLevel = (0, cardGrowth_1.levelOfCard)(entries, cardId);
@@ -131,6 +139,11 @@ exports.enhanceCard = (0, https_1.onCall)(async (request) => {
         currency = step.currency;
         cost = charged;
         freeShotUsed = succeeded && freeShot !== null;
+        // 실패한 강화도 센다 — 재화는 이미 나갔고, 미션이 확률에 좌우되면 같은 횟수를 굴린 두 유저가
+        // 서로 다른 진행도를 갖는다. 진행도는 "시도"의 축이다.
+        // 이 쓰기는 위 grants 읽기보다 뒤여야 한다(Firestore 트랜잭션 규칙).
+        (0, missionStore_1.commitMissionBump)(transaction, missions, "EnhanceCard", 1, firestore_1.FieldValue.serverTimestamp());
+        missionState = (0, missionStore_1.missionResponse)(missions.state, period);
         return {
             slots: {
                 cardGrowth: (0, cardGrowth_1.growthSlot)(succeeded ? (0, cardGrowth_1.applyEnhanceLevel)(entries, cardId, step.level) : entries),
@@ -139,7 +152,7 @@ exports.enhanceCard = (0, https_1.onCall)(async (request) => {
         };
     }, (adopted) => {
         replayed = false;
-        return { ...adopted, outcome, level, currency, cost, freeShotUsed };
+        return { ...adopted, outcome, level, currency, cost, freeShotUsed, missions: missionState };
     });
     if (replayed) {
         logger.info("receipt replay", { uid, env, source: "enhanceCard", txId, revision: result.revision });

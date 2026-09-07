@@ -47,6 +47,9 @@ public static class BattleContentSync
         public bool FromIndex;
         public Dictionary<string, string> Hashes;
         public Dictionary<string, string> BlobPaths;
+        public string NoticeId;
+        public string NoticeTitle;
+        public string NoticeBody;
 
         public string VersionText => ContentVersion.Format(Major, Minor);
     }
@@ -132,6 +135,11 @@ public static class BattleContentSync
             }
             RemoteSpecVector t_remote = await t_metaTask;
             Dictionary<string, string> t_remoteHashes = t_remote.Hashes;
+            bool t_hadPreviousVersion = SpecSnapshotCache.TryGetContentVersion(
+                t_envId, out int t_previousMajor, out long t_previousMinor);
+            string t_previousVersion = t_hadPreviousVersion
+                ? ContentVersion.Format(t_previousMajor, t_previousMinor)
+                : string.Empty;
             Debug.Log($"[BattleContent] 서버 콘텐츠={t_remote.VersionText} source={(t_remote.FromIndex ? "index" : "legacy-meta")}");
 
             int t_mismatch = 0;
@@ -148,6 +156,9 @@ public static class BattleContentSync
 
             if (t_mismatch == 0)
             {
+                ContentUpdateNotice.RecordIfUpdated(
+                    t_hadPreviousVersion, t_previousVersion,
+                    t_remote.NoticeId, t_remote.NoticeTitle, t_remote.NoticeBody);
                 s_lastLocalFingerprint = t_localFingerprint;
                 s_lastCheckUtc = DateTime.UtcNow;
                 return Verdict(EBattleContentGateResult.Current, "서버와 동일 — 그대로 전투 진입");
@@ -176,6 +187,10 @@ public static class BattleContentSync
             if (!SpecSnapshotCache.TrySave(
                     t_envId, t_payload, t_fingerprint, t_remote.Major, t_remote.Minor, out string t_cacheError))
                 throw new IOException("Spec cache write failed: " + t_cacheError);
+
+            ContentUpdateNotice.RecordIfUpdated(
+                t_hadPreviousVersion, t_previousVersion,
+                t_remote.NoticeId, t_remote.NoticeTitle, t_remote.NoticeBody);
 
             s_adoptedFingerprint = t_fingerprint;
             Debug.Log($"[BattleContent] 캐시 교체 완료 지문 {t_localFingerprint} -> {t_fingerprint} ({t_payload.Length:N0}자)");
@@ -307,6 +322,9 @@ public static class BattleContentSync
         }
         if (!TryInteger(t_fields, "minor", out long t_minor) || t_minor < 0)
             throw new InvalidOperationException("Remote spec index minor is missing or invalid.");
+        // 공지 id는 서버의 contentVersion 문자열이 아니라 major·minor로 다시 만든다.
+        // 그 필드는 표시용이라 저작 사고로 틀어질 수 있는데, id가 틀어지면 같은 공지가 반복되거나 영영 안 뜬다.
+        string t_contentVersion = ContentVersion.Format(t_major, t_minor);
         if (!t_fields.TryGetValue("tables", out object t_tablesValue) ||
             !(t_tablesValue is IDictionary<string, object> t_tables))
             throw new InvalidOperationException("Remote spec index tables map is missing.");
@@ -334,8 +352,16 @@ public static class BattleContentSync
             FromIndex = true,
             Hashes = t_hashes,
             BlobPaths = t_blobPaths,
+            NoticeId = t_contentVersion,
+            NoticeTitle = ReadOptionalString(t_fields, "noticeTitle"),
+            NoticeBody = ReadOptionalString(t_fields, "noticeBody"),
         };
     }
+
+    static string ReadOptionalString(IDictionary<string, object> _fields, string _name)
+        => _fields.TryGetValue(_name, out object t_value) && t_value is string t_text
+            ? t_text
+            : string.Empty;
 
     static bool TryInteger(IDictionary<string, object> _fields, string _name, out long _value)
     {

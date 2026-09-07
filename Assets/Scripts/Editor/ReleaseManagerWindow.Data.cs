@@ -10,6 +10,7 @@ public partial class ReleaseManagerWindow
     const string DATA_SELECTION_PREF_KEY = "SpecFirestore.Selected";
     const string DATA_SELECTION_INITIALIZED_PREF_KEY = "SpecFirestore.Selected.Initialized";
     const string DATA_PUBLISH_PREF_KEY = "SpecFirestore.PublishIndex";
+    const int CONTENT_NOTICE_BODY_MAX_LENGTH = 200;
 
     EContentRunMode dataUploadMode;
     List<string> dataTables;
@@ -18,6 +19,8 @@ public partial class ReleaseManagerWindow
     string dataReport;
     // 업로드가 끝나면 새 콘텐츠 버전을 공개할지. 끄면 표 문서만 올라가고 _index 포인터는 그대로다.
     bool dataPublishIndex = true;
+    string dataPublishNoticeTitle = string.Empty;
+    string dataPublishNoticeBody = string.Empty;
     Vector2 dataScroll;
     bool dataRulesOpen;
     bool dataRulesKnown;
@@ -92,6 +95,20 @@ public partial class ReleaseManagerWindow
                 "ContentVersion.MinAppMajor를 올리고 그 세대를 지원하는 앱 빌드를 먼저 배포해야 한다. " +
                 "누락하면 구 앱이 새 행을 해석하지 못해 초기화에 실패할 수 있다.",
                 MessageType.Info);
+
+        if (this.dataPublishIndex)
+        {
+            EditorGUILayout.Space(6);
+            EditorGUILayout.LabelField("이번 공개 공지 (선택)", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "본문이 있을 때만 업데이트 뒤 1회 표시됩니다. 공지 ID는 새 콘텐츠 버전으로 자동 생성됩니다.",
+                MessageType.None);
+            this.dataPublishNoticeTitle = EditorGUILayout.TextField(
+                "공지 제목", this.dataPublishNoticeTitle ?? string.Empty);
+            EditorGUILayout.LabelField($"공지 본문 ({(this.dataPublishNoticeBody ?? string.Empty).Length}/{CONTENT_NOTICE_BODY_MAX_LENGTH})");
+            this.dataPublishNoticeBody = EditorGUILayout.TextArea(
+                this.dataPublishNoticeBody ?? string.Empty, GUILayout.MinHeight(54));
+        }
 
         string t_blocker = DataUploadBlocker(t_hasEnv, t_envError);
         if (!string.IsNullOrEmpty(t_blocker))
@@ -306,6 +323,15 @@ public partial class ReleaseManagerWindow
         if (this.dataSelected.Count == 0) return "업로드할 표를 하나 이상 선택해야 한다.";
         if (this.issues == null) return "콘텐츠 검증을 먼저 실행해야 한다.";
         if (this.issues.Count > 0) return $"콘텐츠 검증 문제 {this.issues.Count}건을 먼저 해결해야 한다.";
+        if (this.dataPublishIndex)
+        {
+            string t_title = (this.dataPublishNoticeTitle ?? string.Empty).Trim();
+            string t_body = (this.dataPublishNoticeBody ?? string.Empty).Trim();
+            if (!string.IsNullOrEmpty(t_title) && string.IsNullOrEmpty(t_body))
+                return "콘텐츠 공지 제목을 입력했다면 본문도 입력해야 한다.";
+            if (t_body.Length > CONTENT_NOTICE_BODY_MAX_LENGTH)
+                return $"콘텐츠 공지 본문은 {CONTENT_NOTICE_BODY_MAX_LENGTH}자 이하여야 한다.";
+        }
         return null;
     }
 
@@ -408,7 +434,10 @@ public partial class ReleaseManagerWindow
                 (_publish
                     ? "\n\n표가 모두 성공하면 새 테이블 버전을 공개한다(_index 갱신)." +
                       "\n\n세대 확인: 새 카드 ID · 키워드 · 시너지 · 랭크 등급을 추가했다면 " +
-                      "ContentVersion.MinAppMajor를 올리고 새 앱을 먼저 배포했는지 확인할 것."
+                      "ContentVersion.MinAppMajor를 올리고 새 앱을 먼저 배포했는지 확인할 것." +
+                      (string.IsNullOrWhiteSpace(this.dataPublishNoticeBody)
+                          ? "\n\n이번 공개에는 사용자 공지가 없다."
+                          : $"\n\n사용자 공지:\n{this.dataPublishNoticeTitle}\n{this.dataPublishNoticeBody}")
                     : "\n\n버전은 올리지 않는다 — _index는 현재 버전을 계속 가리키고 표 문서만 최신이 된다."),
                 "업로드", "취소"))
             return;
@@ -469,10 +498,13 @@ public partial class ReleaseManagerWindow
             t_report.AppendLine("SKIP publish: 테이블 버전을 올리지 않는 업로드다 — _index는 그대로다.");
         if (_publish && !t_cancelled && t_failed == 0)
         {
-            string t_publishLine = SpecFirestoreUploader.PublishIndex(_envId, out string t_publishError);
+            string t_publishLine = SpecFirestoreUploader.PublishIndex(
+                _envId, this.dataPublishNoticeTitle, this.dataPublishNoticeBody, out string t_publishError);
             if (string.IsNullOrEmpty(t_publishError))
             {
                 t_report.AppendLine($"PUBLISH {t_publishLine}");
+                this.dataPublishNoticeTitle = string.Empty;
+                this.dataPublishNoticeBody = string.Empty;
             }
             else
             {

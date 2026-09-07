@@ -85,3 +85,11 @@ int,string,string,int,string,string,long,string
 82,Battle,win.perCard,1,Currency,Gold,10,승리 시 생존 카드 1장당 지급(계수)
 83,Battle,win.floor,1,Currency,Gold,10,승리 지급액 하한(부전승 바닥)
 84,Battle,lose.flat,1,Currency,Gold,5,패배 고정 지급(생존 카드 무관)
+85,Mission,daily.openPack1,1,Currency,Gold,120,팩 개봉 1회
+86,Mission,daily.openPack3,1,Currency,Gold,200,팩 개봉 3회
+87,Mission,weekly.openPack10,1,Currency,Diamond,30,주간 팩 10회
+88,Mission,weekly.enhanceCard5,1,Currency,Shard,100,주간 강화 5회
+89,Mission,weekly.limitBreakCard1,1,Currency,Diamond,50,주간 한계 돌파 1회
+90,Mission,daily.completeBattle3,1,Currency,Gold,200,일일 전투 3회
+91,Mission,weekly.winRankedBattle5,1,Currency,Diamond,40,주간 랭크 승리 5회
+92,Mission,daily.claimReward1,1,Currency,Gold,100,일일 보상 수령 1회

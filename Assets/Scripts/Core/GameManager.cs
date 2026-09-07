@@ -105,6 +105,8 @@ public class GameManager : MonoBehaviour
 
             // 등록 순서 = 초기화 순서. 채택 창구가 세이브 모듈보다 먼저 서야 초기화 시점부터 산다.
             FirebaseManager.Register(new CallableFirebaseModule(t_emulators.FunctionsOrigin));
+            // 버전 게이트가 콘텐츠 모듈보다 앞이다 — 지원이 끝난 빌드는 표 스냅샷을 받기 전에 끊는다.
+            FirebaseManager.Register(new AppVersionFirebaseModule());
             FirebaseManager.Register(new BattleContentFirebaseModule());
             FirebaseManager.Register(new PlayerSaveFirebaseModule());
             FirebaseManager.Register(new MatchResultFirebaseModule());

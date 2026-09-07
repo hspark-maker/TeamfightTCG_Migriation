@@ -4,6 +4,13 @@ import {randomInt, randomUUID} from "node:crypto";
 import {FieldValue} from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
 import {
+  beginMissionBump,
+  commitMissionBump,
+  missionResponse,
+  MissionResponse,
+} from "../missions/missionStore";
+import {missionPeriod} from "../missions/period";
+import {
   isKnownEnv,
   mutateSave,
   requireUid,
@@ -91,6 +98,7 @@ export const enhanceCard = onCall(async (request) => {
   let currency = "";
   let cost = 0;
   let freeShotUsed = false;
+  let missionState: MissionResponse | undefined;
   // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
   // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
   let replayed = true;
@@ -98,8 +106,15 @@ export const enhanceCard = onCall(async (request) => {
   // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
   const txId = clientReceiptId(request.data?.txId, randomUUID());
 
+  // 기간은 여기서 한 번만 잰다 — 콜백은 재실행되므로 그 안에서 재면 경계에 걸린 호출이 흔들린다.
+  const period = missionPeriod(Date.now());
+
   const result = await mutateSave(env, uid, "enhanceCard", {kind: "client", txId},
     async (current, transaction, wallet): Promise<SaveMutation> => {
+      // 미션 읽기가 콜백의 첫 줄이다. 아래 grants 읽기와는 둘 다 읽기라 순서를 다투지 않지만,
+      // 미션 **쓰기**는 그 grants 읽기보다 뒤여야 해서 콜백 맨 끝으로 갈라 두었다.
+      const missions = await beginMissionBump(transaction, db, env, uid, period);
+
       // 트랜잭션이 재실행되면 이전 판정을 버리고 다시 굴린다 — 잔액·레벨과 정합해야 한다.
       const entries = readGrowthEntries(current.cardGrowth);
       const currentLevel = levelOfCard(entries, cardId);
@@ -138,6 +153,12 @@ export const enhanceCard = onCall(async (request) => {
       cost = charged;
       freeShotUsed = succeeded && freeShot !== null;
 
+      // 실패한 강화도 센다 — 재화는 이미 나갔고, 미션이 확률에 좌우되면 같은 횟수를 굴린 두 유저가
+      // 서로 다른 진행도를 갖는다. 진행도는 "시도"의 축이다.
+      // 이 쓰기는 위 grants 읽기보다 뒤여야 한다(Firestore 트랜잭션 규칙).
+      commitMissionBump(transaction, missions, "EnhanceCard", 1, FieldValue.serverTimestamp());
+      missionState = missionResponse(missions.state, period);
+
       return {
         slots: {
           cardGrowth: growthSlot(succeeded ? applyEnhanceLevel(entries, cardId, step.level) : entries),
@@ -147,7 +168,7 @@ export const enhanceCard = onCall(async (request) => {
     },
     (adopted) => {
       replayed = false;
-      return {...adopted, outcome, level, currency, cost, freeShotUsed};
+      return {...adopted, outcome, level, currency, cost, freeShotUsed, missions: missionState};
     });
 
   if (replayed) {

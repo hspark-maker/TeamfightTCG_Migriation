@@ -37,6 +37,9 @@ public class LoadingCoverView : MonoBehaviour
     [SerializeField] Button     retryButton;
     [SerializeField] Button     quitButton;
 
+    [Tooltip("스토어로 보내는 버튼. 앱 버전 차단이고 서버가 주소를 저작했을 때만 보인다. 미배선이면 안내만 남는다.")]
+    [SerializeField] Button     storeButton;
+
     [Header("계정")]
     [Tooltip("로그인 화면. 미배선이면 계정 버튼이 뜨지 않는다(초기화는 그대로 진행).")]
     [SerializeField] LoginEmailPanel loginPanel;
@@ -269,11 +272,13 @@ public class LoadingCoverView : MonoBehaviour
         if (recoveryText != null)
         {
             recoveryText.text = t_updateRequired
-                ? "새 버전으로 업데이트가 필요합니다."
+                ? UpdateNotice()
                 : t_assetFailed
                     ? "게임 데이터를 불러오지 못했습니다.\n다시 시도해 주세요."
                     : "서버에 연결하지 못했습니다.\n네트워크 연결을 확인한 뒤 다시 시도해 주세요.";
         }
+
+        ApplyStoreButton(t_updateRequired);
 
         bool t_canRetry = GameInitialization.CanRetry;
 
@@ -291,6 +296,32 @@ public class LoadingCoverView : MonoBehaviour
         quitButton.interactable = true;
         quitButton.onClick.RemoveAllListeners();
         quitButton.onClick.AddListener(QuitApp);
+    }
+
+    // 같은 UpdateRequired 화면이라도 유저가 할 일이 다르다 — 표 세대 사고는 스토어에 새 빌드가 없을 수 있고,
+    // 앱 버전 차단은 스토어에 반드시 있다. 문구를 뭉치면 전자에서 유저가 스토어를 헛걸음한다.
+    static string UpdateNotice()
+        => GameInitialization.UpdateReason == EUpdateRequiredReason.AppVersion
+            ? string.IsNullOrEmpty(AppVersionGate.LatestText)
+                ? "새 버전으로 업데이트가 필요합니다.\n스토어에서 최신 버전을 받아 주세요."
+                : $"새 버전({AppVersionGate.LatestText})으로 업데이트가 필요합니다.\n스토어에서 최신 버전을 받아 주세요."
+            : "새 버전으로 업데이트가 필요합니다.";
+
+    // 주소는 서버 저작이라 없을 수 있다. 없는데 버튼을 띄우면 눌러도 아무 일이 없어 앱이 멈춘 것으로 읽힌다.
+    void ApplyStoreButton(bool _updateRequired)
+    {
+        if (storeButton == null) return;
+
+        bool t_show = _updateRequired
+                   && GameInitialization.UpdateReason == EUpdateRequiredReason.AppVersion
+                   && AppVersionGate.HasStoreUrl;
+
+        storeButton.gameObject.SetActive(t_show);
+        storeButton.onClick.RemoveAllListeners();
+        if (!t_show) return;
+
+        storeButton.interactable = true;
+        storeButton.onClick.AddListener(() => Application.OpenURL(AppVersionGate.StoreUrl));
     }
 
     void Retry()
