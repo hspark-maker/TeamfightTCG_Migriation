@@ -220,6 +220,29 @@ public class OutgameDebugOverlay : MonoBehaviour
         if (GUILayout.Button($"+E {CurrencyManager.Energy}",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantEnergy();
         if (GUILayout.Button($"+S {CurrencyManager.Shard}",   GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantShard();
         GUILayout.EndHorizontal();
+
+        DrawRouletteControls();
+    }
+
+    // 티켓은 수급 경로가 아직 없어서(기획 범위 밖) 여기가 유일한 입구다 — 없으면 회전이 늘 InsufficientTicket 이다.
+    void DrawRouletteControls()
+    {
+        GUILayout.BeginHorizontal();
+
+        long t_tickets = CurrencyManager.GetBalance(ECurrencyType.RouletteTicket);
+        if (GUILayout.Button($"+TICKET {t_tickets}", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantRouletteTicket();
+
+        // 서버 미배포 상태에서 회전 안무를 보는 유일한 길. 한 번 꽂으면 되돌리지 못한다(재기동해야 서버로 돌아온다).
+        if (RouletteManager.IsServerBacked)
+        {
+            if (GUILayout.Button("SPIN: LOCAL", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.UseLocalRouletteSource();
+        }
+        else
+        {
+            GUILayout.Label("SPIN: LOCAL(ON)", GUILayout.Height(ROW_HEIGHT));
+        }
+
+        GUILayout.EndHorizontal();
     }
 
     void DrawChapterJumps()

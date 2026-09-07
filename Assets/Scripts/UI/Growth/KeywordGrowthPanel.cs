@@ -27,6 +27,9 @@ public class KeywordGrowthPanel : PooledUIBase
     [SerializeField] Transform grid;                    // 칸이 격자로 쌓일 Content(GridLayoutGroup)
     [SerializeField] KeywordGrowthCellView cellPrefab;  // 칸 프리팹
     [SerializeField] Button closeButton;
+
+    [Tooltip("패널 밖(딤)을 눌러 닫는 판. Root/Dim의 알파 0 Image에 배선한다 — 미배선이면 밖을 눌러도 닫히지 않는다.")]
+    [SerializeField] Button dimButton;
     [SerializeField] TMP_Text energyText;
     [SerializeField] Image energyIcon;
 
@@ -108,6 +111,11 @@ public class KeywordGrowthPanel : PooledUIBase
         {
             this.closeButton.onClick.RemoveAllListeners();
             this.closeButton.onClick.AddListener(this.Close);
+        }
+        if (this.dimButton != null)
+        {
+            this.dimButton.onClick.RemoveAllListeners();
+            this.dimButton.onClick.AddListener(this.Close);
         }
         if (this.upgradeButton != null)
         {

@@ -27,7 +27,7 @@ export interface WalletMigration {
  * 세이브 문서 현재값에서 지갑 초기 잔액과 세이브 쪽 패치를 낸다.
  *
  * 멱등하다 — 이미 이관된 문서(currency 없음)를 넣어도 같은 모양이 나온다. 다만 그때
- * balances 는 4키 0 이므로, 지갑이 두 번 서지 않도록 막는 것은 createWallet 의
+ * balances 는 전 키 0 이므로, 지갑이 두 번 서지 않도록 막는 것은 createWallet 의
  * `transaction.create` 다(이 함수가 아니다).
  * @param {Record<string, unknown>} current 세이브 문서 현재값
  * @param {unknown} deleteSentinel 필드 삭제 값(호출부가 FieldValue.delete() 를 넘긴다)

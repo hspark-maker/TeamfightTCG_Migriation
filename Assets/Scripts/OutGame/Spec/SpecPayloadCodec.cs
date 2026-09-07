@@ -25,6 +25,7 @@ public static class SpecPayloadCodec
         "AlbumEntry", "AlbumThemeInfo",
         "SynergyDef", "SynergyTierDef", "SynergyEffectDef",
         "AccountLevel",
+        "Roulette", "RouletteSlot",
     };
 
     public static bool TryBuildLocalTable(object _manager, string _table, out SpecTablePayload _payload, out string _error)
@@ -266,6 +267,7 @@ public static class SpecPayloadCodec
         "SynergyDef" => typeof(SynergyDef), "SynergyTierDef" => typeof(SynergyTierDef),
         "SynergyEffectDef" => typeof(SynergyEffectDef),
         "AccountLevel" => typeof(AccountLevel),
+        "Roulette" => typeof(Roulette), "RouletteSlot" => typeof(RouletteSlot),
         _ => null,
     };
 

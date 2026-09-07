@@ -11,6 +11,9 @@ public static class OutgameDebugActions
     public const long DEBUG_ENERGY_AMOUNT  = 1000;
     public const long DEBUG_SHARD_AMOUNT   = 1000;
 
+    // 1회 회전 비용이 티켓 1장이라 10장이면 충분하다 — 큰 수는 잔액 대조를 흐린다.
+    public const long DEBUG_ROULETTE_TICKET_AMOUNT = 10;
+
     public static void GrantGold() => GrantCurrency(ECurrencyType.Gold, DEBUG_GOLD_AMOUNT);
 
     public static void GrantDiamond() => GrantCurrency(ECurrencyType.Diamond, DEBUG_DIAMOND_AMOUNT);
@@ -18,6 +21,16 @@ public static class OutgameDebugActions
     public static void GrantEnergy() => GrantCurrency(ECurrencyType.Energy, DEBUG_ENERGY_AMOUNT);
 
     public static void GrantShard() => GrantCurrency(ECurrencyType.Shard, DEBUG_SHARD_AMOUNT);
+
+    public static void GrantRouletteTicket() => GrantCurrency(ECurrencyType.RouletteTicket, DEBUG_ROULETTE_TICKET_AMOUNT);
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    // 서버 없이 회전 안무를 만지는 유일한 문. 자동 배선은 없다 — 로컬 추첨이 출시 빌드로 새지 않게 한다.
+    public static void UseLocalRouletteSource()
+    {
+        RouletteManager.UseLocalSourceForDebug();
+    }
+#endif
 
     // 카드 희귀도별 개봉 연출만 검증한다. 소유·중복 보상·재화·랭크·세이브는 건드리지 않는다.
     public static void OpenRarityTestPack(ECardGrade _grade)
@@ -174,7 +187,7 @@ public static class OutgameDebugActions
 #endif
 
     // 재화 지급을 서버에 맡긴다(잔액·영속의 진실원은 서버 문서다).
-    // 반환형은 void를 지켜야 한다 — 이걸 감싸는 GrantGold/GrantDiamond/GrantEnergy/GrantShard 넷이
+    // 반환형은 void를 지켜야 한다 — 이걸 감싸는 GrantGold/GrantDiamond/GrantEnergy/GrantShard/GrantRouletteTicket 다섯이
     // DebugCurrencyButton의 Button OnClick(void)에 직결돼 있다.
     public static void GrantCurrency(ECurrencyType _type, long _amount)
     {

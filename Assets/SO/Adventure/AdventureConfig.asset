@@ -37,28 +37,28 @@ MonoBehaviour:
       kind: 0
       aiDeckId: deck_03
       enemyDeckIds: 010000000200000003000000040000000b0000000c000000
-      aiCardLevel: 2
+      aiCardLevel: 1
     - nodeId: node_04
       displayName: "\uC124\uC6D0\uC758 \uAD70\uC8FC"
       avatar: {fileID: 0}
       kind: 0
       aiDeckId: deck_04
       enemyDeckIds: 010000000200000003000000040000001700000018000000
-      aiCardLevel: 2
+      aiCardLevel: 1
     - nodeId: node_05
       displayName: "\uC7BF\uBE5B \uB300\uC7A5\uC7A5\uC774"
       avatar: {fileID: 0}
       kind: 0
       aiDeckId: deck_05
       enemyDeckIds: 0f00000010000000190000001a0000001500000016000000
-      aiCardLevel: 2
+      aiCardLevel: 1
     - nodeId: node_06
       displayName: "\uBB3C\uACB0\uC758 \uBB34\uD76C"
       avatar: {fileID: 0}
       kind: 1
       aiDeckId: deck_06
       enemyDeckIds: 0f00000010000000190000001a0000001700000018000000
-      aiCardLevel: 2
+      aiCardLevel: 1
     requiredGrade: 0
   - chapterId: chapter_02
     title: "\uC81C2\uC7A5 \xB7 \uBB34\uB108\uC9C4 \uC131\uD130"
@@ -70,42 +70,42 @@ MonoBehaviour:
       kind: 0
       aiDeckId: deck_07
       enemyDeckIds: 08000000090000000a000000050000000600000007000000
-      aiCardLevel: 2
+      aiCardLevel: 1
     - nodeId: node_08
       displayName: "\uD669\uAE08\uAC00\uC9C0 \uC0AC\uC81C"
       avatar: {fileID: 0}
       kind: 0
       aiDeckId: deck_08
       enemyDeckIds: 0500000006000000070000000b0000000c0000000a000000
-      aiCardLevel: 2
+      aiCardLevel: 1
     - nodeId: node_09
       displayName: "\uC2EC\uC5F0\uC758 \uAD00\uCE21\uC790"
       avatar: {fileID: 0}
       kind: 0
       aiDeckId: deck_09
       enemyDeckIds: 150000001600000017000000180000000d0000000e000000
-      aiCardLevel: 3
+      aiCardLevel: 1
     - nodeId: node_10
       displayName: "\uD3D0\uD5C8\uC758 \uC218\uC9D1\uAC00"
       avatar: {fileID: 0}
       kind: 0
       aiDeckId: deck_10
       enemyDeckIds: 1d000000140000001e0000001c000000060000001b000000
-      aiCardLevel: 3
+      aiCardLevel: 2
     - nodeId: node_11
       displayName: "\uC7BF\uBD88\uC758 \uC804\uC870"
       avatar: {fileID: 0}
       kind: 0
       aiDeckId: deck_11
       enemyDeckIds: 1d000000040000001e0000001c0000000b0000001a000000
-      aiCardLevel: 3
+      aiCardLevel: 2
     - nodeId: node_12
       displayName: "\uC655\uAD00 \uC5C6\uB294 \uC655"
       avatar: {fileID: 0}
       kind: 1
       aiDeckId: deck_12
       enemyDeckIds: 1100000012000000020000001e000000060000001b000000
-      aiCardLevel: 3
+      aiCardLevel: 2
     requiredGrade: 1
   - chapterId: chapter_03
     title: "\uC81C3\uC7A5 \xB7 \uC5BC\uC5B4\uBD99\uC740 \uC124\uC6D0"
@@ -117,42 +117,42 @@ MonoBehaviour:
       kind: 0
       aiDeckId: adventure_node_13
       enemyDeckIds: 040000000100000003000000020000000e0000000d000000
-      aiCardLevel: 3
+      aiCardLevel: 2
     - nodeId: node_14
       displayName: "\uB208\uBCF4\uB77C \uBB34\uB9AC"
       avatar: {fileID: 0}
       kind: 0
       aiDeckId: adventure_node_14
       enemyDeckIds: 110000001200000014000000130000000500000007000000
-      aiCardLevel: 3
+      aiCardLevel: 2
     - nodeId: node_15
       displayName: "\uC5BC\uC74C\uBB3C\uACB0 \uC220\uC0AC"
       avatar: {fileID: 0}
       kind: 0
       aiDeckId: adventure_node_15
       enemyDeckIds: 10000000190000001a0000000f0000000500000007000000
-      aiCardLevel: 3
+      aiCardLevel: 2
     - nodeId: node_16
       displayName: "\uC11C\uB9AC\uBB34\uB364 \uC8FC\uC778"
       avatar: {fileID: 0}
       kind: 0
       aiDeckId: adventure_node_16
       enemyDeckIds: 0a000000090000000800000018000000170000001b000000
-      aiCardLevel: 4
+      aiCardLevel: 2
     - nodeId: node_17
       displayName: "\uC138\uAC08\uB798 \uC720\uBB3C\uAE30\uC0AC"
       avatar: {fileID: 0}
       kind: 0
       aiDeckId: adventure_node_17
       enemyDeckIds: 0c0000000b00000016000000150000000e0000000d000000
-      aiCardLevel: 4
+      aiCardLevel: 2
     - nodeId: node_18
       displayName: "\uC124\uC6D0\uC758 \uC131\uC8FC"
       avatar: {fileID: 0}
       kind: 1
       aiDeckId: adventure_node_18
       enemyDeckIds: 050000000700000018000000170000000c0000000b000000
-      aiCardLevel: 4
+      aiCardLevel: 2
     requiredGrade: 2
   - chapterId: chapter_04
     title: "\uC81C4\uC7A5 \xB7 \uC7BF\uBD88\uC758 \uD654\uC0B0"
@@ -164,40 +164,40 @@ MonoBehaviour:
       kind: 0
       aiDeckId: adventure_node_19
       enemyDeckIds: 10000000190000001a0000000f0000000e0000000d000000
-      aiCardLevel: 4
+      aiCardLevel: 2
     - nodeId: node_20
       displayName: "\uBD88\uD2F0 \uB5BC"
       avatar: {fileID: 0}
       kind: 0
       aiDeckId: adventure_node_20
       enemyDeckIds: 110000001200000014000000130000000c0000000b000000
-      aiCardLevel: 4
+      aiCardLevel: 2
     - nodeId: node_21
       displayName: "\uD751\uC694\uC11D \uBC29\uBCBD\uB300"
       avatar: {fileID: 0}
       kind: 0
       aiDeckId: adventure_node_21
       enemyDeckIds: 05000000070000000c0000000b0000001600000015000000
-      aiCardLevel: 4
+      aiCardLevel: 2
     - nodeId: node_22
       displayName: "\uC628\uCC9C\uC758 \uC218\uD638\uC790"
       avatar: {fileID: 0}
       kind: 0
       aiDeckId: adventure_node_22
       enemyDeckIds: 040000000100000003000000020000001600000015000000
-      aiCardLevel: 4
+      aiCardLevel: 2
     - nodeId: node_23
       displayName: "\uC7BF\uB354\uBBF8 \uAC70\uC778\uB300"
       avatar: {fileID: 0}
       kind: 0
       aiDeckId: adventure_node_23
       enemyDeckIds: 050000000700000018000000170000000e0000000d000000
-      aiCardLevel: 4
+      aiCardLevel: 3
     - nodeId: node_24
       displayName: "\uC7BF\uBD88\uC758 \uC655"
       avatar: {fileID: 0}
       kind: 1
       aiDeckId: adventure_node_24
       enemyDeckIds: 180000001700000016000000150000001b00000006000000
-      aiCardLevel: 4
+      aiCardLevel: 3
     requiredGrade: 3

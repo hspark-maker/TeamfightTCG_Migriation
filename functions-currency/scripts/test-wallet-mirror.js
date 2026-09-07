@@ -26,8 +26,8 @@ assert.equal(isKnownEnv("test"), true);
 assert.equal(isKnownEnv("live"), true);
 assert.equal(isKnownEnv("stage"), false, "모르는 환경은 지갑을 열지 못한다");
 
-assert.deepEqual([...CURRENCY_KEYS].sort(), ["Diamond", "Energy", "Gold", "Shard"],
-  "룰의 balances.hasOnly 와 같은 4키여야 한다");
+assert.deepEqual([...CURRENCY_KEYS].sort(), ["Diamond", "Energy", "Gold", "RouletteTicket", "Shard"],
+  "default 의 재화 키 목록과 같아야 한다");
 
 // ── devGrantCurrency 가 밟는 합성 ────────────────────────────────────────────
 // 명령 본문이 하는 일은 grant → nextWallet 두 줄이 전부다. 그 결과가 응답 {rev, balances} 다.
@@ -36,15 +36,15 @@ assert.deepEqual([...CURRENCY_KEYS].sort(), ["Diamond", "Energy", "Gold", "Shard
   const next = nextWallet(empty, grant(empty.balances, [{currency: "Gold", amount: 500}]), "devGrantCurrency").next;
 
   assert.equal(next.rev, 1, "지갑 rev 는 쓰기마다 오른다");
-  assert.deepEqual(Object.keys(next.balances).sort(), ["Diamond", "Energy", "Gold", "Shard"],
-    "지급 뒤에도 항상 4키다");
+  assert.deepEqual(Object.keys(next.balances).sort(), ["Diamond", "Energy", "Gold", "RouletteTicket", "Shard"],
+    "지급 뒤에도 항상 전 키가 선다");
   assert.equal(next.balances.Gold, 500);
   assert.deepEqual(next.paidBalances, {}, "디버그 지급은 무상분이다");
 }
 
 // 두 번째 지급이 쌓이는지 — 클라 디버그 오버레이가 연타하는 경로다.
 {
-  const current = {rev: 7, balances: {Gold: 500, Diamond: 0, Energy: 0, Shard: 0}, paidBalances: {}};
+  const current = {rev: 7, balances: {Gold: 500, Diamond: 0, Energy: 0, Shard: 0, RouletteTicket: 0}, paidBalances: {}};
   const next = nextWallet(current, grant(current.balances, [{currency: "Diamond", amount: 3}]), "devGrantCurrency").next;
 
   assert.equal(next.rev, 8);

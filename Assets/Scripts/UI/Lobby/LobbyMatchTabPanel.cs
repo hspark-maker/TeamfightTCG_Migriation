@@ -24,6 +24,9 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
 
     [SerializeField] Button keywordGrowthButton;
 
+    [Tooltip("룰렛을 여는 버튼. 잠김 룩(FeatureLockView)은 붙이지 않는다 — 룰렛 해금은 온보딩 축이라 아직 없다.")]
+    [SerializeField] Button rouletteButton;
+
     [Header("모험")]
     [Tooltip("모험 맵으로 가는 버튼. 이동 자체는 LobbyRoot가 한다 — 탭 패널은 탭 이동을 모른다.")]
     [SerializeField] Button adventureButton;
@@ -40,6 +43,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (playButton != null) playButton.onClick.AddListener(HandlePlayRequested);
         if (rankRewardButton != null) rankRewardButton.onClick.AddListener(OpenRankRewards);
         if (keywordGrowthButton != null) keywordGrowthButton.onClick.AddListener(OpenKeywordGrowth);
+        if (rouletteButton != null) rouletteButton.onClick.AddListener(OpenRoulette);
         if (adventureButton != null) adventureButton.onClick.AddListener(HandleAdventureRequested);
 
         if (playLabel != null) m_defaultPlayText = playLabel.text;
@@ -66,6 +70,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (playButton != null) playButton.onClick.RemoveListener(HandlePlayRequested);
         if (rankRewardButton != null) rankRewardButton.onClick.RemoveListener(OpenRankRewards);
         if (keywordGrowthButton != null) keywordGrowthButton.onClick.RemoveListener(OpenKeywordGrowth);
+        if (rouletteButton != null) rouletteButton.onClick.RemoveListener(OpenRoulette);
         if (adventureButton != null) adventureButton.onClick.RemoveListener(HandleAdventureRequested);
 
         OutgameFeatureLock.OnChanged -= ApplyFeatureLocks;
@@ -98,6 +103,11 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
 
         if (adventureButton != null)
             adventureButton.interactable = OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure);
+
+        // 룰렛만 기능잠금 축이 아니라 "설정과 소스가 섰는가"로 갈린다. 저작 결함이나 출시 빌드에서
+        // 버튼이 통째로 사라지는 것이 안전장치라, 잠김 룩을 씌우지 않고 감춘다.
+        if (rouletteButton != null)
+            rouletteButton.gameObject.SetActive(RouletteManager.IsAvailable);
     }
 
     /// <summary>랭크 보상 목록. 풀이 없으면(초기화 미초기화) 조용히 지나가지 않고 드러낸다.</summary>
@@ -109,6 +119,15 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.KeywordGrowth)) return;
 
         OpenPooled<KeywordGrowthPanel>();
+    }
+
+    /// <summary>룰렛. 버튼을 감추는 것만으로는 부족하다 — 진입을 실제로 막는 주체는 여기다
+    /// (감추기는 표현이고, 다른 경로로 이 메서드를 부를 수 있다).</summary>
+    public void OpenRoulette()
+    {
+        if (!RouletteManager.IsAvailable) return;
+
+        OpenPooled<RoulettePanel>();
     }
 
     static void OpenPooled<T>() where T : PooledUIBase

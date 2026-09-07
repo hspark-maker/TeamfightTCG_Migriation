@@ -15,7 +15,7 @@ public sealed class LobbyTabBarView : MonoBehaviour
     [SerializeField] float focusSpinSeconds = 6f;
     [SerializeField] bool focusSpinClockwise = true;
     [Tooltip("알약이 선택 탭 자리로 미끄러지는 시간(초). 0이면 즉시 이동")]
-    [SerializeField] float focusSlideSeconds = 0.22f;
+    [SerializeField] float focusSlideSeconds = 0.35f;
 
     /// <summary>알약 아이콘 표시 박스. 탭 아이콘 크기를 따라가지 않는다.</summary>
     static readonly Vector2 FOCUS_ICON_SIZE = new Vector2(150f, 150f);
@@ -166,7 +166,7 @@ public sealed class LobbyTabBarView : MonoBehaviour
         }
 
         focus.DOAnchorPosX(t_x, focusSlideSeconds)
-             .SetEase(Ease.OutCubic)
+             .SetEase(Ease.OutCubic)   // LobbyTabController.SLIDE_EASE와 같은 곡선이어야 한다
              .SetUpdate(true)   // 결과창 등에서 timeScale이 눌려도 탭 전환은 같은 속도로 돈다
              .SetLink(focus.gameObject);
     }

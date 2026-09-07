@@ -7,7 +7,8 @@ using UnityEngine.UI;
 /// 세 통지를 함께 구독하는 이유는 하나다: 이 판은 풀의 uiRoot에서 로비 위를 덮으므로
 /// 판이 닫혀도 아래 탭의 OnEnable이 오지 않는다 — 통지가 유일한 갱신 신호다.
 ///
-/// 배지는 그리지 않는다(티어명만). 로비 RankHud를 대신 붙이지 않는 이유는 MatchProfileView와 같다 —
+/// 배지는 스프라이트만 갈아끼운다 — 승급 연출과 별 줄은 로비 RankHud 몫이다.
+/// 그 RankHud를 여기에 대신 붙이지 않는 이유는 MatchProfileView와 같다 —
 /// 그쪽은 OnEnable에서 자기 정적 인스턴스를 잡아, 이 판이 떠 있는 동안 로비의 승급 연출이 대상을 잃는다.
 ///
 /// 등급 표나 레벨 곡선을 못 읽었으면 그 축은 아무것도 쓰지 않고 저작값을 그대로 둔다.
@@ -20,6 +21,10 @@ public class ProfileSummaryView : MonoBehaviour
 
     [Tooltip("랭크 티어명 자리(\"브론즈 1\"). 미배선이면 그 축만 건너뛴다.")]
     [SerializeField] TMP_Text tierNameText;
+
+    [Tooltip("랭크 티어 배지 자리. 미배선이면 그 축만 건너뛴다.\n" +
+             "등급 표를 못 읽었거나 배지가 미저작이면 저작된 그림을 그대로 둔다.")]
+    [SerializeField] Image rankBadgeImage;
 
     [Header("이름 편집")]
     [Tooltip("연필 버튼. 누르면 닉네임 라벨이 입력칸으로 바뀐다. 미배선이면 편집 길만 없다.")]
@@ -64,9 +69,12 @@ public class ProfileSummaryView : MonoBehaviour
     {
         if (this.nicknameText != null) this.nicknameText.text = ProfileManager.Nickname;
 
-        if (this.tierNameText == null || !RankManager.IsConfigured) return;
+        if (!RankManager.IsConfigured) return;
 
-        this.tierNameText.text = RankManager.GetInfo().DisplayName;
+        RankInfo t_rank = RankManager.GetInfo();
+
+        if (this.tierNameText != null) this.tierNameText.text = t_rank.DisplayName;
+        if (this.rankBadgeImage != null && t_rank.Badge != null) this.rankBadgeImage.sprite = t_rank.Badge;
     }
 
     void RefreshLevel()
@@ -107,43 +115,31 @@ public class ProfileSummaryView : MonoBehaviour
         this.nameInput.ActivateInputField();
     }
 
-    // 확정은 엔터·소프트키보드 완료(onSubmit)뿐이다. 그 밖의 모든 이탈은 아래 파기 경로로 간다.
+    // 편집을 끝내는 유일한 경로다. 엔터·소프트키보드 완료뿐 아니라 포커스를 잃거나 판이 닫히는 이탈도
+    // 여기로 오며, 쓰던 이름을 버리지 않고 그대로 확정한다.
     void CommitNameEdit(string _value)
     {
         if (!this.m_editing) return;
 
-        // 빈 이름은 정제기가 기본 닉네임으로 갈아치운다 — 실수로 지우고 누른 엔터를 개명으로 읽지 않는다.
-        if (string.IsNullOrWhiteSpace(_value))
-        {
-            this.CancelNameEdit();
-            return;
-        }
-
         this.m_editing = false;
-
-        ProfileManager.Apply(_value, ProfileManager.AvatarId, ProfileManager.FrameId);
 
         if (this.nameInput != null) this.nameInput.DeactivateInputField();
         this.SetEditing(false);
+
+        // 빈 이름은 개명으로 읽지 않는다 — 다 지운 채 나가면 정제기가 기본 닉네임으로 갈아치우므로,
+        // 실수로 지우고 나간 경우에 지금 이름을 잃지 않도록 아예 저장을 건너뛴다.
+        if (!string.IsNullOrWhiteSpace(_value))
+        {
+            ProfileManager.Apply(_value, ProfileManager.AvatarId, ProfileManager.FrameId);
+        }
 
         // Apply는 정제한 값이 지금과 같으면 통지 없이 돌아온다 — 잘려 나간 글자가 라벨에 반영되도록 직접 그린다.
         // 레벨 축은 건드리지 않는다(진행 중인 레벨업 차오름을 잘라 먹지 않게).
         this.RefreshIdentity();
     }
 
-    // 포커스를 잃거나 판이 닫히면 입력을 버린다. 이 판은 입력칸 밖 빈 자리가 곧 암막(닫기 판정)이라
-    // "밖을 눌렀다"와 "판을 닫았다"를 구분할 수 없어, 둘을 같은 규칙으로 묶는다.
-    void CancelNameEdit()
-    {
-        if (!this.m_editing) return;
-
-        this.m_editing = false;
-
-        if (this.nameInput != null) this.nameInput.DeactivateInputField();
-        this.SetEditing(false);
-    }
-
-    void DiscardNameEdit(string _value) => this.CancelNameEdit();
+    // 통지가 값을 실어 주지 않는 이탈(판이 닫히는 경우)에서 입력칸에 남아 있는 글자로 확정한다.
+    void CommitNameEditFromInput() => this.CommitNameEdit(this.nameInput != null ? this.nameInput.text : null);
 
     void SetEditing(bool _editing)
     {
@@ -167,13 +163,14 @@ public class ProfileSummaryView : MonoBehaviour
             this.nameInput.onSubmit.RemoveAllListeners();
             this.nameInput.onSubmit.AddListener(this.CommitNameEdit);
 
-            // onEndEdit을 파기로 쓴다. ESC와 안드로이드 백키는 onSubmit도 onDeselect도 거치지 않고
-            // TMP의 DeactivateInputField로만 빠져나가는데, 그 경로가 부르는 것이 이 통지다 —
-            // 여기 걸지 않으면 취소한 뒤에도 입력칸이 뜬 채 라벨이 숨겨진다.
+            // 이탈 경로도 같은 확정으로 묶는다. ESC와 안드로이드 백키는 onSubmit도 onDeselect도 거치지 않고
+            // TMP의 DeactivateInputField로만 빠져나가는데, 그 경로가 부르는 것이 onEndEdit이다 —
+            // 여기 걸지 않으면 나간 뒤에도 입력칸이 뜬 채 라벨이 숨겨진다.
+            // 세 통지가 겹쳐 들어와도 m_editing 문지기가 첫 한 번만 통과시킨다.
             this.nameInput.onEndEdit.RemoveAllListeners();
-            this.nameInput.onEndEdit.AddListener(this.DiscardNameEdit);
+            this.nameInput.onEndEdit.AddListener(this.CommitNameEdit);
             this.nameInput.onDeselect.RemoveAllListeners();
-            this.nameInput.onDeselect.AddListener(this.DiscardNameEdit);
+            this.nameInput.onDeselect.AddListener(this.CommitNameEdit);
         }
 
         this.SetEditing(false);   // 판은 언제나 라벨 상태로 열린다.
@@ -186,7 +183,7 @@ public class ProfileSummaryView : MonoBehaviour
         RankManager.OnChanged         -= this.Refresh;
         AccountLevelManager.OnChanged -= this.Refresh;
 
-        this.CancelNameEdit();
+        this.CommitNameEditFromInput();
 
         if (this.nameInput != null)
         {

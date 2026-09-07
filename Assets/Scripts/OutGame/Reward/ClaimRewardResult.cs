@@ -7,7 +7,7 @@ internal sealed class ClaimRewardResult : ServerCommandResult
     [JsonProperty("granted")] public List<ClaimRewardGain> Granted { get; set; }
 }
 
-// 서버가 지급한 재화 한 줄. 배열 순서가 곧 스펙시트 order 순서다.
+// 서버가 지급한 재화 한 줄. 보상·전투·룰렛이 함께 쓴다(claimReward 의 배열에서는 순서가 곧 스펙시트 order 순서다).
 internal sealed class ClaimRewardGain
 {
     // ECurrencyType 이름 문자열. 못 읽는 표기는 서버가 그 줄을 아예 버리므로 여기 오지 않는다.
