@@ -184,6 +184,32 @@ public partial class Reward
 }
 
 [GeneratorSpecData]
+public partial class Mission
+{
+    /// 행 고유번호
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 미션 고유키
+    public string missionId;
+    /// 활성화 여부
+    public int enabled;
+    /// 주기
+    public string period;
+    /// 집계 이벤트 키
+    public string eventKey;
+    /// 목표 횟수
+    public int targetCount;
+    /// 표시 제목
+    public string title;
+    /// 표시 설명
+    public string description;
+    /// 패스 경험치
+    public long passExp;
+    /// 표시 순서
+    public int sortOrder;
+}
+
+[GeneratorSpecData]
 public partial class Roulette
 {
     /// 행 고유 번호(부여 후 변경 금지)

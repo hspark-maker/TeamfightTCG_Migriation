@@ -87,6 +87,11 @@ internal static class ServerSaveCommands
                 _pending?.Settle();
             }
 
+            // 미션 상태는 명령별 호출부가 아니라 공통 응답 배관에서 채택한다. openPack·강화·보상 등
+            // 새 진행도 생산자가 늘어도 응답의 missions 봉투만 실으면 빠짐없이 같은 캐시로 들어온다.
+            if (t_result.Missions != null)
+                MissionManager.Adopt(t_result.Missions);
+
             // revision 0/누락 = 이 명령은 세이브를 쓰지 않았다. 그대로 채택에 넘기면 "정확히 +1" 단언이
             // 지갑만 쓴 명령을 RemoteAhead로 읽어 전 세션을 끊는다.
             if (t_result.Revision > 0)

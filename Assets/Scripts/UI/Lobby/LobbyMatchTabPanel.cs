@@ -130,6 +130,10 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         OpenPooled<RoulettePanel>();
     }
 
+    /// <summary>일일·주간 미션. 잠금 게이트가 없다 — 미션은 부가 기능이고, 목록이 비어도
+    /// 화면이 스스로 안내한다(활성 미션이 현재 팩 개봉 축뿐이라 실제로 비는 주기가 있다).</summary>
+    public void OpenMissions() => OpenPooled<MissionPanel>();
+
     static void OpenPooled<T>() where T : PooledUIBase
     {
         if (UIPoolManager.Instance == null)

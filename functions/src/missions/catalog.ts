@@ -1,7 +1,7 @@
 /**
- * 미션 정의의 런타임 사본. 저장소 진실원은 `docs/SpecData/MissionDef_sheet.csv` 다.
+ * 미션 정의의 런타임 사본. 저장소 진실원은 `docs/SpecData/Mission_sheet.csv` 다.
  *
- * `MissionDef` 시트로 옮기는 것이 목표지만, 새 표를 만드는 경로가 UPM 패키지
+ * `Mission` 시트로 옮기는 것이 목표지만, 새 표를 만드는 경로가 UPM 패키지
  * (`com.cookapps.specdatamanager`)의 생성기 하나뿐이고 그 진입점이 저장소에 없다
  * (`SpecLocalCsvImporter` 는 `SpecData.bytes` 에 **이미 있는** 표만 교체한다).
  * 그 게이트는 Unity 가 붙은 저장소에서만 통과시킬 수 있어, Firestore 업로드·파서 전환 전까지

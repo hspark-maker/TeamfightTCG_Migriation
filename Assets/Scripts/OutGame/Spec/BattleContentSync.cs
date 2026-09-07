@@ -95,6 +95,9 @@ public static class BattleContentSync
             string t_envId = s_context.EnvId;
             Debug.Log($"[BattleContent] 게이트 시작 env={t_envId} 모드={t_mode} content-major={ContentVersion.Major}");
 
+            // 목록에서 빠진 표는 채택이 통째로 버린다. 대조 로그로는 드러나지 않으므로 여기서 먼저 짚는다.
+            SpecPayloadCodec.WarnUncoveredTables(SpecSource.Manager);
+
             var t_localTables = new List<SpecTablePayload>();
             foreach (string t_tableName in SpecPayloadCodec.TableNames)
             {

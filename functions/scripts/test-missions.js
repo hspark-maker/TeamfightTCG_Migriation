@@ -165,10 +165,10 @@ const reward = judgeRewardClaim(rewardRows, "Mission", "daily.openPack1");
 assert.equal(reward.allow, true);
 assert.deepEqual(reward.gains, [{currency: "Gold", amount: 120}]);
 assert.equal(judgeRewardClaim(rewardRows, "Mission", "daily.missing").allow, false,
-  "MissionDef 와 짝이 없는 Reward 행은 수령을 막는다");
+  "Mission 시트와 짝이 없는 Reward 행은 수령을 막는다");
 
 // ── 시트 ↔ 런타임 카탈로그 이중 진실원 방어 ──────────────────────────────────
-// MissionDef 시트가 서버 상수(catalog.ts)와 손으로 동기화되는 동안, 둘이 갈리면
+// Mission 시트가 서버 상수(catalog.ts)와 손으로 동기화되는 동안, 둘이 갈리면
 // 화면에 보이는 목표와 집행되는 목표가 달라진다. 그 어긋남은 유저 거절로만 드러나므로
 // 여기서 행 단위로 묶는다. 시트 연동이 끝나면 이 블록은 통째로 사라진다.
 //
@@ -192,17 +192,19 @@ const readSheet = (name) => {
   });
 };
 
-const sheetMissions = readSheet("MissionDef");
+const sheetMissions = readSheet("Mission");
 const sheetRewards = readSheet("Reward").filter((row) => row.ownerType === "Mission");
 
 assert.equal(sheetMissions.length, missionCatalog().length,
-  "MissionDef 시트 행 수와 런타임 카탈로그 수가 같아야 한다");
+  "Mission 시트 행 수와 런타임 카탈로그 수가 같아야 한다");
 for (const row of sheetMissions) {
   const mission = findMission(row.missionId);
   assert.ok(mission, `시트의 ${row.missionId} 가 런타임 카탈로그에 없다`);
   assert.equal(String(mission.enabled ? 1 : 0), row.enabled, `${row.missionId} enabled 불일치`);
   assert.equal(mission.period, row.period, `${row.missionId} period 불일치`);
-  assert.equal(mission.event, row.event, `${row.missionId} event 불일치`);
+  // 시트 열은 eventKey 다 — C# 생성 코드에서 `event` 가 예약어라 필드로 못 쓴다.
+  // 런타임 카탈로그(catalog.ts)의 필드명은 TS 라 제약이 없어 event 그대로 둔다.
+  assert.equal(mission.event, row.eventKey, `${row.missionId} event 불일치`);
   assert.equal(String(mission.target), row.targetCount, `${row.missionId} targetCount 불일치`);
   assert.equal(mission.title, row.title, `${row.missionId} title 불일치`);
   assert.equal(mission.description, row.description, `${row.missionId} description 불일치`);

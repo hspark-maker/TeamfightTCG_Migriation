@@ -14,6 +14,9 @@ internal class ServerCommandResult
 
     /// <summary>null이면 이 명령은 지갑을 쓰지 않았다.</summary>
     [JsonProperty("wallet")] public WalletPatch Wallet { get; set; }
+
+    /// <summary>null이면 이 명령은 미션 진행도를 바꾸지 않았다.</summary>
+    [JsonProperty("missions")] public MissionSnapshot Missions { get; set; }
 }
 
 // 세이브를 쓰지 않는 진단용 callable(ping) 응답.

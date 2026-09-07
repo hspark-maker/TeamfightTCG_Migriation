@@ -26,7 +26,43 @@ public static class SpecPayloadCodec
         "SynergyDef", "SynergyTierDef", "SynergyEffectDef",
         "AccountLevel",
         "Roulette", "RouletteSlot",
+        "AdventureChapter",
     };
+
+    /// <summary>
+    /// 매니저가 들고 있는데 <see cref="TableNames"/> 에 없는 표를 찾아 알린다.
+    ///
+    /// <para><b>이 목록에 빠진 표는 동기화가 통째로 버린다.</b> 채택은 여기 적힌 표로만 스냅샷을 다시
+    /// 짓기 때문에, 목록에 없으면 로컬에 데이터가 있어도 채택 뒤 0행이 된다. 그런데 대조 로그는
+    /// "불일치 0/N" 으로 정상처럼 보이고(없는 표끼리는 비교하지 않는다) 컴파일도 통과한다 —
+    /// 실제로 <c>AdventureChapter</c> 가 이 상태로 초기화를 막았고, 원인이 표 데이터가 아니라
+    /// 이 배열이라는 걸 알아내는 데 로그만으로는 도달하지 못했다.</para>
+    ///
+    /// <para>막지는 않는다. 표 하나가 목록에서 빠진 것과 게임을 못 켜는 것은 다른 무게다 —
+    /// 여기서 세우면 저작 실수가 전 유저의 초기화를 끊는다.</para>
+    /// </summary>
+    public static void WarnUncoveredTables(object _manager)
+    {
+        if (_manager == null) return;
+
+        var t_covered = new HashSet<string>(TableNames, StringComparer.Ordinal);
+        foreach (PropertyInfo t_property in _manager.GetType()
+                     .GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (t_covered.Contains(t_property.Name)) continue;
+
+            // 표 컨테이너만 고른다 — All 을 가진 프로퍼티가 표다(TryBuildLocalTable 과 같은 판정).
+            object t_container;
+            try { t_container = t_property.GetValue(_manager); }
+            catch (Exception) { continue; }
+            if (t_container?.GetType().GetProperty("All", BindingFlags.Public | BindingFlags.Instance) == null)
+                continue;
+
+            UnityEngine.Debug.LogError(
+                $"[SpecPayloadCodec] 표 '{t_property.Name}' 가 동기화 목록(TableNames)에 없다 — " +
+                "채택 뒤 0행이 되어 이 표를 읽는 초기화가 실패한다. TableNames 와 RowTypeOf 에 함께 추가할 것.");
+        }
+    }
 
     public static bool TryBuildLocalTable(object _manager, string _table, out SpecTablePayload _payload, out string _error)
     {
@@ -268,6 +304,7 @@ public static class SpecPayloadCodec
         "SynergyEffectDef" => typeof(SynergyEffectDef),
         "AccountLevel" => typeof(AccountLevel),
         "Roulette" => typeof(Roulette), "RouletteSlot" => typeof(RouletteSlot),
+        "AdventureChapter" => typeof(AdventureChapter),
         _ => null,
     };
 

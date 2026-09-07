@@ -5,6 +5,28 @@ using UnityEngine;
 public enum ERewardOwnerType { Album, Adventure, Rank, Battle }
 public enum ERewardType { Currency }
 
+/// <summary>
+/// Reward 표에 있지만 **클라가 색인하지 않는** 소유 영역. 서버만 소비하는 축이다.
+///
+/// <para>미션 보상이 그렇다 — 지급 판정도 금액 계산도 <c>claimMission</c> 이 하고, 화면에 그릴 값은
+/// <c>getMissions</c> 응답의 <c>reward.currencies</c> 로 내려온다. 여기서 같이 색인하면 같은 보상의
+/// 진실원이 둘이 되고, 시트만 고치고 서버 블롭을 안 올린 순간 화면과 실지급이 갈린다.</para>
+///
+/// <para><see cref="ERewardOwnerType"/> 에 넣지 않고 이 목록으로 거르는 이유: enum 에 넣으면
+/// 조회 API 가 열려 누군가 로컬로 읽게 된다. 목록에 없는 미지 값은 계속 경고로 잡아야 오타를 놓치지 않는다.</para>
+/// </summary>
+public static class ServerOwnedRewardOwners
+{
+    static readonly string[] NAMES = { "Mission" };
+
+    public static bool Contains(string _ownerType)
+    {
+        for (int i = 0; i < NAMES.Length; i++)
+            if (string.Equals(NAMES[i], _ownerType, StringComparison.Ordinal)) return true;
+        return false;
+    }
+}
+
 // 모든 정적 보상의 단일 조회 창구. 수령 여부는 각 기능의 기존 세이브 키가 계속 소유한다.
 public static class RewardSpec
 {
@@ -96,6 +118,9 @@ public static class RewardSpec
         {
             Reward t_row = t_sorted[t_i];
             if (t_row == null || string.IsNullOrEmpty(t_row.ownerId)) continue;
+
+            // 서버만 쓰는 축은 정상 저작이다 — 경고로 남기면 매 초기화마다 시끄러워 진짜 오타가 묻힌다.
+            if (ServerOwnedRewardOwners.Contains(t_row.ownerType)) continue;
 
             if (!Enum.TryParse(t_row.ownerType, false, out ERewardOwnerType t_ownerType))
             {

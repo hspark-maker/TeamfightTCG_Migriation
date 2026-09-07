@@ -1,5 +1,5 @@
 ﻿행 고유번호,미션 고유키,활성화 여부,주기,집계 이벤트 키,목표 횟수,표시 제목,표시 설명,패스 경험치,표시 순서,메모
-id,missionId,enabled,period,event,targetCount,title,description,passExp,sortOrder,#memo
+id,missionId,enabled,period,eventKey,targetCount,title,description,passExp,sortOrder,#memo
 int,string,int,string,string,int,string,string,long,int,string
 1,daily.openPack1,1,daily,OpenPack,1,팩 개봉,카드 팩을 1회 개봉하세요,10,1,팩 가격 110 이상 보전
 2,daily.openPack3,1,daily,OpenPack,3,팩 애호가,카드 팩을 3회 개봉하세요,20,2,동일 이벤트 단계형 미션
