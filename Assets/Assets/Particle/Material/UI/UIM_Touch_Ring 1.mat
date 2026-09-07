@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: UI_Additive
-  m_Shader: {fileID: 4800000, guid: 92f55810d56594641bbaf4675405ea34, type: 3}
+  m_Name: UIM_Touch_Ring 1
+  m_Shader: {fileID: 4800000, guid: ecfa8f5732b504ef98fba10aa18d0326, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -24,7 +24,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: b0e1ab61acf698f4d828dcd191bf96f8, type: 3}
+        m_Texture: {fileID: 2800000, guid: 5dde5040ffb53e34683e0b64d04a2932, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
