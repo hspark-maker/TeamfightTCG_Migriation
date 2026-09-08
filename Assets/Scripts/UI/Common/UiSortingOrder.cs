@@ -80,6 +80,13 @@ public static class UiSortingOrder
     /// <summary>보상 수령 팝업(RewardClaimPopup.prefab).</summary>
     public const int RewardClaim = 410;
 
+    /// <summary>재화 획득 빛 줄기(CurrencyGainEffectPlayer가 만드는 LightStreak). 보상 아이콘이 빛이 되어 HUD로 흐르는 이동체라
+    /// 그것을 띄운 화면 어느 것에도 가리면 안 된다 — 수령 팝업(<see cref="RewardClaim"/>) 안에서 피는 빛은 팝업 위,
+    /// 팝업이 닫힌 뒤 랭크 보상 오버레이(<see cref="PooledOverlay"/>)에서 피는 빛은 그 오버레이와 올려 둔 상단바(<see cref="LobbyBarsLifted"/>) 위다.
+    /// 재생기가 앉은 로비 캔버스(<see cref="Lobby"/>)의 형제 순서로는 자기 캔버스를 가진 화면을 넘지 못해 층으로 보장한다.
+    /// 입력은 먹지 않는다(raycastTarget 없음).</summary>
+    public const int GainLight = 420;
+
     /// <summary>설정 화면(SettingUI.prefab·SettingsPanel).</summary>
     public const int Setting = 900;
 

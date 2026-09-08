@@ -37,6 +37,10 @@ public sealed class DeckEditData : UIData
     /// 매치 화면은 끈다(어느 덱으로 싸울지는 이미 그 앞 화면이 정했고, 하단 자리를 전투 시작 버튼이 쓴다).</summary>
     public bool showDeckStrip;
 
+    /// <summary>만석(6/6)일 때 하단 바의 ⊕ 칸을 "가득 참" 비활성 대신 기존 덱 삭제 토글로 쓴다.
+    /// 로비 덱 탭만 켠다 — 매치 셸은 출전 슬롯 좌표를 따로 들고 있어, 여기서 앞 덱을 지우면 그 좌표가 다른 덱을 가리킨다.</summary>
+    public bool allowFullDeleteToggle;
+
     /// <summary>전투 시작(매치 화면 전용). <b>주입 여부가 곧 버튼 표시 여부다</b> —
     /// 눌리는데 아무 데도 안 가는 버튼이 생기지 않게 축을 하나로 둔다.
     /// 로비 탭은 미주입 → 버튼이 꺼진다.
@@ -600,7 +604,8 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
                              this.m_mode == EDeckEditMode.Create,
                              OnDeckStripSlotClicked,
                              OnDeckStripCreateClicked,
-                             OnDeckStripSlotDelete);
+                             OnDeckStripSlotDelete,
+                             this.m_request.allowFullDeleteToggle);
     }
 
     // 검색어가 바뀌면 목록을 다시 만들지 않고 표시만 거른다 — 그리드가 타일 이름을 캐시하고 있다.
@@ -662,12 +667,21 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         });
     }
 
-    // 하단 바의 삭제 버튼. 신규 편집 중일 때만 열린다(DeckStripView.Build가 그 축을 쥔다).
-    // 편집 대상은 아직 저장되지 않은 덱이라 여기서 지우는 칸과 절대 겹치지 않는다 — m_slotIndex는 -1이다.
+    // 하단 바의 삭제 버튼. 신규 편집 중이거나, 만석이라 ⊕ 칸이 삭제 토글이 된 뒤에 열린다(DeckStripView가 두 축을 쥔다).
+    // 신규 편집 중이면 편집 대상은 아직 저장되지 않은 덱이라 지우는 칸과 겹치지 않는다(m_slotIndex는 -1).
+    // 만석 삭제 모드에서는 편집 중인 덱을 바가 제외하지만, 그 앞 덱을 지우면 압축 당김으로 좌표가 밀린다 —
+    // 편집 중인 덱을 참조로 붙들었다가 삭제 뒤 좌표를 되찾는다(OnDeckStripSlotClicked와 같은 판정).
     // 삭제는 되돌릴 수 없으므로 로비 목록(DeckListController.OnSlotDeleteClicked)과 같은 확인 절차를 그대로 밟는다.
     void OnDeckStripSlotDelete(int _slotIndex)
     {
         if (!DeckSaveManager.IsSlotValid(_slotIndex)) return;
+
+        if (this.m_mode == EDeckEditMode.Edit && this.m_slotIndex == _slotIndex)
+        {
+            // 바가 이 칸의 삭제 버튼을 열지 않으므로 여기 닿으면 표시와 상태가 어긋난 것이다.
+            Debug.LogWarning($"[DeckEditController] 편집 중인 덱은 이 화면에서 지울 수 없다 slot={_slotIndex}.");
+            return;
+        }
 
         // 이름은 팝업이 뜨기 전에 캡처한다 — 삭제 후에는 그 좌표가 다른 덱을 가리킨다(압축 당김).
         string t_name = DeckSaveManager.GetDisplayName(_slotIndex);
@@ -695,14 +709,42 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
                     return;
                 }
 
+                // 슬롯 배열은 밀 때 리스트 객체를 그대로 옮기므로(DeckSaveManager.CopySlot) 참조로 되찾을 수 있다.
+                List<int> t_editing = this.m_mode == EDeckEditMode.Edit && DeckSaveManager.IsSlotValid(this.m_slotIndex)
+                    ? DeckSaveManager.GetSlot(this.m_slotIndex)
+                    : null;
+
                 // 실패 사유(미로드·레지스트리 미주입 등)는 DeckSaveManager가 이미 로그한다.
                 if (!DeckSaveManager.TryDeleteAt(_slotIndex))
                     Debug.LogWarning($"[DeckEditController] 덱 삭제 실패 slot={_slotIndex}.");
+
+                if (t_editing != null) RelocateEditingSlot(t_editing);
+                if (!IsOpen) return;   // 되찾기에 실패해 편집기가 닫혔다 — 닫힌 화면의 바를 다시 세우지 않는다
 
                 // 이 화면은 로비 목록과 달리 OnDeckChanged를 구독하지 않는다 — 재빌드를 직접 건다.
                 RebuildDeckStrip();
             },
         });
+    }
+
+    // 앞쪽 덱이 지워져 편집 중인 덱의 좌표가 당겨졌으면 참조 동일성으로 새 좌표를 잡는다.
+    // 저장(SaveEditedDeck)은 m_slotIndex 에 쓰므로, 여기서 안 옮기면 편집분이 다른 덱 위에 덮인다.
+    void RelocateEditingSlot(List<int> _editing)
+    {
+        for (int t_i = 0; t_i < DeckSaveManager.SLOT_COUNT; t_i++)
+        {
+            if (!DeckSaveManager.IsSlotValid(t_i) || !ReferenceEquals(DeckSaveManager.GetSlot(t_i), _editing)) continue;
+
+            this.m_slotIndex = t_i;
+            return;
+        }
+
+        // 편집 중인 덱 자체가 사라졌다(바가 막지만 세이브가 밖에서 바뀌면 가능하다). 빈 좌표에 저장하게 둘 수 없으니 나간다.
+        // 좌표를 먼저 비운다 — 로비 임베디드 경로의 HideEditor 는 CurrentSlot 을 대표 덱 선택에 되넘기므로,
+        // 낡은 좌표를 남기면 엉뚱한 덱이 대표가 된다.
+        Debug.LogWarning("[DeckEditController] 편집 중인 덱을 되찾지 못함 — 편집기를 닫는다.");
+        this.m_slotIndex = -1;
+        ExitEditor();
     }
 
     // 빼 둘 카드는 이번 "진입"의 요청이다 — 덱을 갈아탄 뒤에도 남아 있으면 새 덱에서 엉뚱한 칸이 비거나

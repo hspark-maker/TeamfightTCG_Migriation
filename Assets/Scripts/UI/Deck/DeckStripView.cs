@@ -8,7 +8,8 @@ using UnityEngine.UI;
 // 세이브는 읽기만 한다 — 삽입·삭제는 편집기(DeckEditController)가 자기 저장 경로에서만 한다.
 //
 // 로비 목록(DeckListController)을 재사용하지 않는 이유: 그쪽은 2열 그리드에 삭제 경로와 편집 모드를 함께 들고 있다.
-// 이 바는 "지금 어느 덱을 편집 중인가"를 보여주는 것이 본업이고, 삭제 버튼은 신규 편집 중일 때만 열린다.
+// 이 바는 "지금 어느 덱을 편집 중인가"를 보여주는 것이 본업이고, 삭제 버튼은 신규 편집 중일 때,
+// 그리고 만석이라 ⊕ 칸이 삭제 토글로 바뀐 뒤 그것을 눌렀을 때만 열린다(둘 다 이 바가 쥔 표시 축이다).
 // 지우는 일 자체는 여기서 하지 않는다 — 세이브는 읽기만 하고, 파괴는 편집기가 넘긴 콜백이 맡는다.
 public class DeckStripView : MonoBehaviour
 {
@@ -34,15 +35,31 @@ public class DeckStripView : MonoBehaviour
     // 선택 상태는 여기서 들지 않는다 — 진실원은 편집기(DeckEditController)이고,
     // 이 바는 지시받은 좌표를 칸 표시에 반영하기만 한다(같은 상태를 두 곳이 들면 어긋난다).
 
+    // 만석일 때 ⊕ 칸이 여닫는 삭제 버튼 표시 축. 재빌드마다 닫힌 상태로 돌아간다 —
+    // 한 장을 지우면 더는 만석이 아니라 ⊕ 칸이 생성 칸으로 되돌아오므로, 상태를 이어 갈 이유가 없다.
+    bool m_deleteMode;
+
+    // Build 가 마지막으로 지시받은 편집 중 슬롯 좌표(신규 편집 중이면 -1). 삭제 토글이 켜져도 이 칸만은
+    // 삭제 버튼을 열지 않는다 — 편집 중인 덱이 발밑에서 사라지면 편집기의 좌표가 빈 칸을 가리키게 된다.
+    int m_editingSlot = -1;
+
+    // 이번 Build 가 세운 ⊕ 칸(저작 칸이든 인스턴스든). 삭제 토글을 켜고 끌 때 문구를 갈아끼우려면 다시 잡아야 한다.
+    DeckSlotView m_createView;
+
     // OnEnable에서 자동 Build 하지 않는다 — "어느 슬롯이 선택됐는지"와 클릭 콜백은 편집기만 아는 정보다.
     // 여기서 임의로 그리면 선택 없는 목록이 한 프레임 떴다가 편집기의 Build로 덮이면서 깜빡인다.
 
     /// <summary>편집기가 부르는 유일한 진입점. _selectedSlot은 DeckSaveManager 좌표(없으면 -1),
     /// _createSelected는 신규 생성 편집 중인가(생성 중 칸을 세우고 저장된 칸의 삭제 버튼을 여는 축을 겸한다).
-    /// _onSlotDelete가 null이면 삭제 버튼은 어떤 칸에서도 뜨지 않는다.</summary>
-    public void Build(int _selectedSlot, bool _createSelected, Action<int> _onSlotClick, Action _onCreateClick, Action<int> _onSlotDelete)
+    /// _onSlotDelete가 null이면 삭제 버튼은 어떤 칸에서도 뜨지 않는다.
+    /// _fullDeleteToggle 이 켜져 있으면 만석일 때 ⊕ 칸이 비활성 대신 삭제 토글이 된다(호스트가 정한다 — DeckEditData.allowFullDeleteToggle).</summary>
+    public void Build(int _selectedSlot, bool _createSelected, Action<int> _onSlotClick, Action _onCreateClick, Action<int> _onSlotDelete, bool _fullDeleteToggle = false)
     {
         Clear();
+
+        // 삭제 토글은 재빌드마다 닫힌다 — 지우고 나면 만석이 풀려 ⊕ 칸이 생성 칸으로 돌아오기 때문이다.
+        m_deleteMode  = false;
+        m_editingSlot = _createSelected ? -1 : _selectedSlot;
 
         if (content == null || slotPrefab == null) return;
 
@@ -65,7 +82,7 @@ public class DeckStripView : MonoBehaviour
         }
 
         // 신규 생성 칸을 먼저 붙인다 — 이 바에서 ⊕는 맨 왼쪽 고정 자리다.
-        BuildCreateCell(_onCreateClick);
+        BuildCreateCell(_onCreateClick, _fullDeleteToggle && _onSlotDelete != null);
 
         // 저장 전인 신규 덱도 목록에 세운다 — 어느 덱을 만드는 중인지 이 바에서 읽히게 하기 위함이다.
         // 순번은 붙이지 않는다(저장이 확정되는 순간에 정해진다).
@@ -138,10 +155,17 @@ public class DeckStripView : MonoBehaviour
         m_slotIndices.Clear();
     }
 
-    // 신규 생성 칸. 만석이거나 아직 잠겨 있으면 자리는 지키되 눌리지 않는다(DeckListController.Build와 같은 규칙).
-    void BuildCreateCell(Action _onCreateClick)
+    // 신규 생성 칸. 아직 잠겨 있으면 자리는 지키되 눌리지 않는다(DeckListController.Build와 같은 규칙).
+    // 만석이면 생성 대신 삭제 토글이 된다 — 6장이 꽉 찬 채로는 이 화면에서 덱을 줄일 길이 없었기 때문이다
+    // (삭제 버튼은 신규 편집 중에만 열리는데, 만석이면 신규 편집에 들어갈 수 없다).
+    // _canDelete 가 false 인 호스트(매치 셸 — 출전 좌표를 따로 들어 압축 당김을 못 따라간다)는 예전처럼 "가득 참" 비활성으로 남는다.
+    void BuildCreateCell(Action _onCreateClick, bool _canDelete)
     {
-        bool t_canCreate = !DeckSaveManager.IsFull && OutgameFeatureLock.IsUnlocked(EOutgameFeature.DeckCreate);
+        m_createView = null;
+
+        bool t_unlocked  = OutgameFeatureLock.IsUnlocked(EOutgameFeature.DeckCreate);
+        bool t_canCreate = !DeckSaveManager.IsFull && t_unlocked;
+        bool t_asDelete  =  DeckSaveManager.IsFull && t_unlocked && _canDelete;
 
         // 저작 자식은 목록에 등록하지 않는다 — Clear()가 m_slots를 통째로 Destroy하므로
         // 넣는 순간 프리팹의 자식이 파괴되고, 풀드 인스턴스라 두 번째 진입부터 칸이 영영 사라진다.
@@ -150,7 +174,7 @@ public class DeckStripView : MonoBehaviour
             createCell.gameObject.SetActive(_onCreateClick != null);
             if (_onCreateClick == null) return;
 
-            createCell.BindCreate(t_canCreate, _onCreateClick);
+            BindCreateOrDelete(createCell, t_asDelete, t_canCreate, _onCreateClick);
             FeatureLockView.Attach(createCell.gameObject, EOutgameFeature.DeckCreate);
             return;
         }
@@ -158,13 +182,39 @@ public class DeckStripView : MonoBehaviour
         if (_onCreateClick == null) return;   // 신규 생성을 지원하지 않는 호스트
 
         var t_create = Instantiate(slotPrefab, content);
-        t_create.BindCreate(t_canCreate, _onCreateClick);
+        BindCreateOrDelete(t_create, t_asDelete, t_canCreate, _onCreateClick);
 
-        // BindCreate 뒤에 붙인다 — 그 안에서 꺼지는 자식들까지 흑백 대상으로 잡을 이유가 없다.
+        // Bind 뒤에 붙인다 — 그 안에서 꺼지는 자식들까지 흑백 대상으로 잡을 이유가 없다.
         FeatureLockView.Attach(t_create.gameObject, EOutgameFeature.DeckCreate);
 
         m_slots.Add(t_create);
         m_slotIndices.Add(-1);
+    }
+
+    void BindCreateOrDelete(DeckSlotView _view, bool _asDelete, bool _canCreate, Action _onCreateClick)
+    {
+        m_createView = _view;
+
+        if (_asDelete) _view.BindDeleteToggle(m_deleteMode, ToggleDeleteMode);
+        else           _view.BindCreate(_canCreate, _onCreateClick);
+    }
+
+    // 만석 상태의 ⊕ 칸 클릭. 목록을 재빌드하지 않고 저장된 칸의 삭제 버튼만 여닫는다 —
+    // 재빌드는 스크롤 위치를 잃고, 편집기의 선택 좌표도 바뀌지 않았다.
+    void ToggleDeleteMode()
+    {
+        m_deleteMode = !m_deleteMode;
+
+        for (int t_i = 0; t_i < m_slots.Count; t_i++)
+        {
+            if (m_slots[t_i] == null) continue;
+
+            // 편집 중인 덱은 제외한다. ⊕·생성 중 칸은 삭제 콜백이 없어 SetEditMode 가 알아서 무시한다.
+            bool t_open = m_deleteMode && m_slotIndices[t_i] != m_editingSlot;
+            m_slots[t_i].SetEditMode(t_open);
+        }
+
+        if (m_createView != null) m_createView.BindDeleteToggle(m_deleteMode, ToggleDeleteMode);
     }
 
     // 저장 전인 신규 덱 칸. 목록에 서 있다는 사실 자체가 "지금 신규 편집 중"이라 클릭 경로를 두지 않는다.

@@ -61,6 +61,12 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
     // 이 팝업이 세운 분출. 딤을 눌러 닫고 다음 행을 바로 수령할 수 있어 두 연출이 겹친다.
     Sequence m_burst;
 
+    // 팝업이 닫힌 뒤에 빛이 피어날 칸(연 쪽의 화면에 남아 있는 보상 칸). null이면 종전대로 팝업 안에서 아이콘이 빛이 되며 닫힌다.
+    IReadOnlyList<CurrencyRewardSlotView> m_gainSlotsAfterClose;
+
+    // m_burst가 "닫힌 뒤 피는 빛"인지. 팝업 안 분출과 달리 팝업이 닫힌 뒤에도 날고 있어 다음 Show가 먼저 마무리해야 한다.
+    bool m_burstFliesAfterClose;
+
     /// <summary>
     /// 씬의 공용 팝업을 얻는다. 평소 꺼져 있는 노드라 비활성까지 뒤진다 —
     /// 자가 설치는 하지 않는다(저작된 빛·리본·버튼이 있어 코드로 세울 수 있는 물건이 아니다).
@@ -73,18 +79,29 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
     /// 화면은 곧장 획득 연출로 넘어간다(그래서 반환값도 보지 않는다).
     /// <para>_rewards는 <b>수령 전 예고</b>다(클라 스펙). 분출·롤업이 이 목록으로 서므로 실지급과 갈릴 수 있고,
     /// 그때는 연출이 끝나 고정이 풀릴 때 HUD가 서버 잔액으로 맞춰진다.</para>
+    /// <para>_gainSlotsAfterClose를 넘기면 획득 연출이 <b>팝업이 닫힌 뒤</b> 그 칸에서 피어 HUD로 흐른다 —
+    /// _rewards와 같은 순서로 바인딩된 칸이어야 한다(색인이 곧 재화 짝이다).</para>
     /// </summary>
     public void Show(string _title, IReadOnlyList<RewardLine> _rewards, Func<UniTask<RewardClaimOutcome>> _onConfirm,
-                     bool _claimOnDim = false, Action _onClosed = null)
+                     bool _claimOnDim = false, Action _onClosed = null,
+                     IReadOnlyList<CurrencyRewardSlotView> _gainSlotsAfterClose = null)
     {
         this.m_onConfirm = _onConfirm;
         this.m_onClosed = _onClosed;
+        this.m_gainSlotsAfterClose = _gainSlotsAfterClose;
 
         // 직전 표시의 안무를 걷는다 — 시퀀스에 중첩된 트윈은 대상의 DOKill이 잡지 못해 새 안무와 같은 노드를 함께 민다.
         this.KillIntro();
 
         // 직전 분출의 소유권도 뗀다. 안 떼면 옛 분출의 종료 콜백이 방금 연 이 팝업을 닫는다(수령 경로와 같은 이유).
+        var t_prevBurst = this.m_burst;
         this.m_burst = null;
+
+        // 닫힌 뒤 피는 빛은 팝업이 먼저 닫혀 다음 행을 바로 누를 수 있으므로 아직 날고 있을 수 있다 —
+        // 새 롤업 고정보다 먼저 마무리해야 그 빛의 도착 펀치·롤업이 묻히지 않는다(소유권을 뗀 뒤라 종료 콜백은 아무것도 닫지 않는다).
+        // 팝업 안 분출은 여기서 완료하지 않는다 — 퇴장 안무의 끝값이 새 등장과 같은 노드를 밀기 때문이다.
+        if (this.m_burstFliesAfterClose && t_prevBurst != null && t_prevBurst.IsActive()) t_prevBurst.Complete(true);
+        this.m_burstFliesAfterClose = false;
 
         var t_rewards = _rewards ?? Array.Empty<RewardLine>();
 
@@ -191,6 +208,14 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
         this.m_burst = null;
         if (t_prev != null && t_prev.IsActive()) t_prev.Complete(true);
 
+        // 닫힌 뒤 피는 경로(랭크 보상). 아이콘을 빨아들이는 퇴장 안무는 팝업 안에서 빛이 피어야 성립하므로 타지 않는다 —
+        // 팝업은 평소처럼 걷히고, 그 퇴장이 끝난 박자에 연 쪽 화면의 보상 칸에서 빛이 선다.
+        if (this.m_gainSlotsAfterClose != null)
+        {
+            this.PlayGainAfterClose(t_player);
+            return;
+        }
+
         // 등장이 아직 돌고 있으면 걷어 저작 상태로 되돌린다 — 중간값에서 퇴장을 이어 받으면 아이콘이 튄다.
         this.RestoreReveal();
 
@@ -203,8 +228,8 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
             return;
         }
 
-        // 연출 레이어가 랭크 오버레이보다 아래면 빛이 딤에 가린다(로비 획득 연출과 같은 처리).
-        // 빛이 아이콘 '위'에 떠야 아이콘이 그 아래서 사라진 것으로 읽히므로, 이 한 줄이 연출의 전제다.
+        // 빛이 아이콘 '위'에 떠야 아이콘이 그 아래서 사라진 것으로 읽힌다. 위아래는 빛 줄기의 층(UiSortingOrder.GainLight)이 보장하고,
+        // 형제 순서는 같은 캔버스 안의 연출 레이어끼리의 겹침만 정리한다(로비 획득 연출과 같은 처리).
         t_player.transform.SetAsLastSibling();
 
         // 퇴장 안무와 빛 줄기를 한 시간축에 놓는다 — 아이콘이 사그라드는 구간에 빛이 피어야 그것이 변한 것으로 읽힌다.
@@ -220,6 +245,36 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
         t_burst.SetAutoKill(true).OnKill(this.OnBurstEnded);
 
         // BuildLightGain은 재생을 호출자에게 맡긴다 — 전역 autoPlay 설정에 기대지 않고 여기서 명시적으로 돌린다.
+        t_burst.Play();
+    }
+
+    // 팝업을 먼저 닫고 퇴장 길이만큼 뒤에 빛을 띄운다. 시퀀스를 팝업에 링크하지 않는 이유는 분출과 같다(꺼질 때 죽으면 빛이 굳는다).
+    // 롤업 고정(BuildLightGain)은 닫기 전에 건다 — 퇴장 동안 서버 응답이 먼저 와도 HUD 숫자가 먼저 튀지 않게.
+    void PlayGainAfterClose(CurrencyGainEffectPlayer _player)
+    {
+        var t_gain = _player.BuildLightGain(this.m_rewards, this.m_origins, this.reveal.LightSprite);
+
+        // 빛이 없어도 닫힘은 같다 — 수령 자체는 이미 던져졌다.
+        this.Hide();
+        if (t_gain == null) return;
+
+        // 랭크 오버레이·올려 둔 상단바 위에 뜨는 것은 빛 줄기의 층(UiSortingOrder.GainLight)이 보장한다(팝업 안 분출과 같은 처리).
+        _player.transform.SetAsLastSibling();
+
+        var t_burst = DOTween.Sequence();
+        t_burst.Insert(this.transition.CloseDuration, t_gain);
+        this.m_burst = t_burst;
+        this.m_burstFliesAfterClose = true;
+
+        // 끝나도 다시 닫지 않는다(이미 닫혔고, 그 사이 다시 열린 팝업을 닫게 된다) — 소유권만 뗀다.
+        // 이 빛이 날고 있는 동안 다음 행을 누르면 Show가 먼저 완료시킨다(롤업 순서).
+        t_burst.SetAutoKill(true).OnKill(() =>
+        {
+            if (this.m_burst != t_burst) return;
+
+            this.m_burst = null;
+            this.m_burstFliesAfterClose = false;
+        });
         t_burst.Play();
     }
 
@@ -258,6 +313,21 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
     {
         Array.Clear(this.m_origins, 0, this.m_origins.Length);
 
+        this.BindPopupSlots(_rewards);
+
+        // 닫힌 뒤 피는 경로면 빛의 자리는 팝업 칸이 아니라 연 쪽이 넘긴 칸이다 — 팝업 칸 기록을 덮어쓴다.
+        if (this.m_gainSlotsAfterClose == null) return;
+
+        Array.Clear(this.m_origins, 0, this.m_origins.Length);
+        for (int t_i = 0; t_i < this.m_gainSlotsAfterClose.Count && t_i < _rewards.Count; t_i++)
+        {
+            var t_slot = this.m_gainSlotsAfterClose[t_i];
+            if (t_slot != null) this.RecordOrigin(_rewards[t_i].Gain.Type, t_slot.Icon);
+        }
+    }
+
+    void BindPopupSlots(IReadOnlyList<RewardLine> _rewards)
+    {
         if (this.rewardSlots == null) return;
 
         for (int t_i = 0; t_i < this.rewardSlots.Length; t_i++)

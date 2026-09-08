@@ -157,7 +157,12 @@ public class RankRewardPanel : PooledUIBase
         }
 
         var t_info = RankRewardManager.GetInfo(_tierIndex);
-        t_popup.Show(t_info.DisplayName, t_info.Rewards, () => this.ClaimAsync(_tierIndex), true);
+
+        // 획득 빛은 팝업이 닫힌 뒤 이 행의 보상 칸에서 핀다 — 행은 티어 순서 그대로 쌓이므로 티어 인덱스가 곧 행 색인이다.
+        // 행이 없으면(재빌드 직후 등) 팝업 안에서 피는 종전 경로로 내려간다.
+        var t_row = _tierIndex < this.m_rows.Count ? this.m_rows[_tierIndex] : null;
+        t_popup.Show(t_info.DisplayName, t_info.Rewards, () => this.ClaimAsync(_tierIndex), true,
+                     _gainSlotsAfterClose: t_row != null ? t_row.RewardSlots : null);
     }
 
     // 팝업은 이 패널의 소유가 아니라 씬 공용이다 — 없을 수도 있으므로 로케이터를 거친다.
