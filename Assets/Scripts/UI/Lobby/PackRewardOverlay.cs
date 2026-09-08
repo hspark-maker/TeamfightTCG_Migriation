@@ -63,8 +63,11 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
     // 진행 중 등장 안무. 확인·닫기가 도중에 와도 저작 상태로 되돌린 뒤 이어가야 한다.
     Sequence m_intro;
 
-    // 닫힘 콜백. 한 번 쓰면 비워 연타를 막는다.
+    // 닫힘 콜백. 한 번 쓰면 비워 두 번 흐르지 않게 한다.
     Action m_onClosed;
+
+    /// <summary>획득 결과 오버레이가 서는 층.</summary>
+    protected override int SortingOrder => UiSortingOrder.Reward;
 
     // 팩의 제자리. 프리팹 저작값이 곧 제자리라 최초 1회만 캡처한다.
     Vector2 m_packHome;
@@ -107,7 +110,7 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
             this.confirmButton.onClick.AddListener(this.OnConfirmClicked);
         }
 
-        IsOpen = true;
+        MarkOpen();
         this.SetVisible(true);
         this.CaptureHome();
 
@@ -118,17 +121,17 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
         this.m_intro.Play();
     }
 
-    public void Hide()
+    void CloseNow()
     {
+        this.m_onClosed = null;
         this.KillIntro();
 
-        bool t_wasOpen = IsOpen;
-        IsOpen = false;
+        bool t_wasOpen = ConsumeOpen();
 
         this.SetVisible(false);
         this.ResetChoreography();
 
-        if (t_wasOpen) RaiseClosed();
+        NotifyClosed(t_wasOpen);
     }
 
     // 잠금은 등장 안무가 푼다. Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서는 그 안무가 없어
@@ -145,25 +148,28 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
         this.KillIntro();
         this.ResetChoreography();
 
-        // 꺼진 화면은 떠 있는 것이 아니다. Hide를 거치지 않고 꺼지는 경로(부모 비활성·씬 언로드)에서
+        // 꺼진 화면은 떠 있는 것이 아니다. CloseNow를 거치지 않고 꺼지는 경로(부모 비활성·씬 언로드)에서
         // 이 플래그가 남으면 "로비 표면이 보이는가" 판정이 영영 false가 되어 뒤의 안내가 서지 못한다.
-        IsOpen = false;
+        ClearOpen();
     }
 
     void OnConfirmClicked()
     {
-        // 콜백을 먼저 비워 연타로 두 번 도는 경로를 막는다.
+        // 연타는 여기서 막는다. **콜백 유무로 막지 않는다** — 닫기와 콜백 소비는 별개라,
+        // 콜백을 안 넘긴 호출자에게 [확인]이 아무 일도 안 하는 모달을 남기면 안 된다.
+        if (!IsOpen) return;
+
+        // 콜백은 먼저 비운다. 닫기 도중에 다시 들어와도 두 번 흐르지 않는다.
         var t_callback = this.m_onClosed;
         this.m_onClosed = null;
-        if (t_callback == null) return;
 
         this.SetInputEnabled(false);
 
         // 화면을 먼저 걷고 콜백을 부른다. 그 콜백이 트는 비행의 종료 신호를 기다리는 쪽이
         // "팝업이 떠 있는 동안 온 신호"로 오인해 흘려보내지 않도록(OutgameTutorialBridge.OnCardGainFinished).
-        this.Hide();
+        this.CloseNow();
 
-        t_callback.Invoke();
+        t_callback?.Invoke();
     }
 
     // 등장 안무. 팩만 위에서 내려앉고, 착지 한 프레임에 펀치를 몰아넣는다.

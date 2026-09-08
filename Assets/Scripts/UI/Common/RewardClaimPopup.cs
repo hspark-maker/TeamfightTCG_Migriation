@@ -67,6 +67,9 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
     // m_burst가 "닫힌 뒤 피는 빛"인지. 팝업 안 분출과 달리 팝업이 닫힌 뒤에도 날고 있어 다음 Show가 먼저 마무리해야 한다.
     bool m_burstFliesAfterClose;
 
+    /// <summary>이 팝업이 서는 층.</summary>
+    protected override int SortingOrder => UiSortingOrder.RewardClaim;
+
     /// <summary>
     /// 씬의 공용 팝업을 얻는다. 평소 꺼져 있는 노드라 비활성까지 뒤진다 —
     /// 자가 설치는 하지 않는다(저작된 빛·리본·버튼이 있어 코드로 세울 수 있는 물건이 아니다).

@@ -119,6 +119,9 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
     CanvasGroup m_claimGroup;
     CanvasGroup m_glowGroup;
 
+    /// <summary>획득 결과 오버레이 층.</summary>
+    protected override int SortingOrder => UiSortingOrder.Reward;
+
     /// <summary>카드가 서 있는 자리. 획득 뒤 이어지는 비행이 여기서 출발해야
     /// "방금 본 그 카드가 도감으로 갔다"가 한 줄로 이어진다.</summary>
     public RectTransform CardAnchor => this.cardSlot;
@@ -149,7 +152,7 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
             this.acquireButton.onClick.AddListener(this.OnAcquireClicked);
         }
 
-        IsOpen = true;
+        MarkOpen();
         this.SetVisible(true);
         this.dimTint.Capture();
         this.CaptureHome();
@@ -159,21 +162,6 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
 
         this.m_choreo = this.BuildIntro();
         this.m_choreo.Play();
-    }
-
-    public void Hide()
-    {
-        this.m_onAcquire = null;
-        this.KillChoreo();
-        this.dimTint.Reset();
-
-        bool t_wasOpen = IsOpen;
-        IsOpen = false;
-
-        this.SetVisible(false);
-        this.ResetChoreography();
-
-        if (t_wasOpen) RaiseClosed();
     }
 
     // 잠금은 등장 안무가 푼다. Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서는 그 안무가 없어
@@ -191,28 +179,30 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
         this.dimTint.Reset();
         this.ResetChoreography();
 
-        // 꺼진 화면은 떠 있는 것이 아니다. Hide를 거치지 않고 꺼지는 경로(부모 비활성·씬 언로드)에서
+        // 꺼진 화면은 떠 있는 것이 아니다. [획득]을 거치지 않고 꺼지는 경로(부모 비활성·씬 언로드)에서
         // 이 플래그가 남으면 "로비 표면이 보이는가" 판정이 영영 false가 되어 뒤의 안내가 서지 못한다.
-        IsOpen = false;
+        ClearOpen();
     }
 
     void OnAcquireClicked()
     {
-        // 콜백을 먼저 비워 연타로 두 번 지급되는 경로를 막는다(호출자 가드와 이중 방어).
+        // 연타는 여기서 막는다. **콜백 유무로 막지 않는다** — 콜백을 넘기지 않는 호출자에게
+        // [획득]이 아무 일도 안 하는 죽은 모달로 남는 길을 만들면 안 된다.
+        if (!IsOpen) return;
+
+        // 콜백은 먼저 비운다. 정리 도중 다시 들어와도 지급이 두 번 흐르지 않는다(호출자 가드와 이중 방어).
         var t_callback = this.m_onAcquire;
         this.m_onAcquire = null;
-        if (t_callback == null) return;
 
         this.SetInputEnabled(false);
 
         // 지급은 이 프레임에 끝낸다. 뒤에 오는 것은 표시뿐이라, 화면이 도중에 꺼져도 카드는 이미 들어가 있다.
         // IsOpen도 함께 내린다 — 지급이 트는 획득 연출의 종료 신호를 기다리는 쪽이
         // "보상 화면이 떠 있는 동안 온 신호"로 오인해 흘려보낸다(OutgameTutorialBridge.OnCardGainFinished).
-        bool t_wasOpen = IsOpen;
-        IsOpen = false;
+        bool t_wasOpen = ConsumeOpen();
 
         this.KillChoreo();
-        t_callback.Invoke();
+        t_callback?.Invoke();
 
         this.m_choreo = this.BuildHandoff(t_wasOpen);
         this.m_choreo.Play();
@@ -397,7 +387,7 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
         t_seq.InsertCallback(this.handoffPopDuration, () =>
         {
             this.SetVisible(false);
-            if (_wasOpen) RaiseClosed();
+            NotifyClosed(_wasOpen);
         });
 
         t_seq.OnComplete(() => this.m_choreo = null);

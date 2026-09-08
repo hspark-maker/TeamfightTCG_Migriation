@@ -47,6 +47,9 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
     // 매 표시마다 경고하면 로그가 묻힌다.
     static bool s_rowShortageWarned;
 
+    /// <summary>이 화면이 서는 층.</summary>
+    protected override int SortingOrder => UiSortingOrder.Intro;
+
     /// <summary>안내 오버레이를 얻는다(평소 꺼져 있는 노드라 비활성까지 뒤진다).</summary>
     public static bool TryGet(out UnlockIntroOverlay _overlay)
         => TryGetOrCreate(RuntimeOverlayPrefabs.Get<UnlockIntroOverlay>, out _overlay);
@@ -63,6 +66,12 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
         if (this.m_shownRows == 0)
         {
             this.m_onClose = null;
+
+            // 앞 표시가 떠 있는 채로 빈 목록이 오면 그 화면이 그대로 남는다 — 첫 표시에서는
+            // ConsumeOpen()이 거짓이라 통지가 나가지 않아 종전과 같다.
+            NotifyClosed(ConsumeOpen());
+            SetVisible(false);
+
             _onClose?.Invoke();
             return;
         }
@@ -75,7 +84,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
             this.confirmButton.onClick.AddListener(OnConfirmClicked);
         }
 
-        IsOpen = true;
+        MarkOpen();
         SetVisible(true);
 
         // 다 서기 전에 눌러 닫히면 무엇이 열렸는지 못 본다.
@@ -85,28 +94,6 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 
         this.m_intro = BuildIntro();
         this.m_intro.Play();
-    }
-
-    /// <summary>밖에서 걷는다(화면이 통째로 넘어가는 경로). 콜백은 흘리지 않는다.</summary>
-    public void Hide()
-    {
-        this.m_onClose = null;
-        KillIntro();
-        EndDemo();
-
-        bool t_wasOpen = IsOpen;
-        IsOpen = false;
-
-        SetVisible(false);
-        ResetChoreography();
-
-        if (t_wasOpen) RaiseClosed();
-    }
-
-    // 이 화면이 서는 층은 프리팹 저작값이 아니라 UiSortingOrder 표가 쥔다.
-    void Awake()
-    {
-        UiSortingOrder.Stamp(GetComponent<Canvas>(), UiSortingOrder.Intro);
     }
 
     // 잠금을 푸는 곳이 등장 안무뿐이라, Show를 거치지 않고 뜨면 [확인]이 잠긴 모달로 남는다.
@@ -122,8 +109,8 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
         EndDemo();
         ResetChoreography();
 
-        // Hide를 거치지 않고 꺼지는 경로(부모 비활성·씬 언로드)에서 이 플래그가 남으면 영영 열린 것으로 읽힌다.
-        IsOpen = false;
+        // 닫기를 거치지 않고 꺼지는 경로(부모 비활성·씬 언로드)에서 이 플래그가 남으면 영영 열린 것으로 읽힌다.
+        ClearOpen();
     }
 
     void OnConfirmClicked()
@@ -137,14 +124,14 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 
         SetInputEnabled(false);
 
-        IsOpen = false;
+        bool t_wasOpen = ConsumeOpen();
 
         KillIntro();
         EndDemo();
         SetVisible(false);
         ResetChoreography();
 
-        RaiseClosed();
+        NotifyClosed(t_wasOpen);
 
         // 받는 쪽이 이 화면의 상태를 다시 물어볼 수 있어야 해서 정리가 끝난 뒤에 넘긴다.
         t_callback?.Invoke();
