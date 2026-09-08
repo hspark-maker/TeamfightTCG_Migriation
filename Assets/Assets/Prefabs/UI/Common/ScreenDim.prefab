@@ -66,7 +66,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a5cc62d96e74a1e99e75e524d4e6a31, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScreenDim
-  layer: 1
+  layer: 0
   canvasGroup: {fileID: 1003}
   full: {fileID: 2004}
   holeTop: {fileID: 3002}
