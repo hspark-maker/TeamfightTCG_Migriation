@@ -83,7 +83,7 @@ public class PackResultGrid : MonoBehaviour
     {
         if (cardPrefab == null)
         {
-            Debug.LogWarning("[PackResultGrid] cardPrefab 미배선 → 결과 격자 생성 불가.");
+            Debug.LogWarning("[PackResultGrid] cardPrefab is unwired, so the result grid cannot be created.");
             return;
         }
 

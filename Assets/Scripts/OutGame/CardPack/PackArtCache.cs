@@ -43,7 +43,7 @@ public static class PackArtCache
         {
             s_failed = true;
             s_complete = true;
-            Debug.LogError("[PackArtCache] Packs 라벨 Addressables 카탈로그 조회 실패.");
+            Debug.LogError("[PackArtCache] Failed to query the Addressables catalog for the Packs label.");
             if (t_catalog.IsValid()) Addressables.Release(t_catalog);
             yield break;
         }
@@ -63,7 +63,7 @@ public static class PackArtCache
             else
             {
                 s_failed = true;
-                Debug.LogError($"[PackArtCache] 팩 아트 로드 실패: {t_location.PrimaryKey}");
+                Debug.LogError($"[PackArtCache] Pack art load failed: {t_location.PrimaryKey}");
             }
             s_progress = t_count > 0 ? (float)(t_i + 1) / t_count : 1f;
         }
@@ -75,7 +75,7 @@ public static class PackArtCache
             if (!PackSpec.TryGetPack(t_packId, out CardPack t_pack) || string.IsNullOrEmpty(t_pack.artKey)) continue;
             if (s_loaded.ContainsKey(t_pack.artKey)) continue;
             s_failed = true;
-            Debug.LogError($"[PackArtCache] CardPack '{t_packId}'의 artKey '{t_pack.artKey}'를 찾지 못했습니다.");
+            Debug.LogError($"[PackArtCache] Could not find artKey '{t_pack.artKey}' of CardPack '{t_packId}'.");
         }
 
         if (t_catalog.IsValid()) Addressables.Release(t_catalog);

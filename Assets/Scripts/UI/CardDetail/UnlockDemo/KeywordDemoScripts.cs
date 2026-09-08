@@ -26,7 +26,7 @@ abstract class KeywordDemoScript : IUnlockDemoScript
 
         if (t_opponent <= 0)
         {
-            Debug.LogWarning($"[UnlockDemoStage] {this.Keyword} 데모의 상대 카드가 저작되지 않았습니다(KeywordDemoConfig 확인).");
+            Debug.LogWarning($"[UnlockDemoStage] The opponent card for the {this.Keyword} demo is not authored (check KeywordDemoConfig).");
             return false;
         }
 

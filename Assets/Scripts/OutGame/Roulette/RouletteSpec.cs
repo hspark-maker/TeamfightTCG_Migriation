@@ -126,7 +126,7 @@ public static class RouletteSpec
             return false;
         }
         if (t_dropped > 0)
-            Debug.LogWarning($"[RouletteSpec] 판 '{_rouletteId}'의 칸 행 {t_dropped}개를 저작 결함으로 버렸다.");
+            Debug.LogWarning($"[RouletteSpec] Discarded {t_dropped} slot row(s) of board '{_rouletteId}' as authoring defects.");
 
         _board = new ParsedBoard(t_header.rouletteId, t_header.displayName, t_priceType, t_header.price, t_slots);
         return true;

@@ -62,7 +62,7 @@ public static class TriggeredTutorialRunner
 
         if (s_data != null)
         {
-            Debug.LogWarning($"[TriggeredTutorialRunner] 다른 트리거 튜토리얼 데이터 주입 시도('{_data.name}' ≠ 기존 '{s_data.name}') — 기존 유지.");
+            Debug.LogWarning($"[TriggeredTutorialRunner] Attempted to inject different triggered tutorial data ('{_data.name}' != existing '{s_data.name}') — keeping the existing one.");
             return;
         }
 
@@ -109,7 +109,7 @@ public static class TriggeredTutorialRunner
     {
         if (!TryGetCurrentStep(out var t_step))
         {
-            Debug.LogWarning($"[TriggeredTutorialRunner] '{s_active.Label}'({s_active.Trigger})의 스텝 {s_index}이(가) 비어 있습니다 — 완주로 닫습니다.");
+            Debug.LogWarning($"[TriggeredTutorialRunner] Step {s_index} of '{s_active.Label}'({s_active.Trigger}) is empty — closing it as finished.");
             Finish();
             return EOutgameTutorialStepResult.Advanced;
         }

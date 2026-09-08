@@ -42,7 +42,7 @@ public static class WaveMeshBuilder
             EditorUtility.SetDirty(t_existing);
             AssetDatabase.SaveAssets();
             Object.DestroyImmediate(t_mesh);
-            Debug.Log($"[WaveMesh] 갱신: {OutputPath} (verts {t_existing.vertexCount})");
+            Debug.Log($"[WaveMesh] Updated: {OutputPath} (verts {t_existing.vertexCount})");
             Selection.activeObject = t_existing;
             return;
         }
@@ -54,7 +54,7 @@ public static class WaveMeshBuilder
         AssetDatabase.CreateAsset(t_mesh, OutputPath);
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log($"[WaveMesh] 생성: {OutputPath} (verts {t_mesh.vertexCount})");
+        Debug.Log($"[WaveMesh] Created: {OutputPath} (verts {t_mesh.vertexCount})");
         Selection.activeObject = t_mesh;
     }
 

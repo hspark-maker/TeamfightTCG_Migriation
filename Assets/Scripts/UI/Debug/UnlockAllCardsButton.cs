@@ -23,7 +23,7 @@ public class UnlockAllCardsButton : MonoBehaviour
     public void UnlockAll()
     {
         int t_added = OwnershipManager.GrantEntireCatalog();
-        Debug.Log($"[Ownership] 전체 해금 — 신규 {t_added}장 / 소유 {OwnershipManager.OwnedCount}장");
+        Debug.Log($"[Ownership] Unlock all — {t_added} new / {OwnershipManager.OwnedCount} owned");
     }
 
     void RefreshInteractable()

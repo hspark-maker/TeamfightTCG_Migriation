@@ -234,7 +234,7 @@ public static class RankManager
     {
         if (_before < 0 || _after < 0) throw new ArgumentOutOfRangeException();
         if (Slot.Points != _before)
-            Debug.LogWarning($"[Payout] 로컬 랭크 기준이 서버 원장과 다르다(local={Slot.Points}, server={_before}). 서버 값을 채택한다.");
+            Debug.LogWarning($"[Payout] The local rank baseline differs from the server ledger (local={Slot.Points}, server={_before}). Adopting the server value.");
 
         int t_beforeTier = Config.ResolveTierIndex(_before);
         Slot.Points = _after;

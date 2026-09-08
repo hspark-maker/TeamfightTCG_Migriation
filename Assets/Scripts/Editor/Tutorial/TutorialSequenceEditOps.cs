@@ -378,7 +378,7 @@ public static class TutorialSequenceEditOps
         OutgameTutorialRewind.Cancel();
 
         string t_stage = t_wipePending ? "세이브 밀기 대기" : "지급 재생 대기";
-        Debug.LogWarning($"[TutorialEditOps] 저작이 바뀌어 되감기 예약을 취소했습니다 — 좌표 {t_chapter}-{t_step}({t_stage}) · 사유: {_reason}. 필요하면 다시 예약하세요.");
+        Debug.LogWarning($"[TutorialEditOps] The authoring changed, so the rewind reservation was cancelled — position {t_chapter}-{t_step}({t_stage}) · reason: {_reason}. Re-reserve it if needed.");
     }
 
     static void MarkDirty(UnityEngine.Object _data)

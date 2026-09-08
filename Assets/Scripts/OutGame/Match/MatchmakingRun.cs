@@ -51,7 +51,7 @@ public static class MatchmakingRun
         catch (Exception t_exception)
         {
             // 버려진 매칭의 예외를 삼키면 세션이 어떤 상태로 끝났는지 알 수 없다 — 남기고 결과로도 넘긴다.
-            Debug.LogWarning($"[MatchmakingRun] 매칭이 예외로 끝났다: {t_exception.GetBaseException().Message}");
+            Debug.LogWarning($"[MatchmakingRun] Matchmaking ended with an exception: {t_exception.GetBaseException().Message}");
             _result.TrySetException(t_exception);
         }
         finally

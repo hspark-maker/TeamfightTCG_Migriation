@@ -59,6 +59,6 @@ public static class GameTiming
     {
         if (s_warnedDefault) return;
         s_warnedDefault = true;
-        Debug.LogWarning("[GameTiming] BattleTimingConfig가 주입되지 않아 기본값으로 동작합니다.");
+        Debug.LogWarning("[GameTiming] BattleTimingConfig was not injected; running with default values.");
     }
 }

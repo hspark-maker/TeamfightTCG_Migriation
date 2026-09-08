@@ -147,7 +147,7 @@ public static class MulliganPhase
                 if (DeckConfig.IsMultiplayer && DeckConfig.AiTakeover) break;
                 if (Time.realtimeSinceStartup >= t_deadline)
                 {
-                    Debug.Log($"[Net] 멀리건 선택이 {_timeoutSec}초를 넘겨 자동 스킵한다.");
+                    Debug.Log($"[Net] The mulligan choice exceeded {_timeoutSec}s and is auto-skipped.");
                     break;
                 }
 

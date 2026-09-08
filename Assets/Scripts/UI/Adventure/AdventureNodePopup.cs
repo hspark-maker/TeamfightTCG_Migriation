@@ -133,7 +133,7 @@ public class AdventureNodePopup : PooledUIBase
         if (this.m_rewards.Count > this.rewardSlots.Length && !s_overflowWarned)
         {
             s_overflowWarned = true;
-            Debug.LogWarning($"[AdventureNodePopup] 보상 {this.m_rewards.Count}건이 슬롯 {this.rewardSlots.Length}칸을 초과");
+            Debug.LogWarning($"[AdventureNodePopup] {this.m_rewards.Count} reward(s) exceed the {this.rewardSlots.Length} slot(s)");
         }
     }
 }

@@ -67,7 +67,7 @@ public static class RouletteManager
             // 그릴 수 없는 칸을 성공으로 넘기면 화면이 그 인덱스로 판을 돌리다 터진다.
             if (!TryGetSlot(t_outcome.SlotIndex, out _))
             {
-                Debug.LogError($"[RouletteManager] 결과 칸 {t_outcome.SlotIndex}이(가) 판에 없다 — 저작과 판정이 어긋났다.");
+                Debug.LogError($"[RouletteManager] Result slot {t_outcome.SlotIndex} is not on the board — the authoring and the resolution have diverged.");
                 return RouletteSpinOutcome.CreateFailure(ERouletteSpinResult.RewardUnreadable);
             }
 
@@ -128,7 +128,7 @@ public static class RouletteManager
     {
         if (s_config == null)
         {
-            Debug.LogWarning("[RouletteManager] 설정이 아직 서지 않아 로컬 추첨을 꽂지 못했다.");
+            Debug.LogWarning("[RouletteManager] The config is not up yet, so the local draw could not be applied.");
             return;
         }
 

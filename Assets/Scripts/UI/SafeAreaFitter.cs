@@ -119,7 +119,7 @@ public class SafeAreaFitter : MonoBehaviour
 
         if (this.warnedAboutAncestor) return;
         this.warnedAboutAncestor = true;
-        Debug.LogWarning($"[SafeAreaFitter] 조상 '{t_ancestor.name}'이 이미 SafeArea를 적용해 '{name}'은 적용을 생략합니다.", this);
+        Debug.LogWarning($"[SafeAreaFitter] Ancestor '{t_ancestor.name}' already applies SafeArea, so '{name}' skips it.", this);
     }
 
 #if UNITY_EDITOR

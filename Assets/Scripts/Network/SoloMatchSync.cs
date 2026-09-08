@@ -147,14 +147,14 @@ public static class SoloMatchSync
         if (_ct.IsCancellationRequested) return ESoloMatchSyncResult.Canceled;
         if (!t_deckOk)
         {
-            Debug.LogError("[SoloMatchSync] 출전 덱 스냅샷을 만들지 못해 서버 검증을 시작하지 못했다.");
+            Debug.LogError("[SoloMatchSync] Could not build the entry deck snapshot, so server validation could not start.");
             return ESoloMatchSyncResult.Failed;
         }
 
         if (!SoloMatchHandoff.TryGetLockIdentity(
                 out string t_matchId, out string t_seedHex, out ulong _, out int t_rulesetVersion))
         {
-            Debug.LogError("[SoloMatchSync] findAiMatch가 발급한 매치 신원이 없다.");
+            Debug.LogError("[SoloMatchSync] findAiMatch did not issue a match identity.");
             return ESoloMatchSyncResult.Failed;
         }
 
@@ -175,7 +175,7 @@ public static class SoloMatchSync
         if (_ct.IsCancellationRequested) return ESoloMatchSyncResult.Canceled;
         if (t_lock != DeckLockResult.Approved)
         {
-            Debug.LogError($"[SoloMatchSync] 덱 검증 실패({t_lock}) matchId={t_matchId}");
+            Debug.LogError($"[SoloMatchSync] Deck validation failed ({t_lock}) matchId={t_matchId}");
             return ESoloMatchSyncResult.Failed;
         }
 
@@ -183,12 +183,12 @@ public static class SoloMatchSync
         // 오름차순이 아닌 덱은 서버가 solo_player_deck_mismatch 로 접어 보상·랭크가 통째로 날아간다.
         if (!DeckLockSubmission.TryNormalize(t_cardIds, t_growth, out _, out _, out string t_deckHash))
         {
-            Debug.LogError("[SoloMatchSync] 덱 해시를 만들지 못해 결과 제출 신원을 세우지 못했다.");
+            Debug.LogError("[SoloMatchSync] Could not build the deck hash, so the result submission identity could not be established.");
             return ESoloMatchSyncResult.Failed;
         }
         SoloMatchHandoff.SetLocalDeckHash(t_matchId, t_deckHash);
 
-        Debug.Log($"[SoloMatchSync] 덱 검증 통과 matchId={t_matchId} seed={t_seedHex}");
+        Debug.Log($"[SoloMatchSync] Deck validation passed matchId={t_matchId} seed={t_seedHex}");
         return ESoloMatchSyncResult.Success;
     }
 }

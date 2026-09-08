@@ -11,7 +11,7 @@ public sealed class LocalSaveMatchGrowthSource : IMatchGrowthSource
         if (_ct.IsCancellationRequested) return UniTask.FromResult<CardGrowth[]>(null);
         if (!CardGrowthManager.IsReady || !CardGrowthManager.IsConfigReady || !KeywordGrowthManager.IsReady)
         {
-            Debug.LogError("[MatchGrowth] 로컬 성장 캐시/설정이 준비되지 않아 멀티 성장 스냅샷을 만들 수 없다.");
+            Debug.LogError("[MatchGrowth] The local growth cache/config is not ready, so the multiplayer growth snapshot cannot be built.");
             return UniTask.FromResult<CardGrowth[]>(null);
         }
 
@@ -22,7 +22,7 @@ public sealed class LocalSaveMatchGrowthSource : IMatchGrowthSource
             int t_cardId = _deck[i];
             if (!CardCatalog.Contains(t_cardId))
             {
-                Debug.LogError($"[MatchGrowth] 덱의 카드 참조가 비어 있다: index={i}");
+                Debug.LogError($"[MatchGrowth] A card reference in the deck is empty: index={i}");
                 return UniTask.FromResult<CardGrowth[]>(null);
             }
             t_result[i] = CardGrowthManager.GrowthOf(t_cardId);
@@ -35,7 +35,7 @@ public sealed class LocalSaveMatchGrowthSource : IMatchGrowthSource
     {
         // 개발/오프라인 fallback에는 상대 계정의 정본이 없다. 구조 검증은 수신 경로가 이미 수행하지만
         // 권위 검증은 못 한다. 인터넷 멀티 출시 전 Firebase 구현으로 반드시 교체해야 한다.
-        Debug.LogWarning("[MatchGrowth] 로컬 fallback은 상대 성장 스냅샷의 서버 정본 검증을 생략한다.");
+        Debug.LogWarning("[MatchGrowth] The local fallback skips server-authoritative validation of the opponent growth snapshot.");
         return UniTask.FromResult(!_ct.IsCancellationRequested);
     }
 }

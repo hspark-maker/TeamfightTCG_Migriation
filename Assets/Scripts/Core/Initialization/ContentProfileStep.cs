@@ -16,8 +16,8 @@ public sealed class ContentProfileStep : MainInitializer
 
             // 빌드 종류와 환경을 항상 한 줄 남긴다 — 어떤 빌드가 어느 환경을 보는지는
             // 화면만 보고는 알 수 없어서, 매번 추측으로 시간을 버리는 자리였다.
-            Debug.Log($"[초기화] dev={Debug.isDebugBuild} mode={t_profile.RunMode} env={t_profile.CloudEnvId} " +
-                      $"app={Application.version} tableGen={ContentVersion.Major}");
+            Debug.Log($"[Init] dev={Debug.isDebugBuild} mode={t_profile.RunMode} env={t_profile.CloudEnvId} " +
+                       $"app={Application.version} tableGen={ContentVersion.Major}");
 
             // 스펙시트 파싱은 프로필이 가리키는 환경(CloudEnvId)을 읽으므로 프로필 확정 뒤다.
             SpecSource.Init();

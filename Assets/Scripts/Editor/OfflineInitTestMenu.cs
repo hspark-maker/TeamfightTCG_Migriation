@@ -26,7 +26,7 @@ public static class OfflineInitTestMenu
         if (!TryGetScript(out string t_script)) return;
 
         string t_output = Capture(t_script, "status");
-        if (t_output != null) Debug.Log($"[오프라인 초기화 검증]\n{t_output.TrimEnd()}");
+        if (t_output != null) Debug.Log($"[OfflineInitCheck]\n{t_output.TrimEnd()}");
     }
 
     // UAC 창을 띄워야 하므로 출력을 되받지 못한다 — -NoExit 로 창을 남겨 확인 항목을 그 자리에서 읽게 한다.
@@ -49,7 +49,7 @@ public static class OfflineInitTestMenu
         }
         catch (System.ComponentModel.Win32Exception)
         {
-            Debug.LogWarning("[오프라인 초기화 검증] 관리자 권한 요청이 취소됐습니다.");
+            Debug.LogWarning("[OfflineInitCheck] The administrator permission request was cancelled.");
         }
     }
 
@@ -78,7 +78,7 @@ public static class OfflineInitTestMenu
 
             if (!string.IsNullOrEmpty(t_stderr))
             {
-                Debug.LogError($"[오프라인 초기화 검증] {t_stderr.TrimEnd()}");
+                Debug.LogError($"[OfflineInitCheck] {t_stderr.TrimEnd()}");
                 return null;
             }
 
@@ -91,7 +91,7 @@ public static class OfflineInitTestMenu
         _script = ToolPath("OfflineInitTest.ps1");
         if (File.Exists(_script)) return true;
 
-        Debug.LogError($"[오프라인 초기화 검증] 스크립트가 없습니다: {_script}");
+        Debug.LogError($"[OfflineInitCheck] Script not found: {_script}");
         return false;
     }
 

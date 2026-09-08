@@ -25,7 +25,7 @@ internal static class PassCommands
                 GET_COMMAND, new { env = ContentProfileConfig.Active.CloudEnvId });
             if (t_result == null)
             {
-                Debug.LogWarning("[PassCommands] getPass 가 아무것도 돌려주지 않았다.");
+                Debug.LogWarning("[PassCommands] getPass returned nothing.");
                 return false;
             }
             if (s_inFlightClaims.Count > 0) return false;
@@ -35,7 +35,7 @@ internal static class PassCommands
         }
         catch (Exception t_exception)
         {
-            Debug.LogWarning($"[PassCommands] 패스 조회 실패 — {t_exception.GetBaseException().Message}");
+            Debug.LogWarning($"[PassCommands] Pass query failed — {t_exception.GetBaseException().Message}");
             return false;
         }
     }
@@ -53,22 +53,22 @@ internal static class PassCommands
                 CLAIM_COMMAND,
                 new { env = ContentProfileConfig.Active.CloudEnvId, level = _level });
             PassManager.Adopt(t_result?.Progress);
-            Debug.Log($"[PassCommands] 레벨 {_level} 수령 완료 — 재화 {t_result?.Granted?.Count ?? 0}건");
+            Debug.Log($"[PassCommands] Level {_level} claimed — {t_result?.Granted?.Count ?? 0} currency line(s)");
             return t_result;
         }
         catch (ServerCommandRejectedException t_rejected)
         {
-            Debug.LogWarning($"[PassCommands] 레벨 {_level} 수령 거절({t_rejected.Reason}) — {t_rejected.Message}");
+            Debug.LogWarning($"[PassCommands] Level {_level} claim rejected ({t_rejected.Reason}) — {t_rejected.Message}");
             return null;
         }
         catch (ServerAdoptionException t_adoption)
         {
-            Debug.LogWarning($"[PassCommands] 수령 응답 채택 실패 — {t_adoption.Message}");
+            Debug.LogWarning($"[PassCommands] Failed to adopt the claim response — {t_adoption.Message}");
             return null;
         }
         catch (Exception t_exception)
         {
-            Debug.LogError($"[PassCommands] claimPassReward 실패 — {t_exception.GetBaseException().Message}");
+            Debug.LogError($"[PassCommands] claimPassReward failed — {t_exception.GetBaseException().Message}");
             return null;
         }
         finally

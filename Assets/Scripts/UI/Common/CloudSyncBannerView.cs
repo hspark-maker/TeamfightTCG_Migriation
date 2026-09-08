@@ -51,7 +51,7 @@ public class CloudSyncBannerView : SingletonOverlayBase
         s_instance = t_object.GetComponent<CloudSyncBannerView>();
         if (s_instance == null)
         {
-            Debug.LogError($"[CloudSyncBannerView] {t_prefab.name} 루트에 CloudSyncBannerView가 없습니다.", t_prefab);
+            Debug.LogError($"[CloudSyncBannerView] The root of {t_prefab.name} has no CloudSyncBannerView.", t_prefab);
             Destroy(t_object);
             _banner = null;
             return false;
@@ -70,7 +70,7 @@ public class CloudSyncBannerView : SingletonOverlayBase
         if (this.canvasGroup == null) this.canvasGroup = GetComponent<CanvasGroup>();
 
         if (this.overlayCanvas == null || this.canvasGroup == null)
-            Debug.LogError("[CloudSyncBannerView] 프리팹 루트에 Canvas·CanvasGroup이 필요합니다.", this);
+            Debug.LogError("[CloudSyncBannerView] The prefab root needs a Canvas and a CanvasGroup.", this);
 
         UiSortingOrder.Stamp(this.overlayCanvas, UiSortingOrder.CloudSyncBanner);
 

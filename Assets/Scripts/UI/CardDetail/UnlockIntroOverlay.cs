@@ -155,7 +155,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
     {
         if (this.rowRoot == null)
         {
-            Debug.LogWarning("[UnlockIntroOverlay] rowRoot 미배선 — 세울 자리가 없습니다.");
+            Debug.LogWarning("[UnlockIntroOverlay] rowRoot is unwired — there is nowhere to lay them out.");
             return 0;
         }
 
@@ -169,8 +169,8 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
                 if (!s_rowShortageWarned)
                 {
                     s_rowShortageWarned = true;
-                    Debug.LogWarning($"[UnlockIntroOverlay] 깔린 행이 {this.rowRoot.childCount}개뿐이라 "
-                                   + $"{t_count}개를 다 세우지 못했습니다(프리팹에 행을 더 깔 것).");
+                    Debug.LogWarning($"[UnlockIntroOverlay] Only {this.rowRoot.childCount} row(s) are laid out, "
+                                   + $"so not all {t_count} could be shown (lay out more rows in the prefab).");
                 }
                 break;
             }

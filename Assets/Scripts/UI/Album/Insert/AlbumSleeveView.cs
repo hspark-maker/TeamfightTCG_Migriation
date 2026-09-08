@@ -534,7 +534,7 @@ public class AlbumSleeveView : MonoBehaviour
         if (!m_layerWarned)
         {
             m_layerWarned = true;
-            Debug.LogError("[AlbumSleeveView] panelRect 배선 누락 — 카드 위치를 계산할 수 없다(cardHolder의 부모를 꽂을 것).", this);
+            Debug.LogError("[AlbumSleeveView] panelRect wiring missing — the card position cannot be computed (wire the parent of cardHolder).", this);
         }
         return null;
     }

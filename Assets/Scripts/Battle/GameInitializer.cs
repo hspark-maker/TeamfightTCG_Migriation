@@ -88,11 +88,11 @@ public class GameInitializer : MonoBehaviour
             // 출구 처리(GetComponent)가 MissingReferenceException 으로 다시 터진다 — 그건 원인이 아니라 소음이다.
             if (this == null)
             {
-                Debug.LogWarning($"[GameInitializer] 전투 초기화가 씬 종료로 취소됐다: {t_e.GetBaseException().Message}");
+                Debug.LogWarning($"[GameInitializer] Battle initialization was cancelled by scene teardown: {t_e.GetBaseException().Message}");
                 return;
             }
 
-            Debug.LogError($"[GameInitializer] 전투 초기화 실패 — 전투를 열지 못했다: {t_e}");
+            Debug.LogError($"[GameInitializer] Battle initialization failed — could not open the battle: {t_e}");
             AbortInit(EMatchEndReason.InitError);
         }
         finally
@@ -199,7 +199,7 @@ public class GameInitializer : MonoBehaviour
         }
 #endif
 
-        Debug.LogError("[GameInitializer] 프로덕션 진입에 상대 덱이 없다 — 로컬 AI 덱으로 대체하지 않는다.");
+        Debug.LogError("[GameInitializer] No opponent deck on production entry — will not substitute a local AI deck.");
     }
 
     /// <summary>모드 플래그를 **런타임 사실**과 대조한다.
@@ -226,12 +226,12 @@ public class GameInitializer : MonoBehaviour
         foreach (Fusion.PlayerRef _ in t_runner.ActivePlayers) t_players++;
         if (t_players < 2)
         {
-            Debug.LogWarning($"[Mode] 스테일 러너 감지(접속 {t_players}명). 싱글로 진행한다.");
+            Debug.LogWarning($"[Mode] Stale runner detected ({t_players} players connected). Continuing as single player.");
             return;
         }
 
-        Debug.LogError("[Mode] 러너에 상대가 있는데 IsMultiplayer=false로 전투 씬 진입. "
-                     + "멀티로 승격한다 — 로비 콜백(SetMultiplayer)을 놓친 경로가 있다.");
+        Debug.LogError("[Mode] Entered the battle scene with IsMultiplayer=false while the runner has an opponent. "
+                      + "Promoting to multiplayer — some path missed the lobby callback (SetMultiplayer).");
         DeckConfig.SetMultiplayer(true);
     }
 
@@ -282,7 +282,7 @@ public class GameInitializer : MonoBehaviour
 
         if (t_timedOut == 1)
         {
-            Debug.LogError($"[MultiInit] ownerIndex 확보가 {MultiplayerTurnRunner.InitSyncTimeoutSec}초를 넘겼다. 초기화 중단.");
+            Debug.LogError($"[MultiInit] ownerIndex acquisition exceeded {MultiplayerTurnRunner.InitSyncTimeoutSec}s. Aborting initialization.");
             return false;
         }
 
@@ -293,7 +293,7 @@ public class GameInitializer : MonoBehaviour
         IMatchGrowthSource t_source = MatchGrowthSource.Current;
         if (t_source == null)
         {
-            Debug.LogError("[MatchGrowth] 매치 성장 공급자가 주입되지 않았다.");
+            Debug.LogError("[MatchGrowth] The match growth provider was not injected.");
             this.multiplayerFieldFailureReason = EMatchEndReason.InitError;
             return false;
         }
@@ -323,7 +323,7 @@ public class GameInitializer : MonoBehaviour
             if (!t_resolved)
             {
                 t_growthCts.Cancel();
-                Debug.LogError($"[MatchGrowth] 내 성장 스냅샷 조회가 초기화 상한({NetTimeouts.InitSyncSec}초)을 넘겼다.");
+                Debug.LogError($"[MatchGrowth] Own growth snapshot lookup exceeded the initialization limit ({NetTimeouts.InitSyncSec}s).");
                 this.multiplayerFieldFailureReason = EMatchEndReason.Timeout;
                 return false;
             }
@@ -331,14 +331,14 @@ public class GameInitializer : MonoBehaviour
         }
         catch (System.Exception t_e)
         {
-            Debug.LogError($"[MatchGrowth] 내 성장 스냅샷 조회 실패: {t_e}");
+            Debug.LogError($"[MatchGrowth] Own growth snapshot lookup failed: {t_e}");
             this.multiplayerFieldFailureReason = EMatchEndReason.InitError;
             return false;
         }
 
         if (t_growth == null || t_growth.Length != t_deck.Count)
         {
-            Debug.LogError($"[MatchGrowth] 내 성장 스냅샷 장수 불일치: deck={t_deck.Count}, growth={t_growth?.Length ?? -1}");
+            Debug.LogError($"[MatchGrowth] Own growth snapshot count mismatch: deck={t_deck.Count}, growth={t_growth?.Length ?? -1}");
             this.multiplayerFieldFailureReason = EMatchEndReason.InitError;
             return false;
         }
@@ -349,19 +349,19 @@ public class GameInitializer : MonoBehaviour
             int t_cardId = t_deck[i];
             if (!CardCatalog.Contains(t_cardId))
             {
-                Debug.LogError($"[MatchGrowth] 내 덱 카드가 null이다: index={i}");
+                Debug.LogError($"[MatchGrowth] Own deck card is null: index={i}");
                 this.multiplayerFieldFailureReason = EMatchEndReason.InitError;
                 return false;
             }
             if (!MatchGrowthValidation.IsValid(t_cardId, t_growth[i], out string t_error))
             {
-                Debug.LogError($"[MatchGrowth] 내 성장 스냅샷 오류(index={i}): {t_error}");
+                Debug.LogError($"[MatchGrowth] Own growth snapshot error (index={i}): {t_error}");
                 this.multiplayerFieldFailureReason = EMatchEndReason.InitError;
                 return false;
             }
             if (t_growthByCard.ContainsKey(t_cardId))
             {
-                Debug.LogError($"[MatchGrowth] 멀티 덱에 중복 카드가 있다: id={t_cardId}");
+                Debug.LogError($"[MatchGrowth] The multiplayer deck contains a duplicate card: id={t_cardId}");
                 this.multiplayerFieldFailureReason = EMatchEndReason.InitError;
                 return false;
             }
@@ -447,8 +447,8 @@ public class GameInitializer : MonoBehaviour
             (!SameCardMultiset(t_playerBoardOrder, DeckConfig.PlayerDeck) ||
              !SameCardMultiset(t_enemyBoardOrder, DeckConfig.EnemyDeck)))
         {
-            Debug.LogError("[GameInitializer] 서버 보드 순서가 이 전투의 덱과 다르다 — 로컬 셔플로 되돌린다. " +
-                           "서버 검증은 이 판을 통과시키지 않는다.");
+            Debug.LogError("[GameInitializer] The server board order differs from this battle's deck — reverting to the local shuffle. " +
+                            "The server will not let this match pass validation.");
             t_hasServerBoardOrders = false;
         }
 

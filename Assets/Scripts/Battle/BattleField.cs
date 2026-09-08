@@ -87,7 +87,7 @@ public class BattleField : MonoBehaviour
         var t_cards = new List<int>(_deckData != null ? _deckData.Count : 0);
         if (_deckData == null)
         {
-            Debug.LogError($"[BattleField] owner {_ownerIndex} 덱이 null — 빈 필드로 시작한다.");
+            Debug.LogError($"[BattleField] owner {_ownerIndex} deck is null — starting with an empty field.");
             return t_cards;
         }
 
@@ -105,7 +105,7 @@ public class BattleField : MonoBehaviour
 
         if (t_missing > 0)
             Debug.LogError(
-                $"[BattleField] owner {_ownerIndex} 덱에 빈 칸 {t_missing}개(카드 에셋 참조 끊김) — 그 칸을 빼고 {t_cards.Count}장으로 시작한다. 덱 에셋을 고칠 것.");
+                $"[BattleField] owner {_ownerIndex} deck has {t_missing} empty slot(s) (broken card asset reference) — starting with {t_cards.Count} cards without them. Fix the deck asset.");
 
         return t_cards;
     }
@@ -228,8 +228,8 @@ public class BattleField : MonoBehaviour
         if (!this.state.TryTakeMatchingWaiting(_cardId, out t_card))
         {
             // desync 방어(정상 lockstep에선 도달 안 함): fresh 폴백 + 확정 필드 시너지 재적용.
-            Debug.LogError($"[BattleField] PlaceCardDirectly 미러 큐 불일치 → fresh 폴백 " +
-                             $"(slot={_slot}, cardId={_cardId}, waiting={this.state.WaitingCount})");
+            Debug.LogError($"[BattleField] PlaceCardDirectly mirror queue mismatch → fresh fallback " +
+                              $"(slot={_slot}, cardId={_cardId}, waiting={this.state.WaitingCount})");
             t_card = new CardInstance(_cardId, this.OwnerIndex, GrowthOf(_cardId)); // 성장원도 Initialize와 같은 소스로
             if (this.Synergy != null)
                 SynergyApplier.ApplyAll(this.Synergy, new[] { t_card });

@@ -54,7 +54,7 @@ public class PackCarouselDotsView : MonoBehaviour
 
             var t_focus = t_dot.Find(focusChildName);
             if (t_focus == null)
-                Debug.LogWarning($"[PackCarouselDotsView] dotTemplate에 '{focusChildName}' 자식이 없다 — 선택 표시가 뜨지 않는다.", this);
+                Debug.LogWarning($"[PackCarouselDotsView] dotTemplate has no '{focusChildName}' child — the selection marker will not show.", this);
 
             m_dots.Add(t_dot.gameObject);
             m_focus.Add(t_focus != null ? t_focus.gameObject : null);

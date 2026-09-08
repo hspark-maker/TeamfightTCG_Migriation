@@ -178,8 +178,8 @@ public class MatchmakingShell : MonoBehaviour
 
         if (t_canvas.sortingOrder != UiSortingOrder.Matchmaking)
             Debug.LogWarning(
-                $"[MatchmakingShell] 저작된 층이 표와 다릅니다(저작 {t_canvas.sortingOrder} ≠ 표 {UiSortingOrder.Matchmaking}) — "
-              + "런타임은 표를 따르므로 프리팹만 고쳐서는 바뀌지 않습니다. UiSortingOrder.Matchmaking을 고칠 것.", this);
+                $"[MatchmakingShell] The authored layer differs from the table (authored {t_canvas.sortingOrder} != table {UiSortingOrder.Matchmaking}) — "
+              + "the runtime follows the table, so fixing only the prefab changes nothing. Fix UiSortingOrder.Matchmaking.", this);
 #endif
     }
 
@@ -225,7 +225,7 @@ public class MatchmakingShell : MonoBehaviour
 
         if (cancelButton == null)
         {
-            Debug.LogError("[MatchmakingShell] cancelButton 미배선 — 매칭 중 물러날 방법이 없다.");
+            Debug.LogError("[MatchmakingShell] cancelButton is unwired — there is no way to back out during matchmaking.");
 
             return;
         }
@@ -240,7 +240,7 @@ public class MatchmakingShell : MonoBehaviour
     {
         if (_matchmaker == null)
         {
-            Debug.LogError("[MatchmakingShell] 매치메이커가 없다 — 매칭을 건너뛴다.");
+            Debug.LogError("[MatchmakingShell] There is no matchmaker — skipping matchmaking.");
 
             return null;
         }
@@ -248,7 +248,7 @@ public class MatchmakingShell : MonoBehaviour
         // 이미 진행 중인데 다시 부르면 두 await가 같은 화면을 두고 경쟁한다.
         if (m_running)
         {
-            Debug.LogWarning("[MatchmakingShell] 매칭이 이미 진행 중이다 — 중복 진입을 무시한다.");
+            Debug.LogWarning("[MatchmakingShell] Matchmaking is already in progress — ignoring the duplicate entry.");
 
             return null;
         }
@@ -320,7 +320,7 @@ public class MatchmakingShell : MonoBehaviour
         // 이미 진행 중인데 다시 부르면 두 await가 같은 화면을 두고 경쟁한다.
         if (m_running)
         {
-            Debug.LogWarning("[MatchmakingShell] 대치가 이미 진행 중이다 — 중복 진입을 무시한다.");
+            Debug.LogWarning("[MatchmakingShell] The versus sequence is already in progress — ignoring the duplicate entry.");
 
             return;
         }

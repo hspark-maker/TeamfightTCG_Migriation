@@ -12,7 +12,7 @@ internal static class AlbumValidator
         SpecDataManager t_manager = SpecSource.Manager;
         if (t_manager == null)
         {
-            Debug.LogError("[CardAlbum] SpecData를 읽지 못해 앨범 검증을 할 수 없다.");
+            Debug.LogError("[CardAlbum] Could not read SpecData, so the album cannot be validated.");
             return;
         }
 
@@ -20,7 +20,7 @@ internal static class AlbumValidator
         IReadOnlyList<AlbumEntry> t_entryRows = t_manager.AlbumEntry?.All;
         if (t_themeRows == null || t_themeRows.Count == 0)
         {
-            Debug.LogError("[CardAlbum] AlbumThemeInfo 표가 비었다 — 앨범이 통째로 비어 있다.");
+            Debug.LogError("[CardAlbum] The AlbumThemeInfo table is empty — the whole album is empty.");
             return;
         }
 
@@ -34,14 +34,14 @@ internal static class AlbumValidator
             string t_themeId = Key(t_row.themeId);
             if (t_themeId.Length == 0)
             {
-                Debug.LogError($"[CardAlbum] AlbumThemeInfo {t_row.id}의 themeId가 비었다 — 완성 보상 낙인 키를 만들 수 없다.");
+                Debug.LogError($"[CardAlbum] AlbumThemeInfo {t_row.id} has an empty themeId — the completion reward mark key cannot be built.");
                 t_errors++;
                 continue;
             }
             if (!t_themeById.ContainsKey(t_themeId)) t_themeById.Add(t_themeId, t_row);
             else
             {
-                Debug.LogError($"[CardAlbum] themeId 중복 '{t_themeId}' (AlbumThemeInfo {t_row.id}) — 낙인이 한 테마로 합쳐진다.");
+                Debug.LogError($"[CardAlbum] Duplicate themeId '{t_themeId}' (AlbumThemeInfo {t_row.id}) — the marks collapse into a single theme.");
                 t_errors++;
             }
         }
@@ -61,14 +61,14 @@ internal static class AlbumValidator
             string t_pageId = Key(t_row.pageId);
             if (t_themeId.Length == 0 || t_pageId.Length == 0)
             {
-                Debug.LogError($"[CardAlbum] AlbumEntry {t_row.id}의 themeId·pageId가 비었다 — 페이지 낙인 키를 만들 수 없다.");
+                Debug.LogError($"[CardAlbum] AlbumEntry {t_row.id} has an empty themeId/pageId — the page mark key cannot be built.");
                 t_errors++;
                 continue;
             }
 
             if (!t_themeById.ContainsKey(t_themeId))
             {
-                Debug.LogError($"[CardAlbum] AlbumEntry {t_row.id}가 AlbumThemeInfo에 없는 themeId '{t_themeId}'를 가리킨다 — 갈 곳 없는 칸이다.");
+                Debug.LogError($"[CardAlbum] AlbumEntry {t_row.id} points at themeId '{t_themeId}', which is not in AlbumThemeInfo — this cell has nowhere to go.");
                 t_errors++;
                 continue;
             }
@@ -79,7 +79,7 @@ internal static class AlbumValidator
             string t_pageKey = t_themeId + "/" + t_pageId;
             if (!t_orderKeys.Add(t_pageKey + "#" + t_row.order))
             {
-                Debug.LogWarning($"[CardAlbum] order 중복 '{t_pageKey}' order {t_row.order} — 칸 순서가 행 번호로 갈린다(저작 의도 확인).");
+                Debug.LogWarning($"[CardAlbum] Duplicate order '{t_pageKey}' order {t_row.order} — cell order falls back to the row number (check the authoring intent).");
                 t_warnings++;
             }
 
@@ -88,7 +88,7 @@ internal static class AlbumValidator
             {
                 if (!string.Equals(t_first, t_pageKey, StringComparison.Ordinal))
                 {
-                    Debug.LogWarning($"[CardAlbum] 카드 {t_row.cardId}가 '{t_first}'와 '{t_pageKey}' 두 곳에 배치됐다.");
+                    Debug.LogWarning($"[CardAlbum] Card {t_row.cardId} is placed in both '{t_first}' and '{t_pageKey}'.");
                     t_warnings++;
                 }
             }
@@ -102,12 +102,12 @@ internal static class AlbumValidator
 
             if (!t_locked && t_cells == 0)
             {
-                Debug.LogError($"[CardAlbum] 열린 테마 '{t_pair.Key}'에 칸이 0개다 — 영구 미완성이라 앨범 전체 보상이 봉인된다.");
+                Debug.LogError($"[CardAlbum] Open theme '{t_pair.Key}' has zero cells — it can never be completed, which seals the whole-album reward.");
                 t_errors++;
             }
             else if (t_locked && t_cells > 0)
             {
-                Debug.LogWarning($"[CardAlbum] 준비 중 테마 '{t_pair.Key}'에 칸이 {t_cells}개 저작돼 있다 — 흑백+자물쇠로만 뜨고 완성 모수에서 빠진다(의도 확인).");
+                Debug.LogWarning($"[CardAlbum] Upcoming theme '{t_pair.Key}' has {t_cells} cell(s) authored — they only show greyed out with a lock and are excluded from the completion denominator (confirm this is intended).");
                 t_warnings++;
             }
         }
@@ -118,10 +118,10 @@ internal static class AlbumValidator
 
         if (t_errors == 0 && t_warnings == 0)
         {
-            Debug.Log($"[CardAlbum] 앨범 검증 통과 — 테마 {t_themeById.Count}개 / 칸 {t_placed.Count}개, 드리프트 없음.");
+            Debug.Log($"[CardAlbum] Album validation passed — {t_themeById.Count} theme(s) / {t_placed.Count} cell(s), no drift.");
             return;
         }
-        Debug.Log($"[CardAlbum] 앨범 검증 종료 — 오류 {t_errors}건, 경고 {t_warnings}건.");
+        Debug.Log($"[CardAlbum] Album validation finished — {t_errors} error(s), {t_warnings} warning(s).");
     }
 
     // 카탈로그는 런타임 초기화에서만 채워진다 — 에디터 정지 상태에서는 이 대조를 건너뛴다
@@ -129,7 +129,7 @@ internal static class AlbumValidator
     {
         if (!CardCatalog.IsReady)
         {
-            Debug.LogWarning("[CardAlbum] CardCatalog 미준비 — 카드 실재·누락 대조를 생략한다(플레이 중에 다시 실행할 것).");
+            Debug.LogWarning("[CardAlbum] CardCatalog is not ready — skipping the card existence/missing cross-check (run it again during play).");
             _warnings++;
             return 0;
         }
@@ -142,8 +142,8 @@ internal static class AlbumValidator
         }
         if (t_notInCatalog.Count > 0)
         {
-            Debug.LogError($"[CardAlbum] 카탈로그에 없는 카드 {t_notInCatalog.Count}장이 칸을 차지한다: " +
-                           $"{string.Join(", ", t_notInCatalog)} — 소유로 채울 수 없어 그 페이지가 영구 미완성이다.");
+            Debug.LogError($"[CardAlbum] {t_notInCatalog.Count} card(s) that are not in the catalog occupy cells: " +
+                            $"{string.Join(", ", t_notInCatalog)} — they can never be filled by ownership, so that page is permanently incomplete.");
             t_errors++;
         }
 
@@ -154,7 +154,7 @@ internal static class AlbumValidator
         }
         if (t_missing.Count > 0)
         {
-            Debug.LogWarning($"[CardAlbum] 카탈로그엔 있으나 어느 칸에도 없는 카드 {t_missing.Count}장: {string.Join(", ", t_missing)}");
+            Debug.LogWarning($"[CardAlbum] {t_missing.Count} card(s) exist in the catalog but are in no cell: {string.Join(", ", t_missing)}");
             _warnings++;
         }
         return t_errors;
@@ -166,7 +166,7 @@ internal static class AlbumValidator
     {
         if (_skinSource == null)
         {
-            Debug.LogWarning("[CardAlbum] 스킨 SO가 없어 테마 그림 대조를 생략한다.");
+            Debug.LogWarning("[CardAlbum] There is no skin SO, so the theme art cross-check is skipped.");
             _warnings++;
             return;
         }
@@ -178,19 +178,19 @@ internal static class AlbumValidator
             string t_themeId = Key(t_skins[t_i].themeId);
             if (t_themeId.Length == 0)
             {
-                Debug.LogWarning($"[CardAlbum] 스킨 {t_i}번의 themeId가 비었다 — 어느 테마에도 붙지 않는다.");
+                Debug.LogWarning($"[CardAlbum] Skin #{t_i} has an empty themeId — it attaches to no theme.");
                 _warnings++;
                 continue;
             }
             if (!t_skinIds.Add(t_themeId))
             {
-                Debug.LogWarning($"[CardAlbum] 스킨 themeId 중복 '{t_themeId}' — 뒤쪽 줄은 무시된다.");
+                Debug.LogWarning($"[CardAlbum] Duplicate skin themeId '{t_themeId}' — the later entries are ignored.");
                 _warnings++;
                 continue;
             }
             if (!_themeById.ContainsKey(t_themeId))
             {
-                Debug.LogWarning($"[CardAlbum] 스킨 '{t_themeId}'가 AlbumThemeInfo에 없는 테마를 가리킨다 — 쓰이지 않는 저작이다.");
+                Debug.LogWarning($"[CardAlbum] Skin '{t_themeId}' points at a theme that is not in AlbumThemeInfo — this authoring is unused.");
                 _warnings++;
             }
         }
@@ -198,7 +198,7 @@ internal static class AlbumValidator
         foreach (string t_themeId in _themeById.Keys)
         {
             if (t_skinIds.Contains(t_themeId)) continue;
-            Debug.LogWarning($"[CardAlbum] 테마 '{t_themeId}'의 스킨이 없다 — 셀 프리팹 저작 그림으로 그려진다.");
+            Debug.LogWarning($"[CardAlbum] Theme '{t_themeId}' has no skin — it is drawn with the cell prefab authored art.");
             _warnings++;
         }
     }
@@ -208,7 +208,7 @@ internal static class AlbumValidator
     {
         if (AlbumSpec.TryGetRewards(null, null, out List<AlbumRewardDef> t_rewards) && t_rewards.Count > 0) return 0;
 
-        Debug.LogError("[CardAlbum] Reward 표에 ownerType=Album, ownerId=\"b\" 행이 없다 — 앨범 완주 보상이 빈 목록이 된다.");
+        Debug.LogError("[CardAlbum] The Reward table has no row with ownerType=Album, ownerId=\"b\" — the album completion reward becomes an empty list.");
         return 1;
     }
 

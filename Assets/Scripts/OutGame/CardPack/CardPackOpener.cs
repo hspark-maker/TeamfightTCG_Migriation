@@ -49,7 +49,7 @@ public static class CardPackOpener
 
         // 클라만 SO 폴백을 볼 수 있다 — 시트에 없는 팩은 서버가 아예 모르는 팩이라 반드시 거절된다.
         if (!PackSpec.TryGetPack(_packId, out _))
-            Debug.LogError($"[CardPackOpener] '{_packId}'가 CardPack 표에 없습니다.");
+            Debug.LogError($"[CardPackOpener] '{_packId}' is not in the CardPack table.");
 
         // 첫 await 이전이어야 유저가 누른 프레임에 잔액이 줄어든다. 걷는 쪽은 InvokeAsync 가 전담한다.
         CurrencyPendingTicket t_pending = CurrencyPendingTicket.Hold(PackSpec.PriceType(_packId), -PackSpec.Price(_packId));
@@ -63,13 +63,13 @@ public static class CardPackOpener
         }
         catch (ServerCommandRejectedException t_rejected)
         {
-            Debug.LogWarning($"[CardPackOpener] 사전검사는 통과했으나 서버가 거절했다 — 시트/SO 폴백 드리프트를 점검할 것: {t_rejected.Message}");
+            Debug.LogWarning($"[CardPackOpener] The precheck passed but the server rejected it — check for sheet/SO fallback drift: {t_rejected.Message}");
             return OpenedPack.CreateFailure(Blocked(t_rejected));
         }
         catch (ServerAdoptionException t_adoption)
         {
             // 세션은 이미 접혔고 팝업은 CloudSyncStatusWatcher 담당이다 — 여기서 표면을 두 번 칠하지 않는다.
-            Debug.LogWarning($"[CardPackOpener] 응답 채택이 세션을 접었다 — {t_adoption.Message}");
+            Debug.LogWarning($"[CardPackOpener] Adopting the response closed the session — {t_adoption.Message}");
             return OpenedPack.CreateFailure(EPackOpenResult.SpendFailed);
         }
         catch (System.Exception t_exception)
@@ -78,7 +78,7 @@ public static class CardPackOpener
             // Transient가 아닌 나머지(배선·배포·직렬화)는 유저가 손쓸 수 없으니 예전대로 팩 실패로 접는다.
             bool t_transient = CloudFailureClassifier.Classify(t_exception) == ECloudFailureKind.Transient;
 
-            Debug.LogError($"[CardPackOpener] openPack 실패({CloudFailureClassifier.Describe(t_exception)}) — {t_exception.GetBaseException().Message}");
+            Debug.LogError($"[CardPackOpener] openPack failed ({CloudFailureClassifier.Describe(t_exception)}) — {t_exception.GetBaseException().Message}");
             return OpenedPack.CreateFailure(t_transient ? EPackOpenResult.NetworkFailed : EPackOpenResult.SpendFailed);
         }
         finally
@@ -100,7 +100,7 @@ public static class CardPackOpener
             case REASON_INSUFFICIENT_GOLD: return EPackOpenResult.InsufficientGold;
         }
 
-        Debug.LogWarning($"[CardPackOpener] openPack 거절 사유를 읽지 못했다 — '{_rejected.Reason}'");
+        Debug.LogWarning($"[CardPackOpener] Could not read the openPack rejection reason — '{_rejected.Reason}'");
         return EPackOpenResult.SpendFailed;
     }
 

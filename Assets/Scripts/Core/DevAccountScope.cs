@@ -52,7 +52,7 @@ public static class DevAccountScope
         }
         catch (System.Exception t_exception)
         {
-            Debug.LogWarning($"[DevAccountScope] ParrelSync 인자 파일을 읽지 못했다: {t_exception.Message}");
+            Debug.LogWarning($"[DevAccountScope] Failed to read the ParrelSync argument file: {t_exception.Message}");
         }
 #endif
 #endif

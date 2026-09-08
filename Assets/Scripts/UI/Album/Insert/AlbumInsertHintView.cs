@@ -141,7 +141,7 @@ public class AlbumInsertHintView : MonoBehaviour
 
         // 런타임 RemoveAllListeners는 퍼시스턴트를 못 지운다 — 목업 onClick은 배선 단계에서 지워야 한다
         if (this.skipButton != null && this.skipButton.onClick.GetPersistentEventCount() > 0)
-            Debug.LogWarning("[AlbumInsertHintView] Button_Skip에 목업 퍼시스턴트 onClick이 남아 있다 — 프리팹에서 제거할 것.", this);
+            Debug.LogWarning("[AlbumInsertHintView] A mock persistent onClick is left on Button_Skip — remove it from the prefab.", this);
 
         if (this.skipButton != null) this.skipButton.onClick.AddListener(() => OnSkip?.Invoke());
 

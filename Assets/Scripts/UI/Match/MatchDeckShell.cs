@@ -54,7 +54,7 @@ public class MatchDeckShell : MonoBehaviour
         // 이미 진행 중인데 다시 부르면 선택 상태를 덮어쓰고, Confirm 한 번에 두 await가 동시에 깨어난다.
         if (m_selecting)
         {
-            Debug.LogWarning("[MatchDeckShell] 선택이 이미 진행 중이다 — 중복 진입을 무시한다.");
+            Debug.LogWarning("[MatchDeckShell] A selection is already in progress — ignoring the duplicate entry.");
 
             return false;
         }
@@ -102,7 +102,7 @@ public class MatchDeckShell : MonoBehaviour
 
         if (!TryConfirmSelection())
         {
-            Debug.LogWarning("[MatchDeckShell] 유효한 덱이 선택되지 않았다 — 전투를 시작하지 않는다.");
+            Debug.LogWarning("[MatchDeckShell] No valid deck was selected — not starting the battle.");
 
             return;
         }
@@ -182,7 +182,7 @@ public class MatchDeckShell : MonoBehaviour
         // 매치 화면은 신규 덱 생성을 지원하지 않는다(가로 리스트에 + 칸이 없다) → 편집할 원본이 없으면 열지 않는다.
         if (SelectedSlot < 0)
         {
-            Debug.LogWarning("[MatchDeckShell] 저장된 유효 덱이 없다 — 편집 화면을 열지 않는다(신규 생성은 로비 덱 탭).");
+            Debug.LogWarning("[MatchDeckShell] There is no valid saved deck — not opening the edit screen (create new decks in the lobby deck tab).");
 
             return;
         }

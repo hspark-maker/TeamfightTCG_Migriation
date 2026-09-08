@@ -88,7 +88,7 @@ public static class CardArtCache
         if (!t_handle.IsValid() || t_handle.Status != AsyncOperationStatus.Succeeded)
         {
             s_catalogFailed = true;
-            Debug.LogError("[CardArtCache] Cards 라벨 Addressables 카탈로그 조회 실패.");
+            Debug.LogError("[CardArtCache] Failed to query the Addressables catalog for the Cards label.");
         }
         else
         {
@@ -110,7 +110,7 @@ public static class CardArtCache
             if (!s_reportedCatalogNotReady)
             {
                 s_reportedCatalogNotReady = true;
-                Debug.LogWarning("[CardArtCache] 카탈로그가 준비되지 않아 카드 아트를 표시하지 않습니다.");
+                Debug.LogWarning("[CardArtCache] The catalog is not ready, so card art is not displayed.");
             }
             return false;
         }
@@ -122,7 +122,7 @@ public static class CardArtCache
         if (string.IsNullOrEmpty(_address)) return null;
         if (s_loaded.TryGetValue(_address, out Sprite t_sprite)) return t_sprite;
         if (s_reportedMisses.Add(_address))
-            Debug.LogError($"[CardArtCache] 프리로드되지 않았거나 로드에 실패한 카드 아트: {_address}");
+            Debug.LogError($"[CardArtCache] Card art was not preloaded or failed to load: {_address}");
         return null;
     }
 
@@ -156,7 +156,7 @@ public static class CardArtCache
                 if (!s_addresses.Contains(t_baseAddress))
                 {
                     s_loadFailed = true;
-                    Debug.LogError($"[CardArtCache] 기본 카드 아트 주소 없음: {t_baseAddress}");
+                    Debug.LogError($"[CardArtCache] Missing default card art address: {t_baseAddress}");
                 }
 
                 for (int t_stage = 0; t_stage <= CardSpec.MaxEvolutionStage; t_stage++)
@@ -202,7 +202,7 @@ public static class CardArtCache
             else
             {
                 s_loadFailed = true;
-                Debug.LogError($"[CardArtCache] 카드 아트 로드 실패: {_address}");
+                Debug.LogError($"[CardArtCache] Card art load failed: {_address}");
             }
         };
     }

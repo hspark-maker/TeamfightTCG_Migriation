@@ -56,7 +56,7 @@ public sealed class ServerRouletteSpinSource : IRouletteSpinSource
         catch (ServerAdoptionException t_adoption)
         {
             // 이 명령은 세이브를 쓰지 않아 계약상 도달하지 않는다. 세션은 이미 접혔고 팝업은 CloudSyncStatusWatcher 담당이다.
-            Debug.LogWarning($"[ServerRouletteSpinSource] 응답 채택이 세션을 접었다 — {t_adoption.Message}");
+            Debug.LogWarning($"[ServerRouletteSpinSource] Adopting the response closed the session — {t_adoption.Message}");
             return RouletteSpinOutcome.CreateFailure(ERouletteSpinResult.Rejected);
         }
         catch (Exception t_exception)
@@ -64,11 +64,11 @@ public sealed class ServerRouletteSpinSource : IRouletteSpinSource
             // 망 문제만 갈라낸다 — 판정은 클라우드 분류기 하나에 맡긴다(여기서 예외 목록을 다시 짜면 기준이 둘이 된다).
             if (CloudFailureClassifier.Classify(t_exception) == ECloudFailureKind.Transient)
             {
-                Debug.LogWarning($"[ServerRouletteSpinSource] {COMMAND_NAME} 왕복 실패({CloudFailureClassifier.Describe(t_exception)}) — {t_exception.GetBaseException().Message}");
+                Debug.LogWarning($"[ServerRouletteSpinSource] {COMMAND_NAME} round trip failed ({CloudFailureClassifier.Describe(t_exception)}) — {t_exception.GetBaseException().Message}");
                 return RouletteSpinOutcome.CreateFailure(ERouletteSpinResult.NetworkFailed);
             }
 
-            Debug.LogError($"[ServerRouletteSpinSource] {COMMAND_NAME} 실패({CloudFailureClassifier.Describe(t_exception)}) — {t_exception.GetBaseException().Message}");
+            Debug.LogError($"[ServerRouletteSpinSource] {COMMAND_NAME} failed ({CloudFailureClassifier.Describe(t_exception)}) — {t_exception.GetBaseException().Message}");
             return RouletteSpinOutcome.CreateFailure(ERouletteSpinResult.Rejected);
         }
         finally
@@ -96,25 +96,25 @@ public sealed class ServerRouletteSpinSource : IRouletteSpinSource
         ClaimRewardGain t_gain = _result?.Gain;
         if (t_gain == null || t_gain.Amount <= 0)
         {
-            Debug.LogError($"[ServerRouletteSpinSource] 지급 줄이 비어 있다 — 그릴 상품이 없다(slot={_result?.SlotIndex}).");
+            Debug.LogError($"[ServerRouletteSpinSource] The grant lines are empty — there is no prize to draw (slot={_result?.SlotIndex}).");
             return RouletteSpinOutcome.CreateFailure(ERouletteSpinResult.RewardUnreadable);
         }
 
         if (!CurrencyCode.TryParse(t_gain.Currency, out ECurrencyType t_type))
         {
-            Debug.LogError($"[ServerRouletteSpinSource] 알 수 없는 재화 '{t_gain.Currency}' — 잔액은 이미 서버가 갈아끼웠고 연출만 건너뛴다.");
+            Debug.LogError($"[ServerRouletteSpinSource] Unknown currency '{t_gain.Currency}' — the server already replaced the balance, so only the presentation is skipped.");
             return RouletteSpinOutcome.CreateFailure(ERouletteSpinResult.RewardUnreadable);
         }
 
         // 지갑이 이미 움직였으므로 실패로 접으면 그쪽이 오히려 거짓이다 — 흔적만 남긴다.
         if (m_config != null && !string.IsNullOrEmpty(_result.RouletteId) && _result.RouletteId != m_config.RouletteId)
-            Debug.LogError($"[ServerRouletteSpinSource] 서버가 다른 판을 돌렸다(요청={m_config.RouletteId}, 응답={_result.RouletteId}).");
+            Debug.LogError($"[ServerRouletteSpinSource] The server spun a different board (requested={m_config.RouletteId}, response={_result.RouletteId}).");
 
         // SO 를 고치고 구성 표 업로드를 잊은 경우가 여기서 잡힌다. 서버 판정이 옳으므로 실패로 접지 않는다.
         if (m_config != null && m_config.TryGetSlot(_result.SlotIndex, out RouletteSlotDef t_slot) &&
             (t_slot.currency != t_type || t_slot.amount != t_gain.Amount))
         {
-            Debug.LogError($"[ServerRouletteSpinSource] {_result.SlotIndex}번 칸 저작({t_slot.currency} {t_slot.amount})과 서버 지급({t_type} {t_gain.Amount})이 다르다 — 구성 표 업로드를 점검할 것.");
+            Debug.LogError($"[ServerRouletteSpinSource] Slot {_result.SlotIndex} authoring ({t_slot.currency} {t_slot.amount}) differs from the server grant ({t_type} {t_gain.Amount}) — check the config table upload.");
         }
 
         return RouletteSpinOutcome.CreateSuccess(_result.SlotIndex, t_type, t_gain.Amount);
@@ -131,7 +131,7 @@ public sealed class ServerRouletteSpinSource : IRouletteSpinSource
             case REASON_INSUFFICIENT_TICKET: return ERouletteSpinResult.InsufficientTicket;
         }
 
-        Debug.LogWarning($"[ServerRouletteSpinSource] {COMMAND_NAME} 거절 사유를 읽지 못했다 — '{_rejected.Reason}' · {_rejected.Message}");
+        Debug.LogWarning($"[ServerRouletteSpinSource] Could not read the {COMMAND_NAME} rejection reason — '{_rejected.Reason}' · {_rejected.Message}");
         return ERouletteSpinResult.Rejected;
     }
 }

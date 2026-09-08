@@ -159,21 +159,21 @@ public class MultiplayerTurnRunner : MonoBehaviour
         // 상대방 카드만 처리 (내 카드는 이미 로컬에서 채움)
         if (_ownerIndex == this.MyOwnerIndex)
         {
-            Debug.LogError($"[Net] CardSpawn owner가 로컬 소유자로 들어왔다 — owner={_ownerIndex}");
+            Debug.LogError($"[Net] CardSpawn owner arrived as the local owner — owner={_ownerIndex}");
             TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
             return;
         }
 
         if (this.enemyField?.GetSlot(_slot) != null)
         {
-            Debug.LogError($"[Net] CardSpawn 대상 슬롯이 이미 차 있다 — slot={_slot}, owner={_ownerIndex}");
+            Debug.LogError($"[Net] CardSpawn target slot is already occupied — slot={_slot}, owner={_ownerIndex}");
             TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
             return;
         }
 
         if (!CardCatalog.Contains(_cardId))
         {
-            Debug.LogError($"[Net] CardSpawn 미상 카드 ID — id={_cardId}, slot={_slot}, owner={_ownerIndex}");
+            Debug.LogError($"[Net] CardSpawn unknown card id — id={_cardId}, slot={_slot}, owner={_ownerIndex}");
             TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
             return;
         }
@@ -181,7 +181,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
         CardInstance t_card = this.enemyField?.PlaceCardDirectly(_slot, _cardId);
         if (t_card == null)
         {
-            Debug.LogError($"[Net] CardSpawn 미러 배치 실패 — id={_cardId}, slot={_slot}, owner={_ownerIndex}");
+            Debug.LogError($"[Net] CardSpawn mirror placement failed — id={_cardId}, slot={_slot}, owner={_ownerIndex}");
             TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
             return;
         }
@@ -497,7 +497,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
         this.seedHex = t_result.match.SeedHex;
         this.rulesetVersion = t_result.match.RulesetVersion;
         MatchRandom.Seed(t_result.match.Seed);
-        Debug.Log($"[MatchSeed] 서버 시드 확정 matchId={this.matchId}, slot={t_result.match.Slot}");
+        Debug.Log($"[MatchSeed] Server seed confirmed matchId={this.matchId}, slot={t_result.match.Slot}");
         return true;
     }
 
@@ -637,7 +637,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
             if (t_timedOut != 1) return;
         }
 
-        Debug.LogError($"[MultiInit] {_what} 대기가 초기화 상한({InitSyncTimeoutSec}초)을 넘겼다. 초기화 중단.");
+        Debug.LogError($"[MultiInit] Waiting for {_what} exceeded the initialization limit ({InitSyncTimeoutSec}s). Aborting initialization.");
         this.InitTimedOut = true;
         this.InitAbortReason = EMatchEndReason.Timeout;
         ReleaseInitWaits();
@@ -690,7 +690,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
                        && !this.attackWaitForced
                        && !this.destroyCt.IsCancellationRequested;
         if (t_completed == 1 && !this.destroyCt.IsCancellationRequested)
-            Debug.LogError($"[Net] 상대 공격 대기가 {NetTimeouts.TurnActionSec}초를 넘겼다.");
+            Debug.LogError($"[Net] Waiting for the opponent's attack exceeded {NetTimeouts.TurnActionSec}s.");
 
         if (ReferenceEquals(this.attackTcs, t_tcs))
         {

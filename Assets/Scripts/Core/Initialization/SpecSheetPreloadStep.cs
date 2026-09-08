@@ -73,7 +73,7 @@ public sealed class SpecSheetPreloadStep : MainInitializer
         // 룰렛은 곁가지라 표가 깨져도 초기화를 세우지 않는다 — 판만 서지 않고(RouletteManager.IsAvailable=false)
         // 로비 버튼이 숨는다. 저작 실수 하나로 전 유저의 게임을 막지 않기 위한 선택이다.
         if (!RouletteSpec.TryValidateRequired(out string t_rouletteError))
-            Debug.LogError($"[SpecSheetPreload] 룰렛 표를 쓸 수 없다 — 룰렛만 꺼진다. {t_rouletteError}");
+            Debug.LogError($"[SpecSheetPreload] The roulette table is unusable — only the roulette is turned off. {t_rouletteError}");
 
         // 필수 표가 모두 유효한 뒤에만 전역에 공개한다. 판정과 보상은 같은 서버 스냅샷을 본다.
         RankManager.SetConfig(t_runtimeRank);

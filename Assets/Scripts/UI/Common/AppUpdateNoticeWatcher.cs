@@ -33,7 +33,7 @@ internal static class AppUpdateNoticeWatcher
         // 어차피 방금 설치한 유저라 이 안내가 가장 필요 없는 대상이다 — 다음 실행에서 뜬다.
         if (!OutgameTutorialProgress.IsCompleted)
         {
-            Debug.Log("[AppUpdateNoticeWatcher] 튜토리얼 진행 중이라 버전 안내를 미룹니다.");
+            Debug.Log("[AppUpdateNoticeWatcher] The tutorial is in progress, so the version notice is deferred.");
             return;
         }
 
@@ -69,7 +69,7 @@ internal static class AppUpdateNoticeWatcher
             if (GameInitialization.IsTerminated) return false;
             if (t_waited >= CoverWaitSeconds)
             {
-                Debug.LogWarning("[AppUpdateNoticeWatcher] 로딩 커버가 걷히지 않아 버전 안내를 띄우지 못했습니다.");
+                Debug.LogWarning("[AppUpdateNoticeWatcher] The loading cover did not lift, so the version notice could not be shown.");
                 return false;
             }
 
@@ -137,7 +137,7 @@ internal static class AppUpdateNoticeWatcher
         UIPoolManager t_pool = UIPoolManager.Instance;
         if (t_pool == null)
         {
-            Debug.LogError("[AppUpdateNoticeWatcher] UIPoolManager가 없어 버전 안내를 띄우지 못했습니다.");
+            Debug.LogError("[AppUpdateNoticeWatcher] There is no UIPoolManager, so the version notice could not be shown.");
             return;
         }
 
@@ -152,7 +152,7 @@ internal static class AppUpdateNoticeWatcher
         if (t_pool.AddOrUpdateUI<SimpleYNPopup>(_data) == null)
         {
             // 프리팹 미등록 등으로 못 열었다. 여기서 기다리면 다음 안내까지 통째로 막힌다.
-            Debug.LogError("[AppUpdateNoticeWatcher] 버전 안내 팝업을 열지 못했습니다.");
+            Debug.LogError("[AppUpdateNoticeWatcher] Could not open the version notice popup.");
             return;
         }
 

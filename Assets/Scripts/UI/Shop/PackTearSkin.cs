@@ -401,7 +401,7 @@ public class PackTearSkin : MonoBehaviour
             var t_src = t_g.material;
             if (t_src == null || t_src.shader == null || !t_src.shader.name.Contains("PackTear"))
             {
-                Debug.LogWarning($"[PackTearSkin] {t_g.name}의 재질이 UI/PackTear가 아니다 — 찢김이 적용되지 않는다.");
+                Debug.LogWarning($"[PackTearSkin] The material of {t_g.name} is not UI/PackTear — the tear will not be applied.");
                 continue;
             }
 

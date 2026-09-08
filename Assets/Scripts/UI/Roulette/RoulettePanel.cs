@@ -256,7 +256,7 @@ public class RoulettePanel : PooledUIBase
         }
 
         if (t_count != this.slots.Length)
-            Debug.LogWarning($"[RoulettePanel] 저작 칸 {this.slots.Length}개와 설정 칸 {t_count}개가 다르다 — 판 그림과 상품이 어긋난다.", this);
+            Debug.LogWarning($"[RoulettePanel] The {this.slots.Length} authored slot(s) differ from the {t_count} configured slot(s) — the board art and the prizes are misaligned.", this);
     }
 
     // 낙관 홀드·응답 채택·디버그 지급이 전부 이 통지를 때리므로 회전 뒤에 따로 갱신하지 않는다.

@@ -22,12 +22,12 @@ static class CardDetailChipBaker
     static void Bake()
     {
         GameObject t_root = PrefabUtility.LoadPrefabContents(OverlayPath);
-        if (t_root == null) { Debug.LogError($"[ChipBaker] 프리팹을 못 열었다: {OverlayPath}"); return; }
+        if (t_root == null) { Debug.LogError($"[ChipBaker] Could not open the prefab: {OverlayPath}"); return; }
 
         try
         {
             var t_view = t_root.GetComponentInChildren<CardDetailOverlayView>(true);
-            if (t_view == null) { Debug.LogError("[ChipBaker] CardDetailOverlayView가 없다"); return; }
+            if (t_view == null) { Debug.LogError("[ChipBaker] CardDetailOverlayView is missing"); return; }
 
             var t_so = new SerializedObject(t_view);
             Transform t_keywordRoot = t_so.FindProperty("keywordChipRoot").objectReferenceValue as Transform;
@@ -36,7 +36,7 @@ static class CardDetailChipBaker
 
             if (t_keywordRoot == null || t_synergyRoot == null || t_chip == null)
             {
-                Debug.LogError("[ChipBaker] keywordChipRoot / synergyChipRoot / chipPrefab 중 미배선이 있다");
+                Debug.LogError("[ChipBaker] One of keywordChipRoot / synergyChipRoot / chipPrefab is unwired");
                 return;
             }
 
@@ -46,7 +46,7 @@ static class CardDetailChipBaker
             BakeRow(t_synergyRoot, t_chipAsset, SynergyChipCount, "SynergyChip");
 
             PrefabUtility.SaveAsPrefabAsset(t_root, OverlayPath);
-            Debug.Log($"[ChipBaker] 완료 — 키워드 {KeywordChipCount}개 / 시너지 {SynergyChipCount}개");
+            Debug.Log($"[ChipBaker] Done — {KeywordChipCount} keyword(s) / {SynergyChipCount} synergy(ies)");
         }
         finally
         {

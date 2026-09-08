@@ -138,7 +138,7 @@ public class EmoteCatalog : ScriptableObject
 
             if (t_entry.id == 0) { t_entry.id = t_nextId++; t_assigned = true; }
             if (!t_ids.Add(t_entry.id))
-                Debug.LogWarning($"[EmoteCatalog] 감정표현 id가 중복이다: {t_entry.id} (index {t_i}) — 서로를 가린다.", this);
+                Debug.LogWarning($"[EmoteCatalog] Duplicate emote id: {t_entry.id} (index {t_i}) — they hide each other.", this);
         }
 
         if (t_assigned) UnityEditor.EditorUtility.SetDirty(this);

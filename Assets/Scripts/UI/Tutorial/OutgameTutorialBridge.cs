@@ -103,7 +103,7 @@ public class OutgameTutorialBridge : MonoBehaviour
                 if (!m_pendingApply) return;
             }
 
-            Debug.LogWarning("[OutgameTutorialBridge] 스텝 진입이 반복 재진입해 중단합니다 — 스텝 저작을 확인하세요.");
+            Debug.LogWarning("[OutgameTutorialBridge] Step entry keeps re-entering, so it is aborted — check the step authoring.");
         }
         finally
         {
@@ -145,7 +145,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         {
             if (OutgameTutorialRunner.IsRunning)
             {
-                Debug.LogWarning($"[OutgameTutorialBridge] 스텝 {t_atChapter}-{t_atStep} 진입 실패로 진행이 멈춥니다 — 기능 잠금을 해제합니다.");
+                Debug.LogWarning($"[OutgameTutorialBridge] Progress stops because entering step {t_atChapter}-{t_atStep} failed — releasing the feature lock.");
                 OutgameFeatureLock.NotifyStalled();
             }
 
@@ -239,7 +239,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_step.Anchor == EOutgameTutorialAnchor.None)
         {
             // 클릭 대기 스텝인데 타깃이 없으면 진행이 불가능하다(저작 실수).
-            Debug.LogWarning($"[OutgameTutorialBridge] 스텝 {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex}({m_step.Action})에 앵커가 없어 게이트를 걸 수 없습니다.");
+            Debug.LogWarning($"[OutgameTutorialBridge] Step {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex}({m_step.Action}) has no anchor, so a gate cannot be placed.");
             CloseGate();
             return;
         }

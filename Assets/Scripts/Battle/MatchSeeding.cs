@@ -16,7 +16,7 @@ public static class MatchSeeding
         if (DeckConfig.IsMultiplayer)
         {
             // 정상 경로에선 도달 불가. 조용히 넘기면 미시드로 진행하는 사고를 숨기므로 로그를 남긴다.
-            UnityEngine.Debug.LogError("[Seed] 멀티 경로에서 SeedForNewMatch 호출 — 서버 시드와 충돌한다.");
+            UnityEngine.Debug.LogError("[Seed] SeedForNewMatch was called on the multiplayer path — it conflicts with the server seed.");
             return;
         }
         Apply();
@@ -49,7 +49,7 @@ public static class MatchSeeding
 
         // 로비를 거치지 않은 진입(배틀 씬 직접 재생·테스트 씬)뿐이어야 한다.
         // 정상 경로에서 여기 오면 그 판은 서버가 재현할 수 없으므로 조용히 넘기지 않는다.
-        UnityEngine.Debug.LogWarning("[Seed] 서버 시드가 없어 로컬 난수로 진행한다 — 이 판은 서버가 재현할 수 없다.");
+        UnityEngine.Debug.LogWarning("[Seed] No server seed, proceeding with local RNG — the server cannot reproduce this match.");
         MatchRandom.SeedRandomLocal();
     }
 }

@@ -19,13 +19,13 @@ public static class BattleSceneEntry
     {
         if (string.IsNullOrEmpty(_sceneName))
         {
-            Debug.LogError("[BattleSceneEntry] 전투 씬 이름이 비어 있다 — 전투에 진입할 수 없다.");
+            Debug.LogError("[BattleSceneEntry] The battle scene name is empty — cannot enter the battle.");
             return false;
         }
         if (SceneUtility.GetBuildIndexByScenePath($"Assets/Scenes/{_sceneName}.unity") < 0
             && SceneUtility.GetBuildIndexByScenePath(_sceneName) < 0)
         {
-            Debug.LogError($"[BattleSceneEntry] '{_sceneName}'이 Build Settings에 없다 — 전투에 진입할 수 없다.");
+            Debug.LogError($"[BattleSceneEntry] '{_sceneName}' is not in Build Settings — cannot enter the battle.");
             return false;
         }
 

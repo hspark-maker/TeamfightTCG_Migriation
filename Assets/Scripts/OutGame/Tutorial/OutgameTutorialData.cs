@@ -74,7 +74,7 @@ public class OutgameTutorialData : ScriptableObject
         // 카운터만 움직인 경우에도 저장한다 — 안 하면 다음 로드에 되돌아가 지운 번호를 재발급할 수 있다.
         if (t_assigned.Count == 0 && t_freed.Count == 0 && !t_counterMoved)
         {
-            Debug.Log($"[OutgameTutorialData] 모든 스텝에 ID가 있습니다({t_taken.Count}개, 다음 번호 #{nextStepId}) — 바뀐 것이 없습니다.", this);
+            Debug.Log($"[OutgameTutorialData] Every step already has an id ({t_taken.Count} of them, next number #{nextStepId}) — nothing changed.", this);
             return;
         }
 
@@ -83,15 +83,15 @@ public class OutgameTutorialData : ScriptableObject
 
         if (t_assigned.Count == 0 && t_freed.Count == 0)
         {
-            Debug.Log($"[OutgameTutorialData] 스텝 ID는 그대로({t_taken.Count}개), 다음 번호를 #{nextStepId}로 맞췄습니다.", this);
+            Debug.Log($"[OutgameTutorialData] Step ids are unchanged ({t_taken.Count} of them); the next number was aligned to #{nextStepId}.", this);
             return;
         }
 
-        if (t_assigned.Count > 0) Debug.Log($"[OutgameTutorialData] 빈 스텝 {t_assigned.Count}칸에 ID 부여 — {string.Join(", ", t_assigned)}", this);
+        if (t_assigned.Count > 0) Debug.Log($"[OutgameTutorialData] Assigned ids to {t_assigned.Count} empty step slot(s) — {string.Join(", ", t_assigned)}", this);
 
         // 복제 행은 예상된 일이지만, 어느 쪽이 새 번호를 받았는지는 알려 줘야 한다
         // — 복제본을 원본보다 앞에 붙였다면 원본이 새 번호를 받고 그 스텝에 서 있던 세이브가 밀린다.
-        if (t_freed.Count > 0) Debug.LogWarning($"[OutgameTutorialData] ID가 겹쳐 새로 매긴 칸 {t_freed.Count}개 — {string.Join(", ", t_freed)}. 복제한 행이라면 정상입니다.", this);
+        if (t_freed.Count > 0) Debug.LogWarning($"[OutgameTutorialData] Re-numbered {t_freed.Count} slot(s) whose ids collided — {string.Join(", ", t_freed)}. This is normal for duplicated rows.", this);
     }
 #endif
 }

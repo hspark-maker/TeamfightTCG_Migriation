@@ -74,7 +74,7 @@ public static class AlbumInsertPlan
             int t_id = t_card;
             if (t_id > 0 && t_want.Contains(t_id)) _unplaced.Add(t_card);
         }
-        Debug.LogWarning($"[AlbumInsertPlan] 앨범에 배치되지 않은 카드 {_unplaced.Count}장 — 삽입에서 제외한다(CardAlbumConfig 저작 확인).");
+        Debug.LogWarning($"[AlbumInsertPlan] {_unplaced.Count} card(s) are not placed in the album — excluding them from the insert (check the CardAlbumConfig authoring).");
 
         return t_steps;
     }

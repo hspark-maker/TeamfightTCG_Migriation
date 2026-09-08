@@ -223,9 +223,9 @@ public class NetworkGameController : MonoBehaviour
                             $"상대={FingerprintHex(t_remoteFingerprint)}");
                         return;
                     }
-                    Debug.Log($"[Net] 전투 데이터 지문 일치 {SpecSource.BattleFingerprint} (owner={t_ownerIdx}, count={t_count})");
+                    Debug.Log($"[Net] Battle data fingerprint matched {SpecSource.BattleFingerprint} (owner={t_ownerIdx}, count={t_count})");
                     if (t_count < DeckSaveManager.DECK_SIZE)
-                        Debug.LogError($"[Net] InitialDeck이 기준 장수보다 적다: {t_count}/{DeckSaveManager.DECK_SIZE}");
+                        Debug.LogError($"[Net] InitialDeck has fewer cards than the baseline: {t_count}/{DeckSaveManager.DECK_SIZE}");
 
                     int[] t_ids = new int[t_count];
                     CardGrowth[] t_growth = new CardGrowth[t_count];
@@ -321,7 +321,7 @@ public class NetworkGameController : MonoBehaviour
                     // 그 값으로 덮인다. 검증 전 표시에 새지 않게 표 밖 값은 무효(-1)로 눌러 둔다.
                     if (!RankManager.TryGetTier(t_tier, out _))
                     {
-                        Debug.LogWarning($"[Net] MatchmakingProfile 티어가 범위를 벗어났다({t_tier}) — 랭크 표시를 비운다.");
+                        Debug.LogWarning($"[Net] MatchmakingProfile tier is out of range ({t_tier}) — clearing the rank display.");
                         t_tier = -1;
                     }
                     this.bufferedMatchmakingProfile =
@@ -415,7 +415,7 @@ public class NetworkGameController : MonoBehaviour
         }
         catch (System.Exception t_e)
         {
-            Debug.LogError($"[MatchGrowth] 상대 안정 ID 해석 실패: {t_e}");
+            Debug.LogError($"[MatchGrowth] Failed to resolve the opponent's stable id: {t_e}");
             return string.Empty;
         }
     }
@@ -429,7 +429,7 @@ public class NetworkGameController : MonoBehaviour
 
     void RejectMessage(string _reason)
     {
-        Debug.LogError($"[Net] 수신 패킷 거부 — {_reason}");
+        Debug.LogError($"[Net] Incoming packet rejected — {_reason}");
         if (preBattleReceiver != null) preBattleReceiver.OnProtocolError(_reason);
         else TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
     }
@@ -489,13 +489,13 @@ public class NetworkGameController : MonoBehaviour
         int    t_count = _cardIds?.Length ?? 0;
         if (_growth == null || _growth.Length != t_count)
         {
-            Debug.LogError($"[Net] InitialDeck 송신 배열 길이 불일치(ids={t_count}, growth={_growth?.Length ?? -1})");
+            Debug.LogError($"[Net] InitialDeck send array length mismatch (ids={t_count}, growth={_growth?.Length ?? -1})");
             return false;
         }
 
         if (!TryContentFingerprintBytes(out byte[] t_fingerprint))
         {
-            Debug.LogError("[Net] InitialDeck 송신 차단: 유효한 전투 데이터 지문이 없습니다.");
+            Debug.LogError("[Net] InitialDeck send blocked: there is no valid battle data fingerprint.");
             return false;
         }
         this.LocalDeckHash = ComputeDeckHash(_cardIds, _growth);
@@ -515,7 +515,7 @@ public class NetworkGameController : MonoBehaviour
             WriteInt(t_msg, t_entry + 20, _growth[i].SynergyUnlocked ? 1 : 0);
         }
         SendToOpponents(t_msg);
-        Debug.Log($"[Net] InitialDeck 송신 지문={SpecSource.BattleFingerprint} (owner={_ownerIndex}, count={t_count})");
+        Debug.Log($"[Net] InitialDeck send fingerprint={SpecSource.BattleFingerprint} (owner={_ownerIndex}, count={t_count})");
         return true;
     }
 
@@ -607,7 +607,7 @@ public class NetworkGameController : MonoBehaviour
         if (t_name.Length > byte.MaxValue || t_avatar.Length > byte.MaxValue
             || t_frame.Length > byte.MaxValue || t_ticket.Length > byte.MaxValue)
         {
-            Debug.LogError("[Net] 매칭 프로필 문자열이 255바이트를 초과했다.");
+            Debug.LogError("[Net] The matchmaking profile string exceeded 255 bytes.");
             return false;
         }
 
@@ -749,7 +749,7 @@ public class NetworkGameController : MonoBehaviour
                        && !this.opponentMulliganForced
                        && !this.destroyCt.IsCancellationRequested;
         if (t_completed == 1 && !this.destroyCt.IsCancellationRequested)
-            Debug.LogError($"[Net] 상대 멀리건 대기가 {NetTimeouts.MulliganWaitSec}초를 넘겼다.");
+            Debug.LogError($"[Net] Waiting for the opponent's mulligan exceeded {NetTimeouts.MulliganWaitSec}s.");
 
         if (ReferenceEquals(this.opponentMulliganTcs, t_tcs))
         {
@@ -789,7 +789,7 @@ public class NetworkGameController : MonoBehaviour
                         && !this.opponentReadyForced
                         && !this.destroyCt.IsCancellationRequested;
         if (t_completed == 1 && !this.destroyCt.IsCancellationRequested)
-            Debug.LogError($"[Net] AnimReady 대기가 {NetTimeouts.AnimHandshakeSec}초를 넘겼다.");
+            Debug.LogError($"[Net] Waiting for AnimReady exceeded {NetTimeouts.AnimHandshakeSec}s.");
 
         if (ReferenceEquals(this.opponentReadyTcs, t_tcs))
         {
@@ -821,7 +821,7 @@ public class NetworkGameController : MonoBehaviour
         {
             this.stagedStateHash = 0UL;
             this.stagedStateDump = null;
-            Debug.LogWarning($"[Hash] 상태 지문 계산 실패 — 이번 배리어는 대조를 생략한다: {t_e.Message}");
+            Debug.LogWarning($"[Hash] State fingerprint computation failed — skipping the cross-check for this barrier: {t_e.Message}");
         }
         TryCompareStateHash();
     }
@@ -852,8 +852,8 @@ public class NetworkGameController : MonoBehaviour
 
         if (this.remoteStateHashSeq != this.stagedStateHashSeq)
         {
-            Debug.LogWarning($"[Hash] 핸드셰이크 순번 불일치 local={this.stagedStateHashSeq} " +
-                             $"remote={this.remoteStateHashSeq} — 이번 대조는 생략한다.");
+            Debug.LogWarning($"[Hash] Handshake sequence mismatch local={this.stagedStateHashSeq} " +
+                             $"remote={this.remoteStateHashSeq} — skipping this cross-check.");
             return;
         }
         if (this.remoteStateHash == 0UL) return;   // 상대가 지문을 못 맡겼다(센티널)
@@ -866,9 +866,9 @@ public class NetworkGameController : MonoBehaviour
             return;
         }
 
-        Debug.LogError($"[Hash] **상태 불일치** seq={this.stagedStateHashSeq} " +
+        Debug.LogError($"[Hash] **State mismatch** seq={this.stagedStateHashSeq} " +
                        $"local=0x{this.stagedStateHash:X16} remote=0x{this.remoteStateHash:X16}\n" +
-                       $"  로컬 상태: {this.stagedStateDump}");
+                       $"  local state: {this.stagedStateDump}");
     }
 
     void AppendStateProof(int _seq, ulong _hash)

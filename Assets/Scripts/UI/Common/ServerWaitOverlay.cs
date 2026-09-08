@@ -123,19 +123,19 @@ public class ServerWaitOverlay : PooledUIBase
     void BindFallbacks()
     {
         if (this.contents == null)
-            Debug.LogWarning("[ServerWaitOverlay] contents가 배선되지 않아 대기 화면을 켤 수 없습니다.", this);
+            Debug.LogWarning("[ServerWaitOverlay] contents is not wired, so the wait screen cannot be turned on.", this);
 
         if (this.blocker == null)
         {
-            Debug.LogWarning("[ServerWaitOverlay] blocker가 배선되지 않아 런타임 대체 차단막을 만듭니다.", this);
+            Debug.LogWarning("[ServerWaitOverlay] blocker is not wired, so a runtime substitute blocker is created.", this);
             this.blocker = CreateFallbackBlocker();
         }
 
         if (this.visualGroup == null)
-            Debug.LogWarning("[ServerWaitOverlay] visualGroup이 배선되지 않아 딤·스피너 표시를 건너뜁니다.", this);
+            Debug.LogWarning("[ServerWaitOverlay] visualGroup is not wired, so the dim and spinner display is skipped.", this);
 
         if (this.spinner == null)
-            Debug.LogWarning("[ServerWaitOverlay] spinner가 배선되지 않아 회전 연출을 건너뜁니다.", this);
+            Debug.LogWarning("[ServerWaitOverlay] spinner is not wired, so the spin presentation is skipped.", this);
     }
 
     // 차단막은 contents 아래여야 한다 — Show/Hide가 켜고 끄는 것이 contents뿐이라, 루트에 붙이면 걷히지 않는다.
@@ -236,8 +236,8 @@ public class ServerWaitOverlay : PooledUIBase
 
         PruneDestroyedOwners();
         if (this.m_owners.Count > 0)
-            Debug.LogError($"[ServerWaitOverlay] 대기가 {this.safetyTimeout:0}초 동안 걷히지 않아 강제로 내립니다 " +
-                           $"— Release를 부르지 않은 owner: {DescribeOwners()}", this);
+            Debug.LogError($"[ServerWaitOverlay] The wait did not lift for {this.safetyTimeout:0}s, so it is force-released " +
+                            $"— owners that never called Release: {DescribeOwners()}", this);
 
         Hide();
     }

@@ -52,7 +52,7 @@ public static class BattleCleanup
                     t_session.Disconnect(),
                     UniTask.Delay(System.TimeSpan.FromSeconds(NetTimeouts.RunnerShutdownSec), ignoreTimeScale: true));
                 if (t_timedOut == 1)
-                    UnityEngine.Debug.LogWarning($"[Net] Runner 종료가 {NetTimeouts.RunnerShutdownSec}초 안에 안 끝났다. 씬 전환은 진행한다.");
+                    UnityEngine.Debug.LogWarning($"[Net] Runner shutdown did not finish within {NetTimeouts.RunnerShutdownSec}s. Proceeding with the scene transition.");
             }
 
             // 전투를 떠나는 유일한 문이라 여기서 커버를 태운다 — 로비로 들어오는 화면은 초기화든 복귀든 같은 연출이다.

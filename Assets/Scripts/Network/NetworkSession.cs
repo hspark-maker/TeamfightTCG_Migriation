@@ -83,7 +83,7 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
     static async UniTaskVoid ShutdownAsync(NetworkRunner _runner)
     {
         try { await _runner.Shutdown(); }
-        catch (Exception t_exception) { Debug.LogWarning($"[Net] 러너 종료 실패: {t_exception.Message}"); }
+        catch (Exception t_exception) { Debug.LogWarning($"[Net] Runner shutdown failed: {t_exception.Message}"); }
     }
 
 #if UNITY_EDITOR
@@ -112,7 +112,7 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
         }
         catch (Exception t_exception)
         {
-            Debug.LogWarning($"[Net] 에디터 러너 파괴 실패: {t_exception.Message}");
+            Debug.LogWarning($"[Net] Editor runner destroy failed: {t_exception.Message}");
         }
     }
 #endif

@@ -28,12 +28,12 @@ internal static class MissionCommands
                 GET_COMMAND, new { env = ContentProfileConfig.Active.CloudEnvId });
             if (t_result?.Missions == null)
             {
-                Debug.LogWarning("[MissionCommands] getMissions가 상태를 돌려주지 않았다.");
+                Debug.LogWarning("[MissionCommands] getMissions did not return a state.");
                 return false;
             }
             if (s_inFlightClaims.Count > 0 || t_claimGeneration != s_claimGeneration)
             {
-                Debug.Log("[MissionCommands] 수령과 겹친 미션 조회 응답을 버린다.");
+                Debug.Log("[MissionCommands] Discarding a mission query response that overlapped with a claim.");
                 return false;
             }
 
@@ -42,7 +42,7 @@ internal static class MissionCommands
         }
         catch (Exception t_exception)
         {
-            Debug.LogWarning($"[MissionCommands] 미션 조회 실패 — {t_exception.GetBaseException().Message}");
+            Debug.LogWarning($"[MissionCommands] Mission query failed — {t_exception.GetBaseException().Message}");
             return false;
         }
     }
@@ -61,22 +61,22 @@ internal static class MissionCommands
             ClaimMissionResult t_result = await ServerSaveCommands.InvokeAsync<ClaimMissionResult>(
                 CLAIM_COMMAND,
                 new { env = ContentProfileConfig.Active.CloudEnvId, missionId = t_missionId });
-            Debug.Log($"[MissionCommands] {t_missionId} 수령 완료 — 재화 {t_result?.Granted?.Count ?? 0}건, 패스 경험치 {t_result?.GrantedPassExp ?? 0}");
+            Debug.Log($"[MissionCommands] {t_missionId} claimed — {t_result?.Granted?.Count ?? 0} currency line(s), pass exp {t_result?.GrantedPassExp ?? 0}");
             return t_result;
         }
         catch (ServerCommandRejectedException t_rejected)
         {
-            Debug.LogWarning($"[MissionCommands] {t_missionId} 수령 거절({t_rejected.Reason}) — {t_rejected.Message}");
+            Debug.LogWarning($"[MissionCommands] {t_missionId} claim rejected ({t_rejected.Reason}) — {t_rejected.Message}");
             return null;
         }
         catch (ServerAdoptionException t_adoption)
         {
-            Debug.LogWarning($"[MissionCommands] 수령 응답 채택 실패 — {t_adoption.Message}");
+            Debug.LogWarning($"[MissionCommands] Failed to adopt the claim response — {t_adoption.Message}");
             return null;
         }
         catch (Exception t_exception)
         {
-            Debug.LogError($"[MissionCommands] claimMission 실패 — {t_exception.GetBaseException().Message}");
+            Debug.LogError($"[MissionCommands] claimMission failed — {t_exception.GetBaseException().Message}");
             return null;
         }
         finally

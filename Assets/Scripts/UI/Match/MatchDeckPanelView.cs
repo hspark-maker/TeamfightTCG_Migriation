@@ -58,7 +58,7 @@ public class MatchDeckPanelView : MonoBehaviour
         // 인스턴스 오버라이드로만 배선되는데 그게 비어 있으면 세 버튼이 전부 무동작으로 조용히 죽는다.
         // 패널은 언제나 셸 아래에 서므로 부모에서 찾아 메운다.
         if (shell == null) shell = GetComponentInParent<MatchDeckShell>(true);
-        if (shell == null) Debug.LogWarning("[MatchDeckPanelView] MatchDeckShell을 찾지 못했다 — 하단 버튼이 동작하지 않는다.");
+        if (shell == null) Debug.LogWarning("[MatchDeckPanelView] Could not find MatchDeckShell — the bottom buttons will not work.");
 
         // 미배선 필드는 조용히 건너뛴다 — 이 프로젝트의 UI는 부분 배선으로 축소 화면을 만드는 게 관례다.
         if (editButton != null)

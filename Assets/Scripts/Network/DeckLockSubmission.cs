@@ -54,7 +54,7 @@ internal static class DeckLockSubmission
         }
         catch (Exception t_exception)
         {
-            Debug.LogWarning($"[LockDeck] 최종 승인 확인에 실패했습니다: {t_exception.Message}");
+            Debug.LogWarning($"[LockDeck] Failed to confirm the final approval: {t_exception.Message}");
         }
         return DeckLockResult.Unavailable;
     }
@@ -82,7 +82,7 @@ internal static class DeckLockSubmission
         _deckHash = null;
         if (_cardIds == null || _growth == null || _cardIds.Length == 0 || _cardIds.Length != _growth.Length)
         {
-            Debug.LogError("[LockDeck] 덱 성장 스냅샷이 유효하지 않습니다.");
+            Debug.LogError("[LockDeck] The deck growth snapshot is not valid.");
             return false;
         }
 
@@ -92,7 +92,7 @@ internal static class DeckLockSubmission
         for (int i = 1; i < t_ids.Length; i++)
         {
             if (t_ids[i - 1] != t_ids[i]) continue;
-            Debug.LogError($"[LockDeck] 덱에 중복 카드가 있습니다(cardId={t_ids[i]}).");
+            Debug.LogError($"[LockDeck] The deck contains a duplicate card (cardId={t_ids[i]}).");
             return false;
         }
 
@@ -117,7 +117,7 @@ internal static class DeckLockSubmission
         if (_cardIds == null || _growth == null || _cardIds.Length == 0
             || _cardIds.Length != _growth.Length || _ownerIndex < 0 || _ownerIndex > 1)
         {
-            Debug.LogError("[LockDeck] 덱 성장 스냅샷이 유효하지 않습니다.");
+            Debug.LogError("[LockDeck] The deck growth snapshot is not valid.");
             return DeckLockResult.Rejected;
         }
 
@@ -156,7 +156,7 @@ internal static class DeckLockSubmission
 
         if (!await MatchResultSubmission.EnsureSignedIn())
         {
-            Debug.LogError("[LockDeck] Firebase 로그인이 완료되지 않아 덱 검증을 시작할 수 없습니다.");
+            Debug.LogError("[LockDeck] Firebase sign-in is not complete, so deck validation cannot start.");
             return DeckLockResult.Unavailable;
         }
         if (!PlayerSaveCloud.IsGateComplete
@@ -164,8 +164,8 @@ internal static class DeckLockSubmission
             || PlayerSaveCloud.State == EPlayerSaveCloudState.Blocked)
         {
             Debug.LogError(
-                $"[LockDeck] 클라우드 저장이 비활성 상태입니다(state={PlayerSaveCloud.State}). " +
-                "멀티플레이 테스트는 각 UID의 클라우드 저장을 활성화해야 합니다.");
+                $"[LockDeck] Cloud save is inactive (state={PlayerSaveCloud.State}). " +
+                "Multiplayer testing requires cloud save to be enabled for each UID.");
             return DeckLockResult.Unavailable;
         }
 
@@ -182,20 +182,20 @@ internal static class DeckLockSubmission
             if (PlayerSaveCloud.State != EPlayerSaveCloudState.Ready)
             {
                 Debug.LogError(
-                    $"[LockDeck] 최신 세이브 업로드를 확인할 수 없습니다(state={PlayerSaveCloud.State}).");
+                    $"[LockDeck] Cannot confirm the latest save upload (state={PlayerSaveCloud.State}).");
                 return DeckLockResult.Unavailable;
             }
         }
         catch (OperationCanceledException)
         {
             Debug.LogError(
-                $"[LockDeck] 최신 세이브 업로드가 중단되었습니다({CancelCause(_ct, FlushFallbackTimeout)}). " +
+                $"[LockDeck] The latest save upload was interrupted ({CancelCause(_ct, FlushFallbackTimeout)}). " +
                 $"matchId={_matchId} owner={_ownerIndex} flushMs={t_flushStopwatch.ElapsedMilliseconds}");
             return DeckLockResult.Unavailable;
         }
         catch (Exception t_exception)
         {
-            Debug.LogError($"[LockDeck] 최신 세이브 업로드 실패: {t_exception.Message}");
+            Debug.LogError($"[LockDeck] Latest save upload failed: {t_exception.Message}");
             return DeckLockResult.Unavailable;
         }
 
@@ -227,13 +227,13 @@ internal static class DeckLockSubmission
                         {
                             // 정상 판의 flushMs·lockMs 분포를 알아야 상한 15초가 넉넉한지 판정할 수 있다.
                             Debug.Log(
-                                $"[LockDeck] 승인 matchId={_matchId} owner={_ownerIndex} 폴={t_pollCount} " +
+                                $"[LockDeck] Approved matchId={_matchId} owner={_ownerIndex} polls={t_pollCount} " +
                                 $"flushMs={t_flushMs} lockMs={t_lockStopwatch.ElapsedMilliseconds}");
                             return DeckLockResult.Approved;
                         }
                         if (t_status == "rejected")
                         {
-                            Debug.LogError($"[LockDeck] 서버 검증 거절: {t_data["reason"]}");
+                            Debug.LogError($"[LockDeck] Server validation rejected: {t_data["reason"]}");
                             return DeckLockResult.Rejected;
                         }
                         if (t_status == "pending")
@@ -243,7 +243,7 @@ internal static class DeckLockSubmission
                         }
                     }
 
-                    Debug.LogError("[LockDeck] 서버가 알 수 없는 응답을 반환했습니다.");
+                    Debug.LogError("[LockDeck] The server returned an unknown response.");
                     return DeckLockResult.Unavailable;
                 }
             }
@@ -258,9 +258,9 @@ internal static class DeckLockSubmission
             if (t_confirmed == DeckLockResult.Approved)
             {
                 Debug.LogWarning(
-                    $"[LockDeck] 대기는 끊겼지만 서버는 이미 승인 상태였습니다" +
+                    $"[LockDeck] The wait was cut off, but the server was already in the approved state" +
                     $"({CancelCause(_ct, LockFallbackTimeout)}). " +
-                    $"matchId={_matchId} owner={_ownerIndex} 폴={t_pollCount} " +
+                    $"matchId={_matchId} owner={_ownerIndex} polls={t_pollCount} " +
                     $"flushMs={t_flushMs} lockMs={t_lockStopwatch.ElapsedMilliseconds}");
                 return DeckLockResult.Approved;
             }
@@ -268,9 +268,9 @@ internal static class DeckLockSubmission
             // 취소원이 셋이고(상위 토큰·Firebase 수명·자체 상한) 대응이 전부 다르다. 한 문구로 묶으면
             // 상대 이탈까지 "응답 시간 초과"로 읽혀 원인이 뒤바뀐다 — 실제로 그 오독으로 한 번 돌아왔다.
             Debug.LogError(
-                $"[LockDeck] 덱 잠금 대기가 중단되었고 서버도 승인 전이었습니다" +
+                $"[LockDeck] The deck lock wait was interrupted and the server had not approved either" +
                 $"({CancelCause(_ct, LockFallbackTimeout)}). " +
-                $"matchId={_matchId} owner={_ownerIndex} 폴={t_pollCount} " +
+                $"matchId={_matchId} owner={_ownerIndex} polls={t_pollCount} " +
                 $"flushMs={t_flushMs} lockMs={t_lockStopwatch.ElapsedMilliseconds}");
             return DeckLockResult.Unavailable;
         }
@@ -282,12 +282,12 @@ internal static class DeckLockSubmission
             {
                 // 거절 원인은 서버 신원 대조 5개 항목 중 하나다. 클라가 무엇을 보냈는지 같이 찍어야
                 // Functions 로그의 expected 와 눈으로 맞출 수 있다.
-                Debug.LogError($"[LockDeck] 서버가 덱 잠금을 영구 거절했습니다(code={t_errorCode}). " +
+                Debug.LogError($"[LockDeck] The server permanently rejected the deck lock (code={t_errorCode}). " +
                     $"matchId={_matchId} owner={_ownerIndex} seedSource={_seedSource} " +
                     $"seedHex={_seedHex} ruleset={_rulesetVersion} fingerprint={_contentFingerprint}");
                 return DeckLockResult.Rejected;
             }
-            Debug.LogError($"[LockDeck] 서버 호출 실패: {t_exception.Message}");
+            Debug.LogError($"[LockDeck] Server call failed: {t_exception.Message}");
             return DeckLockResult.Unavailable;
         }
     }

@@ -84,7 +84,7 @@ public class BarProgressGauge : RankProgressGauge
         if (this.m_widthReported) return;
         this.m_widthReported = true;
 
-        Debug.LogError($"[{name}] 게이지 기준 폭이 0이다 — 기준 사각의 저작 폭을 확인할 것.", this);
+        Debug.LogError($"[{name}] The gauge reference width is 0 — check the authored width of the reference rect.", this);
     }
 
 #if UNITY_EDITOR
@@ -95,12 +95,12 @@ public class BarProgressGauge : RankProgressGauge
         // 기준 사각을 채움 쪽으로 잡으면 폭이 그리기마다 줄어들어 게이지가 스스로 사라진다.
         // IsChildOf는 자기 자신에도 true라 "자신이거나 자손"이 이 한 줄로 걸린다.
         if (this.trackRect != null && this.trackRect.IsChildOf(this.fillRect))
-            Debug.LogWarning($"[{name}] 기준 사각이 채움 사각 자신이거나 그 자손이다 — 채움 바깥의 사각을 꽂을 것.", this);
+            Debug.LogWarning($"[{name}] The reference rect is the fill rect itself or a descendant of it — wire a rect outside the fill.", this);
 
         // 가로 스트레치 앵커에서 sizeDelta.x는 폭이 아니라 좌우 여백이라, 그리기가 트랙 밖으로 자라면서도
         // 폭 검사에는 걸리지 않는다. 저작 시점에 잡지 않으면 화면에서만 드러난다.
         if (this.fillRect.pivot.x != 0f || this.fillRect.anchorMin.x != 0f || this.fillRect.anchorMax.x != 0f)
-            Debug.LogWarning($"[{name}] 채움 사각의 pivot.x·anchor.x가 0이 아니다 — 왼쪽 고정 폭 저작이어야 폭이 뜻대로 해석된다.", this);
+            Debug.LogWarning($"[{name}] The fill rect's pivot.x/anchor.x is not 0 — it has to be authored as left-anchored fixed width for the width to be interpreted as intended.", this);
     }
 #endif
 }

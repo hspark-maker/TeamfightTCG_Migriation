@@ -118,7 +118,7 @@ public static class UiPrefabCache
         Type t_type = t_ui.GetType();
         if (s_prefabs.TryGetValue(t_type, out GameObject t_existing) && t_existing != _prefab)
         {
-            Debug.LogError($"[UiPrefabCache] UIPrefab 타입 중복: {t_type.Name} ({t_existing.name}, {_prefab.name})");
+            Debug.LogError($"[UiPrefabCache] Duplicate UIPrefab type: {t_type.Name} ({t_existing.name}, {_prefab.name})");
             return;
         }
 

@@ -296,7 +296,7 @@ public class LobbyRankEffectDirector : MonoBehaviour
     {
         if (this.pointBurst == null)
         {
-            Debug.LogWarning("[LobbyRankEffectDirector] pointBurst 미배선 — 포인트 획득 연출을 건너뛴다.");
+            Debug.LogWarning("[LobbyRankEffectDirector] pointBurst is unwired — skipping the point gain presentation.");
             return null;
         }
 

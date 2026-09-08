@@ -89,8 +89,8 @@ public class UnlockIntroRow : MonoBehaviour
             if (!s_tierShortageWarned)
             {
                 s_tierShortageWarned = true;
-                Debug.LogWarning($"[UnlockIntroRow] 깔린 티어 줄이 {t_slots}개뿐이라 "
-                               + $"{t_count}단계를 다 세우지 못했습니다(프리팹에 줄을 더 깔 것).");
+                Debug.LogWarning($"[UnlockIntroRow] Only {t_slots} tier line(s) are laid out, "
+                               + $"so not all {t_count} stage(s) could be shown (lay out more lines in the prefab).");
             }
             t_count = t_slots;
         }

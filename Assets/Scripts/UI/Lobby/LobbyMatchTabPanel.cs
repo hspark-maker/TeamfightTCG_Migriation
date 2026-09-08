@@ -181,7 +181,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     {
         if (UIPoolManager.Instance == null)
         {
-            Debug.LogError($"[LobbyMatchTabPanel] UIPoolManager가 없어 {typeof(T).Name}을 열 수 없다 — 초기화(InitializationRunner) 초기화를 확인할 것.");
+            Debug.LogError($"[LobbyMatchTabPanel] There is no UIPoolManager, so {typeof(T).Name} cannot be opened — check the initialization (InitializationRunner).");
             return;
         }
 

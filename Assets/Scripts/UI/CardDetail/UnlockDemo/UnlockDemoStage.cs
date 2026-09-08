@@ -86,7 +86,7 @@ public class UnlockDemoStage : SingletonOverlayBase, IUnlockDemoStage
 
                 if (s_instance == null)
                 {
-                    Debug.LogWarning($"[UnlockDemoStage] {t_prefab.name} 루트에 UnlockDemoStage가 없습니다(프리팹 배선 확인).");
+                    Debug.LogWarning($"[UnlockDemoStage] The root of {t_prefab.name} has no UnlockDemoStage (check the prefab wiring).");
                     Destroy(t_go);
                 }
             }

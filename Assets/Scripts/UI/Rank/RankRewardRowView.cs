@@ -113,7 +113,7 @@ public class RankRewardRowView : MonoBehaviour
         if (_rewards.Count > this.rewardSlots.Length && !s_overflowWarned)
         {
             s_overflowWarned = true;
-            Debug.LogWarning($"[RankRewardRowView] 티어 보상 {_rewards.Count}건이 슬롯 {this.rewardSlots.Length}칸을 초과 — 앞칸만 표시한다.", this);
+            Debug.LogWarning($"[RankRewardRowView] {_rewards.Count} tier reward(s) exceed the {this.rewardSlots.Length} slot(s) — showing only the leading ones.", this);
         }
     }
 

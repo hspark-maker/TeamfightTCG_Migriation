@@ -140,7 +140,7 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
         // 코인은 anchoredPosition으로 날린다 — 캔버스 좌표계 위가 아니면 궤적이 성립하지 않는다.
         if (transform is not RectTransform)
         {
-            Debug.LogWarning("[CurrencyGainEffectPlayer] RectTransform이 아닌 오브젝트에 붙어 있어 연출을 건너뛴다.");
+            Debug.LogWarning("[CurrencyGainEffectPlayer] It is attached to a non-RectTransform object, so the presentation is skipped.");
             return null;
         }
 
@@ -148,12 +148,12 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
         var t_hud = _hud != null && _hud.Type == _gain.Type ? _hud : null;
         if (t_hud == null && !CurrencyHud.TryGet(_gain.Type, out t_hud))
         {
-            Debug.LogWarning($"[CurrencyGainEffectPlayer] {_gain.Type} HUD를 찾지 못해 연출을 건너뛴다.");
+            Debug.LogWarning($"[CurrencyGainEffectPlayer] Could not find the {_gain.Type} HUD, so the presentation is skipped.");
             return null;
         }
         if (t_hud.TextRect == null)
         {
-            Debug.LogWarning($"[CurrencyGainEffectPlayer] {_gain.Type} HUD에 수치 텍스트가 없어 연출을 건너뛴다.");
+            Debug.LogWarning($"[CurrencyGainEffectPlayer] The {_gain.Type} HUD has no value text, so the presentation is skipped.");
             return null;
         }
 
@@ -162,7 +162,7 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
         var t_sprite = this.ResolveSprite(_gain.Type, t_textRect);
         if (t_sprite == null)
         {
-            Debug.LogWarning($"[CurrencyGainEffectPlayer] {_gain.Type} 코인 스프라이트를 찾지 못해 연출을 건너뛴다.");
+            Debug.LogWarning($"[CurrencyGainEffectPlayer] Could not find the {_gain.Type} coin sprite, so the presentation is skipped.");
             return null;
         }
 
@@ -275,7 +275,7 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
         var t_layer = transform as RectTransform;
         if (t_layer == null)
         {
-            Debug.LogWarning("[CurrencyGainEffectPlayer] RectTransform이 아닌 오브젝트에 붙어 있어 연출을 건너뛴다.");
+            Debug.LogWarning("[CurrencyGainEffectPlayer] It is attached to a non-RectTransform object, so the presentation is skipped.");
             return null;
         }
 
@@ -283,12 +283,12 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
         var t_hud = _hud;
         if (t_hud == null && !CurrencyHud.TryGet(_type, out t_hud))
         {
-            Debug.LogWarning($"[CurrencyGainEffectPlayer] {_type} HUD를 찾지 못해 연출을 건너뛴다.");
+            Debug.LogWarning($"[CurrencyGainEffectPlayer] Could not find the {_type} HUD, so the presentation is skipped.");
             return null;
         }
         if (t_hud.TextRect == null)
         {
-            Debug.LogWarning($"[CurrencyGainEffectPlayer] {_type} HUD에 수치 텍스트가 없어 연출을 건너뛴다.");
+            Debug.LogWarning($"[CurrencyGainEffectPlayer] The {_type} HUD has no value text, so the presentation is skipped.");
             return null;
         }
 
@@ -296,7 +296,7 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
         var t_art = _lightSprite != null ? _lightSprite : this.ResolveSprite(_type, t_hud.TextRect);
         if (t_art == null)
         {
-            Debug.LogWarning($"[CurrencyGainEffectPlayer] {_type} 빛 스프라이트를 찾지 못해 연출을 건너뛴다.");
+            Debug.LogWarning($"[CurrencyGainEffectPlayer] Could not find the {_type} light sprite, so the presentation is skipped.");
             return null;
         }
 

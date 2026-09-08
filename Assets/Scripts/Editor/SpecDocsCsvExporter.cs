@@ -88,7 +88,7 @@ public static class SpecDocsCsvExporter
         // 방금 시트를 받은 직후다 — 로컬이 최신이므로 시트에서 지워진 행은 문서에서도 지운다.
         if (!Export(true, out string t_summary, out string t_error))
         {
-            Debug.LogWarning($"[SpecDocsCsv] docs CSV 갱신 실패: {t_error}");
+            Debug.LogWarning($"[SpecDocsCsv] docs CSV update failed: {t_error}");
             return;
         }
 
@@ -124,7 +124,7 @@ public static class SpecDocsCsvExporter
             if (!TryBuildCsv(t_table, t_existing, out string t_csv, out List<string> t_droppedIds, out string t_tableError))
             {
                 t_skipped++;
-                Debug.LogWarning($"[SpecDocsCsv] '{t_table.Name}' 건너뜀 — {t_tableError}");
+                Debug.LogWarning($"[SpecDocsCsv] '{t_table.Name}' skipped — {t_tableError}");
                 continue;
             }
 
@@ -132,8 +132,8 @@ public static class SpecDocsCsvExporter
             {
                 t_skipped++;
                 Debug.LogWarning(
-                    $"[SpecDocsCsv] '{t_table.Name}' 건너뜀 — 기존 CSV에만 있는 id {t_droppedIds.Count}개가 지워진다" +
-                    $"({string.Join(", ", t_droppedIds)}). 시트를 다시 받거나 '{FORCE_LABEL}'로 강행할 것.");
+                    $"[SpecDocsCsv] '{t_table.Name}' skipped — {t_droppedIds.Count} id(s) that exist only in the current CSV would be erased" +
+                    $"({string.Join(", ", t_droppedIds)}). Re-download the sheet, or force it with '{FORCE_LABEL}'.");
                 continue;
             }
 
@@ -276,7 +276,7 @@ public static class SpecDocsCsvExporter
                 }
 
                 if (t_extraColumns.Count > 0)
-                    Debug.Log($"[SpecDocsCsv] '{_table}' 생성 코드에 없는 컬럼을 기존 값 그대로 유지한다: {string.Join(", ", t_extraColumns)}");
+                    Debug.Log($"[SpecDocsCsv] '{_table}' keeps columns that are absent from the generated code with their existing values: {string.Join(", ", t_extraColumns)}");
 
                 CollectDroppedRows(t_matrix, t_dataStart, t_oldColumns.Count, _rows, _droppedIds);
             }

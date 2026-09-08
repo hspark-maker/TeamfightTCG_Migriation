@@ -34,18 +34,18 @@ internal static class BattleRewardCommand
         {
             // 표가 비었거나(RewardUnavailable) · 매치 자격이 없거나(MatchUnverified) · 이미 받아 간
             // 판이다(AlreadyClaimed). 어느 쪽이든 세션은 멀쩡하고 이번 판의 지급만 없다.
-            Debug.LogWarning($"[BattleRewardCommand] 전투 보상을 서버가 거절했다 — {t_rejected.Message}");
+            Debug.LogWarning($"[BattleRewardCommand] The server rejected the battle reward — {t_rejected.Message}");
             return CurrencyGain.None;
         }
         catch (ServerAdoptionException t_adoption)
         {
             // 세션은 이미 접혔고 팝업은 CloudSyncStatusWatcher 담당이다 — 여기서 표면을 두 번 칠하지 않는다.
-            Debug.LogWarning($"[BattleRewardCommand] 응답 채택이 세션을 접었다 — {t_adoption.Message}");
+            Debug.LogWarning($"[BattleRewardCommand] Adopting the response closed the session — {t_adoption.Message}");
             return CurrencyGain.None;
         }
         catch (System.Exception t_exception)
         {
-            Debug.LogError($"[BattleRewardCommand] {COMMAND_NAME} 실패 — {t_exception.GetBaseException().Message}");
+            Debug.LogError($"[BattleRewardCommand] {COMMAND_NAME} failed — {t_exception.GetBaseException().Message}");
             return CurrencyGain.None;
         }
     }
@@ -57,7 +57,7 @@ internal static class BattleRewardCommand
 
         if (!CurrencyCode.TryParse(t_granted.Currency, out ECurrencyType t_type))
         {
-            Debug.LogError($"[BattleRewardCommand] 알 수 없는 재화 '{t_granted.Currency}' — 잔액은 이미 서버가 갈아끼웠고 연출만 건너뛴다.");
+            Debug.LogError($"[BattleRewardCommand] Unknown currency '{t_granted.Currency}' — the server already replaced the balance, so only the presentation is skipped.");
             return CurrencyGain.None;
         }
 

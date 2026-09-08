@@ -348,7 +348,7 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
         if (_rewards.Count > this.rewardSlots.Length && !s_overflowWarned)
         {
             s_overflowWarned = true;
-            Debug.LogWarning($"[RewardClaimPopup] 보상 {_rewards.Count}건이 슬롯 {this.rewardSlots.Length}칸을 초과 — 앞칸만 표시한다.", this);
+            Debug.LogWarning($"[RewardClaimPopup] {_rewards.Count} reward(s) exceed the {this.rewardSlots.Length} slot(s) — showing only the leading ones.", this);
         }
     }
 

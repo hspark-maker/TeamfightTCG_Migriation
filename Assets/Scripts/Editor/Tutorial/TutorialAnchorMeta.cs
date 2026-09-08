@@ -157,13 +157,13 @@ public readonly struct TutorialAnchorMeta
     {
         int t_anchors = Enum.GetValues(typeof(EOutgameTutorialAnchor)).Length;
         if (t_anchors != s_table.Length)
-            Debug.LogError($"[TutorialAnchorMeta] 앵커 {t_anchors}개 / 테이블 {s_table.Length}행 — 새 앵커의 행을 테이블에 추가하세요.");
+            Debug.LogError($"[TutorialAnchorMeta] {t_anchors} anchor(s) / {s_table.Length} table row(s) — add a row for the new anchor to the table.");
 
         for (int t_i = 0; t_i < s_table.Length; t_i++)
         {
             if (s_table[t_i].Anchor == (EOutgameTutorialAnchor)t_i) continue;
 
-            Debug.LogError($"[TutorialAnchorMeta] 테이블 {t_i}번 행이 {s_table[t_i].Anchor}입니다 — 행 순서가 앵커 순서와 어긋났습니다(그 뒤 전부가 밀립니다).");
+            Debug.LogError($"[TutorialAnchorMeta] Table row {t_i} is {s_table[t_i].Anchor} — the row order no longer matches the anchor order (everything after it is shifted).");
         }
     }
 }

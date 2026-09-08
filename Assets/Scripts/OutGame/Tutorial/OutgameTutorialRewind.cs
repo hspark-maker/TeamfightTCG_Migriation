@@ -88,7 +88,7 @@ public static class OutgameTutorialRewind
             // QA 경로라 실패가 게임 진입을 막으면 안 된다. 예약을 남기면 매 부팅이 같은 왕복을 반복하면서 원인은 안 보이므로
             // 걷어내고 로그만 남긴다 — QA가 에디터 창에서 다시 예약하면 된다.
             Cancel();
-            Debug.LogError($"[TutorialRewind] 서버 세이브 초기화 실패 — 예약을 취소했다. 좌표 {t_chapter}-{t_step} · {t_exception.GetBaseException().Message}");
+            Debug.LogError($"[TutorialRewind] Server save reset failed — the reservation was cancelled. Position {t_chapter}-{t_step} · {t_exception.GetBaseException().Message}");
             return;
         }
 
@@ -112,7 +112,7 @@ public static class OutgameTutorialRewind
 
         // 잔액은 되돌지 않는다 — 지갑은 세이브 문서 밖이고 되돌리는 경로가 서버에도 없다. test env 전용이라 그 차이를 수용한다.
         // 무료 한 방은 서버가 grants 문서를 지워 되살린다 — 신규 계정 잔액에 Shard·Energy가 없어 그것이 없으면 강화 챕터가 멈춘다.
-        Debug.Log($"[TutorialRewind] 서버 세이브 초기화 — 좌표 {t_chapter}-{t_step}로 되감음(슬롯 전체 첫실행 · 무료 한 방 부활 · 해금 연출 이력 · 정지 판정 해제 · 잔액 유지).");
+        Debug.Log($"[TutorialRewind] Server save reset — rewound to position {t_chapter}-{t_step} (all slots back to first run · free revive restored · unlock presentation history · stuck detection cleared · balances kept).");
     }
 
     /// <summary>2단 — 예약 좌표 직전까지의 <b>결정적인</b> 지급만 재생하고 예약을 소비한다.
@@ -170,7 +170,7 @@ public static class OutgameTutorialRewind
             }
         }
 
-        Debug.Log($"[TutorialRewind] 좌표 {t_chapter}-{t_step}까지 지급 재생 — 덱 스텝 {t_decks}개 / 팩 풀 카드 {t_cards}장 · 소유 {OwnershipManager.OwnedCount}장");
+        Debug.Log($"[TutorialRewind] Replayed grants up to position {t_chapter}-{t_step} — {t_decks} deck step(s) / {t_cards} pack pool card(s) · {OwnershipManager.OwnedCount} owned");
     }
 
     static int GrantCardSet(IReadOnlyList<int> _cardIds)

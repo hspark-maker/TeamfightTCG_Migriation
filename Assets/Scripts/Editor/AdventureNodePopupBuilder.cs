@@ -125,7 +125,7 @@ public static class AdventureNodePopupBuilder
         AssetDatabase.SaveAssets();
         RegisterAddressable();
 
-        Debug.Log($"[AdventureNodePopupBuilder] 저장 완료 — {PREFAB_PATH}");
+        Debug.Log($"[AdventureNodePopupBuilder] Saved — {PREFAB_PATH}");
     }
 
     // 인스펙터 배선은 SerializedObject로 한다 — private [SerializeField]에 리플렉션 없이 닿는 유일한 길이다.
@@ -165,7 +165,7 @@ public static class AdventureNodePopupBuilder
         AddressableAssetSettings t_settings = AddressableAssetSettingsDefaultObject.Settings;
         if (t_settings == null)
         {
-            Debug.LogWarning("[AdventureNodePopupBuilder] Addressables 설정이 없다 — 라벨을 손으로 붙여야 한다.");
+            Debug.LogWarning("[AdventureNodePopupBuilder] There are no Addressables settings — the label has to be attached by hand.");
             return;
         }
 
@@ -181,7 +181,7 @@ public static class AdventureNodePopupBuilder
         t_settings.SetDirty(AddressableAssetSettings.ModificationEvent.EntryModified, t_entry, true);
         AssetDatabase.SaveAssets();
 
-        Debug.Log($"[AdventureNodePopupBuilder] Addressable 등록 — 그룹 '{t_group.Name}' / 라벨 '{UI_LABEL}'");
+        Debug.Log($"[AdventureNodePopupBuilder] Addressable registered — group '{t_group.Name}' / label '{UI_LABEL}'");
     }
 
     // 이미 UIPrefab 라벨이 붙은 항목이 사는 그룹으로 따라 들어간다 — 팝업이 그룹마다 흩어지지 않게.
@@ -327,7 +327,7 @@ public static class AdventureNodePopupBuilder
                 if (t_obj is Sprite t_sprite && t_sprite.name == _name) return t_sprite;
         }
 
-        Debug.LogWarning($"[AdventureNodePopupBuilder] 스프라이트를 찾지 못했다 — {_name}");
+        Debug.LogWarning($"[AdventureNodePopupBuilder] Sprite not found — {_name}");
         return null;
     }
 

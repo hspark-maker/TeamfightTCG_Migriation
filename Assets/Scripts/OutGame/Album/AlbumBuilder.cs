@@ -70,7 +70,7 @@ internal static class AlbumBuilder
         var t_map = new Dictionary<string, AlbumThemeSkin>(StringComparer.Ordinal);
         if (_source == null)
         {
-            Debug.LogWarning("[CardAlbum] 앨범 스킨 SO 미배선 — 테마 그림이 셀 프리팹 저작값으로 남는다(초기화 배선 확인).");
+            Debug.LogWarning("[CardAlbum] The album skin SO is unwired — theme art stays at the cell prefab authored value (check the initialization wiring).");
             return t_map;
         }
 

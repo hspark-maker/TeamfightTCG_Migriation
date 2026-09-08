@@ -551,7 +551,7 @@ public static class TutorialValidator
     {
         var t_info = typeof(TutorialStepDef).GetField(_name, BindingFlags.Instance | BindingFlags.NonPublic);
         if (t_info == null)
-            Debug.LogError($"[TutorialValidator] TutorialStepDef에 '{_name}' 필드가 없습니다 — 이름이 바뀌었다면 남은 값 점검에서 그 축만 조용히 빠집니다.");
+            Debug.LogError($"[TutorialValidator] TutorialStepDef has no '{_name}' field — if it was renamed, that axis is silently dropped from the leftover-value check.");
 
         return t_info;
     }

@@ -243,7 +243,7 @@ public class LobbyMatchLauncher : MonoBehaviour
             t_battleBackground = t_chapter.battleBackground;
         else
             // 정점은 유효한데 챕터를 못 찾았다 = 평탄화 저작 결함이다. 배경만 빠지므로 진입은 막지 않는다.
-            Debug.LogWarning($"[LobbyMatchLauncher] 정점 '{t_node.nodeId}'(index {_nodeIndex})가 어느 챕터에도 속하지 않는다 — 전투 배경을 건너뛴다.", this);
+            Debug.LogWarning($"[LobbyMatchLauncher] Node '{t_node.nodeId}' (index {_nodeIndex}) belongs to no chapter — skipping the battle background.", this);
 
         if (!AdventureRun.Begin(t_node.nodeId, t_node.AiCardLevelOrBase, t_battleBackground)) return;
 

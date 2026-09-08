@@ -21,8 +21,8 @@ public class UIPoolManager : MonoBehaviour
             if (instance == null && !s_nullWarned)
             {
                 s_nullWarned = true;
-                Debug.LogError("[UIPoolManager] instance 없음 — 현재 씬에 UIPoolManager가 배치되지 않았습니다. " +
-                               "팝업/오버레이(카드 정보, 시너지 설명, YN 팝업 등)가 동작하지 않습니다.");
+                Debug.LogError("[UIPoolManager] No instance — UIPoolManager is not placed in the current scene. " +
+                               "Popups and overlays (card info, synergy explanation, YN popup, etc.) will not work.");
             }
             return instance;
         }

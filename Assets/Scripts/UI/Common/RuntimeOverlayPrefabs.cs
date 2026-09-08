@@ -37,7 +37,7 @@ public static class RuntimeOverlayPrefabs
             t_prefab == null || t_prefab.GetComponent<T>() == null)
         {
             Debug.LogError(
-                $"[RuntimeOverlayPrefabs] Addressables에서 {t_type.Name} 프리팹을 찾지 못했습니다.");
+                $"[RuntimeOverlayPrefabs] Could not find the {t_type.Name} prefab in Addressables.");
             if (t_handle.IsValid()) Addressables.Release(t_handle);
             return null;
         }

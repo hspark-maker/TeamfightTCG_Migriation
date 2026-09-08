@@ -230,7 +230,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         // 연출 레이어는 캔버스 좌표계 위여야 한다(anchoredPosition으로 날린다).
         if (transform is not RectTransform)
         {
-            Debug.LogWarning("[LobbyGainEffectDirector] RectTransform이 아닌 오브젝트에 붙어 있어 연출을 건너뛴다.");
+            Debug.LogWarning("[LobbyGainEffectDirector] It is attached to a non-RectTransform object, so the presentation is skipped.");
             if (t_cardCount > 0) CancelInsertSession();
             NotifyFinished(_run, _silent);
             yield break;
@@ -290,7 +290,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         var t_album = ResolveAlbumTab();
         if (t_album == null)
         {
-            Debug.LogWarning("[LobbyGainEffectDirector] AlbumTabController를 찾지 못해 삽입 연출을 건너뛴다 — 카드는 그대로 꽂힌다.");
+            Debug.LogWarning("[LobbyGainEffectDirector] Could not find AlbumTabController, so the insert presentation is skipped — the cards are still inserted.");
             CancelInsertSession();
             return;
         }
@@ -310,7 +310,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         // 탭을 못 켰으면 세션이 설 자리가 없다 — 위장을 남기면 그 카드가 도감에서 영영 빈 칸이다.
         if (!t_album.isActiveAndEnabled)
         {
-            Debug.LogWarning("[LobbyGainEffectDirector] 도감 탭을 켜지 못해 삽입 연출을 건너뛴다 — 카드는 그대로 꽂힌다.");
+            Debug.LogWarning("[LobbyGainEffectDirector] Could not turn on the album tab, so the insert presentation is skipped — the cards are still inserted.");
             CancelInsertSession();
             return;
         }
@@ -351,7 +351,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         m_collectionPunch  = tabBar != null ? tabBar.GetPunchAnchor(collectionTabIndex) : null;
         if (m_collectionTarget == null)
         {
-            Debug.LogWarning("[LobbyGainEffectDirector] 도감 탭 앵커가 연결되지 않아 카드 연출을 건너뛴다.");
+            Debug.LogWarning("[LobbyGainEffectDirector] The album tab anchor is not linked, so the card presentation is skipped.");
             return false;
         }
 
@@ -378,7 +378,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         var t_punch  = this.tabBar != null ? this.tabBar.GetPunchAnchor(this.packTabIndex) : null;
         if (t_target == null)
         {
-            Debug.LogWarning("[LobbyGainEffectDirector] 팩 탭 앵커가 연결되지 않아 팩 비행을 건너뛴다.");
+            Debug.LogWarning("[LobbyGainEffectDirector] The pack tab anchor is not linked, so the pack flight is skipped.");
             return false;
         }
 

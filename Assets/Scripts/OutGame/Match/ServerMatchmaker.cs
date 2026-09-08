@@ -66,7 +66,7 @@ public sealed class ServerMatchmaker : IMatchmaker
         catch (Exception t_exception)
         {
             if (_ct.IsCancellationRequested) return null;
-            Debug.LogError($"[ServerMatchmaker] AI 상대 확정 실패: {t_exception.GetBaseException().Message}");
+            Debug.LogError($"[ServerMatchmaker] Failed to confirm the AI opponent: {t_exception.GetBaseException().Message}");
             ShowFailureNextFrameAsync().Forget();
             return null;
         }
@@ -129,7 +129,7 @@ public sealed class ServerMatchmaker : IMatchmaker
         catch (Exception t_exception)
         {
             Debug.LogWarning(
-                $"[ServerMatchmaker] 취소 뒤 끝난 AI 상대 요청: {t_exception.GetBaseException().Message}");
+                $"[ServerMatchmaker] An AI opponent request finished after cancellation: {t_exception.GetBaseException().Message}");
         }
     }
 }

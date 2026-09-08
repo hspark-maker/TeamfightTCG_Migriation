@@ -38,6 +38,6 @@ internal static class ServerSlotRehydrator
         int t_after = OwnershipManager.OwnedCount;
 
         if (t_after < t_before)
-            Debug.LogError($"[ServerSlotRehydrator] 소유 카드가 재수화로 줄었다 {t_before} → {t_after} — 서버가 준 id를 클라 카탈로그가 모른다(시트/SO 드리프트).");
+            Debug.LogError($"[ServerSlotRehydrator] Owned cards shrank during rehydration {t_before} → {t_after} — the client catalog does not know an id the server sent (sheet/SO drift).");
     }
 }

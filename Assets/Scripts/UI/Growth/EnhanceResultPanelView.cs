@@ -154,7 +154,7 @@ public class EnhanceResultPanelView : MonoBehaviour
         // 닫을 수단이 하나도 없으면 띄우는 순간이 곧 소프트락이다 — 무대만 돌려보내고 뜨지 않는다.
         if (this.tapCatcher == null && this.retryButton == null)
         {
-            Debug.LogError("[EnhanceResultPanelView] 탭 받이·'한 번 더'가 둘 다 미배선 — 결과판을 띄우면 닫을 수단이 없다.");
+            Debug.LogError("[EnhanceResultPanelView] Both the tap catcher and 'once more' are unwired — once the result panel is shown there is no way to close it.");
             _onClose?.Invoke();
             return;
         }

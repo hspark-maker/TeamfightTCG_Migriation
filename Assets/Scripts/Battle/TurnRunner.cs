@@ -170,7 +170,7 @@ public class TurnRunner : MonoBehaviour
     {
         if (!_reason.IsVoid())
         {
-            Debug.LogError($"[Net] 무효 경기 사유가 아닌 값으로 AbortMatch를 요청했다: {_reason}");
+            Debug.LogError($"[Net] AbortMatch was requested with a value that is not a void-match reason: {_reason}");
             return;
         }
         if (this.resultFinalized) return;
@@ -183,7 +183,7 @@ public class TurnRunner : MonoBehaviour
         catch (Exception t_e)
         {
             // 전송 실패가 수신 콜백의 예외 처리로 다시 들어가 AbortMatch가 재귀하지 않게 여기서 끊는다.
-            Debug.LogError($"[Net] MatchAbort 전송 실패 — 로컬 무효 종료는 계속한다: {t_e}");
+            Debug.LogError($"[Net] MatchAbort send failed — the local void termination continues: {t_e}");
         }
         FinalizeResult(false, _reason, _delayVoidExit: true);
         ReleaseNetworkWaits();
@@ -194,7 +194,7 @@ public class TurnRunner : MonoBehaviour
     {
         if (!_reason.IsVoid())
         {
-            Debug.LogError($"[Net] 상대가 잘못된 MatchAbort 사유를 보냈다: {_reason}");
+            Debug.LogError($"[Net] The opponent sent an invalid MatchAbort reason: {_reason}");
             return;
         }
         if (this.resultFinalized) return;
@@ -239,8 +239,8 @@ public class TurnRunner : MonoBehaviour
     void SetPreviewSurvivors(int _count)
     {
         s_previewSurvivors = Mathf.Clamp(_count, 0, BattleField.SLOT_COUNT * 2);
-        Debug.Log($"[결과 미리보기] 생존 {s_previewSurvivors}장 → "
-                + $"{RewardService.CalculateReward(true, s_previewSurvivors).Amount} 골드");
+        Debug.Log($"[ResultPreview] {s_previewSurvivors} survivor(s) → "
+                 + $"{RewardService.CalculateReward(true, s_previewSurvivors).Amount} gold");
     }
 
     // 여운까지 포함한 미리보기. 결과를 확정하지 않으므로(CaptureResult 미호출) 보상·랭크는 건드리지 않는다 —
@@ -555,7 +555,7 @@ public class TurnRunner : MonoBehaviour
         NetworkGameController.Instance?.ForceOpponentMulliganChoice();
         this.battleLoop?.ActiveTurn?.ContinueAfterAiTakeover();
 
-        Debug.Log("[Net] 상대 이탈 — 기존 보드 상태를 유지한 채 AI가 전투를 인수한다.");
+        Debug.Log("[Net] The opponent left — the AI takes over the battle with the current board state kept.");
     }
 
     /// <summary>초기화(StartBattle 이전)가 실패했을 때 GameInitializer가 부르는 출구.
@@ -564,7 +564,7 @@ public class TurnRunner : MonoBehaviour
     /// 양쪽이 동시에 타임아웃 나면 둘 다 보상을 받아 랭크가 부풀어 오른다. 결과 없이 로비로 돌려보낸다.</summary>
     public void HandleInitFailed(EMatchEndReason _reason)
     {
-        Debug.LogError($"[MultiInit] 초기화 실패({_reason}) — 결과·보상 없이 로비로 복귀한다.");
+        Debug.LogError($"[MultiInit] Initialization failed ({_reason}) — returning to the lobby with no result and no reward.");
         AbortMatch(_reason);
     }
 

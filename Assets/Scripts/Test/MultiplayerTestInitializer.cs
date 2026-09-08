@@ -329,7 +329,7 @@ public class MultiplayerTestInitializer : MonoBehaviour
         try { FirebaseManager.Initialize(ContentProfileConfig.Active.CloudEnvId, ContentProfileConfig.Active.FirebaseEmulators); }
         catch (System.Exception _exception)
         {
-            Debug.LogWarning($"[MpTest] Firebase 복구 실패(재시작 필요): {_exception.GetBaseException().Message}");
+            Debug.LogWarning($"[MpTest] Firebase recovery failed (a restart is required): {_exception.GetBaseException().Message}");
         }
     }
 

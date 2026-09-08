@@ -427,7 +427,7 @@ public class AdventureChapterBandView : MonoBehaviour
         if (s_rewardBuffer.Count > this.rewardSlots.Length && !s_overflowWarned)
         {
             s_overflowWarned = true;
-            Debug.LogWarning($"[AdventureChapterBandView] 완주 보상 {s_rewardBuffer.Count}건이 슬롯 {this.rewardSlots.Length}칸을 초과 — 앞칸만 표시한다.", this);
+            Debug.LogWarning($"[AdventureChapterBandView] {s_rewardBuffer.Count} completion reward(s) exceed the {this.rewardSlots.Length} slot(s) — showing only the leading ones.", this);
         }
     }
 }

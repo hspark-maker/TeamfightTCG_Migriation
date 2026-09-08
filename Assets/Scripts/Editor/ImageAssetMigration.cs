@@ -81,7 +81,7 @@ static class ImageAssetMigration
         if (!TryCollectOrphans(out List<string> t_paths)) return;
 
         foreach (string t_path in t_paths) Debug.Log($"[ImageAssetMigration] DELETE {t_path}");
-        Debug.Log($"[ImageAssetMigration] 삭제 검증 완료: {t_paths.Count}개 자산");
+        Debug.Log($"[ImageAssetMigration] Delete check passed: {t_paths.Count} asset(s)");
     }
 
     [MenuItem("Tools/Assets/Images/Delete Verified Orphans")]
@@ -90,7 +90,7 @@ static class ImageAssetMigration
         if (!TryCollectOrphans(out List<string> t_paths)) return;
         if (t_paths.Count == 0)
         {
-            Debug.Log("[ImageAssetMigration] 삭제 대상이 없다 — 이미 정리된 상태다.");
+            Debug.Log("[ImageAssetMigration] Nothing to delete — already cleaned up.");
             return;
         }
 
@@ -103,20 +103,20 @@ static class ImageAssetMigration
             if (string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(t_path))) continue;
             if (!AssetDatabase.DeleteAsset(t_path))
             {
-                Debug.LogError($"[ImageAssetMigration] 삭제 실패: {t_path}");
+                Debug.LogError($"[ImageAssetMigration] Delete failed: {t_path}");
                 t_failed++;
             }
         }
 
         if (AssetDatabase.IsValidFolder(ReferencesRoot) && !AssetDatabase.DeleteAsset(ReferencesRoot))
         {
-            Debug.LogError($"[ImageAssetMigration] 폴더 삭제 실패: {ReferencesRoot}");
+            Debug.LogError($"[ImageAssetMigration] Folder delete failed: {ReferencesRoot}");
             t_failed++;
         }
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log($"[ImageAssetMigration] 고아 자산 삭제 완료, 실패 {t_failed}건");
+        Debug.Log($"[ImageAssetMigration] Orphan assets deleted, {t_failed} failure(s)");
     }
 
     [MenuItem("Tools/Assets/Images/Preview Used Vendor Migration")]
@@ -126,7 +126,7 @@ static class ImageAssetMigration
 
         foreach (MovePair t_move in t_moves)
             Debug.Log($"[ImageAssetMigration] MOVE {t_move.Source} -> {t_move.Destination}");
-        Debug.Log($"[ImageAssetMigration] 이동 검증 완료: {t_moves.Count}개 자산");
+        Debug.Log($"[ImageAssetMigration] Move check passed: {t_moves.Count} asset(s)");
     }
 
     [MenuItem("Tools/Assets/Images/Move Used Vendor Assets")]
@@ -135,12 +135,12 @@ static class ImageAssetMigration
         if (!TryCollectVendorMoves(out List<MovePair> t_moves)) return;
         if (t_moves.Count == 0)
         {
-            Debug.Log("[ImageAssetMigration] 이동 대상이 없다 — 이미 이관된 상태다.");
+            Debug.Log("[ImageAssetMigration] Nothing to move — already migrated.");
             return;
         }
 
         // 모달 다이얼로그는 자동 실행을 막는다. 게이트는 Preview 메뉴, 되돌리기는 git 이다.
-        Debug.Log($"[ImageAssetMigration] Layer Lab 자산 {t_moves.Count}개를 Images/_Vendor 아래로 이동한다.");
+        Debug.Log($"[ImageAssetMigration] Moving {t_moves.Count} Layer Lab asset(s) under Images/_Vendor.");
 
         List<string> t_createdFolders = new List<string>();
         foreach (MovePair t_move in t_moves)
@@ -151,7 +151,7 @@ static class ImageAssetMigration
             string t_error = AssetDatabase.ValidateMoveAsset(t_move.Source, t_move.Destination);
             if (!string.IsNullOrEmpty(t_error))
             {
-                Debug.LogError($"[ImageAssetMigration] 이동 검증 실패: {t_move.Source} -> {t_move.Destination}\n{t_error}");
+                Debug.LogError($"[ImageAssetMigration] Move check failed: {t_move.Source} -> {t_move.Destination}\n{t_error}");
                 DeleteEmptyFolders(t_createdFolders);
                 return;
             }
@@ -163,17 +163,17 @@ static class ImageAssetMigration
             string t_error = AssetDatabase.MoveAsset(t_move.Source, t_move.Destination);
             if (!string.IsNullOrEmpty(t_error))
             {
-                Debug.LogError($"[ImageAssetMigration] 이동 실패: {t_move.Source} -> {t_move.Destination}\n{t_error}");
+                Debug.LogError($"[ImageAssetMigration] Move failed: {t_move.Source} -> {t_move.Destination}\n{t_error}");
                 t_failed++;
                 continue;
             }
 
-            Debug.Log($"[ImageAssetMigration] 이동: {t_move.Source} -> {t_move.Destination}");
+            Debug.Log($"[ImageAssetMigration] Moved: {t_move.Source} -> {t_move.Destination}");
         }
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log($"[ImageAssetMigration] Vendor 자산 이동 완료, 성공 {t_moves.Count - t_failed}건, 실패 {t_failed}건");
+        Debug.Log($"[ImageAssetMigration] Vendor assets moved, {t_moves.Count - t_failed} succeeded, {t_failed} failed");
     }
 
     static bool TryCollectOrphans(out List<string> _paths)
@@ -187,7 +187,7 @@ static class ImageAssetMigration
 
         if (AssetDatabase.IsValidFolder(ReferencesRoot) && t_referenceAssets.Count != ExpectedReferenceImages)
         {
-            Debug.LogError($"[ImageAssetMigration] References 자산 수가 예상과 다름: {t_referenceAssets.Count}/{ExpectedReferenceImages}");
+            Debug.LogError($"[ImageAssetMigration] References asset count differs from what was expected: {t_referenceAssets.Count}/{ExpectedReferenceImages}");
             return false;
         }
 
@@ -204,7 +204,7 @@ static class ImageAssetMigration
                 AddressableAssetEntry t_entry = t_settings.FindAssetEntry(t_guid);
                 if (t_entry == null) continue;
 
-                Debug.LogError($"[ImageAssetMigration] Addressables 엔트리라 삭제 중단: {t_path}");
+                Debug.LogError($"[ImageAssetMigration] It is an Addressables entry, so the delete is aborted: {t_path}");
                 return false;
             }
         }
@@ -219,7 +219,7 @@ static class ImageAssetMigration
         if (t_referencedTargets.Count > 0)
         {
             foreach (string t_path in t_referencedTargets)
-                Debug.LogError($"[ImageAssetMigration] 다른 자산이 참조하므로 삭제 중단: {t_path}");
+                Debug.LogError($"[ImageAssetMigration] Another asset references it, so the delete is aborted: {t_path}");
             return false;
         }
 
@@ -250,19 +250,19 @@ static class ImageAssetMigration
 
         if (t_sourceImages.Count + t_destinationImages.Count != ExpectedVendorImages)
         {
-            Debug.LogError($"[ImageAssetMigration] UI 의존 Vendor 이미지 수가 예상과 다름: " +
-                           $"원본 {t_sourceImages.Count} + 이동됨 {t_destinationImages.Count} / {ExpectedVendorImages}");
+            Debug.LogError($"[ImageAssetMigration] UI-dependent Vendor image count differs from what was expected: " +
+                            $"source {t_sourceImages.Count} + moved {t_destinationImages.Count} / {ExpectedVendorImages}");
 
             // 숫자만으론 원인을 못 찾는다 — 실제 집합을 그대로 남긴다.
             foreach (string t_path in t_sourceImages.Concat(t_destinationImages).OrderBy(t_p => t_p, StringComparer.Ordinal))
-                Debug.LogError($"[ImageAssetMigration] 집계됨: {t_path}");
+                Debug.LogError($"[ImageAssetMigration] Counted: {t_path}");
             return false;
         }
 
         t_sourcePrefabs.UnionWith(t_destinationPrefabs);
         if (!t_sourcePrefabs.SetEquals(ExpectedVendorPrefabs))
         {
-            Debug.LogError($"[ImageAssetMigration] UI 의존 Vendor 프리팹 집합이 예상과 다름: {t_sourcePrefabs.Count}/4");
+            Debug.LogError($"[ImageAssetMigration] UI-dependent Vendor prefab set differs from what was expected: {t_sourcePrefabs.Count}/4");
             return false;
         }
 
@@ -273,7 +273,7 @@ static class ImageAssetMigration
             string t_destination = ToDestinationPath(t_source);
             if (!string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(t_destination)))
             {
-                Debug.LogError($"[ImageAssetMigration] 목표 경로 충돌: {t_destination}");
+                Debug.LogError($"[ImageAssetMigration] Destination path conflict: {t_destination}");
                 return false;
             }
 

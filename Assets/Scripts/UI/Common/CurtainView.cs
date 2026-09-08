@@ -116,7 +116,7 @@ public class CurtainView : MonoBehaviour
     {
         if (_swap == null)
         {
-            Debug.LogError("[CurtainView] 갈아치울 것이 없습니다 — 커튼을 걸지 않습니다.");
+            Debug.LogError("[CurtainView] There is nothing to swap — not drawing the curtain.");
 
             return false;
         }
@@ -130,7 +130,7 @@ public class CurtainView : MonoBehaviour
         // 폴백이 "판 없는 커튼" 한 갈래로 모인다 — 여기서 교체를 직접 돌리면 경로가 둘로 갈린다.
         if (t_view == null)
         {
-            Debug.LogWarning("[CurtainView] 동기 UI 카탈로그에서 커튼 프리팹을 찾지 못해 커튼 없이 전환합니다.");
+            Debug.LogWarning("[CurtainView] Could not find the curtain prefab in the sync UI catalog, so the transition runs without a curtain.");
             t_view = new GameObject("Curtain (판 없음)").AddComponent<CurtainView>();
             t_view.m_panelless = true;
         }
@@ -174,7 +174,7 @@ public class CurtainView : MonoBehaviour
         {
             // 프리팹은 얻었는데 판이 미배선인 경우. 하드컷으로 진행하되 저작 실수를 알린다.
             if (!m_panelless)
-                Debug.LogError("[CurtainView] 판이 미배선이라 커튼을 칠 수 없습니다 — 커튼 없이 전환합니다.");
+                Debug.LogError("[CurtainView] The boards are unwired, so the curtain cannot be drawn — transitioning without a curtain.");
         }
         else
         {
@@ -224,7 +224,7 @@ public class CurtainView : MonoBehaviour
             {
                 if (t_held >= maxWait)
                 {
-                    Debug.LogWarning($"[CurtainView] 교체 준비가 {maxWait}초 안에 끝나지 않아 그대로 진행합니다.");
+                    Debug.LogWarning($"[CurtainView] The swap preparation did not finish within {maxWait}s, so it proceeds anyway.");
                     break;
                 }
 
@@ -354,13 +354,13 @@ public class CurtainView : MonoBehaviour
     {
 #if UNITY_EDITOR
         if (!Mathf.Approximately(top.anchorMin.y, bottom.anchorMin.y))
-            Debug.LogWarning($"[CurtainView] 두 판의 앵커가 다릅니다(위 {top.anchorMin.y} ≠ 아래 {bottom.anchorMin.y}) — 이음매가 어긋납니다.");
+            Debug.LogWarning($"[CurtainView] The two boards have different anchors (top {top.anchorMin.y} != bottom {bottom.anchorMin.y}) — the seam is misaligned.");
 
         if (Mathf.Abs(Mathf.DeltaAngle(top.localEulerAngles.z, bottom.localEulerAngles.z)) > 0.01f)
-            Debug.LogWarning($"[CurtainView] 두 판의 기울기가 다릅니다(위 {top.localEulerAngles.z} ≠ 아래 {bottom.localEulerAngles.z}) — 이음매가 어긋납니다.");
+            Debug.LogWarning($"[CurtainView] The two boards have different tilts (top {top.localEulerAngles.z} != bottom {bottom.localEulerAngles.z}) — the seam is misaligned.");
 
         if (!Mathf.Approximately(top.pivot.y, 0f) || !Mathf.Approximately(bottom.pivot.y, 1f))
-            Debug.LogWarning($"[CurtainView] pivot 규약 위반(위 {top.pivot} 은 y=0, 아래 {bottom.pivot} 은 y=1이어야 함) — 이음매가 어긋납니다.");
+            Debug.LogWarning($"[CurtainView] Pivot convention violated (top {top.pivot} must be y=0 and bottom {bottom.pivot} must be y=1) — the seam is misaligned.");
 #endif
     }
 }

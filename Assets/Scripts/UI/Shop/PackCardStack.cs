@@ -112,7 +112,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
         if (cardPrefab == null || cardLayer == null || stackAnchor == null)
         {
-            Debug.LogWarning("[PackCardStack] cardPrefab/cardLayer/stackAnchor 미배선 → 더미 생성 불가.");
+            Debug.LogWarning("[PackCardStack] cardPrefab/cardLayer/stackAnchor are unwired, so the stack cannot be created.");
             return;
         }
 

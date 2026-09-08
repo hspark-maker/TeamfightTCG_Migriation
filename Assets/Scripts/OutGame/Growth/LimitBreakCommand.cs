@@ -37,12 +37,12 @@ internal static class LimitBreakCommand
         catch (ServerAdoptionException t_adoption)
         {
             // 세션은 이미 접혔고 팝업은 CloudSyncStatusWatcher 담당이다 — 여기서 표면을 두 번 칠하지 않는다.
-            Debug.LogWarning($"[LimitBreakCommand] 응답 채택이 세션을 접었다 — {t_adoption.Message}");
+            Debug.LogWarning($"[LimitBreakCommand] Adopting the response closed the session — {t_adoption.Message}");
             return ELimitBreakOutcome.NotReady;
         }
         catch (Exception t_exception)
         {
-            Debug.LogError($"[LimitBreakCommand] {LIMIT_BREAK_COMMAND} 실패 — {t_exception.GetBaseException().Message}");
+            Debug.LogError($"[LimitBreakCommand] {LIMIT_BREAK_COMMAND} failed — {t_exception.GetBaseException().Message}");
             return ELimitBreakOutcome.NotReady;
         }
     }
@@ -56,9 +56,9 @@ internal static class LimitBreakCommand
         // 서버가 도달했다고 말한 **그 단계**의 클라 값이다 — 왕복 뒤라 다음 단계를 물으면 한 칸 어긋난다.
         bool t_known = GrowthRules.TryGetLimitBreakStep(_result.Stage, out LimitBreakStep t_step);
 
-        Debug.Log($"[LimitBreakCommand] 한계돌파 성공(card={_cardId}) — 단계 {_result.Stage} · " +
-                  $"체력 +{_result.HpGain}(클라 {(t_known ? t_step.HpGain.ToString() : "-")}) · " +
-                  $"간식 -{_result.SnackCost}(클라 {(t_known ? t_step.SnackCost.ToString() : "-")}) · 잔량 {_result.SnackLeft}");
+        Debug.Log($"[LimitBreakCommand] Limit break succeeded (card={_cardId}) — stage {_result.Stage} · " +
+                   $"hp +{_result.HpGain} (client {(t_known ? t_step.HpGain.ToString() : "-")}) · " +
+                   $"snack -{_result.SnackCost} (client {(t_known ? t_step.SnackCost.ToString() : "-")}) · left {_result.SnackLeft}");
     }
 
     // 거절을 화면이 읽을 결말로 접는다. 못 가리는 사유(CardNotOwned · RuleUnavailable · 미지)는 NotReady 다 —
@@ -71,7 +71,7 @@ internal static class LimitBreakCommand
             case REASON_MAX_STAGE:        return ELimitBreakOutcome.MaxStage;
         }
 
-        Debug.LogWarning($"[LimitBreakCommand] {LIMIT_BREAK_COMMAND} 를 서버가 거절했다 — {_rejected.Message}");
+        Debug.LogWarning($"[LimitBreakCommand] The server rejected {LIMIT_BREAK_COMMAND} — {_rejected.Message}");
         return ELimitBreakOutcome.NotReady;
     }
 }

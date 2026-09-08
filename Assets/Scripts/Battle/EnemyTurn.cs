@@ -62,7 +62,7 @@ public class EnemyTurn : TurnBase
                     // 위 폐기 루프를 통과한 스텝이지만 방어 유지 — 범위 밖 저작값이 GetSlot에 그대로 들어가면 크래시.
                     if (!IsEnemyStepPlayable(t_step))
                     {
-                        Debug.LogWarning($"[Tutorial] 적 스텝 무효(atk={t_step.attackerSlot}, def={t_step.targetSlot}) → 스텝 폐기·턴 종료");
+                        Debug.LogWarning($"[Tutorial] Invalid enemy step (atk={t_step.attackerSlot}, def={t_step.targetSlot}) → discarding the step and ending the turn");
                         TutorialConfig.DiscardEnemyStep();
                         return;
                     }

@@ -37,27 +37,27 @@ public static class OutgameDebugActions
     {
         if (_grade != ECardGrade.Rare && _grade != ECardGrade.Arcane && _grade != ECardGrade.Mythic)
         {
-            Debug.LogWarning($"[OutgameDebug] 희귀도 테스트 팩 미지원 등급: {_grade}");
+            Debug.LogWarning($"[OutgameDebug] Unsupported grade for the rarity test pack: {_grade}");
             return;
         }
         if (OutgameTutorialRunner.IsRunning || TriggeredTutorialRunner.IsRunning)
         {
-            Debug.LogWarning("[OutgameDebug] 튜토리얼 진행 중에는 진행도 이벤트를 보호하기 위해 희귀도 테스트 팩을 열 수 없다.");
+            Debug.LogWarning("[OutgameDebug] The rarity test pack cannot be opened during the tutorial, in order to protect the progress events.");
             return;
         }
         if (PackOpenOverlay.Instance == null || PackOpenOverlay.IsOpen)
         {
-            Debug.LogWarning("[OutgameDebug] 개봉 오버레이가 없거나 이미 열려 있어 희귀도 테스트 팩을 열 수 없다.");
+            Debug.LogWarning("[OutgameDebug] The rarity test pack cannot be opened because the reveal overlay is missing or already open.");
             return;
         }
         if (PackHandoff.HasPending)
         {
-            Debug.LogWarning("[OutgameDebug] 소비되지 않은 개봉 세션이 있어 희귀도 테스트 팩을 열 수 없다.");
+            Debug.LogWarning("[OutgameDebug] The rarity test pack cannot be opened because there is an unconsumed reveal session.");
             return;
         }
         if (!CardCatalog.IsReady)
         {
-            Debug.LogWarning("[OutgameDebug] 카드 카탈로그가 아직 준비되지 않아 희귀도 테스트 팩을 열 수 없다.");
+            Debug.LogWarning("[OutgameDebug] The rarity test pack cannot be opened because the card catalog is not ready yet.");
             return;
         }
 
@@ -69,7 +69,7 @@ public static class OutgameDebugActions
         }
         if (t_cards.Count == 0)
         {
-            Debug.LogWarning($"[OutgameDebug] {_grade} 카드가 없어 희귀도 테스트 팩을 열 수 없다.");
+            Debug.LogWarning($"[OutgameDebug] The rarity test pack cannot be opened because there is no {_grade} card.");
             return;
         }
 
@@ -81,7 +81,7 @@ public static class OutgameDebugActions
         if (PackOpenOverlay.TryOpen()) return;
 
         PackHandoff.Consume();
-        Debug.LogWarning($"[OutgameDebug] {_grade} 희귀도 테스트 팩 개봉 화면을 열지 못했다.");
+        Debug.LogWarning($"[OutgameDebug] Could not open the {_grade} rarity test pack reveal screen.");
     }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -119,7 +119,7 @@ public static class OutgameDebugActions
         }
         catch (System.Exception t_exception)
         {
-            Debug.LogError($"[OutgameDebug] ping 실패 — {t_exception.GetBaseException().Message}");
+            Debug.LogError($"[OutgameDebug] ping failed — {t_exception.GetBaseException().Message}");
         }
     }
 
@@ -134,16 +134,16 @@ public static class OutgameDebugActions
 
             Debug.Log(
                 $"[OutgameDebug] devBumpRevision revision {t_before} → {t_result.Revision} " +
-                $"(채택 후 {PlayerSaveCloud.Revision}), state={PlayerSaveCloud.State}");
+                $"({PlayerSaveCloud.Revision} after adoption), state={PlayerSaveCloud.State}");
         }
         catch (ServerCommandRejectedException t_rejected)
         {
             // 거절은 세션 사고가 아니라 이 호출의 결과다 — 도메인이 표면을 진다는 계약의 첫 준수 지점.
-            Debug.LogWarning($"[OutgameDebug] devBumpRevision 거절 — {t_rejected.Message}");
+            Debug.LogWarning($"[OutgameDebug] devBumpRevision rejected — {t_rejected.Message}");
         }
         catch (System.Exception t_exception)
         {
-            Debug.LogError($"[OutgameDebug] devBumpRevision 실패 — {t_exception.GetBaseException().Message}");
+            Debug.LogError($"[OutgameDebug] devBumpRevision failed — {t_exception.GetBaseException().Message}");
         }
     }
 
@@ -158,7 +158,7 @@ public static class OutgameDebugActions
         string t_uid = FirebaseAuthService.Instance.UserId;
         if (string.IsNullOrEmpty(t_uid))
         {
-            Debug.LogWarning("[OutgameDebug] 로그인 전이라 규칙 진단을 할 수 없다.");
+            Debug.LogWarning("[OutgameDebug] Not signed in yet, so the rules probe cannot run.");
             return;
         }
 
@@ -170,17 +170,17 @@ public static class OutgameDebugActions
         if (await LogRuleProbeAsync("매치 문서", FirebaseRootPath.Environment(t_env) + "/matches/rules-probe")) t_denied++;
 
         if (t_denied == RULE_PROBE_COUNT)
-            Debug.Log($"[OutgameDebug] 규칙 진단 {t_denied}/{RULE_PROBE_COUNT} 차단 — 배포된 규칙이 실클라를 막는다. (내 uid {t_uid})");
+            Debug.Log($"[OutgameDebug] Rules probe blocked {t_denied}/{RULE_PROBE_COUNT} — the deployed rules block a real client. (my uid {t_uid})");
         else
-            Debug.LogError($"[OutgameDebug] 규칙 진단 {t_denied}/{RULE_PROBE_COUNT} 차단 — 열린 경로가 있다.");
+            Debug.LogError($"[OutgameDebug] Rules probe blocked {t_denied}/{RULE_PROBE_COUNT} — there is an open path.");
     }
 
     static async UniTask<bool> LogRuleProbeAsync(string _label, string _path)
     {
         PlayerSaveCloud.RuleProbe t_probe = await PlayerSaveCloud.ProbeReadDeniedAsync(_path);
 
-        if (t_probe.Denied) Debug.Log($"[OutgameDebug] 규칙 차단 OK — {_label} · {t_probe.Detail}");
-        else Debug.LogError($"[OutgameDebug] 규칙이 열려 있다 — {_label} · {t_probe.Detail} · {_path}");
+        if (t_probe.Denied) Debug.Log($"[OutgameDebug] Rule block OK — {_label} · {t_probe.Detail}");
+        else Debug.LogError($"[OutgameDebug] A rule is open — {_label} · {t_probe.Detail} · {_path}");
 
         return t_probe.Denied;
     }
@@ -203,20 +203,20 @@ public static class OutgameDebugActions
                 new { env = ContentProfileConfig.Active.CloudEnvId, currency = _type.ToString(), amount = _amount });
 
             // 서버가 확정한 값을 찍는다 — 표시 잔액에는 다른 요청의 낙관분이 섞여 있어 지급 결과를 대조할 수 없다.
-            Debug.Log($"[OutgameDebug] {_type} +{_amount} — 서버 잔액 {CurrencyManager.GetServerBalance(_type)}");
+            Debug.Log($"[OutgameDebug] {_type} +{_amount} — server balance {CurrencyManager.GetServerBalance(_type)}");
         }
         catch (ServerCommandRejectedException t_rejected)
         {
-            Debug.LogWarning($"[OutgameDebug] devGrantCurrency 거절 — {t_rejected.Message}");
+            Debug.LogWarning($"[OutgameDebug] devGrantCurrency rejected — {t_rejected.Message}");
         }
         catch (ServerAdoptionException t_adoption)
         {
             // 세션은 이미 접혔고 팝업은 CloudSyncStatusWatcher 담당이다 — 여기서 표면을 두 번 칠하지 않는다.
-            Debug.LogWarning($"[OutgameDebug] 응답 채택이 세션을 접었다 — {t_adoption.Message}");
+            Debug.LogWarning($"[OutgameDebug] Adopting the response closed the session — {t_adoption.Message}");
         }
         catch (System.Exception t_exception)
         {
-            Debug.LogError($"[OutgameDebug] devGrantCurrency 실패 — {t_exception.GetBaseException().Message}");
+            Debug.LogError($"[OutgameDebug] devGrantCurrency failed — {t_exception.GetBaseException().Message}");
         }
     }
 
@@ -227,11 +227,11 @@ public static class OutgameDebugActions
 
         if (t_changed == 0)
         {
-            Debug.LogWarning("[OutgameDebug] 최대 강화 대상 없음 — 이미 전부 만렙이거나 성장 시스템이 아직 초기화되지 않았다(초기화 경유 필요).");
+            Debug.LogWarning("[OutgameDebug] No target for max enhance — everything is already at max level, or the growth system is not initialized yet (it has to go through initialization).");
             return;
         }
 
-        Debug.Log($"[OutgameDebug] 전 카드 최대 강화 — {t_changed}장 {CardGrowthManager.MaxStar}성");
+        Debug.Log($"[OutgameDebug] Max enhance on every card — {t_changed} card(s) at {CardGrowthManager.MaxStar} star(s)");
     }
 
     // 강화 레벨·진화 단계 재설정 (소유·재화는 유지)
@@ -239,25 +239,25 @@ public static class OutgameDebugActions
     {
         CardGrowthManager.DebugResetAll();
 
-        Debug.Log("[OutgameDebug] 카드 성장 재설정 — 전 카드 0성 · 미진화");
+        Debug.Log("[OutgameDebug] Card growth reset — every card at 0 stars, unevolved");
     }
 
     // 카탈로그 전량 지급
     public static void UnlockAllCards()
     {
         int t_added = OwnershipManager.GrantEntireCatalog();
-        Debug.Log($"[OutgameDebug] 전체 해금 — 신규 {t_added}장 / 소유 {OwnershipManager.OwnedCount}장");
+        Debug.Log($"[OutgameDebug] Unlock all — {t_added} new / {OwnershipManager.OwnedCount} owned");
     }
 
     public static void RevokeAllCards()
     {
         int t_removed = OwnershipManager.RevokeAll();
-        Debug.Log($"[OutgameDebug] 전체 회수 — {t_removed}장 제거 / 소유 {OwnershipManager.OwnedCount}장");
+        Debug.Log($"[OutgameDebug] Revoke all — {t_removed} removed / {OwnershipManager.OwnedCount} owned");
     }
 
     public static void LogOwnership()
     {
-        Debug.Log($"[OutgameDebug] 소유 {OwnershipManager.OwnedCount}장: {string.Join(", ", OwnershipManager.OwnedIds)}");
+        Debug.Log($"[OutgameDebug] {OwnershipManager.OwnedCount} owned: {string.Join(", ", OwnershipManager.OwnedIds)}");
     }
 
     // 튜토리얼 완료 낙인 + 떠 있는 게이트 해제
@@ -267,7 +267,7 @@ public static class OutgameDebugActions
         TriggeredTutorialRunner.Abort();
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.ClearForce();
 
-        Debug.Log("[OutgameDebug] 튜토리얼 완료 처리 — 게이트 해제");
+        Debug.Log("[OutgameDebug] Tutorial marked complete — gate released");
     }
 
     // 튜토리얼 진행도만 재설정 (소유는 유지)
@@ -275,7 +275,7 @@ public static class OutgameDebugActions
     {
         OutgameTutorialProgress.ResetForDebug();
         TriggeredTutorialRunner.Abort();
-        Debug.Log($"[OutgameDebug] 튜토리얼 진행도 리셋 — {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex} / completed {OutgameTutorialProgress.IsCompleted}");
+        Debug.Log($"[OutgameDebug] Tutorial progress reset — {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex} / completed {OutgameTutorialProgress.IsCompleted}");
     }
 
     // 트리거 튜토리얼(탭 첫 진입 등) 낙인만 재설정
@@ -286,7 +286,7 @@ public static class OutgameDebugActions
         TriggeredTutorialRunner.Abort();
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.ClearForce();
 
-        Debug.Log("[OutgameDebug] 트리거 튜토리얼 낙인 재설정 — 탭에 다시 들어가면 재생됩니다");
+        Debug.Log("[OutgameDebug] Triggered tutorial marks reset — they play again when you re-enter the tab");
     }
 
     // 튜토리얼 N편 처음으로 되감기 — 되돌리는 것은 좌표와 완료 낙인뿐이다(씬 재진입 시 적용).
@@ -302,7 +302,7 @@ public static class OutgameDebugActions
         TriggeredTutorialRunner.Abort();
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.ClearForce();
 
-        Debug.Log($"[OutgameDebug] 튜토리얼 {t_chapter + 1}편 처음으로 — 좌표만 되감음(소유·재화 유지). 씬 재진입 시 적용 (저작된 총 {OutgameTutorialRunner.ChapterCount}편)");
+        Debug.Log($"[OutgameDebug] Tutorial chapter {t_chapter + 1} back to the start — only the position is rewound (ownership and currency are kept). Applied on scene re-entry ({OutgameTutorialRunner.ChapterCount} chapter(s) authored in total)");
     }
 
     // 계정 경험치 더하기. 만렙 구간은 전승 1,000판대라 이 문 없이는 확인할 수 없다.
@@ -310,21 +310,21 @@ public static class OutgameDebugActions
     {
         AccountLevelManager.AddExpForDebug(_amount);
         AccountLevelInfo t_info = AccountLevelManager.GetInfo();
-        Debug.Log($"[OutgameDebug] 계정 경험치 +{_amount} — Lv.{t_info.Level} ({t_info.ExpInLevel}/{t_info.ExpToNext})");
+        Debug.Log($"[OutgameDebug] Account exp +{_amount} — Lv.{t_info.Level} ({t_info.ExpInLevel}/{t_info.ExpToNext})");
     }
 
     // 만렙으로 밀기
     public static void FillAccountLevel()
     {
         AccountLevelManager.FillToMaxForDebug();
-        Debug.Log($"[OutgameDebug] 계정 레벨 만렙 — Lv.{AccountLevelManager.Level}");
+        Debug.Log($"[OutgameDebug] Account level maxed — Lv.{AccountLevelManager.Level}");
     }
 
     // 레벨 1로 되돌리기
     public static void ResetAccountLevel()
     {
         AccountLevelManager.ResetForDebug();
-        Debug.Log("[OutgameDebug] 계정 레벨 초기화 — Lv.1");
+        Debug.Log("[OutgameDebug] Account level reset — Lv.1");
     }
 
     // 티어 1단계 올리기/내리기
@@ -344,7 +344,7 @@ public static class OutgameDebugActions
         // 이 버튼은 포인트만 옮기므로, 싣지 않으면 연출을 볼 방법이 전투밖에 없다.
         RankResultHandoff.Set(new RankApplyResult(t_info.Points - t_points, t_before, t_after));
 
-        Debug.Log($"[OutgameDebug] 티어 {t_before} → {t_after} ({t_info.DisplayName}) / 포인트 {t_info.Points} — 씬 재진입 시 연출 재생");
+        Debug.Log($"[OutgameDebug] Tier {t_before} → {t_after} ({t_info.DisplayName}) / points {t_info.Points} — the presentation plays on scene re-entry");
     }
 
     // 승급전 대기선으로 바로 점프. 티어 버튼은 임계치에 세우므로 이 상태엔 못 간다.
@@ -355,7 +355,7 @@ public static class OutgameDebugActions
 
         if (!RankManager.SetPromoStandbyForDebug())
         {
-            Debug.Log("[OutgameDebug] 승급전 대기로 갈 수 없다 — 언랭크이거나 최고 등급이다");
+            Debug.Log("[OutgameDebug] Cannot go to promotion standby — unranked, or already at the top grade");
             return;
         }
 
@@ -364,7 +364,7 @@ public static class OutgameDebugActions
         // StepTier와 같은 이유로 캐리어에 싣는다 — 실어야 씬 재진입 때 승급전 진입 연출이 재생된다.
         RankResultHandoff.Set(new RankApplyResult(t_info.Points - t_points, t_before, t_info.TierIndex, false, true));
 
-        Debug.Log($"[OutgameDebug] 승급전 대기 — {t_info.DisplayName} / 포인트 {t_info.Points} — 씬 재진입 시 연출 재생");
+        Debug.Log($"[OutgameDebug] Promotion standby — {t_info.DisplayName} / points {t_info.Points} — the presentation plays on scene re-entry");
     }
 
     // 랭크 포인트 재설정(브론즈 1로)
@@ -373,7 +373,7 @@ public static class OutgameDebugActions
         RankManager.ResetForDebug();
 
         RankInfo t_info = RankManager.GetInfo();
-        Debug.Log($"[OutgameDebug] 랭크 재설정 — {t_info.DisplayName}");
+        Debug.Log($"[OutgameDebug] Rank reset — {t_info.DisplayName}");
     }
 
     // 잠긴 기능 전체 해금 토글 (튜토리얼 딤은 별개 축이라 걷히지 않는다)
@@ -381,7 +381,7 @@ public static class OutgameDebugActions
     {
         OutgameFeatureLock.ForceUnlockAllForDebug = !OutgameFeatureLock.ForceUnlockAllForDebug;
 
-        Debug.Log($"[OutgameDebug] 기능 잠금 {(OutgameFeatureLock.ForceUnlockAllForDebug ? "무시(전체 해금)" : "정상 적용")}");
+        Debug.Log($"[OutgameDebug] Feature lock {(OutgameFeatureLock.ForceUnlockAllForDebug ? "ignored (everything unlocked)" : "applied normally")}");
     }
 
     // 모험 현재 정점 도전(맵 UI가 붙기 전 검증용). 로비 진입점을 그대로 태운다 — 전투 진입 규율을 우회하지 않는다.
@@ -390,19 +390,19 @@ public static class OutgameDebugActions
         int t_index = AdventureProgress.CurrentNodeIndex;
         if (t_index < 0)
         {
-            Debug.LogWarning("[OutgameDebug] 도전 가능한 정점이 없다 — AdventureConfig 미배선/미저작이거나 전부 클리어했다.");
+            Debug.LogWarning("[OutgameDebug] There is no challengeable node — AdventureConfig is unwired/unauthored, or everything is cleared.");
             return;
         }
 
         var t_launcher = Object.FindFirstObjectByType<LobbyMatchLauncher>(FindObjectsInactive.Include);
         if (t_launcher == null)
         {
-            Debug.LogWarning("[OutgameDebug] 씬에 LobbyMatchLauncher가 없어 정점 도전을 건너뛴다 — 로비 씬에서 실행할 것.");
+            Debug.LogWarning("[OutgameDebug] There is no LobbyMatchLauncher in the scene, so the node challenge is skipped — run this in the lobby scene.");
             return;
         }
 
         t_launcher.StartAdventureBattle(t_index);
-        Debug.Log($"[OutgameDebug] 모험 정점 #{t_index + 1} 도전 — 덱 화면 진입");
+        Debug.Log($"[OutgameDebug] Challenging adventure node #{t_index + 1} — entering the deck screen");
     }
 
     // 팩 없이 앨범 삽입 연출만 반복 검증. 소유 카드를 그대로 다시 꽂는 연출이라 소유·세이브는 건드리지 않는다.
@@ -411,7 +411,7 @@ public static class OutgameDebugActions
         List<int> t_cards = CollectOwnedAlbumCards(_count);
         if (t_cards.Count == 0)
         {
-            Debug.LogWarning("[OutgameDebug] 앨범에 소유 카드가 없어 삽입 세션을 건너뛴다 — 팩을 열거나 전체 해금 후 다시 시도.");
+            Debug.LogWarning("[OutgameDebug] There is no owned card for the album, so the insert session is skipped — open a pack or unlock everything and try again.");
             return;
         }
 
@@ -426,13 +426,13 @@ public static class OutgameDebugActions
             AlbumInsertQueue.Clear();
             AlbumInsertMask.Clear();
 
-            Debug.LogWarning("[OutgameDebug] 씬에 AlbumTabController가 없어 삽입 세션을 건너뛴다 — 로비 씬에서 실행할 것.");
+            Debug.LogWarning("[OutgameDebug] There is no AlbumTabController in the scene, so the insert session is skipped — run this in the lobby scene.");
             return;
         }
 
         // 도감 탭이 꺼져 있으면 조용히 대기했다가 탭에 들어가는 순간 재생된다.
         t_album.TryBeginInsert();
-        Debug.Log($"[OutgameDebug] 앨범 삽입 세션 예약 — {t_cards.Count}장(도감 탭 진입 시 재생)");
+        Debug.Log($"[OutgameDebug] Album insert session reserved — {t_cards.Count} card(s) (plays when the album tab is entered)");
     }
 
     // 앨범 저작 순서(테마→페이지→슬롯) 기준 소유 카드 앞 _count장. 해금은 하지 않는다.

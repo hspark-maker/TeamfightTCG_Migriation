@@ -157,7 +157,7 @@ public class DeckListController : MonoBehaviour
         if (UIPoolManager.Instance == null)
         {
             // 다른 화면은 팝업이 없으면 그냥 진행하는 폴백을 쓰지만, 삭제는 복구가 불가능하므로 취소한다.
-            Debug.LogWarning("[DeckListController] UIPoolManager 없음 — 덱 삭제를 취소한다.");
+            Debug.LogWarning("[DeckListController] No UIPoolManager — cancelling the deck deletion.");
             return;
         }
 
@@ -172,7 +172,7 @@ public class DeckListController : MonoBehaviour
                 // 같은 좌표가 다른 덱을 가리킨다. TryDeleteAt은 유효성만 보므로 여기서 이름으로 동일성을 재확인한다.
                 if (!DeckSaveManager.IsSlotValid(_slotIndex) || DeckSaveManager.GetDisplayName(_slotIndex) != t_name)
                 {
-                    Debug.LogWarning($"[DeckListController] 확인 중 덱 목록이 바뀜 — 삭제 취소 slot={_slotIndex}.");
+                    Debug.LogWarning($"[DeckListController] The deck list changed during confirmation — deletion cancelled slot={_slotIndex}.");
                     Build();
                     return;
                 }
@@ -180,7 +180,7 @@ public class DeckListController : MonoBehaviour
                 // 실패 사유(미로드·레지스트리 미주입 등)는 DeckSaveManager가 이미 로그한다.
                 // 성공 시 재빌드는 OnDeckChanged가 건다(실패면 바뀐 게 없어 다시 그릴 것도 없다).
                 if (!DeckSaveManager.TryDeleteAt(_slotIndex))
-                    Debug.LogWarning($"[DeckListController] 덱 삭제 실패 slot={_slotIndex}.");
+                    Debug.LogWarning($"[DeckListController] Deck deletion failed slot={_slotIndex}.");
             },
         });
     }

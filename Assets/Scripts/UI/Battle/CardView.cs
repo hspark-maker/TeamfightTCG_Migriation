@@ -403,7 +403,7 @@ public class CardView : MonoBehaviour
             if (!this.missingCardBackWarned)
             {
                 this.missingCardBackWarned = true;
-                Debug.LogWarning($"[CardView] cardBackSprite가 없어 뒷면을 숨깁니다: {name}", this);
+                Debug.LogWarning($"[CardView] There is no cardBackSprite, so the back face is hidden: {name}", this);
             }
             return;
         }
@@ -495,7 +495,7 @@ public class CardView : MonoBehaviour
         // 무기를 카드마다 따로 Instantiate하던 구 경로는 삭제됐다:
         // 그 프리팹을 가진 카드가 하나도 없고, 두 경로가 같은 신호를 나눠 가지면 어느 쪽이 그렸는지 흐려진다.
         if (FrameWeaponAnim == null)
-            Debug.Log($"[CardView] FocusWeapon({_active}) on '{name}': WeaponAnimSpec 없음", this);
+            Debug.Log($"[CardView] FocusWeapon({_active}) on '{name}': no WeaponAnimSpec", this);
         else if (_active) FrameWeaponAnim.Draw();
         else              FrameWeaponAnim.ResetToIdle();
     }
@@ -1139,7 +1139,7 @@ public class CardView : MonoBehaviour
     {
         // 당긴 채 기다리던 활을 여기서 쏜다. animTrigger(구 무기 프리팹 경로의 배선)에 기대지 않는다 —
         // 어느 상태를 트는지는 그 장식의 WeaponAnimSpec이 스스로 안다.
-        if (FrameWeaponAnim == null) Debug.Log($"[CardView] PlayAttackAnim on '{name}': WeaponAnimSpec 없음", this);
+        if (FrameWeaponAnim == null) Debug.Log($"[CardView] PlayAttackAnim on '{name}': no WeaponAnimSpec", this);
         else                         FrameWeaponAnim.Fire();
     }
 

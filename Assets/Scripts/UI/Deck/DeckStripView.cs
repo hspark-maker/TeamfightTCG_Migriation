@@ -67,7 +67,7 @@ public class DeckStripView : MonoBehaviour
         // 생성 칸이 그 안에 있으면 두 번째 진입부터 사라진다(증상이 늦게 나와 추적이 어렵다).
         if (createCell != null && createCell.transform.parent == content)
         {
-            Debug.LogError($"[DeckStripView] createCell이 content 안에 저작됐다({name}) — 스크롤 바깥으로 옮겨야 한다. 이번에는 인스턴스 생성으로 대체한다.");
+            Debug.LogError($"[DeckStripView] createCell is authored inside content ({name}) — it has to be moved outside the scroll. For now it is substituted by instantiation.");
             createCell = null;
         }
 
@@ -226,7 +226,7 @@ public class DeckStripView : MonoBehaviour
         // 편집기 불변식(Create 모드면 슬롯 좌표가 없다)이 깨진 채로 들어오면 편집 중 칸과 실제 덱이
         // 동시에 선택돼 보인다. 증상만으로는 원인을 찾기 어려우니 여기서 알린다(표시는 SetSelected가 정리한다).
         if (_selectedSlot >= 0)
-            Debug.LogError($"[DeckStripView] 신규 편집 중인데 슬롯 좌표({_selectedSlot})가 함께 왔다 — 편집 중 칸을 우선한다.");
+            Debug.LogError($"[DeckStripView] A slot position ({_selectedSlot}) came along while editing a new deck — the slot being edited takes priority.");
 
         var t_draft = Instantiate(slotPrefab, content);
         t_draft.BindDraft();

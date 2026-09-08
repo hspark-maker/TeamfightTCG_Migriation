@@ -380,7 +380,7 @@ public class SettingsPanel : PooledUIBase
 
         if (this.frameRateButtons.Length != GameManager.FrameRateOptions.Length)
         {
-            Debug.LogError($"[SettingsPanel] FPS 버튼 배선 {this.frameRateButtons.Length}개 ≠ 옵션 {GameManager.FrameRateOptions.Length}개");
+            Debug.LogError($"[SettingsPanel] {this.frameRateButtons.Length} FPS button(s) wired != {GameManager.FrameRateOptions.Length} option(s)");
             return;
         }
 
@@ -429,7 +429,7 @@ public class SettingsPanel : PooledUIBase
         SelectionStateView t_state = _button.GetComponent<SelectionStateView>();
         if (t_state == null)
         {
-            Debug.LogError($"[SettingsPanel] {_button.name}에 SelectionStateView 미배선 — 선택 표시가 안 바뀐다");
+            Debug.LogError($"[SettingsPanel] {_button.name} has no SelectionStateView wired — the selection display will not change");
             return;
         }
 

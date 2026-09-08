@@ -38,11 +38,11 @@ public static class FlowWavePrefabBuilder
         var t_mesh = AssetDatabase.LoadAssetAtPath<Mesh>(MeshPath);
         if (t_mesh == null)
         {
-            Debug.LogError($"[FlowWave] 메시 없음: {MeshPath} — 먼저 Tools/VFX/Generate Wave Mesh 실행");
+            Debug.LogError($"[FlowWave] Mesh missing: {MeshPath} — run Tools/VFX/Generate Wave Mesh first");
             return;
         }
         var t_mat = AssetDatabase.LoadAssetAtPath<Material>(MaterialPath);
-        if (t_mat == null) Debug.LogWarning($"[FlowWave] 머터리얼 없음: {MaterialPath} — 기본 머터리얼로 굽는다");
+        if (t_mat == null) Debug.LogWarning($"[FlowWave] Material missing: {MaterialPath} — baking with the default material");
 
         var t_root = new GameObject("FlowWave");
         try
@@ -51,7 +51,7 @@ public static class FlowWavePrefabBuilder
                 BuildLayer(t_root.transform, i, t_mesh, t_mat);
 
             PrefabUtility.SaveAsPrefabAsset(t_root, OutputPath, out bool t_ok);
-            if (!t_ok) { Debug.LogError("[FlowWave] 프리팹 저장 실패"); return; }
+            if (!t_ok) { Debug.LogError("[FlowWave] Prefab save failed"); return; }
         }
         finally
         {
@@ -62,7 +62,7 @@ public static class FlowWavePrefabBuilder
         AssetDatabase.Refresh();
 
         var t_saved = AssetDatabase.LoadAssetAtPath<GameObject>(OutputPath);
-        Debug.Log($"[FlowWave] 생성: {OutputPath} (겹 {Layers})");
+        Debug.Log($"[FlowWave] Created: {OutputPath} (layers {Layers})");
         Selection.activeObject = t_saved;
     }
 

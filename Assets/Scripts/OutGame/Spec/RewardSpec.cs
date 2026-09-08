@@ -91,7 +91,7 @@ public static class RewardSpec
         _def = default;
         if (!CurrencyCode.TryParse(_currency, out ECurrencyType t_type))
         {
-            Debug.LogWarning($"[RewardSpec] {_where}: 알 수 없는 재화 '{_currency}' 행을 건너뜁니다.");
+            Debug.LogWarning($"[RewardSpec] {_where}: skipping a row with unknown currency '{_currency}'.");
             return false;
         }
         if (_amount <= 0) return false;
@@ -125,20 +125,20 @@ public static class RewardSpec
 
             if (!Enum.TryParse(t_row.ownerType, false, out ERewardOwnerType t_ownerType))
             {
-                Debug.LogWarning($"[RewardSpec] Reward id {t_row.id}: 알 수 없는 ownerType '{t_row.ownerType}' 행을 건너뜁니다.");
+                Debug.LogWarning($"[RewardSpec] Reward id {t_row.id}: skipping a row with unknown ownerType '{t_row.ownerType}'.");
                 continue;
             }
             if (!Enum.TryParse(t_row.rewardType, false, out ERewardType t_rewardType)
                 || t_rewardType != ERewardType.Currency)
             {
-                Debug.LogWarning($"[RewardSpec] Reward id {t_row.id}: 지원하지 않는 rewardType '{t_row.rewardType}' 행을 건너뜁니다.");
+                Debug.LogWarning($"[RewardSpec] Reward id {t_row.id}: skipping a row with unsupported rewardType '{t_row.rewardType}'.");
                 continue;
             }
 
             string t_orderKey = string.Concat(KeyOf(t_ownerType, t_row.ownerId), "\n", t_row.order.ToString());
             if (string.Equals(t_lastOrderKey, t_orderKey, StringComparison.Ordinal))
             {
-                Debug.LogError($"[RewardSpec] {t_row.ownerType}/{t_row.ownerId}: order {t_row.order}가 중복되어 Reward id {t_row.id}를 건너뜁니다.");
+                Debug.LogError($"[RewardSpec] {t_row.ownerType}/{t_row.ownerId}: order {t_row.order} is duplicated, so Reward id {t_row.id} is skipped.");
                 continue;
             }
             t_lastOrderKey = t_orderKey;

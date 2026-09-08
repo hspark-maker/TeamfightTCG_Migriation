@@ -107,7 +107,7 @@ public class AlbumThemeCellView : MonoBehaviour
     {
         // 런타임 RemoveAllListeners는 퍼시스턴트를 못 지운다 — 목업 onClick은 배선 단계에서 지워야 한다
         if (thumbButton != null && thumbButton.onClick.GetPersistentEventCount() > 0)
-            Debug.LogWarning("[AlbumThemeCellView] 목업 퍼시스턴트 onClick이 남아 있다 — 프리팹에서 제거할 것.", this);
+            Debug.LogWarning("[AlbumThemeCellView] A mock persistent onClick is left over — remove it from the prefab.", this);
     }
 
     // 셀은 갤러리가 다시 그릴 때 꺼지거나 교체된다 — 죽은 칸을 가리키는 등록이 남지 않게 여기서 놓는다
@@ -177,7 +177,7 @@ public class AlbumThemeCellView : MonoBehaviour
         if (t_prefab == null)
         {
             this.m_lockBadgeMissing = true;
-            Debug.LogWarning($"[AlbumThemeCellView] 동기 UI 카탈로그 자물쇠 미배선 — 잠긴 테마가 흑백으로만 보입니다.", this);
+            Debug.LogWarning($"[AlbumThemeCellView] The sync UI catalog lock is unwired — locked themes only appear greyed out.", this);
             return;
         }
 

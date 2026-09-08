@@ -90,20 +90,20 @@ public static class AccountLevelSpec
             AccountLevel t_row = t_rows[t_i];
             if (t_row == null)
             {
-                Debug.LogError("[AccountLevelSpec] AccountLevel 표에 null 행이 있다 — 곡선을 버린다.");
+                Debug.LogError("[AccountLevelSpec] The AccountLevel table has a null row — discarding the curve.");
                 s_requiredExp.Clear();
                 return;
             }
             // id가 곧 레벨이라 1부터 연속이어야 한다. 비면 그 위 레벨의 뜻이 통째로 밀린다.
             if (t_row.id != t_i + 1)
             {
-                Debug.LogError($"[AccountLevelSpec] AccountLevel id가 연속이 아니다({t_i + 1}번째 행의 id={t_row.id}) — 곡선을 버린다.");
+                Debug.LogError($"[AccountLevelSpec] AccountLevel ids are not consecutive (row #{t_i + 1} has id={t_row.id}) — discarding the curve.");
                 s_requiredExp.Clear();
                 return;
             }
             if (t_row.requiredExp <= t_previous)
             {
-                Debug.LogError($"[AccountLevelSpec] AccountLevel id={t_row.id}의 requiredExp({t_row.requiredExp})가 이전 레벨보다 크지 않다 — 곡선을 버린다.");
+                Debug.LogError($"[AccountLevelSpec] AccountLevel id={t_row.id} has requiredExp({t_row.requiredExp}) that is not greater than the previous level — discarding the curve.");
                 s_requiredExp.Clear();
                 return;
             }
@@ -114,7 +114,7 @@ public static class AccountLevelSpec
 
         if (s_requiredExp.Count > 0 && s_requiredExp[0] != 0)
         {
-            Debug.LogError($"[AccountLevelSpec] AccountLevel id=1의 requiredExp가 0이 아니다({s_requiredExp[0]}) — 시작 레벨에 도달하지 못한다.");
+            Debug.LogError($"[AccountLevelSpec] AccountLevel id=1 has a non-zero requiredExp ({s_requiredExp[0]}) — the starting level can never be reached.");
             s_requiredExp.Clear();
             return;
         }

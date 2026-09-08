@@ -141,7 +141,7 @@ public class AlbumPageOverlayView : MonoBehaviour
     {
         if (_theme == null || _theme.Pages == null || _theme.Pages.Count == 0)
         {
-            Debug.LogWarning("[AlbumPageOverlayView] 빈 테마 — 오버레이를 열지 않는다.", this);
+            Debug.LogWarning("[AlbumPageOverlayView] Empty theme — not opening the overlay.", this);
             return;
         }
 
@@ -276,9 +276,9 @@ public class AlbumPageOverlayView : MonoBehaviour
 
         // 런타임 RemoveAllListeners는 퍼시스턴트를 못 지운다 — 목업 onClick은 배선 단계에서 지워야 한다
         if (dimButton != null && dimButton.onClick.GetPersistentEventCount() > 0)
-            Debug.LogWarning("[AlbumPageOverlayView] Dim에 목업 퍼시스턴트 onClick이 남아 있다 — 프리팹에서 제거할 것.", this);
+            Debug.LogWarning("[AlbumPageOverlayView] A mock persistent onClick is left on Dim — remove it from the prefab.", this);
         if (closeButton != null && closeButton.onClick.GetPersistentEventCount() > 0)
-            Debug.LogWarning("[AlbumPageOverlayView] Button_Close에 목업 퍼시스턴트 onClick이 남아 있다 — 프리팹에서 제거할 것.", this);
+            Debug.LogWarning("[AlbumPageOverlayView] A mock persistent onClick is left on Button_Close — remove it from the prefab.", this);
 
         if (dimButton != null) dimButton.onClick.AddListener(HandleCloseRequest);
         if (closeButton != null) closeButton.onClick.AddListener(HandleCloseRequest);
@@ -376,8 +376,8 @@ public class AlbumPageOverlayView : MonoBehaviour
 
         if (slotRoot == null || underSlotRoot == null || slotTemplate == null)
         {
-            Debug.LogError($"[AlbumPageOverlayView] 배선 누락 — slotRoot={slotRoot}, underSlotRoot={underSlotRoot}, " +
-                           $"slotTemplate={slotTemplate}. 슬롯을 만들지 않는다.", this);
+            Debug.LogError($"[AlbumPageOverlayView] Wiring missing — slotRoot={slotRoot}, underSlotRoot={underSlotRoot}, " +
+                            $"slotTemplate={slotTemplate}. No slot is created.", this);
             return;
         }
 

@@ -156,12 +156,12 @@ public class OutgameTutorialGateUI : MonoBehaviour
             if (Instance != null) return Instance;
 
             // 루트가 비활성 저장이면 Awake가 안 돌아 Instance가 비어 있다 — 누수 없이 폴백으로 살린다.
-            Debug.LogError("[OutgameTutorialGateUI] 프리팹이 Awake를 돌지 못했습니다(루트 비활성 저장?) — 코드 폴백으로 대체합니다.");
+            Debug.LogError("[OutgameTutorialGateUI] The prefab did not run Awake (saved with an inactive root?) — falling back to the code path.");
             Destroy(t_spawned.gameObject);
         }
         else
         {
-            Debug.LogWarning("[OutgameTutorialGateUI] 게이트 프리팹 미배선 — 딤+문구만 그립니다(손가락 없음).");
+            Debug.LogWarning("[OutgameTutorialGateUI] The gate prefab is unwired — drawing only the dim and the text (no finger).");
         }
 
         new GameObject("OutgameTutorialGate").AddComponent<OutgameTutorialGateUI>();
@@ -182,7 +182,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     {
         if (_target == null)
         {
-            Debug.LogWarning("[OutgameTutorialGateUI] 타깃 RectTransform이 없어 게이트를 걸지 않습니다.");
+            Debug.LogWarning("[OutgameTutorialGateUI] There is no target RectTransform, so no gate is placed.");
             HideGate(_owner);
             return;
         }
@@ -191,7 +191,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         // 실제로 덱 편집 컬렉션 타일에는 Button이 없다(IPointerClickHandler로 직접 받는다).
         if (_targetButton == null && _onSatisfied != null)
         {
-            Debug.LogWarning($"[OutgameTutorialGateUI] 타깃 '{_target.name}'에 Button이 없어 게이트를 걸지 않습니다(소프트락 방지).");
+            Debug.LogWarning($"[OutgameTutorialGateUI] Target '{_target.name}' has no Button, so no gate is placed (softlock guard).");
             HideGate(_owner);
             return;
         }
@@ -391,7 +391,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
             if (t_active && !m_blockWarned)
             {
                 m_blockWarned = true;
-                Debug.LogWarning($"[OutgameTutorialGateUI] 타깃 '{m_target.name}'의 버튼이 비활성(interactable=false)이라 안내를 숨기고 대기합니다(소프트락 방지).{DescribeLockCause()}");
+                Debug.LogWarning($"[OutgameTutorialGateUI] The button on target '{m_target.name}' is disabled (interactable=false), so the guide is hidden and it waits (softlock guard).{DescribeLockCause()}");
             }
             return;
         }

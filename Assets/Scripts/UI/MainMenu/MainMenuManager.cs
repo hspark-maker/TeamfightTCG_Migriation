@@ -91,7 +91,7 @@ public class MainMenuManager : MonoBehaviour
         if (this.tutorialScenario == null)
         {
             // 시나리오 미배선이면 씬 로드 금지(빈 튜토리얼로 진입해 크래시/무한대기 방지).
-            Debug.LogWarning("[MainMenuManager] tutorialScenario SO가 배선되지 않았습니다. 튜토리얼 진입 취소.");
+            Debug.LogWarning("[MainMenuManager] The tutorialScenario SO is not wired. Cancelling tutorial entry.");
             return;
         }
 
