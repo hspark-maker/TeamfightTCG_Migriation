@@ -3686,6 +3686,7 @@ MonoBehaviour:
     closeDuration: 0.15
     openFromScale: 0.9
     closeToScale: 0.9
+  dimAlpha: 0.95
   minSpinMs: 2500
   closeLockMaxMs: 8000
   gainOrigin: {fileID: 0}
