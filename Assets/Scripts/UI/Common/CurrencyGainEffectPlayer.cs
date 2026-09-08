@@ -335,6 +335,10 @@ public class CurrencyGainEffectPlayer : MonoBehaviour
         var t_go = new GameObject("LightStreak", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         t_go.transform.SetParent(transform, false);
 
+        // 재생기가 앉은 캔버스(로비, 층 0)의 형제 순서로는 자기 캔버스를 가진 오버레이·팝업을 넘지 못한다 —
+        // 빛은 그것을 띄운 화면 위에 떠야 하므로 줄기 노드마다 표의 층으로 올라탄다.
+        UiSortingOrder.LiftNested(t_go, UiSortingOrder.GainLight);
+
         var t_img = t_go.GetComponent<Image>();
         t_img.sprite         = _sprite;
         t_img.preserveAspect = true;

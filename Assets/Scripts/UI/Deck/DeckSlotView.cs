@@ -39,6 +39,10 @@ public class DeckSlotView : MonoBehaviour
     [Tooltip("아직 저장되지 않은 신규 덱 칸에 뜨는 문구. 저장이 확정되면 그 칸은 사라지고 실제 덱 칸이 대신 선다.")]
     [SerializeField] string draftLabel  = "생성 중";
 
+    [Tooltip("만석이라 생성 칸이 삭제 토글로 동작할 때의 문구. 토글이 켜진 동안은 deleteDoneLabel 로 바뀐다.")]
+    [SerializeField] string deleteLabel     = "덱 삭제";
+    [SerializeField] string deleteDoneLabel = "완료";
+
     [Header("선택 시 글자색 (선택)")]
     [Tooltip("켜면 선택 여부에 따라 번호 색을 갈아끼운다. 끄면 프리팹 저작 색을 그대로 둔다.\n"
            + "알약 안 이름은 대상이 아니다 — 그 자리는 밑판 색과 짝으로 저작해야 읽힌다.")]
@@ -116,7 +120,12 @@ public class DeckSlotView : MonoBehaviour
         m_useNewDeckBackground = false;
         SetSelected(false);
 
-        if (plusObject   != null) plusObject.SetActive(true);
+        if (plusObject != null)
+        {
+            plusObject.SetActive(true);
+            // 삭제 토글 모드(BindDeleteToggle)가 ✕로 돌려놓았을 수 있다 — 같은 저작 칸이 두 모드를 오간다.
+            plusObject.transform.localRotation = Quaternion.identity;
+        }
         if (bannerObject != null) bannerObject.SetActive(false);
         if (numberText   != null) numberText.gameObject.SetActive(false);
         if (previewImage != null) previewImage.gameObject.SetActive(false);
@@ -128,6 +137,38 @@ public class DeckSlotView : MonoBehaviour
         }
 
         SetInteractable(_enabled);
+    }
+
+    /// <summary>만석일 때 생성 칸이 맡는 삭제 토글 모드. 누르면 _onClick 이 목록의 삭제 버튼을 여닫는다.
+    /// 지울 대상이 없는 칸이므로 삭제 콜백은 붙지 않고, 클릭 경로는 생성 칸과 같은 자리를 쓴다.</summary>
+    public void BindDeleteToggle(bool _on, Action _onClick)
+    {
+        m_slotIndex = -1;
+        m_onClick   = null;
+        m_onCreate  = _onClick;   // 이 칸의 유일한 동작 — OnClicked 가 이 슬롯을 먼저 본다
+        m_onDelete  = null;
+        Wire();
+
+        SetEditMode(false);
+        m_useNewDeckBackground = false;
+        SetSelected(false);
+
+        if (plusObject != null)
+        {
+            plusObject.SetActive(true);
+            // 별도 아트 없이 ⊕ 를 45° 돌려 ✕ 로 읽히게 한다 — 생성이 아니라 삭제 축임을 이 칸 하나로 알린다.
+            plusObject.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+        }
+        if (bannerObject != null) bannerObject.SetActive(false);
+        if (numberText   != null) numberText.gameObject.SetActive(false);
+        if (previewImage != null) previewImage.gameObject.SetActive(false);
+        if (nameText != null)
+        {
+            nameText.enabled = true;
+            nameText.text    = _on ? deleteDoneLabel : deleteLabel;
+        }
+
+        SetInteractable(true);
     }
 
     // 아직 저장되지 않은 신규 덱 칸. 저장 좌표가 없으니 클릭·삭제 콜백을 붙이지 않는다 —

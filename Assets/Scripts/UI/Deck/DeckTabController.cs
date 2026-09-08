@@ -198,6 +198,7 @@ public class DeckTabController : LobbyTabPanel
             onExit         = CloseEditor,
             dragController = m_dragController,
             showDeckStrip  = true,
+            allowFullDeleteToggle = true,
             holdoutCard    = OutgameTutorialRunner.TryGetPendingEquipCard(out var t_equip) ? t_equip : 0,
         });
     }
@@ -213,6 +214,7 @@ public class DeckTabController : LobbyTabPanel
             onExit         = CloseEditor,
             dragController = m_dragController,
             showDeckStrip  = true,
+            allowFullDeleteToggle = true,   // 이 신규 덱을 저장하는 순간 만석이 될 수 있다
         });
     }
 

@@ -44,6 +44,9 @@ public class RankRewardRowView : MonoBehaviour
     // 깜빡임 대상. highlight 노드에서 1회만 찾아 캐싱한다.
     Image m_highlightImage;
 
+    /// <summary>이 행의 보상 칸(보상 목록과 같은 순서). 수령 팝업이 닫힌 뒤 획득 빛이 피어날 자리로 쓴다.</summary>
+    public IReadOnlyList<CurrencyRewardSlotView> RewardSlots => this.rewardSlots;
+
     // 티어 인덱스 배선 + 리스너 1회 등록(재빌드마다 중복 방지). _isLast면 쉐브론을 끈다.
     public void Bind(int _tierIndex, bool _isLast, Action<int> _onClick)
     {
