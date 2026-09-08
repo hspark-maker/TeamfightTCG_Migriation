@@ -76,6 +76,14 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     [SerializeField] TMP_Text               totalHpText;    // 편성된 카드의 체력 합(미배선이면 표시 생략)
     [SerializeField] DeckSynergyStrip       synergyStrip;
 
+    [Header("컬렉션 검색")]
+    [Tooltip("카드 이름 검색 입력창. 미배선이면 검색 축을 통째로 건너뛴다.\n"
+           + "튜토리얼이 카드를 지목하는 동안에는 잠긴다 — 안내 대상이 걸러지면 진행이 멈춘다.")]
+    [SerializeField] TMP_InputField searchInput;
+
+    [Tooltip("검색창 옆 필터 버튼. 열어 줄 화면이 아직 없어 눌리지 않는 상태로 저작한다(리스너 없음).")]
+    [SerializeField] Button filterButton;
+
     [Header("버튼")]
     [SerializeField] Button unequipAllButton;
     [SerializeField] Button autoEquipButton;
@@ -95,6 +103,10 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     [Tooltip("전투 시작 버튼. DeckEditData.onPlay가 주입됐을 때만 켜진다 —\n"
            + "로비 탭에서는 여기서 전투로 갈 곳이 없다. 미배선이면 그 축을 통째로 건너뛴다.")]
     [SerializeField] Button playButton;
+
+    [Tooltip("전투 시작 버튼을 감싸는 하단 띠. onPlay가 주입됐을 때만 버튼과 함께 뜬다. "
+           + "로비 탭에서는 이 자리를 로비 탭바가 쓰기 때문에 띠까지 같이 꺼야 한다.")]
+    [SerializeField] GameObject playBarNode;
 
     // 목록 칸(DeckSlotView의 이름 표시)이 짧다 — 프리팹 설정 누락에 기대지 않고 코드에서 상한을 박는다.
     const int NAME_MAX_LENGTH = 12;
@@ -222,6 +234,15 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
             nameInput.onEndEdit.AddListener(OnNameEndEdit);
         }
 
+        if (searchInput != null)
+        {
+            searchInput.onValueChanged.RemoveAllListeners();
+            searchInput.onValueChanged.AddListener(OnSearchChanged);
+        }
+
+        // TODO: 필터 화면(칩 줄)이 생기면 여기에 리스너를 붙이고 잠금을 푼다.
+        if (filterButton != null) filterButton.interactable = false;
+
         // 시너지 아이콘 롱프레스 → 그 시너지를 가진 카드만 강조. 어떤 카드가 대상인지는 편성/컬렉션을 아는 여기서 정한다.
         if (synergyStrip != null) synergyStrip.onFocusChanged = ApplySynergyFocus;
 
@@ -309,7 +330,9 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         if (this.deckPowerNode != null) this.deckPowerNode.SetActive(this.m_request.showDeckPower);
 
         // 전투 시작은 갈 곳이 있을 때만 보인다 — 주입 여부가 곧 표시 여부다.
-        if (this.playButton != null) this.playButton.gameObject.SetActive(this.m_request.onPlay != null);
+        bool t_showPlay = this.m_request.onPlay != null;
+        if (this.playBarNode != null) this.playBarNode.SetActive(t_showPlay);
+        if (this.playButton  != null) this.playButton.gameObject.SetActive(t_showPlay);
 
         // 하단 바와 전투 시작 버튼은 두 축이 독립이다 — 대전 진입에서는 둘이 같이 뜬다(자리는 프리팹 저작이 정한다).
         if (this.deckStrip != null) this.deckStrip.gameObject.SetActive(this.m_request.showDeckStrip);
@@ -447,6 +470,8 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         if (synergyStrip   != null) synergyStrip.Clear();
         if (deckStrip      != null) deckStrip.Clear();
         if (nameInput      != null) nameInput.DeactivateInputField();   // 소프트키보드가 패널 밖까지 살아남지 않게
+        if (searchInput    != null) searchInput.DeactivateInputField();
+        ClearSearch();
     }
 
     void OnEnable()
@@ -503,6 +528,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         if (synergyStrip   != null) synergyStrip.Clear();
         if (deckStrip      != null) deckStrip.Clear();
         if (nameInput      != null) nameInput.DeactivateInputField();
+        if (searchInput    != null) searchInput.DeactivateInputField();
     }
 
     // 튜토리얼이 지목한 카드를 이번 편집에서만 빼 둔다 — 세이브는 건드리지 않는다(m_working 위에서만 일어난다).
@@ -547,6 +573,9 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         m_savedName = _initialName;
         if (nameInput != null) nameInput.SetTextWithoutNotify(m_savedName);   // 세팅이 onEndEdit로 되튀지 않게
 
+        // 목록을 만들기 전에 비운다 — 이전 세션의 검색어가 남으면 새로 연 화면이 이유 없이 비어 보인다.
+        ClearSearch();
+
         if (collectionGrid != null) collectionGrid.Build(OnTileDragRequest, OnTileClicked);
 
         if (dragController != null) dragController.Setup(() => Slots, AssignSlot, OnDragEnded);
@@ -570,7 +599,21 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         this.deckStrip.Build(this.m_slotIndex,
                              this.m_mode == EDeckEditMode.Create,
                              OnDeckStripSlotClicked,
-                             OnDeckStripCreateClicked);
+                             OnDeckStripCreateClicked,
+                             OnDeckStripSlotDelete);
+    }
+
+    // 검색어가 바뀌면 목록을 다시 만들지 않고 표시만 거른다 — 그리드가 타일 이름을 캐시하고 있다.
+    void OnSearchChanged(string _value)
+    {
+        if (this.collectionGrid != null) this.collectionGrid.SetNameFilter(_value);
+    }
+
+    // 입력창과 필터를 함께 비운다. 한쪽만 비우면 입력창은 빈데 목록만 걸러진 채로 남는다.
+    void ClearSearch()
+    {
+        if (this.searchInput    != null) this.searchInput.SetTextWithoutNotify(string.Empty);
+        if (this.collectionGrid != null) this.collectionGrid.SetNameFilter(null);
     }
 
     // 하단 바에서 다른 덱을 골랐다. 이탈 판정은 뒤로가기와 같은 창구를 탄다 —
@@ -580,7 +623,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         if (this.m_mode == EDeckEditMode.Edit && this.m_slotIndex == _slotIndex) return;   // 이미 이 덱을 편집 중
 
         // 확인 팝업 응답을 기다리는 사이 "저장"으로 신규 덱이 맨 앞에 꽂히면 뒤 덱 좌표가 전부 밀린다
-        // (TryInsertFront). 좌표를 그대로 들고 가면 엉뚱한 덱이 열리므로, 카드 구성으로 대상을 되찾는다.
+        // (TryInsertFront). 그때만 카드 구성으로 대상을 되찾는다.
         List<int> t_target = _slotIndex >= 0 && _slotIndex < DeckSaveManager.SLOT_COUNT
             ? DeckSaveManager.GetSlot(_slotIndex)
             : null;
@@ -588,7 +631,17 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         RequestLeave(() =>
         {
             int t_slot = _slotIndex;
-            if (t_target != null && DeckSaveManager.TryFindSlot(t_target, out int t_found)) t_slot = t_found;
+
+            // 좌표가 아직 그 덱을 가리키면 되찾지 않는다. TryFindSlot은 같은 구성의 "첫" 슬롯을 돌려주므로,
+            // 방금 만든 덱과 구성이 겹치는 기존 덱을 누르면 맨 앞의 신규 덱으로 되돌아가 영영 열리지 않는다.
+            // 슬롯 배열은 밀 때 리스트 객체를 그대로 옮기므로(DeckSaveManager.CopySlot), 참조 동일성이
+            // "좌표가 아직 유효한가"의 정확한 판정이 된다.
+            bool t_stayed = t_target != null
+                         && _slotIndex >= 0 && _slotIndex < DeckSaveManager.SLOT_COUNT
+                         && ReferenceEquals(DeckSaveManager.GetSlot(_slotIndex), t_target);
+
+            if (!t_stayed && t_target != null && DeckSaveManager.TryFindSlot(t_target, out int t_found))
+                t_slot = t_found;
 
             ConsumeHoldout();
             Open(t_slot);
@@ -606,6 +659,49 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
 
             ConsumeHoldout();
             OpenNew();
+        });
+    }
+
+    // 하단 바의 삭제 버튼. 신규 편집 중일 때만 열린다(DeckStripView.Build가 그 축을 쥔다).
+    // 편집 대상은 아직 저장되지 않은 덱이라 여기서 지우는 칸과 절대 겹치지 않는다 — m_slotIndex는 -1이다.
+    // 삭제는 되돌릴 수 없으므로 로비 목록(DeckListController.OnSlotDeleteClicked)과 같은 확인 절차를 그대로 밟는다.
+    void OnDeckStripSlotDelete(int _slotIndex)
+    {
+        if (!DeckSaveManager.IsSlotValid(_slotIndex)) return;
+
+        // 이름은 팝업이 뜨기 전에 캡처한다 — 삭제 후에는 그 좌표가 다른 덱을 가리킨다(압축 당김).
+        string t_name = DeckSaveManager.GetDisplayName(_slotIndex);
+
+        if (UIPoolManager.Instance == null)
+        {
+            // 다른 경로는 팝업이 없으면 그냥 진행하는 폴백을 쓰지만, 삭제는 복구가 불가능하므로 취소한다.
+            Debug.LogWarning("[DeckEditController] UIPoolManager 없음 — 덱 삭제를 취소한다.");
+            return;
+        }
+
+        UIPoolManager.Instance.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
+        {
+            titleText = $"'{t_name}' 덱을 삭제할까요?",
+            yesText   = "삭제",
+            noText    = "취소",
+            yesAction = () =>
+            {
+                // 팝업이 떠 있는 사이 세이브가 바뀌면 같은 좌표가 다른 덱을 가리킨다.
+                // TryDeleteAt은 유효성만 보므로 여기서 이름으로 동일성을 재확인한다.
+                if (!DeckSaveManager.IsSlotValid(_slotIndex) || DeckSaveManager.GetDisplayName(_slotIndex) != t_name)
+                {
+                    Debug.LogWarning($"[DeckEditController] 확인 중 덱 목록이 바뀜 — 삭제 취소 slot={_slotIndex}.");
+                    RebuildDeckStrip();
+                    return;
+                }
+
+                // 실패 사유(미로드·레지스트리 미주입 등)는 DeckSaveManager가 이미 로그한다.
+                if (!DeckSaveManager.TryDeleteAt(_slotIndex))
+                    Debug.LogWarning($"[DeckEditController] 덱 삭제 실패 slot={_slotIndex}.");
+
+                // 이 화면은 로비 목록과 달리 OnDeckChanged를 구독하지 않는다 — 재빌드를 직접 건다.
+                RebuildDeckStrip();
+            },
         });
     }
 
@@ -955,6 +1051,11 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         if (unequipAllButton != null) unequipAllButton.interactable = t_filled > 0;
         if (autoEquipButton  != null) autoEquipButton.interactable  = t_filled < DeckSaveManager.DECK_SIZE    // 가득 차면 채울 칸이 없다
                                                                    && OutgameFeatureLock.IsUnlocked(EOutgameFeature.DeckAutoEquip);
+
+        // 지목된 카드가 검색에 걸러지면 안내가 가리킬 대상이 사라진다 — 홀드아웃이 살아 있는 동안은 잠근다.
+        // 홀드아웃은 여러 경로에서 풀리므로(끼우기·덱 갈아타기) 판정을 여기 한 곳으로 모은다.
+        if (searchInput != null) searchInput.interactable = m_holdout <= 0;
+
         RefreshSaveButton();
 
         // 위 재바인딩이 하이라이트·알파를 전부 원상복구한 뒤라야 모드 신호가 살아남는다.

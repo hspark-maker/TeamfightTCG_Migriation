@@ -100,6 +100,10 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
     [Tooltip("첫 진입(언랭크 → 첫 티어)에 세우는 문구.")]
     [SerializeField] string titleFirstEntry = "랭크 배정";
 
+    [Tooltip("배지를 눌러 지금 등급을 다시 볼 때(열람) 세우는 문구. 사건이 아니라 상태를 보는 자리라\n" +
+             "승급·배정 문구를 그대로 쓰면 방금 오른 것으로 읽힌다.")]
+    [SerializeField] string titleBrowse = "현재 랭크";
+
     [Header("연출")]
     [Tooltip("암전 자체. openDuration이 곧 급암전 시간이다 — 0.1을 넘기면 '멈춰 세웠다'가 아니라 '어두워진다'로 읽힌다.")]
     [SerializeField] PopupTransition transition = new PopupTransition();
@@ -261,8 +265,10 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
     /// _onCovered는 암전이 완전히 덮인 프레임에 정확히 한 번 온다 — 로비 표시를 갈아끼우는 자리다
     /// (PackPurchaseImpact.Play의 덮임 통지와 같은 규약). 건너뛰기로 안무가 잘려도 반드시 한 번은 온다.
     /// _onClose는 걷힌 뒤 정확히 한 번 온다.
+    /// _browse는 사건이 아니라 지금 상태를 다시 보는 자리(배지 열람)라는 표식이다 — 제목만 갈리고 안무는 같다.
     /// 안무 도중이라도 탭 한 번이면 최종 상태로 점프한 뒤 닫힌다 — 두 번 봐야 하는 화면이 아니다.</summary>
-    public void Show(RankTier _from, RankTier _to, EPromoteKind _kind, Action _onCovered, Action _onClose)
+    public void Show(RankTier _from, RankTier _to, EPromoteKind _kind, Action _onCovered, Action _onClose,
+                     bool _browse = false)
     {
         // 직전 표시의 안무를 걷는다 — 시퀀스에 중첩된 트윈은 대상의 DOKill이 잡지 못해 새 안무와 같은 노드를 함께 민다.
         KillChoreo();
@@ -283,7 +289,7 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
 
         // 티어명은 **옛 이름으로 서 있다가** 한 박에 갈린다(굴리지 않고 드러낸다).
         if (this.tierNameText != null) this.tierNameText.text = this.m_fromName;
-        if (this.titleText != null) this.titleText.text = TitleOf(_kind);
+        if (this.titleText != null) this.titleText.text = TitleOf(_kind, _browse);
         if (this.gradeNameText != null) this.gradeNameText.text = _to.Grade.ToString().ToUpperInvariant();
 
         this.m_toGrade = _to.Grade;
@@ -875,9 +881,11 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
     }
 
     // 갈래별 문구. 비어 있으면 프리팹 저작 문구를 그대로 둔다 — 빈 문자열로 지우면 화면에서 제목이 사라진다.
-    string TitleOf(EPromoteKind _kind)
+    string TitleOf(EPromoteKind _kind, bool _browse)
     {
-        string t_title = _kind == EPromoteKind.GradeUp ? this.titleGradeUp : this.titleFirstEntry;
+        string t_title = _browse
+                             ? this.titleBrowse
+                             : _kind == EPromoteKind.GradeUp ? this.titleGradeUp : this.titleFirstEntry;
 
         if (!string.IsNullOrEmpty(t_title)) return t_title;
 
