@@ -1,1 +1,0 @@
-bones=6 vertices=2401 duration=2.4 loopError=0 motion=0.5752144 weightError=2.980232E-08 frames=48 flippedTriangles=795 maxSkinError=0.0351105 visibleFlips=0
