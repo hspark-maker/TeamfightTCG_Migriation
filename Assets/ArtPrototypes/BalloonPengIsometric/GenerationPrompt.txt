@@ -1,0 +1,10 @@
+Built-in image_gen / style-transfer
+Reference 1: Assets/Assets/Images/Cards/Stage1/Image_Card_BalloonPeng_Stage1.png
+Reference 2: C:/Users/cookapps/Desktop/KakaoTalk_20260907_183159629.jpg
+
+Use case: style-transfer. Asset type: isolated transparent 2D isometric game character sprite, suitable for subtle bone-rigged idle animation.
+Input image 1 is the CHARACTER IDENTITY: BalloonPeng, a very round blue penguin with a white heart-shaped face and big white belly, small orange beak and feet, rosy cheeks, light cyan scarf with a knot and two tails, two pale blue head feathers. Preserve these recognizable features.
+Input image 2 is the VIEW AND GRAPHIC STYLE reference only: small top-down three-quarter game unit, dark confident outline, cute squat proportions, simple bright cel shading, clean readable shapes. Do not copy its red creature identity or background.
+Draw ONE full-body BalloonPeng, at a genuine overhead three-quarter/isometric camera view looking down about 35 degrees, facing diagonally toward the lower-left of the image. The top of head and upper surfaces of feet must be visible and the face foreshortened, not a frontal portrait. Like a small cozy strategy game unit seen on a board.
+Simplify to crisp 2D hand-painted/cel-shaded game art with dark navy outlines and just 2-3 shading tones, readable at 96 pixels. Round body, cheerful open beak, both small wings slightly clear of body so they can sway, both tiny feet resting close together. Head feathers rise a little and flow right. Scarf knot and short tails visible on the near/right side. Calm relaxed standing idle pose. No attack, no action lines.
+Composition: centered full character occupies about 78% of a square canvas, balanced padding, every extremity fully visible. TRUE transparent alpha background, no ground, no shadow, no colored backdrop, no checkerboard drawn into pixels, no text, no panels, no multiple views, no extra objects.

@@ -351,6 +351,9 @@ public class CardView : MonoBehaviour
 
         // 뒷면이면 덱 뒷면 그림으로 갈아 끼운다 — 앞면 일러스트가 남아 있으면 뒷면 그림 밖으로 비친다.
         Sprite t_art = CardVisualRules.PickBattleArt(_card);
+        // 프레임 교체는 SetFaceDownLook보다 **먼저** 한다 — 뒷면 일러스트 배율을 테두리 높이에서 재기 때문에
+        // 순서가 뒤집히면 한 프레임 동안 옛 테두리 크기로 계산된다.
+        ApplyFrame(_card.cardId);
         SetFaceDownLook(t_isFaceDown, t_art);
         SetShieldVisible(!t_isFaceDown && _card.hasShield);
         // 불사 대기 표식: **아직 안 쓴 부활이 있을 때만**. 진실원은 reviveUsed 하나다.
@@ -369,6 +372,25 @@ public class CardView : MonoBehaviour
     Vector3 illustrationBaseScale = Vector3.one;   // 앞면 복귀용. Awake에서 1회 캡처.
     bool    illustrationScaleCached;
     bool    missingCardBackWarned;
+
+    SpriteRenderer frameRenderer;
+    bool           frameRendererSearched;
+
+    /// <summary>등급 × 시너지 개수에 맞는 테두리로 갈아 끼운다(표는 CardFrameConfig 하나).
+    /// 못 고르면 프리팹에 저작된 테두리를 그대로 둔다 — 표가 없는 씬에서 테두리가 사라지지 않게.</summary>
+    void ApplyFrame(int _cardId)
+    {
+        if (!this.frameRendererSearched)
+        {
+            this.frameRendererSearched = true;
+            this.frameRenderer = this.frameRoot != null ? this.frameRoot.GetComponent<SpriteRenderer>() : null;
+        }
+
+        if (this.frameRenderer == null) return;
+
+        Sprite t_frame = CardVisualRules.PickFrame(_cardId);
+        if (t_frame != null) this.frameRenderer.sprite = t_frame;
+    }
 
     /// <summary>뒷면/앞면 겉모습 전환. 뒷면이면 테두리·정보를 숨기고 일러스트를 덱 뒷면 그림으로 바꾼다.
     ///

@@ -170,9 +170,9 @@ MonoBehaviour:
   currencyLook: {fileID: 11400000, guid: b9d217f7eca0f6345ae5bd3b654b4a37, type: 2}
   adventureConfig: {fileID: 11400000, guid: ff32166a7a94716469f68bae386a7555, type: 2}
   profileConfig: {fileID: 11400000, guid: 098146b7940589948afb63e709ac5357, type: 2}
+  emoteCatalog: {fileID: 11400000, guid: 0c1e5b7a94d3f2149a86c5d0e7b31f68, type: 2}
   deckImageCatalog: {fileID: 11400000, guid: 20a3ae6097a4cb440ad35c4621cec66e, type: 2}
   rouletteConfig: {fileID: 11400000, guid: c79a047159501ef46a7e47fcabb63abf, type: 2}
-  emoteCatalog: {fileID: 11400000, guid: 0c1e5b7a94d3f2149a86c5d0e7b31f68, type: 2}
 --- !u!114 &1581884920793774147
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -534,6 +534,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   keywordIconConfig: {fileID: 11400000, guid: 2e0475eb8d64d1449916d99de758135a, type: 2}
+  cardFrameConfig: {fileID: 11400000, guid: ed4cd9df9407f0a4e97ba1a9c52f5890, type: 2}
 --- !u!1 &8415867346927682444
 GameObject:
   m_ObjectHideFlags: 0

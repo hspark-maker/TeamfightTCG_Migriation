@@ -1,0 +1,1 @@
+rigidParts=5 skinning=0 scaleCurves=0 duration=1.2 loopPosition=0 loopRotation=0 frames=48

@@ -58,6 +58,20 @@ public static class CardVisualRules
     public static Sprite PickBattleArt(CardInstance _card)
         => _card == null ? null : PickCardArt(_card.cardId, _card.evolutionStage);
 
+    /// <summary>카드 한 장에 그릴 테두리(프레임). 등급 × 시너지 개수로 갈리며 표는 CardFrameConfig 하나다.
+    /// 표가 없거나(초기화 프리팹을 거치지 않은 씬) 그 칸이 비면 null — 호출부는 프리팹 저작 그림을 그대로 둔다.</summary>
+    public static Sprite PickFrame(int _cardId)
+    {
+        if (_cardId <= 0) return null;
+        if (!CardCatalog.TryGetSpec(_cardId, out CardSpec t_spec)) return null;
+
+        CardFrameConfig t_config = DataLibrary.instance != null ? DataLibrary.instance.cardFrameConfig : null;
+        if (t_config == null) return null;
+
+        int t_synergies = t_spec.SynergyNames != null ? t_spec.SynergyNames.Count : 0;
+        return t_config.TryGetFrame(t_spec.Grade, t_synergies, out Sprite t_frame) ? t_frame : null;
+    }
+
     /// <summary>표시할 키워드 아이콘 1개 = (어떤 키워드, 어떤 스프라이트).
     /// 인게임·아웃게임 둘 다 스프라이트를 쓰고, 키워드는 어느 칸이 무엇인지 가리는 식별자다.
     /// 두 값이 항상 짝이라 병렬 리스트 대신 한 덩어리로 돌려준다.</summary>

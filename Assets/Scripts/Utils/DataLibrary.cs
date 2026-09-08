@@ -9,6 +9,9 @@ public class DataLibrary : MonoBehaviour
 
     [SerializeField] public KeywordIconConfig keywordIconConfig;
 
+    // 카드 테두리 표(등급 × 시너지 개수). 미배선이면 프레임은 프리팹 저작 그림 그대로 남는다.
+    [SerializeField] public CardFrameConfig   cardFrameConfig;
+
     public void Awake()
     {
         InitializeSingleton();
