@@ -139,12 +139,6 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: f1b37da6ebdd20e48954602bec574405
-    m_Address: SettingsPanel
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - UIPrefab
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f66336ab30b21e64c8eef4b3efd7f862
     m_Address: PooledCardElement
     m_ReadOnly: 0

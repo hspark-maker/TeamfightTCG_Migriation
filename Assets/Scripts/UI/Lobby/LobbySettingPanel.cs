@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>로비 프로필 버튼이 처음 여는 판. 프로필 요약을 보여 주고 갈래를 고르게 한다 —
-/// 편집(<see cref="ProfileEditPanel"/>)·설정(<see cref="SettingsPanel"/>)으로 나가는 길이 여기 모인다.
+/// 프로필 편집(<see cref="ProfileEditPanel"/>) 진입과 환경설정을 함께 제공한다.
 ///
 /// <para>예전에는 프로필 버튼이 편집 팝업을 곧바로 열었다. 그 자리에 이 판을 끼운 것이라
 /// 편집으로 가는 길은 사라지지 않고 여기 버튼 하나로 옮겨 왔다.</para>
@@ -13,9 +13,6 @@ public class LobbySettingPanel : PooledUIBase
 {
     [Tooltip("프로필 편집으로 가는 버튼. 미배선이면 그 길만 없다 — 판은 그대로 뜬다.")]
     [SerializeField] Button editButton;
-
-    [Tooltip("설정 화면으로 가는 버튼.")]
-    [SerializeField] Button settingButton;
 
     [Tooltip("닫기 버튼.")]
     [SerializeField] Button closeButton;
@@ -45,7 +42,6 @@ public class LobbySettingPanel : PooledUIBase
         // 인스펙터로 걸지 않는 이유는 LobbyProfileButton과 같다 — 가리킬 대상이 풀에서 세워지는 화면이라
         // 저작 시점에는 존재하지 않는다.
         if (this.editButton    != null) this.editButton.onClick.AddListener(OpenProfileEdit);
-        if (this.settingButton != null) this.settingButton.onClick.AddListener(OpenSettings);
         if (this.closeButton   != null) this.closeButton.onClick.AddListener(Hide);
         if (this.dimButton     != null) this.dimButton.onClick.AddListener(Hide);
     }
@@ -53,7 +49,6 @@ public class LobbySettingPanel : PooledUIBase
     protected override void OnDestroy()
     {
         if (this.editButton    != null) this.editButton.onClick.RemoveListener(OpenProfileEdit);
-        if (this.settingButton != null) this.settingButton.onClick.RemoveListener(OpenSettings);
         if (this.closeButton   != null) this.closeButton.onClick.RemoveListener(Hide);
         if (this.dimButton     != null) this.dimButton.onClick.RemoveListener(Hide);
 
@@ -65,11 +60,5 @@ public class LobbySettingPanel : PooledUIBase
     {
         Hide();
         UIPoolManager.Instance?.AddOrUpdateUI<ProfileEditPanel>();
-    }
-
-    void OpenSettings()
-    {
-        Hide();
-        UIPoolManager.Instance?.AddOrUpdateUI<SettingsPanel>();
     }
 }
