@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -5,8 +6,7 @@ using UnityEngine.UI;
 
 // 프로필 편집 팝업(아바타·프레임·감정표현·닉네임). 풀(UIPoolManager)이 수명을 쥐고 로비 위에 덮인다.
 //
-// 즉시반영이 아니라 커밋 방식이다 — 고른 것은 드래프트(m_draft*)에만 남고 "저장"을 눌러야
-// ProfileManager.Apply로 넘어간다. 닫기는 확인 없이 드래프트를 버린다(세이브는 손대지 않으므로 안전).
+// 편집 중에는 드래프트만 바꾸고 저장·닫기·외부 숨김 시 ProfileManager.Apply로 한 번 확정한다.
 public class ProfileEditPanel : PooledUIBase
 {
     const int TAB_AVATAR = 0;
@@ -18,8 +18,11 @@ public class ProfileEditPanel : PooledUIBase
     public override void Show() => this.Open();
     public override void Hide()
     {
+        this.CancelEmoteDrag();
         // 풀 정리 등 외부 숨김에서는 호출 화면을 다시 열지 않는다.
         this.data = null;
+        this.isShow = false;
+        this.CommitSession();
         if (this.nicknameInput != null) this.nicknameInput.DeactivateInputField();
         this.SetVisible(false);
     }
@@ -30,6 +33,7 @@ public class ProfileEditPanel : PooledUIBase
     [SerializeField] TMP_InputField nicknameInput;
     [Tooltip("연필 버튼. 누르기 전까지 닉네임 입력은 라벨처럼 잠겨 있다.")]
     [SerializeField] Button pencilButton;
+    [SerializeField] TMP_Text nameValidationText;
 
     [Header("탭")]
     [SerializeField] TabButtonView avatarTab;
@@ -38,6 +42,8 @@ public class ProfileEditPanel : PooledUIBase
     [SerializeField] GameObject avatarPanel;
     [SerializeField] GameObject framePanel;
     [SerializeField] GameObject emotePanel;
+    [SerializeField] GameObject profileViewRoot;
+    [SerializeField] GameObject equippedEmotePanel;
 
     [Header("아바타·프레임 그리드")]
     [SerializeField] ScrollRect avatarScroll;
@@ -77,6 +83,16 @@ public class ProfileEditPanel : PooledUIBase
 
     // 칸 생성 여부. 목록은 런타임 불변이라 최초 1회만 만들고 이후엔 선택 표시만 갱신한다.
     bool m_built;
+    EmoteEditDragController m_emoteDrag;
+    int m_currentTab;
+    bool m_sessionOpen;
+    bool m_editingNickname;
+    int m_nameEditGeneration;
+    int m_lengthRejectedFrame = -1;
+
+    const string BLOCKED_NAME_MESSAGE = "사용할 수 없는 이름입니다";
+    const string EMPTY_NAME_MESSAGE = "닉네임을 입력해 주세요";
+    static readonly string LENGTH_MESSAGE = $"닉네임은 최대 {ProfileManager.NICKNAME_MAX_LENGTH}자입니다";
 
     // 임시 선택. 저장 전까지 ProfileManager에는 아무것도 넘어가지 않는다.
     string m_draftAvatarId;
@@ -88,12 +104,14 @@ public class ProfileEditPanel : PooledUIBase
     /// <summary>드래프트를 현재 프로필로 리셋하고 팝업을 띄운다.</summary>
     public void Open()
     {
+        if (this.m_sessionOpen) return;
         this.m_draftAvatarId = ProfileManager.AvatarId;
         this.m_draftFrameId = ProfileManager.FrameId;
         this.m_draftNickname = ProfileManager.Nickname;
         this.m_draftEmoteIds.Clear();
         for (int t_i = 0; t_i < ProfileManager.EmoteIds.Count; t_i++)
             this.m_draftEmoteIds.Add(ProfileManager.EmoteIds[t_i]);
+        while (this.m_draftEmoteIds.Count < EmoteCatalog.SLOT_COUNT) this.m_draftEmoteIds.Add(0);
         this.m_selectedEmoteSlot = 0;
 
         if (!this.m_built) this.Build();
@@ -103,13 +121,14 @@ public class ProfileEditPanel : PooledUIBase
         this.RefreshPreview();
         this.RefreshNicknameField();
         if (this.saveButton != null) this.saveButton.interactable = false;
+        this.m_sessionOpen = true;
         this.SetVisible(true);
     }
 
-    /// <summary>드래프트를 버리고 닫는다. 확인 팝업은 두지 않는다.</summary>
+    /// <summary>드래프트를 저장하고 닫은 뒤 호출 화면으로 복귀한다.</summary>
     public void Close()
     {
-        if (!this.isShow) return;
+        if (!this.m_sessionOpen) return;
         var t_onHide = this.data?.onHide;
         this.Hide();
         t_onHide?.Invoke();
@@ -130,7 +149,16 @@ public class ProfileEditPanel : PooledUIBase
 
         if (this.nicknameInput != null)
         {
-            this.nicknameInput.characterLimit = ProfileManager.NICKNAME_MAX_LENGTH;
+            // 기본 상한 대신 검증기로 제한해 초과 입력 시에도 안내한다.
+            this.nicknameInput.characterLimit = 0;
+            this.nicknameInput.onValidateInput -= this.ValidateNameCharacter;
+            this.nicknameInput.onValidateInput += this.ValidateNameCharacter;
+            this.nicknameInput.onSubmit.RemoveListener(this.EndNicknameEdit);
+            this.nicknameInput.onSubmit.AddListener(this.EndNicknameEdit);
+            this.nicknameInput.onEndEdit.RemoveListener(this.EndNicknameEdit);
+            this.nicknameInput.onEndEdit.AddListener(this.EndNicknameEdit);
+            this.nicknameInput.onDeselect.RemoveListener(this.EndNicknameEdit);
+            this.nicknameInput.onDeselect.AddListener(this.EndNicknameEdit);
             this.nicknameInput.onValueChanged.RemoveAllListeners();
             this.nicknameInput.onValueChanged.AddListener(this.OnNicknameChanged);
         }
@@ -138,11 +166,18 @@ public class ProfileEditPanel : PooledUIBase
 
     void OnDisable()
     {
+        this.CancelEmoteDrag();
         this.data = null;
+        this.isShow = false;
+        this.CommitSession();
         // 소프트키보드가 팝업 밖까지 살아남지 않게 — 팝업이 풀에서 꺼지는 경로는 Close를 거치지 않는다.
         if (this.nicknameInput != null)
         {
-            this.nicknameInput.onValueChanged.RemoveAllListeners();
+            this.nicknameInput.onValueChanged.RemoveListener(this.OnNicknameChanged);
+            this.nicknameInput.onValidateInput -= this.ValidateNameCharacter;
+            this.nicknameInput.onSubmit.RemoveListener(this.EndNicknameEdit);
+            this.nicknameInput.onEndEdit.RemoveListener(this.EndNicknameEdit);
+            this.nicknameInput.onDeselect.RemoveListener(this.EndNicknameEdit);
             this.nicknameInput.DeactivateInputField();
         }
 
@@ -154,6 +189,10 @@ public class ProfileEditPanel : PooledUIBase
     // 세 그리드를 한 번에 세운다. 설정이 아직 없으면(초기화 배선 전) 그 축만 조용히 비운다 — 씬이 죽지 않게.
     void Build()
     {
+        this.CancelEmoteDrag();
+        if (this.m_emoteDrag == null)
+            this.m_emoteDrag = this.GetComponent<EmoteEditDragController>() ?? this.gameObject.AddComponent<EmoteEditDragController>();
+        this.m_emoteDrag.Initialize((RectTransform)this.ResolveTarget().transform, this.m_equippedEmoteCells, this.OnEmoteDropped);
         this.m_avatarCells.Clear();
         this.m_frameCells.Clear();
         this.m_equippedEmoteCells.Clear();
@@ -235,6 +274,7 @@ public class ProfileEditPanel : PooledUIBase
     {
         if (_content == null || this.emoteCellPrefab == null) return null;
         EmoteItemCell t_cell = Instantiate(this.emoteCellPrefab, _content);
+        t_cell.ConfigureDrag(this.OnEmoteDragRequested);
         t_cell.gameObject.SetActive(true);
         return t_cell;
     }
@@ -278,47 +318,159 @@ public class ProfileEditPanel : PooledUIBase
     // 풀에서 골랐다 — 지금 고르는 자리에 끼운다.
     void OnEmoteClicked(int _id)
     {
-        EmoteCatalog t_catalog = ProfileManager.EmoteCatalog;
-        if (t_catalog == null || !t_catalog.TryGet(_id, out _)) return;
-        if (this.m_selectedEmoteSlot < 0 || this.m_selectedEmoteSlot >= this.m_draftEmoteIds.Count) return;
+        this.AssignEmote(this.m_selectedEmoteSlot, _id);
+    }
 
-        this.m_draftEmoteIds[this.m_selectedEmoteSlot] = _id;
+    void AssignEmote(int _slot, int _id)
+    {
+        EmoteCatalog t_catalog = ProfileManager.EmoteCatalog;
+        if (t_catalog == null || !t_catalog.TryGet(_id, out _) || !ProfileManager.IsEmoteOwned(_id)) return;
+        if (_slot < 0 || _slot >= this.m_draftEmoteIds.Count) return;
+
+        int t_existing = this.m_draftEmoteIds.IndexOf(_id);
+        if (t_existing >= 0) this.m_draftEmoteIds[t_existing] = this.m_draftEmoteIds[_slot];
+        this.m_draftEmoteIds[_slot] = _id;
+        this.m_selectedEmoteSlot = _slot;
         this.RefreshEmotes();
         this.RefreshSaveButton();
     }
 
+    void OnEmoteDragRequested(EmoteItemCell _cell, UnityEngine.EventSystems.PointerEventData _pointer)
+    {
+        if (!this.m_sessionOpen || this.m_currentTab != TAB_EMOTE) return;
+        this.m_emoteDrag.Begin(_cell, _pointer, this.emoteScroll);
+    }
+
+    void OnEmoteDropped(int _slot, int _id, int _sourceSlot)
+    {
+        if (!this.m_sessionOpen || this.m_currentTab != TAB_EMOTE) return;
+        if (_sourceSlot >= 0 && (_sourceSlot >= this.m_draftEmoteIds.Count || this.m_draftEmoteIds[_sourceSlot] != _id)) return;
+        this.AssignEmote(_slot, _id);
+    }
+
+    void CancelEmoteDrag()
+    {
+        if (this.m_emoteDrag != null) this.m_emoteDrag.Cancel();
+        foreach (EmoteItemCell t_cell in this.m_equippedEmoteCells) if (t_cell != null) t_cell.CancelGesture();
+        foreach (EmoteItemCell t_cell in this.m_emoteCells) if (t_cell != null) t_cell.CancelGesture();
+    }
+
     void OnNicknameChanged(string _value)
     {
+        if (!this.m_sessionOpen) return;
+        if (_value.Length > ProfileManager.NICKNAME_MAX_LENGTH)
+        {
+            _value = _value.Substring(0, ProfileManager.NICKNAME_MAX_LENGTH);
+            this.nicknameInput.SetTextWithoutNotify(_value);
+            this.m_lengthRejectedFrame = Time.frameCount;
+            this.ShowNameValidation(LENGTH_MESSAGE);
+        }
         this.m_draftNickname = _value;
+        if (this.m_lengthRejectedFrame != Time.frameCount) this.RefreshNameValidation();
         this.RefreshSaveButton();
     }
 
-    // 연필을 누르기 전까지 입력칸은 라벨처럼 잠겨 있다 — 팝업을 열자마자 키보드가 올라오지 않게.
     void BeginNicknameEdit()
     {
-        if (this.nicknameInput == null) return;
+        if (!this.m_sessionOpen || this.nicknameInput == null || this.m_editingNickname) return;
+        this.m_editingNickname = true;
+        this.m_nameEditGeneration++;
+        this.ClearNameValidation();
         this.nicknameInput.interactable = true;
         this.nicknameInput.ActivateInputField();
     }
 
-    // 드래프트를 실제 프로필로 커밋한다. 영속·통지는 ProfileManager가 처리한다.
-    void Save()
+    void EndNicknameEdit(string _value)
     {
-        // 이름이 막히면 네 축을 통째로 보류하고 팝업을 열어 둔 채 안내한다 — 고른 아바타·감정표현을 잃지 않고
-        // 이름만 고쳐 다시 저장할 수 있게.
-        if (ProfileManager.IsNicknameBlocked(this.m_draftNickname))
+        if (!this.m_sessionOpen || !this.m_editingNickname) return;
+        // 기존 계정의 긴 이름을 편집 없이 확정하면 그대로 보존한다.
+        if (_value != this.m_draftNickname) this.OnNicknameChanged(_value);
+        this.m_editingNickname = false;
+        if (string.IsNullOrWhiteSpace(this.m_draftNickname) || ProfileManager.IsNicknameBlocked(this.m_draftNickname))
         {
-            NicknameRejectNotice.Show();
+            this.RefreshNameValidation();
+            this.ResumeNicknameEditAsync(this.m_nameEditGeneration).Forget();
             return;
         }
+        this.m_nameEditGeneration++;
+        this.LockNicknameInputAsync(this.m_nameEditGeneration).Forget();
+    }
 
-        ProfileManager.Apply(this.m_draftNickname, this.m_draftAvatarId, this.m_draftFrameId, this.m_draftEmoteIds);
-        this.Close();
+    async UniTaskVoid LockNicknameInputAsync(int _generation)
+    {
+        // OnDeselect 안에서 interactable을 내리면 선택 해제가 재진입한다.
+        // 현재 선택 전환이 끝난 뒤 잠그되, 그 사이 시작한 편집이나 종료한 세션은 건드리지 않는다.
+        await UniTask.NextFrame();
+        if (this == null || !this.isActiveAndEnabled || !this.m_sessionOpen ||
+            this.nicknameInput == null || this.m_editingNickname ||
+            _generation != this.m_nameEditGeneration) return;
+        this.nicknameInput.interactable = false;
+    }
+
+    async UniTaskVoid ResumeNicknameEditAsync(int _generation)
+    {
+        await UniTask.NextFrame();
+        if (this == null || !this.isActiveAndEnabled || !this.m_sessionOpen ||
+            this.nicknameInput == null || _generation != this.m_nameEditGeneration) return;
+        this.m_editingNickname = true;
+        this.nicknameInput.interactable = true;
+        this.nicknameInput.ActivateInputField();
+    }
+
+    char ValidateNameCharacter(string _text, int _position, char _character)
+    {
+        if (_text.Length < ProfileManager.NICKNAME_MAX_LENGTH || _character == '\n' || _character == '\r')
+            return _character;
+        this.m_lengthRejectedFrame = Time.frameCount;
+        this.ShowNameValidation(LENGTH_MESSAGE);
+        return '\0';
+    }
+
+    void RefreshNameValidation()
+    {
+        if (string.IsNullOrWhiteSpace(this.m_draftNickname)) this.ShowNameValidation(EMPTY_NAME_MESSAGE);
+        else if (ProfileManager.IsNicknameBlocked(this.m_draftNickname)) this.ShowNameValidation(BLOCKED_NAME_MESSAGE);
+        else this.ClearNameValidation();
+    }
+
+    void ShowNameValidation(string _message)
+    {
+        if (this.nameValidationText == null) return;
+        this.nameValidationText.text = _message;
+        this.nameValidationText.gameObject.SetActive(true);
+    }
+
+    void ClearNameValidation()
+    {
+        this.m_lengthRejectedFrame = -1;
+        if (this.nameValidationText == null) return;
+        this.nameValidationText.text = string.Empty;
+        this.nameValidationText.gameObject.SetActive(false);
+    }
+
+    void Save() => this.Close();
+
+    // 모든 종료 경로가 이 문지기를 지난다. Apply 통지의 재진입 전에 세션을 닫는다.
+    void CommitSession()
+    {
+        if (!this.m_sessionOpen) return;
+        this.m_sessionOpen = false;
+        this.m_editingNickname = false;
+        this.m_nameEditGeneration++;
+        if (this.nicknameInput != null) this.m_draftNickname = this.nicknameInput.text;
+        string t_nickname = string.IsNullOrWhiteSpace(this.m_draftNickname)
+            || ProfileManager.IsNicknameBlocked(this.m_draftNickname)
+            ? ProfileManager.Nickname : this.m_draftNickname;
+        ProfileManager.Apply(t_nickname, this.m_draftAvatarId, this.m_draftFrameId, this.m_draftEmoteIds);
     }
 
     // 공용 탭 컨트롤러가 없어 여기서 직접 토글한다(DeckTabController와 같은 관용구).
     void SetTab(int _tab)
     {
+        this.CancelEmoteDrag();
+        this.m_currentTab = _tab;
+        if (this.profileViewRoot != null) this.profileViewRoot.SetActive(_tab != TAB_EMOTE);
+        if (this.equippedEmotePanel != null) this.equippedEmotePanel.SetActive(_tab == TAB_EMOTE);
         if (this.avatarPanel != null) this.avatarPanel.SetActive(_tab == TAB_AVATAR);
         if (this.framePanel != null) this.framePanel.SetActive(_tab == TAB_FRAME);
         if (this.emotePanel != null) this.emotePanel.SetActive(_tab == TAB_EMOTE);
@@ -361,7 +513,9 @@ public class ProfileEditPanel : PooledUIBase
         for (int t_i = 0; t_i < this.m_emoteCells.Count; t_i++)
         {
             EmoteItemCell t_cell = this.m_emoteCells[t_i];
-            if (t_cell != null) t_cell.SetSelected(t_cell.Key == t_selectedId);
+            if (t_cell == null) continue;
+            t_cell.SetSelected(t_cell.Key == t_selectedId);
+            t_cell.SetEquipped(this.m_draftEmoteIds.Contains(t_cell.Key));
         }
     }
 
@@ -375,6 +529,9 @@ public class ProfileEditPanel : PooledUIBase
 
     void RefreshNicknameField()
     {
+        this.m_editingNickname = false;
+        this.m_nameEditGeneration++;
+        this.ClearNameValidation();
         if (this.nicknameInput == null) return;
         this.nicknameInput.SetTextWithoutNotify(this.m_draftNickname);   // 세팅이 onValueChanged로 되튀지 않게
         this.nicknameInput.interactable = false;                          // 연필을 누르기 전까지는 라벨

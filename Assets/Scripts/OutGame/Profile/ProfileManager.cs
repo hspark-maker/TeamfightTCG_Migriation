@@ -173,19 +173,32 @@ public static class ProfileManager
 
     static bool IsKnownFrame(string _id) => Config != null && Config.TryGetFrame(_id, out _);
 
-    // 길이를 SLOT_COUNT로 고정한다 — 못 알아볼 칸을 걸러내며 압축하면 뒤 칸이 당겨져 슬롯이 밀리고,
-    // 짧아진 목록은 편집 화면이 뒤쪽 칸을 아예 못 고르게 만든다. 못 알아볼 칸은 같은 자리 기본값 → 0.
+    // 유효한 첫 등장과 슬롯 위치를 먼저 보존한다. 그 뒤 빈 칸만 풀의 미사용 ID로 채워야
+    // 앞쪽의 누락 칸이 뒤쪽에 저장된 ID를 먼저 가져가 순서를 바꾸는 일이 없다.
     static List<int> BuildLoadout(IReadOnlyList<int> _source)
     {
-        List<int> t_defaults = EmoteCatalog != null ? EmoteCatalog.DefaultLoadout() : new List<int>();
         var t_result = new List<int>(global::EmoteCatalog.SLOT_COUNT);
+        var t_used = new HashSet<int>();
 
         for (int t_i = 0; t_i < global::EmoteCatalog.SLOT_COUNT; t_i++)
         {
             int t_id = _source != null && t_i < _source.Count ? _source[t_i] : 0;
-            if (EmoteCatalog == null || !EmoteCatalog.TryGet(t_id, out _))
-                t_id = t_i < t_defaults.Count ? t_defaults[t_i] : 0;
+            if (EmoteCatalog == null || !EmoteCatalog.TryGet(t_id, out _) || !t_used.Add(t_id))
+                t_id = 0;
             t_result.Add(t_id);
+        }
+
+        int t_poolIndex = 0;
+        for (int t_i = 0; t_i < t_result.Count; t_i++)
+        {
+            if (t_result[t_i] != 0) continue;
+            while (EmoteCatalog != null && t_poolIndex < EmoteCatalog.Count)
+            {
+                EmoteEntry t_entry = EmoteCatalog.PoolAt(t_poolIndex++);
+                if (t_entry == null || t_entry.id <= 0 || !t_used.Add(t_entry.id)) continue;
+                t_result[t_i] = t_entry.id;
+                break;
+            }
         }
         return t_result;
     }
