@@ -187,7 +187,7 @@ public class FeatureLockView : MonoBehaviour
         if (t_parent == null)
         {
             this.m_badgeMissing = true;
-            Debug.LogWarning($"[FeatureLockView] '{name}'이 RectTransform이 아니라 자물쇠를 얹을 자리가 없습니다.");
+            Debug.LogWarning($"[FeatureLockView] '{name}' is not a RectTransform, so there is nowhere to put the lock.");
             return;
         }
 
@@ -195,7 +195,7 @@ public class FeatureLockView : MonoBehaviour
         if (t_prefab == null)
         {
             this.m_badgeMissing = true;
-            Debug.LogWarning($"[FeatureLockView] 동기 UI 카탈로그 자물쇠 미배선 — '{name}'의 자물쇠를 그리지 못합니다(잠김은 흑백으로만 보입니다).");
+            Debug.LogWarning($"[FeatureLockView] The sync UI catalog lock is unwired — the lock for '{name}' cannot be drawn (locked state only appears greyed out).");
             return;
         }
 

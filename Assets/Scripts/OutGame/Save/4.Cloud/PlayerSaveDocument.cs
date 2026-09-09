@@ -134,7 +134,7 @@ static class PlayerSaveDocument
         catch (Exception t_exception)
         {
             // 못 읽으면 고칠 대상인지도 알 수 없다 — 여기서 참을 돌려 왕복을 늘리지 않는다.
-            Debug.LogWarning($"[PlayerSaveDocument] 슬롯 개명 판정 실패: {t_exception.GetBaseException().Message}");
+            Debug.LogWarning($"[PlayerSaveDocument] Slot rename detection failed: {t_exception.GetBaseException().Message}");
 
             return false;
         }

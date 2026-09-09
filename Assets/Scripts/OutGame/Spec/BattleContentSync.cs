@@ -93,7 +93,7 @@ public static class BattleContentSync
         try
         {
             string t_envId = s_context.EnvId;
-            Debug.Log($"[BattleContent] 게이트 시작 env={t_envId} 모드={t_mode} content-major={ContentVersion.Major}");
+            Debug.Log($"[BattleContent] Gate start env={t_envId} mode={t_mode} content-major={ContentVersion.Major}");
 
             // 목록에서 빠진 표는 채택이 통째로 버린다. 대조 로그로는 드러나지 않으므로 여기서 먼저 짚는다.
             SpecPayloadCodec.WarnUncoveredTables(SpecSource.Manager);
@@ -103,7 +103,7 @@ public static class BattleContentSync
             var t_localTables = new List<SpecTablePayload>();
             if (SpecSource.Manager == null)
             {
-                Debug.Log($"[BattleContent] 로컬 스냅샷 없음({SpecSource.LastErrorCode ?? "-"}) — 전 표를 서버에서 받는다");
+                Debug.Log($"[BattleContent] No local snapshot ({SpecSource.LastErrorCode ?? "-"}) — downloading every table from the server");
             }
             else
             {
@@ -111,7 +111,7 @@ public static class BattleContentSync
                 {
                     if (!SpecPayloadCodec.TryBuildLocalTable(SpecSource.Manager, t_tableName, out SpecTablePayload t_table, out string t_error))
                     {
-                        Debug.LogError($"[BattleContent] 로컬 스냅샷 생성 실패 table={t_tableName}: {t_error}");
+                        Debug.LogError($"[BattleContent] Local snapshot creation failed table={t_tableName}: {t_error}");
                         return Verdict(EBattleContentGateResult.Blocked, $"로컬 표 '{t_tableName}' 생성 실패");
                     }
                     t_localTables.Add(t_table);
@@ -122,7 +122,7 @@ public static class BattleContentSync
             var t_localLog = new StringBuilder();
             foreach (SpecTablePayload t_table in t_localTables)
                 t_localLog.Append($"\n  {t_table.Table,-16} rows={t_table.Rows.Count,-5} hash={t_table.PayloadHash}");
-            Debug.Log($"[BattleContent] 로컬 스냅샷 지문={t_localFingerprint} 전투지문={SpecSource.BattleFingerprint}{t_localLog}");
+            Debug.Log($"[BattleContent] Local snapshot fingerprint={t_localFingerprint} battleFingerprint={SpecSource.BattleFingerprint}{t_localLog}");
 
             bool t_noLocalSnapshot = t_localTables.Count == 0;
             // 스냅샷이 없으면 TTL 로 서버 조회를 건너뛰면 안 된다 — 건너뛰는 순간 스펙 없이 진행된다.
@@ -155,7 +155,7 @@ public static class BattleContentSync
             string t_previousVersion = t_hadPreviousVersion
                 ? ContentVersion.Format(t_previousMajor, t_previousMinor)
                 : string.Empty;
-            Debug.Log($"[BattleContent] 서버 콘텐츠={t_remote.VersionText} source={(t_remote.FromIndex ? "index" : "legacy-meta")}");
+            Debug.Log($"[BattleContent] Server content={t_remote.VersionText} source={(t_remote.FromIndex ? "index" : "legacy-meta")}");
 
             int t_mismatch = 0;
             var t_compare = new StringBuilder();
@@ -167,7 +167,7 @@ public static class BattleContentSync
                 string t_remoteText = t_found ? t_remoteHash : "(없음)";
                 t_compare.Append($"\n  {t_table.Table,-16} 로컬={t_table.PayloadHash} 서버={t_remoteText,-16} {(t_match ? "일치" : "불일치")}");
             }
-            Debug.Log($"[BattleContent] 스냅샷 대조 env={t_envId} 불일치 {t_mismatch}/{t_localTables.Count}{t_compare}");
+            Debug.Log($"[BattleContent] Snapshot cross-check env={t_envId} mismatches {t_mismatch}/{t_localTables.Count}{t_compare}");
 
             // 로컬이 아예 없으면 대조할 것도 없다 — 불일치 0으로 읽혀 "서버와 동일" 로 빠지면 스펙 없이 진행된다.
             if (t_noLocalSnapshot) t_mismatch = SpecPayloadCodec.TableNames.Length;
@@ -182,7 +182,7 @@ public static class BattleContentSync
                 return Verdict(EBattleContentGateResult.Current, "서버와 동일 — 그대로 전투 진입");
             }
 
-            Debug.Log($"[BattleContent] 불일치 {t_mismatch}건 — 불일치 표만 내려받기 시작");
+            Debug.Log($"[BattleContent] {t_mismatch} mismatch(es) — starting to download only the mismatched tables");
             Task<string> t_downloadTask = DownloadSnapshotAsync(t_envId, t_remote, t_localTables);
             if (await Task.WhenAny(t_downloadTask, Task.Delay(FirebaseTimeouts.TransactionMilliseconds, _ct)) != t_downloadTask)
             {
@@ -211,7 +211,7 @@ public static class BattleContentSync
                 t_remote.NoticeId, t_remote.NoticeTitle, t_remote.NoticeBody);
 
             s_adoptedFingerprint = t_fingerprint;
-            Debug.Log($"[BattleContent] 캐시 교체 완료 지문 {t_localFingerprint} -> {t_fingerprint} ({t_payload.Length:N0}자)");
+            Debug.Log($"[BattleContent] Cache swap done fingerprint {t_localFingerprint} -> {t_fingerprint} ({t_payload.Length:N0} chars)");
             return Verdict(EBattleContentGateResult.UpdatedRestartRequired, "새 스냅샷 캐시 완료 — 재시작 후 적용");
         }
         catch (ContentUpdateRequiredException t_exception)
@@ -249,7 +249,7 @@ public static class BattleContentSync
                 throw new InvalidOperationException(
                     $"내려받은 스냅샷을 채택하지 못했다({SpecSource.LastErrorCode ?? "-"}): 기대={t_expected} " +
                     $"실제={SpecSource.Fingerprint} 원본={SpecSource.Origin} 사유={SpecSource.LastErrorDetail ?? "-"}");
-            Debug.Log($"[BattleContent] 초기화 중 새 콘텐츠 스냅샷 채택 완료 지문={t_expected}");
+            Debug.Log($"[BattleContent] Adopted a new content snapshot during initialization, fingerprint={t_expected}");
             return;
         }
 
@@ -313,7 +313,7 @@ public static class BattleContentSync
         foreach (SpecTablePayload t_table in t_tables)
             t_log.Append($"\n  {t_table.Table,-16} rows={t_table.Rows.Count,-5} hash={t_table.PayloadHash} " +
                          $"{(t_stale.Contains(t_table.Table) ? "수신" : "로컬재사용")}");
-        Debug.Log($"[BattleContent] 스냅샷 구성 env={_envId} 수신 {t_stale.Count}/{t_tables.Length}표{t_log}");
+        Debug.Log($"[BattleContent] Snapshot composed env={_envId} received {t_stale.Count}/{t_tables.Length} table(s){t_log}");
 
         return SpecPayloadCodec.BuildManagerJson(t_tables);
     }
@@ -418,8 +418,8 @@ public static class BattleContentSync
         TimeSpan t_elapsed = DateTime.UtcNow - s_lateTaskStartedUtc;
         if (t_elapsed >= LateTaskGrace)
         {
-            Debug.LogWarning($"[BattleContent] 직전 조회가 {(int)t_elapsed.TotalSeconds}초째 응답 없음 — " +
-                             "버려진 것으로 보고 새로 조회한다.");
+            Debug.LogWarning($"[BattleContent] The previous query has had no response for {(int)t_elapsed.TotalSeconds}s — " +
+                             "treating it as abandoned and querying again.");
             s_lateTask = null;
             return false;
         }

@@ -69,25 +69,32 @@ internal static class RewardClaimCommand
                 new { env = ContentProfileConfig.Active.CloudEnvId, ownerType = _ownerType, ownerId = _ownerId },
                 _pending);
 
-            Debug.Log($"[RewardClaimCommand] {_ownerType}/{_ownerId} 수령 — {Describe(t_result)}");
-            return new RewardClaimOutcome(ToGains(t_result, _ownerType, _ownerId));
+            if (_ownerType == OwnerRank && t_result?.RankProgress != null)
+                RankManager.AdoptServerProgress(
+                    t_result.RankProgress.Points,
+                    t_result.RankProgress.SeasonId,
+                    t_result.RankProgress.BestTierIndex,
+                    t_result.RankProgress.ClaimedTierIndexes);
+
+            Debug.Log($"[RewardClaimCommand] {_ownerType}/{_ownerId} claimed — {Describe(t_result)}");
+            return new RewardClaimOutcome(ToGains(t_result, _ownerType, _ownerId), RewardItemDisplay.ToDrawn(t_result?.Cards));
         }
         catch (ServerCommandRejectedException t_rejected)
         {
             // 사전검사를 통과했는데 여기 왔다면 클라 스펙 캐시와 서버 표가 갈렸거나, 다른 기기가 먼저 받은 것이다.
-            Debug.LogWarning($"[RewardClaimCommand] {_ownerType}/{_ownerId} 를 서버가 거절했다 — {t_rejected.Message}");
+            Debug.LogWarning($"[RewardClaimCommand] The server rejected {_ownerType}/{_ownerId} — {t_rejected.Message}");
             OnRejected?.Invoke();
             return default;
         }
         catch (ServerAdoptionException t_adoption)
         {
             // 세션은 이미 접혔고 팝업은 CloudSyncStatusWatcher 담당이다 — 여기서 표면을 두 번 칠하지 않는다.
-            Debug.LogWarning($"[RewardClaimCommand] 응답 채택이 세션을 접었다 — {t_adoption.Message}");
+            Debug.LogWarning($"[RewardClaimCommand] Adopting the response closed the session — {t_adoption.Message}");
             return default;
         }
         catch (System.Exception t_exception)
         {
-            Debug.LogError($"[RewardClaimCommand] {COMMAND_NAME} 실패 — {t_exception.GetBaseException().Message}");
+            Debug.LogError($"[RewardClaimCommand] {COMMAND_NAME} failed — {t_exception.GetBaseException().Message}");
             return default;
         }
         finally
@@ -112,7 +119,7 @@ internal static class RewardClaimCommand
 
             if (!CurrencyCode.TryParse(t_line.Currency, out ECurrencyType t_type))
             {
-                Debug.LogWarning($"[RewardClaimCommand] {_ownerType}/{_ownerId}: 알 수 없는 재화 '{t_line.Currency}' 를 건너뛴다.");
+                Debug.LogWarning($"[RewardClaimCommand] {_ownerType}/{_ownerId}: skipping unknown currency '{t_line.Currency}'.");
                 continue;
             }
 

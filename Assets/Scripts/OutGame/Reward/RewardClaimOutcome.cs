@@ -11,10 +11,12 @@ public readonly struct RewardClaimOutcome
 
     /// <summary>지급 목록. 성사돼도 비어 있을 수 있다(보상 미저작 정점처럼 지급 0건인 수령).</summary>
     public readonly IReadOnlyList<CurrencyGain> Granted;
+    public readonly IReadOnlyList<DrawnCard> Cards;
 
-    public RewardClaimOutcome(IReadOnlyList<CurrencyGain> _granted)
+    public RewardClaimOutcome(IReadOnlyList<CurrencyGain> _granted, IReadOnlyList<DrawnCard> _cards = null)
     {
         Succeeded = true;
         Granted = _granted;
+        Cards = _cards;
     }
 }

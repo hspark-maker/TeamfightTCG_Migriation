@@ -57,11 +57,18 @@ function resolveTierIndex(points, grades) {
 }
 function divisionFloor(points, grades) {
     const tier = resolveTierIndex(points, grades);
-    const grade = grades[Math.floor(tier / 4)];
-    return grade == null ? 0 : grade.entryPoints + (tier % 4) * grade.pointsPerDivision;
+    const grade = grades[Math.floor(tier / exports.DIVISIONS_PER_GRADE)];
+    return grade == null ? 0 :
+        grade.entryPoints + (tier % exports.DIVISIONS_PER_GRADE) * grade.pointsPerDivision;
+}
+function gradeFloor(points, grades) {
+    if (grades.length === 0 || points < grades[0].entryPoints)
+        return 0;
+    const tier = resolveTierIndex(points, grades);
+    return grades[Math.floor(tier / exports.DIVISIONS_PER_GRADE)]?.entryPoints ?? 0;
 }
 function gradeCeiling(points, grades) {
-    const nextGrade = Math.floor(resolveTierIndex(points, grades) / 4) + 1;
+    const nextGrade = Math.floor(resolveTierIndex(points, grades) / exports.DIVISIONS_PER_GRADE) + 1;
     return nextGrade < grades.length ? grades[nextGrade].entryPoints : null;
 }
 /**
@@ -91,7 +98,7 @@ function computeRankPayout(before, won, grades) {
         after = won ? ceiling : floor + Math.trunc((ceiling - floor) / 2);
     }
     else {
-        const floor = before >= grades[0].entryPoints ? divisionFloor(before, grades) : 0;
+        const floor = gradeFloor(before, grades);
         const max = ceiling == null ? Number.MAX_SAFE_INTEGER : ceiling - 1;
         // C# RankConfig의 winPoints/losePoints는 등급별이 아니라 전역 한 쌍이다.
         const delta = won ? grades[0].winPoints : -grades[0].losePoints;

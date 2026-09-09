@@ -12,7 +12,7 @@ using UnityEngine.UI;
 /// <para><b>시즌·곡선·보상을 이 화면이 들고 있지 않는다.</b> 전부 서버 <c>getPass</c> 응답이고
 /// 레벨 판정도 서버 값이다. 화면이 사본을 두면 밸런스 수정이 앱 배포에 묶인다.</para>
 ///
-/// <para>열 때 조회를 던지되 기다리지 않는다 — 캐시로 즉시 그리고
+/// <para>게임 시작 때 미리 받은 캐시로 즉시 그리고
 /// <see cref="PassManager.OnChanged"/> 가 오면 다시 그린다.</para>
 /// </summary>
 public class PassPanel : PooledUIBase
@@ -70,6 +70,7 @@ public class PassPanel : PooledUIBase
 
     // 지금 깔린 행이 어느 시즌·곡선으로 만들어졌는지. 시즌이 바뀌면 다시 깐다.
     string m_builtSignature;
+    bool m_claiming;
 
     // 씬 버튼 UnityEvent 가 인자 없는 이 시그니처에 바인딩된다 — 매개변수를 붙이면 배선이 끊긴다.
     public void Open()
@@ -77,9 +78,11 @@ public class PassPanel : PooledUIBase
         this.SetVisible(true);
         this.Rebuild();
 
-        // 캐시가 있으면 그것으로 먼저 그리고, 조회는 던져만 둔다. 시즌 경계가 지났을 수 있어
-        // 열 때마다 한 번은 새로 묻는다 — 미션과 달리 초기화 선조회가 없다.
-        PassCommands.RefreshAsync().Forget();
+        // 선조회 실패·진행도 변경·시즌 경계만 재조회한다. 시즌 판정은 서버 응답을 따른다.
+        if (PassCommands.NeedsRefresh || !PassManager.HasSeason ||
+            (PassManager.Season.EndAtMs > 0L &&
+             PassManager.Season.EndAtMs <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()))
+            PassCommands.RefreshAsync().Forget();
     }
 
     public void Close() => this.SetVisible(false);
@@ -243,18 +246,36 @@ public class PassPanel : PooledUIBase
 
     async UniTaskVoid ClaimAsync(int _level)
     {
+        if (this.m_claiming) return;
+        this.m_claiming = true;
+        ClaimPassRewardResult t_result = null;
+        try
+        {
+            string t_selected = null;
+            foreach (var t_level in PassManager.Levels)
+            {
+                if (t_level.Level != _level || t_level.Items == null) continue;
+                if (!t_level.Items.Exists(t_item => t_item.RewardType == "PackChoice")) break;
+                t_selected = await RewardPackChoice.ChooseAsync(PassManager.PackChoices);
+                if (string.IsNullOrEmpty(t_selected)) return;
+                break;
+            }
         // 왕복 동안 입력을 막는다. 딤·스피너는 임계 뒤에만 뜨므로 빠른 응답에서는 깜빡이지 않는다.
         ServerWaitOverlay.Hold(this);
         try
         {
             // 낙관 갱신하지 않는다 — 응답의 진행 상태를 PassCommands 가 채택하고 OnChanged 가 화면을 갱신한다.
-            await PassCommands.ClaimAsync(_level);
+            t_result = await PassCommands.ClaimAsync(_level, t_selected);
         }
         finally
         {
             // **팝업보다 먼저 걷는다.** 순서를 뒤집으면 안내가 대기 딤에 묻힌다.
             ServerWaitOverlay.Release(this);
         }
+        if (t_result?.Cards != null && t_result.Cards.Count > 0 && CardSetRewardOverlay.TryGet(out var t_cards))
+            t_cards.ShowGranted(RewardItemDisplay.ToDrawn(t_result.Cards));
+        }
+        finally { this.m_claiming = false; }
     }
 
     // 여는 순간 오버레이 자신을 켠다 — 저작본은 루트가 꺼진 채로 들어오므로, 켜 주지 않으면

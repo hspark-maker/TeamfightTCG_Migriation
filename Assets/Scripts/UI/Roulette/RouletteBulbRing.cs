@@ -35,7 +35,7 @@ public class RouletteBulbRing : MonoBehaviour
 
         // 켜짐·꺼짐 그림이 없으면 마퀴가 화면에 아무 변화를 못 낸다 — 조용히 죽지 않게 드러낸다.
         if (this.onSprite == null || this.offSprite == null)
-            Debug.LogError($"[RouletteBulbRing] 전구 그림이 미배선이라 연출이 보이지 않는다 — on {this.onSprite} / off {this.offSprite}", this);
+            Debug.LogError($"[RouletteBulbRing] The bulb sprites are unwired, so the presentation is invisible — on {this.onSprite} / off {this.offSprite}", this);
     }
 
     void OnDisable()

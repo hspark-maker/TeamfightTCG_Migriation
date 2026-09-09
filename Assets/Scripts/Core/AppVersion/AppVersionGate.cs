@@ -128,7 +128,7 @@ public static class AppVersionGate
         if (!s_currentParsed)
         {
             // 여기서 막으면 bundleVersion 오저작 빌드가 통째로 못 켜진다. 안내를 포기하는 쪽을 고른다.
-            Debug.LogWarning($"[AppVersionGate] 앱 버전 '{Application.version}' 을 읽지 못해 버전 통지를 건너뜁니다.");
+            Debug.LogWarning($"[AppVersionGate] Could not read the app version '{Application.version}', so the version notice is skipped.");
             return;
         }
 
@@ -146,7 +146,7 @@ public static class AppVersionGate
         catch (Exception t_exception)
         {
             // 통지를 못 읽은 것은 초기화 실패가 아니다. 로그만 남기고 게임을 연다.
-            Debug.LogWarning($"[AppVersionGate] 버전 정책을 읽지 못했습니다: {t_exception.GetBaseException().Message}");
+            Debug.LogWarning($"[AppVersionGate] Failed to read the version policy: {t_exception.GetBaseException().Message}");
         }
     }
 
@@ -170,7 +170,7 @@ public static class AppVersionGate
             _ct.ThrowIfCancellationRequested();
             if (t_wait.ElapsedMilliseconds >= FirebaseTimeouts.AuthAndReadMilliseconds)
             {
-                Debug.LogWarning("[AppVersionGate] Firebase 모듈이 서지 않아 버전 통지를 건너뜁니다.");
+                Debug.LogWarning("[AppVersionGate] The Firebase module is not up, so the version notice is skipped.");
                 return null;
             }
             await Task.Delay(50, _ct);
@@ -186,7 +186,7 @@ public static class AppVersionGate
         if (!t_snapshot.Exists)
         {
             // 문서가 없는 것은 "정책 미저작"이지 오류가 아니다. 첫 배포 전 상태가 이렇다.
-            Debug.Log($"[AppVersionGate] 버전 정책 문서가 없습니다({t_path}). 통지 없이 진행합니다.");
+            Debug.Log($"[AppVersionGate] There is no version policy document ({t_path}). Proceeding without a notice.");
             return null;
         }
 
@@ -207,7 +207,7 @@ public static class AppVersionGate
                 ? t_blockedLatest.ToString()
                 : string.Empty;
             Action = EAppVersionAction.Blocked;
-            Debug.LogWarning($"[AppVersionGate] 지원이 끝난 버전입니다: 현재={s_current} 최소={t_min}");
+            Debug.LogWarning($"[AppVersionGate] This version is no longer supported: current={s_current} min={t_min}");
             return;
         }
 
@@ -215,7 +215,7 @@ public static class AppVersionGate
         {
             s_latestText = t_latest.ToString();
             Action = EAppVersionAction.Recommended;
-            Debug.Log($"[AppVersionGate] 새 버전이 있습니다: 현재={s_current} 최신={t_latest}");
+            Debug.Log($"[AppVersionGate] A new version is available: current={s_current} latest={t_latest}");
             return;
         }
 
@@ -244,7 +244,7 @@ public static class AppVersionGate
         if (AppSemVer.TryParse(t_text, out _version)) return true;
 
         // 저작 오류로 차단이 걸리는 것보다, 걸리지 않는 쪽이 안전하다.
-        Debug.LogWarning($"[AppVersionGate] 버전 정책의 '{_key}' 값 '{t_text}' 을 읽지 못했습니다. 이 축은 무시합니다.");
+        Debug.LogWarning($"[AppVersionGate] Could not read the version policy value '{_key}' = '{t_text}'. This axis is ignored.");
         return false;
     }
 

@@ -51,7 +51,7 @@ public static class TutorialStepExecutor
         }
 
         // 저작 실수라 정책을 물을 자리가 아니다 — 시퀀스가 이 칸에 걸리지 않게 넘긴다.
-        Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} 알 수 없는 액션({(int)_step.Action}) — 건너뜁니다.");
+        Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} unknown action ({(int)_step.Action}) — skipping.");
         _context.CommitAdvance();
         _context.CompleteIfLast();
         return EOutgameTutorialStepResult.Advanced;
@@ -66,7 +66,7 @@ public static class TutorialStepExecutor
         bool t_halt = _step != null && _step.OnFailure == EOutgameTutorialFailure.Halt;
 
         Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} {_reason} — "
-                       + (t_halt ? "여기서 멈춥니다(기능 잠금 해제)." : "건너뛰고 진행합니다."));
+                       + (t_halt ? "stopping here (feature lock released)." : "skipping and continuing."));
 
         if (t_halt)
         {
@@ -133,7 +133,7 @@ public static class TutorialStepExecutor
     {
         // 이미 닫혀 있으면 걷을 것이 없다(유저가 먼저 나갔거나 다른 화면에서 재생된 경우) — 실패가 아니라 정상 통과다.
         if (!DeckEditController.TryRequestExitOpen())
-            Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} 덱 편집이 열려 있지 않아 닫기를 생략합니다.");
+            Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} deck edit is not open, so the close is skipped.");
 
         _context.CommitAdvance();
         _context.CompleteIfLast();
@@ -145,7 +145,7 @@ public static class TutorialStepExecutor
     {
         // 실패로 치지 않는다 — 시나리오가 비어도 전투는 그대로 열린다(대본이 없을 뿐인 "저하된 성공").
         if (_step.Scenario == null)
-            Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} BattleEntry에 시나리오가 미배선 — 일반 전투로 진입합니다.");
+            Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} BattleEntry has no scenario wired — entering a normal battle.");
 
         TutorialConfig.Begin(_step.Scenario, _step.ShowDeckGate);
         return EOutgameTutorialStepResult.Gated;
@@ -157,7 +157,7 @@ public static class TutorialStepExecutor
         _context.CompleteIfLast();
 
         if (_step.Scenario == null)
-            Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} AutoBattle에 시나리오가 미배선 — 일반 전투로 진입합니다.");
+            Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} AutoBattle has no scenario wired — entering a normal battle.");
 
         TutorialConfig.Begin(_step.Scenario, _step.ShowDeckGate);
         SceneManager.LoadScene(BattleScene);
@@ -195,7 +195,7 @@ public static class TutorialStepExecutor
         if (t_opened == null)
         {
             // 안내는 PackPurchaseFlow가 이미 띄웠다 — 좌표는 이미 전진해 되돌리지 못한다.
-            Debug.LogError($"[TutorialStepExecutor] {_where} 자동 구매 왕복 실패(pack={t_packId}) — 이미 전진해 되돌리지 못한다.");
+            Debug.LogError($"[TutorialStepExecutor] {_where} auto-purchase round trip failed (pack={t_packId}) — it already moved forward and cannot be rolled back.");
 
             // 되감을 구매 스텝이 없는 갈래라, 오지 않을 개봉 신호를 기다리는 칸에 갇혀 스스로 풀 수 없다.
             // 망 오류 한 번에 초기화 3회(SameCoordInitCount)를 거듭하게 두지 않으려고 여기서 문을 연다(멱등).
@@ -207,7 +207,7 @@ public static class TutorialStepExecutor
 
         // 열지 못해도 결제는 이미 나갔다 — 연출만 생략하고 전진한다(실패 정책을 묻는 자리가 아니다).
         if (!PackOpenOverlay.TryOpen())
-            Debug.LogWarning($"[TutorialStepExecutor] {_where} 개봉 오버레이 열기 실패(pack={t_packId}) — 구매는 유지, 개봉 연출만 생략.");
+            Debug.LogWarning($"[TutorialStepExecutor] {_where} failed to open the reveal overlay (pack={t_packId}) — the purchase stands, only the reveal presentation is skipped.");
     }
 
     static EOutgameTutorialStepResult EnterDeckGrant(TutorialStepDef _step, OutgameTutorialStepContext _context)
@@ -230,7 +230,7 @@ public static class TutorialStepExecutor
             DeckSaveManager.TryInsertFront(t_cards, _step.DeckName, DeckImages.PickRandomKey(), out t_index))
             DeckSaveManager.TrySelectSlot(t_index);
         else
-            Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} 덱 삽입 실패 — 목록이 가득 찼거나 세이브 미로드(DeckSaveManager 로그 확인).");
+            Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} deck insertion failed — the list is full or the save is not loaded (check the DeckSaveManager log).");
 
         RequestGrant(GrantPackIdOf(_step, Where(_context)));
 
@@ -281,7 +281,7 @@ public static class TutorialStepExecutor
         // 기다리는 스텝을 놓아준다. 이 신호가 없으면 올 리 없는 연출을 기다리며 영영 멈춘다.
         LobbyGainEffectDirector.NotifySkipped();
 
-        Debug.LogWarning("[TutorialStepExecutor] 획득 연출을 재생하지 못해 카드 비행을 생략합니다(지급 요청은 보냈다).");
+        Debug.LogWarning("[TutorialStepExecutor] Could not play the gain presentation, so the card flight is skipped (the grant request was still sent).");
         return false;
     }
 
@@ -333,7 +333,7 @@ public static class TutorialStepExecutor
         CardPackRewardHandoff.TryConsume(null, out _);
         LobbyGainEffectDirector.NotifySkipped();
 
-        Debug.LogWarning("[TutorialStepExecutor] 획득 연출을 재생하지 못해 카드 비행을 생략합니다(지급 요청은 보냈다).");
+        Debug.LogWarning("[TutorialStepExecutor] Could not play the gain presentation, so the card flight is skipped (the grant request was still sent).");
     }
 
     // 팩이 도착했음을 알리는 자리. 지급도 구매도 하지 않는다 —
@@ -375,7 +375,7 @@ public static class TutorialStepExecutor
         // 기다리는 스텝을 놓아준다. 이 신호가 없으면 올 리 없는 연출을 기다리며 영영 멈춘다.
         LobbyGainEffectDirector.NotifySkipped();
 
-        Debug.LogWarning("[TutorialStepExecutor] 팩 비행을 재생하지 못해 생략합니다(안내는 계속 진행).");
+        Debug.LogWarning("[TutorialStepExecutor] Could not play the pack flight, so it is skipped (the guide keeps going).");
     }
 
     // FailAfterGrant와 같은 규약 — 소유 보장은 서버 이관 후 best-effort 다.
@@ -404,7 +404,7 @@ public static class TutorialStepExecutor
         string t_packId = _step.PackId;
 
         if (string.IsNullOrEmpty(t_packId))
-            Debug.LogError($"[TutorialStepExecutor] {_where} {_step.Action}에 지급 팩이 미배선 — 지급 요청을 보내지 않습니다(스텝 저작의 pack 확인).");
+            Debug.LogError($"[TutorialStepExecutor] {_where} {_step.Action} has no grant pack wired — no grant request is sent (check the pack field in the step authoring).");
 
         return t_packId;
     }

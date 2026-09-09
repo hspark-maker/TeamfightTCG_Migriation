@@ -70,7 +70,7 @@ public static class AIDeckSpec
         {
             // 래치하지 않는다 — 여기서 굳으면 카탈로그가 선 뒤에도 같은 스냅샷인 한 다시 조립하지 않아
             // 그 세션 내내 AI 덱이 빈 채로 남는다. 순서가 어긋난 호출은 조립을 미루고 다음 호출에 맡긴다.
-            Debug.LogError("[AIDeckSpec] CardCatalog보다 먼저 AIDeck 조립을 요청했다 — 조립을 미룬다.");
+            Debug.LogError("[AIDeckSpec] AIDeck assembly was requested before CardCatalog — deferring assembly.");
             return;
         }
         s_loaded = true;

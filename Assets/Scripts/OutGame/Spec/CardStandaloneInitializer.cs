@@ -19,7 +19,7 @@ public static class CardStandaloneInitializer
 #endif
         if (_synergyRegistry == null)
         {
-            Debug.LogError("[CardStandaloneInitializer] SynergyRegistry가 없다.");
+            Debug.LogError("[CardStandaloneInitializer] There is no SynergyRegistry.");
             return false;
         }
 

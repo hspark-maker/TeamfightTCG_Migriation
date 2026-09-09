@@ -59,7 +59,7 @@ public class AlbumTabController : LobbyTabPanel
         if (t_session == null)
         {
             // 위장이 남으면 그 카드가 도감에서 영영 빈 칸이다 — 연출을 못 하면 그냥 꽂는다
-            Debug.LogError("[AlbumTabController] AlbumInsertSession을 찾지 못해 삽입 연출을 건너뛴다.", this);
+            Debug.LogError("[AlbumTabController] Could not find AlbumInsertSession, so the insert presentation is skipped.", this);
             AlbumInsertQueue.Clear();
             AlbumInsertMask.Clear();
             return;
@@ -144,7 +144,7 @@ public class AlbumTabController : LobbyTabPanel
 
         // 배선 누락은 예외 없이 "0셀"로만 나타나 원인 추적이 어렵다 → 조용히 끝내지 않는다
         if (galleryContent == null || cellTemplate == null || pageOverlay == null)
-            Debug.LogError($"[AlbumTabController] 배선 누락 — galleryContent={galleryContent}, cellTemplate={cellTemplate}, pageOverlay={pageOverlay}.", this);
+            Debug.LogError($"[AlbumTabController] Wiring missing — galleryContent={galleryContent}, cellTemplate={cellTemplate}, pageOverlay={pageOverlay}.", this);
 
         if (galleryContent == null || cellTemplate == null) return;
 
@@ -266,7 +266,7 @@ public class AlbumTabController : LobbyTabPanel
         var t_view = _theme.CellPrefab.GetComponent<AlbumThemeCellView>();
         if (t_view != null) return t_view;
 
-        Debug.LogError($"[AlbumTabController] 테마 '{_theme.Key}'의 cellPrefab '{_theme.CellPrefab.name}'에 AlbumThemeCellView가 없다 — 기본 셀로 대체한다.", this);
+        Debug.LogError($"[AlbumTabController] cellPrefab '{_theme.CellPrefab.name}' of theme '{_theme.Key}' has no AlbumThemeCellView — falling back to the default cell.", this);
         return cellTemplate;
     }
 
@@ -286,7 +286,7 @@ public class AlbumTabController : LobbyTabPanel
         if (_rewards.Count > rewardSlots.Length && !m_overflowWarned)
         {
             m_overflowWarned = true;
-            Debug.LogWarning($"[AlbumTabController] 앨범 보상 {_rewards.Count}건이 슬롯 {rewardSlots.Length}칸을 초과 — 앞칸만 표시한다.", this);
+            Debug.LogWarning($"[AlbumTabController] {_rewards.Count} album reward(s) exceed the {rewardSlots.Length} slot(s) — showing only the leading ones.", this);
         }
     }
 

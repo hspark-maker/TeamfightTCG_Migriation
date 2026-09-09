@@ -147,8 +147,8 @@ public sealed class FirebaseAuthService
             this.LastError = string.Empty;
             SetState(EFirebaseAuthState.SignedIn);
             Debug.Log(_createAccount
-                ? $"[FirebaseAuth] 이메일 계정을 새로 만들었습니다(uid={this.UserId})."
-                : $"[FirebaseAuth] 이메일 계정으로 로그인했습니다(uid={this.UserId}).");
+                ? $"[FirebaseAuth] Created a new email account (uid={this.UserId})."
+                : $"[FirebaseAuth] Signed in with an email account (uid={this.UserId}).");
             return true;
         }
         catch (Exception _exception)
@@ -187,8 +187,8 @@ public sealed class FirebaseAuthService
         LocalPrefs.SetString(UidPrefsKeyPrefix + AbandonedOnSignInKey, t_current.UserId);
         LocalPrefs.Save();
         Debug.LogWarning(
-            $"[FirebaseAuth] 이메일 로그인을 위해 익명 계정 {t_current.UserId} 를 버린다 — 다시 로그인할 수 없다. " +
-            $"기록 위치 LocalPrefs[{UidPrefsKeyPrefix}{AbandonedOnSignInKey}].");
+            $"[FirebaseAuth] Abandoning anonymous account {t_current.UserId} in order to sign in with email — it can never be signed into again. " +
+            $"Recorded at LocalPrefs[{UidPrefsKeyPrefix}{AbandonedOnSignInKey}].");
     }
 
     /// <summary>SDK 코드를 사람이 고칠 수 있는 문장으로 바꾼다.
@@ -245,7 +245,7 @@ public sealed class FirebaseAuthService
         if (this.changingAnonymousAccount) return false;
         if (ContentProfileConfig.Active.RunMode != EContentRunMode.Test)
         {
-            UnityEngine.Debug.LogWarning("[FirebaseAuth] 새 익명 계정 발급은 Test 런모드에서만 허용됩니다.");
+            UnityEngine.Debug.LogWarning("[FirebaseAuth] Issuing a new anonymous account is allowed only in the Test run mode.");
             return false;
         }
 
@@ -280,7 +280,7 @@ public sealed class FirebaseAuthService
             this.LastError = string.Empty;
             this.suppressAuthStateChanges = false;
             SetState(EFirebaseAuthState.SignedIn);
-            UnityEngine.Debug.Log($"[FirebaseAuth] 새 테스트 익명 계정으로 로그인했습니다(uid={this.UserId}).");
+            UnityEngine.Debug.Log($"[FirebaseAuth] Signed in with a new test anonymous account (uid={this.UserId}).");
             return true;
         }
         catch (Exception _exception)
@@ -303,12 +303,12 @@ public sealed class FirebaseAuthService
         if (this.changingAnonymousAccount) return false;
         if (string.IsNullOrWhiteSpace(_accountId))
         {
-            UnityEngine.Debug.LogWarning("[FirebaseAuth] 테스트 계정 id가 비어 있습니다.");
+            UnityEngine.Debug.LogWarning("[FirebaseAuth] The test account id is empty.");
             return false;
         }
         if (ContentProfileConfig.Active.RunMode != EContentRunMode.Test)
         {
-            UnityEngine.Debug.LogWarning("[FirebaseAuth] 테스트 계정 로그인은 Test 런모드에서만 허용됩니다.");
+            UnityEngine.Debug.LogWarning("[FirebaseAuth] Test account sign-in is allowed only in the Test run mode.");
             return false;
         }
 
@@ -344,7 +344,7 @@ public sealed class FirebaseAuthService
             this.UserId = t_user.UserId;
             this.LastError = string.Empty;
             SetState(EFirebaseAuthState.SignedIn);
-            UnityEngine.Debug.Log($"[FirebaseAuth] 테스트 계정 '{_accountId}'로 로그인했습니다(uid={this.UserId}).");
+            UnityEngine.Debug.Log($"[FirebaseAuth] Signed in with test account '{_accountId}' (uid={this.UserId}).");
             return true;
         }
         catch (Exception _exception)
@@ -491,9 +491,9 @@ public sealed class FirebaseAuthService
             // 계정이 새로 생긴 순간이 곧 이전 진행도가 끊긴 순간이다. 초기화 경로는 uid를 어디에도 남기지
             // 않아, 이 두 줄이 없으면 콘솔의 익명 계정이 왜 늘었는지 사후에 가릴 방법이 없다.
             if (t_mintedAccount)
-                Debug.LogWarning($"[FirebaseAuth] 복원할 계정이 없어 새 익명 계정을 발급했습니다(uid={this.UserId}).");
+                Debug.LogWarning($"[FirebaseAuth] There was no account to restore, so a new anonymous account was issued (uid={this.UserId}).");
             else
-                Debug.Log($"[FirebaseAuth] 기기에 남은 익명 계정으로 복원했습니다(uid={this.UserId}).");
+                Debug.Log($"[FirebaseAuth] Restored the anonymous account left on this device (uid={this.UserId}).");
 
             SetState(EFirebaseAuthState.SignedIn);
         }

@@ -285,7 +285,7 @@ public static class DeckSaveManager
     {
         if (s_loaded && CardCatalog.IsReady) return true;
 
-        Debug.LogWarning("[DeckSaveManager] LoadFromSave 미경유 또는 카드 레지스트리 미주입 — 순서 변경 거부(메모리·세이브 어긋남 방지). 초기화 프리팹이 있는 씬에서 실행할 것.");
+        Debug.LogWarning("[DeckSaveManager] LoadFromSave was not passed through, or the card registry is not injected — reorder is refused (to keep memory and save from diverging). Run this in a scene that has the initialization prefab.");
         return false;
     }
 
@@ -296,7 +296,7 @@ public static class DeckSaveManager
     {
         if (!s_loaded)
         {
-            Debug.LogWarning("[DeckSaveManager] LoadFromSave 미경유 — 전량 저장 거부(세이브 덱 전체 소실 방지). 초기화 프리팹이 있는 씬에서 실행할 것.");
+            Debug.LogWarning("[DeckSaveManager] LoadFromSave was not passed through — a full save is refused (to avoid losing every saved deck). Run this in a scene that has the initialization prefab.");
             return;
         }
 
@@ -333,7 +333,7 @@ public static class DeckSaveManager
         {
             if (t_saved[t_i].CardIds.Count != DECK_SIZE || IsSlotValid(t_i)) continue;
 
-            Debug.LogWarning($"[DeckSaveManager] 슬롯 {t_i}의 카드 번호를 레지스트리에서 해석하지 못했다 — 압축·저장 보류(세이브 원본 보존). 카드 번호 변경·삭제를 확인할 것.");
+            Debug.LogWarning($"[DeckSaveManager] Could not resolve the card id in slot {t_i} through the registry — compaction and save are deferred (the save original is preserved). Check for changed or deleted card ids.");
             return false;
         }
 
@@ -371,7 +371,7 @@ public static class DeckSaveManager
         }
 
         if (t_dropped > 0)
-            Debug.LogWarning($"[DeckSaveManager] 유효 덱 {DECK_SIZE}장을 이루지 못한 슬롯 {t_dropped}개를 압축에서 제외했다.");
+            Debug.LogWarning($"[DeckSaveManager] Excluded {t_dropped} slot(s) from compaction because they did not form a valid {DECK_SIZE}-card deck.");
 
         return t_changed;
     }

@@ -36,7 +36,7 @@ public class PlayerTurn : TurnBase
                 }
                 else
                 {
-                    Debug.LogWarning("[Tutorial] 플레이어 스텝 소진 → 턴 스킵(hang 방지)");
+                    Debug.LogWarning("[Tutorial] Player steps exhausted → skipping the turn (hang guard)");
                     this.turnDone = true;
                     return;
                 }
@@ -143,7 +143,7 @@ public class PlayerTurn : TurnBase
         // 스텝은 소비하지 않는다 — 다음 정규 턴에서 forced 없이 재시도되어 자연 복구.
         if (_forced != null && !IsFreeStep(t_step) && t_step.attackerSlot != _forced.slotIndex)
         {
-            Debug.LogWarning($"[Tutorial] 재무장 스텝 attackerSlot({t_step.attackerSlot}) != 처형 공격자 슬롯({_forced.slotIndex}) → 턴 종료");
+            Debug.LogWarning($"[Tutorial] Rearm step attackerSlot({t_step.attackerSlot}) != execution attacker slot({_forced.slotIndex}) → ending the turn");
             return false;
         }
 

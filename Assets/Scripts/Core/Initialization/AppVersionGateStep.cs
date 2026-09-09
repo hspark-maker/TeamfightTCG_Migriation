@@ -19,7 +19,7 @@ public sealed class AppVersionGateStep : MainInitializer
     {
         if (bypassInTestMode && _context.Profile != null && _context.Profile.RunMode == EContentRunMode.Test)
         {
-            Debug.Log("[AppVersionGateStep] Test 런모드라 버전 대조를 건너뜁니다.");
+            Debug.Log("[AppVersionGateStep] Test run mode, so the version check is skipped.");
             return;
         }
 
@@ -35,7 +35,7 @@ public sealed class AppVersionGateStep : MainInitializer
         catch (Exception t_exception)
         {
             // EvaluateAsync 는 스스로 삼키지만, 그래도 여기서 초기화를 끊지 않는다는 것을 명시해 둔다.
-            Debug.LogWarning($"[AppVersionGateStep] 버전 대조에 실패해 통지 없이 진행합니다: {t_exception.Message}");
+            Debug.LogWarning($"[AppVersionGateStep] The version check failed, so it proceeds without a notice: {t_exception.Message}");
             return;
         }
 

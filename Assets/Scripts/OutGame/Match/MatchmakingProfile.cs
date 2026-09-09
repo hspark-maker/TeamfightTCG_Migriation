@@ -51,19 +51,26 @@ public readonly struct MatchmakingProfile
                 "getRankSnapshot", new { env = t_env });
             if (t_result == null || !RankManager.TryGetTier(t_result.TierIndex, out _))
             {
-                Debug.LogWarning("[Matchmaking] 서버 랭크 스냅샷이 비었거나 티어가 범위를 벗어났다 — 로컬 값으로 진행한다.");
+                Debug.LogWarning("[Matchmaking] The server rank snapshot is empty or its tier is out of range — proceeding with the local value.");
                 return t_local;
             }
 
+            if (!string.IsNullOrEmpty(t_result.SeasonId))
+                RankManager.AdoptServerProgress(
+                    t_result.Points,
+                    t_result.SeasonId,
+                    t_result.BestTierIndex,
+                    t_result.ClaimedTierIndexes);
+
             if (t_result.TierIndex != t_local.TierIndex)
-                Debug.Log($"[Matchmaking] 티어를 서버 값으로 맞춘다: 로컬 {t_local.TierIndex} → 서버 {t_result.TierIndex}");
+                Debug.Log($"[Matchmaking] Aligning the tier to the server value: local {t_local.TierIndex} → server {t_result.TierIndex}");
 
             return new MatchmakingProfile(t_local.Nickname, t_result.TierIndex,
                                           t_local.AvatarId, t_local.FrameId, t_result.Ticket);
         }
         catch (System.Exception t_exception)
         {
-            Debug.LogWarning($"[Matchmaking] 서버 랭크 스냅샷 실패 — 로컬 값으로 진행한다: {t_exception.Message}");
+            Debug.LogWarning($"[Matchmaking] Server rank snapshot failed — proceeding with the local value: {t_exception.Message}");
             return t_local;
         }
     }
@@ -82,7 +89,7 @@ public readonly struct MatchmakingProfile
 
         if (string.IsNullOrEmpty(_opponent.Ticket))
         {
-            Debug.LogWarning("[Matchmaking] 상대가 티켓을 보내지 않았다 — 랭크 표시를 비운다.");
+            Debug.LogWarning("[Matchmaking] The opponent did not send a ticket — clearing the rank display.");
             return Unranked(_opponent);
         }
 
@@ -92,19 +99,19 @@ public readonly struct MatchmakingProfile
                 "verifyMatchTicket", new { env = t_env, ticket = _opponent.Ticket });
             if (t_result == null || !t_result.Valid)
             {
-                Debug.LogWarning($"[Matchmaking] 상대 티켓 검증 실패({t_result?.Reason ?? "no-response"}) — 랭크 표시를 비운다.");
+                Debug.LogWarning($"[Matchmaking] Opponent ticket validation failed ({t_result?.Reason ?? "no-response"}) — clearing the rank display.");
                 return Unranked(_opponent);
             }
 
             if (t_result.TierIndex != _opponent.TierIndex)
-                Debug.LogWarning($"[Matchmaking] 상대 신고 티어({_opponent.TierIndex})와 서버 티켓({t_result.TierIndex})이 다르다 — 서버 값을 쓴다.");
+                Debug.LogWarning($"[Matchmaking] The opponent's reported tier ({_opponent.TierIndex}) differs from the server ticket ({t_result.TierIndex}) — using the server value.");
 
             return new MatchmakingProfile(_opponent.Nickname, t_result.TierIndex,
                                           _opponent.AvatarId, _opponent.FrameId, _opponent.Ticket);
         }
         catch (System.Exception t_exception)
         {
-            Debug.LogWarning($"[Matchmaking] 티켓 검증 호출 실패 — 랭크 표시를 비운다: {t_exception.Message}");
+            Debug.LogWarning($"[Matchmaking] The ticket validation call failed — clearing the rank display: {t_exception.Message}");
             return Unranked(_opponent);
         }
     }

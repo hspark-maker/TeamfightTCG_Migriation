@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 랭크(표시용 티어 진행도)의 static 단일 창구 — 티어는 points의 순수 파생이라 세이브엔 points만 둔다
@@ -8,11 +10,24 @@ public static class RankManager
 
     static RankConfig s_config;
     static bool s_configured;
+    static string s_seasonId = string.Empty;
+    static int s_bestTierIndex = -1;
+    static readonly HashSet<int> s_claimedTierIndexes = new HashSet<int>();
+    static bool s_hasServerProgress;
 
     public static bool IsConfigured => s_configured;
 
     // 현재 랭크 포인트
     public static long Points => Slot.Points;
+    public static string SeasonId => s_seasonId;
+    public static int BestTierIndex => s_hasServerProgress
+        ? s_bestTierIndex
+        : (IsRanked ? TierIndex : -1);
+
+    public static bool IsTierRewardClaimed(int _tierIndex)
+        => s_hasServerProgress
+            ? s_claimedTierIndexes.Contains(_tierIndex)
+            : Slot.ClaimedTiers.Contains(_tierIndex);
 
     /// <summary>첫 티어에 도달했는가. 튜토리얼 졸업 전(언랭크)과 브론즈 1을 가르는 유일한 판정 —
     /// 티어 인덱스는 미도달도 0으로 폴백하므로 인덱스로는 구분되지 않는다.</summary>
@@ -148,6 +163,7 @@ public static class RankManager
         long t_points = t_slot.Points;
 
         t_slot.Points = Config.FirstTierPoints;
+        s_bestTierIndex = Math.Max(s_bestTierIndex, Config.ResolveTierIndex(t_slot.Points));
         Save();
 
         _result = new RankApplyResult(
@@ -175,9 +191,10 @@ public static class RankManager
         if (!_tutorial && PromoPendingAt(t_points))
             return ApplyPromoResult(t_slot, t_points, t_index, _won);
 
-        // 단계 강등이 없다 — 바닥은 현재 단계 진입선(한 번 켠 별은 꺼지지 않는다).
+        // 같은 등급 안에서는 단계 강등이 있다 — 바닥은 현재 **등급** 진입선이라 등급은 내려가지 않는다.
+        // 서버 payout.ts 의 gradeFloor 와 같은 규칙이어야 한다(미리보기와 확정이 갈리면 안 된다).
         // 언랭크(첫 티어 미도달)만 0 — 언랭크는 "튜토리얼 중"이라는 뜻을 이미 갖고 있다.
-        long t_floor = IsRanked ? t_config.DivisionFloorPoints(t_points) : 0;
+        long t_floor = IsRanked ? t_config.GradeFloorPoints(t_points) : 0;
 
         // 일반 전투는 다음 등급 진입선 바로 아래에서 멈춘다 — 등급을 넘는 일은 승급전(위 분기) 한 판만 한다.
         // 최고 등급이면 GradeCeilingPoints가 long.MaxValue라 사실상 천장이 없다.
@@ -219,7 +236,7 @@ public static class RankManager
                 t_config.ResolveTierIndex(t_after), true, PromoPendingAt(t_after));
         }
 
-        long t_floorPoints = t_points >= t_config.FirstTierPoints ? t_config.DivisionFloorPoints(t_points) : 0;
+        long t_floorPoints = t_points >= t_config.FirstTierPoints ? t_config.GradeFloorPoints(t_points) : 0;
         long t_ceilingPoints = t_config.GradeCeilingPoints(t_points) - 1;
         if (_tutorial)
             t_ceilingPoints = Math.Min(t_ceilingPoints, Math.Max(t_config.FirstTierPoints - 1, t_points));
@@ -230,14 +247,20 @@ public static class RankManager
     }
 
     /// <summary>서버 payout 원장이 확정한 절대 포인트를 적용한다.</summary>
-    public static RankApplyResult ApplyServerPayout(long _before, long _after)
+    public static RankApplyResult ApplyServerPayout(
+        long _before, long _after, string _seasonId = null, int _bestTierIndex = -1,
+        IEnumerable<int> _claimedTierIndexes = null)
     {
         if (_before < 0 || _after < 0) throw new ArgumentOutOfRangeException();
         if (Slot.Points != _before)
-            Debug.LogWarning($"[Payout] 로컬 랭크 기준이 서버 원장과 다르다(local={Slot.Points}, server={_before}). 서버 값을 채택한다.");
+            Debug.LogWarning($"[Payout] The local rank baseline differs from the server ledger (local={Slot.Points}, server={_before}). Adopting the server value.");
 
         int t_beforeTier = Config.ResolveTierIndex(_before);
         Slot.Points = _after;
+        if (!string.IsNullOrEmpty(_seasonId))
+            AdoptServerProgressFields(_seasonId, _bestTierIndex, _claimedTierIndexes);
+        else
+            s_bestTierIndex = Math.Max(s_bestTierIndex, Config.ResolveTierIndex(_after));
         Save();
         return new RankApplyResult(_after - _before, t_beforeTier, Config.ResolveTierIndex(_after),
             PromoPendingAt(_before), PromoPendingAt(_after));
@@ -253,6 +276,7 @@ public static class RankManager
         if (!t_config.TryGetTier(t_target, out RankTier t_tier)) return t_config.ResolveTierIndex(Points);
 
         Slot.Points = t_tier.RequiredPoints;
+        s_bestTierIndex = Math.Max(s_bestTierIndex, t_target);
         Save();
 
         return t_config.ResolveTierIndex(Slot.Points);
@@ -291,6 +315,10 @@ public static class RankManager
     {
         s_config = null;
         s_configured = false;
+        s_seasonId = string.Empty;
+        s_bestTierIndex = -1;
+        s_claimedTierIndexes.Clear();
+        s_hasServerProgress = false;
         OnChanged = null;
     }
 
@@ -298,7 +326,70 @@ public static class RankManager
     public static void ResetForDebug()
     {
         Slot.Points = 0;
+        s_bestTierIndex = -1;
+        s_claimedTierIndexes.Clear();
         Save();
+    }
+
+    public static void ResetRewardClaimsForDebug()
+    {
+        Slot.ClaimedTiers.Clear();
+        s_claimedTierIndexes.Clear();
+        Save();
+    }
+
+    public static void AdoptServerProgress(
+        long _points, string _seasonId, int _bestTierIndex, IEnumerable<int> _claimedTierIndexes)
+    {
+        if (_points < 0 || string.IsNullOrEmpty(_seasonId))
+            throw new ArgumentOutOfRangeException(nameof(_points));
+
+        Slot.Points = _points;
+        AdoptServerProgressFields(_seasonId, _bestTierIndex, _claimedTierIndexes);
+        Save();
+    }
+
+    public static async UniTask RefreshServerProgressAsync()
+    {
+        string t_env = ContentProfileConfig.Active != null ? ContentProfileConfig.Active.CloudEnvId : null;
+        if (string.IsNullOrEmpty(t_env)) return;
+
+        try
+        {
+            RankSnapshotResult t_result = await ServerSaveCommands.InvokeReadOnlyAsync<RankSnapshotResult>(
+                "getRankSnapshot", new { env = t_env, issueTicket = false });
+            if (t_result == null || !TryGetTier(t_result.TierIndex, out _)) return;
+            if (!string.IsNullOrEmpty(t_result.SeasonId))
+                AdoptServerProgress(
+                    t_result.Points,
+                    t_result.SeasonId,
+                    t_result.BestTierIndex,
+                    t_result.ClaimedTierIndexes);
+        }
+        catch (Exception t_exception)
+        {
+            Debug.LogWarning($"[Rank] Server progress refresh failed: {t_exception.GetBaseException().Message}");
+        }
+    }
+
+    static void AdoptServerProgressFields(
+        string _seasonId, int _bestTierIndex, IEnumerable<int> _claimedTierIndexes)
+    {
+        bool t_seasonChanged = s_hasServerProgress && s_seasonId != _seasonId;
+        s_seasonId = _seasonId;
+        s_bestTierIndex = Math.Max(-1, _bestTierIndex);
+        if (t_seasonChanged || _claimedTierIndexes != null) s_claimedTierIndexes.Clear();
+        if (_claimedTierIndexes != null)
+        {
+            Slot.ClaimedTiers.Clear();
+            foreach (int t_tier in _claimedTierIndexes)
+            {
+                if (t_tier < 0 || t_tier >= Config.TierCount) continue;
+                s_claimedTierIndexes.Add(t_tier);
+                Slot.ClaimedTiers.Add(t_tier);
+            }
+        }
+        s_hasServerProgress = true;
     }
 
     /// <summary>승급전 한 판의 정산 — 승리는 다음 등급 진입선, 패배는 현 단계 절반으로 **스냅**한다.

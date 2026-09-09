@@ -1,0 +1,349 @@
+=== UIPoolManager Public Methods ===
+public T GetUI<T>() where T : PooledUIBase
+{
+    if (this.activeUIs.TryGetValue(typeof(T), out var t_ui))
+        return t_ui as T;
+    LogUtil.Log($"No Such UI {typeof(T).Name}");
+    return null;
+}
+
+public T ShowUI<T>() where T : PooledUIBase
+{
+    if (this.activeUIs.TryGetValue(typeof(T), out var t_ui))
+    {
+        t_ui.Show();
+        return t_ui as T;
+    }
+    LogUtil.Log($"No Such UI {typeof(T).Name}");
+    return null;
+}
+
+public T HideUI<T>() where T : PooledUIBase
+{
+    if (this.activeUIs.TryGetValue(typeof(T), out var t_ui))
+    {
+        t_ui.Hide();
+        return t_ui as T;
+    }
+    LogUtil.Log($"No Such UI {typeof(T).Name}");
+    return null;
+}
+
+public T AddOrUpdateUI<T>(UIData _data = null) where T : PooledUIBase
+{
+    if (this.activeUIs.TryGetValue(typeof(T), out var existingUI))
+    {
+        existingUI.transform.SetAsLastSibling();
+        existingUI.Initialization(_data);
+        existingUI.Show();
+        return existingUI as T;
+    }
+    GameObject uiPrefab = DataLibrary.instance.GetUI<T>();
+    if (uiPrefab == null)
+    {
+        Debug.LogError($"UI Prefab Not Exist: {typeof(T).Name}");
+        return null;
+    }
+    T uiInstance = Instantiate(uiPrefab, uiRoot).GetComponent<T>();
+    if (uiInstance == null)
+    {
+        Debug.LogError($"UI Component Not Exist: {typeof(T).Name}");
+        return null;
+    }
+    if (_data == null || _data.order == -1)
+        uiInstance.transform.SetAsLastSibling();
+    else
+        uiInstance.transform.SetSiblingIndex(_data.order);
+    this.activeUIs[typeof(T)] = uiInstance;
+    uiInstance.Initialization(_data);
+    uiInstance.Show();
+    return uiInstance;
+}
+
+=== UiPrefabCache (전체) ===
+public static class UiPrefabCache
+{
+    static readonly Dictionary<Type, GameObject> s_prefabs = new();
+    static AsyncOperationHandle<IList<GameObject>> s_handle;
+    static bool s_started;
+    static bool s_complete;
+    static bool s_failed;
+    static int s_generation;
+
+    public static bool IsComplete => s_complete;
+    public static bool HasFailed => s_failed;
+    public static float LoadProgress => s_complete ? 1f : s_handle.IsValid() ? s_handle.PercentComplete : 0f;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetRuntimeState() => Reset();
+
+    public static void ResetIfFailed()
+    {
+        if (!s_failed) return;
+        Reset();
+    }
+
+    static void Reset()
+    {
+        s_generation++;
+        if (s_handle.IsValid()) Addressables.Release(s_handle);
+        s_handle = default;
+        s_prefabs.Clear();
+        s_started = false;
+        s_complete = false;
+        s_failed = false;
+    }
+
+    public static async UniTask Preload()
+    {
+        if (s_started) return;
+        s_started = true;
+        int t_generation = s_generation;
+        try
+        {
+            AsyncOperationHandle<IList<GameObject>> t_handle =
+                Addressables.LoadAssetsAsync<GameObject>("UIPrefab", _prefab => Register(t_generation, _prefab));
+            s_handle = t_handle;
+            await t_handle.ToUniTask();
+            if (t_generation != s_generation) return;
+            if (t_handle.Status != AsyncOperationStatus.Succeeded)
+                throw new InvalidOperationException("UIPrefab Addressables load failed.");
+            s_complete = true;
+            LogUtil.Log("All Good");
+        }
+        catch (Exception t_exception)
+        {
+            if (t_generation != s_generation) return;
+            s_failed = true;
+            Debug.LogException(t_exception);
+        }
+    }
+
+    public static GameObject Get<T>() where T : PooledUIBase
+    {
+        if (s_prefabs.TryGetValue(typeof(T), out GameObject t_prefab)) return t_prefab;
+        LogUtil.Log($"UI Prefab Not Found: {typeof(T).Name}");
+        return null;
+    }
+
+    public static bool TryGet(Type _type, out GameObject _prefab)
+    {
+        _prefab = null;
+        return _type != null && s_prefabs.TryGetValue(_type, out _prefab) && _prefab != null;
+    }
+
+    static void Register(int _generation, GameObject _prefab)
+    {
+        if (_generation != s_generation) return;
+        Register(_prefab);
+    }
+
+    static void Register(GameObject _prefab)
+    {
+        Component t_ui = _prefab.GetComponent<PooledUIBase>();
+        if (t_ui == null) t_ui = _prefab.GetComponent<SingletonOverlayBase>();
+        if (t_ui == null) return;
+        Type t_type = t_ui.GetType();
+        if (s_prefabs.TryGetValue(t_type, out GameObject t_existing) && t_existing != _prefab)
+        {
+            Debug.LogError($"[UiPrefabCache] Duplicate UIPrefab type: {t_type.Name} ({t_existing.name}, {_prefab.name})");
+            return;
+        }
+        s_prefabs[t_type] = _prefab;
+    }
+}
+
+=== SyncUiPrefabCatalog (풀 T 로드 클래스) ===
+public sealed class SyncUiPrefabCatalog : ScriptableObject
+{
+    [SerializeField] GameObject sceneCurtain;
+    [SerializeField] GameObject lockBadge;
+    [SerializeField] GameObject loadingCover;
+    [SerializeField] GameObject matchmakingRoot;
+
+    public GameObject Get(ESyncUiPrefab _id)
+        => _id switch
+        {
+            ESyncUiPrefab.SceneCurtain => sceneCurtain,
+            ESyncUiPrefab.LockBadge => lockBadge,
+            ESyncUiPrefab.LoadingCover => loadingCover,
+            ESyncUiPrefab.MatchmakingRoot => matchmakingRoot,
+            _ => null,
+        };
+}
+
+public static class SyncUiPrefabs
+{
+    const string CatalogAddress = "SyncUiPrefabCatalog";
+    static SyncUiPrefabCatalog s_catalog;
+
+    public static void SetSource(SyncUiPrefabCatalog _catalog) => s_catalog = _catalog;
+
+    public static GameObject Get(ESyncUiPrefab _id)
+    {
+        if (s_catalog == null)
+            s_catalog = SyncAddressable.Load<SyncUiPrefabCatalog>(CatalogAddress);
+        GameObject t_prefab = s_catalog != null ? s_catalog.Get(_id) : null;
+        if (t_prefab == null)
+            Debug.LogError($"[SyncUiPrefabs] The {_id} prefab is not linked in the sync UI catalog.");
+        return t_prefab;
+    }
+}
+
+=== OpponentProfilePool (전체) + GUID ===
+[CreateAssetMenu(fileName = "OpponentProfilePool", menuName = "Card Battle/Opponent Profile Pool")]
+public class OpponentProfilePool : ScriptableObject
+{
+    public const string FALLBACK_NAME = "도전자";
+    public List<string> names = new List<string>();
+    public bool appendNumber = true;
+    public int numberMax = 999;
+    public List<Sprite> avatars = new List<Sprite>();
+
+    public string PickName()
+    {
+        string t_name = FALLBACK_NAME;
+        if (this.names != null && this.names.Count > 0)
+        {
+            string t_picked = this.names[Random.Range(0, this.names.Count)];
+            if (!string.IsNullOrWhiteSpace(t_picked)) t_name = t_picked;
+        }
+        if (!this.appendNumber || this.numberMax < 1) return t_name;
+        return $"{t_name}{Random.Range(1, this.numberMax + 1)}";
+    }
+
+    public Sprite PickAvatar()
+    {
+        if (this.avatars == null || this.avatars.Count == 0) return null;
+        return this.avatars[Random.Range(0, this.avatars.Count)];
+    }
+}
+// OpponentProfilePool.cs GUID: 4a405047569862b48950c17b1caa35c3
+// Asset path: Assets/SO/OpponentProfilePool.asset
+
+=== RankConfig ResolveTierIndex/TryGetTier/RankTier ===
+public int ResolveTierIndex(long _points)
+{
+    if (grades == null) return 0;
+    for (int t_g = grades.Count - 1; t_g >= 0; t_g--)
+    {
+        RankGradeConfig t_grade = grades[t_g];
+        if (t_grade == null) continue;
+        for (int t_d = DivisionsPerGrade - 1; t_d >= 0; t_d--)
+        {
+            if (t_grade.entryPoints + t_d * t_grade.pointsPerDivision <= _points)
+                return t_g * DivisionsPerGrade + t_d;
+        }
+    }
+    return 0;
+}
+
+public bool TryGetTier(int _index, out RankTier _tier)
+{
+    _tier = RankTier.None;
+    if (grades == null || _index < 0 || _index >= TierCount) return false;
+    RankGradeConfig t_grade = grades[_index / DivisionsPerGrade];
+    if (t_grade == null) return false;
+    int t_division = _index % DivisionsPerGrade + 1;
+    long t_step = t_division - 1;
+    _tier = new RankTier(
+        _index,
+        t_grade.grade,
+        t_division,
+        $"{t_grade.displayName} {t_division}",
+        t_grade.badge,
+        t_grade.entryPoints + t_step * t_grade.pointsPerDivision);
+    return true;
+}
+
+[Serializable]
+public class RankGradeConfig
+{
+    public ERankGrade grade;
+    public string displayName = "";
+    public Sprite badge;
+    public long entryPoints;
+    public long pointsPerDivision;
+}
+
+public readonly struct RankTier
+{
+    public static readonly RankTier None = new RankTier(0, ERankGrade.Bronze, 0, null, null, 0);
+    public readonly int Index;
+    public readonly ERankGrade Grade;
+    public readonly int Division;
+    public readonly string DisplayName;
+    public readonly Sprite Badge;
+    public readonly long RequiredPoints;
+
+    public RankTier(int _index, ERankGrade _grade, int _division, string _displayName, Sprite _badge, long _requiredPoints)
+    {
+        Index = _index;
+        Grade = _grade;
+        Division = _division;
+        DisplayName = _displayName != null ? _displayName : string.Empty;
+        Badge = _badge;
+        RequiredPoints = _requiredPoints;
+    }
+}
+
+=== RankManager.Config ===
+static RankConfig Config
+{
+    get
+    {
+        if (s_config != null) return s_config;
+        return RankGradeSpec.UninitializedConfig;
+    }
+}
+
+=== RankHud (첫 28줄) ===
+using System.Collections.Generic;
+using DG.Tweening;
+using TMPro;
+using UnityEngine;
+using UnityEngine.Serialization;
+using UnityEngine.UI;
+
+// 로비 랭크 표시(배지 = 등급, 별 = 단계 안 진행 — 한 칸이 1승이고 네 칸이 차면 다음 단계, 텍스트 = 티어명).
+// 랭크는 전투 씬에서만 변하므로 변경 이벤트 없이 표시 시점에 RankManager를 재조회한다.
+// 포인트 수치는 화면에 두지 않는다 — 증감은 배지 반응으로만 알린다(조립은 LobbyRankEffectDirector).
+public class RankHud : MonoBehaviour
+{
+    [SerializeField] Image badgeImage;   // 티어 배지
+    [SerializeField] TMP_Text descText;  // 티어 표시명("브론즈 1")
+
+    [Header("단계 별")]
+    [Tooltip("별을 묶는 노드(RankPips). 언랭크면 통째로 끈다 — 빈 별 네 칸은 '아직 아무것도 아님'을 알리는 데 방해만 된다.\n" +
+             "미배선이면 끄지 않고 빈 칸만 그린다.")]
+    [SerializeField] GameObject pipsRoot;
+
+    [Header("진행 게이지")]
+    [Tooltip("단계 안 진행을 그리는 게이지(RankProgressGauge 구현이면 무엇이든).\n" +
+             "별이 얼마나 찼는지도, 언제 꽉 차는지도 모두 이 게이지가 낸다 — 진행을 그리는 축은 이것 하나뿐이다.\n" +
+             "미배선이면 진행 표시 없이 배지·이름만 갱신된다.")]
+    [FormerlySerializedAs("arc")]
+    [SerializeField] RankProgressGauge gauge;
+
+    [Tooltip("조각이 꽂힌 프레임부터 게이지가 목표치까지 가는 시간. 전진은 한 번뿐이라 이 값이 곧 '차오르는 시간' 전부다.\n"
+
+=== Prefab GUIDs & Paths ===
+RankRewardOverlay.prefab
+  Path: Assets/Assets/Prefabs/UI/PooledUI/RankRewardOverlay.prefab
+  GUID: 8a64cbb246ea50344ac445bc7d85e0c7
+
+RankRewardRow.prefab
+  Path: Assets/Assets/Prefabs/UI/LobbyUI/RankUI/RankRewardRow.prefab
+  GUID: 3e73acab0ea34f04f8f10b0f6f843862
+
+=== RankHud Script GUID ===
+RankHud.cs GUID: [조회 필요]
+
+=== Note ===
+- UIPoolManager 호출: DataLibrary.instance.GetUI<T>() → UiPrefabCache.Get<T>()
+- UiPrefabCache: Addressables "UIPrefab" 라벨 로드, Type-GameObject 딕셔너리
+- SyncUiPrefabCatalog: SO 기반, ESyncUiPrefab enum으로 로드
+- OpponentProfilePool: 공개 names/avatars 필드, PickName/PickAvatar 메서드
+- RankConfig: ResolveTierIndex(points) → tierIndex, TryGetTier(index) → RankTier(DisplayName, Badge)
+- RankManager.Config: static RankConfig 게터, RankGradeSpec.UninitializedConfig 폴백
+- RankHud: 표시 전용, Button/Graphic 없음, badgeImage/descText/pipsRoot/gauge 필드만

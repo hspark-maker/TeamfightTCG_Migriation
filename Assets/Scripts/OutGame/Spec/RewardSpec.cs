@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public enum ERewardOwnerType { Album, Adventure, Rank, Battle }
-public enum ERewardType { Currency }
+public enum ERewardType { Currency, Card, Pack, PackChoice }
 
 /// <summary>
 /// Reward 표에 있지만 **클라가 색인하지 않는** 소유 영역. 서버만 소비하는 축이다.
@@ -18,7 +18,7 @@ public enum ERewardType { Currency }
 public static class ServerOwnedRewardOwners
 {
     // Pass 도 같은 성격이다 — 지급은 claimPassReward 가 하고, 화면 값은 getPass 응답의 levels[].reward 로 온다.
-    static readonly string[] NAMES = { "Mission", "Pass" };
+    static readonly string[] NAMES = { "Mission", "Pass", "Guide", "CardDuplicate" };
 
     public static bool Contains(string _ownerType)
     {
@@ -91,7 +91,7 @@ public static class RewardSpec
         _def = default;
         if (!CurrencyCode.TryParse(_currency, out ECurrencyType t_type))
         {
-            Debug.LogWarning($"[RewardSpec] {_where}: 알 수 없는 재화 '{_currency}' 행을 건너뜁니다.");
+            Debug.LogWarning($"[RewardSpec] {_where}: skipping a row with unknown currency '{_currency}'.");
             return false;
         }
         if (_amount <= 0) return false;
@@ -125,25 +125,34 @@ public static class RewardSpec
 
             if (!Enum.TryParse(t_row.ownerType, false, out ERewardOwnerType t_ownerType))
             {
-                Debug.LogWarning($"[RewardSpec] Reward id {t_row.id}: 알 수 없는 ownerType '{t_row.ownerType}' 행을 건너뜁니다.");
+                Debug.LogWarning($"[RewardSpec] Reward id {t_row.id}: skipping a row with unknown ownerType '{t_row.ownerType}'.");
                 continue;
             }
             if (!Enum.TryParse(t_row.rewardType, false, out ERewardType t_rewardType)
-                || t_rewardType != ERewardType.Currency)
+                || !Enum.IsDefined(typeof(ERewardType), t_rewardType))
             {
-                Debug.LogWarning($"[RewardSpec] Reward id {t_row.id}: 지원하지 않는 rewardType '{t_row.rewardType}' 행을 건너뜁니다.");
+                Debug.LogWarning($"[RewardSpec] Reward id {t_row.id}: skipping a row with unsupported rewardType '{t_row.rewardType}'.");
                 continue;
             }
 
             string t_orderKey = string.Concat(KeyOf(t_ownerType, t_row.ownerId), "\n", t_row.order.ToString());
             if (string.Equals(t_lastOrderKey, t_orderKey, StringComparison.Ordinal))
             {
-                Debug.LogError($"[RewardSpec] {t_row.ownerType}/{t_row.ownerId}: order {t_row.order}가 중복되어 Reward id {t_row.id}를 건너뜁니다.");
+                Debug.LogError($"[RewardSpec] {t_row.ownerType}/{t_row.ownerId}: order {t_row.order} is duplicated, so Reward id {t_row.id} is skipped.");
                 continue;
             }
             t_lastOrderKey = t_orderKey;
 
-            if (!TryConvert(t_row.rewardId, t_row.amount, $"Reward id {t_row.id}", out AlbumRewardDef t_def)) continue;
+            AlbumRewardDef t_def;
+            if (t_rewardType == ERewardType.Currency)
+            {
+                if (!TryConvert(t_row.rewardId, t_row.amount, $"Reward id {t_row.id}", out t_def)) continue;
+            }
+            else
+            {
+                if (t_row.amount <= 0 || string.IsNullOrEmpty(t_row.rewardId)) continue;
+                t_def = new AlbumRewardDef { rewardType = t_rewardType, rewardId = t_row.rewardId, amount = t_row.amount };
+            }
             string t_key = KeyOf(t_ownerType, t_row.ownerId);
             if (!s_rewards.TryGetValue(t_key, out List<AlbumRewardDef> t_list))
                 s_rewards[t_key] = t_list = new List<AlbumRewardDef>();

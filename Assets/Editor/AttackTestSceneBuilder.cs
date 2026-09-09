@@ -21,7 +21,7 @@ public static class AttackTestSceneBuilder
         var t_battle = EditorSceneManager.OpenScene(BattlePath, OpenSceneMode.Single);
         if (!t_battle.IsValid())
         {
-            Debug.LogError($"[AttackTest] BattleScene을 열 수 없다: {BattlePath}");
+            Debug.LogError($"[AttackTest] Cannot open BattleScene: {BattlePath}");
             return;
         }
 
@@ -37,7 +37,7 @@ public static class AttackTestSceneBuilder
         var t_enemyFieldView = FindComponent<BattleFieldView>("EnemyFieldView");
         if (t_playerFieldView == null || t_enemyFieldView == null)
         {
-            Debug.LogError("[AttackTest] BattleFieldView를 찾지 못했다.");
+            Debug.LogError("[AttackTest] BattleFieldView not found.");
             return;
         }
 
@@ -55,14 +55,14 @@ public static class AttackTestSceneBuilder
 
         EditorSceneManager.MarkSceneDirty(t_scene);
         EditorSceneManager.SaveScene(t_scene, TestPath);
-        Debug.Log($"[AttackTest] 테스트 씬 생성 완료: {TestPath}");
+        Debug.Log($"[AttackTest] Test scene created: {TestPath}");
     }
 
     static void Deactivate(string _name)
     {
         var t_go = GameObject.Find(_name);
         if (t_go != null) t_go.SetActive(false);
-        else Debug.LogWarning($"[AttackTest] '{_name}' 없음(스킵)");
+        else Debug.LogWarning($"[AttackTest] '{_name}' missing (skipped)");
     }
 
     static T FindComponent<T>(string _name) where T : Component

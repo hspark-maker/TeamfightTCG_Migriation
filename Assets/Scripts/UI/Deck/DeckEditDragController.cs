@@ -91,7 +91,7 @@ public class DeckEditDragController : MonoBehaviour
         if (m_ghostRect == null)
         {
             // 여기서 멈추면 스크롤 소유권만 뺏고 드래그는 시작 못 한 상태라 조작이 먹통처럼 보인다 — 배선 누락을 반드시 알린다.
-            Debug.LogError("[DeckEditDragController] ghostPrefab/dragLayer 미배선 — 드래그를 시작할 수 없다.");
+            Debug.LogError("[DeckEditDragController] ghostPrefab/dragLayer are unwired — a drag cannot start.");
             return;
         }
 

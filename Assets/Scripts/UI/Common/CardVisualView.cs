@@ -170,8 +170,14 @@ public class CardVisualView : MonoBehaviour
 
         RefreshArt(_card, _mine);
 
-        // 프레임은 카드별로 바뀌지 않는다. 스프라이트 미배선 시 흰 사각형이 뜨는 것만 막는다.
-        if (this.frame != null) this.frame.enabled = this.frame.sprite != null;
+        // 프레임은 등급 × 시너지 개수로 갈린다(표는 CardFrameConfig 하나). 못 고르면 프리팹 저작 그림을
+        // 그대로 두고, 그마저 미배선이면 흰 사각형이 뜨지 않게 렌더러를 끈다.
+        if (this.frame != null)
+        {
+            Sprite t_frame = CardVisualRules.PickFrame(_card);
+            if (t_frame != null) this.frame.sprite = t_frame;
+            this.frame.enabled = this.frame.sprite != null;
+        }
 
         {
             bool t_showName = _owned && this.ShowName;

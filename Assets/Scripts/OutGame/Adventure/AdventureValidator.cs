@@ -19,7 +19,7 @@ internal static class AdventureValidator
         // 정점마다 "덱 비었음"을 뱉으면 원인이 묻힌다 — 여기서 한 번만 말하고 정점별 덱 검사는 건너뛴다.
         bool t_specReady = AdventureNodeSpec.TryValidateRequired(out string t_specError);
         if (!t_specReady)
-            Debug.LogError($"[Adventure] AdventureChapter 서버 표를 읽지 못해 상대 덱을 검증할 수 없다 — {t_specError}");
+            Debug.LogError($"[Adventure] Could not read the AdventureChapter server table, so the opponent deck cannot be validated — {t_specError}");
 
         int t_unstable = 0;
         int t_emptyDeck = 0;
@@ -36,19 +36,19 @@ internal static class AdventureValidator
             if (!t_node.HasStableKey)
             {
                 t_unstable++;
-                Debug.LogError($"[Adventure] nodeId 미저작 (정점 #{t_i}) — 이 정점과 뒤 정점 전부가 영구 잠금이다.");
+                Debug.LogError($"[Adventure] nodeId is unauthored (node #{t_i}) — this node and every node after it is permanently locked.");
             }
             else if (!t_keys.Add(t_node.nodeId))
             {
                 t_dupKey++;
-                Debug.LogError($"[Adventure] nodeId 중복 '{t_node.nodeId}' (정점 #{t_i}) — 낙인이 한 정점으로 합쳐진다.");
+                Debug.LogError($"[Adventure] Duplicate nodeId '{t_node.nodeId}' (node #{t_i}) — the marks collapse into a single node.");
             }
 
             // 저작이 책임지는 것은 덱 키 하나다 — 카드 목록은 서버 표가 가리키는 AIDeck 행에서 온다.
             if (!t_node.HasAiDeckKey)
             {
                 t_noDeckKey++;
-                Debug.LogError($"[Adventure] aiDeckId 미저작 (정점 #{t_i} '{t_node.displayName}') — 서버 표를 올릴 수 없다.");
+                Debug.LogError($"[Adventure] aiDeckId is unauthored (node #{t_i} '{t_node.displayName}') — the server table cannot be uploaded.");
             }
 
             if (t_specReady &&
@@ -57,19 +57,19 @@ internal static class AdventureValidator
                  CountCards(t_enemyDeck) != DeckSaveManager.DECK_SIZE))
             {
                 t_emptyDeck++;
-                Debug.LogError($"[Adventure] 상대 덱 비었음 (정점 #{t_i} '{t_node.displayName}') — 전투를 열 수 없다.");
+                Debug.LogError($"[Adventure] Opponent deck is empty (node #{t_i} '{t_node.displayName}') — the battle cannot be opened.");
             }
 
             if (SpecRewardCount(t_node.nodeId) == 0)
             {
                 t_noReward++;
-                Debug.LogWarning($"[Adventure] 보상 미저작 (정점 #{t_i} '{t_node.displayName}') — 클리어해도 지급이 없다.");
+                Debug.LogWarning($"[Adventure] Reward is unauthored (node #{t_i} '{t_node.displayName}') — clearing it grants nothing.");
             }
         }
 
         if (t_specReady && t_chapterFault == 0 && t_unstable == 0 && t_dupKey == 0 &&
             t_emptyDeck == 0 && t_noDeckKey == 0 && t_noReward == 0)
-            Debug.Log($"[Adventure] 저작 검증 통과 — 챕터 {t_chapters.Count}개 · 정점 {t_nodes.Count}개, 결함 없음.");
+            Debug.Log($"[Adventure] Authoring validation passed — {t_chapters.Count} chapter(s) · {t_nodes.Count} node(s), no defects.");
     }
 
     // 챕터 결함 수(경고 포함)를 돌려준다
@@ -82,7 +82,7 @@ internal static class AdventureValidator
 
         if (_chapters.Count == 0)
         {
-            Debug.LogError("[Adventure] 챕터 미저작 — 맵에 아무것도 뜨지 않는다.");
+            Debug.LogError("[Adventure] No chapters authored — nothing shows up on the map.");
             return 1;
         }
 
@@ -91,29 +91,29 @@ internal static class AdventureValidator
             AdventureChapterDef t_chapter = _chapters[t_i];
 
             if (t_chapter.battleBackground == null)
-                Debug.LogWarning($"[Adventure] 전투 배경 미저작(챕터 #{t_i} '{t_chapter.title}') — BattleScene 저작 배경을 그대로 쓴다.");
+                Debug.LogWarning($"[Adventure] Battle background is unauthored (chapter #{t_i} '{t_chapter.title}') — the BattleScene authored background is used as is.");
 
             if (!t_chapter.HasStableKey)
             {
                 t_fault++;
-                Debug.LogError($"[Adventure] chapterId 미저작 (챕터 #{t_i}) — 완주 보상을 영영 받을 수 없다.");
+                Debug.LogError($"[Adventure] chapterId is unauthored (chapter #{t_i}) — the completion reward can never be claimed.");
             }
             else if (!t_keys.Add(t_chapter.chapterId))
             {
                 t_fault++;
-                Debug.LogError($"[Adventure] chapterId 중복 '{t_chapter.chapterId}' (챕터 #{t_i}) — 수령 낙인이 한 챕터로 합쳐진다.");
+                Debug.LogError($"[Adventure] Duplicate chapterId '{t_chapter.chapterId}' (chapter #{t_i}) — the claim marks collapse into a single chapter.");
             }
 
             if (t_chapter.NodeCount == 0)
             {
                 t_fault++;
-                Debug.LogError($"[Adventure] 정점 0개 (챕터 #{t_i} '{t_chapter.title}') — 완주 판정 모수가 없다.");
+                Debug.LogError($"[Adventure] Zero nodes (chapter #{t_i} '{t_chapter.title}') — there is no denominator for the completion check.");
             }
 
             if (SpecRewardCount(t_chapter.chapterId) == 0)
             {
                 t_fault++;
-                Debug.LogWarning($"[Adventure] 완주 보상 미저작 (챕터 #{t_i} '{t_chapter.title}') — 완주해도 지급이 없다.");
+                Debug.LogWarning($"[Adventure] Completion reward is unauthored (chapter #{t_i} '{t_chapter.title}') — completing it grants nothing.");
             }
 
             // 챕터 잠금 문턱은 AdventureChapter 표가 소유한다 — 첫 챕터 0, 역행 금지는
@@ -124,7 +124,7 @@ internal static class AdventureValidator
             if (t_chapterRewards > 2)
             {
                 t_fault++;
-                Debug.LogWarning($"[Adventure] 완주 보상 {t_chapterRewards}줄 (챕터 #{t_i} '{t_chapter.title}') — 띠 슬롯 2칸을 넘어 뒷줄이 표시되지 않는다.");
+                Debug.LogWarning($"[Adventure] Completion reward has {t_chapterRewards} line(s) (chapter #{t_i} '{t_chapter.title}') — it exceeds the 2 band slots, so the trailing lines are not shown.");
             }
         }
 

@@ -55,7 +55,7 @@ public static class OutgameTutorialRunner
 
         if (s_data != null)
         {
-            Debug.LogWarning($"[OutgameTutorialRunner] 다른 튜토리얼 데이터 주입 시도('{_data.name}' ≠ 기존 '{s_data.name}') — 기존 유지.");
+            Debug.LogWarning($"[OutgameTutorialRunner] Attempted to inject different tutorial data ('{_data.name}' != existing '{s_data.name}') — keeping the existing one.");
             return;
         }
 
@@ -92,7 +92,7 @@ public static class OutgameTutorialRunner
             // 그 항이 남으면 그 구간에서 앱을 다시 켰을 때 되감을 대상을 못 찾아 영구 정지한다.
             if (!t_def.ShowDeckGate) return;
 
-            Debug.LogWarning($"[OutgameTutorialRunner] 대본 전투 전에 앱이 닫혔습니다 — 좌표 {t_chapter}-{t_step}을(를) 전투 진입 스텝 {t_chapter}-{t_i}로 되감습니다.");
+            Debug.LogWarning($"[OutgameTutorialRunner] The app closed before the scripted battle — rewinding position {t_chapter}-{t_step} to the battle entry step {t_chapter}-{t_i}.");
 
             // 초기화에서 UI 구독보다 먼저 도는 자리라 OnStepChanged는 쏘지 않는다(들을 구독자가 아직 없다).
             OutgameTutorialProgress.CommitStep(t_chapter, t_i);
@@ -125,14 +125,14 @@ public static class OutgameTutorialRunner
         if (!TryFindStepId(t_id, out int t_chapter, out int t_step))
         {
             // 스텝이 삭제됐다 — 좌표 기준으로 되돌아간다(ID 도입 이전과 같은 동작).
-            Debug.LogWarning($"[OutgameTutorialRunner] 세이브가 가리키는 스텝 #{t_id}이(가) 시퀀스에 없습니다 — 좌표 {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex}를 그대로 씁니다.");
+            Debug.LogWarning($"[OutgameTutorialRunner] Step #{t_id} that the save points at is not in the sequence — using position {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex} as is.");
             StampAnchorAtCoord();
             return;
         }
 
         if (t_chapter == OutgameTutorialProgress.ChapterIndex && t_step == OutgameTutorialProgress.StepIndex) return;
 
-        Debug.Log($"[OutgameTutorialRunner] 스텝 #{t_id}이(가) {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex} → {t_chapter}-{t_step}로 옮겨졌습니다 — 좌표를 따라갑니다.");
+        Debug.Log($"[OutgameTutorialRunner] Step #{t_id} moved from {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex} to {t_chapter}-{t_step} — following the position.");
 
         OutgameTutorialProgress.CommitStep(t_chapter, t_step);
 
@@ -316,7 +316,7 @@ public static class OutgameTutorialRunner
             if (!TryGetStepAt(t_chapter, t_i, out var t_def)) continue;
             if (t_def.Action != EOutgameTutorialAction.BattleStart) continue;
 
-            Debug.LogWarning($"[OutgameTutorialRunner] 안내를 거치지 않고 전투가 시작됐습니다 — 좌표 {t_chapter}-{t_step}을(를) 전투 스텝 {t_chapter}-{t_i} 뒤로 옮깁니다.");
+            Debug.LogWarning($"[OutgameTutorialRunner] The battle started without going through the guide — moving position {t_chapter}-{t_step} to after the battle step {t_chapter}-{t_i}.");
 
             TryGetNext(t_chapter, t_i, out int t_nextChapter, out int t_nextStep);
             OutgameTutorialProgress.CommitStep(t_nextChapter, t_nextStep);
@@ -375,7 +375,7 @@ public static class OutgameTutorialRunner
 
         if (TotalStepCount == 0)
         {
-            Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'에 저작된 스텝이 없습니다(챕터 {ChapterCount}개) — 진행할 수 없습니다.");
+            Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}' has no authored step ({ChapterCount} chapter(s)) — cannot proceed.");
             return EOutgameTutorialStepResult.Failed;
         }
 
@@ -387,7 +387,7 @@ public static class OutgameTutorialRunner
             // 끝 좌표(마지막 스텝 바로 다음 자리)는 정상이다 — 전투로 나간 마지막 스텝이 미뤄 둔 졸업을 여기서 확정한다.
             // 브리지 Start에서 도는 자리라 로비 랭크 연출 디렉터의 캐리어 소비(다음 프레임)보다 앞선다.
             if (t_chapter > ChapterCount || t_index != 0)
-                Debug.LogWarning($"[OutgameTutorialRunner] 좌표 {t_chapter}-{t_index}이(가) '{s_data.name}'의 챕터 {ChapterCount}개 밖입니다 — 완료로 닫습니다.");
+                Debug.LogWarning($"[OutgameTutorialRunner] Position {t_chapter}-{t_index} is outside the {ChapterCount} chapter(s) of '{s_data.name}' — closing it as complete.");
 
             CompleteSequence();
             return EOutgameTutorialStepResult.Advanced;
@@ -395,18 +395,18 @@ public static class OutgameTutorialRunner
 
         if (t_index < StepCountOf(t_chapter))
         {
-            Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 챕터 {t_chapter} 스텝 {t_index}이(가) 비어 있습니다 — 진행할 수 없습니다.");
+            Debug.LogWarning($"[OutgameTutorialRunner] Chapter {t_chapter} step {t_index} of '{s_data.name}' is empty — cannot proceed.");
             return EOutgameTutorialStepResult.Failed;
         }
 
         if (TryGetNext(t_chapter, StepCountOf(t_chapter) - 1, out int t_nextChapter, out int t_nextStep))
         {
-            Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 챕터 {t_chapter}이(가) {t_index}칸보다 짧습니다 — 좌표를 {t_nextChapter}-{t_nextStep}로 정정합니다(다음 씬에서 재개).");
+            Debug.LogWarning($"[OutgameTutorialRunner] Chapter {t_chapter} of '{s_data.name}' is shorter than {t_index} slots — correcting the position to {t_nextChapter}-{t_nextStep} (resumes in the next scene).");
             OutgameTutorialProgress.CommitStep(t_nextChapter, t_nextStep);
             return EOutgameTutorialStepResult.Advanced;
         }
 
-        Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 마지막 챕터 {t_chapter} 뒤에 남은 스텝이 없습니다 — 완료로 닫습니다.");
+        Debug.LogWarning($"[OutgameTutorialRunner] There is no step left after the last chapter {t_chapter} of '{s_data.name}' — closing it as complete.");
         CompleteSequence();
         return EOutgameTutorialStepResult.Advanced;
     }
@@ -418,7 +418,7 @@ public static class OutgameTutorialRunner
         {
             if (!TryGetChapter(i, out var t_chapter) || t_chapter.StepCount == 0)
             {
-                Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 챕터 {i}에 스텝이 없습니다 — 저작을 마치기 전엔 진행이 멈춥니다.");
+                Debug.LogWarning($"[OutgameTutorialRunner] Chapter {i} of '{s_data.name}' has no step — progress stops until the authoring is finished.");
                 continue;
             }
 
@@ -429,14 +429,9 @@ public static class OutgameTutorialRunner
                 if (!t_chapter.TryGetStep(t_s, out var t_def) || t_def.OnFailure != EOutgameTutorialFailure.Halt) continue;
                 if (t_def.Anchor != EOutgameTutorialAnchor.None || t_def.Completion != EOutgameTutorialCompletion.Auto) continue;
 
-                Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 스텝 {i}-{t_s}({t_def.Action})가 Halt인데 앵커도 완료 신호도 없습니다 — 되돌려도 이 초기화에서 재개할 수단이 없습니다.");
+                Debug.LogWarning($"[OutgameTutorialRunner] Step {i}-{t_s}({t_def.Action}) of '{s_data.name}' is Halt but has neither an anchor nor a completion signal — even after a rewind there is no way to resume in this initialization.");
             }
 
-            // 마지막 챕터는 면제한다 — 그 끝은 다음 챕터로의 인계가 아니라 졸업이라 씬을 떠날 이유가 없다.
-            if (i == ChapterCount - 1) continue;
-
-            if (!t_chapter.TryGetStep(t_chapter.StepCount - 1, out var t_last) || !t_last.LeavesScene)
-                Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 챕터 {i}('{t_chapter.Label}') 마지막 스텝이 씬을 떠나지 않습니다 — 챕터는 전투 스텝으로 끝나야 합니다.");
         }
 
         WarnOnBadStepIds();
@@ -460,13 +455,13 @@ public static class OutgameTutorialRunner
 
                 if (t_def.StepId <= 0)
                 {
-                    Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 스텝 {t_c}-{t_s}({t_def.Action})에 ID가 없습니다 — 시퀀스 SO의 [스텝 ID 부여]를 돌리세요. 지금은 좌표로만 지목되어 저작이 바뀌면 밀립니다.");
+                    Debug.LogWarning($"[OutgameTutorialRunner] Step {t_c}-{t_s}({t_def.Action}) of '{s_data.name}' has no id — run [Assign step ids] on the sequence SO. For now it is addressed only by position, so it shifts when the authoring changes.");
                     continue;
                 }
 
                 if (t_seen.TryGetValue(t_def.StepId, out string t_first))
                 {
-                    Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}'의 스텝 {t_c}-{t_s}가 {t_first}과(와) 같은 ID #{t_def.StepId}입니다(행 복제?) — [스텝 ID 부여]를 돌리세요. 지금은 앞 칸이 이겨 진행이 그리로 되감깁니다.");
+                    Debug.LogWarning($"[OutgameTutorialRunner] Step {t_c}-{t_s} of '{s_data.name}' has the same id #{t_def.StepId} as {t_first} (duplicated row?) — run [Assign step ids]. For now the earlier slot wins and progress rewinds to it.");
                     continue;
                 }
 

@@ -157,7 +157,7 @@ public static class UiSortingOrder
         // 조용한 실패를 소리내어 잡는다 — 중첩 캔버스는 overrideSorting이 꺼져 있으면 이 대입을 버린다.
         // 루트 캔버스에 찍는 것은 정상이라(UnlockIntroOverlay) isRootCanvas로 걸러낸다.
         if (_canvas.transform.parent != null && !_canvas.isRootCanvas && !_canvas.overrideSorting)
-            Debug.LogWarning($"[UiSortingOrder] '{_canvas.name}'은 중첩 캔버스인데 overrideSorting이 꺼져 있어 층({_order})이 먹지 않는다 — LiftNested를 쓸 것.");
+            Debug.LogWarning($"[UiSortingOrder] '{_canvas.name}' is a nested canvas with overrideSorting off, so the layer ({_order}) has no effect — use LiftNested.");
 
         _canvas.sortingOrder = _order;
     }

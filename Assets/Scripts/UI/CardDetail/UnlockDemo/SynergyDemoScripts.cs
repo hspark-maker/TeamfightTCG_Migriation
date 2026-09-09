@@ -22,7 +22,7 @@ abstract class SynergyDemoScript : IUnlockDemoScript
 
         if (this.Synergy.vfx == null)
         {
-            Debug.LogWarning($"[UnlockDemoStage] {this.Synergy.SynergyId}: 연출 에셋(vfx) 미배선 — 무대 없이 글자만 남깁니다.");
+            Debug.LogWarning($"[UnlockDemoStage] {this.Synergy.SynergyId}: the presentation asset (vfx) is unwired — only the text is left, with no stage.");
             return false;
         }
 
@@ -34,7 +34,7 @@ abstract class SynergyDemoScript : IUnlockDemoScript
 
         if (t_opponent <= 0)
         {
-            Debug.LogWarning("[UnlockDemoStage] 시너지 데모의 상대 카드가 저작되지 않았습니다(KeywordDemoConfig의 기본 배역 확인).");
+            Debug.LogWarning("[UnlockDemoStage] The opponent card for the synergy demo is not authored (check the default cast in KeywordDemoConfig).");
             return false;
         }
 
@@ -58,7 +58,7 @@ abstract class SynergyDemoScript : IUnlockDemoScript
 
     /// <summary>연출 에셋 타입이 어긋났다고 알린다. 대본이 통째로 무음이 되는 것과 깨진 것을 로그로 가른다.</summary>
     protected void WarnVfxType(string _expected)
-        => Debug.LogWarning($"[UnlockDemoStage] {this.Synergy.SynergyId}: vfx가 {_expected}가 아니라 기본 대본으로 떨어집니다.");
+        => Debug.LogWarning($"[UnlockDemoStage] {this.Synergy.SynergyId}: vfx is not {_expected}, so it falls back to the default script.");
 
     /// <summary>대본이 아직 없는 시너지와 연출 에셋 타입이 어긋난 경우의 폴백.</summary>
     protected async UniTask PlayFallbackAsync(IUnlockDemoStage _stage, CancellationToken _token)

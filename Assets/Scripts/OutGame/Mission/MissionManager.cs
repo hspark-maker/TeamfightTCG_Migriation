@@ -70,7 +70,17 @@ internal static class MissionManager
            s_snapshot.Claimed.TryGetValue(_missionId, out bool t_claimed) && t_claimed;
 
     internal static bool CanClaim(MissionDefinition _definition)
-        => IsComplete(_definition) && !IsClaimed(_definition.Id) && !MissionCommands.IsInFlight(_definition.Id);
+        => IsComplete(_definition) && !IsClaimed(_definition.Id) && !MissionCommands.IsInFlight(_definition.Id)
+           && IsGuideUnlocked(_definition);
+
+    internal static bool IsGuideUnlocked(MissionDefinition _definition)
+    {
+        if (_definition == null || _definition.Period != "guide") return true;
+        foreach (var t_mission in s_definitions)
+            if (t_mission.Period == "guide" && t_mission.SortOrder < _definition.SortOrder && !IsClaimed(t_mission.Id))
+                return false;
+        return true;
+    }
 
     internal static MissionDefinition Find(string _missionId)
     {

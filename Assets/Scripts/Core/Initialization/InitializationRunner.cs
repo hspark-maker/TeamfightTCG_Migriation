@@ -63,7 +63,7 @@ public sealed class InitializationRunner : MonoBehaviour
     {
         if (s_instance == null)
         {
-            Debug.LogError("[InitializationRunner] 초기화 러너가 없어 재시도를 걸 수 없습니다.");
+            Debug.LogError("[InitializationRunner] There is no initialization runner, so a retry cannot be scheduled.");
             return;
         }
 
@@ -75,7 +75,7 @@ public sealed class InitializationRunner : MonoBehaviour
         int t_start = initializers.FindIndex(_step => _step != null && _step.RetryEntry);
         if (t_start < 0)
         {
-            Debug.LogError("[InitializationRunner] retryEntry로 표시된 스텝이 없어 재시도할 자리를 못 찾았습니다.", this);
+            Debug.LogError("[InitializationRunner] No step is marked as retryEntry, so there is no place to retry from.", this);
             return;
         }
 

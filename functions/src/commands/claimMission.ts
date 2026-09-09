@@ -15,7 +15,10 @@ import {clientReceiptId, isClientReceiptId} from "../save/receiptId";
 import {db} from "../firebaseApp";
 import {CurrencyGain, grant} from "../currency/wallet";
 import {nextWallet} from "../currency/walletStore";
-import {MAX_MISSION_ID_LENGTH} from "../missions/catalog";
+import {GrantedItems, grantRewardItems, loadItemGrantContext} from "../rewards/itemGrant";
+import {findMission, MAX_MISSION_ID_LENGTH} from "../missions/catalog";
+import {rankRef} from "../rank/rankStore";
+import {evaluateGuideProgress} from "../missions/guideProgress";
 import {judgeMissionClaim, MissionClaimReject} from "../missions/judgeMissionClaim";
 import {
   beginMissionBump,
@@ -117,6 +120,12 @@ export const claimMission = onCall(async (request) => {
     }),
   ]);
   const rewardRows = parseRewardRows(rawRewardRows);
+  const definition = findMission(missionId);
+  const guideCards = definition?.period === "guide" ? await readSpecRows(env, "Card") : [];
+  const rewardOwner = definition?.period === "guide" ? "Guide" : "Mission";
+  const authored = judgeSpecRewardClaim(rewardRows, rewardOwner, missionId);
+  const itemContext = authored.items.length ? await loadItemGrantContext(env, authored.items) : null;
+  let itemGrant: GrantedItems = {slots: {}, cards: [], currencies: []};
   let activePassSeason: PassSeasonDef | null = null;
   try {
     activePassSeason = currentPassSeason(parsePassSeasons(passSeasonRows), Date.now());
@@ -147,10 +156,14 @@ export const claimMission = onCall(async (request) => {
   let passProgress: PassProgressResponse | undefined;
 
   const result = await mutateSave(env, uid, "claimMission", {kind: "client", txId},
-    async (_current, transaction, wallet): Promise<SaveMutation> => {
+    async (current, transaction, wallet): Promise<SaveMutation> => {
       // 읽기가 콜백의 첫 줄이고, 아래 쓰기보다 앞이다(Firestore 트랜잭션 규칙).
       // beginMissionBump 이 기간 리셋까지 반영하므로, 어제 진행도로 오늘 보상을 타는 경로가 없다.
       const missions = await beginMissionBump(transaction, db, env, uid, period);
+      if (definition?.period === "guide") {
+        missions.state.progress = evaluateGuideProgress(current, guideCards, missions.state.progress);
+      }
+      const rankSnapshot = itemContext === null ? null : await transaction.get(rankRef(db, env, uid));
       // Keep this read before commitMissionClaim and all other transaction writes.
       const pass = activePassSeason === null ? undefined :
         await beginPassMutation(transaction, db, env, uid, activePassSeason.seasonId);
@@ -165,7 +178,7 @@ export const claimMission = onCall(async (request) => {
       }
 
       const mission = verdict.mission;
-      const rewardJudgement = judgeSpecRewardClaim(rewardRows, "Mission", mission.id);
+      const rewardJudgement = judgeSpecRewardClaim(rewardRows, rewardOwner, mission.id);
       if (rewardJudgement.dropped.length > 0) {
         logger.warn("mission reward rows dropped", {
           uid, env, missionId, dropped: rewardJudgement.dropped,
@@ -185,7 +198,10 @@ export const claimMission = onCall(async (request) => {
       missionPeriodKind = mission.period;
       missionEvent = mission.event;
       missionTarget = mission.target;
-      grantedCurrencies = rewardJudgement.gains;
+      itemGrant = itemContext === null ? {slots: {}, cards: [], currencies: []} :
+        grantRewardItems(current, rewardJudgement.items, itemContext, rewardRows, "",
+          Number(rankSnapshot?.data()?.points ?? (current.rank as {points?: number})?.points ?? 0));
+      grantedCurrencies = [...rewardJudgement.gains, ...itemGrant.currencies];
       grantedPassExp = mission.passExp;
 
       // 낙인과 패스 경험치를 함께 찍는다 — 카운터는 깎지 않는다.
@@ -203,9 +219,9 @@ export const claimMission = onCall(async (request) => {
       //
       // 줄 재화가 없으면 지갑을 아예 쓰지 않는다(claimReward 와 같은 정책) — 패스 경험치만 주는
       // 미션이 빈 지급으로 지갑 rev 만 올리면 클라가 달라진 것 없는 잔액을 채택한다.
-      const currencies = rewardJudgement.gains;
+      const currencies = grantedCurrencies;
       return {
-        slots: {},
+        slots: itemGrant.slots,
         wallet: currencies.length === 0 ?
           undefined :
           nextWallet(wallet, grant(wallet.balances, currencies), "claimMission"),
@@ -217,6 +233,7 @@ export const claimMission = onCall(async (request) => {
         ...adopted,
         missionId,
         granted: grantedCurrencies,
+        cards: itemGrant.cards,
         grantedPassExp,
         missions: missionState,
         pass: passProgress,

@@ -47,7 +47,19 @@ public class SettingsPanel : PooledUIBase
     [SerializeField] Button     optionsButton;       // 메뉴 → 환경설정
     [SerializeField] Button     optionsBackButton;   // 환경설정 → 메뉴(창을 닫지 않는다)
 
-    [SerializeField] SettingsOptionsView settingsOptions;
+    [SerializeField] Slider   bgmSlider;
+    [SerializeField] TMP_Text bgmValueText;
+    [SerializeField] Slider   sfxSlider;
+    [SerializeField] TMP_Text sfxValueText;
+
+    [Header("Frame Rate")]
+    // 프리팹의 FrameRateRow 버튼들. 순서는 GameManager.FrameRateOptions와 1:1로 맞춘다.
+    [SerializeField] Button[] frameRateButtons;
+
+    [Header("Screen Shake")]
+    // 타격 화면 흔들림 켜기/끄기. FPS 행과 같은 규약(선택된 쪽만 밝게) — 미배선이면 옵션 줄만 빠진다.
+    [SerializeField] Button screenShakeOnButton;
+    [SerializeField] Button screenShakeOffButton;
 
     [Header("Battle")]
     // 전투 전용. 로비 등 TurnRunner가 없는 씬에서는 Show가 통째로 숨긴다.
@@ -69,12 +81,17 @@ public class SettingsPanel : PooledUIBase
 
         // 저작된 자리가 곧 복귀 목표. 풀 재사용으로 Show가 여러 번 돌아도 이 값은 안 변한다.
         if (this.panelRoot != null) this.panelHomePos = this.panelRoot.anchoredPosition;
+        BindFrameRateButtons();
         CachePageHome(this.menuPage,    ref this.menuHomePos);
         CachePageHome(this.optionsPage, ref this.optionsHomePos);
         // 페이지 전환은 리스너를 Awake에서 한 번만 건다 — 풀에서 재사용되므로 Show에서 걸면 눌린 횟수만큼 중복된다.
         // 버튼으로 넘길 때만 전환 연출을 켠다(창이 처음 열릴 때는 등장 연출과 겹쳐 산만해진다).
         this.optionsButton?.onClick.AddListener(() => ShowPage(_options: true,  _animate: true));
         this.optionsBackButton?.onClick.AddListener(() => ShowPage(_options: false, _animate: true));
+        this.screenShakeOnButton?.onClick.AddListener(() => OnScreenShakeChanged(true));
+        this.screenShakeOffButton?.onClick.AddListener(() => OnScreenShakeChanged(false));
+        this.bgmSlider?.onValueChanged.AddListener(OnBGMChanged);
+        this.sfxSlider?.onValueChanged.AddListener(OnSFXChanged);
         this.surrenderButton?.onClick.AddListener(OnSurrender);
 #if UNITY_EDITOR
         this.winDebugButton?.onClick.AddListener(OnDebugWin);
@@ -109,9 +126,17 @@ public class SettingsPanel : PooledUIBase
         // 풀 재사용: 지난번에 환경설정을 열어둔 채 닫았어도 항상 메뉴부터 시작한다.
         ShowPage(_options: false);
 
-        this.settingsOptions?.Refresh();
+        if (SoundManager.Instance != null)
+        {
+            this.bgmSlider?.SetValueWithoutNotify(SoundManager.Instance.BGMVolume);
+            this.sfxSlider?.SetValueWithoutNotify(SoundManager.Instance.SFXVolume);
+            RefreshText(this.bgmValueText, SoundManager.Instance.BGMVolume);
+            RefreshText(this.sfxValueText, SoundManager.Instance.SFXVolume);
+        }
 
         RefreshBattleButtons();
+        RefreshFrameRateButtons();
+        RefreshScreenShakeButtons();
 
         this.animator?.Fade(this.contentsGroup, 1f);
     }
@@ -335,7 +360,84 @@ public class SettingsPanel : PooledUIBase
         base.OnDestroy();
     }
 
-    public void OnBGMChanged(float _val) => this.settingsOptions?.OnBGMChanged(_val);
+    public void OnBGMChanged(float _val)
+    {
+        SoundManager.Instance?.SetBGMVolume(_val);
+        RefreshText(this.bgmValueText, _val);
+    }
 
-    public void OnSFXChanged(float _val) => this.settingsOptions?.OnSFXChanged(_val);
+    public void OnSFXChanged(float _val)
+    {
+        SoundManager.Instance?.SetSFXVolume(_val);
+        RefreshText(this.sfxValueText, _val);
+    }
+
+    /// <summary>프리팹에 저작된 FPS 버튼에 옵션 값을 인덱스로 물린다.
+    /// 배선이 옵션 수와 어긋나면 조용히 잘못 적용되는 대신 로그로 드러낸다.</summary>
+    void BindFrameRateButtons()
+    {
+        if (this.frameRateButtons == null || this.frameRateButtons.Length == 0) return;
+
+        if (this.frameRateButtons.Length != GameManager.FrameRateOptions.Length)
+        {
+            Debug.LogError($"[SettingsPanel] {this.frameRateButtons.Length} FPS button(s) wired != {GameManager.FrameRateOptions.Length} option(s)");
+            return;
+        }
+
+        for (int i = 0; i < this.frameRateButtons.Length; i++)
+        {
+            int t_frameRate = GameManager.FrameRateOptions[i];
+            this.frameRateButtons[i]?.onClick.AddListener(() => OnFrameRateChanged(t_frameRate));
+        }
+    }
+
+    void OnFrameRateChanged(int _frameRate)
+    {
+        GameManager.SetTargetFrameRate(_frameRate);
+        RefreshFrameRateButtons();
+    }
+
+    void RefreshFrameRateButtons()
+    {
+        if (this.frameRateButtons == null) return;
+        if (this.frameRateButtons.Length != GameManager.FrameRateOptions.Length) return;
+
+        for (int i = 0; i < this.frameRateButtons.Length; i++)
+            ApplySelectedTint(this.frameRateButtons[i],
+                              GameManager.FrameRateOptions[i] == GameManager.CurrentFrameRate);
+    }
+
+    void OnScreenShakeChanged(bool _on)
+    {
+        GameManager.SetScreenShake(_on);
+        RefreshScreenShakeButtons();
+    }
+
+    void RefreshScreenShakeButtons()
+    {
+        ApplySelectedTint(this.screenShakeOnButton,   GameManager.ScreenShakeEnabled);
+        ApplySelectedTint(this.screenShakeOffButton, !GameManager.ScreenShakeEnabled);
+    }
+
+    /// <summary>선택 표시를 <b>칸 자신</b>(SelectionStateView)에게 넘긴다 — 스프라이트도 색도 그쪽이 소유한다.
+    /// 여기(패널)는 "어느 칸이 선택인가"만 안다. 두 줄(FPS·화면 흔들림)이 같은 규약을 쓴다.
+    /// 컴포넌트가 미배선이면 그 칸만 표시가 안 바뀌므로 조용히 넘어가지 않고 로그로 드러낸다.</summary>
+    static void ApplySelectedTint(Button _button, bool _selected)
+    {
+        if (_button == null) return;
+
+        SelectionStateView t_state = _button.GetComponent<SelectionStateView>();
+        if (t_state == null)
+        {
+            Debug.LogError($"[SettingsPanel] {_button.name} has no SelectionStateView wired — the selection display will not change");
+            return;
+        }
+
+        t_state.SetSelected(_selected);
+    }
+
+    void RefreshText(TMP_Text _text, float _val)
+    {
+        if (_text != null) _text.text = $"{Mathf.RoundToInt(_val * 100)}%";
+    }
 }

@@ -16,7 +16,7 @@ static class UiAddressableUtility
         GameObject t_prefab = AssetDatabase.LoadAssetAtPath<GameObject>(_assetPath);
         if (t_prefab == null)
         {
-            Debug.LogError($"[UiAddressableUtility] 프리팹을 못 찾음: {_assetPath}");
+            Debug.LogError($"[UiAddressableUtility] Prefab not found: {_assetPath}");
             return false;
         }
 
@@ -29,7 +29,7 @@ static class UiAddressableUtility
             _address = t_singletonOverlay.GetType().Name;
         else
         {
-            Debug.LogError($"[UiAddressableUtility] 루트 UI 컴포넌트가 없음: {_assetPath}");
+            Debug.LogError($"[UiAddressableUtility] No root UI component: {_assetPath}");
             return false;
         }
 
@@ -42,7 +42,7 @@ static class UiAddressableUtility
         AddressableAssetSettings t_settings = AddressableAssetSettingsDefaultObject.Settings;
         if (t_settings == null)
         {
-            Debug.LogError("[UiAddressableUtility] Addressables 설정이 없다.");
+            Debug.LogError("[UiAddressableUtility] There are no Addressables settings.");
             return;
         }
 
@@ -60,13 +60,13 @@ static class UiAddressableUtility
 
                 if (!TryResolveAddress(t_entry.AssetPath, out string t_address))
                 {
-                    Debug.LogError("[UiAddressableUtility] 주소 정규화를 중단한다.");
+                    Debug.LogError("[UiAddressableUtility] Aborting address normalization.");
                     return;
                 }
 
                 if (!t_uniqueAddresses.Add(t_address))
                 {
-                    Debug.LogError($"[UiAddressableUtility] 중복 UI 주소라 정규화를 중단한다: {t_address}");
+                    Debug.LogError($"[UiAddressableUtility] Duplicate UI address, so normalization is aborted: {t_address}");
                     return;
                 }
 
@@ -93,7 +93,7 @@ static class UiAddressableUtility
             AssetDatabase.SaveAssets();
         }
 
-        Debug.Log($"[UiAddressableUtility] 주소 {t_changed}건 정규화, 전체 {t_entries.Count}건, " +
-                  $"'{DeprecatedUiLabel}' 라벨 제거: {t_removedLabel}");
+        Debug.Log($"[UiAddressableUtility] {t_changed} address(es) normalized out of {t_entries.Count}, " +
+                   $"'{DeprecatedUiLabel}' label removed: {t_removedLabel}");
     }
 }

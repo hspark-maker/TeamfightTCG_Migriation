@@ -9,7 +9,7 @@ public static class RouletteSpec
     /// <summary>지금 화면이 쓰는 판 키. 표에 이 판이 없으면 초기화를 접는다.</summary>
     public const string DEFAULT_ROULETTE_ID = "roulette_default";
 
-    // 지금은 재화 상품 하나뿐이다. 다른 값이 실린 칸 행은 버린다(서버 REWARD_TYPE_CURRENCY 와 같다).
+    // 서버 rouletteDraw와 동일하게 재화·팩 상품을 읽는다.
     const string REWARD_TYPE_CURRENCY = "Currency";
 
     static RouletteConfig s_runtime;
@@ -97,12 +97,17 @@ public static class RouletteSpec
 
         foreach (RouletteSlot t_row in RowsOfBoard(t_allSlots, _rouletteId))
         {
-            if (!string.Equals(t_row.rewardType?.Trim(), REWARD_TYPE_CURRENCY, StringComparison.OrdinalIgnoreCase))
+            bool t_pack = string.Equals(t_row.rewardType?.Trim(), "Pack", StringComparison.OrdinalIgnoreCase);
+            if (!t_pack && !string.Equals(t_row.rewardType?.Trim(), REWARD_TYPE_CURRENCY, StringComparison.OrdinalIgnoreCase))
             { t_dropped++; continue; }
             if (t_row.amount <= 0) { t_dropped++; continue; }
+            if (t_pack && (t_row.amount > 100 || !System.Text.RegularExpressions.Regex.IsMatch(
+                    t_row.rewardId ?? string.Empty, @"^[A-Za-z0-9_-]{1,128}$")))
+            { t_dropped++; continue; }
 
             // 티켓 상품은 회전이 스스로를 재생산하므로 칸이 될 수 없다.
-            if (!TryReadCurrency(t_row.rewardId, out ECurrencyType t_currency) || t_currency == ECurrencyType.RouletteTicket)
+            ECurrencyType t_currency = default;
+            if (!t_pack && (!TryReadCurrency(t_row.rewardId, out t_currency) || t_currency == ECurrencyType.RouletteTicket))
             { t_dropped++; continue; }
             if (t_row.slotIndex < 0 || t_row.slotIndex >= RouletteConfig.SLOT_COUNT) { t_dropped++; continue; }
 
@@ -112,6 +117,8 @@ public static class RouletteSpec
             t_taken[t_row.slotIndex] = true;
             t_slots[t_row.slotIndex] = new RouletteSlotDef
             {
+                rewardType = t_pack ? ERewardType.Pack : ERewardType.Currency,
+                rewardId = t_row.rewardId,
                 currency = t_currency,
                 amount = t_row.amount,
                 weight = t_row.weight,
@@ -126,7 +133,7 @@ public static class RouletteSpec
             return false;
         }
         if (t_dropped > 0)
-            Debug.LogWarning($"[RouletteSpec] 판 '{_rouletteId}'의 칸 행 {t_dropped}개를 저작 결함으로 버렸다.");
+            Debug.LogWarning($"[RouletteSpec] Discarded {t_dropped} slot row(s) of board '{_rouletteId}' as authoring defects.");
 
         _board = new ParsedBoard(t_header.rouletteId, t_header.displayName, t_priceType, t_header.price, t_slots);
         return true;

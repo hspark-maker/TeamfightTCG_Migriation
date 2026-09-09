@@ -27,7 +27,7 @@ public class NoRemoteSceneSyncManager : NetworkSceneManagerDefault
         if (!this.suppressedOnce)
         {
             this.suppressedOnce = true;
-            Debug.Log($"[Net] 원격 씬 전환 지시를 무시한다(씬 전환은 각 클라가 소유). source={_changeSource}");
+            Debug.Log($"[Net] Ignoring the remote scene change directive (each client owns its own scene transitions). source={_changeSource}");
         }
         return true;
     }

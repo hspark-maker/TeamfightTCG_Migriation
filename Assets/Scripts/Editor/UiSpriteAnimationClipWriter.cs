@@ -25,7 +25,7 @@ public static class UiSpriteAnimationClipWriter
         AnimationClip t_clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(t_clipPath);
         if (t_clip == null && AssetDatabase.LoadMainAssetAtPath(t_clipPath) != null)
         {
-            Debug.LogError($"[UI Animation] 같은 경로에 AnimationClip이 아닌 에셋이 있습니다: {t_clipPath}");
+            Debug.LogError($"[UI Animation] There is a non-AnimationClip asset at the same path: {t_clipPath}");
             return null;
         }
 

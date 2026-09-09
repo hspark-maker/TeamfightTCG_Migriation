@@ -333,8 +333,8 @@ public static class SpecSource
             // 이 로그의 값어치는 멀티가 "스펙 스냅샷 다름"으로 끊겼을 때 어느 원본을 물었는지 보는 것뿐이라
             // 플레이 중에만 필요하다. 실패 로그(LogError)는 에디터에서도 그대로 나간다.
             if (Application.isPlaying)
-                Debug.Log($"[SpecSource] 스펙 로드 완료 원본={s_origin} env={t_envId} 전투표={t_battleTable} " +
-                          $"지문={s_fingerprint ?? "(없음)"} 전투지문={s_battleFingerprint ?? "(없음)"}");
+                Debug.Log($"[SpecSource] Spec load done origin={s_origin} env={t_envId} battleTable={t_battleTable} " +
+                          $"fingerprint={s_fingerprint ?? "(none)"} battleFingerprint={s_battleFingerprint ?? "(none)"}");
         }
     }
 

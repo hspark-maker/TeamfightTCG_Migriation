@@ -174,6 +174,7 @@ export function assertWritableSchema(
  * @param {ReceiptKey} receipt 영수증 번호(요청 txId 또는 서버 발급)
  * @param {Function} mutate 현재 문서·트랜잭션·지갑을 받아 갱신할 슬롯 전체 값을 돌려준다
  * @param {Function} finalize 채택 계약에 명령별 필드를 얹어 최종 응답을 만든다. 트랜잭션 안에서 돈다
+ * @param {Function} isLegacyWalletReceipt 전환 전 지갑 전용 영수증의 선택적 검증기
  * @return {Promise<TResponse>} finalize 가 만든 응답
  */
 export async function mutateSave<TResponse extends SaveMutationResult>(
@@ -187,6 +188,7 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
     wallet: WalletState,
   ) => Promise<SaveMutation> | SaveMutation,
   finalize: (result: SaveMutationResult) => TResponse,
+  isLegacyWalletReceipt?: (cached: unknown) => boolean,
 ): Promise<TResponse> {
   const reference = saveDocument(env, uid);
   const walletReference = walletRef(db, env, uid);
@@ -229,6 +231,9 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
           `txId '${receipt.txId}' was already used by another command.`,
           {uid, env, source, receiptSource: lookup.source, txId: receipt.txId});
       }
+      // 명령이 지갑 전용에서 슬롯 지급으로 전환된 경우만, 검증된 옛 응답을 원형 재생한다.
+      // revision을 만들어 붙이면 클라이언트의 +1 채택 계약을 깨뜨린다.
+      if (isLegacyWalletReceipt?.(lookup.result)) return lookup.result as TResponse;
       try {
         // 문서 revision 을 넘겨 코히런스를 검사한다 — 캐시본은 첫 시도의 revision·지갑을,
         // updatedSlots 는 지금 문서를 실으므로 둘이 어긋나면 섞인 상태가 나간다.

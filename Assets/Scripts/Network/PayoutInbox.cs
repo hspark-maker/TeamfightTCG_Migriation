@@ -78,7 +78,13 @@ static class PayoutInbox
                 if (!s_applied.Contains(t_payout.MatchId))
                 {
                     // 잔액은 건드리지 않는다 — 크레딧의 진실원은 아래 ack 응답의 지갑이다.
-                    RankApplyResult t_rank = RankManager.ApplyServerPayout(t_payout.Rank.Before, t_payout.Rank.After);
+                    RankProgressResult t_progress = t_payout.RankProgress;
+                    RankApplyResult t_rank = RankManager.ApplyServerPayout(
+                        t_payout.Rank.Before,
+                        t_payout.Rank.After,
+                        t_progress?.SeasonId,
+                        t_progress?.BestTierIndex ?? -1,
+                        null);
                     DataSaveManager.SaveImmediate();
                     RankResultHandoff.Set(t_rank);
                     s_applied.Add(t_payout.MatchId);
@@ -109,7 +115,7 @@ static class PayoutInbox
         }
         catch (Exception t_exception)
         {
-            Debug.LogWarning($"[Payout] 서버 확정 지급 회수를 미룬다: {t_exception.GetBaseException().Message}");
+            Debug.LogWarning($"[Payout] Deferring collection of the server-confirmed payout: {t_exception.GetBaseException().Message}");
             RetryAfterDelay(t_generation).Forget();
         }
         finally
@@ -132,13 +138,13 @@ static class PayoutInbox
 
         if (_payout.Currency == null || _payout.Rank == null)
         {
-            Debug.LogError($"[Payout] 지급 줄에 필드가 빠져 적용을 보류한다(match={_payout.MatchId}).");
+            Debug.LogError($"[Payout] A payout line is missing a field, so applying it is deferred (match={_payout.MatchId}).");
             return false;
         }
 
         if (!CurrencyCode.TryParse(_payout.Currency.Currency, out ECurrencyType t_type))
         {
-            Debug.LogError($"[Payout] 알 수 없는 재화라 적용을 보류한다(match={_payout.MatchId}, currency={_payout.Currency.Currency}).");
+            Debug.LogError($"[Payout] Unknown currency, so applying it is deferred (match={_payout.MatchId}, currency={_payout.Currency.Currency}).");
             return false;
         }
 

@@ -20,6 +20,7 @@ internal static class PassManager
     internal static bool HasSeason => s_snapshot?.Season != null;
 
     internal static PassSeasonDefinition Season => s_snapshot?.Season;
+    internal static IReadOnlyList<string> PackChoices => (IReadOnlyList<string>)s_snapshot?.PackChoices ?? Array.Empty<string>();
 
     internal static IReadOnlyList<PassLevelDefinition> Levels
         => (IReadOnlyList<PassLevelDefinition>)s_snapshot?.Levels ?? Array.Empty<PassLevelDefinition>();

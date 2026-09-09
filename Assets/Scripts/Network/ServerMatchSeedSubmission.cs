@@ -83,7 +83,7 @@ internal static class ServerMatchSeedSubmission
                         if (_mode == "solo")
                         {
                             Debug.LogError(
-                                "[MatchSeed] 서버가 solo 매치를 정원 1로 처리하지 않았다 — functions 배포 상태를 확인해라.");
+                                "[MatchSeed] The server did not treat the solo match as capacity 1 — check the functions deployment state.");
                             return (ServerMatchSeedStatus.Unavailable, null);
                         }
 
@@ -112,7 +112,7 @@ internal static class ServerMatchSeedSubmission
         }
         catch (OperationCanceledException)
         {
-            Debug.LogError("[MatchSeed] 서버 페어링 제한 시간 초과. 매치를 중단합니다.");
+            Debug.LogError("[MatchSeed] Server pairing timed out. Aborting the match.");
             return (ServerMatchSeedStatus.Unavailable, null);
         }
         catch (Exception t_exception)
@@ -121,10 +121,10 @@ internal static class ServerMatchSeedSubmission
                     t_exception,
                     out FunctionsErrorCode t_errorCode))
             {
-                Debug.LogError($"[MatchSeed] 서버 매치 발급 거절(code={t_errorCode}).");
+                Debug.LogError($"[MatchSeed] Server match issue rejected (code={t_errorCode}).");
                 return (ServerMatchSeedStatus.Rejected, null);
             }
-            Debug.LogError($"[MatchSeed] 서버 매치 발급 실패. 매치를 중단합니다: {t_exception.Message}");
+            Debug.LogError($"[MatchSeed] Server match issue failed. Aborting the match: {t_exception.Message}");
             return (ServerMatchSeedStatus.Unavailable, null);
         }
     }

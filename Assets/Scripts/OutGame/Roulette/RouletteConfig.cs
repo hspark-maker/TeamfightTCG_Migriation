@@ -7,6 +7,9 @@ using UnityEngine;
 [Serializable]
 public struct RouletteSlotDef
 {
+    public ERewardType rewardType;
+    public string rewardId;
+    public bool IsPack => rewardType == ERewardType.Pack;
     [Tooltip("이 칸에 당첨됐을 때 주는 재화입니다. 값의 진실원은 RouletteSlot 스펙시트의 rewardId 열이고, " +
              "여기 저작값은 게임이 켜질 때 표가 덮습니다.\n\n" +
              "룰렛 티켓은 넣을 수 없습니다. 티켓으로 돌려 티켓이 나오면 회전이 스스로를 재생산해 " +
@@ -102,8 +105,10 @@ public class RouletteConfig : ScriptableObject
             RouletteSlotDef t_slot = slots[t_i];
 
             // 티켓 칸은 그 칸만 버리지 않는다 — 7칸 판이 되면 저작자가 자기 실수를 화면에서 못 본다.
-            if (t_slot.currency == ECurrencyType.RouletteTicket)
+            if (!t_slot.IsPack && t_slot.currency == ECurrencyType.RouletteTicket)
                 AddFault(_faults, ref t_faultCount, $"{t_i}번 칸이 룰렛 티켓입니다 — 회전이 스스로를 재생산합니다.");
+            if (t_slot.IsPack && (string.IsNullOrWhiteSpace(t_slot.rewardId) || t_slot.amount > 100))
+                AddFault(_faults, ref t_faultCount, $"{t_i}번 칸의 팩 상품이 유효하지 않습니다.");
 
             if (t_slot.amount <= 0)
                 AddFault(_faults, ref t_faultCount, $"{t_i}번 칸의 수량이 {t_slot.amount}입니다 — 1 이상이어야 합니다.");

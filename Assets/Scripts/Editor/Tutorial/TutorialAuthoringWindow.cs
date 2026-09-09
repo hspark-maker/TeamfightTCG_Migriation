@@ -602,7 +602,7 @@ public class TutorialAuthoringWindow : EditorWindow
             if (t_trigger != t_entry.Trigger)
             {
                 Defer(() => TutorialSequenceEditOps.SetTriggeredKey(this.triggeredData, _entry, t_trigger));
-                Debug.LogWarning("[튜토리얼 저작] 발화 키는 완주 낙인의 식별자다 — 바꾸면 이미 완주한 계정이 이 묶음을 다시 본다.");
+                Debug.LogWarning("[TutorialAuthoring] The trigger key is the identifier of the completion mark — changing it makes accounts that already finished see this bundle again.");
             }
         }
     }

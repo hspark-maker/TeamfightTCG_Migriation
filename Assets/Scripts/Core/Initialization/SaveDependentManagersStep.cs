@@ -93,6 +93,7 @@ public sealed class SaveDependentManagersStep : MainInitializer
             // 문서는 이미 서버(ensureAccount)가 만들어 뒀다 — 여기 업로드는 설치 중 생긴 변경분을 올린다.
             // 지급의 멱등은 그 callable이 진다(문서가 있으면 쓰지 않는다).
             DataSaveManager.SaveImmediate();
+            await RankManager.RefreshServerProgressAsync();
         }
         finally
         {

@@ -38,9 +38,9 @@ public sealed class BattleBackgroundView : MonoBehaviour
         if (Mathf.Approximately(t_authored.x, t_next.x) && Mathf.Approximately(t_authored.y, t_next.y)) return;
 
         Debug.LogWarning(
-            $"[BattleBackgroundView] 챕터 배경 '{_next.name}'의 크기가 저작 배경 '{_authored.name}'과 다르다 "
+            $"[BattleBackgroundView] Chapter background '{_next.name}' has a different size than the authored background '{_authored.name}' "
           + $"({t_next.x:F2}x{t_next.y:F2} vs {t_authored.x:F2}x{t_authored.y:F2}) — "
-          + "Battle_BG의 비균등 스케일이 그대로 먹어 화면에서 늘어난다. 같은 픽셀 크기·PPU로 저작해라.");
+          + "the non-uniform scale on Battle_BG carries over and stretches it on screen. Author it with the same pixel size and PPU.");
 #endif
     }
 }

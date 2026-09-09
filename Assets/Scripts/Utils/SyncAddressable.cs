@@ -22,7 +22,7 @@ public static class SyncAddressable
 
         if (t_handle.Status != AsyncOperationStatus.Succeeded || t_asset == null)
         {
-            Debug.LogError($"[SyncAddressable] '{_address}' 에셋을 읽지 못했습니다.");
+            Debug.LogError($"[SyncAddressable] Could not read the '{_address}' asset.");
             if (t_handle.IsValid()) Addressables.Release(t_handle);
             return null;
         }

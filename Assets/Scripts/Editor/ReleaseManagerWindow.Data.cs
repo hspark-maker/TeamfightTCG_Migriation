@@ -323,7 +323,7 @@ public partial class ReleaseManagerWindow
         }
 
         _report.AppendLine($"FAIL {_table}: {_error}");
-        Debug.LogError($"[SpecFirestore] {_table} 업로드 실패: {_error}");
+        Debug.LogError($"[SpecFirestore] {_table} upload failed: {_error}");
         _failed++;
     }
 
@@ -391,7 +391,7 @@ public partial class ReleaseManagerWindow
                     else
                     {
                         t_report.AppendLine($"FAIL {t_table}: {t_error}");
-                        Debug.LogError($"[SpecFirestore] {t_table} 업로드 실패: {t_error}");
+                        Debug.LogError($"[SpecFirestore] {t_table} upload failed: {t_error}");
                         t_failed++;
                     }
                 }
@@ -425,14 +425,14 @@ public partial class ReleaseManagerWindow
             else
             {
                 t_report.AppendLine($"FAIL publish: {t_publishError}");
-                Debug.LogError($"[SpecFirestore] 콘텐츠 인덱스 공개 실패: {t_publishError}");
+                Debug.LogError($"[SpecFirestore] Content index publish failed: {t_publishError}");
                 t_failed++;
             }
         }
 
         string t_cancelNote = t_cancelled ? " / 사용자 취소" : string.Empty;
         this.dataReport = $"성공 {t_done} / 실패 {t_failed}{t_cancelNote}\n\n{t_report}";
-        Debug.Log($"[SpecFirestore] env={_envId}, 성공={t_done}, 실패={t_failed}, 취소={t_cancelled}");
+        Debug.Log($"[SpecFirestore] env={_envId}, succeeded={t_done}, failed={t_failed}, cancelled={t_cancelled}");
     }
 
     static bool TryGetDataEnvId(EContentRunMode _mode, out string _envId, out string _error)

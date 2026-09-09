@@ -24,11 +24,11 @@ static class FirebaseEditorWarmup
         {
             if (_task.IsFaulted)
             {
-                Debug.LogWarning($"[FirebaseEditorWarmup] SDK 사전 적재 실패: {_task.Exception?.GetBaseException().Message}");
+                Debug.LogWarning($"[FirebaseEditorWarmup] SDK preload failed: {_task.Exception?.GetBaseException().Message}");
                 return;
             }
 
-            Debug.Log($"[FirebaseEditorWarmup] SDK 사전 적재 완료: {_task.Result}");
+            Debug.Log($"[FirebaseEditorWarmup] SDK preload done: {_task.Result}");
         });
     }
 }

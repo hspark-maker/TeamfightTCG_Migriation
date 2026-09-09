@@ -114,8 +114,6 @@ public static class TutorialValidator
 
             ScanDeckGates(t_chapter, out bool[] t_gateOpen, out bool[] t_gateUnclosed);
 
-            bool t_lastChapter = t_c == _data.chapters.Count - 1;
-
             for (int t_s = 0; t_s < t_chapter.StepCount; t_s++)
             {
                 // (17) 목록 중간의 빈 행. 런타임이 진짜로 닫히는 유일한 경로다 —
@@ -133,13 +131,6 @@ public static class TutorialValidator
                 ValidateAnchorGate(t_def, t_c, t_s, t_state, t_issues);
                 ValidateDeckGate(t_def, t_c, t_s, t_gateOpen[t_s], t_gateUnclosed[t_s], t_issues);
 
-                // (9) 챕터 = 씬 경계. 씬을 떠나지 않는 끝은 다음 챕터를 세울 화면이 없다는 뜻이다
-                //     (OutgameTutorialRunner.WarnOnMisauthoredChapters — 마지막 챕터는 졸업이라 면제)
-                if (!t_lastChapter && t_s == t_chapter.StepCount - 1 && !t_def.LeavesScene)
-                    Add(t_issues, ETutorialIssueLevel.Warning, t_def, t_c, t_s, "챕터 끝이 씬을 안 떠남",
-                        $"챕터의 마지막 스텝({t_def.Action})이 씬을 떠나지 않습니다.",
-                        "챕터를 전투 스텝으로 끝내거나, 다음 챕터와 합치세요.");
-
                 ValidateStep(t_def, t_c, t_s, true, t_issues);
             }
         }
@@ -147,7 +138,7 @@ public static class TutorialValidator
         return t_issues;
     }
 
-    /// <summary>트리거 시퀀스 점검. 좌표·해금에 기대는 규칙(스텝 ID·앵커 게이트·덱 게이트·챕터 경계)은 빼고 본다 —
+    /// <summary>트리거 시퀀스 점검. 좌표·해금에 기대는 규칙(스텝 ID·앵커 게이트·덱 게이트)은 빼고 본다 —
     /// 트리거는 진행이 메모리에만 남고 OutgameFeatureLock이 열거하지도 않는다.</summary>
     public static List<TutorialIssue> ValidateTriggered(TriggeredTutorialData _data)
     {
@@ -551,7 +542,7 @@ public static class TutorialValidator
     {
         var t_info = typeof(TutorialStepDef).GetField(_name, BindingFlags.Instance | BindingFlags.NonPublic);
         if (t_info == null)
-            Debug.LogError($"[TutorialValidator] TutorialStepDef에 '{_name}' 필드가 없습니다 — 이름이 바뀌었다면 남은 값 점검에서 그 축만 조용히 빠집니다.");
+            Debug.LogError($"[TutorialValidator] TutorialStepDef has no '{_name}' field — if it was renamed, that axis is silently dropped from the leftover-value check.");
 
         return t_info;
     }

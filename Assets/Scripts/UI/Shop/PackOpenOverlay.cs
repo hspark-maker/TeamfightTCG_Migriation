@@ -39,7 +39,7 @@ public class PackOpenOverlay : MonoBehaviour
         PackOpenOverlay t_overlay = Resolve();
         if (t_overlay == null)
         {
-            Debug.LogWarning("[PackOpenOverlay] 인스턴스 없음 — 개봉 화면을 열 수 없다(로비 씬 배치 확인).");
+            Debug.LogWarning("[PackOpenOverlay] No instance — the reveal screen cannot be opened (check the lobby scene placement).");
             return false;
         }
 
@@ -77,7 +77,7 @@ public class PackOpenOverlay : MonoBehaviour
     {
         if (s_instance != null && s_instance != this)
         {
-            Debug.LogWarning("[PackOpenOverlay] 중복 인스턴스 — 나중 것을 버린다.");
+            Debug.LogWarning("[PackOpenOverlay] Duplicate instance — discarding the later one.");
             Destroy(gameObject);
             return;
         }
@@ -129,7 +129,7 @@ public class PackOpenOverlay : MonoBehaviour
 
         if (this.controller == null || this.view == null)
         {
-            Debug.LogWarning("[PackOpenOverlay] controller/view 미배선 — 개봉 화면을 열 수 없다.");
+            Debug.LogWarning("[PackOpenOverlay] controller/view are unwired — the reveal screen cannot be opened.");
             IsOpen = false;
             gameObject.SetActive(false);
             return false;

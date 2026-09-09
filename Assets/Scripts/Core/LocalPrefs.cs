@@ -94,7 +94,7 @@ public static class LocalPrefs
         }
         catch (Exception t_exception)
         {
-            Debug.LogError($"[LocalPrefs] 저장 실패: {t_exception.Message}");
+            Debug.LogError($"[LocalPrefs] Save failed: {t_exception.Message}");
         }
     }
 
@@ -117,7 +117,7 @@ public static class LocalPrefs
         }
         catch (Exception t_exception)
         {
-            Debug.LogError($"[LocalPrefs] 읽기 실패(기본값으로 시작): {t_exception.Message}");
+            Debug.LogError($"[LocalPrefs] Read failed (starting with default values): {t_exception.Message}");
             s_values.Clear();
         }
 

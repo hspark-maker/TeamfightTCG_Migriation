@@ -60,8 +60,8 @@ public class DeckTabController : LobbyTabPanel
         // 손실은 "이번 편집분"뿐이고 기존 덱은 온전하다 — 그래서 확인 팝업 없이 다시 열어도 안전하다.
         // 오버라이드 한 줄이라 Revert 한 번에 꺼진다 — 꺼지면 풀에 등록돼 매치 화면이 이것을 빌려 간다.
         if (this.editor != null && !this.editor.IsHostEmbedded)
-            Debug.LogError("[DeckTabController] 탭 안에 놓인 편집기인데 hostEmbedded가 꺼져 있다 — "
-                         + "DeckEditPanel 인스턴스의 DeckEditController에서 켤 것.", this.editor);
+            Debug.LogError("[DeckTabController] This editor is placed inside a tab but hostEmbedded is off — "
+                         + "turn it on in the DeckEditController of the DeckEditPanel instance.", this.editor);
 
         OpenEditorForResolvedSlot();
     }
@@ -230,7 +230,7 @@ public class DeckTabController : LobbyTabPanel
         if (t_shell == null)
         {
             // 나갈 곳을 못 찾으면 전체화면 오버레이에 갇힌다 — 조용히 넘어가지 않고 소리내어 잡는다.
-            Debug.LogError("[DeckTabController] 탭 셸을 찾지 못해 덱 탭을 떠날 수 없다 — LobbyTabController 배선을 확인할 것.", this);
+            Debug.LogError("[DeckTabController] Could not find the tab shell, so the deck tab cannot be left — check the LobbyTabController wiring.", this);
             return;
         }
 

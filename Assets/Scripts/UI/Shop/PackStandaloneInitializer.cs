@@ -36,7 +36,7 @@ public class PackStandaloneInitializer : MonoBehaviour
         var t_cards = ResolveCards();
         if (t_cards.Count == 0)
         {
-            Debug.LogWarning("[PackStandaloneInitializer] 더미 카드 없음(dummyPack/dummyCardIds 미배선) — 주입 생략.");
+            Debug.LogWarning("[PackStandaloneInitializer] No dummy cards (dummyPack/dummyCardIds unwired) — skipping the injection.");
             return;
         }
 
@@ -54,7 +54,7 @@ public class PackStandaloneInitializer : MonoBehaviour
         var t_packId = !string.IsNullOrEmpty(dummyPackId) ? dummyPackId : "DummyPack";
         PackHandoff.Set(OpenedPack.CreateSuccess(t_drawn, t_refundType), dummyPackId, nextScene, startTutorial);
 
-        Debug.Log($"[PackStandaloneInitializer] 단독 실행 — 더미 개봉 세션 주입(packId={t_packId}, {t_drawn.Count}장).");
+        Debug.Log($"[PackStandaloneInitializer] Standalone run — injecting a dummy reveal session (packId={t_packId}, {t_drawn.Count} card(s)).");
     }
 
     // 오버레이가 Awake에서 Instance를 선점하므로 열기는 Start까지 미룬다.
@@ -66,7 +66,7 @@ public class PackStandaloneInitializer : MonoBehaviour
         yield return PackArtCache.Preload();
         if (!CardArtCache.IsReady)
         {
-            Debug.LogError("[PackStandaloneInitializer] 카드 연출 에셋 준비 실패.");
+            Debug.LogError("[PackStandaloneInitializer] Failed to prepare the card presentation assets.");
             yield break;
         }
 

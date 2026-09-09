@@ -43,7 +43,7 @@ public sealed class TouchEffectOverlay : SingletonOverlayBase
         s_instance = t_object.GetComponent<TouchEffectOverlay>();
         if (s_instance == null)
         {
-            Debug.LogError($"[TouchEffectOverlay] {t_prefab.name} 루트에 TouchEffectOverlay가 없습니다.", t_prefab);
+            Debug.LogError($"[TouchEffectOverlay] The root of {t_prefab.name} has no TouchEffectOverlay.", t_prefab);
             Destroy(t_object);
             return;
         }
@@ -59,7 +59,7 @@ public sealed class TouchEffectOverlay : SingletonOverlayBase
         if (this.stage         == null) this.stage         = transform as RectTransform;
 
         if (this.overlayCanvas == null)
-            Debug.LogError("[TouchEffectOverlay] 프리팹 루트에 Canvas가 필요합니다.", this);
+            Debug.LogError("[TouchEffectOverlay] The prefab root needs a Canvas.", this);
 
         UiSortingOrder.Stamp(this.overlayCanvas, UiSortingOrder.TouchEffect);
 
@@ -71,7 +71,7 @@ public sealed class TouchEffectOverlay : SingletonOverlayBase
         }
 
         if (this.items == null || this.items.Length == 0)
-            Debug.LogError("[TouchEffectOverlay] 저작된 TouchEffectItem이 없습니다 — 아무것도 그려지지 않습니다.", this);
+            Debug.LogError("[TouchEffectOverlay] There is no authored TouchEffectItem — nothing will be drawn.", this);
 
         for (int i = 0; i < (this.items?.Length ?? 0); i++)
             if (this.items[i] != null) this.items[i].gameObject.SetActive(false);

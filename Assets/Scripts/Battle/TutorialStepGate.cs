@@ -30,8 +30,8 @@ public static class TutorialStepGate
             if (!TryPeekStep(_side, t_ahead, out var t_attack)) return;                  // 남은 공격 스텝 없음
             if (IsPlayable(_side, t_attack, _attackerField, _defenderField)) return;     // 유효 묶음 도달
 
-            Debug.LogWarning($"[Tutorial] {SideLabel(_side)} 공격 스텝 무효(atk={t_attack.attackerSlot}, def={t_attack.targetSlot})" +
-                             $" → 선행 안내 포함 {t_ahead + 1}개 스킵");
+            Debug.LogWarning($"[Tutorial] {SideLabel(_side)} attack step is invalid (atk={t_attack.attackerSlot}, def={t_attack.targetSlot})" +
+                              $" → skipping {t_ahead + 1} step(s) including the leading guide");
             for (int i = 0; i <= t_ahead; i++) DiscardStep(_side);
         }
     }

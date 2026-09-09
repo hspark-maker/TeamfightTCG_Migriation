@@ -20,21 +20,21 @@ public static class AlbumSpec
         SpecDataManager t_manager = SpecSource.Manager;
         if (t_manager == null)
         {
-            Debug.LogError("[AlbumSpec] SpecData를 읽지 못해 앨범 구조를 만들 수 없다 — 앨범이 비어 있다.");
+            Debug.LogError("[AlbumSpec] Could not read SpecData, so the album structure cannot be built — the album is empty.");
             return false;
         }
 
         IReadOnlyList<AlbumThemeInfo> t_themeRows = t_manager.AlbumThemeInfo?.All;
         if (t_themeRows == null || t_themeRows.Count == 0)
         {
-            Debug.LogError("[AlbumSpec] AlbumThemeInfo 표가 비었다 — 앨범이 비어 있다.");
+            Debug.LogError("[AlbumSpec] The AlbumThemeInfo table is empty — the album is empty.");
             return false;
         }
 
         IReadOnlyList<AlbumEntry> t_entryRows = t_manager.AlbumEntry?.All;
         if (t_entryRows == null || t_entryRows.Count == 0)
         {
-            Debug.LogError("[AlbumSpec] AlbumEntry 표가 비었다 — 앨범이 비어 있다.");
+            Debug.LogError("[AlbumSpec] The AlbumEntry table is empty — the album is empty.");
             return false;
         }
 

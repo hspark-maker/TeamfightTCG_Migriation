@@ -20,9 +20,21 @@ public class RouletteSlotView : MonoBehaviour
         {
             Sprite t_sprite = CurrencyLook.IconOf(_currency);
             if (t_sprite != null) this.icon.sprite = t_sprite;
+            this.icon.enabled = this.icon.sprite != null;
         }
 
         if (this.amountText != null) this.amountText.text = _amount.ToString(this.amountFormat);
+    }
+
+    public void Bind(RouletteSlotDef _slot)
+    {
+        if (!_slot.IsPack) { Bind(_slot.currency, _slot.amount); return; }
+        if (this.icon != null)
+        {
+            this.icon.sprite = PackSpec.Art(_slot.rewardId);
+            this.icon.enabled = this.icon.sprite != null;
+        }
+        if (this.amountText != null) this.amountText.text = $"×{_slot.amount:N0}";
     }
 
     /// <summary>당첨된 칸을 한 박 튀긴다. 판이 멈춘 뒤 어디에 섰는지를 칸 자신이 말한다.</summary>

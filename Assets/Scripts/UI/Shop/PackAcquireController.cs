@@ -105,12 +105,12 @@ public class PackAcquireController : MonoBehaviour
         if (!PackHandoff.HasPending)
         {
             // 정상 진입은 상점/초기화가 캐리어를 채우고 오버레이를 연 경우뿐. 그 외는 열 팩이 없음.
-            Debug.LogWarning("[PackAcquireController] PackHandoff 없음 — 정상 진입이 아님(열 팩 없음).");
+            Debug.LogWarning("[PackAcquireController] No PackHandoff — this is not a normal entry (there is no pack to open).");
             return false;
         }
         if (view == null)
         {
-            Debug.LogWarning("[PackAcquireController] view 미배선 → 개봉 진행 불가.");
+            Debug.LogWarning("[PackAcquireController] view is unwired, so the reveal cannot proceed.");
             return false;
         }
 
@@ -123,7 +123,7 @@ public class PackAcquireController : MonoBehaviour
         if (t_opened == null || !t_opened.Success)
         {
             // 정상 진입은 구매가 성립한 뒤뿐이다 — 태울 결과가 없으면 세션을 열지 않는다.
-            Debug.LogWarning("[PackAcquireController] 개봉할 결과가 없음 — 세션을 열지 않는다.");
+            Debug.LogWarning("[PackAcquireController] There is no result to reveal — not opening a session.");
             return false;
         }
 
@@ -355,7 +355,7 @@ public class PackAcquireController : MonoBehaviour
         var t_precheck = CardPackOpener.Precheck(t_pack);
         if (t_precheck != EPackOpenResult.Success)
         {
-            Debug.LogWarning($"[PackAcquireController] 재개봉 불가({t_precheck}) — 팩 데이터 확인.");
+            Debug.LogWarning($"[PackAcquireController] Cannot reopen ({t_precheck}) — check the pack data.");
             PackPurchaseFailurePopup.Show(t_pack, t_precheck);
             RefreshRetryLock();
             return;
@@ -374,7 +374,7 @@ public class PackAcquireController : MonoBehaviour
             // 캐리어에 싣지 않는 것은 의도적이다: 다음에 열리는 개봉이 남의 결과를 물려받는 편이 더 나쁘다
             // (PackShowcaseController.BuyAsync와 같은 처방).
             if (t_opened != null)
-                Debug.LogWarning("[PackAcquireController] 구매 성립 후 개봉 세션이 사라짐 — 카드는 지급됐으나 연출 생략.");
+                Debug.LogWarning("[PackAcquireController] The reveal session disappeared after the purchase went through — the cards were granted but the presentation is skipped.");
 
             // 잠금은 살아 있는 갈래에서만 손으로 내린다. 획득은 되돌려질 수 있어(오버레이 미배선 폴백)
             // 켜 둔 채 남기면 그 뒤로 되사기·획득이 함께 죽는다.
@@ -423,7 +423,7 @@ public class PackAcquireController : MonoBehaviour
 
         // 태우지 못하면 두 버튼이 이미 숨겨진 뒤라 출구 없는 빈 화면이 남는다 — 오버레이째 떨어뜨린다
         // (PackOpenOverlay.Open이 같은 false를 받고 하는 일과 같은 처분).
-        Debug.LogWarning("[PackAcquireController] 재개봉 세션 시작 실패 — 오버레이를 닫는다.");
+        Debug.LogWarning("[PackAcquireController] Failed to start the reopen session — closing the overlay.");
         if (PackOpenOverlay.Instance != null) PackOpenOverlay.Instance.Close();
     }
 
@@ -454,7 +454,7 @@ public class PackAcquireController : MonoBehaviour
                 // 되사기도 함께 되살린다 — 안 그러면 이탈 잠금만 남아 유일한 다른 출구까지 죽는다.
                 m_left = false;
                 RefreshRetryLock();
-                Debug.LogWarning("[PackAcquireController] PackOpenOverlay 없음 — 닫기 불가(오버레이 배선 확인).");
+                Debug.LogWarning("[PackAcquireController] No PackOpenOverlay — cannot close (check the overlay wiring).");
                 return;
             }
 

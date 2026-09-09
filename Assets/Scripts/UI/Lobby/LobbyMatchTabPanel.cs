@@ -22,6 +22,9 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
            + "패널이 풀에서 세워지면 저작 시점에 대상이 없어 배선할 수 없다 → 여기서 코드로 연다.")]
     [SerializeField] Button rankRewardButton;
 
+    [Tooltip("시즌 랭킹과 내 순위를 여는 버튼.")]
+    [SerializeField] Button rankingButton;
+
     [SerializeField] Button keywordGrowthButton;
 
     [Tooltip("룰렛을 여는 버튼. 잠김 룩(FeatureLockView)은 붙이지 않는다 — 룰렛 해금은 온보딩 축이라 아직 없다.")]
@@ -53,6 +56,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     {
         if (playButton != null) playButton.onClick.AddListener(HandlePlayRequested);
         if (rankRewardButton != null) rankRewardButton.onClick.AddListener(OpenRankRewards);
+        if (rankingButton != null) rankingButton.onClick.AddListener(OpenRanking);
         if (keywordGrowthButton != null) keywordGrowthButton.onClick.AddListener(OpenKeywordGrowth);
         if (rouletteButton != null) rouletteButton.onClick.AddListener(OpenRoulette);
         if (missionButton != null) missionButton.onClick.AddListener(OpenMissions);
@@ -83,6 +87,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     {
         if (playButton != null) playButton.onClick.RemoveListener(HandlePlayRequested);
         if (rankRewardButton != null) rankRewardButton.onClick.RemoveListener(OpenRankRewards);
+        if (rankingButton != null) rankingButton.onClick.RemoveListener(OpenRanking);
         if (keywordGrowthButton != null) keywordGrowthButton.onClick.RemoveListener(OpenKeywordGrowth);
         if (rouletteButton != null) rouletteButton.onClick.RemoveListener(OpenRoulette);
         if (missionButton != null) missionButton.onClick.RemoveListener(OpenMissions);
@@ -129,6 +134,8 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
 
     /// <summary>랭크 보상 목록. 풀이 없으면(초기화 미초기화) 조용히 지나가지 않고 드러낸다.</summary>
     public void OpenRankRewards() => OpenPooled<RankRewardPanel>();
+
+    public void OpenRanking() => OpenPooled<RankingBoardPanel>();
 
     public void OpenKeywordGrowth()
     {
@@ -181,7 +188,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     {
         if (UIPoolManager.Instance == null)
         {
-            Debug.LogError($"[LobbyMatchTabPanel] UIPoolManager가 없어 {typeof(T).Name}을 열 수 없다 — 초기화(InitializationRunner) 초기화를 확인할 것.");
+            Debug.LogError($"[LobbyMatchTabPanel] There is no UIPoolManager, so {typeof(T).Name} cannot be opened — check the initialization (InitializationRunner).");
             return;
         }
 

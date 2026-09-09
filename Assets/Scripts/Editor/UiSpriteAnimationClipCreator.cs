@@ -45,12 +45,12 @@ public static class UiSpriteAnimationClipCreator
             if (t_clip == null) continue;
             t_created++;
             Selection.activeObject = t_clip;
-            Debug.Log($"[UI Animation] {(t_isNew ? "생성" : "덮어쓰기")}: {t_clipPath} ({t_frames.Count} frames)", t_clip);
+            Debug.Log($"[UI Animation] {(t_isNew ? "created" : "overwritten")}: {t_clipPath} ({t_frames.Count} frames)", t_clip);
         }
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        if (t_created == 0) Debug.Log("[UI Animation] 생성하거나 변경한 클립이 없습니다.");
+        if (t_created == 0) Debug.Log("[UI Animation] No clip was created or changed.");
     }
 
     [MenuItem(MenuPath, true)]
@@ -77,7 +77,7 @@ public static class UiSpriteAnimationClipCreator
         }
 
         if (t_groups.Count == 0)
-            Debug.LogWarning("[UI Animation] Sprite 또는 Sprite가 포함된 Texture2D를 선택하세요.");
+            Debug.LogWarning("[UI Animation] Select a Sprite, or a Texture2D that contains Sprites.");
         return t_groups;
     }
 

@@ -70,7 +70,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
 
         if (!CardCatalog.IsReady)
         {
-            Debug.LogError("[DeckEditCollectionGrid] CardCatalog 미초기화 — 초기화(InitializationRunner)를 거치지 않았다.");
+            Debug.LogError("[DeckEditCollectionGrid] CardCatalog is not initialized — it did not go through initialization (InitializationRunner).");
             return;
         }
 

@@ -1,5 +1,7 @@
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import {db} from "../firebaseApp";
+import {loadItemGrantContext, unlockedRewardPacks} from "../rewards/itemGrant";
+import {rankRef} from "../rank/rankStore";
 import {readSpecRows} from "../packs/packSpecReader";
 import {
   currentPassSeason,
@@ -39,6 +41,10 @@ export const getPass = onCall(async (request) => {
     const levels = parsePassLevels(levelRows, season);
     const state = applyPassSeason(readPass(snapshot), season.seasonId);
     const rewardSpec = parseRewardRows(rewardRows);
+    const choiceItems = rewardSpec.filter((row) => row.ownerType === "Pass" && row.rewardType === "PackChoice")
+      .map((row) => ({rewardType: "PackChoice" as const, rewardId: row.rewardId, amount: row.amount}));
+    const choices = choiceItems.length ? await loadItemGrantContext(env, choiceItems) : null;
+    const rankSnapshot = choices === null ? null : await rankRef(db, env, uid).get();
     const currentLevel = passLevelOf(state.exp, levels);
     const next = levels.find((entry) => entry.level > currentLevel);
 
@@ -47,9 +53,11 @@ export const getPass = onCall(async (request) => {
       progress: passProgressResponse(state),
       currentLevel,
       nextRequiredExp: next?.requiredExp ?? null,
+      packChoices: choices === null ? [] : unlockedRewardPacks(choices, Number(rankSnapshot?.data()?.points ?? 0)),
       levels: levels.map((entry) => ({
         level: entry.level,
         requiredExp: entry.requiredExp,
+        items: resolveRewards(rewardSpec, "Pass", passRewardOwnerId(season.seasonId, entry.level)).items,
         reward: resolveRewards(
           rewardSpec, "Pass", passRewardOwnerId(season.seasonId, entry.level)).gains,
       })),

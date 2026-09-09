@@ -152,8 +152,8 @@ public static class OutgameTutorialProgress
 
         if (t_slot.SameCoordInitCount < STALL_INIT_COUNT) return;
 
-        Debug.LogWarning($"[OutgameTutorialProgress] 좌표 {t_slot.ChapterIndex}-{t_slot.ChapterStepIndex}에서 "
-                       + $"{t_slot.SameCoordInitCount + 1}번째 초기화 — 진행이 막힌 것으로 보고 기능 잠금을 해제합니다.");
+        Debug.LogWarning($"[OutgameTutorialProgress] Initialization #{t_slot.SameCoordInitCount + 1} at position "
+                       + $"{t_slot.ChapterIndex}-{t_slot.ChapterStepIndex} — treating progress as stuck and releasing the feature lock.");
         OutgameFeatureLock.NotifyStalled();
     }
 }

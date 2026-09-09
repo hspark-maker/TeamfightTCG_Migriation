@@ -50,13 +50,13 @@ public class ScreenDim : MonoBehaviour
         int t_index = (int)this.layer;
         if (t_index < 0 || t_index >= s_instances.Length)
         {
-            Debug.LogError($"[ScreenDim] 지원하지 않는 레이어입니다: {this.layer}", this);
+            Debug.LogError($"[ScreenDim] Unsupported layer: {this.layer}", this);
             return;
         }
 
         ScreenDim t_previous = Get(this.layer);
         if (t_previous != null && t_previous != this)
-            Debug.LogWarning($"[ScreenDim] 씬에 {this.layer} 인스턴스가 둘 이상 있습니다. 마지막 인스턴스를 사용합니다.");
+            Debug.LogWarning($"[ScreenDim] There is more than one {this.layer} instance in the scene. Using the last one.");
         s_instances[t_index] = this;
         ApplyHidden();
     }

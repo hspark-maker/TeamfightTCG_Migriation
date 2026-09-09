@@ -221,7 +221,7 @@ public class PackRevealView : MonoBehaviour
         if (m_stage != EStage.Idle) return;   // 재진입 = 중복 개봉 방지
         if (_opened == null || !_opened.Success)
         {
-            Debug.LogWarning("[PackRevealView] BeginOpen에 유효하지 않은 OpenedPack — 개봉 취소.");
+            Debug.LogWarning("[PackRevealView] BeginOpen received an invalid OpenedPack — cancelling the reveal.");
             return;
         }
 
@@ -254,7 +254,7 @@ public class PackRevealView : MonoBehaviour
 
         // 지난 세션의 카드가 남아 있으면 빈 팩이어야 할 등장 구간에 그대로 비친다.
         if (cardStack != null) cardStack.Clear();
-        else Debug.LogWarning("[PackRevealView] cardStack 미배선 → 카드 표시 생략.");
+        else Debug.LogWarning("[PackRevealView] cardStack is unwired, so the card display is skipped.");
 
         // 지난 세션의 합계가 굴러가던 중이었다면 끊는다.
         KillTotalRefundTween();
@@ -385,7 +385,7 @@ public class PackRevealView : MonoBehaviour
 
         if (shellRig == null)
         {
-            Debug.LogWarning("[PackRevealView] shellRig 미배선 → 등장 생략.");
+            Debug.LogWarning("[PackRevealView] shellRig is unwired, so the entrance is skipped.");
             EnterShifting();
             return;
         }
@@ -424,7 +424,7 @@ public class PackRevealView : MonoBehaviour
 
         if (shellRig == null)
         {
-            Debug.LogWarning("[PackRevealView] shellRig 미배선 → 자리잡기 생략.");
+            Debug.LogWarning("[PackRevealView] shellRig is unwired, so the settling is skipped.");
             EnterTearing();
             return;
         }
@@ -457,7 +457,7 @@ public class PackRevealView : MonoBehaviour
 
         if (tearSkin == null || tearHandle == null)
         {
-            Debug.LogWarning("[PackRevealView] tearSkin/tearHandle 미배선 → 직접 찢기 생략.");
+            Debug.LogWarning("[PackRevealView] tearSkin/tearHandle are unwired, so manual tearing is skipped.");
             if (tearSkin != null) tearSkin.SetProgress(1f);
             AnnounceOpened();
             EnterPulling();

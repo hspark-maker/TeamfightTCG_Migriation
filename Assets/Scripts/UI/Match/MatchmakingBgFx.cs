@@ -377,16 +377,16 @@ public class MatchmakingBgFx
     {
 #if UNITY_EDITOR
         if (!Mathf.Approximately(this.top.anchorMin.y, this.bottom.anchorMin.y))
-            Debug.LogWarning($"[MatchmakingBgFx] 두 판의 앵커가 다릅니다(위 {this.top.anchorMin.y} ≠ 아래 {this.bottom.anchorMin.y}) — 이음매가 어긋납니다.");
+            Debug.LogWarning($"[MatchmakingBgFx] The two boards have different anchors (top {this.top.anchorMin.y} != bottom {this.bottom.anchorMin.y}) — the seam is misaligned.");
 
         if (Mathf.Abs(Mathf.DeltaAngle(this.top.localEulerAngles.z, this.bottom.localEulerAngles.z)) > 0.01f)
-            Debug.LogWarning($"[MatchmakingBgFx] 두 판의 기울기가 다릅니다(위 {this.top.localEulerAngles.z} ≠ 아래 {this.bottom.localEulerAngles.z}) — 이음매가 어긋납니다.");
+            Debug.LogWarning($"[MatchmakingBgFx] The two boards have different tilts (top {this.top.localEulerAngles.z} != bottom {this.bottom.localEulerAngles.z}) — the seam is misaligned.");
 
         if (!Mathf.Approximately(this.top.pivot.y, 0f) || !Mathf.Approximately(this.bottom.pivot.y, 1f))
-            Debug.LogWarning($"[MatchmakingBgFx] pivot 규약 위반(위 {this.top.pivot} 은 y=0, 아래 {this.bottom.pivot} 은 y=1이어야 함) — 이음매가 어긋납니다.");
+            Debug.LogWarning($"[MatchmakingBgFx] Pivot convention violated (top {this.top.pivot} must be y=0 and bottom {this.bottom.pivot} must be y=1) — the seam is misaligned.");
 
         if (!Mathf.Approximately(this.top.localScale.x, this.bottom.localScale.x))
-            Debug.LogWarning($"[MatchmakingBgFx] 두 판의 배율이 다릅니다(위 {this.top.localScale.x} ≠ 아래 {this.bottom.localScale.x}) — 이음매 길이는 위 판에서만 읽습니다.");
+            Debug.LogWarning($"[MatchmakingBgFx] The two boards have different scales (top {this.top.localScale.x} != bottom {this.bottom.localScale.x}) — the seam length is read from the top board only.");
 #endif
     }
 
@@ -402,7 +402,7 @@ public class MatchmakingBgFx
         if (t_w <= 0f || t_h <= 0f) return;
 
         if (t_w + 0.5f < _needed.x || t_h + 0.5f < _needed.y)
-            Debug.LogWarning($"[MatchmakingBgFx] 판이 화면을 덮기에 모자랍니다(저작 {t_w:F0}×{t_h:F0} < 필요 {_needed.x:F0}×{_needed.y:F0}) — 기울어진 귀퉁이 뒤로 로비가 드러납니다. 판의 Width·Height 또는 Scale을 키우세요.");
+            Debug.LogWarning($"[MatchmakingBgFx] The boards are too small to cover the screen (authored {t_w:F0}x{t_h:F0} < needed {_needed.x:F0}x{_needed.y:F0}) — the lobby shows through behind the tilted corners. Increase the boards' Width/Height or Scale.");
 #endif
     }
 }

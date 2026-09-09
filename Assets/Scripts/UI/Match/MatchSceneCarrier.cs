@@ -35,7 +35,7 @@ public class MatchSceneCarrier : MonoBehaviour
     {
         if (_swap == null)
         {
-            Debug.LogError("[MatchSceneCarrier] 갈아치울 것이 없습니다 — 화면을 데려가지 않습니다.");
+            Debug.LogError("[MatchSceneCarrier] There is nothing to swap — not carrying the screen over.");
 
             return false;
         }
@@ -117,7 +117,7 @@ public class MatchSceneCarrier : MonoBehaviour
             {
                 if (t_waited >= MaxWaitSeconds)
                 {
-                    Debug.LogWarning($"[MatchSceneCarrier] 교체 준비가 {MaxWaitSeconds}초 안에 끝나지 않아 그대로 진행합니다.");
+                    Debug.LogWarning($"[MatchSceneCarrier] The swap preparation did not finish within {MaxWaitSeconds}s, so it proceeds anyway.");
 
                     break;
                 }

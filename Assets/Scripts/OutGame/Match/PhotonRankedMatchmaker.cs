@@ -47,7 +47,7 @@ public sealed class PhotonRankedMatchmaker : IMatchmaker
         NetworkSession t_session = NetworkSession.Instance;
         if (t_session == null)
         {
-            Debug.LogWarning("[Matchmaking] NetworkSession이 없어 실매칭을 건너뛰고 AI로 진행한다.");
+            Debug.LogWarning("[Matchmaking] There is no NetworkSession, so real matchmaking is skipped and it proceeds against AI.");
             return (EOutcome.NoOpponent, default);
         }
         if (_ct.IsCancellationRequested) return (EOutcome.Canceled, default);
@@ -113,7 +113,7 @@ public sealed class PhotonRankedMatchmaker : IMatchmaker
 
             if (!await _session.JoinRankedLobby())
             {
-                Debug.LogWarning("[Matchmaking] Photon 랭크 로비 참가에 실패했다 — AI로 진행한다.");
+                Debug.LogWarning("[Matchmaking] Failed to join the Photon ranked lobby — proceeding against AI.");
                 await _session.Disconnect();
                 return (EOutcome.NoOpponent, null);
             }
@@ -129,7 +129,7 @@ public sealed class PhotonRankedMatchmaker : IMatchmaker
                 && !await WaitForSessionListAsync(_session, _ct))
             {
                 if (_ct.IsCancellationRequested) break;
-                Debug.LogWarning("[Matchmaking] 로비 목록을 못 받았다 — 후보 탐색 없이 방을 세운다.");
+                Debug.LogWarning("[Matchmaking] Did not receive the lobby list — creating a room without searching for candidates.");
             }
 
             t_elapsed = Time.realtimeSinceStartup - t_startedAt;
@@ -288,7 +288,7 @@ public sealed class PhotonRankedMatchmaker : IMatchmaker
         };
         Action<string> t_onFailed = _reason =>
         {
-            Debug.LogWarning($"[Matchmaking] 매칭 대기 중 연결이 끊겼다: {_reason}");
+            Debug.LogWarning($"[Matchmaking] The connection dropped while waiting for a match: {_reason}");
             t_tcs.TrySetResult();
         };
 

@@ -33,7 +33,7 @@ public static class PredatorVfx
             // 스폰이 실패해도 화면엔 "그냥 안 뜸"으로만 보인다 — 풀·프리팹 문제를 로그로 갈라 준다.
             VfxHandle t_impact = BattleVfx.Play(_vfx.impact, t_from, t_layer);
             if (!t_impact.Valid)
-                Debug.LogWarning($"[PredatorVfx] impact 스폰 실패 ({_vfx.impact.prefab.name}) — 풀 등록/프리팹을 확인해라.");
+                Debug.LogWarning($"[PredatorVfx] impact spawn failed ({_vfx.impact.prefab.name}) — check the pool registration and the prefab.");
         }
 
         if (_vfx.trail.prefab == null) return;   // 표식만 배선 = 이동 생략
@@ -88,7 +88,7 @@ public static class PredatorVfx
             t_trail = BattleVfx.Spawn(_vfx.trail, _from, _layer);
             if (!t_trail.Valid)
             {
-                Debug.LogWarning($"[PredatorVfx] trail 스폰 실패 ({_vfx.trail.prefab.name}) — 풀 등록/프리팹을 확인해라.");
+                Debug.LogWarning($"[PredatorVfx] trail spawn failed ({_vfx.trail.prefab.name}) — check the pool registration and the prefab.");
                 return;
             }
 

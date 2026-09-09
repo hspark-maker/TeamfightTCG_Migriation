@@ -1,7 +1,7 @@
 using Newtonsoft.Json;
 
 // 서버 spinRoulette 응답. 멈출 칸과 지급 한 줄의 진실원이다
-// (잔액 자체는 응답의 wallet 이 갈아끼운다 — 이 명령은 세이브를 쓰지 않아 revision·updatedSlots 가 없다).
+// wallet과 updatedSlots 채택으로 티켓·카드·중복 보상을 함께 반영한다.
 internal sealed class SpinRouletteResult : ServerCommandResult
 {
     // 요청한 판과 같은지 대조하는 용도다. 어긋나도 지갑은 이미 움직였으므로 실패로 접지 않는다.
@@ -10,4 +10,9 @@ internal sealed class SpinRouletteResult : ServerCommandResult
     [JsonProperty("slotIndex")] public int SlotIndex { get; set; }
 
     [JsonProperty("gain")] public ClaimRewardGain Gain { get; set; }
+    [JsonProperty("rewardType")] public string RewardType { get; set; }
+    [JsonProperty("rewardId")] public string RewardId { get; set; }
+    [JsonProperty("amount")] public long Amount { get; set; }
+    [JsonProperty("cards")] public OpenPackCard[] Cards { get; set; }
+    [JsonProperty("granted")] public ClaimRewardGain[] Granted { get; set; }
 }

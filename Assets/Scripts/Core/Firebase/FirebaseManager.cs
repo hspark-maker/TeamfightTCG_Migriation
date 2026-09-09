@@ -186,7 +186,7 @@ public static class FirebaseManager
         FirebaseFirestore t_firestore = s_firestore;
 
         try { Shutdown(); }
-        catch (Exception t_exception) { Debug.LogWarning($"[Firebase] 에디터 정리 실패: {t_exception.Message}"); }
+        catch (Exception t_exception) { Debug.LogWarning($"[Firebase] Editor cleanup failed: {t_exception.Message}"); }
 
         // 여기서 TerminateAsync를 await하거나 .Wait()로 막으면 안 된다.
         // Firebase는 완료 콜백을 UnitySynchronizationContext로 메인 스레드에 넘기는데,
@@ -198,7 +198,7 @@ public static class FirebaseManager
             try { t_firestore.TerminateAsync(); }
             catch (Exception t_exception)
             {
-                Debug.LogWarning($"[Firebase] Firestore 종료 요청 실패: {t_exception.Message}");
+                Debug.LogWarning($"[Firebase] Firestore shutdown request failed: {t_exception.Message}");
             }
         }
 
@@ -211,7 +211,7 @@ public static class FirebaseManager
         }
         catch (Exception t_exception)
         {
-            Debug.LogWarning($"[Firebase] 앱 정리 실패: {t_exception.Message}");
+            Debug.LogWarning($"[Firebase] App cleanup failed: {t_exception.Message}");
         }
     }
 #endif

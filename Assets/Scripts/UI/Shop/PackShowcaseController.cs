@@ -315,7 +315,7 @@ public class PackShowcaseController : MonoBehaviour
         // 커밋만 남고 개봉 신호가 영영 오지 않아 진행이 막힌다. 결제 앞에서 끊는 것이 유일한 안전판이다.
         if (PackOpenOverlay.Instance == null)
         {
-            Debug.LogError("[PackShowcaseController] 개봉 오버레이 미배치 — 구매를 막는다(로비 씬 배선 확인).");
+            Debug.LogError("[PackShowcaseController] The reveal overlay is not placed — blocking the purchase (check the lobby scene wiring).");
             return;
         }
 
@@ -347,7 +347,7 @@ public class PackShowcaseController : MonoBehaviour
         {
             s_transitioning = false;
             if (t_opened != null)
-                Debug.LogWarning("[PackShowcaseController] 구매 성립 후 진열이 사라짐 — 카드는 지급됐으나 연출 생략.");
+                Debug.LogWarning("[PackShowcaseController] The showcase disappeared after the purchase went through — the cards were granted but the presentation is skipped.");
             return;
         }
 
@@ -367,7 +367,7 @@ public class PackShowcaseController : MonoBehaviour
         try { OnAnyPurchased?.Invoke(); }
         catch (Exception t_exception)
         {
-            Debug.LogError($"[PackShowcaseController] 구매 성립 신호의 구독자가 끊겼습니다 — 개봉은 그대로 이어갑니다.\n{t_exception}");
+            Debug.LogError($"[PackShowcaseController] A subscriber of the purchase-completed signal threw — the reveal continues regardless.\n{t_exception}");
         }
 
         // 일반 구매 목적지는 지금 이 씬(오버레이만 닫고 제자리), 튜토리얼 없음(첫실행 경로와 구분).
@@ -393,7 +393,7 @@ public class PackShowcaseController : MonoBehaviour
         // 열지 못하면 닫힘 신호도 오지 않는다 — 얼려 둔 진열을 여기서 함께 풀지 않으면 영영 굳는다.
         s_transitioning = false;
         Refresh();
-        Debug.LogWarning("[PackShowcaseController] 개봉 오버레이를 열지 못함 — 카드는 지급됐으나 연출 생략(오버레이 배선 확인).");
+        Debug.LogWarning("[PackShowcaseController] Could not open the reveal overlay — the cards were granted but the presentation is skipped (check the overlay wiring).");
     }
 
     // 임팩트가 반응시킬 팩 노드. 캐러셀이 가리키는 페이지가 곧 방금 산 팩이다(미배선이면 구매 버튼으로 폴백).

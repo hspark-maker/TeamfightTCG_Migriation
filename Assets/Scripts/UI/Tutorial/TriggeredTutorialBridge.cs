@@ -98,7 +98,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
                 if (!m_pendingApply) return;
             }
 
-            Debug.LogWarning("[TriggeredTutorialBridge] 스텝 진입이 반복 재진입해 중단합니다 — 스텝 저작을 확인하세요.");
+            Debug.LogWarning("[TriggeredTutorialBridge] Step entry keeps re-entering, so it is aborted — check the step authoring.");
         }
         finally
         {
@@ -179,7 +179,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
         }
 
         // 이 브리지는 팩 개봉·구매 신호를 구독하지 않는다 → 그 스텝을 꽂으면 완료 신호가 없어 영구 정지다(저작 실수).
-        Debug.LogWarning($"[TriggeredTutorialBridge] 스텝 {TriggeredTutorialRunner.StepIndex}({m_step.Action})의 완료 조건({m_step.Completion})은 트리거 튜토리얼에서 지원하지 않습니다 — 중단합니다.");
+        Debug.LogWarning($"[TriggeredTutorialBridge] The completion condition ({m_step.Completion}) of step {TriggeredTutorialRunner.StepIndex}({m_step.Action}) is not supported by triggered tutorials — aborting.");
         CloseGate();
     }
 

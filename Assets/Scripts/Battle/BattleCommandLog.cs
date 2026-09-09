@@ -63,15 +63,15 @@ public static class BattleCommandLog
         // 양쪽 로그가 갈린다. 조용히 건너뛰면 그 사실이 숨으므로 로그를 명시적으로 무효화한다.
         if (_actorOwner != 0 && _actorOwner != 1)
         {
-            Debug.LogError($"[BattleCommandLog] ownerIndex 미확정({_actorOwner}) — 명령 로그를 무효화합니다.");
+            Debug.LogError($"[BattleCommandLog] ownerIndex is undetermined ({_actorOwner}) — invalidating the command log.");
             IsTruncated = true;
             return;
         }
         if (Count >= MaxCommands)
         {
             Debug.LogError(
-                $"[BattleCommandLog] 명령 수가 상한({MaxCommands})에 도달해 로그를 버립니다 — " +
-                "이 매치는 서버에서 무효 처리됩니다. 상한 재검토가 필요합니다.");
+                $"[BattleCommandLog] Command count reached the cap ({MaxCommands}); dropping the log — " +
+                "this match will be voided on the server. The cap needs to be reviewed.");
             IsTruncated = true;
             return;
         }

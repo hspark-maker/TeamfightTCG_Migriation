@@ -40,7 +40,9 @@ public sealed class LocalRouletteSpinSource : IRouletteSpinSource
             t_roll -= t_slot.EffectiveWeight;
             if (t_roll >= 0) continue;
 
-            return UniTask.FromResult(RouletteSpinOutcome.CreateSuccess(t_i, t_slot.currency, t_slot.amount));
+            return UniTask.FromResult(t_slot.IsPack
+                ? RouletteSpinOutcome.CreatePack(t_i, t_slot.rewardId, t_slot.amount, null, null)
+                : RouletteSpinOutcome.CreateSuccess(t_i, t_slot.currency, t_slot.amount));
         }
 
         return UniTask.FromResult(RouletteSpinOutcome.CreateFailure(ERouletteSpinResult.EmptyPool));

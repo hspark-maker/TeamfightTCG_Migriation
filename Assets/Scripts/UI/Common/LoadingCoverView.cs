@@ -108,7 +108,7 @@ public class LoadingCoverView : MonoBehaviour
         // 커버를 못 얻어도 전환 자체는 반드시 되게 한다 — 연출 때문에 화면이 갇히면 탈출로가 없다.
         if (t_view == null)
         {
-            Debug.LogWarning("[LoadingCoverView] 동기 UI 카탈로그에서 로딩 커버를 찾지 못해 커버 없이 전환합니다.");
+            Debug.LogWarning("[LoadingCoverView] Could not find the loading cover in the sync UI catalog, so the transition runs without a cover.");
             _onBeforeLoad?.Invoke();
             SceneManager.LoadScene(_scene);
             return;
@@ -193,8 +193,8 @@ public class LoadingCoverView : MonoBehaviour
         {
             if (Time.realtimeSinceStartup - t_initializeWaitStarted >= initializeWaitTimeout)
             {
-                Debug.LogError($"[LoadingCoverView] 게임 초기화가 {initializeWaitTimeout}초 안에 끝나지 않아 복구 화면으로 전환합니다. " +
-                               $"상태={GameInitialization.State}");
+                Debug.LogError($"[LoadingCoverView] Game initialization did not finish within {initializeWaitTimeout}s, switching to the recovery screen. " +
+                               $"state={GameInitialization.State}");
                 GameInitialization.MarkRecoveryRequired();
                 break;
             }
@@ -463,7 +463,7 @@ public class LoadingCoverView : MonoBehaviour
 
             if (t_elapsed >= maxDuration)
             {
-                Debug.LogWarning($"[LoadingCoverView] 로딩이 {maxDuration}초 안에 끝나지 않아 그대로 진행합니다.");
+                Debug.LogWarning($"[LoadingCoverView] Loading did not finish within {maxDuration}s, so it proceeds anyway.");
                 break;
             }
 

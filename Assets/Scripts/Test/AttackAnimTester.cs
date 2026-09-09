@@ -172,7 +172,7 @@ public class AttackAnimTester : MonoBehaviour
         yield return CardArtCache.Preload(CardCatalog.AllSpecs);
         if (!CardArtCache.IsReady)
         {
-            Debug.LogError("[AttackAnimTester] 카드 연출 에셋 준비 실패.");
+            Debug.LogError("[AttackAnimTester] Failed to prepare the card presentation assets.");
             yield break;
         }
 
@@ -737,7 +737,7 @@ public class AttackAnimTester : MonoBehaviour
     bool WarnMissing(bool _ok, string _reason)
     {
         if (_ok) return true;
-        Debug.LogWarning($"[AttackTest] {CurrentEmblemSynergy?.name ?? "(시너지 없음)"}: {_reason}");
+        Debug.LogWarning($"[AttackTest] {CurrentEmblemSynergy?.name ?? "(no synergy)"}: {_reason}");
         return false;
     }
 
@@ -830,8 +830,8 @@ public class AttackAnimTester : MonoBehaviour
 
         if (t_syn.vfx == null || !t_syn.vfx.PlaysEmblemAt(this.emblemTiming))
         {
-            Debug.LogWarning($"[AttackTest] {t_syn.name}: {this.emblemTiming} 타이밍 엠블럼 배선 없음"
-                           + $"{(t_syn.vfx == null ? " (vfx SO 자체가 비어 있다)" : "")}");
+            Debug.LogWarning($"[AttackTest] {t_syn.name}: no emblem wired for the {this.emblemTiming} timing"
+                           + $"{(t_syn.vfx == null ? " (the vfx SO itself is empty)" : "")}");
             return;
         }
         SynergyEmblemVfx.Play(t_view, t_syn, this.emblemTiming);
@@ -878,7 +878,7 @@ public class AttackAnimTester : MonoBehaviour
     public void SpawnHitVfxPreview() => this.hitVfx.Spawn(this.enemyFieldView?.GetSlotView(0)?.transform);
 
     public void LogVfxPaths()
-        => Debug.Log($"[AttackTest] 피격VFX = {this.hitVfx.CurrentPath}");
+        => Debug.Log($"[AttackTest] Hit VFX = {this.hitVfx.CurrentPath}");
 
     /// <summary>지금 고른 후보를 모든 슬롯의 무장 VFX 프리팹으로 밀어넣는다.
     /// 스폰 시점은 CardView가 쥐고 있으므로(무장~접촉) 테스터는 "무엇을 쓸지"만 정한다.</summary>

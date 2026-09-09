@@ -23,7 +23,7 @@ public static class RewardService
         if (!s_warnedMissing)
         {
             s_warnedMissing = true;
-            Debug.LogError($"[RewardService] Reward 표에 Battle/{_ownerId} 행이 없어 전투 보상이 0으로 계산됩니다.");
+            Debug.LogError($"[RewardService] The Reward table has no Battle/{_ownerId} row, so the battle reward is computed as 0.");
         }
         return 0;
     }
@@ -64,7 +64,7 @@ public static class RewardService
         {
             // 여기서 그냥 부르면 서버가 MatchUnverified 로 접는다 — 왕복만 버리고 결과는 같다.
             // 튜토리얼 전투가 이 갈래다(시나리오 덱이라 lockDeck을 통과할 수 없어 매치를 열지 않는다).
-            Debug.Log("[RewardService] 서버 매치가 없는 전투라 보상 지급을 건너뛴다.");
+            Debug.Log("[RewardService] This battle has no server match, so the reward grant is skipped.");
             return;
         }
 

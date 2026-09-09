@@ -85,7 +85,7 @@ public class MultiplayerOpponentTurn : TurnBase
             CardInstance t_def = this.ctx.playerField.GetSlot(t_defenderSlot);
             if (t_atk == null || !t_atk.IsAlive || t_def == null)
             {
-                Debug.LogError($"[Net] 공격 미러 불일치 — atkSlot={t_attackerSlot}, defSlot={t_defenderSlot}, " +
+                Debug.LogError($"[Net] Attack mirror mismatch — atkSlot={t_attackerSlot}, defSlot={t_defenderSlot}, " +
                                $"attacker={(t_atk == null ? "null" : t_atk.IsAlive ? "alive" : "dead")}, " +
                                $"defender={(t_def == null ? "null" : "present")}");
                 TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
@@ -94,7 +94,7 @@ public class MultiplayerOpponentTurn : TurnBase
 
             if (t_expectedExecutionAttacker != null && !ReferenceEquals(t_atk, t_expectedExecutionAttacker))
             {
-                Debug.LogError($"[Net] 처형 재공격자 불일치 — expectedSlot={t_expectedExecutionAttacker.slotIndex}, " +
+                Debug.LogError($"[Net] Execution re-attacker mismatch — expectedSlot={t_expectedExecutionAttacker.slotIndex}, " +
                                $"receivedSlot={t_attackerSlot}");
                 TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
                 return;
@@ -106,8 +106,8 @@ public class MultiplayerOpponentTurn : TurnBase
             if (!t_locallyDecided && !t_ruleBackstopOff
                 && !this.ctx.playerField.CanAttack(t_atk, t_def))
             {
-                Debug.LogError($"[Net] 규칙 위반 공격 수신 — atkSlot={t_attackerSlot}, defSlot={t_defenderSlot}, " +
-                               $"유효타깃={string.Join(",", this.ctx.playerField.GetValidTargets(t_atk).ConvertAll(c => c.slotIndex))}");
+                Debug.LogError($"[Net] Received a rule-violating attack — atkSlot={t_attackerSlot}, defSlot={t_defenderSlot}, " +
+                               $"validTargets={string.Join(",", this.ctx.playerField.GetValidTargets(t_atk).ConvertAll(c => c.slotIndex))}");
                 TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
                 return;
             }

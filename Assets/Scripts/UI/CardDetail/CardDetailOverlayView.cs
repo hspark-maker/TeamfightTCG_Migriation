@@ -293,7 +293,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (s_instance == null && !s_missingWarned)
         {
             s_missingWarned = true;
-            Debug.LogError("[CardDetailOverlayView] 현재 씬에 카드 상세 오버레이가 배치되지 않았습니다 — 카드를 길게 눌러도 열리지 않습니다.");
+            Debug.LogError("[CardDetailOverlayView] The card detail overlay is not placed in the current scene — a long press on a card will not open it.");
         }
 
         return s_instance;
@@ -1286,7 +1286,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 저작 실수(초기화 누락)는 조용히 넘기지 않는다 — 재화는 소모되지 않았고 원인이 화면 밖에 있다.
         if (t_result.Outcome == EEnhanceOutcome.NotReady && !CardGrowthManager.IsReady)
-            Debug.LogError("[CardDetailOverlayView] 성장 데이터 미초기화 — CardGrowthManager.Init()이 초기화에서 호출되지 않았다.");
+            Debug.LogError("[CardDetailOverlayView] Growth data is not initialized — CardGrowthManager.Init() was not called during initialization.");
 
         bool t_played = t_result.Outcome == EEnhanceOutcome.Success || t_result.Outcome == EEnhanceOutcome.Failed;
 
@@ -1722,8 +1722,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (_root == null) return false;
         if (_index >= _root.childCount)
         {
-            Debug.LogWarning($"[CardDetailOverlay] {_what} 칩이 모자라다 — 프리팹에 깔린 {_root.childCount}개까지만 보인다. " +
-                             "Tools/UI/도감 상세창 칩 박기로 개수를 늘릴 것");
+            Debug.LogWarning($"[CardDetailOverlay] Not enough {_what} chips — only the {_root.childCount} laid out in the prefab are visible. " +
+                             "Increase the count with Tools/UI/Bake album detail chips");
             return false;
         }
 

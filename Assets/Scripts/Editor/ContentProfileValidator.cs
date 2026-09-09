@@ -22,8 +22,8 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
         // 어느 창에서 빌드하든 여기는 지난다. 개발 빌드 여부를 산출물로 확인하려면 APK 를 깔아 봐야 해서
         // 매번 추측이 붙던 자리 — 빌드 시작 시점에 한 줄로 못 박는다.
         bool t_development = (_report.summary.options & BuildOptions.Development) != 0;
-        Debug.Log($"[빌드] mode={t_mode} development={t_development} target={_report.summary.platform} " +
-                  $"app={PlayerSettings.bundleVersion} tableGen={ContentVersion.Major} options={_report.summary.options}");
+        Debug.Log($"[Build] mode={t_mode} development={t_development} target={_report.summary.platform} " +
+                   $"app={PlayerSettings.bundleVersion} tableGen={ContentVersion.Major} options={_report.summary.options}");
 
         ValidateOrThrow(t_mode);
     }
@@ -195,7 +195,7 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
         var t_warnings = new List<string>();
         List<string> t_errors = Collect(t_warnings, _mode);
         if (t_warnings.Count > 0)
-            Debug.LogWarning("[ContentProfile] 경고(빌드는 막지 않는다)\n- " + string.Join("\n- ", t_warnings));
+            Debug.LogWarning("[ContentProfile] Warnings (these do not block the build)\n- " + string.Join("\n- ", t_warnings));
         if (t_errors.Count > 0)
             throw new BuildFailedException("[ContentProfile] 검증 실패\n- " + string.Join("\n- ", t_errors));
     }

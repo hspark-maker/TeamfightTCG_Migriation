@@ -127,7 +127,7 @@ public static class AdventureChapterBandBuilder
         Object.DestroyImmediate(t_root);
 
         AssetDatabase.SaveAssets();
-        Debug.Log($"[AdventureChapterBandBuilder] 저장 완료 — {PREFAB_PATH}");
+        Debug.Log($"[AdventureChapterBandBuilder] Saved — {PREFAB_PATH}");
     }
 
     // 인스펙터 배선은 SerializedObject로 한다 — private [SerializeField]에 리플렉션 없이 닿는 유일한 길이다.
@@ -259,7 +259,7 @@ public static class AdventureChapterBandBuilder
                 if (t_obj is Sprite t_sprite && t_sprite.name == _name) return t_sprite;
         }
 
-        Debug.LogWarning($"[AdventureChapterBandBuilder] 스프라이트를 찾지 못했다 — {_name}");
+        Debug.LogWarning($"[AdventureChapterBandBuilder] Sprite not found — {_name}");
         return null;
     }
 

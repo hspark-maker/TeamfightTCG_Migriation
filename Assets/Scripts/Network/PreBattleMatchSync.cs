@@ -160,14 +160,14 @@ public static class PreBattleMatchSync
             t_abortCause = $"상대가 방을 떠났습니다(player={_player})";
             // 취소 시점에 바로 찍는다 — 나중에 실패 분기에서 찍으면 다른 로그에 파묻혀
             // "응답 시간 초과"만 눈에 들어온다(실제로 그 오독으로 두 번 돌아왔다).
-            Debug.LogError($"[PreBattleSync] 준비 데드라인 취소: {t_abortCause}");
+            Debug.LogError($"[PreBattleSync] Ready deadline cancelled: {t_abortCause}");
             t_deadline.Cancel();
         }
         void OnConnectionFailed(string _detail)
         {
             if (t_abortCause != null) return;
             t_abortCause = $"연결이 끊겼습니다({_detail})";
-            Debug.LogError($"[PreBattleSync] 준비 데드라인 취소: {t_abortCause}");
+            Debug.LogError($"[PreBattleSync] Ready deadline cancelled: {t_abortCause}");
             t_deadline.Cancel();
         }
         t_session.OnPlayerLeftRoom += OnPlayerLeft;
@@ -217,7 +217,7 @@ public static class PreBattleMatchSync
 
             // 두 클라가 같은 문서를 잡았는지는 이 키가 같은지로만 판별된다 — 키가 갈리면 각자 다른
             // 매치 문서에서 상대 승인을 기다리다 데드라인까지 pending 이다(증상: lockDeck 응답 시간 초과).
-            Debug.Log($"[PreBattleSync] 페어링 키={t_pairingKey.Substring(0, 12)} room={t_session.PairingKey} owner={t_ownerIndex}");
+            Debug.Log($"[PreBattleSync] Pairing key={t_pairingKey.Substring(0, 12)} room={t_session.PairingKey} owner={t_ownerIndex}");
 
             (ServerMatchSeedStatus status, ServerMatchSeed match) t_seedResult =
                 await ServerMatchSeedSubmission.TryAcquireAsync(
@@ -255,13 +255,13 @@ public static class PreBattleMatchSync
             {
                 // 취소원이 셋이라 여기서 갈라 둔다: 방 이벤트(t_abortCause) · 로비 상위 토큰(_ct) ·
                 // 이 함수가 건 45초. 셋의 대응이 전부 다르다.
-                Debug.LogError("[PreBattleSync] 덱 잠금이 끊긴 실제 원인: " + (
+                Debug.LogError("[PreBattleSync] Actual reason the deck lock was cut off: " + (
                     t_abortCause
                     ?? (_ct.IsCancellationRequested
-                        ? "로비 상위 토큰이 취소됐습니다(화면 종료·유저 취소)"
+                        ? "the lobby parent token was cancelled (screen closed or user cancelled)"
                         : t_token.IsCancellationRequested
-                            ? $"준비 상한 {NetTimeouts.PreBattleSyncSec:0}초 초과"
-                            : "취소가 아니라 서버 응답 자체가 실패했습니다")));
+                            ? $"ready limit of {NetTimeouts.PreBattleSyncSec:0}s exceeded"
+                            : "not a cancellation — the server response itself failed")));
                 EMatchEndReason t_reason = t_lockResult == DeckLockResult.Rejected
                     ? EMatchEndReason.Desync
                     : EMatchEndReason.InitError;
@@ -285,7 +285,7 @@ public static class PreBattleMatchSync
                 OpponentCardIds = t_receiver.OpponentCardIds,
                 OpponentGrowth = t_receiver.OpponentGrowth,
             });
-            Debug.Log($"[PreBattleSync] 준비 완료 matchId={t_seedResult.match.MatchId}, owner={t_ownerIndex}");
+            Debug.Log($"[PreBattleSync] Ready matchId={t_seedResult.match.MatchId}, owner={t_ownerIndex}");
             return EPreBattleSyncResult.Success;
         }
         catch (OperationCanceledException)
@@ -294,7 +294,7 @@ public static class PreBattleMatchSync
         }
         catch (Exception t_exception)
         {
-            Debug.LogError($"[PreBattleSync] 준비 실패: {t_exception}");
+            Debug.LogError($"[PreBattleSync] Ready failed: {t_exception}");
             return EPreBattleSyncResult.Failed;
         }
         finally
@@ -321,7 +321,7 @@ public static class PreBattleMatchSync
         }
         catch (Exception t_exception)
         {
-            Debug.LogError($"[PreBattleSync] 내 성장 스냅샷 조회 실패: {t_exception.Message}");
+            Debug.LogError($"[PreBattleSync] Own growth snapshot lookup failed: {t_exception.Message}");
             return (false, null, null);
         }
         if (t_growth == null || t_growth.Length != t_cardIds.Length) return (false, null, null);

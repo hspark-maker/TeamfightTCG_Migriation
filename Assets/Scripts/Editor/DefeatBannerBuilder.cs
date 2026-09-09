@@ -54,7 +54,7 @@ public static class DefeatBannerBuilder
                 throw new InvalidOperationException("패배 배너 프리팹 저장 실패: " + PrefabPath);
 
             AssetDatabase.SaveAssets();
-            Debug.Log("[DefeatBannerBuilder] 패배 배너 갱신 완료: " + PrefabPath);
+            Debug.Log("[DefeatBannerBuilder] Defeat banner updated: " + PrefabPath);
         }
         finally
         {

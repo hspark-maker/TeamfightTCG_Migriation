@@ -41,7 +41,7 @@ public static class SyncUiPrefabs
 
         GameObject t_prefab = s_catalog != null ? s_catalog.Get(_id) : null;
         if (t_prefab == null)
-            Debug.LogError($"[SyncUiPrefabs] {_id} 프리팹이 동기 UI 카탈로그에 연결되지 않았습니다.");
+            Debug.LogError($"[SyncUiPrefabs] The {_id} prefab is not linked in the sync UI catalog.");
         return t_prefab;
     }
 }

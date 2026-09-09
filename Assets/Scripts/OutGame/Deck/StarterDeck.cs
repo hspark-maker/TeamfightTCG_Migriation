@@ -15,14 +15,14 @@ public static class StarterDeck
 
         if (!PackSpec.TryGetPack(_starterPackId, out _))
         {
-            Debug.LogWarning("[StarterDeck] 스타터덱 SO 미배선 — 지급 생략(초기화(InitializationRunner) 확인).");
+            Debug.LogWarning("[StarterDeck] The starter deck SO is unwired — the grant is skipped (check initialization / InitializationRunner).");
             return;
         }
 
         var t_cards = TakeDeckCards(_starterPackId);
         if (t_cards.Count != DeckSaveManager.DECK_SIZE)
         {
-            Debug.LogWarning($"[StarterDeck] {_starterPackId} pool 유효 카드 {t_cards.Count}장 ≠ DECK_SIZE {DeckSaveManager.DECK_SIZE} — 지급 생략.");
+            Debug.LogWarning($"[StarterDeck] {_starterPackId} pool has {t_cards.Count} valid card(s) ≠ DECK_SIZE {DeckSaveManager.DECK_SIZE} — the grant is skipped.");
             return;
         }
 
@@ -32,13 +32,13 @@ public static class StarterDeck
 
         if (t_missing.Count > 0)
         {
-            Debug.LogWarning($"[StarterDeck] 스타터덱 {t_cards.Count}장 중 미소유 {t_missing.Count}장({string.Join(", ", t_missing)}) — "
-                           + "덱을 세우지 않는다(소유의 정본은 서버다. 덱이 0개인 채로 남는다).");
+            Debug.LogWarning($"[StarterDeck] {t_missing.Count} of the {t_cards.Count} starter deck card(s) are unowned ({string.Join(", ", t_missing)}) — "
+                            + "the deck is not built (the server is the source of truth for ownership, so it stays at zero decks).");
             return;
         }
 
         if (!DeckSaveManager.TryInsertFront(t_cards, DECK_NAME, DeckImages.PickRandomKey(), out _))
-            Debug.LogWarning("[StarterDeck] 덱 삽입 실패 — 지급 생략(DeckSaveManager 로그 확인).");
+            Debug.LogWarning("[StarterDeck] Deck insertion failed — the grant is skipped (check the DeckSaveManager log).");
     }
 
     // 드로우가 아니라 pool 앞에서부터의 고정 순서 복사(스타터덱은 매 계정 동일)

@@ -1,0 +1,23 @@
+{
+  "result": "PASS",
+  "rows": {
+    "Reward": 141,
+    "Mission": 30,
+    "RouletteSlot": 8,
+    "AdventureReward": 44,
+    "CardEnhance": 3,
+    "PassLevel": 10
+  },
+  "firstHour": {
+    "guideShard": 300,
+    "adventureShard": 240,
+    "remainingShard": 60
+  },
+  "importedTypedCellsMatched": 1398,
+  "unsupportedRewardTypes": {
+    "Pack": 14,
+    "PackChoice": 1,
+    "Card": 1
+  },
+  "unsupportedRoulettePackSlots": 2
+}

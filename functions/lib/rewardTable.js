@@ -60,6 +60,7 @@ function parseRewardRows(rows) {
  */
 function resolveRewards(rows, ownerType, ownerId) {
     const gains = [];
+    const items = [];
     const dropped = [];
     const seenOrders = new Set();
     // 축이 다르면 절대 섞이지 않는다 — Rank/"1" 과 Adventure/"1" 은 남남이다.
@@ -71,7 +72,7 @@ function resolveRewards(rows, ownerType, ownerId) {
             id: row.id, reason, rewardType: row.rewardType, rewardId: row.rewardId, amount: row.amount,
         });
         // 카드 보상이 저작되면 여기서 드러나야 한다. 조용히 재화로 바꾸지 않는다.
-        if (row.rewardType !== "Currency") {
+        if (!["Currency", "Card", "Pack", "PackChoice"].includes(row.rewardType)) {
             drop("UnknownRewardType");
             continue;
         }
@@ -80,6 +81,19 @@ function resolveRewards(rows, ownerType, ownerId) {
             continue;
         }
         seenOrders.add(row.order);
+        if (row.amount <= 0) {
+            drop("NonPositiveAmount");
+            continue;
+        }
+        if (row.rewardType !== "Currency") {
+            if (!row.rewardId.trim() || (row.rewardType === "Card" &&
+                (!Number.isSafeInteger(Number(row.rewardId)) || Number(row.rewardId) <= 0))) {
+                drop("InvalidRewardId");
+                continue;
+            }
+            items.push({ rewardType: row.rewardType, rewardId: row.rewardId, amount: row.amount });
+            continue;
+        }
         const currency = strictCurrency(row.rewardId);
         if (currency === null) {
             drop("UnknownCurrency");
@@ -91,7 +105,7 @@ function resolveRewards(rows, ownerType, ownerId) {
         }
         gains.push({ currency, amount: row.amount });
     }
-    return { gains, dropped };
+    return { gains, items, dropped };
 }
 /**
  * 챕터 완주 보상의 ownerId 접두사. 챕터는 ownerType 을 정점과 공유하고(둘 다 "Adventure")
@@ -121,15 +135,15 @@ function isChapterOwnerId(ownerId) {
  * @return {RewardClaimJudgement} 허용 여부와 지급 목록
  */
 function judgeRewardClaim(rows, ownerType, ownerId) {
-    const { gains, dropped } = resolveRewards(rows, ownerType, ownerId);
+    const { gains, items, dropped } = resolveRewards(rows, ownerType, ownerId);
     if (rows.length === 0) {
-        return { allow: false, reason: "NotEligible", specEmpty: true, gains: [], dropped };
+        return { allow: false, reason: "NotEligible", specEmpty: true, gains: [], items, dropped };
     }
     const carriesProgress = ownerType === "Adventure" && !isChapterOwnerId(ownerId);
-    if (gains.length === 0 && !carriesProgress) {
-        return { allow: false, reason: "RewardNotFound", specEmpty: false, gains, dropped };
+    if (gains.length === 0 && items.length === 0 && !carriesProgress) {
+        return { allow: false, reason: "RewardNotFound", specEmpty: false, gains, items, dropped };
     }
-    return { allow: true, authored: gains.length > 0, gains, dropped };
+    return { allow: true, authored: gains.length + items.length > 0, gains, items, dropped };
 }
 /**
  * 룰이 claimedTiers 에 거는 상한. **firestore.rules:98 의

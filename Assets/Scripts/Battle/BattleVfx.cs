@@ -25,7 +25,7 @@ public static class BattleVfx
     {
         if (_library == null) return;
         if (s_library != null && s_library != _library)
-            Debug.LogWarning($"[BattleVfx] 이미 주입된 라이브러리를 교체합니다: {s_library.name} -> {_library.name}");
+            Debug.LogWarning($"[BattleVfx] Replacing an already injected library: {s_library.name} -> {_library.name}");
         s_library = _library;
     }
 

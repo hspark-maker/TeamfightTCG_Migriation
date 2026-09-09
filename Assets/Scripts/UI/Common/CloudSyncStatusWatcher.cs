@@ -43,7 +43,7 @@ internal static class CloudSyncStatusWatcher
         UIPoolManager t_pool = UIPoolManager.Instance;
         if (t_pool == null)
         {
-            Debug.LogError("[CloudSyncStatusWatcher] UIPoolManager가 없어 재시작 안내를 띄우지 못했습니다.");
+            Debug.LogError("[CloudSyncStatusWatcher] There is no UIPoolManager, so the restart notice could not be shown.");
             return;
         }
 
@@ -59,7 +59,7 @@ internal static class CloudSyncStatusWatcher
         // 미등록 프리팹 등으로 null이 돌아온 자리에 플래그부터 세우면 차단 안내가 영구 소실된다.
         if (t_popup == null)
         {
-            Debug.LogError("[CloudSyncStatusWatcher] 재시작 안내 팝업을 열지 못했습니다.");
+            Debug.LogError("[CloudSyncStatusWatcher] Could not open the restart notice popup.");
             return;
         }
 

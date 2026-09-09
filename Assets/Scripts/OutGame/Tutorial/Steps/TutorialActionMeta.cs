@@ -122,13 +122,13 @@ public readonly struct TutorialActionMeta
     {
         int t_actions = Enum.GetValues(typeof(EOutgameTutorialAction)).Length;
         if (t_actions != s_table.Length)
-            Debug.LogError($"[TutorialActionMeta] 액션 {t_actions}개 / 테이블 {s_table.Length}행 — 새 액션의 행을 테이블에 추가하세요.");
+            Debug.LogError($"[TutorialActionMeta] {t_actions} action(s) / {s_table.Length} table row(s) — add a row for the new action to the table.");
 
         for (int t_i = 0; t_i < s_table.Length; t_i++)
         {
             if (s_table[t_i].Action == (EOutgameTutorialAction)t_i) continue;
 
-            Debug.LogError($"[TutorialActionMeta] 테이블 {t_i}번 행이 {s_table[t_i].Action}입니다 — 행 순서가 액션 순서와 어긋났습니다(그 뒤 전부가 밀립니다).");
+            Debug.LogError($"[TutorialActionMeta] Table row {t_i} is {s_table[t_i].Action} — the row order no longer matches the action order (everything after it is shifted).");
         }
     }
 }

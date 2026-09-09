@@ -145,7 +145,7 @@ public class RankConfig : ScriptableObject
             AlbumRewardDef t_def = t_rewards[t_i];
             if (t_def.amount <= 0) continue;
 
-            _sink.Add(new RewardLine(new CurrencyGain(t_def.currency, t_def.amount)));
+            _sink.Add(new RewardLine(t_def));
         }
     }
 }

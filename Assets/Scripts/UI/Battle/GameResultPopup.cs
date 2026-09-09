@@ -85,7 +85,7 @@ public class GameResultPopup : MonoBehaviour
         // 타이틀은 배너든 패널이든 하나는 있어야 한다. 둘 다 비면 제목 없이 보상 줄만 뜨는데,
         // 매 판 보는 화면이라 조용히 넘어가면 아무도 배선이 끊긴 줄 모른다.
         if (this.banner == null && this.panel == null)
-            Debug.LogError($"[{name}] 결과창에 타이틀이 없다 — banner 또는 panel 중 하나는 배선해야 한다.", this);
+            Debug.LogError($"[{name}] The result window has no title — either banner or panel has to be wired.", this);
 
         // 배너가 화면을 이끄는 배선에서는 패널 스케일에 손대지 않는다 — Animator 포즈와 싸운다.
         if (this.banner == null && this.panel != null)

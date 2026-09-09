@@ -1,26 +1,9 @@
-/**
- * 미션 정의의 런타임 사본. 저장소 진실원은 `docs/SpecData/Mission_sheet.csv` 다.
- *
- * `Mission` 시트로 옮기는 것이 목표지만, 새 표를 만드는 경로가 UPM 패키지
- * (`com.cookapps.specdatamanager`)의 생성기 하나뿐이고 그 진입점이 저장소에 없다
- * (`SpecLocalCsvImporter` 는 `SpecData.bytes` 에 **이미 있는** 표만 교체한다).
- * 그 게이트는 Unity 가 붙은 저장소에서만 통과시킬 수 있어, Firestore 업로드·파서 전환 전까지
- * CSV와 같은 정의를 여기에도 둔다. 재화 보상의 진실원은 `Reward_sheet.csv` 다.
- *
- * **클라에 사본을 두지 않는다** — 클라는 `getMissions` 로 정의를 받아 그린다.
- * 사본을 두는 순간 밸런스 수정이 앱 배포에 묶인다.
- *
- * ## 값은 전부 임시다
- * 프로젝트에 Analytics 가 하나도 붙어 있지 않다(`Assets/Scripts` 에 `LogEvent` 호출 0건).
- * 유저가 하루에 팩을 몇 개 까는지 데이터가 없으므로 아래 `target` 과 passExp는 **감으로 잡은 값**이다.
- * 보수적으로 두고 운영 데이터가 나온 뒤 조정한다. 기획 확정 전에는 라이브에 올리지 않는다.
- */
-
+/** Mission CSV의 서버 번들 사본. prebuild 생성기로 동기화한다. */
 import * as logger from "firebase-functions/logger";
-import {EVENTS} from "../analytics/eventNames";
+import {GENERATED_MISSIONS} from "./catalogData";
 
 /** 미션 주기. 낙인·카운터가 서로 다른 리셋 축을 타므로 값 하나로 뭉치지 않는다. */
-export type MissionPeriodKind = "daily" | "weekly";
+export type MissionPeriodKind = "daily" | "weekly" | "guide";
 
 /** 미션 한 건의 정의. */
 export interface MissionDef {
@@ -52,150 +35,13 @@ export interface MissionDef {
 export const MISSION_ID_PREFIX: Record<MissionPeriodKind, string> = {
   daily: "daily.",
   weekly: "weekly.",
+  guide: "guide.",
 };
 
 /** 미션 id 최대 길이. 문서 키로 쓰이므로 상한을 둔다. */
 export const MAX_MISSION_ID_LENGTH = 64;
 
-const CATALOG: MissionDef[] = [
-  {
-    id: "daily.openPack1",
-    period: "daily",
-    event: EVENTS.packOpened.missionKey,
-    target: 1,
-    enabled: true,
-    title: "팩 개봉",
-    description: "카드 팩을 1회 개봉하세요",
-    passExp: 10,
-    sortOrder: 1,
-  },
-  {
-    id: "daily.openPack3",
-    period: "daily",
-    event: EVENTS.packOpened.missionKey,
-    target: 3,
-    enabled: true,
-    title: "팩 애호가",
-    description: "카드 팩을 3회 개봉하세요",
-    passExp: 20,
-    sortOrder: 2,
-  },
-  {
-    id: "weekly.openPack10",
-    period: "weekly",
-    event: EVENTS.packOpened.missionKey,
-    target: 10,
-    enabled: true,
-    title: "주간 팩 개봉",
-    description: "카드 팩을 10회 개봉하세요",
-    passExp: 50,
-    sortOrder: 1,
-  },
-  {
-    id: "weekly.enhanceCard5",
-    period: "weekly",
-    event: EVENTS.cardEnhanceResolved.missionKey,
-    target: 5,
-    enabled: false,
-    title: "주간 강화",
-    description: "카드를 5회 강화하세요",
-    passExp: 50,
-    sortOrder: 2,
-  },
-  {
-    id: "weekly.limitBreakCard1",
-    period: "weekly",
-    event: EVENTS.cardLimitBreakCompleted.missionKey,
-    target: 1,
-    enabled: false,
-    title: "한계 돌파",
-    description: "카드를 1회 한계 돌파하세요",
-    passExp: 50,
-    sortOrder: 3,
-  },
-
-  // ── 전투 축(꺼짐) ──────────────────────────────────────────────────────────
-  // 재시뮬 검증 배관이 아직 없어 서버가 완전히 검증하지 못한다. 정의만 미리 둔다.
-  // `enabled` 를 true 로 바꾸고 전투 커맨드에서 bump 만 부르면 붙는다 —
-  // 미션 시스템 코드는 한 줄도 고치지 않는다. 그것이 event 를 문자열로 둔 이유다.
-  {
-    id: "daily.completeBattle3",
-    period: "daily",
-    event: EVENTS.battleCompleted.missionKey,
-    target: 3,
-    enabled: true,
-    title: "일일 전투",
-    description: "전투를 3회 완료하세요",
-    passExp: 20,
-    sortOrder: 3,
-  },
-  {
-    id: "weekly.winRankedBattle5",
-    period: "weekly",
-    event: EVENTS.rankedBattleWon.missionKey,
-    target: 5,
-    enabled: true,
-    title: "랭크 도전자",
-    description: "랭크 전투에서 5회 승리하세요",
-    passExp: 60,
-    sortOrder: 4,
-  },
-  {
-    id: "daily.claimReward1",
-    period: "daily",
-    event: EVENTS.rewardClaimed.missionKey,
-    target: 1,
-    enabled: false,
-    title: "보상 수령",
-    description: "보상을 1회 수령하세요",
-    passExp: 10,
-    sortOrder: 4,
-  },
-  {
-    id: "daily.destroyCards3",
-    period: "daily",
-    event: EVENTS.battleCardsDestroyed.missionKey,
-    target: 3,
-    enabled: true,
-    title: "카드 파괴",
-    description: "상대 카드를 3장 파괴하세요",
-    passExp: 15,
-    sortOrder: 5,
-  },
-  {
-    id: "daily.triggerSynergy2",
-    period: "daily",
-    event: EVENTS.battleSynergiesTriggered.missionKey,
-    target: 2,
-    enabled: true,
-    title: "시너지 발동",
-    description: "시너지를 2회 발동하세요",
-    passExp: 20,
-    sortOrder: 6,
-  },
-  {
-    id: "daily.triggerKeyword2",
-    period: "daily",
-    event: EVENTS.battleKeywordsTriggered.missionKey,
-    target: 2,
-    enabled: true,
-    title: "키워드 발동",
-    description: "키워드를 2회 발동하세요",
-    passExp: 20,
-    sortOrder: 7,
-  },
-  {
-    id: "weekly.attackTimes50",
-    period: "weekly",
-    event: EVENTS.battleAttacksPerformed.missionKey,
-    target: 50,
-    enabled: true,
-    title: "주간 공격",
-    description: "공격을 50회 수행하세요",
-    passExp: 50,
-    sortOrder: 5,
-  },
-];
+const CATALOG: MissionDef[] = GENERATED_MISSIONS;
 
 /**
  * 저작된 정의 전부(꺼진 것 포함). 수령 판정이 "없는 미션"과 "꺼진 미션"을 갈라야 해서

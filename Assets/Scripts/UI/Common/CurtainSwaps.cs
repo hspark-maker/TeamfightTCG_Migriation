@@ -51,7 +51,7 @@ public class SceneLoadSwap : ICurtainSwap
         // 로드를 못 걸었으면 Commit이 동기 로드로 되돌아간다 — 연출 때문에 화면이 갇히는 일은 없어야 한다.
         if (m_op == null)
         {
-            Debug.LogError($"[SceneLoadSwap] '{m_scene}' 를 비동기 로드할 수 없습니다 — 덮인 뒤 동기 로드로 넘깁니다.");
+            Debug.LogError($"[SceneLoadSwap] Cannot load '{m_scene}' asynchronously — handing it to a synchronous load once covered.");
 
             return;
         }

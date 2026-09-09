@@ -220,7 +220,7 @@ public class RoulettePanel : PooledUIBase
 
             this.PlayWinPunch(t_outcome.SlotIndex);
 
-            this.PlayGainEffect(t_outcome);
+            await this.PlayGainEffectAsync(t_outcome);
         }
         finally
         {
@@ -259,11 +259,11 @@ public class RoulettePanel : PooledUIBase
             if (this.slots[t_i] == null || t_i >= t_count) continue;
 
             RouletteSlotDef t_def = t_defs[t_i];
-            this.slots[t_i].Bind(t_def.currency, t_def.amount);
+            this.slots[t_i].Bind(t_def);
         }
 
         if (t_count != this.slots.Length)
-            Debug.LogWarning($"[RoulettePanel] 저작 칸 {this.slots.Length}개와 설정 칸 {t_count}개가 다르다 — 판 그림과 상품이 어긋난다.", this);
+            Debug.LogWarning($"[RoulettePanel] The {this.slots.Length} authored slot(s) differ from the {t_count} configured slot(s) — the board art and the prizes are misaligned.", this);
     }
 
     // 낙관 홀드·응답 채택·디버그 지급이 전부 이 통지를 때리므로 회전 뒤에 따로 갱신하지 않는다.
@@ -325,8 +325,30 @@ public class RoulettePanel : PooledUIBase
     }
 
     // 잔액은 서버 응답 채택이 이미 갈아끼웠다 — 롤업이 (잔액 − 획득량) → 잔액으로 세므로 끝값이 곧 실제 지급 뒤 잔액이다.
-    void PlayGainEffect(RouletteSpinOutcome _outcome)
+    async UniTask PlayGainEffectAsync(RouletteSpinOutcome _outcome)
     {
+        if (_outcome.IsPack)
+        {
+            // 카드 결과는 로비 보상층에 뜬다. 더 높은 룰렛이 퇴장한 뒤 열어 입력도 전달한다.
+            this.Close();
+            await UniTask.Delay(Mathf.CeilToInt(this.transition.CloseDuration * 1000f),
+                DelayType.UnscaledDeltaTime, cancellationToken: this.GetCancellationTokenOnDestroy());
+            if (_outcome.Cards != null && _outcome.Cards.Count > 0 && CardSetRewardOverlay.TryGet(out var t_cards))
+                t_cards.ShowGranted(_outcome.Cards);
+            if (_outcome.Granted != null)
+            {
+                var t_bucket = new CurrencyGainBucket();
+                foreach (var t_gain in _outcome.Granted) t_bucket.Add(t_gain);
+                if (CurrencyGainEffectPlayer.TryGet(this, out var t_packPlayer))
+                    for (int t_i = 0; t_i < (int)ECurrencyType.Count; t_i++)
+                    {
+                        var t_type = (ECurrencyType)t_i;
+                        if (t_bucket[t_type] > 0)
+                            t_packPlayer.Play(null, new CurrencyGain(t_type, t_bucket[t_type]), null);
+                    }
+            }
+            return;
+        }
         CurrencyGainEffectPlayer t_player = this.gainPlayer;
         if (t_player == null && !CurrencyGainEffectPlayer.TryGet(this, out t_player)) return;
 
@@ -367,7 +389,7 @@ public class RoulettePanel : PooledUIBase
         switch (_result)
         {
             case ERouletteSpinResult.InsufficientTicket: return "룰렛 티켓이 부족합니다.\n티켓 획득처는 준비 중입니다.";
-            case ERouletteSpinResult.RewardUnreadable:   return "보상은 지급되었습니다.\n결과를 그리지 못했으니 잔액을 확인해 주세요.";
+            case ERouletteSpinResult.RewardUnreadable:   return "보상은 지급되었습니다.\n결과를 그리지 못했으니 보유 카드와 재화를 확인해 주세요.";
             case ERouletteSpinResult.Rejected:           return "회전이 거절되었습니다.\n잠시 후 다시 시도해 주세요.";
             case ERouletteSpinResult.RouletteNotFound:   return "룰렛을 준비하지 못했습니다.\n잠시 후 다시 시도해 주세요.";
             default:                                     return "지금은 룰렛을 돌릴 수 없습니다.";

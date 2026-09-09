@@ -74,8 +74,8 @@ public static class SpecPayloadCodec
                 continue;
 
             UnityEngine.Debug.LogError(
-                $"[SpecPayloadCodec] 표 '{t_property.Name}' 가 동기화 목록(TableNames)에 없다 — " +
-                "채택 뒤 0행이 되어 이 표를 읽는 초기화가 실패한다. TableNames 와 RowTypeOf 에 함께 추가할 것.");
+                $"[SpecPayloadCodec] Table '{t_property.Name}' is not in the sync list (TableNames) — " +
+                "it becomes 0 rows after adoption, so any initialization that reads this table fails. Add it to both TableNames and RowTypeOf.");
         }
     }
 

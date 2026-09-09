@@ -11,6 +11,7 @@ const {
   effectiveWeight,
   resolveRouletteBoard,
   drawRouletteSlot,
+  isLegacyRouletteReceipt,
 } = require("../lib/roulette/rouletteDraw.js");
 
 const BOARD_ID = "roulette_default";
@@ -70,7 +71,7 @@ assert.equal(effectiveWeight(-5), 1);
   assert.equal(board.price, 1);
   assert.equal(board.droppedRows, 0);
   assert.deepEqual(board.slots.map((s) => s.slotIndex), [0, 1, 2], "칸 순서는 칸 표 id 오름차순이다");
-  assert.deepEqual(board.slots[0], {slotIndex: 0, currency: "Gold", amount: 100, weight: 1});
+  assert.deepEqual(board.slots[0], {slotIndex: 0, rewardType: "Currency", rewardId: "Gold", currency: "Gold", amount: 100, weight: 1});
 }
 
 // 칸 행이 0개라도 헤더가 있으면 판은 선다 — 빈 풀 판정은 호출부(EmptyPool)의 몫이다.
@@ -124,6 +125,9 @@ for (const [label, over] of [
   ["slotIndex 음수", {slotIndex: -1}],
   ["slotIndex 상한 밖", {slotIndex: ROULETTE_SLOT_COUNT}],
   ["slotIndex 소수", {slotIndex: 0.5}],
+  ["빈 팩", {rewardType: "Pack", rewardId: ""}],
+  ["잘못된 팩 키", {rewardType: "Pack", rewardId: "a/b"}],
+  ["팩 수량 초과", {rewardType: "Pack", rewardId: "pack", amount: 101}],
 ]) {
   const board = resolveRouletteBoard(header(), [row(1, over), row(2)]);
   assert.equal(board.droppedRows, 1, `${label} 행이 버려져야 한다`);
@@ -186,3 +190,29 @@ assert.equal(resolveRouletteBoard(header(), [row(1, {rewardType: " Currency "})]
 assert.equal(drawRouletteSlot([], scriptedRoll([])), null);
 
 console.log("test-roulette: ok");
+
+// 실제 시트의 재화 6칸·팩 2칸이 빠짐없이 표시/추첨된다.
+{
+  const fs = require('node:fs');
+  const lines = fs.readFileSync(require('node:path').join(__dirname, '../../docs/SpecData/RouletteSlot_sheet.csv'), 'utf8').trim().split(/\r?\n/);
+  const data = lines.filter(line => /^\d+,/.test(line)).map(line => {
+    const [id, rouletteId, slotIndex, rewardType, rewardId, amount, weight] = line.split(',');
+    return {id:Number(id),rouletteId,slotIndex:Number(slotIndex),rewardType,rewardId,amount:Number(amount),weight:Number(weight)};
+  });
+  const board = resolveRouletteBoard(header(), data);
+  assert.equal(board.slots.length, 8);
+  assert.equal(board.droppedRows, 0);
+  assert.equal(board.slots.filter(slot => slot.rewardType === 'Pack').length, 2);
+  let offset = 0;
+  for (const slot of board.slots) {
+    assert.equal(drawRouletteSlot(board.slots, () => offset), slot);
+    offset += effectiveWeight(slot.weight);
+  }
+  const {CURRENCY_KEYS} = require('../lib/currency/currencyKeys');
+  const legacy = {rouletteId:BOARD_ID, slotIndex:0, gain:{currency:'Gold',amount:10}, wallet:{rev:1,balances:Object.fromEntries(CURRENCY_KEYS.map(k=>[k,0]))}};
+  assert.equal(isLegacyRouletteReceipt(legacy), true);
+  assert.equal(isLegacyRouletteReceipt({...legacy,revision:3,slotKeys:[]}), false);
+  assert.equal(isLegacyRouletteReceipt({...legacy,cards:[]}), false);
+  assert.equal(isLegacyRouletteReceipt({...legacy,gain:{currency:'Invalid',amount:10}}), false);
+}
+console.log('roulette mixed rewards and legacy receipt: OK');

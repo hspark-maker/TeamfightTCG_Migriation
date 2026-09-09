@@ -36,12 +36,12 @@ internal static class EnhanceCommand
         catch (ServerAdoptionException t_adoption)
         {
             // 세션은 이미 접혔고 팝업은 CloudSyncStatusWatcher 담당이다 — 여기서 표면을 두 번 칠하지 않는다.
-            Debug.LogWarning($"[EnhanceCommand] 응답 채택이 세션을 접었다 — {t_adoption.Message}");
+            Debug.LogWarning($"[EnhanceCommand] Adopting the response closed the session — {t_adoption.Message}");
             return EnhanceCommandResult.Blocked(EEnhanceOutcome.NotReady);
         }
         catch (Exception t_exception)
         {
-            Debug.LogError($"[EnhanceCommand] {CARD_COMMAND} 실패 — {t_exception.GetBaseException().Message}");
+            Debug.LogError($"[EnhanceCommand] {CARD_COMMAND} failed — {t_exception.GetBaseException().Message}");
             return EnhanceCommandResult.Blocked(EEnhanceOutcome.NotReady);
         }
         finally
@@ -70,12 +70,12 @@ internal static class EnhanceCommand
         }
         catch (ServerAdoptionException t_adoption)
         {
-            Debug.LogWarning($"[EnhanceCommand] 응답 채택이 세션을 접었다 — {t_adoption.Message}");
+            Debug.LogWarning($"[EnhanceCommand] Adopting the response closed the session — {t_adoption.Message}");
             return EnhanceCommandResult.Blocked(EEnhanceOutcome.NotReady);
         }
         catch (Exception t_exception)
         {
-            Debug.LogError($"[EnhanceCommand] {KEYWORD_COMMAND} 실패 — {t_exception.GetBaseException().Message}");
+            Debug.LogError($"[EnhanceCommand] {KEYWORD_COMMAND} failed — {t_exception.GetBaseException().Message}");
             return EnhanceCommandResult.Blocked(EEnhanceOutcome.NotReady);
         }
         finally
@@ -95,7 +95,7 @@ internal static class EnhanceCommand
             case REASON_MAX_LEVEL:      return EnhanceCommandResult.Rejected(EEnhanceOutcome.MaxLevel, _rejected.Reason);
         }
 
-        Debug.LogWarning($"[EnhanceCommand] {_commandName} 를 서버가 거절했다 — {_rejected.Message}");
+        Debug.LogWarning($"[EnhanceCommand] The server rejected {_commandName} — {_rejected.Message}");
         return EnhanceCommandResult.Rejected(EEnhanceOutcome.NotReady, _rejected.Reason);
     }
 }

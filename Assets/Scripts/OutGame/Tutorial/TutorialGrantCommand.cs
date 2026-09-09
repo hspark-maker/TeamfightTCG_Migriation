@@ -18,7 +18,7 @@ internal static class TutorialGrantCommand
         // 세션이 차단된다(CloudFailureClassifier) — 저작 실수 하나로 게임이 멎지 않게 왕복 전에 끊는다.
         if (string.IsNullOrEmpty(_packId))
         {
-            Debug.LogWarning("[TutorialGrantCommand] 지급 팩이 미배선 — 지급 요청을 보내지 않는다(스텝 저작의 pack 확인).");
+            Debug.LogWarning("[TutorialGrantCommand] No grant pack wired — no grant request is sent (check the pack field in the step authoring).");
             return null;
         }
 
@@ -31,24 +31,24 @@ internal static class TutorialGrantCommand
             int t_grantedCount = t_result.Granted != null ? t_result.Granted.Count : 0;
             var t_cardIds = t_result.CardIds ?? (IReadOnlyList<int>)Array.Empty<int>();
 
-            Debug.Log($"[TutorialGrantCommand] 지급 완료(pack={_packId}) — 보장 {t_cardIds.Count}장 중 신규 {t_grantedCount}장.");
+            Debug.Log($"[TutorialGrantCommand] Grant done (pack={_packId}) — {t_grantedCount} new out of the {t_cardIds.Count} guaranteed card(s).");
 
             return t_cardIds;
         }
         catch (ServerCommandRejectedException t_rejected)
         {
-            Debug.LogWarning($"[TutorialGrantCommand] 서버가 지급을 거절했다(pack={_packId}, reason={t_rejected.Reason}) — {t_rejected.Message}");
+            Debug.LogWarning($"[TutorialGrantCommand] The server rejected the grant (pack={_packId}, reason={t_rejected.Reason}) — {t_rejected.Message}");
             return null;
         }
         catch (ServerAdoptionException t_adoption)
         {
             // 세션은 이미 접혔고 팝업은 CloudSyncStatusWatcher 담당이다 — 여기서 표면을 두 번 칠하지 않는다.
-            Debug.LogWarning($"[TutorialGrantCommand] 응답 채택이 세션을 접었다 — {t_adoption.Message}");
+            Debug.LogWarning($"[TutorialGrantCommand] Adopting the response closed the session — {t_adoption.Message}");
             return null;
         }
         catch (Exception t_exception)
         {
-            Debug.LogError($"[TutorialGrantCommand] {GRANT_COMMAND} 실패(pack={_packId}) — {t_exception.GetBaseException().Message}");
+            Debug.LogError($"[TutorialGrantCommand] {GRANT_COMMAND} failed (pack={_packId}) — {t_exception.GetBaseException().Message}");
             return null;
         }
     }

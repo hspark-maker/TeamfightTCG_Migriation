@@ -48,6 +48,9 @@ const cardCatalog_1 = require("../packs/cardCatalog");
 const packDraw_1 = require("../packs/packDraw");
 const packSlots_1 = require("../packs/packSlots");
 const wallet_1 = require("../currency/wallet");
+const itemGrant_1 = require("../rewards/itemGrant");
+const rewardTable_1 = require("../rewardTable");
+const rankStore_1 = require("../rank/rankStore");
 const walletStore_1 = require("../currency/walletStore");
 const cardGrowth_1 = require("../growth/cardGrowth");
 const domainReject_1 = require("../save/domainReject");
@@ -91,11 +94,16 @@ exports.openPack = (0, https_1.onCall)(async (request) => {
         // 환급 경로는 클라·서버 양쪽에서 죽어 있다(중복 보상은 간식). 저작 실수를 조용히 삼키지 않는다.
         logger.warn("pack authors a refund that is never paid out", { env, packId, refundAmount: pack.refundAmount });
     }
-    const [dropRows, gradeRows, catalogIds] = await Promise.all([
+    const [dropRows, gradeRows, catalogIds, cardRows, rawRewards] = await Promise.all([
         (0, packSpecReader_1.readDropRows)(env, packId),
         (0, packSpecReader_1.readRankGradeRows)(env),
         (0, cardCatalog_1.loadCatalogIds)(env),
+        (0, packSpecReader_1.readSpecRows)(env, "Card"),
+        pack.price > 0 ? (0, packSpecReader_1.readSpecRows)(env, "Reward") : Promise.resolve([]),
     ]);
+    const duplicateRows = (0, rewardTable_1.parseRewardRows)(rawRewards);
+    const cardGrades = new Map(cardRows.map((row) => [Number(row.id), String(row.grade)]));
+    let granted = [];
     const entryPoints = (0, rankGrade_1.entryPointsFromRows)(gradeRows);
     if (entryPoints === null) {
         // 임계치가 없으면 잠금이 통째로 어긋난다 — 폴백으로 돌되 반드시 보이게 남긴다.
@@ -119,7 +127,8 @@ exports.openPack = (0, https_1.onCall)(async (request) => {
         // 미션 읽기가 콜백의 첫 줄이다 — 아래 쓰기보다 반드시 앞이어야 한다(Firestore 트랜잭션 규칙).
         const missions = await (0, missionStore_1.beginMissionBump)(transaction, firebaseApp_1.db, env, uid, period);
         // 트랜잭션이 재실행되면 이전 추첨을 버리고 다시 뽑는다 — 잔액·소유와 정합해야 한다.
-        const points = Number(current.rank?.points ?? 0);
+        const rankSnapshot = await transaction.get((0, rankStore_1.rankRef)(firebaseApp_1.db, env, uid));
+        const points = Number(rankSnapshot.data()?.points ?? current.rank?.points ?? 0);
         const grade = (0, rankGrade_1.gradeOf)(thresholds, points);
         const required = (0, rankGrade_1.parseRequiredGrade)(pack.minRankGrade);
         if (required !== null && (!(0, rankGrade_1.isRanked)(thresholds, points) || grade < required)) {
@@ -137,7 +146,8 @@ exports.openPack = (0, https_1.onCall)(async (request) => {
         const owned = (0, packSlots_1.readOwnedIds)(current.ownership);
         const ownedSet = new Set(owned);
         drawn = (0, packDraw_1.drawPack)(pool, pack.drawCount, pack.uniqueDraw, catalogIds, ownedSet, node_crypto_1.randomInt);
-        const paid = (0, wallet_1.spend)(balances, pack.priceType, pack.price);
+        granted = pack.price > 0 ? (0, itemGrant_1.duplicateGains)(drawn, cardGrades, duplicateRows) : [];
+        const paid = (0, wallet_1.grant)((0, wallet_1.spend)(balances, pack.priceType, pack.price), granted);
         goldBefore = balances[pack.priceType];
         goldAfter = paid[pack.priceType];
         // 진행도는 콜백 **안**에서 올린다 — mutateSave 는 영수증이 히트하면 이 콜백을 통째로 건너뛰므로,
@@ -153,7 +163,7 @@ exports.openPack = (0, https_1.onCall)(async (request) => {
         };
     }, (adopted) => {
         replayed = false;
-        return { ...adopted, packId, cards: drawn, refundType: pack.refundType, missions: missionState };
+        return { ...adopted, packId, cards: drawn, granted, refundType: pack.refundType, missions: missionState };
     });
     if (replayed) {
         logger.info("receipt replay", { uid, env, source: "openPack", txId, revision: result.revision });

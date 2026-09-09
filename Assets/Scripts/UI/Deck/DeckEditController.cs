@@ -300,7 +300,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
 
         if (this.m_request == null)
         {
-            Debug.LogError("[DeckEditController] DeckEditData가 아니면 어느 덱을 열지 알 수 없다.", this);
+            Debug.LogError("[DeckEditController] Without DeckEditData there is no way to know which deck to open.", this);
             return;
         }
 
@@ -370,7 +370,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     {
         if (UIPoolManager.Instance == null)
         {
-            Debug.LogError("[DeckEditController] UIPoolManager가 없어 덱 편집을 열 수 없다 — 초기화(InitializationRunner) 초기화를 확인할 것.");
+            Debug.LogError("[DeckEditController] There is no UIPoolManager, so deck edit cannot be opened — check the initialization (InitializationRunner).");
 
             return null;
         }
@@ -402,7 +402,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         // DeckSaveManager는 슬롯 배열을 직접 인덱싱한다 — 범위 밖 좌표가 새면 예외가 난다.
         if (_slotIndex < 0 || _slotIndex >= DeckSaveManager.SLOT_COUNT)
         {
-            Debug.LogError($"[DeckEditController] 잘못된 슬롯 인덱스 {_slotIndex} — 편집을 열지 않는다.");
+            Debug.LogError($"[DeckEditController] Invalid slot index {_slotIndex} — not opening the editor.");
             return;
         }
 
@@ -551,7 +551,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         }
 
         // 빼 둘 카드가 덱에 없으면 빈 칸이 안 생긴다 — "이 카드를 끼워라"라는 안내가 끼울 자리를 못 찾는다.
-        Debug.LogWarning($"[DeckEditController] 튜토리얼이 지목한 카드({CardCatalog.RequireSpec(m_holdout).DisplayName})가 이 덱에 없어 빈 칸을 만들지 못했다.");
+        Debug.LogWarning($"[DeckEditController] The card the tutorial points at ({CardCatalog.RequireSpec(m_holdout).DisplayName}) is not in this deck, so an empty slot could not be made.");
         m_holdout = 0;
     }
 
@@ -585,7 +585,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         if (dragController != null) dragController.Setup(() => Slots, AssignSlot, OnDragEnded);
         // 배선이 프리팹 인스턴스 오버라이드로만 존재한다(DragLayer가 이 프리팹 밖에 있다) — Revert 한 번에 조용히 사라진다.
         // 여기서 알리지 않으면 "롱프레스해도 아무 일 없음"으로만 드러난다. 패널을 열 때 한 번만 찍힌다.
-        else Debug.LogError($"[DeckEditController] dragController 미배선({name}) — 드래그 이동이 동작하지 않는다(클릭 배치만 가능).");
+        else Debug.LogError($"[DeckEditController] dragController is unwired ({name}) — drag-to-move does not work (click placement only).");
 
         s_open = this;
 
@@ -669,13 +669,19 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
 
     // 하단 바의 삭제 버튼. 신규 편집 중이거나, 만석이라 ⊕ 칸이 삭제 토글이 된 뒤에 열린다(DeckStripView가 두 축을 쥔다).
     // 신규 편집 중이면 편집 대상은 아직 저장되지 않은 덱이라 지우는 칸과 겹치지 않는다(m_slotIndex는 -1).
-    // 만석 삭제 모드에서는 편집 중인 덱까지 지울 수 있고, 그 앞 덱을 지우면 압축 당김으로 좌표가 밀린다 —
-    // 편집 중인 덱을 참조로 붙들었다가 삭제 뒤 좌표를 되찾고, 그 덱 자체가 지워졌으면 이웃 덱으로 갈아탄다
-    // (OnDeckStripSlotClicked와 같은 참조 판정 · RelocateEditingSlot).
+    // 만석 삭제 모드에서는 편집 중인 덱을 바가 제외하지만, 그 앞 덱을 지우면 압축 당김으로 좌표가 밀린다 —
+    // 편집 중인 덱을 참조로 붙들었다가 삭제 뒤 좌표를 되찾는다(OnDeckStripSlotClicked와 같은 판정).
     // 삭제는 되돌릴 수 없으므로 로비 목록(DeckListController.OnSlotDeleteClicked)과 같은 확인 절차를 그대로 밟는다.
     void OnDeckStripSlotDelete(int _slotIndex)
     {
         if (!DeckSaveManager.IsSlotValid(_slotIndex)) return;
+
+        if (this.m_mode == EDeckEditMode.Edit && this.m_slotIndex == _slotIndex)
+        {
+            // 바가 이 칸의 삭제 버튼을 열지 않으므로 여기 닿으면 표시와 상태가 어긋난 것이다.
+            Debug.LogWarning($"[DeckEditController] The deck being edited cannot be deleted from this screen slot={_slotIndex}.");
+            return;
+        }
 
         // 이름은 팝업이 뜨기 전에 캡처한다 — 삭제 후에는 그 좌표가 다른 덱을 가리킨다(압축 당김).
         string t_name = DeckSaveManager.GetDisplayName(_slotIndex);
@@ -683,7 +689,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         if (UIPoolManager.Instance == null)
         {
             // 다른 경로는 팝업이 없으면 그냥 진행하는 폴백을 쓰지만, 삭제는 복구가 불가능하므로 취소한다.
-            Debug.LogWarning("[DeckEditController] UIPoolManager 없음 — 덱 삭제를 취소한다.");
+            Debug.LogWarning("[DeckEditController] No UIPoolManager — cancelling the deck deletion.");
             return;
         }
 
@@ -698,7 +704,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
                 // TryDeleteAt은 유효성만 보므로 여기서 이름으로 동일성을 재확인한다.
                 if (!DeckSaveManager.IsSlotValid(_slotIndex) || DeckSaveManager.GetDisplayName(_slotIndex) != t_name)
                 {
-                    Debug.LogWarning($"[DeckEditController] 확인 중 덱 목록이 바뀜 — 삭제 취소 slot={_slotIndex}.");
+                    Debug.LogWarning($"[DeckEditController] The deck list changed during confirmation — deletion cancelled slot={_slotIndex}.");
                     RebuildDeckStrip();
                     return;
                 }
@@ -710,11 +716,10 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
 
                 // 실패 사유(미로드·레지스트리 미주입 등)는 DeckSaveManager가 이미 로그한다.
                 if (!DeckSaveManager.TryDeleteAt(_slotIndex))
-                    Debug.LogWarning($"[DeckEditController] 덱 삭제 실패 slot={_slotIndex}.");
+                    Debug.LogWarning($"[DeckEditController] Deck deletion failed slot={_slotIndex}.");
 
-                // 갈아탔으면 Open 이 바를 이미 다시 세웠고, 닫혔으면 세울 화면이 없다.
-                if (t_editing != null && RelocateEditingSlot(t_editing)) return;
-                if (!IsOpen) return;
+                if (t_editing != null) RelocateEditingSlot(t_editing);
+                if (!IsOpen) return;   // 되찾기에 실패해 편집기가 닫혔다 — 닫힌 화면의 바를 다시 세우지 않는다
 
                 // 이 화면은 로비 목록과 달리 OnDeckChanged를 구독하지 않는다 — 재빌드를 직접 건다.
                 RebuildDeckStrip();
@@ -724,43 +729,22 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
 
     // 앞쪽 덱이 지워져 편집 중인 덱의 좌표가 당겨졌으면 참조 동일성으로 새 좌표를 잡는다.
     // 저장(SaveEditedDeck)은 m_slotIndex 에 쓰므로, 여기서 안 옮기면 편집분이 다른 덱 위에 덮인다.
-    // 편집 중인 덱 자체가 지워졌으면 같은 자리로 당겨 온 덱(없으면 마지막 덱)으로 갈아탄다 —
-    // 이 화면은 돌아갈 목록이 없어 편집기를 닫으면 덱 탭을 통째로 떠나게 된다.
-    // 갈아탔으면 true 를 돌려준다(Open 이 바를 다시 세웠다는 뜻).
-    bool RelocateEditingSlot(List<int> _editing)
+    void RelocateEditingSlot(List<int> _editing)
     {
         for (int t_i = 0; t_i < DeckSaveManager.SLOT_COUNT; t_i++)
         {
             if (!DeckSaveManager.IsSlotValid(t_i) || !ReferenceEquals(DeckSaveManager.GetSlot(t_i), _editing)) continue;
 
             this.m_slotIndex = t_i;
-            return false;
+            return;
         }
 
-        int t_next = -1;
-        for (int t_i = Mathf.Min(this.m_slotIndex, DeckSaveManager.SLOT_COUNT - 1); t_i >= 0; t_i--)
-        {
-            if (!DeckSaveManager.IsSlotValid(t_i)) continue;
-
-            t_next = t_i;
-            break;
-        }
-
-        if (t_next >= 0)
-        {
-            // Open 은 m_dirty 를 내리고 바를 다시 세운다 — 지워진 덱의 미저장 편집분은 함께 버려진다.
-            ConsumeHoldout();   // 덱을 갈아타는 경로는 전부 이 요청을 소비한다(OnDeckStripSlotClicked와 같다)
-            Open(t_next);
-            return true;
-        }
-
-        // 남은 덱이 없다(만석에서 하나만 지우므로 정상 경로에서는 오지 않는다). 빈 좌표에 저장하게 둘 수 없으니 나간다.
+        // 편집 중인 덱 자체가 사라졌다(바가 막지만 세이브가 밖에서 바뀌면 가능하다). 빈 좌표에 저장하게 둘 수 없으니 나간다.
         // 좌표를 먼저 비운다 — 로비 임베디드 경로의 HideEditor 는 CurrentSlot 을 대표 덱 선택에 되넘기므로,
         // 낡은 좌표를 남기면 엉뚱한 덱이 대표가 된다.
-        Debug.LogWarning("[DeckEditController] 갈아탈 덱이 없음 — 편집기를 닫는다.");
+        Debug.LogWarning("[DeckEditController] Could not recover the deck being edited — closing the editor.");
         this.m_slotIndex = -1;
         ExitEditor();
-        return false;
     }
 
     // 빼 둘 카드는 이번 "진입"의 요청이다 — 덱을 갈아탄 뒤에도 남아 있으면 새 덱에서 엉뚱한 칸이 비거나
@@ -1039,7 +1023,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
                 if (ContainsInWorking(t_card)) continue;
 
                 if (!OwnershipManager.IsOwned(t_card))
-                    Debug.LogWarning($"[DeckEditController] 튜토리얼 지정 카드 '{CardCatalog.RequireSpec(t_card).DisplayName}'가 미소유 상태다 — 그대로 편성한다.");
+                    Debug.LogWarning($"[DeckEditController] The tutorial-designated card '{CardCatalog.RequireSpec(t_card).DisplayName}' is unowned — placing it anyway.");
 
                 if (!TryFillFirstEmpty(t_card)) break;   // 6칸이 다 찼다
                 t_changed = true;
@@ -1241,7 +1225,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         // 팝업이 못 뜨면(UIPoolManager 미배치·프리팹 미등록) 확인을 못 받은 채 화면에 갇힐 수 있다 → 그냥 내보낸다.
         if (t_popup == null)
         {
-            Debug.LogError("[DeckEditController] 확인 팝업 생성 실패 — 저장 없이 편집을 닫는다.");
+            Debug.LogError("[DeckEditController] Failed to create the confirmation popup — closing the editor without saving.");
             _onGranted?.Invoke();
         }
     }
@@ -1320,7 +1304,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         }
 
         // 만석·미로드 등 실패 사유는 DeckSaveManager가 로그로 남긴다. 여기서는 나가지 않는다는 사실만 알린다.
-        Debug.LogError("[DeckEditController] 신규 덱 저장 실패 — 편집 화면을 유지한다.");
+        Debug.LogError("[DeckEditController] Failed to save the new deck — keeping the edit screen open.");
 
         return false;
     }

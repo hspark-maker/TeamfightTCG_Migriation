@@ -55,7 +55,7 @@ public sealed class OutgameConfigStep : MainInitializer
         if (RouletteSpec.TryBuildRuntime(rouletteConfig, out RouletteConfig t_runtimeRoulette, out string t_rouletteError))
             RouletteManager.SetConfig(t_runtimeRoulette);
         else
-            Debug.LogError($"[OutgameConfig] 룰렛 판을 세우지 못했다 — 룰렛만 꺼진다. {t_rouletteError}");
+            Debug.LogError($"[OutgameConfig] Could not build the roulette board — only the roulette is turned off. {t_rouletteError}");
 
         // 신규 덱 저장 시 여기서 대표 이미지 키를 뽑는다.
         DeckImages.SetSource(deckImageCatalog);

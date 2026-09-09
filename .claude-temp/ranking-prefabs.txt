@@ -1,0 +1,79 @@
+=== PREFAB 정보 정확 추출 ===
+
+파일 1: Assets/Assets/Prefabs/UI/PooledUI/RankRewardOverlay.prefab
+GUID: 8a64cbb246ea50344ac445bc7d85e0c7
+
+RankRewardOverlay.prefab 구조:
+- GameObject: RankRewardOverlay (루트, fileID 미확인 필요)
+  - RectTransform 자식:
+    - Dim (fileID 미확인)
+    - Panel (fileID 미확인)
+      - Root
+        - Closebtn
+        - Scroll View (ScrollRect)
+          - Viewport
+            - Content (VerticalLayoutGroup)
+              - [동적 행 생성 자리]
+
+RankRewardOverlay.prefab 모노비헤이비어:
+- RankRewardPanel (GUID: 미확인, 스크립트)
+  - [SerializeField] root (GameObject)
+  - [SerializeField] scrollRect (ScrollRect)
+  - [SerializeField] content (Transform)
+  - [SerializeField] rowPrefab (RankRewardRowView)
+  - [SerializeField] closeButton (Button)
+  - [SerializeField] transition (PopupTransition)
+  - [SerializeField] float dimAlpha
+
+---
+
+파일 2: Assets/Assets/Prefabs/UI/LobbyUI/RankUI/RankRewardRow.prefab
+GUID: 3e73acab0ea34f04f8f10b0f6f843862
+
+RankRewardRow.prefab 구조:
+- GameObject: RankRewardRow (루트)
+  - RectTransform:
+    - Highlight (GameObject, 선택)
+    - BadgeImage (Image, 티어 배지)
+    - TierNameText (TMP_Text, 등급명)
+    - RewardBox (Button, 보상 박스)
+      - [아이콘+수량 자식들]
+    - ClaimedMark (GameObject, 체크마크)
+    - LockDim (GameObject, 자물쇠)
+    - Chevron (GameObject, 장식선)
+
+RankRewardRow.prefab 모노비헤이비어:
+- RankRewardRowView (GUID: 미확인, 스크립트)
+  - [SerializeField] badgeImage (Image)
+  - [SerializeField] tierNameText (TMP_Text)
+  - [SerializeField] rewardBox (Button)
+  - [SerializeField] rewardSlots[] (CurrencyRewardSlotView[])
+  - [SerializeField] highlight (GameObject)
+  - [SerializeField] claimedMark (GameObject)
+  - [SerializeField] lockDim (GameObject)
+  - [SerializeField] chevron (GameObject)
+  - [SerializeField] canvasGroup (CanvasGroup)
+  - [SerializeField] float claimedAlpha (0.6f)
+  - [SerializeField] float readyPulseMinAlpha (0.45f)
+  - [SerializeField] float readyPulseDuration (0.8f)
+
+---
+
+추가 위치:
+RankHud.cs 부착 프리팹: Assets/Assets/Prefabs/UI/LobbyUI/RankInfo.prefab
+  (794930fce48917844b2b730d8868dd8a 스크립트 참조)
+
+OpponentProfilePool.asset.meta GUID: 7f6df2feb8d5076418b96358ee58377d
+OpponentProfilePool.asset 경로: Assets/SO/OpponentProfilePool.asset
+
+AddressableAssetsData 등록:
+  m_GUID: 8a64cbb246ea50344ac445bc7d85e0c7
+  m_Address: RankRewardPanel
+  m_ReadOnly: 0
+  m_SerializedLabels: [UIPrefab]
+
+=== 주의 ===
+- RankRewardOverlay/RankRewardRow 프리팹은 Addressables "UIPrefab" 라벨로 로드됨
+- 신규 RankingBoardPanel/RankingRow 프리팹 생성 시 동일 라벨 추가 필수
+- 프리팹 YAML fileID는 실제 파일 열어서 확인 필요 (동적 참조용)
+- 기존 RankRewardRow의 rewardSlots 자식을 신규에서는 제거/비활성화 예정

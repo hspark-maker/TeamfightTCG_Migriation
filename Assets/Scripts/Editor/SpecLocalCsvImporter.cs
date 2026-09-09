@@ -39,7 +39,7 @@ public static class SpecLocalCsvImporter
     public static void RunImportInteractive()
     {
         if (!Import(out string t_summary, out string t_error)) { Debug.LogError("[SpecLocalCsv] " + t_error); return; }
-        Debug.LogWarning("[SpecLocalCsv] " + t_summary + "\n※ 이건 로컬 실험본이다. 시트에 반영하지 않으면 다음 '시트 적용 & CS 생성'에서 사라진다.");
+        Debug.LogWarning("[SpecLocalCsv] " + t_summary + "\nNote: this is a local experiment build. If it is not reflected back into the sheet, it disappears on the next 'Apply sheet & generate CS'.");
     }
 
     /// <summary>지금 bytes 와 docs CSV 를 비교만 한다(쓰지 않는다).</summary>
@@ -416,7 +416,7 @@ public static class SpecLocalCsvImporter
             byte[] t_body = Encoding.UTF8.GetBytes(_text);
             return t_aes.CreateEncryptor().TransformFinalBlock(t_body, 0, t_body.Length);
         }
-        catch (Exception t_exception) { Debug.LogError("[SpecLocalCsv] 암호화 실패: " + t_exception.Message); return null; }
+        catch (Exception t_exception) { Debug.LogError("[SpecLocalCsv] Encryption failed: " + t_exception.Message); return null; }
     }
 
     static byte[] DecryptAes128(byte[] _data, byte[] _key)

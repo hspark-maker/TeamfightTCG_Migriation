@@ -7,9 +7,11 @@ import {drawAiDeck, parseAiDeckRows} from "../matchmaking/aiDeckDraw";
 import {MATCH_PAIRING_TTL_MS, SERVER_RULESET_VERSION} from "../matchPairing";
 import {withCountedTransaction} from "../observability/countedTransaction";
 import {parseRankGradeRows, resolveTierIndex} from "../payout";
+import {currentRankSeason} from "../rank/rankSeason";
+import {ensureRankState} from "../rank/rankStore";
 import {HEX_16, HEX_32, HEX_64, objectRecord, safeInteger} from "../match/payloadGuards";
 import {clientReceiptId} from "../save/receiptId";
-import {isKnownEnv, requireUid, saveDocument} from "../save/saveDocument";
+import {isKnownEnv, requireUid} from "../save/saveDocument";
 import {
   BATTLE_REPLAY_SPEC_TABLES,
   fingerprintOfSpecPins,
@@ -30,7 +32,7 @@ type AuthoredFindAiMatchData = {
   contentFingerprint: string;
   playerDeck: number[];
   txId: string;
-  resultProtocol: 0 | 1;
+  resultProtocol: 1;
 };
 
 type FindAiMatchData = LegacyFindAiMatchData | AuthoredFindAiMatchData;
@@ -65,7 +67,7 @@ function parseData(raw: unknown): FindAiMatchData {
     // 정상 클라는 ServerSaveCommands가 같은 재시도에 같은 유효 txId를 싣는다. fallback UUID는
     // txId가 없는 수동 호출용일 뿐이며 clientReceiptId는 유효한 원본을 그대로 반환한다.
     txId: clientReceiptId(data?.txId, randomUUID()),
-    resultProtocol: data?.resultProtocol === 1 ? 1 : 0,
+    resultProtocol: 1,
   };
 }
 
@@ -111,7 +113,7 @@ function storedResponse(raw: Record<string, unknown>, data: AuthoredFindAiMatchD
     cardLevel: aiDeck.cardLevel,
     playerBoardOrder,
     enemyBoardOrder,
-    resultProtocol: raw.resultProtocol === 1 ? 1 : 0,
+    resultProtocol: 1,
   };
 }
 
@@ -122,18 +124,19 @@ function storedResponse(raw: Record<string, unknown>, data: AuthoredFindAiMatchD
 export const findAiMatch = onCall(async (request) => {
   const uid = requireUid(request.auth);
   const data = parseData(request.data);
-  const [snapshot, rankRows, deckRows] = await Promise.all([
-    saveDocument(data.env, uid).get(),
+  const [rankRows, deckRows, seasonRows] = await Promise.all([
     readSpecRows(data.env, "RankGrade"),
     readSpecRows(data.env, "AIDeck"),
+    readSpecRows(data.env, "PassSeason"),
   ]);
-  if (!snapshot.exists) throw new HttpsError("failed-precondition", "Save document is missing.");
 
-  const rank = snapshot.data()?.rank as Record<string, unknown> | undefined;
-  const rawPoints = rank?.points;
-  const points = Number.isSafeInteger(rawPoints) ? rawPoints as number : 0;
   const grades = parseRankGradeRows(rankRows);
   if (grades.length === 0) throw new HttpsError("failed-precondition", "RankGrade spec is empty.");
+  const season = currentRankSeason(seasonRows, Date.now());
+  if (season === null) throw new HttpsError("failed-precondition", "No rank season is active.");
+  const rankState = await ensureRankState(db, data.env, uid, season.seasonId, grades);
+  if (rankState === null) throw new HttpsError("failed-precondition", "Save document is missing.");
+  const points = rankState.points;
 
   try {
     const parsed = parseAiDeckRows(deckRows);
@@ -168,6 +171,9 @@ export const findAiMatch = onCall(async (request) => {
       if (prior.exists) {
         const stored = storedResponse(prior.data() ?? {}, authoredData);
         if (stored == null) throw new HttpsError("already-exists", "AI match receipt was reused");
+        if (prior.data()?.resultProtocol !== 1) {
+          tx.set(matchRef, {resultProtocol: 1}, {merge: true});
+        }
         return stored;
       }
 

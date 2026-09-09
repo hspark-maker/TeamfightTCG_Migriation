@@ -49,15 +49,8 @@ public sealed class BattleOutcome
         }
 
         long t_rankPointsBefore = RankManager.Points;
-        bool t_serverPayout = DeckConfig.IsMultiplayer || SoloMatchHandoff.UsesResultSubmission;
         // 결과 팝업이 읽을 예상액이다 — 싱글·멀티 모두 확정 액수의 진실원은 서버 쪽이다.
         Reward = RewardService.CalculateReward(_won, t_remaining);
-
-        // 구 결과 프로토콜의 싱글 지급만 여기서 띄운다. 새 싱글과 멀티는 submitMatchResult payout을 함께 쓴다.
-        // matchId는 **지금** 읽는다. 지급은 씬 밖에서 이어지는데 TurnRunner.Cleanup이 캐리어를 비우므로,
-        // 비동기 안에서 읽으면 이미 지워진 뒤일 수 있다.
-        if (!t_serverPayout)
-            RewardService.GrantBattleRewardAsync(_won, t_remaining, SoloMatchHandoff.MatchId);
 
         if (t_draw)
         {
@@ -66,11 +59,8 @@ public sealed class BattleOutcome
         }
         else
         {
-            RankApplyResult t_rank = t_serverPayout
-                ? RankManager.PreviewBattleResult(_won, TutorialConfig.IsActive)
-                : RankManager.ApplyBattleResult(_won, TutorialConfig.IsActive);
+            RankApplyResult t_rank = RankManager.PreviewBattleResult(_won, TutorialConfig.IsActive);
             RankDelta = t_rank.Delta;
-            if (!t_serverPayout) RankResultHandoff.Set(t_rank);
         }
 
         SubmitMatchEvidence(_won, t_remaining, t_rankPointsBefore, _reason);

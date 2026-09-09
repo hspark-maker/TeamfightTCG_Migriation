@@ -69,7 +69,7 @@ public static class PackSpec
             return true;
         }
 
-        Debug.LogWarning($"[PackSpec] {_packId}.minRankGrade 값이 올바르지 않습니다: '{t_row.minRankGrade}'");
+        Debug.LogWarning($"[PackSpec] {_packId}.minRankGrade has an invalid value: '{t_row.minRankGrade}'");
         return false;
     }
 
@@ -107,7 +107,7 @@ public static class PackSpec
             if (!s_warnedCatalogNotReady)
             {
                 s_warnedCatalogNotReady = true;
-                Debug.LogWarning("[PackSpec] CardCatalog 초기화 전에 드롭 풀을 조회했다. 정상 흐름에서는 초기화(InitializationRunner)가 CardCatalog.SetSource 후 PackSpec을 초기화해야 한다.");
+                Debug.LogWarning("[PackSpec] The drop pool was queried before CardCatalog was initialized. In the normal flow, initialization (InitializationRunner) must initialize PackSpec after CardCatalog.SetSource.");
             }
             return t_result;
         }
@@ -125,7 +125,7 @@ public static class PackSpec
         if (t_result.Count != t_selectedRowCount && !s_warnedUnresolvedDrops)
         {
             s_warnedUnresolvedDrops = true;
-            Debug.LogWarning($"[PackSpec] '{_packId}'/{t_best} 드롭 {t_selectedRowCount}행 중 {t_result.Count}행만 CardCatalog에서 해석했다. 누락 cardId는 SO 폴백으로 숨기지 말고 Card/CardPackDrop 표를 맞춰야 한다.");
+            Debug.LogWarning($"[PackSpec] Only {t_result.Count} of the {t_selectedRowCount} drop row(s) for '{_packId}'/{t_best} resolved through CardCatalog. Missing cardIds must be fixed in the Card/CardPackDrop tables, not hidden behind an SO fallback.");
         }
         return t_result;
     }

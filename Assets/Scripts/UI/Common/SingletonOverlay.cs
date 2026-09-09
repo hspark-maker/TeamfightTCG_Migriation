@@ -47,7 +47,7 @@ public abstract class SingletonOverlay<T> : SingletonOverlayBase
         if (t_found == null)
         {
             Debug.LogError(
-                $"[SingletonOverlay] {t_prefab.name} 루트에 {typeof(T).Name}이 없습니다.",
+                $"[SingletonOverlay] The root of {t_prefab.name} has no {typeof(T).Name}.",
                 t_prefab);
             Destroy(t_instance);
         }

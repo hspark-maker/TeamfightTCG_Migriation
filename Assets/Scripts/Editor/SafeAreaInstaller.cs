@@ -68,13 +68,13 @@ public static class SafeAreaInstaller
                 string t_name = t_canvas.gameObject.name;
                 if (System.Array.IndexOf(SkipCanvases, t_name) >= 0)
                 {
-                    Debug.Log($"[SafeArea] 제외(전체화면 연출): {t_name}");
+                    Debug.Log($"[SafeArea] Excluded (full-screen presentation): {t_name}");
                     t_skipped++;
                     continue;
                 }
                 if (t_canvas.transform.Find(WrapperName) != null)
                 {
-                    Debug.Log($"[SafeArea] 이미 있음: {t_name}/{WrapperName}");
+                    Debug.Log($"[SafeArea] Already present: {t_name}/{WrapperName}");
                     t_skipped++;
                     continue;
                 }
@@ -85,8 +85,8 @@ public static class SafeAreaInstaller
         }
 
         if (t_added > 0) EditorSceneManager.MarkSceneDirty(t_scene);
-        Debug.Log($"[SafeArea] 씬 '{t_scene.name}' — 삽입 {t_added}건, 건너뜀 {t_skipped}건"
-                  + (t_added > 0 ? " (씬 저장 필요)" : ""));
+        Debug.Log($"[SafeArea] Scene '{t_scene.name}' — {t_added} inserted, {t_skipped} skipped"
+                   + (t_added > 0 ? " (scene needs saving)" : ""));
     }
 
     [MenuItem("Tools/UI/Install SafeArea (Pooled UI Prefabs)")]
@@ -104,7 +104,7 @@ public static class SafeAreaInstaller
                     : t_root.transform.Find(t_layout.parentPath);
                 if (t_parent == null)
                 {
-                    Debug.LogError($"[SafeArea] 부모 없음: {t_layout.assetPath}/{t_layout.parentPath}");
+                    Debug.LogError($"[SafeArea] Parent not found: {t_layout.assetPath}/{t_layout.parentPath}");
                     t_failed++;
                     continue;
                 }
@@ -113,9 +113,9 @@ public static class SafeAreaInstaller
                 if (t_existing != null)
                 {
                     if (t_existing.GetComponent<SafeAreaFitter>() == null)
-                        Debug.LogError($"[SafeArea] 이름은 있지만 Fitter 없음: {t_layout.assetPath}/{t_layout.parentPath}/{WrapperName}");
+                        Debug.LogError($"[SafeArea] Name exists but there is no Fitter: {t_layout.assetPath}/{t_layout.parentPath}/{WrapperName}");
                     else
-                        Debug.Log($"[SafeArea] 이미 있음: {t_layout.assetPath}/{t_layout.parentPath}/{WrapperName}");
+                        Debug.Log($"[SafeArea] Already present: {t_layout.assetPath}/{t_layout.parentPath}/{WrapperName}");
                     t_skipped++;
                     continue;
                 }
@@ -126,7 +126,7 @@ public static class SafeAreaInstaller
                     Transform t_child = t_parent.Find(t_name);
                     if (t_child == null || t_child.parent != t_parent)
                     {
-                        Debug.LogError($"[SafeArea] 직속 자식 없음: {t_layout.assetPath}/{t_layout.parentPath}/{t_name}");
+                        Debug.LogError($"[SafeArea] No direct child: {t_layout.assetPath}/{t_layout.parentPath}/{t_name}");
                         t_children.Clear();
                         break;
                     }
@@ -158,7 +158,7 @@ public static class SafeAreaInstaller
                 t_go.AddComponent<SafeAreaFitter>();
                 Stretch(t_rect); // ExecuteAlways가 현재 Device Simulator 값을 굽지 않게 저작 상태는 full stretch로 저장.
                 PrefabUtility.SaveAsPrefabAsset(t_root, t_layout.assetPath);
-                Debug.Log($"[SafeArea] 풀링 프리팹 적용: {t_layout.assetPath} (콘텐츠 {t_children.Count}개)");
+                Debug.Log($"[SafeArea] Applied to pooled prefab: {t_layout.assetPath} ({t_children.Count} content item(s))");
                 t_added++;
             }
             finally
@@ -168,7 +168,7 @@ public static class SafeAreaInstaller
         }
 
         AssetDatabase.SaveAssets();
-        Debug.Log($"[SafeArea] 풀링 프리팹 완료: 적용 {t_added}건, 건너뜀 {t_skipped}건, 실패 {t_failed}건");
+        Debug.Log($"[SafeArea] Pooled prefabs done: {t_added} applied, {t_skipped} skipped, {t_failed} failed");
     }
 
     static void Wrap(Canvas _canvas)
@@ -204,7 +204,7 @@ public static class SafeAreaInstaller
         t_go.AddComponent<SafeAreaFitter>();
         t_rect.SetAsFirstSibling();
 
-        Debug.Log($"[SafeArea] {_canvas.name} → {WrapperName} 삽입, 자식 {t_children.Count}개 이동");
+        Debug.Log($"[SafeArea] {_canvas.name} → {WrapperName} inserted, {t_children.Count} child/children moved");
     }
 
     static void Stretch(RectTransform _rect)

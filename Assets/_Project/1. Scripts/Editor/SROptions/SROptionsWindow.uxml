@@ -1,0 +1,40 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+    <ui:VisualElement name="root" class="sro-root">
+
+        <ui:VisualElement name="toolbar" class="sro-toolbar">
+            <uie:ToolbarSearchField name="search-field" class="sro-search" />
+            <ui:Button name="favorite-button" text="★" tooltip="즐겨찾기만 보기" class="sro-tbtn" />
+            <ui:Button name="collapse-button" text="모두 접기" class="sro-tbtn" />
+            <ui:Button name="theme-button" text="Light" tooltip="밝은 스킨으로" class="sro-tbtn" />
+            <ui:Label name="play-state" text="EDIT" class="sro-state sro-state--stop" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="banner" class="sro-banner">
+            <ui:Label name="banner-label" text="플레이 모드에서만 값을 편집할 수 있다. 목록은 미리 볼 수 있다." />
+            <ui:VisualElement class="sro-banner__spacer" />
+            <ui:Button name="play-button" text="▶ 플레이" class="sro-tbtn" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="body" class="sro-body">
+            <ui:ScrollView name="side" class="sro-side" />
+
+            <ui:VisualElement name="main" class="sro-main">
+                <ui:VisualElement name="crumb" class="sro-crumb">
+                    <ui:Button name="category-button" text="≡" tooltip="카테고리 고르기" class="sro-tbtn" />
+                    <ui:Label name="crumb-title" text="—" class="sro-crumb__title" />
+                    <ui:Label name="crumb-sub" text="" class="sro-crumb__sub" />
+                    <ui:Button name="expand-button" text="전체 펼치기" class="sro-tbtn" />
+                </ui:VisualElement>
+
+                <ui:ScrollView name="content" class="sro-scroll" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="status" class="sro-status">
+            <ui:Label name="status-left" text="" />
+            <ui:VisualElement class="sro-status__spacer" />
+            <ui:Label name="status-right" text="더블클릭으로 즐겨찾기 · Ctrl+F 검색" />
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+</ui:UXML>

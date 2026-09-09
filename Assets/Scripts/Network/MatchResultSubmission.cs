@@ -103,7 +103,7 @@ static class MatchResultSubmission
             out string t_soloMatchId, out string t_soloDeckHash, out string t_soloOpponentDeckHash);
         if (string.IsNullOrEmpty(s_envId) || (t_multiplayer ? !t_hasMultiplayerIdentity : !t_hasSoloIdentity))
         {
-            Debug.LogError("[MatchResult] 제출 증거가 완성되지 않아 서버 확정을 시작하지 못했다.");
+            Debug.LogError("[MatchResult] The submission evidence was not complete, so server confirmation could not start.");
             return false;
         }
 
@@ -194,7 +194,7 @@ static class MatchResultSubmission
                     // 영구 거절은 재시도해도 같은 답이 온다. 큐에 남기면 같은 실패를 영원히 반복한다.
                     if (IsPermanentRejection(t_exception, out FunctionsErrorCode t_code))
                     {
-                        Debug.LogError($"[MatchResult] 서버가 제출을 영구 거절했다(match={t_item.matchId}, " +
+                        Debug.LogError($"[MatchResult] The server permanently rejected the submission (match={t_item.matchId}, " +
                                        $"code={t_code}, uid={FirebaseAuthService.Instance.UserId}): " +
                                        $"{t_exception.GetBaseException().Message}");
                         // 큐에서 버리는 순간 이 판의 보상·랭크는 영영 오지 않는다. 결과 화면이 방금 보여 준 수치가
@@ -204,8 +204,8 @@ static class MatchResultSubmission
                     }
                     else
                     {
-                        Debug.LogWarning($"[MatchResult] 제출 보류(match={t_item.matchId}, " +
-                                         $"{t_item.attempts}/{MaxAttempts}회): {t_exception.GetBaseException().Message}");
+                        Debug.LogWarning($"[MatchResult] Submission deferred (match={t_item.matchId}, " +
+                                         $"attempt {t_item.attempts}/{MaxAttempts}): {t_exception.GetBaseException().Message}");
                     }
                 }
 
@@ -263,7 +263,7 @@ static class MatchResultSubmission
         await t_auth.InitializeAsync();
         if (t_auth.IsCurrentUserActive) return true;
 
-        Debug.LogWarning($"[MatchResult] 로그인 전이라 제출을 미룬다(state={t_auth.State}, error={t_auth.LastError}).");
+        Debug.LogWarning($"[MatchResult] Not signed in yet, so the submission is deferred (state={t_auth.State}, error={t_auth.LastError}).");
         return false;
     }
 
@@ -321,7 +321,7 @@ static class MatchResultSubmission
         {
             _complete = true;
             TryString(t_root, "reason", out string t_reason);
-            Debug.LogError($"[MatchResult] 서버가 매치를 무효 처리했다(match={_matchId}, reason={t_reason}).");
+            Debug.LogError($"[MatchResult] The server voided the match (match={_matchId}, reason={t_reason}).");
             // 무효는 payout 문서를 아예 만들지 않는다 — PayoutInbox가 나중에 메워 줄 것도 없다.
             MatchResultFailurePopup.Show();
             return true;
@@ -332,7 +332,7 @@ static class MatchResultSubmission
         // 제출 큐를 내린 뒤 PayoutInbox가 서버 원장을 로컬 세이브에 반영한다.
         _complete = true;
         Debug.Log(
-            $"[MatchResult] 서버 대조 일치, payout 회수를 시작한다(match={_matchId}, " +
+            $"[MatchResult] Server cross-check matched; starting payout collection (match={_matchId}, " +
             $"saveUploadsThisSession={PlayerSaveCloud.UploadCountThisSession}).");
         return true;
     }

@@ -26,7 +26,7 @@ internal static class AdventureWinCommand
     {
         if (string.IsNullOrEmpty(_nodeId))
         {
-            Debug.LogWarning("[AdventureWinCommand] nodeId 가 비어 신고하지 않는다(정점 저작의 nodeId 확인).");
+            Debug.LogWarning("[AdventureWinCommand] nodeId is empty, so nothing is reported (check the nodeId in the node authoring).");
             return UniTask.FromResult(false);
         }
 
@@ -56,31 +56,31 @@ internal static class AdventureWinCommand
             // 없는 선물을 그리게 된다(응답에 nodeId 가 없는 구 서버는 그대로 믿는다).
             t_reported = string.IsNullOrEmpty(t_result.NodeId) || t_result.NodeId == _nodeId;
             if (t_reported)
-                Debug.Log($"[AdventureWinCommand] 격파 신고 완료(node={_nodeId}, rev={t_result.Revision}).");
+                Debug.Log($"[AdventureWinCommand] Defeat reported (node={_nodeId}, rev={t_result.Revision}).");
             else
-                Debug.LogError($"[AdventureWinCommand] 서버가 다른 정점을 낙인했다(신고={_nodeId}, 응답={t_result.NodeId}).");
+                Debug.LogError($"[AdventureWinCommand] The server marked a different node (reported={_nodeId}, response={t_result.NodeId}).");
         }
         catch (ServerCommandRejectedException t_rejected)
         {
             // 재시도가 성공과 같은 자리에 도착한 것이다 — 낙인은 이미 서 있거나 수령까지 끝났다.
             if (t_rejected.Reason == "AlreadyPending" || t_rejected.Reason == "AlreadyCleared")
             {
-                Debug.Log($"[AdventureWinCommand] 이미 반영된 신고다(node={_nodeId}, reason={t_rejected.Reason}).");
+                Debug.Log($"[AdventureWinCommand] This report was already applied (node={_nodeId}, reason={t_rejected.Reason}).");
                 t_reported = true;
             }
             else
             {
-                Debug.LogWarning($"[AdventureWinCommand] 서버가 신고를 거절했다(node={_nodeId}, reason={t_rejected.Reason}) — {t_rejected.Message}");
+                Debug.LogWarning($"[AdventureWinCommand] The server rejected the report (node={_nodeId}, reason={t_rejected.Reason}) — {t_rejected.Message}");
             }
         }
         catch (ServerAdoptionException t_adoption)
         {
             // 세션은 이미 접혔고 팝업은 CloudSyncStatusWatcher 담당이다 — 여기서 표면을 두 번 칠하지 않는다.
-            Debug.LogWarning($"[AdventureWinCommand] 응답 채택이 세션을 접었다 — {t_adoption.Message}");
+            Debug.LogWarning($"[AdventureWinCommand] Adopting the response closed the session — {t_adoption.Message}");
         }
         catch (Exception t_exception)
         {
-            Debug.LogError($"[AdventureWinCommand] {REPORT_COMMAND} 실패(node={_nodeId}) — {t_exception.GetBaseException().Message}");
+            Debug.LogError($"[AdventureWinCommand] {REPORT_COMMAND} failed (node={_nodeId}) — {t_exception.GetBaseException().Message}");
         }
         finally
         {

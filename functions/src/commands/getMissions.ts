@@ -1,6 +1,8 @@
 import {HttpsError, onCall} from "firebase-functions/v2/https";
-import {isKnownEnv, requireUid} from "../save/saveDocument";
+import {isKnownEnv, requireUid, saveDocument} from "../save/saveDocument";
 import {db} from "../firebaseApp";
+import {FieldValue} from "firebase-admin/firestore";
+import {evaluateGuideProgress} from "../missions/guideProgress";
 import {enabledMissions} from "../missions/catalog";
 import {
   applyPeriodReset,
@@ -36,11 +38,20 @@ export const getMissions = onCall(async (request) => {
 
   const period = missionPeriod(Date.now());
   // 문서 부재는 정상이다 — ensureAccount 가 만들지 않으므로 첫 조회는 항상 빈 상태다.
-  const [missionSnapshot, rewardSpecRows] = await Promise.all([
-    missionsRef(db, env, uid).get(),
+  const [guideCards, rewardSpecRows] = await Promise.all([
+    readSpecRows(env, "Card"),
     readSpecRows(env, "Reward"),
   ]);
-  const state = applyPeriodReset(readMissions(missionSnapshot), period);
+  const state = await db.runTransaction(async (transaction) => {
+    const reference = missionsRef(db, env, uid);
+    const [missionSnapshot, saveSnapshot] = await transaction.getAll(reference, saveDocument(env, uid));
+    const stored = readMissions(missionSnapshot);
+    const progress = evaluateGuideProgress(saveSnapshot.data() ?? {}, guideCards, stored.progress);
+    if (JSON.stringify(progress) !== JSON.stringify(stored.progress)) {
+      transaction.set(reference, {progress, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
+    }
+    return applyPeriodReset({...stored, progress}, period);
+  });
   const rewardRows = parseRewardRows(rewardSpecRows);
 
   return {
@@ -61,7 +72,8 @@ export const getMissions = onCall(async (request) => {
       description: mission.description,
       sortOrder: mission.sortOrder,
       reward: {
-        currencies: resolveRewards(rewardRows, "Mission", mission.id).gains,
+        currencies: resolveRewards(rewardRows, mission.period === "guide" ? "Guide" : "Mission", mission.id).gains,
+        items: resolveRewards(rewardRows, mission.period === "guide" ? "Guide" : "Mission", mission.id).items,
         passExp: mission.passExp,
       },
     })),

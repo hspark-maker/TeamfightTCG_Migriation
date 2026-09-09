@@ -142,7 +142,7 @@ public class AlbumInsertSession : MonoBehaviour
         // 부모(오버레이)가 끝내 안 켜졌으면 StartCoroutine이 예외다 — 위장을 되돌리고 조용히 물러난다.
         if (!gameObject.activeInHierarchy)
         {
-            Debug.LogError("[AlbumInsertSession] 페이지 오버레이가 켜지지 않아 연출을 건너뛴다 — 카드는 그대로 꽂힌다.", this);
+            Debug.LogError("[AlbumInsertSession] The page overlay did not turn on, so the presentation is skipped — the cards are still inserted.", this);
             Finish();
             return;
         }
@@ -286,7 +286,7 @@ public class AlbumInsertSession : MonoBehaviour
 
         if (pageOverlay == null || !pageOverlay.TryGetSlot(_step.SlotIndex, out var t_slot))
         {
-            Debug.LogWarning($"[AlbumInsertSession] 슬롯 {_step.SlotIndex}을 얻지 못했다 — 이 카드는 연출 없이 꽂는다.", this);
+            Debug.LogWarning($"[AlbumInsertSession] Could not obtain slot {_step.SlotIndex} — this card is inserted without a presentation.", this);
             AlbumInsertMask.Reveal(_step.CardId);
             _result?.Invoke(false);
             yield break;
@@ -602,7 +602,7 @@ public class AlbumInsertSession : MonoBehaviour
     {
         if (sleeve != null && dragger != null && cardVisual != null && pageOverlay != null) return true;
 
-        Debug.LogError($"[AlbumInsertSession] 배선 누락 — sleeve={sleeve}, dragger={dragger}, cardVisual={cardVisual}, pageOverlay={pageOverlay}. 연출 없이 카드를 꽂는다.", this);
+        Debug.LogError($"[AlbumInsertSession] Wiring missing — sleeve={sleeve}, dragger={dragger}, cardVisual={cardVisual}, pageOverlay={pageOverlay}. Cards are inserted without a presentation.", this);
         return false;
     }
 }

@@ -168,7 +168,7 @@ public class PackCarouselView : MonoBehaviour, IBeginDragHandler, IDragHandler, 
             if (t_art != null)
             {
                 if (t_image != null) t_image.sprite = t_art;
-                else Debug.LogWarning($"[PackCarouselView] pageTemplate에 '{artChildName}'(Image) 자식이 없다 — 팩 그림이 반영되지 않는다.", this);
+                else Debug.LogWarning($"[PackCarouselView] pageTemplate has no '{artChildName}' (Image) child — the pack art will not be applied.", this);
             }
 
             m_pages.Add(t_page);

@@ -49,6 +49,8 @@ public struct AlbumThemeSkin
 [System.Serializable]
 public struct AlbumRewardDef
 {
+    public ERewardType rewardType;
+    public string rewardId;
     public ECurrencyType currency;
     public long amount;
 }

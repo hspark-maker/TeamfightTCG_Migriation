@@ -32,7 +32,7 @@ public sealed class CardIdDrawer : PropertyDrawer
         }
         catch (Exception t_exception)
         {
-            Debug.LogWarning($"[CardIdDrawer] 카드 표를 읽지 못했습니다: {t_exception.Message}");
+            Debug.LogWarning($"[CardIdDrawer] Failed to read the card table: {t_exception.Message}");
         }
 
         var t_rows = new List<CardSpec>(t_specs.Values);
