@@ -95,7 +95,7 @@ public class RankingBoardPanel : PooledUIBase
             m_endAtMs = t_result.Season.EndAtMs;
             UpdateClock();
             var t_entries = t_result.Entries;
-            const float t_height = 150.6456f;
+            float t_height = ((RectTransform)rowPrefab.transform).rect.height;
             const float t_spacing = 13f;
             for (int t_i = 0; t_i < t_entries.Length; t_i++)
             {
