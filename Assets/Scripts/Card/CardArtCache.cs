@@ -66,6 +66,9 @@ public static class CardArtCache
         return $"Image_Card_{t_name}_Stage{_stage + 1}";
     }
 
+    /// <summary>미보유 카드는 기본 단계의 전용 실루엣을 표시한다.</summary>
+    public static string SilhouetteAddressOf(CardSpec _spec) => AddressOf(_spec, 0) + "_Silhouette";
+
     /// <summary>Cards 라벨 위치를 한 번 조회해 PrimaryKey 집합을 만든다. 실제 Sprite는 로드하지 않는다.</summary>
     public static IEnumerator EnsureCatalog()
     {
@@ -164,6 +167,9 @@ public static class CardArtCache
                     string t_address = AddressOf(t_spec, t_stage);
                     if (s_addresses.Contains(t_address)) t_wanted.Add(t_address);
                 }
+
+                string t_silhouetteAddress = SilhouetteAddressOf(t_spec);
+                if (s_addresses.Contains(t_silhouetteAddress)) t_wanted.Add(t_silhouetteAddress);
             }
         }
 

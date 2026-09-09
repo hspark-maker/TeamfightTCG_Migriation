@@ -25,6 +25,7 @@ public partial class ReleaseManagerWindow : EditorWindow
         Release,
         Data,
         Auth,
+        Sheets = 3,
     }
 
     Tab selectedTab;
@@ -47,17 +48,19 @@ public partial class ReleaseManagerWindow : EditorWindow
 
     void OnEnable()
     {
-        this.selectedTab = (Tab)Mathf.Clamp(EditorPrefs.GetInt(PREF_TAB, 0), 0, (int)Tab.Auth);
+        this.selectedTab = (Tab)Mathf.Clamp(EditorPrefs.GetInt(PREF_TAB, 0), 0, (int)Tab.Sheets);
         Revalidate();
         EnableDataTab();
         EnableVersionManagement();
         EnableBattleReplayManagement();
+        EnableSheetsTab();
     }
 
     void OnDisable()
     {
         EditorPrefs.SetInt(PREF_TAB, (int)this.selectedTab);
         DisableDataTab();
+        DisableSheetsTab();
     }
 
     void OnGUI()
@@ -68,12 +71,14 @@ public partial class ReleaseManagerWindow : EditorWindow
             return;
         }
 
-        // 로그인 상태는 SpecAdminAuth 하나가 들고 있다 — 그리는 자리도 로그인 탭 하나다.
-        // 기능 탭은 DrawAdminAuthStatus 로 "지금 쓸 수 있는지"만 알린다.
-        this.selectedTab = (Tab)GUILayout.Toolbar(
-            (int)this.selectedTab,
-            new[] { "릴리즈", "데이터", AdminReady ? "로그인 ●" : "로그인" },
-            GUILayout.Height(26));
+        // Firestore 관리자 로그인은 로그인 탭, Google Sheets 연결은 Sheets 탭에서 관리한다.
+        using (new EditorGUI.DisabledScope(this.sheetsBusy))
+        {
+            this.selectedTab = (Tab)GUILayout.Toolbar(
+                (int)this.selectedTab,
+                new[] { "릴리즈", "데이터", AdminReady ? "로그인 ●" : "로그인", "Google Sheet" },
+                GUILayout.Height(26));
+        }
 
         if (this.selectedTab == Tab.Data)
         {
@@ -84,6 +89,12 @@ public partial class ReleaseManagerWindow : EditorWindow
         if (this.selectedTab == Tab.Auth)
         {
             DrawAuthTab();
+            return;
+        }
+
+        if (this.selectedTab == Tab.Sheets)
+        {
+            DrawSheetsTab();
             return;
         }
 

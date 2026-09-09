@@ -331,5 +331,27 @@ export const GENERATED_MISSIONS: MissionDef[] = [
     "description": "모험 6번 정점을 클리어해 1장을 완료하세요. 이미 완료했다면 자동 인정합니다",
     "passExp": 0,
     "sortOrder": 13
+  },
+  {
+    "id": "daily.completeMissions5",
+    "enabled": true,
+    "period": "daily",
+    "event": "CompleteDailyMissions",
+    "target": 5,
+    "title": "일일 미션 5개 완료",
+    "description": "일일 미션을 5개 완료하고 추가 보상을 받으세요",
+    "passExp": 0,
+    "sortOrder": 7
+  },
+  {
+    "id": "weekly.completeMissions5",
+    "enabled": true,
+    "period": "weekly",
+    "event": "CompleteWeeklyMissions",
+    "target": 5,
+    "title": "주간 미션 5개 완료",
+    "description": "주간 미션을 5개 완료하고 추가 보상을 받으세요",
+    "passExp": 0,
+    "sortOrder": 6
   }
 ];

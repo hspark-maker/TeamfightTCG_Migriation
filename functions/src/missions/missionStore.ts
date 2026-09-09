@@ -26,6 +26,7 @@ import type {
   Transaction,
 } from "firebase-admin/firestore";
 import {
+  enabledMissions,
   MISSION_ID_PREFIX,
   MissionDef,
   MissionPeriodKind,
@@ -34,6 +35,11 @@ import type {MissionPeriod} from "./period";
 
 /** 미션 문서의 스키마 축. 세이브 SCHEMA_VERSION 과 별개로 승급한다. */
 export const MISSION_SCHEMA_VERSION = 1;
+
+/** 일반 일일 미션의 달성 수로 계산하는 파생 이벤트. 저장 카운터는 신뢰하지 않는다. */
+export const DAILY_MISSION_COMPLETION_EVENT = "CompleteDailyMissions";
+/** 일반 주간 미션의 달성 수로 계산하는 파생 이벤트. */
+export const WEEKLY_MISSION_COMPLETION_EVENT = "CompleteWeeklyMissions";
 
 /** 카운터 한 축의 상한. 저작 실수나 폭주가 있어도 문서가 무한히 커지지 않게 자른다. */
 const COUNTER_MAX = 1000000;
@@ -312,12 +318,29 @@ export function commitMissionClaim(
 }
 
 /**
- * 이 미션의 현재 진행도. 주기 축의 카운터만 본다.
+ * 해당 주기의 활성 일반 미션 달성 수. 보상 수령 여부와 무관하며 누적 보상은 제외한다.
+ * @param {MissionState} state 리셋을 반영한 상태
+ * @param {MissionPeriodKind} period 집계할 주기
+ * @return {number} 달성한 일반 미션 수
+ */
+function completedMissions(state: MissionState, period: MissionPeriodKind): number {
+  return enabledMissions().filter((mission) => mission.period === period &&
+    mission.event !== DAILY_MISSION_COMPLETION_EVENT &&
+    mission.event !== WEEKLY_MISSION_COMPLETION_EVENT &&
+    (state.progress[progressKey(period, mission.event)] ?? 0) >= mission.target).length;
+}
+
+/**
+ * 이 미션의 현재 진행도. 누적 완료 보상은 일반 미션 카운터에서 파생한다.
  * @param {MissionState} state 리셋을 반영한 상태
  * @param {MissionDef} mission 미션 정의
  * @return {number} 누적 횟수
  */
 export function progressOf(state: MissionState, mission: MissionDef): number {
+  if ((mission.period === "daily" && mission.event === DAILY_MISSION_COMPLETION_EVENT) ||
+      (mission.period === "weekly" && mission.event === WEEKLY_MISSION_COMPLETION_EVENT)) {
+    return completedMissions(state, mission.period);
+  }
   return state.progress[progressKey(mission.period, mission.event)] ?? 0;
 }
 
@@ -344,7 +367,11 @@ export function missionResponse(state: MissionState, period: MissionPeriod): Mis
   return {
     dailyKey: period.daily,
     weeklyKey: period.weekly,
-    progress: {...state.progress},
+    progress: {
+      ...state.progress,
+      [progressKey("daily", DAILY_MISSION_COMPLETION_EVENT)]: completedMissions(state, "daily"),
+      [progressKey("weekly", WEEKLY_MISSION_COMPLETION_EVENT)]: completedMissions(state, "weekly"),
+    },
     claimed: {...state.claimed},
     passExp: state.passExp,
     dailyResetAtMs: period.dailyResetAtMs,

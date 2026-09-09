@@ -85,6 +85,10 @@ public class RankingBoardPanel : PooledUIBase
         {
             var t_result = await ServerSaveCommands.InvokeReadOnlyAsync<RankLeaderboardResult>(
                 "getRankLeaderboard", new { env = ContentProfileConfig.Active.CloudEnvId });
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.Log($"[RankingBoardPanel] Received env={ContentProfileConfig.Active.CloudEnvId}, entries={t_result?.Entries?.Length}\n"
+                + Newtonsoft.Json.JsonConvert.SerializeObject(t_result, Newtonsoft.Json.Formatting.Indented));
+#endif
             if (this == null || !isShow || _version != m_requestVersion) return;
             if (t_result?.Entries == null || t_result.Self == null || t_result.Season == null)
                 throw new InvalidOperationException("Ranking response is incomplete.");

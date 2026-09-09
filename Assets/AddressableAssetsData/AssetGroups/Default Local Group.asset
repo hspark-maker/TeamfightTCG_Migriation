@@ -68,6 +68,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 72510d8af51ef38479005e5413776af4
+    m_Address: RankingBoardPanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8134ddc58443c3348a644266ea3669ec
     m_Address: DeckEditController
     m_ReadOnly: 0

@@ -54,6 +54,14 @@ public static class CardVisualRules
         return null;
     }
 
+    /// <summary>미보유 카드의 전용 실루엣. 원본 아트로 대체하지 않는다.</summary>
+    public static Sprite PickCardSilhouette(int _cardId)
+    {
+        if (!CardCatalog.TryGetSpec(_cardId, out CardSpec t_spec)) return null;
+        string t_address = CardArtCache.SilhouetteAddressOf(t_spec);
+        return CardArtCache.Exists(t_address) ? CardArtCache.Get(t_address) : null;
+    }
+
     /// <summary>전투 카드 인스턴스의 진화 단계를 반영한 아트.</summary>
     public static Sprite PickBattleArt(CardInstance _card)
         => _card == null ? null : PickCardArt(_card.cardId, _card.evolutionStage);

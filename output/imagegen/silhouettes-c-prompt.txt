@@ -1,0 +1,11 @@
+Image 1 edit target; image 2 silhouette style reference only. Preserve source aspect ratio, exact framing, pose, position, size, outer contours and attached gear. Entire character flat #20202A; no facial or internal details. Entire background uniform flat #B0B0B0; no ground, shadows, gradients, textures, dust, background effects, detached decorative marks, text or watermark. One individual card image per call.
+
+Per-card additions:
+Exact common prompt: Use case: style-transfer. Image 1 is the edit target. Image 2 is silhouette STYLE REFERENCE ONLY, do not copy its character. Create a locked/unowned card silhouette of the entire character in Image 1, including all attached gear. Preserve Image 1 canvas aspect ratio, framing, exact pose, position, size and outer contours. Fill entire character as a single flat very dark charcoal #20202A shape. No eyes, face, internal lines, patterns, highlights or detail. Replace entire background with perfectly uniform flat gray #B0B0B0. Remove ground, shadows, dust, background effects, detached decorative marks. No gradients, textures, text, symbols or watermark. Crisp antialiased contour. Output only one edited card image.
+SnowballBear: Include the large snowball held by the bear as part of its silhouette.
+Sparkfin: Retain ears with plug prongs and lightning-shaped attached tail. Remove all detached electric arcs. [Generation rejected: moderation_blocked output other]
+Startori correction: Edit only the thin light star outline over the upper left ear of this silhouette. Fill that thin internal light line with the exact surrounding dark silhouette color so it disappears entirely. Keep everything else identical including outer silhouette contour, background, canvas size and framing. No internal lines or highlights.
+Thunderhorn: Common prompt only. [Generation rejected: moderation_blocked output other]
+Ticktockgon: Keep the two real holes in the winding key filled with background gray.
+WaterdropLong: Retain the otter character and its attached tail and head water tuft. Remove surrounding water puddle, splashes and detached droplets.
+Waveri: Retain the dolphin and all worn gear, cap, float ring and surfboard as dark silhouettes. Remove all ocean waves and water spray.

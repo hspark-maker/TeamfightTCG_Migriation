@@ -99,7 +99,7 @@ int,string,string,int,string,string,long,string
 139,Rank,19,3,Pack,ImmortalLegacyPack,3,다이아몬드 4 팩 지급 구현 대기
 140,Mission,daily.completeBattle3,1,Currency,Shard,40,미션 catalog/모험 집계 동기화 대기
 141,Mission,daily.completeBattle5,1,Currency,Gold,100,미션 catalog/모험 집계 동기화 대기
-142,Mission,daily.completeBattle5,2,Currency,RouletteTicket,1,미션 catalog/모험 집계 동기화 대기
+142,Mission,daily.completeBattle3,2,Currency,RouletteTicket,1,일일 첫 회전은 전투 3회 완료로 지급; 승패 무관
 143,Mission,daily.triggerKeyword2,1,Currency,Energy,10,미션 catalog/모험 집계 동기화 대기
 144,Mission,daily.triggerSynergy2,1,Currency,Shard,20,미션 catalog/모험 집계 동기화 대기
 145,Mission,weekly.completeBattle20,1,Currency,Shard,120,미션 catalog/모험 집계 동기화 대기
@@ -109,7 +109,7 @@ int,string,string,int,string,string,long,string
 149,Mission,weekly.enhanceCard10,1,Currency,Gold,200,미션 catalog/모험 집계 동기화 대기
 150,Mission,weekly.enhanceCard10,2,Currency,Energy,30,미션 catalog/모험 집계 동기화 대기
 151,Mission,weekly.winBattle10,1,Currency,Diamond,20,미션 catalog/모험 집계 동기화 대기
-152,Mission,weekly.winBattle10,2,Currency,RouletteTicket,3,미션 catalog/모험 집계 동기화 대기
+152,Mission,weekly.completeBattle20,2,Currency,RouletteTicket,3,주간 회전 보충은 전투 20회 완료로 지급; 승패 무관
 153,Pass,S1:2,1,Currency,Shard,60,시즌 1 무료 트랙 레벨 2
 154,Pass,S1:3,1,Pack,NormalPack_TEST,1,시즌 1 무료 트랙 레벨 3; 팩 지급 구현 대기
 155,Pass,S1:3,2,Currency,RouletteTicket,2,시즌 1 무료 트랙 레벨 3
@@ -142,3 +142,7 @@ int,string,string,int,string,string,long,string
 182,CardDuplicate,Rare,1,Currency,Shard,2,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
 183,CardDuplicate,Arcane,1,Currency,Shard,5,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
 184,CardDuplicate,Mythic,1,Currency,Shard,10,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
+185,Mission,daily.completeMissions5,1,Currency,RouletteTicket,1,일일 미션 5개 완료 추가 보상
+186,Mission,daily.completeMissions5,2,Currency,Diamond,30,일일 미션 5개 완료 추가 보상
+187,Mission,weekly.completeMissions5,1,Currency,RouletteTicket,3,주간 미션 5개 완료 추가 보상
+188,Mission,weekly.completeMissions5,2,Currency,Diamond,100,주간 미션 5개 완료 추가 보상

@@ -163,8 +163,8 @@ public partial class ReleaseManagerWindow
         Header("SpecData ↔ docs CSV");
 
         EditorGUILayout.HelpBox(
-            "저장소의 docs/SpecData/{표}_sheet.csv 는 '지금 앱에 실린 SpecData'를 사람이 읽을 수 있게 떠 둔 사본이다.\n" +
-            "값의 진실원은 구글 스펙시트 → SpecData.bytes 순서이고, 이 CSV 는 그 결과를 따라 적는 문서다.",
+            "스펙 값의 저장소 진실원은 docs/SpecData/{표}_sheet.csv 다. 값 변경은 CSV에서 끝낸다.\n" +
+            "Google Sheet 탭에서 선택한 CSV를 시트에 반영할 수 있다. SpecData.bytes는 별도 생성 산출물이며 자동으로 갱신하지 않는다.",
             MessageType.Info);
 
         this.specCsvOpen = EditorGUILayout.Foldout(this.specCsvOpen, "내보내기 · 되돌려 넣기", true);
@@ -172,10 +172,10 @@ public partial class ReleaseManagerWindow
 
         EditorGUI.indentLevel++;
 
-        // ① 정방향: bytes → CSV. 문서를 최신으로 맞추는 쪽이라 위험이 낮다.
-        EditorGUILayout.LabelField("SpecData → docs CSV (문서 갱신)", EditorStyles.boldLabel);
+        // 산출물에서 CSV를 복원하는 기존 경로. 현재 CSV 변경을 덮을 수 있다.
+        EditorGUILayout.LabelField("SpecData → docs CSV (CSV 덮어쓰기)", EditorStyles.boldLabel);
         EditorGUILayout.LabelField(
-            "지금 앱에 실린 SpecData 값으로 docs CSV 를 덮어쓴다. 시트를 받은 지 오래됐으면 문서가 과거로 되돌아간다.",
+            "생성 산출물의 값으로 진실원인 docs CSV를 덮어쓴다. 아직 산출물에 반영하지 않은 CSV 변경은 사라질 수 있다.",
             EditorStyles.wordWrappedMiniLabel);
 
         bool t_auto = SpecDocsCsvExporter.AutoExport;
@@ -195,18 +195,18 @@ public partial class ReleaseManagerWindow
 
         EditorGUILayout.Space(6);
 
-        // ② 역방향: CSV → bytes. 진실원을 우회하므로 경고를 먼저 세운다.
-        EditorGUILayout.LabelField("docs CSV → SpecData (로컬 실험본)", EditorStyles.boldLabel);
+        // CSV 변경과 산출물 생성은 별도 작업이다. 아래 기존 기능은 명시적으로 실행할 때만 동작한다.
+        EditorGUILayout.LabelField("docs CSV → SpecData (별도 산출물 생성)", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "시트를 거치지 않고 CSV 를 고쳐 바로 돌려 보고 싶을 때만 쓴다.\n" +
-            "여기서 만든 SpecData.bytes 는 로컬 실험본이라, 시트에 반영하지 않으면 다음 '시트 적용 & CS 생성'에서 사라진다.",
+            "CSV를 고쳤다는 이유로 실행하지 않는다. 산출물 갱신을 별도로 명시한 경우에만 사용한다.\n" +
+            "Google Sheet 업로드는 이 기능을 호출하지 않으며 SpecData.bytes와 CS를 생성하지 않는다.",
             MessageType.Warning);
 
         if (GUILayout.Button("docs CSV 로 SpecData 덮어쓰기", GUILayout.Height(24))
             && EditorUtility.DisplayDialog(
-                "로컬 실험본 만들기",
+                "SpecData 산출물 생성",
                 "docs/SpecData CSV 내용으로 Assets/Resources/SpecData.bytes 를 다시 쓴다.\n" +
-                "진실원(스펙시트)을 우회하는 임시 경로다. 계속할까?",
+                "CSV 변경과 별개인 산출물 생성 작업이다. 계속할까?",
                 "덮어쓰기", "취소"))
         {
             SpecLocalCsvImporter.RunImportInteractive();

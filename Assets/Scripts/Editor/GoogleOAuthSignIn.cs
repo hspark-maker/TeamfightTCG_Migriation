@@ -51,11 +51,57 @@ public static class GoogleOAuthSignIn
     public static bool TryAcquireGoogleIdToken(out string _googleIdToken, out string _error)
     {
         _googleIdToken = null;
+        if (!TryAcquireTokens(SCOPE, out TokenResponse t_tokens, out _error)) return false;
+        if (string.IsNullOrEmpty(t_tokens.id_token))
+        {
+            _error = "토큰 응답에 id_token이 없다. OAuth 클라이언트 범위에 openid가 있는지 확인할 것.";
+            return false;
+        }
+        _googleIdToken = t_tokens.id_token;
+        return true;
+    }
+
+    /// <summary>지정한 Google API 범위의 액세스 토큰을 받는다. Firebase 로그인 세션은 변경하지 않는다.</summary>
+    public static bool TryAcquireGoogleAccessToken(
+        string _scope, out string _accessToken, out int _expiresIn, out string _error)
+    {
+        _accessToken = null;
+        _expiresIn = 0;
+        if (string.IsNullOrWhiteSpace(_scope))
+        {
+            _error = "Google API 권한 범위가 비어 있다.";
+            return false;
+        }
+        if (!TryAcquireTokens(_scope, out TokenResponse t_tokens, out _error)) return false;
+        if (string.IsNullOrEmpty(t_tokens.access_token) || t_tokens.expires_in <= 0)
+        {
+            _error = "토큰 응답에 유효한 access_token 또는 만료 시간이 없다.";
+            return false;
+        }
+        // scope 생략은 요청과 동일하다는 뜻이다. 부분 동의 응답이면 요청한 권한을 확인한다.
+        if (!string.IsNullOrWhiteSpace(t_tokens.scope))
+        {
+            var t_granted = new HashSet<string>(t_tokens.scope.Split(' '), StringComparer.Ordinal);
+            foreach (string t_scope in _scope.Split(' '))
+            {
+                if (t_scope.Length == 0 || t_granted.Contains(t_scope)) continue;
+                _error = "요청한 Google API 권한이 허용되지 않았다. 다시 연결해 권한을 허용할 것.";
+                return false;
+            }
+        }
+        _accessToken = t_tokens.access_token;
+        _expiresIn = t_tokens.expires_in;
+        return true;
+    }
+
+    static bool TryAcquireTokens(string _scope, out TokenResponse _tokens, out string _error)
+    {
+        _tokens = null;
         _error = null;
 
         if (!IsConfigured)
         {
-            _error = "구글 OAuth 클라이언트 ID가 비어 있다. 데이터 탭에서 입력할 것.";
+            _error = "구글 OAuth 클라이언트 ID가 비어 있다. 로그인 탭에서 입력할 것.";
             return false;
         }
 
@@ -81,10 +127,10 @@ public static class GoogleOAuthSignIn
 
         try
         {
-            OpenBrowser(BuildAuthUrl(t_redirectUri, t_challenge, t_state));
+            OpenBrowser(BuildAuthUrl(t_redirectUri, t_challenge, t_state, _scope));
 
             if (!TryWaitForCode(t_listener, t_state, out string t_code, out _error)) return false;
-            if (!TryExchangeCode(t_code, t_verifier, t_redirectUri, out _googleIdToken, out _error)) return false;
+            if (!TryExchangeCode(t_code, t_verifier, t_redirectUri, out _tokens, out _error)) return false;
             return true;
         }
         finally
@@ -94,13 +140,13 @@ public static class GoogleOAuthSignIn
         }
     }
 
-    static string BuildAuthUrl(string _redirectUri, string _challenge, string _state)
+    static string BuildAuthUrl(string _redirectUri, string _challenge, string _state, string _scope)
     {
         var t_url = new StringBuilder(AUTH_ENDPOINT);
         t_url.Append("?client_id=").Append(Uri.EscapeDataString(ClientId))
              .Append("&redirect_uri=").Append(Uri.EscapeDataString(_redirectUri))
              .Append("&response_type=code")
-             .Append("&scope=").Append(Uri.EscapeDataString(SCOPE))
+             .Append("&scope=").Append(Uri.EscapeDataString(_scope))
              .Append("&code_challenge=").Append(_challenge)
              .Append("&code_challenge_method=S256")
              .Append("&state=").Append(_state)
@@ -235,9 +281,9 @@ public static class GoogleOAuthSignIn
     }
 
     static bool TryExchangeCode(
-        string _code, string _verifier, string _redirectUri, out string _googleIdToken, out string _error)
+        string _code, string _verifier, string _redirectUri, out TokenResponse _tokens, out string _error)
     {
-        _googleIdToken = null;
+        _tokens = null;
         _error = null;
 
         var t_form = new StringBuilder();
@@ -267,13 +313,13 @@ public static class GoogleOAuthSignIn
             }
 
             var t_parsed = UnityEngine.JsonUtility.FromJson<TokenResponse>(t_text);
-            if (t_parsed == null || string.IsNullOrEmpty(t_parsed.id_token))
+            if (t_parsed == null)
             {
-                _error = "토큰 응답에 id_token이 없다. OAuth 클라이언트 범위에 openid가 있는지 확인할 것.";
+                _error = "Google 토큰 응답을 읽지 못했다.";
                 return false;
             }
 
-            _googleIdToken = t_parsed.id_token;
+            _tokens = t_parsed;
             return true;
         }
         catch (Exception t_exception)
@@ -306,5 +352,12 @@ public static class GoogleOAuthSignIn
         return _text.Length <= 300 ? _text : _text.Substring(0, 300) + "…";
     }
 
-    [Serializable] sealed class TokenResponse { public string id_token; public string access_token; public string refresh_token; }
+    [Serializable] sealed class TokenResponse
+    {
+        public string id_token;
+        public string access_token;
+        public string refresh_token;
+        public int expires_in;
+        public string scope;
+    }
 }

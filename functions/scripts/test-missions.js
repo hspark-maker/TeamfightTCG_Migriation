@@ -14,7 +14,8 @@ const assert = require("node:assert/strict");
 const {missionPeriod, MISSION_TIME_ZONE} = require("../lib/missions/period.js");
 const {
   readMissions, applyPeriodReset, commitMissionBump, commitMissionClaim,
-  progressKey, progressOf, isClaimed, missionResponse,
+  progressKey, progressOf, isClaimed, missionResponse, DAILY_MISSION_COMPLETION_EVENT,
+  WEEKLY_MISSION_COMPLETION_EVENT,
 } = require("../lib/missions/missionStore.js");
 const {
   missionCatalog, enabledMissions, findMission, missionCatalogIssues,
@@ -149,6 +150,134 @@ assert.equal(second.reason, "AlreadyClaimed", "진행도가 10이어도 두 번�
 // 수령이 카운터를 깎지 않는다 — 깎으면 같은 이벤트를 세는 주간 미션이 함께 무너진다.
 assert.equal(progressOf(bump.state, findMission("weekly.openPack10")), 10);
 
+// ── 일일 누적 완료: 수령이 아니라 활성 일반 미션 달성 수를 센다 ──────────────
+const milestone = findMission("daily.completeMissions5");
+assert.ok(milestone, "일일 5개 완료 보상이 저작돼 있어야 한다");
+assert.equal(milestone.target, 5);
+assert.equal(milestone.event, DAILY_MISSION_COMPLETION_EVENT);
+const milestoneKey = progressKey("daily", DAILY_MISSION_COMPLETION_EVENT);
+const milestoneState = applyPeriodReset(readMissions(snapshotOf(undefined)), period);
+Object.assign(milestoneState.progress, {
+  "daily.CompleteBattle": 5, // 전투 3회와 5회, 두 미션을 각각 인정한다.
+  "daily.DestroyCards": 3,
+  "daily.TriggerKeyword": 2,
+  "daily.ClaimReward": 999, // 비활성 일일 미션은 집계하지 않는다.
+  [milestoneKey]: 999, // 과거/위조 파생 카운터는 판정과 응답 모두 무시한다.
+});
+for (const mission of enabledMissions().filter((entry) => entry.period !== "daily")) {
+  milestoneState.progress[progressKey(mission.period, mission.event)] = mission.target;
+}
+assert.deepEqual(milestoneState.claimed, {}, "일반 미션을 아직 수령하지 않은 상태다");
+assert.equal(progressOf(milestoneState, milestone), 4,
+  "주간·가이드·비활성·누적 보상 자신은 일일 완료 수에 포함하지 않는다");
+assert.equal(judgeMissionClaim(milestone.id, milestoneState).reason, "NotEligible",
+  "4개 완료는 거절한다");
+assert.equal(missionResponse(milestoneState, period).progress[milestoneKey], 4,
+  "응답도 저장된 999가 아니라 실제 완료 수를 보낸다");
+assert.equal(milestoneState.progress[milestoneKey], 999, "파생 조회는 저장 상태를 변형하지 않는다");
+
+milestoneState.progress["daily.TriggerSynergy"] = 2;
+assert.equal(progressOf(milestoneState, milestone), 5);
+assert.equal(judgeMissionClaim(milestone.id, milestoneState).allow, true,
+  "일반 미션 보상을 받기 전에도 5개 달성이면 수령할 수 있다");
+assert.equal(missionResponse(milestoneState, period).progress[milestoneKey], 5);
+
+// 같은 이벤트를 쓰는 다른 누적 단계가 추가돼도 서로 완료 수를 올리지 않는다.
+const additionalMilestone = {...milestone, id: "daily.testMilestone", target: 1};
+missionCatalog().push(additionalMilestone);
+try {
+  assert.equal(progressOf(milestoneState, additionalMilestone), 5);
+  assert.equal(progressOf(milestoneState, milestone), 5,
+    "다른 누적 보상도 일반 미션 집계에서 제외한다");
+} finally {
+  missionCatalog().pop();
+}
+
+milestoneState.progress["daily.OpenPack"] = 1;
+assert.equal(progressOf(milestoneState, milestone), 6);
+assert.equal(judgeMissionClaim(milestone.id, milestoneState).allow, true,
+  "목표를 넘겨 6개를 완료해도 수령할 수 있다");
+commitMissionClaim(fakeTx(), bumpOf(milestoneState, period), milestone.id, milestone.passExp, "now");
+assert.equal(judgeMissionClaim(milestone.id, milestoneState).reason, "AlreadyClaimed",
+  "누적 보상도 하루 한 번만 수령한다");
+assert.equal(progressOf(milestoneState, milestone), 6, "누적 보상 수령은 자기 진행도를 올리지 않는다");
+assert.equal(missionResponse(milestoneState, period).progress[milestoneKey], 6);
+
+const nextDayPeriod = {...period, daily: "2026-09-05"};
+const nextDayMilestone = applyPeriodReset(milestoneState, nextDayPeriod);
+assert.equal(progressOf(nextDayMilestone, milestone), 0, "일일 리셋 뒤 완료수는 0이다");
+assert.equal(isClaimed(nextDayMilestone, milestone.id), false, "누적 보상 낙인도 초기화한다");
+assert.equal(judgeMissionClaim(milestone.id, nextDayMilestone).reason, "NotEligible");
+assert.equal(missionResponse(nextDayMilestone, nextDayPeriod).progress[milestoneKey], 0);
+assert.equal(nextDayMilestone.progress["weekly.OpenPack"], milestoneState.progress["weekly.OpenPack"],
+  "일일 누적 보상 리셋이 주간 진행도를 건드리지 않는다");
+
+// ── 주간 누적 완료: 일일과 독립 집계하며 주간 경계에서만 낙인을 비운다 ────────
+const weeklyMilestone = findMission("weekly.completeMissions5");
+assert.ok(weeklyMilestone, "주간 5개 완료 보상이 저작돼 있어야 한다");
+assert.equal(weeklyMilestone.target, 5);
+assert.equal(weeklyMilestone.event, WEEKLY_MISSION_COMPLETION_EVENT);
+const weeklyMilestoneKey = progressKey("weekly", WEEKLY_MISSION_COMPLETION_EVENT);
+const weeklyMilestoneState = applyPeriodReset(readMissions(snapshotOf(undefined)), period);
+Object.assign(weeklyMilestoneState.progress, {
+  "weekly.CompleteBattle": 35, // 전투 20회와 35회, 두 미션을 각각 인정한다.
+  "weekly.OpenPack": 10,
+  "weekly.EnhanceCard": 10,
+  "weekly.AttackTimes": 999,
+  "weekly.LimitBreakCard": 999,
+  "weekly.WinRankedBattle": 999,
+  "daily.CompleteBattle": 5,
+  "guide.Guide.AdventureNode01": 1,
+  [weeklyMilestoneKey]: 999,
+  [milestoneKey]: 999,
+  [progressKey("weekly", DAILY_MISSION_COMPLETION_EVENT)]: 999,
+});
+assert.equal(progressOf(weeklyMilestoneState, weeklyMilestone), 4,
+  "일일·가이드·비활성·누적 보상은 주간 완료 수에 포함하지 않는다");
+assert.equal(progressOf(weeklyMilestoneState, milestone), 2, "같은 이벤트라도 일일 카운터만 본다");
+assert.equal(judgeMissionClaim(weeklyMilestone.id, weeklyMilestoneState).reason, "NotEligible");
+assert.equal(missionResponse(weeklyMilestoneState, period).progress[weeklyMilestoneKey], 4,
+  "주간 응답도 위조/오래된 파생 카운터를 무시한다");
+assert.equal(weeklyMilestoneState.progress[weeklyMilestoneKey], 999);
+
+const weeklyExtraMilestones = [
+  {...weeklyMilestone, id: "weekly.testMilestone", target: 1},
+  {...weeklyMilestone, id: "weekly.testDailyEvent", event: DAILY_MISSION_COMPLETION_EVENT, target: 1},
+];
+missionCatalog().push(...weeklyExtraMilestones);
+try {
+  assert.equal(progressOf(weeklyMilestoneState, weeklyMilestone), 4,
+    "일일·주간 누적 이벤트 모두 일반 미션 집계에서 제외한다");
+} finally {
+  missionCatalog().splice(-weeklyExtraMilestones.length);
+}
+
+weeklyMilestoneState.progress["weekly.WinBattle"] = 10;
+assert.deepEqual(weeklyMilestoneState.claimed, {}, "주간 일반 미션을 수령하지 않아도 달성을 인정한다");
+assert.equal(progressOf(weeklyMilestoneState, weeklyMilestone), 5);
+assert.equal(judgeMissionClaim(weeklyMilestone.id, weeklyMilestoneState).allow, true);
+assert.equal(missionResponse(weeklyMilestoneState, period).progress[weeklyMilestoneKey], 5);
+commitMissionClaim(fakeTx(), bumpOf(weeklyMilestoneState, period), weeklyMilestone.id,
+  weeklyMilestone.passExp, "now");
+assert.equal(judgeMissionClaim(weeklyMilestone.id, weeklyMilestoneState).reason, "AlreadyClaimed");
+assert.equal(progressOf(weeklyMilestoneState, weeklyMilestone), 5, "주간 수령은 자기 완료 수를 올리지 않는다");
+assert.equal(isClaimed(weeklyMilestoneState, milestone.id), false, "주간 수령이 일일 낙인을 찍지 않는다");
+
+const weeklyAfterDailyReset = applyPeriodReset(weeklyMilestoneState, nextDayPeriod);
+assert.equal(progressOf(weeklyAfterDailyReset, milestone), 0);
+assert.equal(progressOf(weeklyAfterDailyReset, weeklyMilestone), 5, "일일 리셋 뒤에도 주간 달성 수를 유지한다");
+assert.equal(isClaimed(weeklyAfterDailyReset, weeklyMilestone.id), true, "주간 수령 낙인도 유지한다");
+assert.equal(judgeMissionClaim(weeklyMilestone.id, weeklyAfterDailyReset).reason, "AlreadyClaimed");
+assert.equal(missionResponse(weeklyAfterDailyReset, nextDayPeriod).progress[weeklyMilestoneKey], 5);
+
+const nextWeekPeriod = missionPeriod(Date.parse("2026-09-06T20:01:00Z"));
+const weeklyAfterWeekReset = applyPeriodReset(weeklyMilestoneState, nextWeekPeriod);
+assert.notEqual(nextWeekPeriod.weekly, period.weekly, "월요일 05시를 넘긴 다음 주다");
+assert.equal(progressOf(weeklyAfterWeekReset, weeklyMilestone), 0);
+assert.equal(isClaimed(weeklyAfterWeekReset, weeklyMilestone.id), false);
+assert.equal(judgeMissionClaim(weeklyMilestone.id, weeklyAfterWeekReset).reason, "NotEligible");
+assert.equal(missionResponse(weeklyAfterWeekReset, nextWeekPeriod).progress[weeklyMilestoneKey], 0);
+
 // ── 응답 봉투: 참조를 그대로 싣지 않는다 ─────────────────────────────────────
 const envelope = missionResponse(bump.state, period);
 assert.equal(envelope.dailyKey, period.daily);
@@ -195,6 +324,24 @@ const readSheet = (name) => {
 
 const sheetMissions = readSheet("Mission");
 const sheetRewards = readSheet("Reward").filter((row) => ["Mission", "Guide"].includes(row.ownerType));
+
+const milestoneReward = judgeRewardClaim(parseRewardRows(sheetRewards.map((row) => ({
+  ...row, amount: Number(row.amount),
+}))), "Mission", milestone.id);
+assert.equal(milestoneReward.allow, true);
+assert.deepEqual(milestoneReward.gains.slice().sort((a, b) => a.currency.localeCompare(b.currency)), [
+  {currency: "Diamond", amount: 30},
+  {currency: "RouletteTicket", amount: 1},
+], "일일 5개 완료 보상은 보석 30과 룰렛 티켓 1이다");
+
+const weeklyMilestoneReward = judgeRewardClaim(parseRewardRows(sheetRewards.map((row) => ({
+  ...row, amount: Number(row.amount),
+}))), "Mission", weeklyMilestone.id);
+assert.equal(weeklyMilestoneReward.allow, true);
+assert.deepEqual(weeklyMilestoneReward.gains.slice().sort((a, b) => a.currency.localeCompare(b.currency)), [
+  {currency: "Diamond", amount: 100},
+  {currency: "RouletteTicket", amount: 3},
+], "주간 5개 완료 보상은 보석 100과 룰렛 티켓 3이다");
 
 assert.equal(sheetMissions.length, missionCatalog().length,
   "Mission 시트 행 수와 런타임 카탈로그 수가 같아야 한다");

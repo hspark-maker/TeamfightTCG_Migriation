@@ -32,6 +32,13 @@ public class MissionRowView : MonoBehaviour
     [Tooltip("보상 개수(x100 꼴). 비워 두면 그리지 않는다.")]
     [SerializeField] TMP_Text rewardCountText;
 
+    [Tooltip("재화 보상이 둘이면 기존 보상 칸 안에 두 아이콘과 수량을 함께 표시한다.")]
+    [SerializeField] GameObject dualRewardRoot;
+    [SerializeField] Image dualRewardIcon;
+    [SerializeField] TMP_Text dualRewardCountText;
+    [SerializeField] Image secondRewardIcon;
+    [SerializeField] TMP_Text secondRewardCountText;
+
     [SerializeField] Button claimButton;
 
     [Tooltip("수령 버튼 라벨. 상태에 따라 문구가 바뀐다.")]
@@ -123,10 +130,17 @@ public class MissionRowView : MonoBehaviour
     /// 아이템이면 저작 그림을 신뢰한다. 패스 경험치는 여기서도 문구에서도 그리지 않는다.</summary>
     void ApplyRewardVisual(MissionDefinition _definition)
     {
-        if (this.rewardIcon == null && this.rewardCountText == null) return;
-
-        ClaimRewardGain t_gain = FirstCurrency(_definition);
+        ClaimRewardGain t_gain = CurrencyAt(_definition, 0);
+        ClaimRewardGain t_secondGain = CurrencyAt(_definition, 1);
         ClaimRewardItem t_item = t_gain == null ? FirstItem(_definition) : null;
+        bool t_dual = t_secondGain != null && this.dualRewardRoot != null;
+
+        if (this.dualRewardRoot != null) this.dualRewardRoot.SetActive(t_dual);
+        if (t_dual)
+        {
+            ApplyCurrencyVisual(this.dualRewardIcon, this.dualRewardCountText, t_gain);
+            ApplyCurrencyVisual(this.secondRewardIcon, this.secondRewardCountText, t_secondGain);
+        }
 
         if (this.rewardIcon != null)
         {
@@ -135,22 +149,30 @@ public class MissionRowView : MonoBehaviour
                 Sprite t_sprite = CurrencyLook.IconOf(t_type);
                 if (t_sprite != null) this.rewardIcon.sprite = t_sprite;
             }
-            this.rewardIcon.gameObject.SetActive(t_gain != null || t_item != null);
+            this.rewardIcon.gameObject.SetActive(!t_dual && (t_gain != null || t_item != null));
         }
 
         if (this.rewardCountText != null)
         {
+            this.rewardCountText.gameObject.SetActive(!t_dual);
             long t_amount = t_gain != null ? t_gain.Amount : t_item != null ? t_item.Amount : 0;
             this.rewardCountText.text = t_amount > 0 ? "x" + t_amount : string.Empty;
         }
     }
 
-    static ClaimRewardGain FirstCurrency(MissionDefinition _definition)
+    static void ApplyCurrencyVisual(Image _icon, TMP_Text _countText, ClaimRewardGain _gain)
+    {
+        if (_icon != null && System.Enum.TryParse(_gain.Currency, out ECurrencyType t_type))
+            _icon.sprite = CurrencyLook.IconOf(t_type);
+        if (_countText != null) _countText.text = "x" + _gain.Amount;
+    }
+
+    static ClaimRewardGain CurrencyAt(MissionDefinition _definition, int _index)
     {
         List<ClaimRewardGain> t_gains = _definition?.Reward?.Currencies;
         if (t_gains == null) return null;
         for (int i = 0; i < t_gains.Count; i++)
-            if (t_gains[i] != null && t_gains[i].Amount > 0) return t_gains[i];
+            if (t_gains[i] != null && t_gains[i].Amount > 0 && _index-- == 0) return t_gains[i];
         return null;
     }
 

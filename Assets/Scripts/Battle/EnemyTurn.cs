@@ -20,7 +20,12 @@ public class EnemyTurn : TurnBase
 
     public override async UniTask Execute()
     {
-        await UniTask.Delay((int)(GameTiming.Battle.EnemyTurnStartDelay * 1000));
+        // 생각 시간은 연출 전용 난수로 정해 전투 판정의 MatchRandom 시퀀스를 보존한다.
+        float t_thinkDelay = TutorialConfig.IsActive
+            ? GameTiming.Battle.EnemyTurnStartDelay
+            : UnityEngine.Random.Range(4f, 5f);
+        await UniTask.Delay((int)(t_thinkDelay * 1000),
+            ignoreTimeScale: !TutorialConfig.IsActive, cancellationToken: GetCt());
 
         CardInstance t_forcedAttacker = null;
         CardInstance t_forcedTarget = null;
