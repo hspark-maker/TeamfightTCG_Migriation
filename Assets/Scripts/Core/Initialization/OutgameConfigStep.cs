@@ -48,6 +48,7 @@ public sealed class OutgameConfigStep : MainInitializer
         AdventureProgress.SetConfig(t_runtimeAdventure);
         ProfileManager.SetConfig(profileConfig);
         ProfileManager.SetEmoteCatalog(emoteCatalog);
+        ProfileManager.SetNicknameFilter(new BadWordNicknameFilter());
 
         // 표 값을 덮은 사본만 꽂는다 — 저작 SO를 그대로 꽂으면 화면이 서버와 다른 상품을 그린다.
         // 실패하면 아무것도 꽂지 않는다: 룰렛만 서지 않고(IsAvailable=false) 로비 버튼이 숨는다.

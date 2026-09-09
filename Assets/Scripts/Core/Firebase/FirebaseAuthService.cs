@@ -36,6 +36,22 @@ public sealed class FirebaseAuthService
     public string LastError { get; private set; } = string.Empty;
     public bool IsCurrentUserActive => this.auth?.CurrentUser != null &&
                                        this.auth.CurrentUser.UserId == this.UserId;
+    public bool IsAnonymous => IsCurrentUserActive && this.auth.CurrentUser.IsAnonymous;
+    public string Email => IsCurrentUserActive ? this.auth.CurrentUser.Email ?? string.Empty : string.Empty;
+    public string DisplayName => IsCurrentUserActive ? this.auth.CurrentUser.DisplayName ?? string.Empty : string.Empty;
+
+    // FirebaseManager가 세션 구독과 진행 중 요청을 정리한 다음에만 호출한다.
+    internal void SignOutForLogout()
+    {
+        FirebaseAuth t_auth = FirebaseAuth.DefaultInstance;
+        FirebaseUser t_user = t_auth.CurrentUser;
+        if (t_user != null && t_user.IsAnonymous)
+        {
+            LocalPrefs.SetString(UidPrefsKeyPrefix + "abandonedOnLogout", t_user.UserId);
+            LocalPrefs.Save();
+        }
+        t_auth.SignOut();
+    }
 
     FirebaseAuth auth;
     bool stateChangedSubscribed;

@@ -37,6 +37,12 @@ public sealed class InitializationRunner : MonoBehaviour
 
     async UniTask InitializeAsync()
     {
+        // 씬 복귀로 생긴 사본이 영속 러너의 재시도 포인터를 덮어쓰면 안 된다.
+        if (InitClaimed && s_instance != null && s_instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
         if (!TryValidateOrder(out string t_error))
         {
             Debug.LogError($"[InitializationRunner] {t_error}", this);

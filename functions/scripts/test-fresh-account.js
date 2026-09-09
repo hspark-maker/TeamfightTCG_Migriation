@@ -66,20 +66,30 @@ assert.equal(slots.profile.frameId, null);
 assert.equal(typeof slots.profile.nickname, "string");
 assert.ok(slots.profile.nickname.length > 0 &&
   slots.profile.nickname.length <= NICKNAME_MAX_LENGTH,
-"닉네임은 1..12 자 — 넘으면 클라 SanitizeNickname 이 저장값을 잘라 표시한다");
+`닉네임은 1..${NICKNAME_MAX_LENGTH} 자 — 유저가 고치려 열었을 때 입력칸에 원래 이름이 다 들어가야 한다`);
 
 // 낱말표 추첨은 주입 축이라 값이 고정된다 — 문서에 그대로 실리는지만 본다.
 assert.equal(buildFreshAccountSlots(STARTER, "푸른 여우").profile.nickname,
   "푸른 여우");
 
-// 표는 100x100 이고 어떤 조합도 상한을 넘지 않아야 한다 — 넘는 낱말이 들어오면 재추첨이 늘고
-// 최악에는 명사 하나로 떨어진다. 표를 늘릴 때 여기서 잡힌다.
+// 명사 단독은 재추첨이 다 실패했을 때의 마지막 폴백이라 반드시 상한 이내여야 한다.
+// 여기가 넘으면 generateNickname 의 slice 가 낱말을 깨고("장난꾸러", 이름 그대로 잘린다) 나간다.
+for (const noun of NICKNAME_NOUNS) {
+  assert.ok(noun.length <= NICKNAME_MAX_LENGTH, `명사가 상한을 넘는다: ${noun}`);
+}
+
+// 상한을 넘는 조합은 버려지고 다시 뽑히므로(generateNickname) 전 조합이 들어맞을 필요는 없다.
+// 다만 통과 비율이 낮아지면 재추첨이 늘고 끝내는 명사 하나로 떨어져 이름이 단조로워진다 —
+// 표를 늘리거나 상한을 조일 때 그 쏠림을 여기서 잡는다.
+let fits = 0;
 for (const modifier of NICKNAME_MODIFIERS) {
   for (const noun of NICKNAME_NOUNS) {
-    assert.ok(modifier.length + 1 + noun.length <= NICKNAME_MAX_LENGTH,
-      `낱말 조합이 길다: ${modifier} ${noun}`);
+    if (modifier.length + 1 + noun.length <= NICKNAME_MAX_LENGTH) fits++;
   }
 }
+const fitRatio = fits / (NICKNAME_MODIFIERS.length * NICKNAME_NOUNS.length);
+assert.ok(fitRatio >= 0.5,
+  `상한 ${NICKNAME_MAX_LENGTH} 자에 들어맞는 조합이 ${(fitRatio * 100).toFixed(1)}% 뿐이다 — 낱말을 줄이거나 상한을 늘려라`);
 
 // 추첨기는 주입 가능하다 — 0 고정이면 표의 첫 낱말 한 벌이 나온다.
 assert.equal(generateNickname(() => 0), `${NICKNAME_MODIFIERS[0]} ${NICKNAME_NOUNS[0]}`);

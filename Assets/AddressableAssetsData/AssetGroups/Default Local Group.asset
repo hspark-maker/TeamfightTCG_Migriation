@@ -80,6 +80,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 89e5ccc4ebffa9547a10d9ea5b9a0f13
+    m_Address: SettingsPanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8a64cbb246ea50344ac445bc7d85e0c7
     m_Address: RankRewardPanel
     m_ReadOnly: 0

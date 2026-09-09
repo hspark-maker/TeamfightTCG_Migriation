@@ -39,6 +39,24 @@ public class LobbyTabController : MonoBehaviour
     const Ease SLIDE_EASE = Ease.OutCubic;
 
     int m_currentIndex = -1;
+    int m_swipeVersion;
+
+    public int SwipeVersion => m_swipeVersion;
+
+    public bool CanSwipe => isActiveAndEnabled && m_currentIndex >= 0
+        && (dragController == null || !dragController.IsDragging)
+        && m_pendingStart == null && m_startSlides == null
+        && m_pendingArrive == null && m_leaving == null
+        // 미완주 상태라도 전체 해금된 로비는 자유 조작을 허용한다.
+        && (!OutgameTutorialRunner.IsRunning || OutgameFeatureLock.AllUnlocked)
+        && !TriggeredTutorialRunner.IsRunning;
+
+    /// <summary>Moves one adjacent tab through the same policy as a tab button.</summary>
+    public void TrySwipe(int _direction)
+    {
+        if (!CanSwipe || (_direction != -1 && _direction != 1)) return;
+        Select(m_currentIndex + _direction);
+    }
 
     // 탭바를 풀 오버레이 위로 올렸을 때의 중첩 캔버스. 되돌릴 때 overrideSorting만 끈다 —
     // 컴포넌트를 떼면 같은 탭을 다시 열 때마다 붙였다 떼기를 반복한다.
@@ -119,6 +137,7 @@ public class LobbyTabController : MonoBehaviour
     // (로비를 떠나는 정규 경로는 씬 전환이라 여기는 방어에 가깝다.)
     void OnDisable()
     {
+        m_swipeVersion++;
         FlushPendingStart();
         FinishPendingSlide();
     }
@@ -179,6 +198,7 @@ public class LobbyTabController : MonoBehaviour
     /// 앞선 RequestLeave가 취소되면 전환 자체가 무산되기 때문이다.</summary>
     void CommitSelection(int _index, bool _fireTrigger)
     {
+        m_swipeVersion++;
         // 순서를 지켜야 한다. 앞의 것이 밀린 출발을 세우고, 뒤의 것이 그 트윈을 강제 완결시킨다.
         FlushPendingStart();
         FinishPendingSlide();

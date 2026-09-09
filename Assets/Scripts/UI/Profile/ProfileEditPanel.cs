@@ -13,10 +13,16 @@ public class ProfileEditPanel : PooledUIBase
     const int TAB_FRAME  = 1;
     const int TAB_EMOTE  = 2;
 
-    // 풀 계약. 표시값은 ProfileManager에서 스스로 당기므로 UIData가 필요 없다.
-    public override void Initialization(UIData _data) { }
+    // 표시값은 ProfileManager에서 읽고, 호출 화면의 복귀 동작만 전달받는다.
+    public override void Initialization(UIData _data) => this.data = _data;
     public override void Show() => this.Open();
-    public override void Hide() => this.Close();
+    public override void Hide()
+    {
+        // 풀 정리 등 외부 숨김에서는 호출 화면을 다시 열지 않는다.
+        this.data = null;
+        if (this.nicknameInput != null) this.nicknameInput.DeactivateInputField();
+        this.SetVisible(false);
+    }
 
     [Header("미리보기")]
     [Tooltip("판·얼굴·링 한 덩어리. 팝업 안에서만 드래프트를 즉시 반영한다.")]
@@ -103,9 +109,10 @@ public class ProfileEditPanel : PooledUIBase
     /// <summary>드래프트를 버리고 닫는다. 확인 팝업은 두지 않는다.</summary>
     public void Close()
     {
-        // 소프트키보드가 팝업 밖까지 살아남지 않게(DeckEditController와 같은 규약).
-        if (this.nicknameInput != null) this.nicknameInput.DeactivateInputField();
-        this.SetVisible(false);
+        if (!this.isShow) return;
+        var t_onHide = this.data?.onHide;
+        this.Hide();
+        t_onHide?.Invoke();
     }
 
     void OnEnable()
@@ -131,6 +138,7 @@ public class ProfileEditPanel : PooledUIBase
 
     void OnDisable()
     {
+        this.data = null;
         // 소프트키보드가 팝업 밖까지 살아남지 않게 — 팝업이 풀에서 꺼지는 경로는 Close를 거치지 않는다.
         if (this.nicknameInput != null)
         {
@@ -296,6 +304,14 @@ public class ProfileEditPanel : PooledUIBase
     // 드래프트를 실제 프로필로 커밋한다. 영속·통지는 ProfileManager가 처리한다.
     void Save()
     {
+        // 이름이 막히면 네 축을 통째로 보류하고 팝업을 열어 둔 채 안내한다 — 고른 아바타·감정표현을 잃지 않고
+        // 이름만 고쳐 다시 저장할 수 있게.
+        if (ProfileManager.IsNicknameBlocked(this.m_draftNickname))
+        {
+            NicknameRejectNotice.Show();
+            return;
+        }
+
         ProfileManager.Apply(this.m_draftNickname, this.m_draftAvatarId, this.m_draftFrameId, this.m_draftEmoteIds);
         this.Close();
     }

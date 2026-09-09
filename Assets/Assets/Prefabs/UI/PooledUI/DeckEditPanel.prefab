@@ -316,9 +316,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 701667878696700260}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1aa08ab6e0800fa44ae55d278d1423e3, type: 3}
+  m_Script: {fileID: 11500000, guid: a627eb1f68424f0409cdd1016421f090, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.ScrollRect
+  m_EditorClassIdentifier: Assembly-CSharp::SwipeThroughScrollRect
   m_Content: {fileID: 8833142970937548326}
   m_Horizontal: 0
   m_Vertical: 1

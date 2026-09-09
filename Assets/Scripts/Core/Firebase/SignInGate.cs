@@ -28,6 +28,7 @@ public static class SignInGate
     static UniTaskCompletionSource<ESignInMethod> s_choice;
     static bool s_panelReady;
     static bool s_completed;
+    static bool s_requireExplicitChoice;
 
     /// <summary>기기에 저장된 로그인 방식. None 이면 아직 한 번도 고르지 않았다.</summary>
     public static ESignInMethod StoredMethod
@@ -47,6 +48,7 @@ public static class SignInGate
         s_choice = null;
         s_panelReady = false;
         s_completed = false;
+        s_requireExplicitChoice = false;
     }
 
     /// <summary>계정이 정해졌는가. 로딩 화면이 "인증 대기" 단계를 끝낼 시점을 이 값으로 본다.</summary>
@@ -80,11 +82,19 @@ public static class SignInGate
         LocalPrefs.Save();
     }
 
+    internal static void ResetForLogout()
+    {
+        ClearStoredMethod();
+        ResetRuntimeState();
+        s_requireExplicitChoice = true;
+    }
+
     /// <summary>계정이 정해질 때까지 초기화를 멈춘다. 이미 정해져 있으면 그 자리에서 끝난다.</summary>
     public static async UniTask<ESignInMethod> WaitAsync()
     {
         ESignInMethod t_stored = StoredMethod;
         if (t_stored != ESignInMethod.None) return t_stored;
+        if (s_choice != null) return await s_choice.Task;
 
         // 대기 소스를 먼저 세운다 — 화면이 먼저 떠서 유저가 즉시 누르면 Complete 가 받을 곳이 없다.
         s_choice = new UniTaskCompletionSource<ESignInMethod>();
@@ -97,7 +107,7 @@ public static class SignInGate
             t_waited += 100;
         }
 
-        if (!s_panelReady && !s_completed)
+        if (!s_panelReady && !s_completed && !s_requireExplicitChoice)
         {
             // 이 결론은 기기에 남기지 않는다 — 유저가 고른 것이 아니라 화면이 없어 대신 정한 것이라,
             // 남기면 로그인 화면이 있는 다음 실행에서도 이번에 발급된 익명 계정에 영영 묶인다
