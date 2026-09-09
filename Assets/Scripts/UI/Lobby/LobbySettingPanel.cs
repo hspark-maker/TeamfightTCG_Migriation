@@ -1,6 +1,5 @@
 using System;
 using Cysharp.Threading.Tasks;
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -23,10 +22,12 @@ public class LobbySettingPanel : PooledUIBase
     [Tooltip("바깥 암막 클릭 판정. 닫기와 같은 동작이다.")]
     [SerializeField] Button dimButton;
 
-    [Header("계정 관리")]
-    [SerializeField] TMP_Text accountStatusText;
-    [SerializeField] TMP_Text accountIdText;
-    [SerializeField] Button logoutButton;
+    [Header("연결된 서비스")]
+    [SerializeField] RectTransform serviceRoot;
+    [SerializeField] AccountServiceCellView serviceCellPrefab;
+    [SerializeField] AccountServiceCellView addServiceCell;
+
+    AccountServiceCellView serviceCell;
 
     bool confirmingLogout;
     bool loggingOut;
@@ -56,7 +57,6 @@ public class LobbySettingPanel : PooledUIBase
         if (this.editButton    != null) this.editButton.onClick.AddListener(OpenProfileEdit);
         if (this.closeButton   != null) this.closeButton.onClick.AddListener(Hide);
         if (this.dimButton     != null) this.dimButton.onClick.AddListener(Hide);
-        if (this.logoutButton  != null) this.logoutButton.onClick.AddListener(ConfirmLogout);
         FirebaseAuthService.Instance.OnStateChanged += RefreshAccount;
     }
 
@@ -65,7 +65,6 @@ public class LobbySettingPanel : PooledUIBase
         if (this.editButton    != null) this.editButton.onClick.RemoveListener(OpenProfileEdit);
         if (this.closeButton   != null) this.closeButton.onClick.RemoveListener(Hide);
         if (this.dimButton     != null) this.dimButton.onClick.RemoveListener(Hide);
-        if (this.logoutButton  != null) this.logoutButton.onClick.RemoveListener(ConfirmLogout);
         FirebaseAuthService.Instance.OnStateChanged -= RefreshAccount;
 
         base.OnDestroy();
@@ -86,23 +85,22 @@ public class LobbySettingPanel : PooledUIBase
 
     void RefreshAccount()
     {
+        // 다른 목록 패널처럼 프리팹을 한 번 생성하고, 풀 재개방 시 같은 셀을 재사용한다.
+        if (this.serviceCell == null && this.serviceRoot != null && this.serviceCellPrefab != null)
+        {
+            this.serviceCell = Instantiate(this.serviceCellPrefab, this.serviceRoot);
+            this.serviceCell.transform.SetAsFirstSibling();
+        }
+        if (this.serviceCell == null) return;
+
         FirebaseAuthService t_auth = FirebaseAuthService.Instance;
         bool t_active = t_auth.IsCurrentUserActive;
-        if (this.accountStatusText != null)
-        {
-            // 이메일에 TMP 태그처럼 보이는 문자가 있어도 계정 문자열 그대로 표시한다.
-            this.accountStatusText.richText = false;
-            this.accountStatusText.text = !t_active ? "계정 정보를 확인할 수 없습니다."
-                : t_auth.IsAnonymous ? "게스트 : "
-                : "이메일 : " + t_auth.Email;
-        }
-        if (this.accountIdText != null)
-        {
-            this.accountIdText.richText = false;
-            this.accountIdText.text = t_active ? "UID: " + t_auth.UserId : string.Empty;
-        }
-        if (this.logoutButton != null)
-            this.logoutButton.interactable = t_active && !this.loggingOut && !GameManager.IsLoggingOut;
+        this.serviceCell.Bind(EAccountServiceCellState.Connected,
+            null,
+            t_active && !this.loggingOut && !GameManager.IsLoggingOut, ConfirmLogout);
+        this.serviceCell.gameObject.SetActive(t_active);
+        if (this.addServiceCell != null)
+            this.addServiceCell.Bind(EAccountServiceCellState.Add, null, true, null);
     }
 
     void ConfirmLogout()
@@ -128,6 +126,7 @@ public class LobbySettingPanel : PooledUIBase
     {
         if (this.loggingOut || GameManager.IsLoggingOut) return;
         this.loggingOut = true;
+        RefreshAccount();
         // 확인 팝업이 자신의 Hide를 끝낸 다음 대기/실패 팝업을 연다.
         await UniTask.Yield();
         Hide();
