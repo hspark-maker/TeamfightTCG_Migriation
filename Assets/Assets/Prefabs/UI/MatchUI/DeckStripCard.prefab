@@ -149,6 +149,8 @@ MonoBehaviour:
   createLabel: "\uC2E0\uADDC \uC0DD\uC131"
   fullLabel: "\uAC00\uB4DD \uCC38"
   draftLabel: "\uC0DD\uC131 \uC911"
+  deleteLabel: "\uB371 \uC0AD\uC81C"
+  deleteDoneLabel: "\uC644\uB8CC"
   tintTextOnSelect: 1
   normalTextColor: {r: 0.6313726, g: 0.6039216, b: 0.56078434, a: 1}
   selectedTextColor: {r: 0.23529412, g: 0.09019608, b: 0, a: 1}
@@ -1003,9 +1005,9 @@ RectTransform:
   - {fileID: 7842157734724649212}
   - {fileID: 3297587794213991961}
   - {fileID: 5672434883581351941}
-  - {fileID: 6940032705323389777}
   - {fileID: 581029311872762748}
   - {fileID: 6555885649040983411}
+  - {fileID: 6940032705323389777}
   m_Father: {fileID: 369589340622444868}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}

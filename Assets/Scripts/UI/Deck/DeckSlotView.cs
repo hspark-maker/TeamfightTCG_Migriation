@@ -120,12 +120,7 @@ public class DeckSlotView : MonoBehaviour
         m_useNewDeckBackground = false;
         SetSelected(false);
 
-        if (plusObject != null)
-        {
-            plusObject.SetActive(true);
-            // 삭제 토글 모드(BindDeleteToggle)가 ✕로 돌려놓았을 수 있다 — 같은 저작 칸이 두 모드를 오간다.
-            plusObject.transform.localRotation = Quaternion.identity;
-        }
+        if (plusObject   != null) plusObject.SetActive(true);
         if (bannerObject != null) bannerObject.SetActive(false);
         if (numberText   != null) numberText.gameObject.SetActive(false);
         if (previewImage != null) previewImage.gameObject.SetActive(false);
@@ -153,12 +148,7 @@ public class DeckSlotView : MonoBehaviour
         m_useNewDeckBackground = false;
         SetSelected(false);
 
-        if (plusObject != null)
-        {
-            plusObject.SetActive(true);
-            // 별도 아트 없이 ⊕ 를 45° 돌려 ✕ 로 읽히게 한다 — 생성이 아니라 삭제 축임을 이 칸 하나로 알린다.
-            plusObject.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
-        }
+        if (plusObject   != null) plusObject.SetActive(true);
         if (bannerObject != null) bannerObject.SetActive(false);
         if (numberText   != null) numberText.gameObject.SetActive(false);
         if (previewImage != null) previewImage.gameObject.SetActive(false);

@@ -3567,6 +3567,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4728205727678782227}
   - component: {fileID: 4728205727678782224}
+  - component: {fileID: 900000000000000001}
   - component: {fileID: 4728205727678782225}
   - component: {fileID: 4822530144572137969}
   - component: {fileID: 3364638490900046813}
@@ -3621,16 +3622,7 @@ MonoBehaviour:
   titleText: {fileID: 4728205726107392313}
   optionsButton: {fileID: 2272089273140638216}
   optionsBackButton: {fileID: 4728205726538363938}
-  bgmSlider: {fileID: 4728205727220254712}
-  bgmValueText: {fileID: 4728205726504223307}
-  sfxSlider: {fileID: 4728205726967911327}
-  sfxValueText: {fileID: 4728205727416124745}
-  frameRateButtons:
-  - {fileID: 2929629499641339517}
-  - {fileID: 2326935933005227434}
-  - {fileID: 8345286996558913540}
-  screenShakeOnButton: {fileID: 3863284739614266292}
-  screenShakeOffButton: {fileID: 2187050136713102520}
+  settingsOptions: {fileID: 900000000000000001}
   surrenderButton: {fileID: 1448690061176102198}
   winDebugButton: {fileID: 293768040893075040}
 --- !u!114 &4728205727678782225
@@ -5503,3 +5495,25 @@ MonoBehaviour:
   targetImage: {fileID: 4996008223445435488}
   selectedTint: {r: 1, g: 1, b: 1, a: 1}
   unselectedTint: {r: 0.55, g: 0.55, b: 0.55, a: 1}
+--- !u!114 &900000000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4728205727678782226}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0802ef8577f579448dd54e956b96f7f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  bgmSlider: {fileID: 4728205727220254712}
+  bgmValueText: {fileID: 4728205726504223307}
+  sfxSlider: {fileID: 4728205726967911327}
+  sfxValueText: {fileID: 4728205727416124745}
+  frameRateButtons:
+  - {fileID: 2929629499641339517}
+  - {fileID: 2326935933005227434}
+  - {fileID: 8345286996558913540}
+  screenShakeOnButton: {fileID: 3863284739614266292}
+  screenShakeOffButton: {fileID: 2187050136713102520}

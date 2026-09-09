@@ -39,10 +39,6 @@ public class DeckStripView : MonoBehaviour
     // 한 장을 지우면 더는 만석이 아니라 ⊕ 칸이 생성 칸으로 되돌아오므로, 상태를 이어 갈 이유가 없다.
     bool m_deleteMode;
 
-    // Build 가 마지막으로 지시받은 편집 중 슬롯 좌표(신규 편집 중이면 -1). 삭제 토글이 켜져도 이 칸만은
-    // 삭제 버튼을 열지 않는다 — 편집 중인 덱이 발밑에서 사라지면 편집기의 좌표가 빈 칸을 가리키게 된다.
-    int m_editingSlot = -1;
-
     // 이번 Build 가 세운 ⊕ 칸(저작 칸이든 인스턴스든). 삭제 토글을 켜고 끌 때 문구를 갈아끼우려면 다시 잡아야 한다.
     DeckSlotView m_createView;
 
@@ -58,8 +54,7 @@ public class DeckStripView : MonoBehaviour
         Clear();
 
         // 삭제 토글은 재빌드마다 닫힌다 — 지우고 나면 만석이 풀려 ⊕ 칸이 생성 칸으로 돌아오기 때문이다.
-        m_deleteMode  = false;
-        m_editingSlot = _createSelected ? -1 : _selectedSlot;
+        m_deleteMode = false;
 
         if (content == null || slotPrefab == null) return;
 
@@ -199,20 +194,16 @@ public class DeckStripView : MonoBehaviour
         else           _view.BindCreate(_canCreate, _onCreateClick);
     }
 
-    // 만석 상태의 ⊕ 칸 클릭. 목록을 재빌드하지 않고 저장된 칸의 삭제 버튼만 여닫는다 —
+    // 만석 상태의 ⊕ 칸 클릭. 목록을 재빌드하지 않고 저장된 칸 전부의 삭제 버튼을 여닫는다 —
     // 재빌드는 스크롤 위치를 잃고, 편집기의 선택 좌표도 바뀌지 않았다.
+    // 편집 중인 덱도 제외하지 않는다 — 그 덱이 지워지면 편집기가 다른 덱으로 갈아탄다(DeckEditController.RelocateEditingSlot).
     void ToggleDeleteMode()
     {
         m_deleteMode = !m_deleteMode;
 
+        // ⊕·생성 중 칸은 삭제 콜백이 없어 SetEditMode 가 알아서 무시한다.
         for (int t_i = 0; t_i < m_slots.Count; t_i++)
-        {
-            if (m_slots[t_i] == null) continue;
-
-            // 편집 중인 덱은 제외한다. ⊕·생성 중 칸은 삭제 콜백이 없어 SetEditMode 가 알아서 무시한다.
-            bool t_open = m_deleteMode && m_slotIndices[t_i] != m_editingSlot;
-            m_slots[t_i].SetEditMode(t_open);
-        }
+            if (m_slots[t_i] != null) m_slots[t_i].SetEditMode(m_deleteMode);
 
         if (m_createView != null) m_createView.BindDeleteToggle(m_deleteMode, ToggleDeleteMode);
     }

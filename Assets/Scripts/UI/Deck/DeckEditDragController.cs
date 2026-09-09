@@ -69,7 +69,11 @@ public class DeckEditDragController : MonoBehaviour
         //    pointerDrag만 null로 만들면 ScrollRect가 OnEndDrag를 못 받아
         //    m_Dragging=true인 채 남아 다음 프레임 관성이 튄다.
         if (_data.pointerDrag != null && _data.dragging)
+        {
+            // 소유권 인계를 위한 강제 종료다. 상위 스와이프가 손을 뗀 것으로 판정하지 않게 한다.
+            _data.dragging = false;
             ExecuteEvents.Execute(_data.pointerDrag, _data, ExecuteEvents.endDragHandler);
+        }
 
         // 2) 입력 모듈이 더는 이 포인터의 드래그를 라우팅하지 않게 한다.
         //    StandaloneInputModule.ProcessDrag는 pointerDrag == null이면 첫 줄에서 return한다.

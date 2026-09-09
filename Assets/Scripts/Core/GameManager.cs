@@ -1,5 +1,6 @@
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 // 게임 전역을 관리하는 지속 싱글턴.
 public class GameManager : MonoBehaviour
@@ -14,6 +15,83 @@ public class GameManager : MonoBehaviour
 
     public static GameManager Instance { get; private set; }
     public static int CurrentFrameRate { get; private set; } = DefaultFrameRate;
+    public static bool IsLoggingOut { get; private set; }
+
+    /// <summary>저장을 확인한 뒤 로그아웃하고 시작 화면으로 돌아간다. false면 로그아웃을 완료하지 못했다.</summary>
+    public static async UniTask<bool> LogoutAsync()
+    {
+        if (IsLoggingOut || Instance == null || !FirebaseManager.IsInitialized ||
+            !FirebaseAuthService.Instance.IsCurrentUserActive) return false;
+        // 씬이 빌드에서 빠진 상태라면 현재 인증을 버리기 전에 중단한다.
+        if (!Application.CanStreamedLevelBeLoaded("StartScene")) return false;
+
+        IsLoggingOut = true;
+        bool t_sessionEnded = false;
+        UnityEngine.Events.UnityAction<Scene, LoadSceneMode> t_loaded = null;
+        try
+        {
+            await FirebaseManager.FlushPendingAsync().Timeout(
+                System.TimeSpan.FromMilliseconds(FirebaseTimeouts.CallableMilliseconds));
+            if (PlayerSaveCloud.HasPendingUpload) return false;
+
+            var t_sceneReady = new UniTaskCompletionSource();
+            t_loaded = (_scene, _mode) =>
+            {
+                if (_scene.name == "StartScene") t_sceneReady.TrySetResult();
+            };
+            SceneManager.sceneLoaded += t_loaded;
+            LoadingCoverView.LoadScene("StartScene", () =>
+            {
+                try
+                {
+                    FirebaseManager.Shutdown();
+                    t_sessionEnded = true;
+                    FirebaseAuthService.Instance.SignOutForLogout();
+                    SignInGate.ResetForLogout();
+                    SaveDependentManagersStep.ResetForAccountChange();
+                    GameInitialization.SetState(EGameInitState.Initializing);
+                }
+                catch (System.Exception t_exception)
+                {
+                    t_sceneReady.TrySetException(t_exception);
+                }
+            });
+            await t_sceneReady.Task.Timeout(System.TimeSpan.FromSeconds(60));
+            ResumeAfterLogoutAsync().Forget();
+            return true;
+        }
+        catch (System.Exception t_exception)
+        {
+            Debug.LogWarning($"[Account] 로그아웃을 완료하지 못했습니다: {t_exception.Message}");
+            if (t_sessionEnded) GameInitialization.MarkRecoveryRequired();
+            return false;
+        }
+        finally
+        {
+            if (t_loaded != null) SceneManager.sceneLoaded -= t_loaded;
+            IsLoggingOut = false;
+        }
+    }
+
+    static async UniTaskVoid ResumeAfterLogoutAsync()
+    {
+        // StartScene의 로그인 패널이 생성된 뒤 기다려야 화면 대기 폴백이 먼저 끝나지 않는다.
+        await SignInGate.WaitAsync();
+        // Complete의 동기 연속 실행 중 초기화하면 LoginEmailPanel의 후속 재시작과 겹친다.
+        await UniTask.NextFrame();
+        try
+        {
+            ContentProfileConfig t_profile = ContentProfileConfig.Active;
+            GameInitialization.SetState(EGameInitState.SyncingSave);
+            FirebaseManager.Initialize(t_profile.CloudEnvId, t_profile.FirebaseEmulators);
+            InitializationRunner.RestartGate();
+        }
+        catch (System.Exception t_exception)
+        {
+            Debug.LogException(t_exception);
+            GameInitialization.MarkRecoveryRequired();
+        }
+    }
 
     /// <summary>타격 화면 흔들림 사용 여부. 흔들림에 멀미를 느끼는 사용자를 위한 접근성 옵션이라 기본은 켬.
     /// 판정은 BattleCamera 한 곳에서만 본다 — 호출부(AttackSequence)는 이 값을 몰라야 한다.
@@ -134,6 +212,7 @@ public class GameManager : MonoBehaviour
         if (!FirebaseManager.IsInitialized) return;
 
         FirebaseManager.Shutdown();
+        SaveDependentManagersStep.ResetForAccountChange();
         GameInitialization.SetState(EGameInitState.SyncingSave);
 
         ContentProfileConfig t_profile = ContentProfileConfig.Active;

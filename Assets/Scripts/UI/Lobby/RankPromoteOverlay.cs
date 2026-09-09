@@ -254,6 +254,9 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
     Vector2   m_gradeNamePos;
     bool      m_captured;
 
+    /// <summary>이 화면이 서는 층.</summary>
+    protected override int SortingOrder => UiSortingOrder.Intro;
+
     /// <summary>승급 오버레이를 얻는다. 평소 꺼져 있는 노드라 이미 선 것을 찾을 때는 비활성까지 뒤진다
     /// (UnlockIntroOverlay와 같은 규약).</summary>
     public static bool TryGet(out RankPromoteOverlay _overlay)
@@ -302,7 +305,7 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
             this.tapButton.onClick.AddListener(OnTapped);
         }
 
-        IsOpen = true;
+        MarkOpen();
         SetVisible(true);
 
         // 손은 처음부터 열어 둔다 — 이 화면의 유일한 문이라, 안무가 어디서 끊겨도 잠긴 모달로 남지 않는다.
@@ -323,22 +326,6 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
         this.m_choreo.Play();
     }
 
-    /// <summary>밖에서 걷는다(화면이 통째로 넘어가는 경로). 콜백은 흘리지 않는다 —
-    /// 이 길로 닫는 쪽은 이미 자기 흐름을 쥐고 있다.</summary>
-    public void Hide()
-    {
-        this.m_onClose = null;
-
-        bool t_wasOpen = IsOpen;
-        IsOpen = false;
-
-        KillChoreo();
-        ResetChoreography();
-        SetVisible(false);
-
-        if (t_wasOpen) RaiseClosed();
-    }
-
     // Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서도 문이 잠기지 않게 열어 둔다.
     void OnEnable()
     {
@@ -352,9 +339,9 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
         KillChoreo();
         ResetChoreography();
 
-        // 꺼진 화면은 떠 있는 것이 아니다. Hide를 거치지 않고 꺼지는 경로(부모 비활성·씬 언로드)에서
+        // 꺼진 화면은 떠 있는 것이 아니다. 닫기를 거치지 않고 꺼지는 경로(부모 비활성·씬 언로드)에서
         // 이 플래그가 남으면 "로비 표면이 보이는가" 판정이 영영 false가 된다.
-        IsOpen = false;
+        ClearOpen();
     }
 
     // 탭 한 번이 곧 끝이다. 안무 중이면 최종 상태로 점프한 뒤 닫는다.
@@ -379,14 +366,13 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
     {
         SetInputEnabled(false);
 
-        bool t_wasOpen = IsOpen;
-        IsOpen = false;
+        bool t_wasOpen = ConsumeOpen();
 
         KillChoreo();
         ResetChoreography();
         SetVisible(false);
 
-        if (t_wasOpen) RaiseClosed();
+        NotifyClosed(t_wasOpen);
     }
 
     // 암전 → 덮임 통지 → 안무. 갈래는 하나뿐이고 옛 배지 유무만 안에서 갈린다.

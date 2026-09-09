@@ -39,7 +39,7 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
     // 진행 중 등장 안무. 받기·닫기가 도중에 와도 저작 상태로 되돌린 뒤 이어가야 한다.
     Sequence m_intro;
 
-    // 받기 콜백. 한 번 쓰면 비워 연타를 막는다. 지급이 실패하든 말든 화면은 닫힌다 —
+    // 받기 콜백. 한 번 쓰면 비워 두 번 흐르지 않게 한다. 지급이 실패하든 말든 화면은 닫힌다 —
     // 받아야 넘어가는 자리라 여기서 가두면 탈출로가 없다.
     Action m_onClaim;
     bool m_continueGrantedPage;
@@ -48,6 +48,9 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
 
     // 표시할 때마다 새로 만들지 않는다 — 한 화면에 한 번 쓰는 목록이라 재사용으로 족하다.
     readonly List<DrawnCard> m_drawn = new List<DrawnCard>();
+
+    /// <summary>획득 결과 오버레이가 서는 층.</summary>
+    protected override int SortingOrder => UiSortingOrder.Reward;
 
     /// <summary>카드가 서 있는 자리. 받은 뒤 이어지는 비행이 여기서 출발해야
     /// "방금 본 그 카드들이 도감으로 갔다"가 한 줄로 이어진다.</summary>
@@ -80,7 +83,7 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
             this.claimButton.onClick.AddListener(this.OnClaimClicked);
         }
 
-        IsOpen = true;
+        MarkOpen();
         this.SetVisible(true);
 
         // 격자 생성은 화면이 켜진 뒤여야 한다 — 꺼진 부모 밑에서는 자리 계산이 도는 동안 캔버스가 갱신되지 않는다.
@@ -93,18 +96,17 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
         this.m_intro.Play();
     }
 
-    public void Hide()
+    void CloseNow()
     {
         this.m_onClaim = null;
         this.KillIntro();
 
-        bool t_wasOpen = IsOpen;
-        IsOpen = false;
+        bool t_wasOpen = ConsumeOpen();
 
         this.SetVisible(false);
         if (this.grid != null) this.grid.Hide();
 
-        if (t_wasOpen) RaiseClosed();
+        NotifyClosed(t_wasOpen);
     }
 
     public void ShowGranted(IReadOnlyList<DrawnCard> _cards)
@@ -142,17 +144,20 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
         this.transition.HandleDisabled(this.ResolveTarget());
         this.KillIntro();
 
-        // 꺼진 화면은 떠 있는 것이 아니다. Hide를 거치지 않고 꺼지는 경로(부모 비활성·씬 언로드)에서
+        // 꺼진 화면은 떠 있는 것이 아니다. CloseNow를 거치지 않고 꺼지는 경로(부모 비활성·씬 언로드)에서
         // 이 플래그가 남으면 "로비 표면이 보이는가" 판정이 영영 false가 되어 뒤의 안내가 서지 못한다.
-        IsOpen = false;
+        ClearOpen();
     }
 
     void OnClaimClicked()
     {
-        // 콜백을 먼저 비워 연타로 두 번 지급되는 경로를 막는다(호출자 가드와 이중 방어).
+        // 연타는 여기서 막는다. **콜백 유무로 막지 않는다** — 닫기와 콜백 소비는 별개라,
+        // 콜백을 안 넘긴 호출자에게 [받기]가 아무 일도 안 하는 모달을 남기면 안 된다.
+        if (!IsOpen) return;
+
+        // 콜백은 먼저 비운다. 닫기 도중에 다시 들어와도 두 번 흐르지 않는다.
         var t_callback = this.m_onClaim;
         this.m_onClaim = null;
-        if (t_callback == null) return;
 
         this.SetInputEnabled(false);
         this.KillIntro();
@@ -168,9 +173,9 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
         // 화면을 먼저 걷고 지급한다. 순서가 뒤집히면 지급이 트는 획득 연출의 종료 신호를 기다리는 쪽이
         // "보상 화면이 떠 있는 동안 온 신호"로 오인해 흘려보낸다(OutgameTutorialBridge.OnCardGainFinished).
         // 딤이 남아 있으면 그 아래에서 출발한 비행 카드가 가려지는 문제도 같은 순서로 함께 풀린다.
-        this.Hide();
+        this.CloseNow();
 
-        t_callback.Invoke();
+        t_callback?.Invoke();
     }
 
     // 등장 안무. 카드가 서는 리듬은 격자가 쥐고 있으니 여기서는 [받기]가 열리는 시각만 정한다.

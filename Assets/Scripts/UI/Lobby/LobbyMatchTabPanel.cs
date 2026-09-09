@@ -161,8 +161,8 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         // 언랭크도 CurrentGrade가 Bronze를 돌려주므로 등급으로는 갈리지 않는다(PackUnlockRules와 같은 규율).
         if (!RankManager.IsRanked) return;
 
-        // 안내 중에는 비켜선다 — 안내가 짠 순서에 전면 오버레이가 끼어든다.
-        if (OutgameTutorialRunner.IsRunning || TriggeredTutorialRunner.IsRunning) return;
+        // 온보딩 진행 여부로는 막지 않는다. 안내가 화면을 잡고 있는 동안에는 게이트 blocker가 이미 클릭을 먹고,
+        // IsRunning은 "시퀀스 미완주"라서 그것으로 막으면 온보딩을 끝내지 않은 계정은 배지가 영영 무반응이 된다.
 
         // 정산 연출 중에는 막는다. Show가 앞 안무를 죽이며 디렉터의 덮임 통지를 앞당겨 발화시키고,
         // 그쪽 대기가 열람 탭 한 번에 풀린다.

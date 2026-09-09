@@ -7,8 +7,12 @@
  * 긴 낱말만 잔뜩 넣으면 재추첨이 늘 뿐 결과가 잘리지는 않는다.
  */
 
-/** 클라 ProfileManager.NICKNAME_MAX_LENGTH 와 같아야 한다 — 넘으면 클라가 저장값을 잘라 표시한다. */
-export const NICKNAME_MAX_LENGTH = 12;
+/**
+ * 클라 ProfileManager.NICKNAME_MAX_LENGTH 와 짝이다 — 발급한 이름이 유저가 스스로 지을 수 있는
+ * 길이를 넘으면, 고치려 연 입력칸에 원래 이름조차 다 들어가지 않는다.
+ * (클라는 저장된 이름을 자르지 않으므로 어긋나도 표시가 깨지지는 않는다: ProfileManager.RestoreNickname)
+ */
+export const NICKNAME_MAX_LENGTH = 8;
 
 /** 앞 낱말 100개. */
 export const NICKNAME_MODIFIERS: readonly string[] = [

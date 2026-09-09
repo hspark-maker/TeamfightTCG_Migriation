@@ -249,6 +249,7 @@ MonoBehaviour:
   recoveryText: {fileID: 2138776694632452108}
   retryButton: {fileID: 5764358577848001203}
   quitButton: {fileID: 7100000000000000005}
+  storeButton: {fileID: 0}
   loginPanel: {fileID: 0}
   accountButton: {fileID: 5133797103028889196}
   minDuration: 1
@@ -839,7 +840,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: 0, y: 54}
+  m_AnchoredPosition: {x: 0, y: 100}
   m_SizeDelta: {x: -180.00012, y: 71}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &7004482626366096119

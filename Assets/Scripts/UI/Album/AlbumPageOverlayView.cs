@@ -48,8 +48,7 @@ public class AlbumPageOverlayView : MonoBehaviour
 
     [Header("삽입 연출 — 로비 셸 위로 올라서기")]
     [Tooltip("이 오버레이는 탭 콘텐츠 안에 있어 평소엔 상단바·탭바 아래에 그려지고, 딤도 콘텐츠 영역까지만 덮는다.\n" +
-             "삽입 연출 동안만 이 order로 셸 위에 올라서서 딤 한 장이 화면 전체를 덮게 한다(SetFrontmost).\n" +
-             "로비 UI 중 정렬을 덮어쓰는 것은 여기뿐이라 값끼리 다툴 상대가 없다 — 양수면 된다.")]
+             "삽입 연출 동안만 이 order로 셸 위에 올라서서 딤 한 장이 화면 전체를 덮게 한다(SetFrontmost).")]
     [SerializeField] int frontSortingOrder = 100;
 
     [Tooltip("올라선 동안 Dim이 콘텐츠 경계 밖으로 뻗는 여유(px). 상단바 180 / 하단바 220을 넘기기만 하면 되고,\n" +
