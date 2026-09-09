@@ -31,6 +31,8 @@ public static class BalloonPengCutoutBuilder
         new Vector2(0.49f, 0.35f), new Vector2(0.4f, 0.41f)
     };
     private const float Duration = 1.2f;
+    private const float NearWingRestAngle = -22f;
+    private const float FarWingRestAngle = 22f;
     private static readonly Vector3 PoseOrigin = Position(0.5f, 0.14f);
     private static readonly string[] Names = { "Body", "WingFar", "WingNear", "FootFar", "FootNear" };
     private static readonly Vector2[] Pivots =
@@ -92,6 +94,8 @@ public static class BalloonPengCutoutBuilder
                 var part = new GameObject(Names[i]);
                 part.transform.SetParent(i < 3 ? pose : root.transform, false);
                 part.transform.localPosition = Anchors[i] - (i < 3 ? PoseOrigin : Vector3.zero);
+                if (i == 1) part.transform.localRotation = Quaternion.Euler(0, 0, FarWingRestAngle);
+                if (i == 2) part.transform.localRotation = Quaternion.Euler(0, 0, NearWingRestAngle);
                 var mesh = CreateQuad(i, regions[i]);
                 AssetDatabase.CreateAsset(mesh, Folder + Names[i] + "_Mesh.asset");
                 part.AddComponent<MeshFilter>().sharedMesh = mesh;
@@ -378,8 +382,8 @@ public static class BalloonPengCutoutBuilder
         var clip = new AnimationClip { name = "Walk", frameRate = 30, wrapMode = WrapMode.Loop };
         Curve(clip, "Pose", "m_LocalPosition.y", a => PoseOrigin.y + 0.015f * (1 - Mathf.Cos(2 * a)));
         Curve(clip, "Pose", "localEulerAnglesRaw.z", a => 1.5f * Mathf.Sin(a));
-        Curve(clip, "Pose/WingFar", "localEulerAnglesRaw.z", a => 4 * Mathf.Sin(a + 0.25f));
-        Curve(clip, "Pose/WingNear", "localEulerAnglesRaw.z", a => 4 * Mathf.Sin(a - 0.25f));
+        Curve(clip, "Pose/WingFar", "localEulerAnglesRaw.z", a => FarWingRestAngle - 24 * Mathf.Sin(a - 0.25f));
+        Curve(clip, "Pose/WingNear", "localEulerAnglesRaw.z", a => NearWingRestAngle + 24 * Mathf.Sin(a - 0.25f));
         for (var i = 3; i < 5; i++)
         {
             var rest = Anchors[i];

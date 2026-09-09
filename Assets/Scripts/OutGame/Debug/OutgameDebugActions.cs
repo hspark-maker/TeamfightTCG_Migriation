@@ -1,8 +1,8 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
-// 아웃게임 디버그 조작의 단일 창구 (인스펙터 ContextMenu·런타임 오버레이 공용)
+// 아웃게임 디버그 조작의 단일 창구 (인스펙터 ContextMenu·SROptions 공용)
 public static class OutgameDebugActions
 {
     // 디버그 지급 단위
@@ -187,8 +187,7 @@ public static class OutgameDebugActions
 #endif
 
     // 재화 지급을 서버에 맡긴다(잔액·영속의 진실원은 서버 문서다).
-    // 반환형은 void를 지켜야 한다 — 이걸 감싸는 GrantGold/GrantDiamond/GrantEnergy/GrantShard/GrantRouletteTicket 다섯이
-    // DebugCurrencyButton의 Button OnClick(void)에 직결돼 있다.
+    // SROptions의 인자 없는 void 버튼 메서드가 각 지급 함수를 호출한다.
     public static void GrantCurrency(ECurrencyType _type, long _amount)
     {
         GrantCurrencyAsync(_type, _amount).Forget();
@@ -217,6 +216,34 @@ public static class OutgameDebugActions
         catch (System.Exception t_exception)
         {
             Debug.LogError($"[OutgameDebug] devGrantCurrency failed — {t_exception.GetBaseException().Message}");
+        }
+    }
+
+    // 활성 일일·주간 미션의 진행도를 서버에서 목표까지 채운다(수령 낙인은 안 찍는다 — 수령 흐름 검증용).
+    public static void CompleteMissions()
+    {
+        CompleteMissionsAsync().Forget();
+    }
+
+    static async UniTaskVoid CompleteMissionsAsync()
+    {
+        try
+        {
+            await ServerSaveCommands.InvokeReadOnlyAsync<ServerCommandResult>(
+                "devCompleteMissions",
+                new { env = ContentProfileConfig.Active.CloudEnvId });
+
+            // 채운 진행도는 미션 문서에만 있다 — 재조회로 캐시를 갈아야 화면(OnChanged)이 따라온다.
+            await MissionCommands.RefreshAsync();
+            Debug.Log("[OutgameDebug] devCompleteMissions done — mission cache refreshed.");
+        }
+        catch (ServerCommandRejectedException t_rejected)
+        {
+            Debug.LogWarning($"[OutgameDebug] devCompleteMissions rejected — {t_rejected.Message}");
+        }
+        catch (System.Exception t_exception)
+        {
+            Debug.LogError($"[OutgameDebug] devCompleteMissions failed — {t_exception.GetBaseException().Message}");
         }
     }
 

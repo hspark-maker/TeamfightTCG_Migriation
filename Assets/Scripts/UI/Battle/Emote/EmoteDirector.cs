@@ -50,7 +50,10 @@ public class EmoteDirector : MonoBehaviour
 
         int t_id = ProfileManager.EmoteIds[_slot];
         PlayId(t_id, _isEnemy: false);
-        ScheduleAiReply(t_id);
+        if (IsMultiplayer())
+            NetworkGameController.Instance?.SendEmote(t_id);
+        else
+            ScheduleAiReply(t_id);
     }
 
     /// <summary>배선·목록이 비면 조용히 무동작 — 감정표현은 어디까지나 곁들이라 없다고 전투가 멈추면 안 된다.</summary>

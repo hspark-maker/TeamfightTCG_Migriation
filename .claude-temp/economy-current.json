@@ -1,0 +1,82 @@
+{
+  "metadata": {
+    "source": "docs/SpecData CSV + functions/src + Assets/Scripts 조사",
+    "date": "2026-09-08",
+    "scope": "현재 구현 상태 스냅샷"
+  },
+  "currency": {
+    "types": ["Gold", "Diamond", "Shard", "Energy"],
+    "note": "docs/SpecData 에 Currency_sheet.csv 미발견 (용도 구분은 CSV에서 추론)"
+  },
+  "packs": {
+    "source": "docs/SpecData/CardPack_sheet.csv (17줄, 헤더+타입+14개팩)",
+    "data": [
+      {"id": 1, "name": "NormalPack_TEST", "price": 110, "priceType": "Gold", "drawCount": 6, "uniqueDraw": false, "refundType": "Shard", "refundAmount": 0},
+      {"id": 2, "name": "SpecialPack", "price": 140, "priceType": "Gold", "drawCount": 6, "uniqueDraw": false},
+      {"id": 3, "name": "UltraPack", "price": 30, "priceType": "Diamond", "drawCount": 6, "uniqueDraw": true},
+      {"id": 4, "name": "StarterPack", "price": 0, "priceType": "Gold", "drawCount": 6, "uniqueDraw": true, "note": "튜토리얼 무료지급"},
+      {"id": 6, "name": "SynergyPack", "price": 0, "priceType": "Gold", "drawCount": 6, "uniqueDraw": true}
+    ],
+    "note": "중복환급: 모든 팩이 refundAmount=0 (중복처리 로직은 함수/src에서 판정)"
+  },
+  "battle_reward": {
+    "source": "Assets/Scripts/OutGame/Reward/BattleReward.cs + BattleOutcome.cs",
+    "goldPerCard": 10,
+    "winFloor": 10,
+    "loseGold": 5,
+    "calculation": "승리=(남은카드*10) 최소10 / 패배=고정5",
+    "note": "RewardService.CalculateReward 로직은 미확인"
+  },
+  "enhancement": {
+    "source": "docs/SpecData/CardEnhance_sheet.csv (5줄, 헤더+타입+3개레벨)",
+    "data": [
+      {"level": 2, "costCurrency": "Shard", "cost": 25, "successPermille": 1000},
+      {"level": 3, "costCurrency": "Shard", "cost": 75, "successPermille": 1000},
+      {"level": 4, "costCurrency": "Shard", "cost": 150, "successPermille": 1000}
+    ],
+    "note": "successPermille=1000 (100%) - 실패 소모 정책 미확인"
+  },
+  "limit_break": {
+    "source": "docs/SpecData/CardLimitBreak_sheet.csv (4줄, 헤더+타입+3개단계)",
+    "data": [
+      {"stage": 1, "hpGain": 1, "snackCost": 1},
+      {"stage": 2, "hpGain": 1, "snackCost": 2},
+      {"stage": 3, "hpGain": 1, "snackCost": 3}
+    ],
+    "note": "snackCost 의미 미확인 (재화 종류/량 미명시)"
+  },
+  "cards": {
+    "total_count": 40,
+    "source": "docs/SpecData/Card_sheet.csv",
+    "grades": "Common/Rare/Arcane/Mythic",
+    "keyword_unlock_level": "0~4중 설정",
+    "starter_pack": "6장 (StarterPack/KeywordDeck/SynergyPack)",
+    "note": "deck size 명시 미발견"
+  },
+  "rank": {
+    "source": "docs/SpecData/RankGrade_sheet.csv + Assets/Scripts/OutGame/Rank/RankConfig.cs",
+    "grades": [
+      {"grade": "Bronze", "entryPoints": 100, "pointsPerDivision": 40, "winPoints": 10, "losePoints": 10},
+      {"grade": "Silver", "entryPoints": 260, "pointsPerDivision": 40},
+      {"grade": "Gold", "entryPoints": 420, "pointsPerDivision": 40}
+    ],
+    "note": "RankReward_sheet.csv 미발견, 보상 구조 미확인"
+  },
+  "adventure": {
+    "source": "docs/SpecData/AdventureReward_sheet.csv (2줄, 헤더+1개보상)",
+    "sample": {"id": 1, "ownerKey": "node_01", "currency": "Gold", "amount": 200},
+    "note": "전체 node 수 및 진행도 미확인"
+  },
+  "album": {
+    "source": "docs/SpecData/AlbumReward_sheet.csv (2줄, 헤더+1개보상)",
+    "sample": {"themeId": "Theme_Nature", "currency": "Diamond", "amount": 20},
+    "note": "페이지별/테마별 보상 분포 미확인"
+  },
+  "gaps": {
+    "미확인_1": "Currency_sheet.csv 미발견 (재화 용도 정의 부재)",
+    "미확인_2": "RankReward_sheet.csv 미발견 (랭크 보상 등급별 액수 불명)",
+    "미확인_3": "functions/src 보상 로직 상세 (pack draw duplicate, enhance failure cost, settlement)",
+    "미확인_4": "DeckSize / 카드 중복 수집 정책",
+    "미확인_5": "일일/주간/월간 반복 미션 보상"
+  }
+}

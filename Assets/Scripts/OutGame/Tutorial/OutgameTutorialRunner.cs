@@ -432,11 +432,6 @@ public static class OutgameTutorialRunner
                 Debug.LogWarning($"[OutgameTutorialRunner] Step {i}-{t_s}({t_def.Action}) of '{s_data.name}' is Halt but has neither an anchor nor a completion signal — even after a rewind there is no way to resume in this initialization.");
             }
 
-            // 마지막 챕터는 면제한다 — 그 끝은 다음 챕터로의 인계가 아니라 졸업이라 씬을 떠날 이유가 없다.
-            if (i == ChapterCount - 1) continue;
-
-            if (!t_chapter.TryGetStep(t_chapter.StepCount - 1, out var t_last) || !t_last.LeavesScene)
-                Debug.LogWarning($"[OutgameTutorialRunner] The last step of chapter {i} ('{t_chapter.Label}') of '{s_data.name}' does not leave the scene — a chapter has to end with a battle step.");
         }
 
         WarnOnBadStepIds();

@@ -4739,6 +4739,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: ScreenDim_Content
       objectReference: {fileID: 0}
+    - target: {fileID: 1004, guid: 2c98023a88fc48eab8fd67b947bd3981, type: 3}
+      propertyPath: layer
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

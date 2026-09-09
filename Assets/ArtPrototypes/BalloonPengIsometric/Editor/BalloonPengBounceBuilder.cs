@@ -105,10 +105,10 @@ public static class BalloonPengBounceBuilder
                 new[] { 0f, -0.055f, 0f, 0.48f, 0f, -0.07f, 0f, 0f });
             Curve(temporary, "Pose", "localEulerAnglesRaw.z", pose.localEulerAngles.z, bodyTimes,
                 new[] { 0f, -0.4f, 0f, 1.2f, 0f, -1.2f, 0f, 0f });
-            Curve(temporary, "Pose/WingFar", "localEulerAnglesRaw.z", farWing.localEulerAngles.z, bodyTimes,
-                new[] { 0f, 2f, -3f, -9f, 0f, 2f, 0f, 0f });
-            Curve(temporary, "Pose/WingNear", "localEulerAnglesRaw.z", nearWing.localEulerAngles.z, bodyTimes,
-                new[] { 0f, -2f, 3f, 9f, 0f, -2f, 0f, 0f });
+            Curve(temporary, "Pose/WingFar", "localEulerAnglesRaw.z", Mathf.DeltaAngle(0, farWing.localEulerAngles.z), bodyTimes,
+                new[] { 0f, 12f, -15f, -40f, 0f, 20f, 0f, 0f });
+            Curve(temporary, "Pose/WingNear", "localEulerAnglesRaw.z", Mathf.DeltaAngle(0, nearWing.localEulerAngles.z), bodyTimes,
+                new[] { 0f, -12f, 15f, 40f, 0f, -20f, 0f, 0f });
             foreach (var name in new[] { "FootFar", "FootNear" })
             {
                 var foot = Require(root, name);

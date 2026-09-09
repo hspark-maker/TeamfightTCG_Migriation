@@ -31,7 +31,10 @@ public static class TurnState
     public static bool UiBlocking { get; set; }
 
     /// <summary>카드 입력을 실제로 받아도 되는가. 입력 판정은 전부 이 하나를 본다.</summary>
-    public static bool CardInputAllowed => InputAllowed && !UiBlocking;
+    public static bool CardInputAllowed => InputAllowed && !UiBlocking && !DebugUiBlocking;
+
+    // 씬을 넘어 유지되는 디버그 UI의 차단 상태. Reset 대신 표시 주체가 열기·닫기에 맞춰 해제한다.
+    public static bool DebugUiBlocking { get; set; }
 
     /// <summary>연속 공격 강제 대상. null 아니면 이 카드만 조작 가능.</summary>
     public static CardInstance ForcedAttacker { get; set; }

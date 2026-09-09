@@ -1,0 +1,520 @@
+/* 런타임 치트 화면 스타일. 터치 기준으로 히트 영역을 최소 44px로 잡는다 */
+
+.cheat-root {
+    flex-grow: 1;
+    background-color: rgb(24, 26, 30);
+    color: rgb(228, 231, 236);
+    font-size: 15px;
+}
+
+/* 상단 검색 줄 */
+
+.cheat-topbar {
+    flex-direction: row;
+    align-items: center;
+    height: 52px;
+    padding-left: 10px;
+    padding-right: 10px;
+    background-color: rgb(31, 34, 40);
+    border-bottom-width: 1px;
+    border-bottom-color: rgb(52, 57, 66);
+}
+
+.cheat-brand {
+    -unity-font-style: bold;
+    font-size: 13px;
+    color: rgb(120, 190, 255);
+    margin-right: 10px;
+    letter-spacing: 2px;
+}
+
+.cheat-search {
+    flex-grow: 1;
+    height: 40px;
+    margin-right: 8px;
+}
+
+.cheat-search > .unity-base-text-field__input {
+    background-color: rgb(18, 20, 24);
+    border-color: rgb(62, 68, 78);
+    border-width: 1px;
+    border-radius: 6px;
+    padding-left: 10px;
+    color: rgb(228, 231, 236);
+    font-size: 15px;
+}
+
+.cheat-tbtn {
+    width: 44px;
+    height: 40px;
+    background-color: rgb(45, 49, 58);
+    border-width: 0;
+    border-radius: 6px;
+    color: rgb(200, 206, 214);
+    font-size: 16px;
+}
+
+.cheat-tbtn:hover {
+    background-color: rgb(60, 66, 78);
+}
+
+/* 본문 — 가로에서는 좌우 2단, 세로에서는 위아래 */
+
+.cheat-body {
+    flex-grow: 1;
+    flex-direction: row;
+}
+
+.cheat-navbar {
+    width: 190px;
+    background-color: rgb(28, 31, 37);
+    border-right-width: 1px;
+    border-right-color: rgb(52, 57, 66);
+}
+
+.cheat-navbar .unity-scroll-view__content-container {
+    flex-direction: column;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.cheat-nav {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+    min-height: 44px;
+    margin-left: 6px;
+    margin-right: 6px;
+    margin-top: 2px;
+    margin-bottom: 2px;
+    padding-left: 10px;
+    padding-right: 10px;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-radius: 6px;
+}
+
+.cheat-nav:hover {
+    background-color: rgb(40, 44, 52);
+}
+
+.cheat-nav--on {
+    background-color: rgb(46, 84, 130);
+}
+
+.cheat-nav__name {
+    flex-grow: 1;
+    flex-shrink: 1;
+    color: rgb(186, 193, 203);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -unity-text-align: middle-left;
+}
+
+.cheat-nav--on .cheat-nav__name {
+    color: rgb(238, 244, 252);
+}
+
+.cheat-nav__count {
+    /* 이름이 길어도 개수가 먼저 잘리면 안 된다 — 줄어드는 쪽은 이름이다 */
+    flex-shrink: 0;
+    margin-left: 8px;
+    font-size: 11px;
+    color: rgb(140, 148, 160);
+    white-space: nowrap;
+}
+
+/* 스크롤바는 얇게. 치트 화면은 내용이 주인공이다 */
+
+.cheat-root .unity-scroller--vertical {
+    width: 10px;
+}
+
+.cheat-root .unity-scroller--vertical .unity-base-slider--vertical {
+    width: 10px;
+    margin: 0;
+}
+
+.cheat-root .unity-scroller__low-button,
+.cheat-root .unity-scroller__high-button {
+    display: none;
+}
+
+.cheat-root .unity-base-slider__dragger {
+    background-color: rgb(78, 85, 98);
+    border-width: 0;
+    border-radius: 5px;
+}
+
+.cheat-root .unity-scroller {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+}
+
+.cheat-root .unity-scroller .unity-base-slider__tracker {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+}
+
+.cheat-content {
+    flex-grow: 1;
+}
+
+.cheat-content .unity-scroll-view__content-container {
+    padding: 10px;
+}
+
+/* 옵션 카드 */
+
+.cheat-group {
+    background-color: rgb(33, 36, 43);
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: rgb(48, 53, 62);
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.cheat-group--fired {
+    border-color: rgb(96, 176, 112);
+}
+
+.cheat-group__header {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.cheat-group__title {
+    flex-grow: 1;
+    -unity-font-style: bold;
+    font-size: 15px;
+    color: rgb(226, 231, 238);
+    white-space: normal;
+}
+
+.cheat-favorite {
+    width: 44px;
+    height: 40px;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    color: rgb(228, 190, 90);
+    font-size: 20px;
+}
+
+.cheat-subheader {
+    -unity-font-style: bold;
+    font-size: 12px;
+    color: rgb(132, 142, 156);
+    margin-top: 6px;
+    margin-bottom: 6px;
+    letter-spacing: 1px;
+}
+
+.cheat-empty {
+    color: rgb(132, 142, 156);
+    padding: 20px;
+    white-space: normal;
+    -unity-text-align: middle-center;
+}
+
+/* 값 편집 줄 */
+
+.cheat-row {
+    flex-direction: row;
+    align-items: center;
+    min-height: 44px;
+}
+
+.cheat-row__label {
+    width: 120px;
+    flex-shrink: 0;
+    color: rgb(168, 176, 188);
+    font-size: 13px;
+    white-space: normal;
+}
+
+.cheat-row__control {
+    flex-grow: 1;
+}
+
+.cheat-field {
+    min-height: 40px;
+    margin: 0;
+}
+
+.cheat-field .unity-base-field__input,
+.cheat-field > .unity-base-text-field__input {
+    min-height: 40px;
+    background-color: rgb(20, 22, 27);
+    border-color: rgb(62, 68, 78);
+    border-width: 1px;
+    border-radius: 6px;
+    color: rgb(228, 231, 236);
+    font-size: 15px;
+    padding-left: 8px;
+}
+
+.cheat-field .unity-base-slider__dragger {
+    width: 22px;
+    height: 22px;
+    border-radius: 11px;
+    background-color: rgb(120, 190, 255);
+    border-width: 0;
+}
+
+.cheat-field .unity-base-slider__tracker {
+    height: 4px;
+    background-color: rgb(62, 68, 78);
+    border-width: 0;
+}
+
+.cheat-field .unity-toggle__checkmark {
+    width: 26px;
+    height: 26px;
+}
+
+.cheat-unsupported {
+    color: rgb(196, 128, 128);
+    font-size: 12px;
+    white-space: normal;
+}
+
+.cheat-nested {
+    flex-grow: 1;
+}
+
+/* 목록을 여는 버튼 */
+
+.cheat-picker-button {
+    -unity-text-align: middle-left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-left: 10px;
+    padding-right: 28px;
+    background-color: rgb(20, 22, 27);
+    border-color: rgb(62, 68, 78);
+    border-width: 1px;
+    border-radius: 6px;
+    color: rgb(228, 231, 236);
+}
+
+.cheat-picker-button__arrow {
+    position: absolute;
+    right: 8px;
+    color: rgb(140, 148, 160);
+}
+
+/* 실행 버튼 */
+
+.cheat-action {
+    min-height: 48px;
+    margin-top: 6px;
+    margin-left: 0;
+    margin-right: 0;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    padding-left: 12px;
+    padding-right: 12px;
+    white-space: normal;
+    background-color: rgb(46, 84, 130);
+    border-width: 0;
+    border-radius: 6px;
+    color: rgb(238, 244, 252);
+    font-size: 15px;
+    -unity-font-style: bold;
+}
+
+.cheat-action:hover {
+    background-color: rgb(56, 100, 154);
+}
+
+.cheat-action--fired {
+    background-color: rgb(64, 132, 84);
+}
+
+/* 상태 줄 */
+
+.cheat-status {
+    height: 26px;
+    padding-left: 12px;
+    background-color: rgb(31, 34, 40);
+    border-top-width: 1px;
+    border-top-color: rgb(52, 57, 66);
+    color: rgb(150, 200, 160);
+    font-size: 12px;
+    -unity-text-align: middle-left;
+    opacity: 1;
+    transition-property: opacity;
+    transition-duration: 0.4s;
+}
+
+.cheat-status--faded {
+    opacity: 0;
+}
+
+/* 값 고르기 오버레이 */
+
+.cheat-picker {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.65);
+    align-items: center;
+    justify-content: center;
+}
+
+.cheat-picker__card {
+    width: 86%;
+    max-width: 560px;
+    height: 76%;
+    background-color: rgb(31, 34, 40);
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: rgb(62, 68, 78);
+    padding: 10px;
+}
+
+.cheat-picker__header {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.cheat-picker__title {
+    flex-grow: 1;
+    -unity-font-style: bold;
+    font-size: 15px;
+}
+
+.cheat-picker__close {
+    width: 44px;
+    height: 40px;
+    background-color: rgb(45, 49, 58);
+    border-width: 0;
+    border-radius: 6px;
+    color: rgb(200, 206, 214);
+    font-size: 16px;
+}
+
+.cheat-picker__search {
+    height: 40px;
+    margin-bottom: 8px;
+}
+
+.cheat-picker__search > .unity-base-text-field__input {
+    background-color: rgb(20, 22, 27);
+    border-color: rgb(62, 68, 78);
+    border-width: 1px;
+    border-radius: 6px;
+    padding-left: 10px;
+    color: rgb(228, 231, 236);
+    font-size: 15px;
+}
+
+.cheat-picker__notice {
+    color: rgb(150, 158, 170);
+    font-size: 12px;
+    margin-bottom: 6px;
+    white-space: normal;
+}
+
+.cheat-picker__list {
+    flex-grow: 1;
+}
+
+.cheat-picker__row {
+    min-height: 46px;
+    margin: 0;
+    margin-bottom: 4px;
+    background-color: rgb(38, 42, 50);
+    border-width: 0;
+    border-radius: 6px;
+    color: rgb(224, 229, 236);
+    font-size: 15px;
+    -unity-text-align: middle-left;
+    padding-left: 12px;
+    white-space: normal;
+}
+
+.cheat-picker__row:hover {
+    background-color: rgb(50, 56, 66);
+}
+
+/* 좁은 화면 — 카테고리를 위쪽 가로 띠로 돌리고 한 컬럼으로 내려간다 */
+
+.cheat-root--single .cheat-body {
+    flex-direction: column;
+}
+
+.cheat-root--single .cheat-navbar {
+    width: auto;
+    height: 56px;
+    flex-shrink: 0;
+    border-right-width: 0;
+    border-bottom-width: 1px;
+    border-bottom-color: rgb(52, 57, 66);
+}
+
+.cheat-root--single .cheat-navbar .unity-scroll-view__content-container {
+    flex-direction: row;
+    align-items: center;
+    padding-left: 6px;
+    padding-right: 6px;
+}
+
+.cheat-root--single .cheat-nav__name {
+    flex-grow: 0;
+}
+
+.cheat-root--single .cheat-row {
+    flex-direction: column;
+    align-items: stretch;
+    min-height: 0;
+    margin-bottom: 8px;
+}
+
+.cheat-root--single .cheat-row__label {
+    width: auto;
+    margin-bottom: 4px;
+}
+
+.cheat-root--single .cheat-picker__card {
+    width: 94%;
+    height: 84%;
+}
+
+/* 폭이 빠듯한 2단 화면 — 사이드바와 라벨 칸을 줄여 본문을 넓힌다 */
+
+.cheat-root--compact .cheat-navbar {
+    width: 132px;
+}
+
+.cheat-root--compact .cheat-nav {
+    padding-left: 8px;
+    padding-right: 8px;
+    font-size: 13px;
+}
+
+.cheat-root--compact .cheat-row__label {
+    width: 84px;
+    font-size: 12px;
+}
+
+.cheat-root--compact .cheat-brand {
+    display: none;
+}
+
+/* 한 컬럼일 때는 compact여도 사이드바 폭 규칙이 적용되면 안 된다 */
+
+.cheat-root--single.cheat-root--compact .cheat-navbar {
+    width: auto;
+}
+
+.cheat-root--single.cheat-root--compact .cheat-row__label {
+    width: auto;
+}

@@ -1,97 +1,44 @@
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
 using UnityEngine;
 
-/// <summary>전투 중 카드를 **강제로 죽이는** 디버그 창(F2). 사망 시 발동하는 것들
-/// (유산 왕관 비행 · 불사 부활 · 포식자 · 사망 연출)을 판을 끝까지 굴리지 않고 보기 위한 도구다.
-///
-/// 씬에 배선하지 않는다 — <see cref="Install"/>가 실행 시점에 자기 GameObject를 만든다.
-/// 디버그 하나 때문에 전투 씬 YAML을 건드리면 씬 병합 충돌만 늘어난다(VfxDebugWindow는 테스트 씬 전용이라
-/// 실제 전투 씬에는 없다). 에디터·개발빌드에서만 컴파일된다.
-///
-/// ⚠ 멀티에서는 동작하지 않는다. 한쪽 클라에서만 카드를 죽이면 그 순간부터 두 클라의 보드가 갈라진다
-///   (결정론 계약 위반). 러너가 살아 있으면 창에 경고만 띄우고 버튼을 잠근다.
-///
-/// 죽이는 방법은 전투와 같은 경로다: 체력만큼 <see cref="CardInstance.TakeDamage"/> →
-/// <see cref="AttackProcessor.RemoveDead"/>. 여기서 슬롯을 직접 비우면 Lethal/Removed 훅이 건너뛰어져
-/// "디버그로 죽였을 때만 유산이 안 터지는" 가짜 증상이 생긴다.</summary>
-public class BattleDebugKill : MonoBehaviour
+// SROptions에서 호출하는 강제 사망 조작. 멀티에서는 실행하지 않는다.
+public static class BattleDebugKill
 {
-    const float REF_HEIGHT = 1080f;   // IMGUI는 픽셀 단위 — 고해상도에서 글자가 작아지지 않게 스케일 기준을 둔다.
-
-    static readonly KeyCode ToggleKey = KeyCode.F2;
-
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    static void Install()
+    public static string DescribeSlot(bool _enemy, int _slot)
     {
-        var t_go = new GameObject("[BattleDebugKill]");
-        t_go.AddComponent<BattleDebugKill>();
-        DontDestroyOnLoad(t_go);
+        BattleFieldView t_view = FindField(_enemy);
+        CardInstance t_card = t_view != null ? t_view.Field.GetSlot(_slot) : null;
+        return t_card == null ? "빈 슬롯" : $"{Name(t_card)} HP {t_card.hp} (+{t_card.bonusHp})";
     }
 
-    Rect windowRect = new Rect(16f, 16f, 340f, 320f);
-    bool open;
-
-    void Update()
-    {
-        if (Input.GetKeyDown(ToggleKey)) this.open = !this.open;
-    }
-
-    void OnGUI()
-    {
-        if (!this.open) return;
-
-        // 창 좌표·크기는 1080 기준 "논리 픽셀"로 다루고 실제 픽셀 변환은 여기 한 곳에서(VfxDebugWindow와 같은 규약).
-        Matrix4x4 t_prev = GUI.matrix;
-        float     t_k    = Screen.height / REF_HEIGHT;
-        GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(t_k, t_k, 1f));
-
-        this.windowRect = GUI.Window(GetInstanceID(), this.windowRect, DrawWindow, "카드 죽이기 (F2)");
-
-        GUI.matrix = t_prev;
-    }
-
-    void DrawWindow(int _id)
+    public static void KillSlot(bool _enemy, int _slot)
     {
         if (IsMultiplayer())
         {
-            GUILayout.Label("멀티 중에는 못 쓴다.\n한쪽만 죽으면 보드가 갈라진다(divergence).");
-            GUI.DragWindow();
+            Debug.LogWarning("[BattleDebug] 멀티플레이 중에는 강제 사망을 사용할 수 없습니다.");
             return;
         }
+        if (_slot < 0 || _slot >= BattleField.SLOT_COUNT) return;
 
-        // 필드는 씬에서 찾는다 — 디버그가 GameInitializer 배선에 손을 뻗으면 그쪽 필드를 public으로 열어야 한다.
-        BattleFieldView[] t_views = FindObjectsByType<BattleFieldView>(FindObjectsSortMode.None);
-        if (t_views.Length == 0)
+        BattleFieldView t_view = FindField(_enemy);
+        CardInstance t_card = t_view != null ? t_view.Field.GetSlot(_slot) : null;
+        if (t_card == null || !t_card.IsAlive)
         {
-            GUILayout.Label("전투 필드가 없다(전투 씬에서 열어라).");
-            GUI.DragWindow();
+            Debug.LogWarning("[BattleDebug] 선택한 필드에 살아 있는 카드가 없습니다.");
             return;
         }
+        Kill(t_view.Field, t_view, t_card);
+    }
 
-        foreach (BattleFieldView t_view in t_views)
+    static BattleFieldView FindField(bool _enemy)
+    {
+        foreach (var t_view in Object.FindObjectsByType<BattleFieldView>(FindObjectsSortMode.None))
         {
-            BattleField t_field = t_view != null ? t_view.Field : null;
-            if (t_field == null) continue;
-
-            GUILayout.Label($"— {t_view.name} —");
-
-            for (int t_i = 0; t_i < BattleField.SLOT_COUNT; t_i++)
-            {
-                CardInstance t_card = t_field.GetSlot(t_i);
-                if (t_card == null || !t_card.IsAlive)
-                {
-                    GUILayout.Label($"  {t_i}: (빈 슬롯)");
-                    continue;
-                }
-
-                GUILayout.BeginHorizontal();
-                GUILayout.Label($"  {t_i}: {Name(t_card)}  {t_card.hp}(+{t_card.bonusHp})", GUILayout.Width(200f));
-                if (GUILayout.Button("죽이기")) Kill(t_field, t_view, t_card);
-                GUILayout.EndHorizontal();
-            }
+            if (t_view.Field == null) continue;
+            bool t_enemy = t_view.Field.OwnerIndex != TurnState.LocalOwnerIndex;
+            if (t_enemy == _enemy) return t_view;
         }
-
-        GUI.DragWindow();
+        return null;
     }
 
     /// <summary>전투와 같은 순서로 죽인다 — 피해를 체력만큼 넣고 필드 정리를 돌린다.

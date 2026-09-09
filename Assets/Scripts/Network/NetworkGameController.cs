@@ -43,6 +43,7 @@ public class NetworkGameController : MonoBehaviour
         SceneReady = 10,
         Surrender = 11,
         MatchmakingProfile = 12,
+        Emote = 13,
     }
 
     UniTaskCompletionSource opponentReadyTcs;
@@ -355,6 +356,13 @@ public class NetworkGameController : MonoBehaviour
                     OnOpponentMulliganChoiceReceived(t_slot);
                     break;
                 }
+                case MsgType.Emote:
+                {
+                    if (!RequireLength(_data, 5, t_type)) return;
+                    int t_emoteId = ReadInt(t_buf, t_offset + 1);
+                    EmoteDirector.Instance?.PlayId(t_emoteId, _isEnemy: true);
+                    break;
+                }
                 default:
                     RejectMessage($"알 수 없는 메시지 타입({t_buf[t_offset]})");
                     break;
@@ -585,6 +593,14 @@ public class NetworkGameController : MonoBehaviour
         byte[] t_msg = new byte[1 + _pairingNonce.Length];
         t_msg[0] = (byte)MsgType.ServerSeedCapability;
         Array.Copy(_pairingNonce, 0, t_msg, 1, _pairingNonce.Length);
+        SendToOpponents(t_msg);
+    }
+
+    public void SendEmote(int _emoteId)
+    {
+        byte[] t_msg = new byte[5];
+        t_msg[0] = (byte)MsgType.Emote;
+        WriteInt(t_msg, 1, _emoteId);
         SendToOpponents(t_msg);
     }
 

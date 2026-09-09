@@ -1,268 +1,51 @@
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if !DISABLE_SRDEBUGGER
 using UnityEngine;
-using UnityEngine.EventSystems;
-using System.Collections.Generic;
 
-static class OutgameDebugInputLock
-{
-    static readonly HashSet<object> s_owners = new HashSet<object>();
-    static EventSystem s_events;
-    // 잠그기 전 상태. 무조건 true로 복원하면 게임이 원래 꺼둔 EventSystem을 켜 버린다.
-    static bool s_wasEnabled;
-
-    public static void Acquire(object _owner)
-    {
-        if (_owner == null || !s_owners.Add(_owner)) return;
-        if (s_owners.Count > 1) return;
-
-        Lock(EventSystem.current);
-    }
-
-    public static void Release(object _owner)
-    {
-        if (_owner == null || !s_owners.Remove(_owner) || s_owners.Count > 0) return;
-
-        Unlock();
-    }
-
-    /// <summary>씬 전환 등으로 EventSystem이 새로 생기면 그쪽도 잠근다.
-    ///
-    /// **null은 "바뀌었다"가 아니라 "이미 잠겼다"로 읽어야 한다** — `enabled = false`로 끈 EventSystem은
-    /// `EventSystem.current`에서 빠지기 때문이다. 여기서 s_events를 null로 덮으면 복원 대상을 잃고,
-    /// 패널을 닫아도 EventSystem이 꺼진 채 남아 화면 입력이 영구히 죽는다.</summary>
-    public static void Refresh()
-    {
-        if (s_owners.Count == 0) return;
-
-        EventSystem t_events = EventSystem.current;
-        if (t_events == null || t_events == s_events) return;
-
-        Unlock();
-        Lock(t_events);
-    }
-
-    static void Lock(EventSystem _events)
-    {
-        s_events = _events;
-        if (s_events == null) return;
-
-        s_wasEnabled     = s_events.enabled;
-        s_events.enabled = false;
-    }
-
-    static void Unlock()
-    {
-        if (s_events != null && s_wasEnabled) s_events.enabled = true;
-
-        s_events     = null;
-        s_wasEnabled = false;
-    }
-}
-
-// 런타임 아웃게임 디버그 패널 (배선 없이 자동 생성, 우상단 [DEBUG] 또는 F8)
+// F8은 에디터에서 SROptions+ 창, 플레이어에서 SRDebugger 옵션 탭으로 연결한다.
+// 화면 표시·입력 차단은 SRDebugger, 전투 콜라이더 차단은 TurnState가 담당한다.
 public class OutgameDebugOverlay : MonoBehaviour
 {
-    const KeyCode TOGGLE_KEY = KeyCode.F8;
-
-    const float REFERENCE_HEIGHT = 900f;
-
-    const float PANEL_WIDTH   = 190f;
-    const float ROW_HEIGHT    = 26f;
-    const float CLOSED_HEIGHT = 30f;
-    // 열었을 때 쓸 최대 높이. 화면이 더 짧으면 그만큼만 쓴다.
-    // 내용이 넘치면 잘리지 않고 스크롤된다 — 고정 높이만 두면 줄을 추가할 때 아래가 조용히 사라진다(실제로 그랬음).
-    const float OPENED_HEIGHT = 460f;
-
     static OutgameDebugOverlay s_instance;
-
-    bool m_open;
-
-    // 패널이 화면보다 길어졌을 때의 스크롤 위치.
-    Vector2 m_scroll;
-
-    // 이번 실행이 붙은 Firebase 백엔드 표시. 첫 그리기에서 한 번만 해석한다.
-    string m_backendLabel;
+    SRDebugger.Services.IDebugService m_debugService;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Initialize()
     {
-        if (s_instance != null) return;
-
-        var t_go = new GameObject("[OutgameDebugOverlay]");
+        if (s_instance != null || !SRDebugger.Settings.Instance.IsEnabled) return;
+        SRDebug.Init();
+        var t_go = new GameObject("[SROptionsInput]");
         DontDestroyOnLoad(t_go);
         s_instance = t_go.AddComponent<OutgameDebugOverlay>();
     }
 
+    void OnEnable()
+    {
+        m_debugService = SRDebug.Instance;
+        if (m_debugService == null) return;
+        m_debugService.PanelVisibilityChanged += OnPanelVisibilityChanged;
+        OnPanelVisibilityChanged(m_debugService.IsDebugPanelVisible);
+    }
+
     void OnDisable()
     {
-        SetOpen(false);
+        // 종료 중에는 서비스 조회가 null을 반환할 수 있으므로 구독했던 인스턴스에서 해제한다.
+        if (m_debugService != null) m_debugService.PanelVisibilityChanged -= OnPanelVisibilityChanged;
+        m_debugService = null;
+        TurnState.DebugUiBlocking = false;
     }
 
     void Update()
     {
-        if (Input.GetKeyDown(TOGGLE_KEY)) SetOpen(!m_open);
+        if (!Input.GetKeyDown(KeyCode.F8)) return;
+#if UNITY_EDITOR
+        if (SRDebug.Instance.IsDebugPanelVisible) SRDebug.Instance.HideDebugPanel();
+        UnityEditor.EditorApplication.ExecuteMenuItem("Window/SRDebugger/SROptions Window (UXML)");
+#else
+        if (SRDebug.Instance.IsDebugPanelVisible) SRDebug.Instance.HideDebugPanel();
+        else SRDebug.Instance.ShowDebugPanel(SRDebugger.DefaultTabs.Options);
+#endif
     }
 
-    void OnGUI()
-    {
-        OutgameDebugInputLock.Refresh();
-
-        float      t_scale = Mathf.Max(1f, Screen.height / REFERENCE_HEIGHT);
-        Matrix4x4  t_prev  = GUI.matrix;
-        GUI.matrix = Matrix4x4.Scale(new Vector3(t_scale, t_scale, 1f));
-
-        float t_right = Screen.width / t_scale;
-        // 화면 밖으로 나가지 않게 상하 여백을 뺀 값으로 제한한다(세로가 짧은 기기 대응).
-        float t_maxHeight = Mathf.Max(CLOSED_HEIGHT, Screen.height / t_scale - 16f);
-        float t_height    = m_open ? Mathf.Min(OPENED_HEIGHT, t_maxHeight) : CLOSED_HEIGHT;
-        var   t_area      = new Rect(t_right - PANEL_WIDTH - 8f, 8f, PANEL_WIDTH, t_height);
-
-        GUILayout.BeginArea(t_area, GUI.skin.box);
-
-        // 라벨은 ASCII만 — IMGUI 기본 폰트에 한글 글리프가 없어 □로 깨진다
-        if (GUILayout.Button(m_open ? "CLOSE (F8)" : "DEBUG (F8)", GUILayout.Height(22f))) SetOpen(!m_open);
-        if (m_open) DrawBody();
-
-        GUILayout.EndArea();
-
-        GUI.matrix = t_prev;
-    }
-
-    void DrawBody()
-    {
-        // 스크롤로 감싼다 — 버튼을 하나 더 붙였을 때 아래가 잘려 "버튼이 없다"가 되지 않게.
-        m_scroll = GUILayout.BeginScrollView(m_scroll);
-
-        GUILayout.Label($"OWNED {OwnershipManager.OwnedCount} / {CardCatalog.Count}");
-
-        if (GUILayout.Button("UNLOCK ALL CARDS", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.UnlockAllCards();
-        if (GUILayout.Button("REVOKE ALL CARDS", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.RevokeAllCards();
-        if (GUILayout.Button("SKIP TUTORIAL",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.SkipTutorial();
-        if (GUILayout.Button("RESET TUTORIAL",   GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ResetTutorial();
-        if (GUILayout.Button("RESET TRIGGERS",   GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ResetTriggeredTutorials();
-        if (GUILayout.Button(OutgameFeatureLock.ForceUnlockAllForDebug ? "FEATURE LOCK: OFF" : "FEATURE LOCK: ON",
-                                                 GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ToggleFeatureLock();
-        if (GUILayout.Button("MAX GROWTH (ALL)", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.MaxCardGrowth();
-        if (GUILayout.Button("RESET GROWTH",     GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ResetCardGrowth();
-        if (GUILayout.Button("LOG OWNERSHIP",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LogOwnership();
-        if (GUILayout.Button("ALBUM INSERT x3",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ForceAlbumInsertSession(3);
-        if (GUILayout.Button("ADVENTURE NODE",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.StartCurrentAdventureNode();
-        if (GUILayout.Button("ACCOUNT EXP +500", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.AddAccountExp(500);
-        if (GUILayout.Button("ACCOUNT LV MAX",   GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.FillAccountLevel();
-        if (GUILayout.Button("ACCOUNT LV RESET", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ResetAccountLevel();
-
-        DrawServerProbes();
-        DrawRarityPackControls();
-        DrawCurrencyGrants();
-        DrawTierControls();
-        DrawChapterJumps();
-
-        GUILayout.EndScrollView();
-    }
-
-    void DrawRarityPackControls()
-    {
-        ECardGrade t_grade = ECardGrade.Unknown;
-
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button("RARE",   GUILayout.Height(ROW_HEIGHT))) t_grade = ECardGrade.Rare;
-        if (GUILayout.Button("ARCANE", GUILayout.Height(ROW_HEIGHT))) t_grade = ECardGrade.Arcane;
-        if (GUILayout.Button("MYTHIC", GUILayout.Height(ROW_HEIGHT))) t_grade = ECardGrade.Mythic;
-        GUILayout.EndHorizontal();
-
-        if (t_grade == ECardGrade.Unknown) return;
-        SetOpen(false);
-        OutgameDebugActions.OpenRarityTestPack(t_grade);
-    }
-
-    // 티어 이동(디버그). 표시·보상 확인용이다.
-    void DrawTierControls()
-    {
-        RankInfo t_info = RankManager.GetInfo();
-
-        string t_promo = RankManager.IsPromoPending ? "  [승급전]" : string.Empty;
-        GUILayout.Label($"TIER {t_info.DisplayName}{t_promo}");
-
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button("TIER -", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.LowerTier();
-        if (GUILayout.Button("TIER +", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.RaiseTier();
-        if (GUILayout.Button("PROMO", GUILayout.Height(ROW_HEIGHT)))  OutgameDebugActions.JumpToPromoStandby();
-        if (GUILayout.Button("RESET", GUILayout.Height(ROW_HEIGHT)))  OutgameDebugActions.ResetTier();
-        GUILayout.EndHorizontal();
-    }
-
-    // 서버 왕복 판정용. 어느 백엔드를 상대로 성공했는지 화면에서 같이 읽히지 않으면 왕복 결과를 해석할 수 없다.
-    void DrawServerProbes()
-    {
-        // 백엔드 판정은 한 번만 — 주소가 잘못 저작돼 있으면 해석기가 에러를 뱉는데 OnGUI에서 매 프레임 부르면 콘솔이 잠긴다.
-        if (m_backendLabel == null)
-            m_backendLabel = ContentProfileConfig.Active.FirebaseEmulators.IsEnabled ? "EMU" : "LIVE";
-
-        string t_uid = FirebaseAuthService.Instance.UserId;
-        if (string.IsNullOrEmpty(t_uid)) t_uid = "-";
-        else if (t_uid.Length > 10) t_uid = t_uid.Substring(0, 10);
-
-        GUILayout.Label($"CLOUD {m_backendLabel} / {PlayerSaveCloud.State} / rev {PlayerSaveCloud.Revision}");
-        GUILayout.Label($"UID {t_uid} / {FirebaseAuthService.Instance.State}");
-
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button("PING",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.PingServer();
-        if (GUILayout.Button("BUMP",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.BumpServerRevision();
-        if (GUILayout.Button("DENY?", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.ProbeRuleDenials();
-        GUILayout.EndHorizontal();
-    }
-
-    void DrawCurrencyGrants()
-    {
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button($"+G {CurrencyManager.Gold}",    GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantGold();
-        if (GUILayout.Button($"+D {CurrencyManager.Diamond}", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantDiamond();
-        if (GUILayout.Button($"+E {CurrencyManager.Energy}",  GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantEnergy();
-        if (GUILayout.Button($"+S {CurrencyManager.Shard}",   GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantShard();
-        GUILayout.EndHorizontal();
-
-        DrawRouletteControls();
-    }
-
-    // 티켓은 수급 경로가 아직 없어서(기획 범위 밖) 여기가 유일한 입구다 — 없으면 회전이 늘 InsufficientTicket 이다.
-    void DrawRouletteControls()
-    {
-        GUILayout.BeginHorizontal();
-
-        long t_tickets = CurrencyManager.GetBalance(ECurrencyType.RouletteTicket);
-        if (GUILayout.Button($"+TICKET {t_tickets}", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.GrantRouletteTicket();
-
-        // 서버 미배포 상태에서 회전 안무를 보는 유일한 길. 한 번 꽂으면 되돌리지 못한다(재기동해야 서버로 돌아온다).
-        if (RouletteManager.IsServerBacked)
-        {
-            if (GUILayout.Button("SPIN: LOCAL", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.UseLocalRouletteSource();
-        }
-        else
-        {
-            GUILayout.Label("SPIN: LOCAL(ON)", GUILayout.Height(ROW_HEIGHT));
-        }
-
-        GUILayout.EndHorizontal();
-    }
-
-    void DrawChapterJumps()
-    {
-        int t_count = OutgameTutorialRunner.ChapterCount;
-        if (t_count <= 0) return;
-
-        GUILayout.BeginHorizontal();
-        for (int i = 0; i < t_count; i++)
-        {
-            if (GUILayout.Button($"CH{i + 1}", GUILayout.Height(ROW_HEIGHT))) OutgameDebugActions.RestartTutorialFromChapter(i);
-        }
-        GUILayout.EndHorizontal();
-    }
-
-    void SetOpen(bool _open)
-    {
-        m_open = _open;
-        if (_open) OutgameDebugInputLock.Acquire(this);
-        else OutgameDebugInputLock.Release(this);
-    }
+    static void OnPanelVisibilityChanged(bool _visible) => TurnState.DebugUiBlocking = _visible;
 }
 #endif

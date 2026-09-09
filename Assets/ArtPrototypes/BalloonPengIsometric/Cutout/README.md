@@ -39,6 +39,9 @@
 - 날개와 발이 몸통에 가려지는 접합부를 여유 있게 겹쳐 조립했습니다.
 - 화면 왼쪽 날개는 몸 뒤(-2), 화면 오른쪽 날개(WingNear)는 몸 앞(1)에 표시합니다. 오른쪽 날개는 연결 연장부가 없는 원본 `BalloonPeng_Parts.png`의 짧은 파츠(폭 0.74, 원본 피벗)로 복원했습니다. 다른 날개와 발은 확장된 뿌리·발목을 유지합니다. 이전의 ‘네 접합부 모두 몸 뒤’ 가림 검증은 이 변경 전 결과입니다.
 - 최신 짧은 앞날개 미리보기: `output/balloonpeng-short-wing/BalloonPeng_ShortWing_Motions.webp`. 96프레임에서 대기·걷기·통통 뛰기의 길이와 앞뒤 순서를 확인했습니다.
+- 오른쪽 날개의 기본각을 -22도로 내려 대기는 ±20도, 걷기는 ±24도 움직이게 했습니다. 통통 뛰기는 준비 시 아래로, 상승 시 위로 펼칩니다. 원래의 짧은 파츠 크기와 앞쪽 배치는 유지합니다.
+- 최신 팔 움직임 미리보기: `output/balloonpeng-wing-swing/BalloonPeng_WingSwing_Motions.webp`. 세 모션의 반복 경계와 전환 중 각도 범위를 Unity Animator로 검사했습니다.
+- 왼쪽 팔도 기본각 +22도로 내리고 오른쪽과 거울 방향으로 함께 파닥이도록 맞췄습니다. 최신 양팔 미리보기: `output/balloonpeng-both-wings/BalloonPeng_BothWings_Motions.webp`. 대기·걷기·통통 뛰기 및 전환 구간에서 1,152회 양팔 각도 동기화 검사를 통과했습니다.
 - 확장된 팔다리의 크기와 피벗은 `HiddenPartSizes`·`HiddenPartPivots`에서 정합니다. 기존 메시의 식별자는 유지하며 실제 정점·UV 버퍼를 갱신합니다.
 
 ## 아트 제작

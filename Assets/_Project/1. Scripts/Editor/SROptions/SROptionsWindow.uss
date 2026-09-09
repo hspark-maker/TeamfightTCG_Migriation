@@ -1,0 +1,643 @@
+/* SROptions UXML 창 스타일.
+   Unity USS는 gap · box-shadow · grid · ::before 를 지원하지 않으므로 flex와 margin으로만 짠다. */
+
+.sro-root {
+    --bg: #383838;
+    --panel: #3C3C3C;
+    --side: #2B2B2B;
+    --line: #232323;
+    --line-soft: #2F2F2F;
+    --text: #C4C4C4;
+    --text-hi: #EDEDED;
+    --text-dim: #8A8A8A;
+    --card: #3F3F3F;
+    --card-line: #333333;
+    --sel: #2C5D87;
+    --accent: #4C90D9;
+    --ok: #6FBF73;
+    --warn: #D9A441;
+    --star: #E4B95B;
+
+    flex-grow: 1;
+    flex-direction: column;
+    background-color: var(--bg);
+    color: var(--text);
+    font-size: 12px;
+}
+
+.sro-root.sro-light {
+    --bg: #C8C8C8;
+    --panel: #CBCBCB;
+    --side: #BDBDBD;
+    --line: #9A9A9A;
+    --line-soft: #ADADAD;
+    --text: #2B2B2B;
+    --text-hi: #101010;
+    --text-dim: #5E5E5E;
+    --card: #D2D2D2;
+    --card-line: #B4B4B4;
+    --sel: #3A72AF;
+    --accent: #2C6BB5;
+    --star: #A9761A;
+}
+
+/* ── 툴바 ── */
+.sro-toolbar {
+    flex-direction: row;
+    align-items: center;
+    height: 30px;
+    padding-left: 6px;
+    padding-right: 6px;
+    background-color: var(--panel);
+    border-bottom-width: 1px;
+    border-bottom-color: var(--line);
+}
+
+.sro-search {
+    flex-grow: 1;
+    min-width: 60px;
+    margin-right: 6px;
+}
+
+.sro-search .unity-text-field__input {
+    border-radius: 10px;
+    padding-left: 8px;
+}
+
+.sro-tbtn {
+    height: 19px;
+    margin-left: 0;
+    margin-right: 4px;
+    padding-left: 8px;
+    padding-right: 8px;
+    border-radius: 3px;
+    color: var(--text);
+    -unity-text-align: middle-center;
+    flex-shrink: 0;
+}
+
+.sro-tbtn:hover {
+    background-color: var(--line-soft);
+    color: var(--text-hi);
+}
+
+.sro-tbtn:active {
+    background-color: var(--accent);
+    color: #FFFFFF;
+}
+
+.sro-tbtn.sro-tbtn--on {
+    background-color: var(--sel);
+    color: #FFFFFF;
+    -unity-font-style: bold;
+}
+
+.sro-state {
+    height: 18px;
+    padding-left: 9px;
+    padding-right: 9px;
+    border-radius: 9px;
+    border-width: 1px;
+    font-size: 10px;
+    -unity-text-align: middle-center;
+    flex-shrink: 0;
+}
+
+.sro-state--play {
+    color: var(--ok);
+    border-color: var(--ok);
+}
+
+.sro-state--stop {
+    color: var(--warn);
+    border-color: var(--warn);
+}
+
+/* ── 플레이 모드 안내 배너 ── */
+.sro-banner {
+    flex-direction: row;
+    align-items: center;
+    padding: 5px 10px;
+    background-color: rgba(217, 164, 65, 0.12);
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(217, 164, 65, 0.35);
+    color: var(--warn);
+    font-size: 11px;
+}
+
+.sro-banner__spacer {
+    flex-grow: 1;
+}
+
+/* ── 본문 2분할 ── */
+.sro-body {
+    flex-grow: 1;
+    flex-direction: row;
+}
+
+.sro-side {
+    width: 186px;
+    flex-shrink: 0;
+    background-color: var(--side);
+    border-right-width: 1px;
+    border-right-color: var(--line);
+}
+
+.sro-side--hidden {
+    display: none;
+}
+
+.sro-side__group {
+    padding: 8px 12px 3px 12px;
+    font-size: 9px;
+    color: var(--text-dim);
+    -unity-font-style: bold;
+}
+
+.sro-nav {
+    flex-direction: row;
+    align-items: center;
+    height: 22px;
+    padding-left: 12px;
+    padding-right: 8px;
+    border-left-width: 2px;
+    border-left-color: rgba(0, 0, 0, 0);
+    color: var(--text);
+}
+
+.sro-nav:hover {
+    background-color: var(--line-soft);
+}
+
+.sro-nav--selected {
+    background-color: var(--sel);
+    border-left-color: var(--accent);
+    color: #FFFFFF;
+}
+
+.sro-nav__arrow {
+    flex-shrink: 0;
+    width: 12px;
+    font-size: 9px;
+    color: var(--text-dim);
+    -unity-text-align: middle-center;
+}
+
+.sro-nav--selected .sro-nav__arrow {
+    color: #FFFFFF;
+}
+
+.sro-nav--sub {
+    padding-left: 26px;
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.sro-nav__name {
+    flex-grow: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sro-nav__count {
+    flex-shrink: 0;
+    min-width: 20px;
+    padding-left: 5px;
+    padding-right: 5px;
+    border-radius: 8px;
+    font-size: 10px;
+    color: var(--text-dim);
+    background-color: rgba(0, 0, 0, 0.18);
+    -unity-text-align: middle-center;
+}
+
+.sro-nav--selected .sro-nav__count {
+    color: #E6EEF6;
+    background-color: rgba(255, 255, 255, 0.18);
+}
+
+.sro-sep {
+    height: 1px;
+    margin: 5px 10px 5px 10px;
+    background-color: var(--line-soft);
+}
+
+/* ── 우측 본문 ── */
+.sro-main {
+    flex-grow: 1;
+}
+
+.sro-crumb {
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 12px;
+    background-color: var(--panel);
+    border-bottom-width: 1px;
+    border-bottom-color: var(--line);
+    flex-shrink: 0;
+}
+
+.sro-crumb__title {
+    color: var(--text-hi);
+    font-size: 13px;
+    -unity-font-style: bold;
+}
+
+.sro-crumb__sub {
+    margin-left: 8px;
+    color: var(--text-dim);
+    font-size: 11px;
+    flex-grow: 1;
+}
+
+.sro-scroll {
+    flex-grow: 1;
+}
+
+/* ── 서브카테고리 폴드아웃 ── */
+.sro-fold {
+    margin: 6px 12px 2px 12px;
+}
+
+.sro-fold > .unity-foldout__toggle {
+    margin-left: 0;
+}
+
+.sro-fold .unity-foldout__text {
+    -unity-font-style: bold;
+    color: var(--text-hi);
+}
+
+.sro-fold > .unity-foldout__content {
+    margin-left: 0;
+    padding-left: 0;
+}
+
+/* 서브카테고리째 즐겨찾기하는 별. 폴드아웃 제목 오른쪽 끝에 붙인다 */
+.sro-fold__star {
+    margin-left: auto;
+    margin-right: 4px;
+}
+
+/* 즐겨찾기처럼 카테고리가 섞이는 화면에서 폴드아웃 제목 옆에 출처를 적는다 */
+.sro-fold__path {
+    margin-left: 6px;
+    color: var(--text-dim);
+    font-size: 9px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 즐겨찾기 블록 안의 폴드아웃. 바깥 표가 이미 여백을 주므로 좌우 여백을 줄인다 */
+.sro-fold--fav {
+    margin: 2px 0 0 6px;
+}
+
+/* ── 옵션 표 — 서브카테고리 하나가 표 하나 ── */
+.sro-table {
+    margin: 0 12px 6px 12px;
+    background-color: var(--card);
+    border-width: 1px;
+    border-color: var(--card-line);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+/* 표의 한 줄: [이름] [파라미터들] [실행] [★] */
+.sro-line {
+    flex-direction: row;
+    align-items: center;
+    min-height: 24px;
+    padding: 2px 6px 2px 8px;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--line-soft);
+    border-left-width: 2px;
+    border-left-color: rgba(0, 0, 0, 0);
+}
+
+.sro-line:hover {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.sro-line--action {
+    border-left-color: var(--accent);
+}
+
+/* 이름 칸은 내용 길이에 맞춘다. 입력 필드가 남은 폭을 가져가되 이름을 밀어내지는 못한다 */
+.sro-line__head {
+    min-width: 120px;
+    max-width: 50%;
+    flex-shrink: 0;
+    margin-right: 8px;
+}
+
+.sro-line__name {
+    color: var(--text-hi);
+    font-size: 11px;
+    -unity-font-style: bold;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 메서드 줄의 이름은 실행 버튼 자체다. 머리 칸을 꽉 채우고 글자는 왼쪽 정렬 */
+.sro-line__head > .sro-action {
+    margin: 0;
+    padding-left: 8px;
+    padding-right: 8px;
+    background-color: var(--sel);
+    color: #FFFFFF;
+    -unity-text-align: middle-left;
+}
+
+/* 머리 칸 버튼은 위 규칙이 더 구체적이라, 눌림·실행 상태를 같은 구체성으로 다시 준다 */
+.sro-line__head > .sro-action:hover {
+    background-color: var(--accent);
+}
+
+.sro-line__head > .sro-action:active {
+    background-color: var(--accent);
+    scale: 0.97 0.97;
+}
+
+.sro-line__head > .sro-action.sro-action--fired {
+    background-color: var(--ok);
+    color: #10240F;
+}
+
+/* 즐겨찾기·최근처럼 여러 카테고리가 섞여 나오는 화면에서 줄의 출처를 적는다 */
+.sro-line__path {
+    color: var(--text-dim);
+    font-size: 9px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 파라미터 영역. 비어 있어도 자리를 차지해 실행 버튼이 오른쪽 끝에 정렬된다 */
+.sro-line__params {
+    flex-grow: 1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    min-width: 0;
+}
+
+.sro-param {
+    flex-direction: row;
+    align-items: center;
+    flex-grow: 1;
+    min-width: 110px;
+    margin-right: 8px;
+    margin-top: 1px;
+    margin-bottom: 1px;
+}
+
+.sro-param__label {
+    flex-shrink: 0;
+    margin-right: 4px;
+    color: var(--text-dim);
+    font-size: 10px;
+    white-space: nowrap;
+}
+
+.sro-param__control {
+    flex-grow: 1;
+    min-width: 60px;
+    max-width: 260px;
+}
+
+/* ── 옵션 한 줄 ── */
+.sro-row {
+    flex-direction: row;
+    align-items: center;
+    min-height: 21px;
+    margin-top: 1px;
+    margin-bottom: 1px;
+}
+
+.sro-label {
+    width: 150px;
+    flex-shrink: 0;
+    margin-right: 6px;
+    color: var(--text);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sro-control {
+    flex-grow: 1;
+    min-width: 0;
+    margin-right: 4px;
+}
+
+.sro-field {
+    flex-grow: 1;
+    margin: 0;
+}
+
+.sro-enum-picker {
+    -unity-text-align: middle-left;
+    height: 18px;
+    padding-right: 18px;
+}
+
+.sro-enum-picker__arrow {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 5px;
+    color: var(--text-dim);
+    -unity-text-align: middle-center;
+}
+
+.sro-unsupported {
+    color: var(--text-dim);
+    -unity-font-style: italic;
+}
+
+.sro-star {
+    width: 18px;
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    color: var(--text-dim);
+    opacity: 0.35;
+    -unity-text-align: middle-center;
+}
+
+.sro-star:hover {
+    opacity: 0.8;
+}
+
+.sro-star--on {
+    color: var(--star);
+    opacity: 1;
+}
+
+/* ── 즐겨찾기 순서 이동 — 블록(즐겨찾기 id 하나) 왼쪽의 손잡이를 끌어 옮긴다 ── */
+.sro-fav-block {
+    flex-direction: row;
+    border-top-width: 2px;
+    border-top-color: rgba(0, 0, 0, 0);
+}
+
+.sro-fav-block--last {
+    border-bottom-width: 2px;
+    border-bottom-color: rgba(0, 0, 0, 0);
+}
+
+.sro-fav-block--dragging {
+    opacity: 0.45;
+}
+
+.sro-fav-block--drop-before {
+    border-top-color: var(--accent);
+}
+
+.sro-fav-block--drop-after {
+    border-bottom-color: var(--accent);
+}
+
+.sro-fav-block__rows {
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.sro-fav-handle {
+    width: 16px;
+    flex-shrink: 0;
+    color: var(--text-dim);
+    opacity: 0.5;
+    -unity-text-align: middle-center;
+    border-right-width: 1px;
+    border-right-color: var(--line-soft);
+}
+
+.sro-fav-handle:hover {
+    color: var(--text-hi);
+    opacity: 1;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* ── 실행 버튼 ── */
+.sro-action {
+    height: 20px;
+    margin: 0 0 0 4px;
+    padding-left: 10px;
+    padding-right: 10px;
+    flex-shrink: 0;
+    border-width: 1px;
+    border-color: var(--card-line);
+    transition-property: background-color, border-color, scale;
+    transition-duration: 0.08s;
+}
+
+.sro-action:hover {
+    background-color: var(--accent);
+    border-color: var(--text-hi);
+    color: #FFFFFF;
+}
+
+/* 누르고 있는 동안: 색이 진해지고 살짝 눌린다 */
+.sro-action:active {
+    background-color: var(--sel);
+    border-color: var(--accent);
+    scale: 0.97 0.97;
+}
+
+/* 실행 직후 잠깐 초록으로 번쩍여 「눌렸다」를 알린다 */
+.sro-action--fired {
+    background-color: var(--ok);
+    border-color: var(--ok);
+    color: #10240F;
+    -unity-font-style: bold;
+}
+
+.sro-action--primary {
+    background-color: var(--sel);
+    color: #FFFFFF;
+}
+
+/* 메서드 줄 자체도 눌린 직후 잠깐 강조한다 */
+.sro-line--fired {
+    background-color: rgba(111, 191, 115, 0.14);
+    border-left-color: var(--ok);
+}
+
+/* ── 검색 결과 줄 ── */
+.sro-result {
+    flex-direction: row;
+    align-items: center;
+    padding: 4px 12px;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--line-soft);
+}
+
+.sro-result:hover {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+.sro-result__meta {
+    width: 150px;
+    flex-shrink: 0;
+    margin-right: 6px;
+}
+
+.sro-result__name {
+    color: var(--text-hi);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sro-result__path {
+    color: var(--text-dim);
+    font-size: 9px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── 빈 화면 ── */
+.sro-empty {
+    padding: 24px 16px;
+    -unity-text-align: middle-center;
+    color: var(--text-dim);
+    white-space: normal;
+}
+
+/* ── 하단 상태바 ── */
+.sro-status {
+    flex-direction: row;
+    align-items: center;
+    height: 19px;
+    padding-left: 10px;
+    padding-right: 10px;
+    background-color: var(--side);
+    border-top-width: 1px;
+    border-top-color: var(--line);
+    color: var(--text-dim);
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+.sro-status__spacer {
+    flex-grow: 1;
+}
+
+/* ── 중첩 직렬화 필드 ── */
+.sro-nested {
+    flex-grow: 1;
+}
+
+.sro-nested .sro-label {
+    width: 120px;
+}

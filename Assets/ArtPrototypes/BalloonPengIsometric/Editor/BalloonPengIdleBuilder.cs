@@ -99,12 +99,12 @@ public static class BalloonPengIdleBuilder
         {
             var poseY = pose.localPosition.y;
             var poseAngle = pose.localEulerAngles.z;
-            var farAngle = far.localEulerAngles.z;
-            var nearAngle = near.localEulerAngles.z;
+            var farAngle = Mathf.DeltaAngle(0, far.localEulerAngles.z);
+            var nearAngle = Mathf.DeltaAngle(0, near.localEulerAngles.z);
             Curve(temporary, "Pose", "m_LocalPosition.y", a => poseY + 0.035f * (1 - Mathf.Cos(a)));
             Curve(temporary, "Pose", "localEulerAnglesRaw.z", a => poseAngle + 0.6f * Mathf.Sin(a));
-            Curve(temporary, "Pose/WingFar", "localEulerAnglesRaw.z", a => farAngle - 3 + 4 * Mathf.Sin(a - 0.35f));
-            Curve(temporary, "Pose/WingNear", "localEulerAnglesRaw.z", a => nearAngle + 3 - 4 * Mathf.Sin(a + 0.35f));
+            Curve(temporary, "Pose/WingFar", "localEulerAnglesRaw.z", a => farAngle - 20 * Mathf.Sin(a + 0.35f));
+            Curve(temporary, "Pose/WingNear", "localEulerAnglesRaw.z", a => nearAngle + 20 * Mathf.Sin(a + 0.35f));
             foreach (var name in new[] { "FootFar", "FootNear" })
             {
                 var foot = Require(root, name);

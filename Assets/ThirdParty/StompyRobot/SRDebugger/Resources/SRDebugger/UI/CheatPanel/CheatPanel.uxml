@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/ThirdParty/StompyRobot/SRDebugger/Resources/SRDebugger/UI/CheatPanel/CheatPanel.uss" />
+    <ui:VisualElement name="cheat-root" class="cheat-root">
+        <ui:VisualElement name="topbar" class="cheat-topbar">
+            <ui:Label text="CHEAT" class="cheat-brand" />
+            <ui:TextField name="search" class="cheat-search" />
+            <ui:Button name="clear-search" text="✕" class="cheat-tbtn" />
+        </ui:VisualElement>
+        <ui:VisualElement name="body" class="cheat-body">
+            <ui:ScrollView name="nav" class="cheat-navbar" />
+            <ui:ScrollView name="content" class="cheat-content" />
+        </ui:VisualElement>
+        <ui:Label name="status" class="cheat-status" />
+        <ui:VisualElement name="picker" />
+    </ui:VisualElement>
+</ui:UXML>
