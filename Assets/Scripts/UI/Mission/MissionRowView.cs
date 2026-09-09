@@ -22,8 +22,15 @@ public class MissionRowView : MonoBehaviour
     [Tooltip("0~1 로 채우는 게이지(Image.Type = Filled). 비워 두면 그리지 않는다.")]
     [SerializeField] Image progressFill;
 
-    [Tooltip("보상 문구. 재화 목록과 패스 경험치를 한 줄로 적는다.")]
+    [Tooltip("보상 문구. 재화·아이템 목록을 한 줄로 적는다. 비워 두면 그리지 않는다.")]
     [SerializeField] TMP_Text rewardText;
+
+    [Tooltip("보상 아이콘. 첫 재화 보상이면 CurrencyLook 아이콘으로 갈고, 아이템 보상이면 저작 그림을 그대로 둔다\n" +
+             "(팩·카드 아이콘 조회 축이 아직 없다). 보상이 통째로 없으면 꺼진다. 패스 경험치는 표시 축이 아니다.")]
+    [SerializeField] Image rewardIcon;
+
+    [Tooltip("보상 개수(x100 꼴). 비워 두면 그리지 않는다.")]
+    [SerializeField] TMP_Text rewardCountText;
 
     [SerializeField] Button claimButton;
 
@@ -58,9 +65,10 @@ public class MissionRowView : MonoBehaviour
             this.claimButton.onClick.AddListener(this.HandleClaim);
         }
 
-        if (this.titleText != null) this.titleText.text = _definition?.Title ?? string.Empty;
+        if (this.titleText != null) this.titleText.text = (_definition?.Period == "guide" ? "가이드 · " : "") + (_definition?.Title ?? string.Empty);
         if (this.descriptionText != null) this.descriptionText.text = _definition?.Description ?? string.Empty;
         if (this.rewardText != null) this.rewardText.text = BuildRewardText(_definition);
+        this.ApplyRewardVisual(_definition);
 
         this.Refresh();
     }
@@ -111,6 +119,50 @@ public class MissionRowView : MonoBehaviour
         this.m_onClaim?.Invoke(this.m_definition.Id);
     }
 
+    /// <summary>대표 보상 하나를 아이콘·개수로 그린다. 재화면 아이콘을 갈아끼우고,
+    /// 아이템이면 저작 그림을 신뢰한다. 패스 경험치는 여기서도 문구에서도 그리지 않는다.</summary>
+    void ApplyRewardVisual(MissionDefinition _definition)
+    {
+        if (this.rewardIcon == null && this.rewardCountText == null) return;
+
+        ClaimRewardGain t_gain = FirstCurrency(_definition);
+        ClaimRewardItem t_item = t_gain == null ? FirstItem(_definition) : null;
+
+        if (this.rewardIcon != null)
+        {
+            if (t_gain != null && System.Enum.TryParse(t_gain.Currency, out ECurrencyType t_type))
+            {
+                Sprite t_sprite = CurrencyLook.IconOf(t_type);
+                if (t_sprite != null) this.rewardIcon.sprite = t_sprite;
+            }
+            this.rewardIcon.gameObject.SetActive(t_gain != null || t_item != null);
+        }
+
+        if (this.rewardCountText != null)
+        {
+            long t_amount = t_gain != null ? t_gain.Amount : t_item != null ? t_item.Amount : 0;
+            this.rewardCountText.text = t_amount > 0 ? "x" + t_amount : string.Empty;
+        }
+    }
+
+    static ClaimRewardGain FirstCurrency(MissionDefinition _definition)
+    {
+        List<ClaimRewardGain> t_gains = _definition?.Reward?.Currencies;
+        if (t_gains == null) return null;
+        for (int i = 0; i < t_gains.Count; i++)
+            if (t_gains[i] != null && t_gains[i].Amount > 0) return t_gains[i];
+        return null;
+    }
+
+    static ClaimRewardItem FirstItem(MissionDefinition _definition)
+    {
+        List<ClaimRewardItem> t_items = _definition?.Reward?.Items;
+        if (t_items == null) return null;
+        for (int i = 0; i < t_items.Count; i++)
+            if (t_items[i] != null && t_items[i].Amount > 0) return t_items[i];
+        return null;
+    }
+
     static string BuildRewardText(MissionDefinition _definition)
     {
         if (_definition?.Reward == null) return string.Empty;
@@ -127,11 +179,8 @@ public class MissionRowView : MonoBehaviour
                 s_text.Append(CurrencyLabel(t_gain.Currency)).Append(' ').Append(t_gain.Amount);
             }
         }
-        if (_definition.Reward.PassExp > 0)
-        {
-            if (s_text.Length > 0) s_text.Append("  ");
-            s_text.Append("패스 경험치 ").Append(_definition.Reward.PassExp);
-        }
+        // 패스 경험치는 표시하지 않는다 — 보상 표기는 유저가 받는 실물(재화·아이템)만 말한다.
+        RewardItemDisplay.Append(s_text, _definition.Reward.Items);
         return s_text.ToString();
     }
 

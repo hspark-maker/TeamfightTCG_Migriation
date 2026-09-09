@@ -10,100 +10,135 @@ int,string,string,int,string,string,long,string
 7,Album,b,1,Currency,Gold,1500,앨범 전체 완성
 8,Album,b,2,Currency,Diamond,30,앨범 전체 완성
 9,Album,b,3,Currency,Shard,300,앨범 전체 완성
-10,Adventure,node_01,1,Currency,Gold,200,
-11,Adventure,node_02,1,Currency,Shard,50,
-12,Adventure,node_03,1,Currency,Energy,40,
-13,Adventure,node_04,1,Currency,Gold,250,
+10,Adventure,node_01,1,Currency,Gold,110,
+11,Adventure,node_02,1,Currency,Shard,30,
+12,Adventure,node_03,1,Currency,Energy,20,
+13,Adventure,node_04,1,Currency,Gold,110,
 14,Adventure,node_05,1,Currency,Shard,60,
-15,Adventure,node_06,1,Currency,Diamond,10,
-16,Adventure,chapter_01,1,Currency,Gold,300,
-17,Adventure,chapter_01,2,Currency,Shard,40,
-18,Adventure,node_07,1,Currency,Gold,250,
-19,Adventure,node_08,1,Currency,Shard,60,
-20,Adventure,node_09,1,Currency,Energy,50,
-21,Adventure,node_10,1,Currency,Gold,300,
+16,Adventure,chapter_01,1,Currency,Gold,110,
+18,Adventure,node_07,1,Currency,Gold,140,
+19,Adventure,node_08,1,Currency,Shard,40,
+20,Adventure,node_09,1,Currency,Energy,30,
+21,Adventure,node_10,1,Currency,Gold,150,
 22,Adventure,node_11,1,Currency,Shard,70,
-23,Adventure,node_12,1,Currency,Diamond,15,
-24,Adventure,chapter_02,1,Currency,Gold,450,
-25,Adventure,chapter_02,2,Currency,Shard,50,
-26,Adventure,node_13,1,Currency,Gold,300,
-27,Adventure,node_14,1,Currency,Shard,70,
-28,Adventure,node_15,1,Currency,Energy,70,
-29,Adventure,node_16,1,Currency,Gold,400,
+24,Adventure,chapter_02,1,Currency,Gold,150,
+26,Adventure,node_13,1,Currency,Gold,180,
+27,Adventure,node_14,1,Currency,Shard,50,
+28,Adventure,node_15,1,Currency,Energy,40,
+29,Adventure,node_16,1,Currency,Gold,180,
 30,Adventure,node_17,1,Currency,Shard,80,
-31,Adventure,node_18,1,Currency,Diamond,25,
-32,Adventure,chapter_03,1,Currency,Gold,550,
-33,Adventure,chapter_03,2,Currency,Shard,50,
-34,Adventure,node_19,1,Currency,Gold,400,
-35,Adventure,node_20,1,Currency,Shard,80,
-36,Adventure,node_21,1,Currency,Energy,90,
-37,Adventure,node_22,1,Currency,Gold,500,
+32,Adventure,chapter_03,1,Currency,Gold,190,
+34,Adventure,node_19,1,Currency,Gold,220,
+35,Adventure,node_20,1,Currency,Shard,60,
+36,Adventure,node_21,1,Currency,Energy,50,
+37,Adventure,node_22,1,Currency,Gold,220,
 38,Adventure,node_23,1,Currency,Shard,90,
-39,Adventure,node_24,1,Currency,Diamond,30,
-40,Adventure,chapter_04,1,Currency,Gold,600,
-41,Adventure,chapter_04,2,Currency,Shard,50,
-42,Rank,0,1,Currency,Gold,100,브론즈 1
-43,Rank,0,2,Currency,Diamond,3,브론즈 1
-44,Rank,1,1,Currency,Gold,150,브론즈 2
-45,Rank,1,2,Currency,Diamond,4,브론즈 2
-46,Rank,2,1,Currency,Gold,200,브론즈 3
-47,Rank,2,2,Currency,Diamond,5,브론즈 3
-48,Rank,3,1,Currency,Gold,250,브론즈 4
-49,Rank,3,2,Currency,Diamond,6,브론즈 4
-50,Rank,4,1,Currency,Gold,300,실버 1
-51,Rank,4,2,Currency,Diamond,5,실버 1
-52,Rank,5,1,Currency,Gold,350,실버 2
-53,Rank,5,2,Currency,Diamond,6,실버 2
-54,Rank,6,1,Currency,Gold,400,실버 3
-55,Rank,6,2,Currency,Diamond,7,실버 3
-56,Rank,7,1,Currency,Gold,450,실버 4
-57,Rank,7,2,Currency,Diamond,8,실버 4
-58,Rank,8,1,Currency,Gold,500,골드 1
-59,Rank,8,2,Currency,Diamond,10,골드 1
-60,Rank,9,1,Currency,Gold,600,골드 2
-61,Rank,9,2,Currency,Diamond,12,골드 2
-62,Rank,10,1,Currency,Gold,700,골드 3
-63,Rank,10,2,Currency,Diamond,14,골드 3
-64,Rank,11,1,Currency,Gold,800,골드 4
-65,Rank,11,2,Currency,Diamond,16,골드 4
-66,Rank,12,1,Currency,Gold,900,플래티넘 1
-67,Rank,12,2,Currency,Diamond,20,플래티넘 1
-68,Rank,13,1,Currency,Gold,1000,플래티넘 2
-69,Rank,13,2,Currency,Diamond,25,플래티넘 2
-70,Rank,14,1,Currency,Gold,1100,플래티넘 3
-71,Rank,14,2,Currency,Diamond,30,플래티넘 3
-72,Rank,15,1,Currency,Gold,1200,플래티넘 4
-73,Rank,15,2,Currency,Diamond,35,플래티넘 4
-74,Rank,16,1,Currency,Gold,1400,다이아몬드 1
-75,Rank,16,2,Currency,Diamond,40,다이아몬드 1
-76,Rank,17,1,Currency,Gold,1600,다이아몬드 2
-77,Rank,17,2,Currency,Diamond,50,다이아몬드 2
-78,Rank,18,1,Currency,Gold,1800,다이아몬드 3
-79,Rank,18,2,Currency,Diamond,60,다이아몬드 3
-80,Rank,19,1,Currency,Gold,2000,다이아몬드 4
-81,Rank,19,2,Currency,Diamond,70,다이아몬드 4
+40,Adventure,chapter_04,1,Currency,Gold,220,
+42,Rank,0,1,Currency,Gold,80,브론즈 1
+44,Rank,1,1,Currency,Gold,80,브론즈 2
+46,Rank,2,1,Currency,Gold,80,브론즈 3
+48,Rank,3,1,Currency,Gold,80,브론즈 4
+49,Rank,3,2,Currency,Diamond,5,브론즈 4 완주
+50,Rank,4,1,Currency,Gold,120,실버 1
+52,Rank,5,1,Currency,Gold,120,실버 2
+54,Rank,6,1,Currency,Gold,120,실버 3
+56,Rank,7,1,Currency,Gold,120,실버 4
+57,Rank,7,2,Currency,Diamond,10,실버 4 완주
+58,Rank,8,1,Currency,Gold,180,골드 1
+60,Rank,9,1,Currency,Gold,180,골드 2
+62,Rank,10,1,Currency,Gold,180,골드 3
+64,Rank,11,1,Currency,Gold,180,골드 4
+65,Rank,11,2,Currency,Diamond,15,골드 4 완주
+66,Rank,12,1,Currency,Gold,250,플래티넘 1
+68,Rank,13,1,Currency,Gold,250,플래티넘 2
+70,Rank,14,1,Currency,Gold,250,플래티넘 3
+72,Rank,15,1,Currency,Gold,250,플래티넘 4
+73,Rank,15,2,Currency,Diamond,20,플래티넘 4 완주
+74,Rank,16,1,Currency,Gold,350,다이아몬드 1
+76,Rank,17,1,Currency,Gold,350,다이아몬드 2
+78,Rank,18,1,Currency,Gold,350,다이아몬드 3
+80,Rank,19,1,Currency,Gold,350,다이아몬드 4
+81,Rank,19,2,Currency,Diamond,30,다이아몬드 4 완주
 82,Battle,win.perCard,1,Currency,Gold,10,승리 시 생존 카드 1장당 지급(계수)
 83,Battle,win.floor,1,Currency,Gold,10,승리 지급액 하한(부전승 바닥)
 84,Battle,lose.flat,1,Currency,Gold,5,패배 고정 지급(생존 카드 무관)
-85,Mission,daily.openPack1,1,Currency,Gold,120,팩 개봉 1회
-86,Mission,daily.openPack3,1,Currency,Gold,200,팩 개봉 3회
-87,Mission,weekly.openPack10,1,Currency,Diamond,30,주간 팩 10회
-88,Mission,weekly.enhanceCard5,1,Currency,Shard,100,주간 강화 5회
-89,Mission,weekly.limitBreakCard1,1,Currency,Diamond,50,주간 한계 돌파 1회
-90,Mission,daily.completeBattle3,1,Currency,Gold,200,일일 전투 3회
-91,Mission,weekly.winRankedBattle5,1,Currency,Diamond,40,주간 랭크 승리 5회
-92,Mission,daily.claimReward1,1,Currency,Gold,100,일일 보상 수령 1회
-93,Mission,daily.destroyCards3,1,Currency,Gold,150,일일 카드 파괴 3장
-94,Mission,daily.triggerSynergy2,1,Currency,Gold,150,일일 시너지 발동 2회
-95,Mission,daily.triggerKeyword2,1,Currency,Gold,150,일일 키워드 발동 2회
-96,Mission,weekly.attackTimes50,1,Currency,Diamond,30,주간 공격 50회
+85,Mission,daily.openPack1,1,Currency,Gold,50,미션 catalog/모험 집계 동기화 대기
+93,Mission,daily.destroyCards3,1,Currency,Gold,80,미션 catalog/모험 집계 동기화 대기
 101,Pass,S1:1,1,Currency,Gold,200,시즌 1 무료 트랙 레벨 1
-102,Pass,S1:2,1,Currency,Gold,250,시즌 1 무료 트랙 레벨 2
-103,Pass,S1:3,1,Currency,Shard,50,시즌 1 무료 트랙 레벨 3
-104,Pass,S1:4,1,Currency,Gold,300,시즌 1 무료 트랙 레벨 4
-105,Pass,S1:5,1,Currency,Diamond,20,시즌 1 무료 트랙 레벨 5
-106,Pass,S1:6,1,Currency,Gold,400,시즌 1 무료 트랙 레벨 6
+106,Pass,S1:6,1,Currency,Gold,300,시즌 1 무료 트랙 레벨 6
 107,Pass,S1:7,1,Currency,Shard,100,시즌 1 무료 트랙 레벨 7
-108,Pass,S1:8,1,Currency,Gold,500,시즌 1 무료 트랙 레벨 8
-109,Pass,S1:9,1,Currency,Diamond,30,시즌 1 무료 트랙 레벨 9
 110,Pass,S1:10,1,Currency,Diamond,50,시즌 1 무료 트랙 레벨 10
+111,Adventure,node_01,2,Currency,Shard,30,
+112,Adventure,node_03,2,Currency,Shard,30,
+113,Adventure,node_04,2,Currency,Shard,60,
+114,Adventure,node_06,1,Currency,Shard,30,
+115,Adventure,chapter_01,2,Currency,Diamond,10,
+116,Adventure,chapter_01,3,Pack,NormalPack_TEST,1,팩 지급 구현 대기
+117,Adventure,node_07,2,Currency,Shard,40,
+118,Adventure,node_09,2,Currency,Shard,40,
+119,Adventure,node_10,2,Currency,Shard,70,
+120,Adventure,node_12,1,Currency,Shard,40,
+121,Adventure,chapter_02,2,Currency,Diamond,15,
+122,Adventure,chapter_02,3,Pack,SpecialPack,1,팩 지급 구현 대기
+123,Adventure,node_13,2,Currency,Shard,50,
+124,Adventure,node_15,2,Currency,Shard,50,
+125,Adventure,node_16,2,Currency,Shard,80,
+126,Adventure,node_18,1,Currency,Shard,50,
+127,Adventure,chapter_03,2,Currency,Diamond,20,
+128,Adventure,chapter_03,3,Pack,GiantsGardenPack,1,팩 지급 구현 대기
+129,Adventure,node_19,2,Currency,Shard,60,
+130,Adventure,node_21,2,Currency,Shard,60,
+131,Adventure,node_22,2,Currency,Shard,90,
+132,Adventure,node_24,1,Currency,Shard,60,
+133,Adventure,chapter_04,2,Currency,Diamond,30,
+134,Adventure,chapter_04,3,Pack,HuntingBrandPack,2,팩 지급 구현 대기
+135,Rank,3,3,Pack,NormalPack_TEST,1,브론즈 4 팩 지급 구현 대기
+136,Rank,7,3,Pack,SpecialPack,1,실버 4 팩 지급 구현 대기
+137,Rank,11,3,Pack,GiantsGardenPack,1,골드 4 팩 지급 구현 대기
+138,Rank,15,3,Pack,HuntingBrandPack,2,플래티넘 4 팩 지급 구현 대기
+139,Rank,19,3,Pack,ImmortalLegacyPack,3,다이아몬드 4 팩 지급 구현 대기
+140,Mission,daily.completeBattle3,1,Currency,Shard,40,미션 catalog/모험 집계 동기화 대기
+141,Mission,daily.completeBattle5,1,Currency,Gold,100,미션 catalog/모험 집계 동기화 대기
+142,Mission,daily.completeBattle5,2,Currency,RouletteTicket,1,미션 catalog/모험 집계 동기화 대기
+143,Mission,daily.triggerKeyword2,1,Currency,Energy,10,미션 catalog/모험 집계 동기화 대기
+144,Mission,daily.triggerSynergy2,1,Currency,Shard,20,미션 catalog/모험 집계 동기화 대기
+145,Mission,weekly.completeBattle20,1,Currency,Shard,120,미션 catalog/모험 집계 동기화 대기
+146,Mission,weekly.completeBattle35,1,Currency,Shard,60,미션 catalog/모험 집계 동기화 대기
+147,Mission,weekly.completeBattle35,2,Currency,Gold,300,미션 catalog/모험 집계 동기화 대기
+148,Mission,weekly.openPack10,1,Pack,NormalPack_TEST,1,미션 catalog/모험 집계 동기화 대기; 팩 지급 구현 대기
+149,Mission,weekly.enhanceCard10,1,Currency,Gold,200,미션 catalog/모험 집계 동기화 대기
+150,Mission,weekly.enhanceCard10,2,Currency,Energy,30,미션 catalog/모험 집계 동기화 대기
+151,Mission,weekly.winBattle10,1,Currency,Diamond,20,미션 catalog/모험 집계 동기화 대기
+152,Mission,weekly.winBattle10,2,Currency,RouletteTicket,3,미션 catalog/모험 집계 동기화 대기
+153,Pass,S1:2,1,Currency,Shard,60,시즌 1 무료 트랙 레벨 2
+154,Pass,S1:3,1,Pack,NormalPack_TEST,1,시즌 1 무료 트랙 레벨 3; 팩 지급 구현 대기
+155,Pass,S1:3,2,Currency,RouletteTicket,2,시즌 1 무료 트랙 레벨 3
+156,Pass,S1:4,1,Currency,Diamond,10,시즌 1 무료 트랙 레벨 4
+157,Pass,S1:4,2,Currency,Energy,20,시즌 1 무료 트랙 레벨 4
+158,Pass,S1:5,1,Currency,Shard,80,시즌 1 무료 트랙 레벨 5
+159,Pass,S1:5,2,Pack,SpecialPack,1,시즌 1 무료 트랙 레벨 5; 팩 지급 구현 대기
+160,Pass,S1:6,2,Currency,RouletteTicket,2,시즌 1 무료 트랙 레벨 6
+161,Pass,S1:8,1,Currency,Diamond,20,시즌 1 무료 트랙 레벨 8
+162,Pass,S1:8,2,Currency,Energy,30,시즌 1 무료 트랙 레벨 8
+163,Pass,S1:9,1,Currency,Shard,120,시즌 1 무료 트랙 레벨 9
+164,Pass,S1:9,2,Pack,NormalPack_TEST,2,시즌 1 무료 트랙 레벨 9; 팩 지급 구현 대기
+165,Pass,S1:10,2,PackChoice,UnlockedThemePack,1,시즌 1 무료 트랙 레벨 10; 팩 지급 구현 대기
+166,Guide,guide.01,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
+167,Guide,guide.02,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
+168,Guide,guide.03,1,Currency,Shard,40,계정당 1회 가이드 지급 구현 대기
+169,Guide,guide.04,1,Currency,Gold,50,계정당 1회 가이드 지급 구현 대기
+170,Guide,guide.05,1,Currency,Shard,30,계정당 1회 가이드 지급 구현 대기
+171,Guide,guide.05,2,Card,9,1,계정당 1회 가이드 지급 구현 대기
+172,Guide,guide.06,1,Currency,Shard,30,계정당 1회 가이드 지급 구현 대기
+173,Guide,guide.07,1,Currency,Shard,90,계정당 1회 가이드 지급 구현 대기
+174,Guide,guide.08,1,Currency,Gold,60,계정당 1회 가이드 지급 구현 대기
+175,Guide,guide.09,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
+176,Guide,guide.10,1,Currency,Shard,20,계정당 1회 가이드 지급 구현 대기
+177,Guide,guide.11,1,Currency,Shard,60,계정당 1회 가이드 지급 구현 대기
+178,Guide,guide.12,1,Pack,NormalPack_TEST,1,계정당 1회 가이드 지급 구현 대기
+179,Guide,guide.13,1,Currency,Diamond,10,계정당 1회 가이드 지급 구현 대기
+180,Guide,guide.13,2,Currency,RouletteTicket,1,계정당 1회 가이드 지급 구현 대기
+181,CardDuplicate,Common,1,Currency,Shard,1,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
+182,CardDuplicate,Rare,1,Currency,Shard,2,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
+183,CardDuplicate,Arcane,1,Currency,Shard,5,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
+184,CardDuplicate,Mythic,1,Currency,Shard,10,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외

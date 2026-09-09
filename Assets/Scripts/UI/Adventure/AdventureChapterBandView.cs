@@ -418,7 +418,7 @@ public class AdventureChapterBandView : MonoBehaviour
             if (this.rewardSlots[t_i] == null) continue;
 
             if (t_i < s_rewardBuffer.Count)
-                this.rewardSlots[t_i].Bind(s_rewardBuffer[t_i].Icon, s_rewardBuffer[t_i].Gain.Amount);
+                this.rewardSlots[t_i].Bind(s_rewardBuffer[t_i]);
             else
                 this.rewardSlots[t_i].Hide();
         }

@@ -1,15 +1,19 @@
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {randomInt, randomUUID} from "node:crypto";
-import {isKnownEnv, requireUid} from "../save/saveDocument";
+import {isKnownEnv, requireUid, mutateSave} from "../save/saveDocument";
 import {rejectDomain} from "../save/domainReject";
 import {clientReceiptId, isClientReceiptId} from "../save/receiptId";
 import {canAfford, grant, spend} from "../currency/wallet";
 import {nextWallet} from "../currency/walletStore";
-import {mutateWallet} from "../currency/walletTransaction";
+import {db} from "../firebaseApp";
+import {rankRef} from "../rank/rankStore";
+import {RewardGain, RewardItem, parseRewardRows} from "../rewardTable";
+import {grantRewardItems, loadItemGrantContext, GrantedItems} from "../rewards/itemGrant";
+import {readSpecRows} from "../specs/specBlobReader";
 import {EVENTS} from "../analytics/eventNames";
 import {recordEvent} from "../observability/analyticsEvent";
-import {drawRouletteSlot, resolveRouletteBoard, RouletteSlot} from "../roulette/rouletteDraw";
+import {drawRouletteSlot, resolveRouletteBoard, RouletteSlot, isLegacyRouletteReceipt} from "../roulette/rouletteDraw";
 import {MAX_ROULETTE_ID_LENGTH, readRouletteHeaderRow, readRouletteSlotRows} from "../roulette/rouletteSpecReader";
 
 /**
@@ -31,8 +35,7 @@ function reject(reason: RouletteReject, message: string, context: Record<string,
 /**
  * 룰렛 1회 회전. 비용 차감·추첨·지급을 서버가 소유한다.
  *
- * **세이브 문서를 건드리지 않는다** — 움직이는 것이 잔액뿐이라 revision 도 슬롯도 오를 이유가 없다.
- * 그래서 응답에 revision·updatedSlots 가 없다(claimBattleReward 와 같은 축).
+ * 팩 상품은 즉시 추첨해 소유·성장 슬롯에 지급한다. 티켓과 카드, 중복 재화는 같은 영수증으로 묶는다.
  *
  * 자격 문서(WalletGuard)도 없다. 소진 자격이 티켓 잔액 그 자체라 낙인할 바깥 문서가 없다 —
  * 같은 txId 의 재시도는 영수증이 막고, 새 txId 는 티켓이 있는 만큼만 돈다.
@@ -71,6 +74,13 @@ export const spinRoulette = onCall(async (request) => {
   if (board.droppedRows > 0) {
     logger.warn("roulette rows dropped", {...context, droppedRows: board.droppedRows, slotCount: board.slots.length});
   }
+  if (board.slots.length !== 8) {
+    reject("EmptyPool", "Roulette requires all eight authored slots.", context);
+  }
+  const items: RewardItem[] = board.slots.filter((slot) => slot.rewardType === "Pack")
+    .map((slot) => ({rewardType: "Pack", rewardId: slot.rewardId, amount: slot.amount}));
+  const itemContext = items.length ? await loadItemGrantContext(env, items) : null;
+  const rewardRows = items.length ? parseRewardRows(await readSpecRows(env, "Reward")) : [];
 
   // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
   const txId = clientReceiptId(request.data?.txId, randomUUID());
@@ -78,10 +88,13 @@ export const spinRoulette = onCall(async (request) => {
   let replayed = true;
   // 추첨 결과. mutate 가 채우고 finalize 가 읽는다(한 트랜잭션 안에서 mutate 가 먼저 돈다).
   let drawn: RouletteSlot | null = null;
+  let itemGrant: GrantedItems = {slots: {}, cards: [], currencies: []};
+  let granted: RewardGain[] = [];
 
-  const result = await mutateWallet(env, uid, "spinRoulette", {kind: "client", txId},
-    (current) => {
-      const balances = current.balances;
+  const result = await mutateSave(env, uid, "spinRoulette", {kind: "client", txId},
+    async (current, transaction, wallet) => {
+      const rank = itemContext ? await transaction.get(rankRef(db, env, uid)) : null;
+      const balances = wallet.balances;
       if (!canAfford(balances, board.priceType, board.price)) {
         reject("InsufficientTicket", `Not enough ${board.priceType} to spin '${rouletteId}'.`,
           {...context, priceType: board.priceType, price: board.price, balance: balances[board.priceType]});
@@ -94,22 +107,33 @@ export const spinRoulette = onCall(async (request) => {
         reject("EmptyPool", `Roulette '${rouletteId}' has no drawable slot.`, context);
       }
       drawn = slot;
+      itemGrant = slot.rewardType === "Pack" ? grantRewardItems(current,
+        [{rewardType: "Pack", rewardId: slot.rewardId, amount: slot.amount}], itemContext!, rewardRows, "",
+        Number(rank?.data()?.points ?? (current.rank as {points?: number})?.points ?? 0)) :
+        {slots: {}, cards: [], currencies: []};
+      granted = slot.currency === null ? itemGrant.currencies :
+        [{currency: slot.currency, amount: slot.amount}];
 
       // 차감과 지급을 한 nextWallet 으로 묶는다 — 영수증 changes 가 순증감 한 줄로 남아야 한다.
       const paid = spend(balances, board.priceType, board.price);
-      const after = grant(paid, [{currency: slot.currency, amount: slot.amount}]);
-      return nextWallet(current, after, "spinRoulette");
+      const after = grant(paid, granted);
+      return {slots: itemGrant.slots, wallet: nextWallet(wallet, after, "spinRoulette")};
     },
-    (wallet) => {
+    (adopted) => {
       replayed = false;
       if (drawn === null) throw new HttpsError("internal", "Roulette draw did not run before finalize.");
       return {
+        ...adopted,
         rouletteId,
         slotIndex: drawn.slotIndex,
-        gain: {currency: drawn.currency, amount: drawn.amount},
-        wallet,
+        rewardType: drawn.rewardType,
+        rewardId: drawn.rewardId,
+        amount: drawn.amount,
+        gain: drawn.currency === null ? null : {currency: drawn.currency, amount: drawn.amount},
+        granted,
+        cards: itemGrant.cards,
       };
-    });
+    }, isLegacyRouletteReceipt);
 
   if (replayed) {
     logger.info("receipt replay",
@@ -118,7 +142,7 @@ export const spinRoulette = onCall(async (request) => {
     recordEvent(EVENTS.rouletteSpun.name, {
       uid, env, eventId: txId, sourceCommand: "spinRoulette", result: "success",
       rouletteId, slotIndex: result.slotIndex,
-      currency: result.gain.currency, amount: result.gain.amount,
+      rewardType: result.rewardType, rewardId: result.rewardId, amount: result.amount,
       price: board.price, rev: result.wallet.rev,
       txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",
     });

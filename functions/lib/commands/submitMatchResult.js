@@ -55,6 +55,8 @@ const matchPairing_1 = require("../matchPairing");
 const battleReplayService_1 = require("../battleReplayService");
 const battleReplayConfig_1 = require("../battleReplayConfig");
 const battleReplayTelemetry_1 = require("../battleReplayTelemetry");
+const rankSeason_1 = require("../rank/rankSeason");
+const rankStore_1 = require("../rank/rankStore");
 // 서버 재생 권위 스위치. true = 승패·잔존의 진실원이 Cloud Run 재생(C# BattleCore)이다.
 // 켠 근거: Tools/BattleCoreGolden 이 functions/testdata/golden 코퍼스로 finalStateHash·체크포인트
 // 일치를 강제한다. 끄면 두 클라 합의(decideMatch)로 즉시 되돌아간다 — 롤백 레버는 이 한 줄이다.
@@ -255,15 +257,21 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
     // 여기서 다시 캐시하지 마라 — TTL 이 두 벌이 되고 clearSpecCache 로 비워도 이쪽이 옛 값을 계속 준다.
     let rewardRows;
     let rankRows;
+    let rankSeason;
     const cardSpecs = new Map();
     try {
-        const [rewardSpecRows, rankSpecRows, cardSpecRows] = await Promise.all([
+        const [rewardSpecRows, rankSpecRows, cardSpecRows, seasonSpecRows] = await Promise.all([
             (0, specBlobReader_1.readSpecRows)(data.env, "Reward"),
             (0, specBlobReader_1.readSpecRows)(data.env, "RankGrade"),
             (0, specBlobReader_1.readSpecRows)(data.env, cardTable),
+            (0, specBlobReader_1.readSpecRows)(data.env, "PassSeason"),
         ]);
         rewardRows = (0, rewardTable_1.parseRewardRows)(rewardSpecRows);
         rankRows = (0, payout_1.parseRankGradeRows)(rankSpecRows);
+        const activeSeason = (0, rankSeason_1.currentRankSeason)(seasonSpecRows, Date.now());
+        if (activeSeason === null)
+            throw new Error("no active rank season");
+        rankSeason = activeSeason;
         for (const row of cardSpecRows) {
             const spec = (0, deckValidation_1.parseCardSpecRow)(row);
             if (spec == null)
@@ -526,31 +534,17 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
                 }
             }
         }
+        const rankRefs = entries.map((entry) => (0, rankStore_1.rankRef)(firebaseApp_1.db, data.env, entry.uid));
         const rankStateRefs = entries.map((entry) => firebaseApp_1.db.doc(`envs/${data.env}/users/${entry.uid}/payoutState/current`));
         const saveRefs = entries.map((entry) => firebaseApp_1.db.doc(`envs/${data.env}/users/${entry.uid}/save/current`));
+        const rankSnapshots = await tx.getAll(...rankRefs);
         const rankStateSnapshots = await tx.getAll(...rankStateRefs);
-        const missingRankStateIndexes = [];
-        const missingSaveRefs = [];
-        for (let i = 0; i < rankStateSnapshots.length; i++) {
-            if (rankStateSnapshots[i].exists)
-                continue;
-            missingRankStateIndexes.push(i);
-            missingSaveRefs.push(saveRefs[i]);
-        }
-        const missingSaveSnapshots = missingSaveRefs.length === 0 ? [] :
-            await tx.getAll(...missingSaveRefs);
+        const saveSnapshots = await tx.getAll(...saveRefs);
         // 미션 문서는 payout 쓰기보다 먼저 전부 읽는다. 정산 트랜잭션의 pending -> confirmed 전이가
         // matchId 멱등 게이트라 같은 제출을 다시 보내도 이 경로에는 재진입하지 않는다.
         const missionBumps = [];
         for (const entry of entries) {
             missionBumps.push(await (0, missionStore_1.beginMissionBump)(tx, firebaseApp_1.db, data.env, entry.uid, period));
-        }
-        // payoutState가 있는 사용자는 save 폴백을 쓰지 않으므로 그 칸은 비워 둔다.
-        // rankState 스냅샷으로 메우면 폴백이 실제로 걸릴 때(문서는 있는데 currentPoints가 깨진 경우)
-        // save가 아니라 payoutState에서 rank.points를 찾게 되어 멀쩡한 계정이 정산 실패로 튕긴다.
-        const saveSnapshots = entries.map(() => undefined);
-        for (let i = 0; i < missingRankStateIndexes.length; i++) {
-            saveSnapshots[missingRankStateIndexes[i]] = missingSaveSnapshots[i];
         }
         const settledAt = firestore_1.Timestamp.now();
         const payoutExpiresAt = firestore_1.Timestamp.fromMillis(settledAt.toMillis() + 180 * 24 * 60 * 60 * 1000);
@@ -560,18 +554,13 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
         const settleOutcomes = [];
         for (let i = 0; i < entries.length; i++) {
             const entry = entries[i];
-            const storedPoints = rankStateSnapshots[i].data()?.currentPoints;
             const storedSequence = rankStateSnapshots[i].data()?.sequence;
-            const saveRank = saveSnapshots[i]?.data()?.rank;
-            const savePoints = saveRank?.points;
-            const rankBefore = Number.isSafeInteger(storedPoints) ? storedPoints : savePoints;
+            const fallbackPoints = (0, rankStore_1.legacyRankPoints)(rankStateSnapshots[i].data(), saveSnapshots[i].data());
+            const fallbackClaimed = (0, rankStore_1.legacyClaimedTiers)(saveSnapshots[i].data(), (0, payout_1.rankTierCount)(rankRows));
+            let rankState = (0, rankStore_1.applyRankSeason)((0, rankStore_1.readRank)(rankSnapshots[i], fallbackPoints, fallbackClaimed, rankRows), rankSeason.seasonId, rankRows);
+            rankState = (0, rankStore_1.adoptLegacyEntry)(rankState, fallbackPoints, rankRows);
+            const rankBefore = rankState.points;
             const rankSequence = Number.isSafeInteger(storedSequence) ? storedSequence + 1 : 1;
-            if (!Number.isSafeInteger(rankBefore) || rankBefore < 0) {
-                throw new https_1.HttpsError("failed-precondition", "rank baseline is unavailable");
-            }
-            if (!rankStateSnapshots[i].exists && entry.rankPointsBefore !== rankBefore) {
-                throw new https_1.HttpsError("failed-precondition", "rank baseline does not match server save");
-            }
             const owner = ownerIndexByUid?.[entry.uid] ?? -1;
             // 권위 모드에서는 서버 재생의 판정을 쓰고, 구 ruleset(섀도)에서는 클라 신고를 쓴다.
             const replayOutcome = authoritativeRules && serverReplay?.ok === true && owner >= 0 ?
@@ -595,6 +584,9 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
                 logger.error("payout_calculation_failed", { matchId: data.matchId, uid: entry.uid, error });
                 throw new https_1.HttpsError("failed-precondition", "payout calculation failed");
             }
+            rankState.points = rank.after;
+            rankState.bestTierIndex = Math.max(rankState.bestTierIndex, rank.afterTierIndex);
+            const rankProgress = (0, rankStore_1.rankProgressResponse)(rankState);
             const payout = {
                 status: "ready",
                 env: data.env,
@@ -603,23 +595,25 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
                 won,
                 currency,
                 rank,
+                rankProgress,
                 rankSequence,
                 settledAt,
                 expiresAt: payoutExpiresAt,
             };
             tx.set(firebaseApp_1.db.doc(`envs/${data.env}/users/${entry.uid}/payouts/${data.matchId}`), payout);
+            (0, rankStore_1.writeRank)(tx, rankRefs[i], rankState, settledAt);
             tx.set(rankStateRefs[i], {
                 currentPoints: rank.after,
                 sequence: rankSequence,
                 lastMatchId: data.matchId,
                 updatedAt: settledAt,
             }, { merge: true });
-            payoutSummary[entry.uid] = { currency, rank, won };
+            payoutSummary[entry.uid] = { currency, rank, rankProgress, won };
             settleOutcomes.push({
                 uid: entry.uid,
                 won,
                 draw,
-                rankBefore: rankBefore,
+                rankBefore,
                 rankAfter: rank.after,
             });
         }
@@ -631,6 +625,9 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
             const owner = ownerIndexByUid?.[entries[i].uid] ?? (solo ? 0 : -1);
             const bump = missionBumps[i];
             (0, missionStore_1.commitMissionBump)(tx, bump, eventNames_1.EVENTS.battleCompleted.missionKey, 1, missionNow);
+            if (outcome.won && serverReplay?.ok === true) {
+                (0, missionStore_1.commitMissionBump)(tx, bump, "WinBattle", 1, missionNow);
+            }
             if (!solo && outcome.won && serverReplay?.ok === true) {
                 (0, missionStore_1.commitMissionBump)(tx, bump, eventNames_1.EVENTS.rankedBattleWon.missionKey, 1, missionNow);
             }

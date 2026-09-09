@@ -267,15 +267,15 @@ public partial class RouletteSlot
     public int id;
     /// Roulette.rouletteId 참조
     public string rouletteId;
-    /// 판 위의 자리(0=12시
+    /// 판 위의 자리(0=12시 · 시계방향으로 1~7). 판 그림이 8쐐기라 한 판에 0~7이 정확히 한 번씩 있어야 한다
     public int slotIndex;
-    /// 시계방향으로 1~7). 판 그림이 8쐐기라 한 판에 0~7이 정확히 한 번씩 있어야 한다""
+    /// 보상 종류 Currency/Pack. Pack은 지급 구현 대기이며 현재 서버는 해당 행을 버린다
     public string rewardType;
-    /// 보상 종류. 지금은 Currency만 쓴다(다른 값은 서버가 그 행을 버린다)
+    /// 주는 재화(Gold/Diamond/Energy/Shard) 또는 CardPack.packId. 룰렛 티켓은 상품으로 넣을 수 없다
     public string rewardId;
-    /// 주는 재화(Gold/Diamond/Energy/Shard). 룰렛 티켓은 넣을 수 없다 — 회전이 스스로를 재생산한다
-    public long amount;
     /// 주는 수량. 1 이상이어야 한다(0 이하면 서버가 그 행을 버린다)
+    public long amount;
+    /// 추첨 가중치. 확률은 (이 칸 가중치 / 판 전체 가중치 합)이다. 0 이하는 1로 본다 — 칸을 막는 수단이 아니다
     public int weight;
 }
 

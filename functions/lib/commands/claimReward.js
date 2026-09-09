@@ -52,8 +52,11 @@ const rewardTable_1 = require("../rewardTable");
 const completionTable_1 = require("../completionTable");
 const adventureTable_1 = require("../adventureTable");
 const packSlots_1 = require("../packs/packSlots");
+const itemGrant_1 = require("../rewards/itemGrant");
 const wallet_1 = require("../currency/wallet");
 const walletStore_1 = require("../currency/walletStore");
+const rankSeason_1 = require("../rank/rankSeason");
+const rankStore_1 = require("../rank/rankStore");
 /** 소유자 키 하나의 최대 길이. 저작 키는 node_01 · p:Theme_Nature/P1 처럼 짧다. */
 const MAX_OWNER_ID_LENGTH = adventureTable_1.MAX_NODE_ID_LENGTH;
 /**
@@ -80,19 +83,6 @@ const readIdList = adventureTable_1.readNodeIdList;
  * @param {number} tierCount 전체 티어 수
  * @return {number[]} 오름차순 티어 인덱스
  */
-function readClaimedTiers(rank, tierCount) {
-    const raw = rank?.claimedTiers;
-    if (!Array.isArray(raw))
-        return [];
-    const seen = new Set();
-    for (const entry of raw) {
-        const tier = Number(entry);
-        if (!Number.isInteger(tier) || tier < 0 || tier >= tierCount)
-            continue;
-        seen.add(tier);
-    }
-    return [...seen].sort((a, b) => a - b);
-}
 /**
  * 랭크 등급 표. 못 읽으면 자격을 잴 수 없으므로 NotEligible 로 떨어뜨린다
  * — failed-precondition 으로 던지면 클라 CloudFailureClassifier 가 세션을 끊는다.
@@ -160,42 +150,25 @@ async function loadChapterNodes(context) {
     return entries;
 }
 /**
- * 랭크 티어 수령 — 낙인은 claimedTiers 다. rank 슬롯 **전체 값**을 돌려준다.
+ * 랭크 티어 수령 — 낙인은 rank/current 의 claimed 맵이다. state 를 제자리에서 고친다.
  *
  * Claimed 검사가 도달 검사보다 먼저다(클라 RankRewardManager.StateOf 와 같은 순서) —
- * 강등으로 도달 티어가 내려간 구간에서 수령 표시가 풀리면 안 된다.
- * @param {Record<string, unknown>} current 현재 문서
+ * 단계 강등으로 현재 티어가 내려간 구간에서 수령 표시가 풀리면 안 된다.
+ * 도달 판정 축은 현재 점수가 아니라 시즌 최고 도달 티어(bestTierIndex)다.
+ * @param {RankState} state 이번 트랜잭션의 랭크 상태(제자리 수정)
  * @param {number} tier 티어 인덱스
- * @param {number} required 요구 점수
- * @param {number} tierCount 전체 티어 수
  * @param {ClaimContext} context 요청 맥락
- * @return {object} rank 슬롯 전체 값
  */
-function claimRankTier(current, tier, required, tierCount, context) {
-    const rank = current.rank;
-    const points = Number(rank?.points ?? 0);
-    if (!Number.isSafeInteger(points) || points < 0) {
-        // NaN 은 어떤 비교도 통과시키지 않으므로 자격 검사보다 먼저 끊는다. 0 으로 되쓰면 랭크 진행도가 날아간다.
-        logger.error("rank points are unreadable", { ...context, points: rank?.points ?? null });
-        reject("NotEligible", "Rank points are unreadable.", { ...context, points: rank?.points ?? null });
-    }
-    const claimed = readClaimedTiers(rank, tierCount);
-    if (claimed.includes(tier)) {
+function claimRankTier(state, tier, context) {
+    if (state.claimed[String(tier)] === true) {
         reject("AlreadyClaimed", `Rank tier ${tier} is already claimed.`, { ...context, tier });
     }
-    if (points < required) {
-        reject("NotEligible", `Rank tier ${tier} requires ${required} points.`, { ...context, tier, points, required });
-    }
-    const claimedTiers = (0, rewardTable_1.appendClaimedTier)(claimed, tier);
-    if (claimedTiers === null) {
-        // "표를 늘렸는데 firestore.rules 를 안 늘렸다"는 운영 사고다. 넘긴 문서를 쓰면 그 계정의 이후 클라 저장이
-        // 전부 PERMISSION_DENIED 가 되고 delete 도 룰에 막혀 복구 경로가 없다 — 수령 하나를 거부하는 편이 낫다.
-        logger.error("claimedTiers would exceed the firestore.rules limit", {
-            ...context, tier, claimedCount: claimed.length, limit: rewardTable_1.MAX_CLAIMED_TIERS,
+    if (state.bestTierIndex < tier) {
+        reject("NotEligible", `Rank tier ${tier} has not been reached this season.`, {
+            ...context, tier, bestTierIndex: state.bestTierIndex,
         });
-        reject("NotEligible", `Rank claim would exceed the claimedTiers limit of ${rewardTable_1.MAX_CLAIMED_TIERS}.`, { ...context, tier, claimedCount: claimed.length, limit: rewardTable_1.MAX_CLAIMED_TIERS });
     }
-    return { points, claimedTiers };
+    state.claimed[String(tier)] = true;
 }
 /**
  * 정점 수령 — 이 도메인은 "수령 = 클리어 확정"이라 낙인이 clearedNodeIds 하나다(별도 claimed 목록이 없다).
@@ -310,19 +283,33 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
     // 스펙 읽기는 트랜잭션 밖이다 — 유저 문서와 무관하고, 재실행마다 다시 읽으면 비용만 는다.
     let tierIndex = -1;
     let tierCount = 0;
-    let requiredPoints = 0;
+    let rankGrades = [];
+    let rankSeason = null;
     let albumEntries = [];
     let albumThemes = [];
     let chapterNodes = [];
     if (ownerType === "Rank") {
-        const grades = await loadRankGrades(context);
-        tierCount = (0, payout_1.rankTierCount)(grades);
+        const [grades, seasonRows] = await Promise.all([
+            loadRankGrades(context),
+            (0, packSpecReader_1.readSpecRows)(context.env, "PassSeason"),
+        ]);
+        rankGrades = grades;
+        try {
+            rankSeason = (0, rankSeason_1.currentRankSeason)(seasonRows, Date.now());
+        }
+        catch (error) {
+            logger.error("PassSeason spec is unreadable for rank", { ...context, error });
+            reject("NotEligible", "Rank season spec is unreadable.", { ...context });
+        }
+        if (rankSeason === null) {
+            reject("NotEligible", "No rank season is active.", { ...context });
+        }
+        tierCount = (0, payout_1.rankTierCount)(rankGrades);
         tierIndex = Number(ownerId);
-        const required = (0, payout_1.requiredPointsForTier)(tierIndex, grades);
+        const required = (0, payout_1.requiredPointsForTier)(tierIndex, rankGrades);
         if (required === null) {
             reject("RewardNotFound", `Rank tier '${ownerId}' is out of range.`, { ...context, tierCount });
         }
-        requiredPoints = required;
     }
     else if (ownerType === "Album") {
         // 낙인 키 모양이 아니면 잴 범위 자체가 없다 — 표를 읽기 전에 끊는다.
@@ -340,7 +327,10 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
     const specOwnerId = ownerType === "Rank" ? String(tierIndex) : ownerId;
     const rewardRows = (0, rewardTable_1.parseRewardRows)(await (0, packSpecReader_1.readSpecRows)(env, "Reward"));
     const judgement = (0, rewardTable_1.judgeRewardClaim)(rewardRows, ownerType, specOwnerId);
-    const { gains, dropped } = judgement;
+    const { gains, items, dropped } = judgement;
+    const itemContext = items.length ? await (0, itemGrant_1.loadItemGrantContext)(env, items) : null;
+    let itemGrant = { slots: {}, cards: [], currencies: [] };
+    let granted = gains;
     if (dropped.length > 0) {
         // 저작 실수를 조용히 삼키지 않는다 — 카드 보상이 저작되면 UnknownRewardType 으로 여기 뜬다.
         logger.warn("reward rows dropped", { ...context, specOwnerId, dropped });
@@ -368,15 +358,33 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
     // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
     let replayed = true;
     let missionState;
+    let rankProgress;
     const result = await (0, saveDocument_1.mutateSave)(env, uid, "claimReward", { kind: "client", txId }, async (current, transaction, wallet) => {
         // 미션 읽기가 콜백의 첫 줄이다 — 아래 쓰기보다 반드시 앞이어야 한다(Firestore 트랜잭션 규칙).
         const missions = await (0, missionStore_1.beginMissionBump)(transaction, firebaseApp_1.db, env, uid, period);
+        const itemRankSnapshot = itemContext !== null && ownerType !== "Rank" ?
+            await transaction.get((0, rankStore_1.rankRef)(firebaseApp_1.db, env, uid)) : null;
+        let rankState;
+        let currentRankRef;
+        let payoutStateRef;
+        if (ownerType === "Rank") {
+            currentRankRef = (0, rankStore_1.rankRef)(firebaseApp_1.db, env, uid);
+            payoutStateRef = firebaseApp_1.db.doc(`envs/${env}/users/${uid}/payoutState/current`);
+            const [rankSnapshot, payoutSnapshot] = await transaction.getAll(currentRankRef, payoutStateRef);
+            const fallbackPoints = (0, rankStore_1.legacyRankPoints)(payoutSnapshot.data(), current);
+            const fallbackClaimed = (0, rankStore_1.legacyClaimedTiers)(current, tierCount);
+            rankState = (0, rankStore_1.applyRankSeason)((0, rankStore_1.readRank)(rankSnapshot, fallbackPoints, fallbackClaimed, rankGrades), rankSeason.seasonId, rankGrades);
+            rankState = (0, rankStore_1.adoptLegacyEntry)(rankState, fallbackPoints, rankGrades);
+        }
         // 지급은 자격 판정보다 먼저 계산해도 안전하다 — 거절은 아래 낙인 함수들이 던지고, 던지면 트랜잭션 전체가 없던 일이 된다.
         // 줄 것이 없으면 지갑을 아예 쓰지 않는다(claimBattleReward·claimPayout 과 같은 정책) — 보상 미저작 정점의
         // 해금 수령이 빈 지급으로 rev 만 올리면 클라가 달라진 것 없는 잔액을 채택하고 사고를 못 알아챈다.
-        const paid = gains.length === 0 ?
+        itemGrant = itemContext === null ? { slots: {}, cards: [], currencies: [] } :
+            (0, itemGrant_1.grantRewardItems)(current, items, itemContext, rewardRows, "", rankState?.points ?? Number(itemRankSnapshot?.data()?.points ?? current.rank?.points ?? 0));
+        granted = [...gains, ...itemGrant.currencies];
+        const paid = granted.length === 0 ?
             undefined :
-            (0, walletStore_1.nextWallet)(wallet, (0, wallet_1.grant)(wallet.balances, gains), "claimReward");
+            (0, walletStore_1.nextWallet)(wallet, (0, wallet_1.grant)(wallet.balances, granted), "claimReward");
         // 아래 낙인 함수들은 트랜잭션을 **읽지 않는다**(이미 받은 current 만 본다). 그래서 여기서 써도
         // "모든 읽기가 모든 쓰기보다 앞" 규칙을 깨지 않는다. 거절이 던지면 트랜잭션째 없던 일이 되므로
         // 자격 판정보다 앞선 이 위치가 진행도를 새게 하지도 않는다.
@@ -386,22 +394,25 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
         (0, missionStore_1.commitMissionBump)(transaction, missions, eventNames_1.EVENTS.rewardClaimed.missionKey, 1, firestore_1.FieldValue.serverTimestamp());
         missionState = (0, missionStore_1.missionResponse)(missions.state, period);
         if (ownerType === "Rank") {
-            const rank = claimRankTier(current, tierIndex, requiredPoints, tierCount, context);
-            return { slots: { rank }, wallet: paid };
+            claimRankTier(rankState, tierIndex, context);
+            rankProgress = (0, rankStore_1.rankProgressResponse)(rankState);
+            (0, rankStore_1.writeRank)(transaction, currentRankRef, rankState, firestore_1.FieldValue.serverTimestamp());
+            transaction.set(payoutStateRef, { currentPoints: rankState.points, updatedAt: firestore_1.FieldValue.serverTimestamp() }, { merge: true });
+            return { slots: itemGrant.slots, wallet: paid };
         }
         if (ownerType === "Album") {
             return {
-                slots: { albumReward: claimAlbumReward(current, albumEntries, albumThemes, context) },
+                slots: { ...itemGrant.slots, albumReward: claimAlbumReward(current, albumEntries, albumThemes, context) },
                 wallet: paid,
             };
         }
         if (isChapter) {
-            return { slots: { adventure: claimAdventureChapter(current, chapterNodes, context) }, wallet: paid };
+            return { slots: { ...itemGrant.slots, adventure: claimAdventureChapter(current, chapterNodes, context) }, wallet: paid };
         }
-        return { slots: { adventure: claimAdventureNode(current, chapterNodes, context) }, wallet: paid };
+        return { slots: { ...itemGrant.slots, adventure: claimAdventureNode(current, chapterNodes, context) }, wallet: paid };
     }, (adopted) => {
         replayed = false;
-        return { ...adopted, granted: gains, missions: missionState };
+        return { ...adopted, granted, cards: itemGrant.cards, missions: missionState, rankProgress };
     });
     if (replayed) {
         logger.info("receipt replay", { uid, env, source: "claimReward", txId, revision: result.revision });

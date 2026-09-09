@@ -86,6 +86,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 72510d8af51ef38479005e5413776af4
+    m_Address: RankingBoardPanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 900576455767af6468c2f5dfdb5ff54b
     m_Address: RewardClaimPopup
     m_ReadOnly: 0

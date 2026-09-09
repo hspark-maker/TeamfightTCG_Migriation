@@ -18,6 +18,9 @@ export type RewardRow = {
 /** 지급 한 줄. 배열 순서가 곧 표시 순서다(클라 RewardLine 과 같은 뜻). */
 export type RewardGain = {currency: CurrencyKey; amount: number};
 
+/** 비재화 보상. 수령 트랜잭션에서 카드로 지급하며 재화와 함께 확정한다. */
+export type RewardItem = {rewardType: "Card" | "Pack" | "PackChoice"; rewardId: string; amount: number};
+
 /** 버려진 보상 줄. 저작 실수를 조용히 삼키지 않으려고 사유를 들고 나온다. */
 export type DroppedReward = {
   id: number;
@@ -28,7 +31,7 @@ export type DroppedReward = {
 };
 
 /** 한 소유자의 보상 해석 결과. */
-export type RewardResolution = {gains: RewardGain[]; dropped: DroppedReward[]};
+export type RewardResolution = {gains: RewardGain[]; items: RewardItem[]; dropped: DroppedReward[]};
 
 function finiteInteger(value: unknown, field: string): number {
   if (typeof value !== "number" || !Number.isSafeInteger(value)) throw new Error(`invalid ${field}`);
@@ -82,6 +85,7 @@ export function parseRewardRows(rows: Record<string, unknown>[]): RewardRow[] {
  */
 export function resolveRewards(rows: RewardRow[], ownerType: string, ownerId: string): RewardResolution {
   const gains: RewardGain[] = [];
+  const items: RewardItem[] = [];
   const dropped: DroppedReward[] = [];
   const seenOrders = new Set<number>();
 
@@ -96,7 +100,7 @@ export function resolveRewards(rows: RewardRow[], ownerType: string, ownerId: st
     });
 
     // 카드 보상이 저작되면 여기서 드러나야 한다. 조용히 재화로 바꾸지 않는다.
-    if (row.rewardType !== "Currency") {
+    if (!["Currency", "Card", "Pack", "PackChoice"].includes(row.rewardType)) {
       drop("UnknownRewardType");
       continue;
     }
@@ -105,6 +109,20 @@ export function resolveRewards(rows: RewardRow[], ownerType: string, ownerId: st
       continue;
     }
     seenOrders.add(row.order);
+
+    if (row.amount <= 0) {
+      drop("NonPositiveAmount");
+      continue;
+    }
+    if (row.rewardType !== "Currency") {
+      if (!row.rewardId.trim() || (row.rewardType === "Card" &&
+        (!Number.isSafeInteger(Number(row.rewardId)) || Number(row.rewardId) <= 0))) {
+        drop("InvalidRewardId");
+        continue;
+      }
+      items.push({rewardType: row.rewardType as RewardItem["rewardType"], rewardId: row.rewardId, amount: row.amount});
+      continue;
+    }
 
     const currency = strictCurrency(row.rewardId);
     if (currency === null) {
@@ -119,7 +137,7 @@ export function resolveRewards(rows: RewardRow[], ownerType: string, ownerId: st
     gains.push({currency, amount: row.amount});
   }
 
-  return {gains, dropped};
+  return {gains, items, dropped};
 }
 
 /** 보상 수령 거절 사유. claimReward 의 ClaimReject 부분집합이다 — 클라가 그대로 대조하는 와이어 문자열이라 늘리지 않는다. */
@@ -146,8 +164,8 @@ export function isChapterOwnerId(ownerId: string): boolean {
  * specEmpty 는 "표를 통째로 못 읽음"이고, authored 는 "표는 읽혔고 그 소유자 행이 있다"이다. 둘은 다른 사건이다.
  */
 export type RewardClaimJudgement =
-  | {allow: true; authored: boolean; gains: RewardGain[]; dropped: DroppedReward[]}
-  | {allow: false; reason: RewardClaimReject; specEmpty: boolean; gains: RewardGain[]; dropped: DroppedReward[]};
+  | ({allow: true; authored: boolean} & RewardResolution)
+  | ({allow: false; reason: RewardClaimReject; specEmpty: boolean} & RewardResolution);
 
 /**
  * 수령을 허용할지 판정한다. **표가 비었으면 소유자 축과 무관하게 거절**한다 —
@@ -163,17 +181,17 @@ export type RewardClaimJudgement =
  * @return {RewardClaimJudgement} 허용 여부와 지급 목록
  */
 export function judgeRewardClaim(rows: RewardRow[], ownerType: string, ownerId: string): RewardClaimJudgement {
-  const {gains, dropped} = resolveRewards(rows, ownerType, ownerId);
+  const {gains, items, dropped} = resolveRewards(rows, ownerType, ownerId);
 
   if (rows.length === 0) {
-    return {allow: false, reason: "NotEligible", specEmpty: true, gains: [], dropped};
+    return {allow: false, reason: "NotEligible", specEmpty: true, gains: [], items, dropped};
   }
 
   const carriesProgress = ownerType === "Adventure" && !isChapterOwnerId(ownerId);
-  if (gains.length === 0 && !carriesProgress) {
-    return {allow: false, reason: "RewardNotFound", specEmpty: false, gains, dropped};
+  if (gains.length === 0 && items.length === 0 && !carriesProgress) {
+    return {allow: false, reason: "RewardNotFound", specEmpty: false, gains, items, dropped};
   }
-  return {allow: true, authored: gains.length > 0, gains, dropped};
+  return {allow: true, authored: gains.length + items.length > 0, gains, items, dropped};
 }
 
 /**

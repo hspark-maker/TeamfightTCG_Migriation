@@ -88,7 +88,7 @@ public class PassLevelRowView : MonoBehaviour
     static string BuildRewardText(PassLevelDefinition _definition)
     {
         List<ClaimRewardGain> t_gains = _definition?.Reward;
-        if (t_gains == null || t_gains.Count == 0) return "-";
+        if (t_gains == null) t_gains = new List<ClaimRewardGain>();
 
         s_text.Clear();
         for (int t_i = 0; t_i < t_gains.Count; t_i++)
@@ -98,6 +98,7 @@ public class PassLevelRowView : MonoBehaviour
             if (s_text.Length > 0) s_text.Append(", ");
             s_text.Append(t_gain.Currency).Append(' ').Append(t_gain.Amount);
         }
+        RewardItemDisplay.Append(s_text, _definition?.Items);
         return s_text.Length == 0 ? "-" : s_text.ToString();
     }
 }

@@ -74,6 +74,14 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
     public static bool TryGet(out RewardClaimPopup _popup)
         => TryGetExisting(out _popup);
 
+    public static async UniTask ClaimWithoutPopup(Func<UniTask<RewardClaimOutcome>> _claim)
+    {
+        if (_claim == null) return;
+        var t_outcome = await _claim();
+        if (t_outcome.Succeeded && t_outcome.Cards != null && t_outcome.Cards.Count > 0 &&
+            CardSetRewardOverlay.TryGet(out var t_cards)) t_cards.ShowGranted(t_outcome.Cards);
+    }
+
     /// <summary>
     /// 보상을 띄운다. _onConfirm은 던지고 기다리지 않는다 — 수령을 누르면 서버 왕복이 뒤에서 도는 동안
     /// 화면은 곧장 획득 연출로 넘어간다(그래서 반환값도 보지 않는다).
@@ -167,7 +175,9 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
         this.RestoreReveal();
     }
 
-    void ClaimClicked()
+    void ClaimClicked() => ClaimClickedAsync().Forget();
+
+    async UniTaskVoid ClaimClickedAsync()
     {
         // 콜백을 먼저 비워 연타로 두 번 지급되는 경로를 막는다(매니저 가드와 이중 방어).
         var t_callback = this.m_onConfirm;
@@ -175,22 +185,25 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
 
         this.SetInputEnabled(false);
 
-        // 왕복을 기다리지 않는다 — 지급·영속은 뒤에서 마저 끝나고, 화면은 이 프레임에 획득으로 넘어간다.
-        var t_claim = t_callback != null ? t_callback.Invoke() : UniTask.FromResult(default(RewardClaimOutcome));
-
-        // 다만 로컬 가드에 걸린 거절(상태가 어긋남·이미 날아간 같은 보상)은 왕복 없이 이 자리에서 판정된다 —
-        // 그때는 줄 것이 없으니 소리도 연출도 없다. 서버까지 간 거절은 알 길이 없어 그대로 연출이 돈다.
-        if (t_claim.Status.IsCompleted())
+        RewardClaimOutcome t_outcome;
+        ServerWaitOverlay.Hold(this);
+        try
         {
-            if (!t_claim.GetAwaiter().GetResult().Succeeded)
-            {
-                this.Hide();
-                return;
-            }
+            t_outcome = t_callback != null ? await t_callback.Invoke() : default;
         }
-        else
+        catch (Exception t_error)
         {
-            t_claim.Forget();
+            Debug.LogException(t_error);
+            this.Hide();
+            return;
+        }
+        finally { ServerWaitOverlay.Release(this); }
+        if (!t_outcome.Succeeded) { this.Hide(); return; }
+        if (t_outcome.Cards != null && t_outcome.Cards.Count > 0)
+        {
+            this.Hide();
+            if (CardSetRewardOverlay.TryGet(out var t_cards)) t_cards.ShowGranted(t_outcome.Cards);
+            return;
         }
 
         SoundManager.Instance?.PlayCue(EOutgameSound.RewardClaim);
@@ -322,7 +335,7 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
         for (int t_i = 0; t_i < this.m_gainSlotsAfterClose.Count && t_i < _rewards.Count; t_i++)
         {
             var t_slot = this.m_gainSlotsAfterClose[t_i];
-            if (t_slot != null) this.RecordOrigin(_rewards[t_i].Gain.Type, t_slot.Icon);
+            if (t_slot != null && _rewards[t_i].IsCurrency) this.RecordOrigin(_rewards[t_i].Gain.Type, t_slot.Icon);
         }
     }
 
@@ -340,8 +353,8 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
                 continue;
             }
 
-            this.rewardSlots[t_i].Bind(_rewards[t_i].Icon, _rewards[t_i].Gain.Amount);
-            this.RecordOrigin(_rewards[t_i].Gain.Type, this.rewardSlots[t_i].Icon);
+            this.rewardSlots[t_i].Bind(_rewards[t_i]);
+            if (_rewards[t_i].IsCurrency) this.RecordOrigin(_rewards[t_i].Gain.Type, this.rewardSlots[t_i].Icon);
         }
 
         // 저작 문제라 표시할 때마다 찍으면 소음이다 — 세션에 한 번이면 족하다.

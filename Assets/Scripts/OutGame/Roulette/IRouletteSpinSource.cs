@@ -1,4 +1,5 @@
 using System.Threading;
+using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 
 // 룰렛 회전 1회의 결과 코드.
@@ -33,6 +34,10 @@ public readonly struct RouletteSpinOutcome
     // 상품을 결과가 직접 운반한다 — 화면이 RouletteConfig를 되읽으면 서버 표와 클라 저작이 어긋나는 순간 거짓말을 그린다.
     public readonly ECurrencyType Currency;
     public readonly long Amount;
+    public readonly string PackId;
+    public readonly IReadOnlyList<DrawnCard> Cards;
+    public readonly IReadOnlyList<CurrencyGain> Granted;
+    public bool IsPack => !string.IsNullOrEmpty(PackId);
 
     public bool Success => Result == ERouletteSpinResult.Success;
 
@@ -42,12 +47,20 @@ public readonly struct RouletteSpinOutcome
     public static RouletteSpinOutcome CreateFailure(ERouletteSpinResult _result)
         => new RouletteSpinOutcome(_result, INVALID_SLOT, ECurrencyType.Gold, 0L);
 
-    RouletteSpinOutcome(ERouletteSpinResult _result, int _slotIndex, ECurrencyType _currency, long _amount)
+    public static RouletteSpinOutcome CreatePack(int _slotIndex, string _packId, long _amount,
+        IReadOnlyList<DrawnCard> _cards, IReadOnlyList<CurrencyGain> _granted)
+        => new RouletteSpinOutcome(ERouletteSpinResult.Success, _slotIndex, default, _amount, _packId, _cards, _granted);
+
+    RouletteSpinOutcome(ERouletteSpinResult _result, int _slotIndex, ECurrencyType _currency, long _amount,
+        string _packId = null, IReadOnlyList<DrawnCard> _cards = null, IReadOnlyList<CurrencyGain> _granted = null)
     {
         Result = _result;
         SlotIndex = _slotIndex;
         Currency = _currency;
         Amount = _amount;
+        PackId = _packId;
+        Cards = _cards;
+        Granted = _granted;
     }
 }
 

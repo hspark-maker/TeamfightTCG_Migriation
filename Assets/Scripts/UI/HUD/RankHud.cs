@@ -10,6 +10,8 @@ using UnityEngine.UI;
 // 포인트 수치는 화면에 두지 않는다 — 증감은 배지 반응으로만 알린다(조립은 LobbyRankEffectDirector).
 public class RankHud : MonoBehaviour
 {
+    public void OpenRanking() => UIPoolManager.Instance?.AddOrUpdateUI<RankingBoardPanel>();
+
     [SerializeField] Image badgeImage;   // 티어 배지
     [SerializeField] TMP_Text descText;  // 티어 표시명("브론즈 1")
 

@@ -137,13 +137,13 @@ const row = (id, ownerType, ownerId, order, rewardId, amount, rewardType = "Curr
     [{currency: "Gold", amount: 200}, {currency: "Gold", amount: 5}],
     "실측 Adventure/node_01 = Gold 200");
   assert.deepEqual(resolved.dropped.map((d) => [d.id, d.reason]), [
-    [2, "UnknownRewardType"],
     [3, "UnknownCurrency"],
     [4, "NonPositiveAmount"],
     [5, "NonPositiveAmount"],
     [6, "UnknownCurrency"],
     [7, "UnknownCurrency"],
-  ], "카드 보상이 저작되면 UnknownRewardType 으로 드러나야 한다");
+  ], "알 수 없는 재화와 잘못된 수량은 버린다");
+  assert.deepEqual(resolved.items, [{rewardType: "Card", rewardId: "12", amount: 1}]);
 }
 {
   // rewardType 은 대소문자를 가린다 — 클라가 Enum.TryParse(ignoreCase:false) 로 읽는다.

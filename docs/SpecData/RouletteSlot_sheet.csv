@@ -1,11 +1,11 @@
-﻿행 고유 번호(부여 후 변경 금지),Roulette.rouletteId 참조,판 위의 자리(0=12시 · 시계방향으로 1~7). 판 그림이 8쐐기라 한 판에 0~7이 정확히 한 번씩 있어야 한다,보상 종류. 지금은 Currency만 쓴다(다른 값은 서버가 그 행을 버린다),주는 재화(Gold/Diamond/Energy/Shard). 룰렛 티켓은 넣을 수 없다 — 회전이 스스로를 재생산한다,주는 수량. 1 이상이어야 한다(0 이하면 서버가 그 행을 버린다),추첨 가중치. 확률은 (이 칸 가중치 / 판 전체 가중치 합)이다. 0 이하는 1로 본다 — 칸을 막는 수단이 아니다,참고용 메모(데이터 아님)
+﻿행 고유 번호(부여 후 변경 금지),Roulette.rouletteId 참조,판 위의 자리(0=12시 · 시계방향으로 1~7). 판 그림이 8쐐기라 한 판에 0~7이 정확히 한 번씩 있어야 한다,보상 종류 Currency/Pack. Pack은 지급 구현 대기이며 현재 서버는 해당 행을 버린다,주는 재화(Gold/Diamond/Energy/Shard) 또는 CardPack.packId. 룰렛 티켓은 상품으로 넣을 수 없다,주는 수량. 1 이상이어야 한다(0 이하면 서버가 그 행을 버린다),추첨 가중치. 확률은 (이 칸 가중치 / 판 전체 가중치 합)이다. 0 이하는 1로 본다 — 칸을 막는 수단이 아니다,참고용 메모(데이터 아님)
 id,rouletteId,slotIndex,rewardType,rewardId,amount,weight,#memo
 int,string,int,string,string,long,int,string
-1,roulette_default,0,Currency,Diamond,300,1,최고 상품
-2,roulette_default,1,Currency,Gold,500,25,
-3,roulette_default,2,Currency,Energy,10,18,
-4,roulette_default,3,Currency,Gold,1500,12,
-5,roulette_default,4,Currency,Shard,20,20,
-6,roulette_default,5,Currency,Gold,800,18,
-7,roulette_default,6,Currency,Diamond,30,10,
-8,roulette_default,7,Currency,Shard,50,8,
+1,roulette_default,0,Currency,Gold,50,25,목표 확률 25%; 전체 판은 팩 지급 구현 후 적용
+2,roulette_default,1,Currency,Gold,150,20,목표 확률 20%; 전체 판은 팩 지급 구현 후 적용
+3,roulette_default,2,Currency,Shard,10,25,목표 확률 25%; 전체 판은 팩 지급 구현 후 적용
+4,roulette_default,3,Currency,Shard,30,15,목표 확률 15%; 전체 판은 팩 지급 구현 후 적용
+5,roulette_default,4,Currency,Diamond,5,8,목표 확률 8%; 전체 판은 팩 지급 구현 후 적용
+6,roulette_default,5,Currency,Energy,20,4,목표 확률 4%; 전체 판은 팩 지급 구현 후 적용
+7,roulette_default,6,Pack,NormalPack_TEST,1,2,목표 확률 2%; 팩 지급 및 미개봉 팩 권리 단일 소비 구현 대기; 현재 서버 미지원
+8,roulette_default,7,Pack,SpecialPack,1,1,목표 확률 1%; 팩 지급 및 미개봉 팩 권리 단일 소비 구현 대기; 현재 서버 미지원

@@ -19,6 +19,7 @@ public class CurrencyRewardSlotView
     public void Bind(Sprite _icon, long _amount)
     {
         if (root != null) root.SetActive(true);
+        if (icon != null) icon.enabled = true;
         if (icon != null && _icon != null) icon.sprite = _icon;   // null이면 목업 스프라이트 보존
         if (amountLabel != null) amountLabel.text = _amount.ToString("N0");
     }
@@ -26,5 +27,13 @@ public class CurrencyRewardSlotView
     public void Hide()
     {
         if (root != null) root.SetActive(false);
+    }
+
+    public void Bind(RewardLine _line)
+    {
+        Bind(_line.Icon, _line.Amount);
+        if (icon != null) icon.enabled = _line.Icon != null;
+        if (!_line.IsCurrency && _line.Icon == null && amountLabel != null)
+            amountLabel.text = RewardItemDisplay.NameOf(_line.Type.ToString(), _line.RewardId) + " ×" + _line.Amount;
     }
 }

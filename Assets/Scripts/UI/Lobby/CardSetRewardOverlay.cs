@@ -42,6 +42,7 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
     // 받기 콜백. 한 번 쓰면 비워 연타를 막는다. 지급이 실패하든 말든 화면은 닫힌다 —
     // 받아야 넘어가는 자리라 여기서 가두면 탈출로가 없다.
     Action m_onClaim;
+    bool m_continueGrantedPage;
 
     CanvasGroup m_claimGroup;
 
@@ -61,6 +62,7 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
     /// 그때 지급하고, 이어지는 획득 연출도 그쪽이 튼다(화면은 그 연출에 자리를 넘기고 걷힌다).</summary>
     public void Show(string _title, IReadOnlyList<int> _cards, Action _onClaim)
     {
+        this.m_continueGrantedPage = false;
         this.m_onClaim = _onClaim;
         this.KillIntro();
 
@@ -105,6 +107,28 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
         if (t_wasOpen) RaiseClosed();
     }
 
+    public void ShowGranted(IReadOnlyList<DrawnCard> _cards)
+    {
+        if (_cards == null || _cards.Count == 0) return;
+        ShowGrantedPage(_cards, 0);
+    }
+
+    void ShowGrantedPage(IReadOnlyList<DrawnCard> _cards, int _offset)
+    {
+        // 기존 팩 결과 격자는 3열×2행이다. 여러 팩 보상은 여섯 장씩 보여 화면 밖으로 밀리지 않게 한다.
+        const int PAGE_SIZE = 6;
+        int t_next = Mathf.Min(_offset + PAGE_SIZE, _cards.Count);
+        int t_pages = (_cards.Count + PAGE_SIZE - 1) / PAGE_SIZE;
+        string t_title = t_pages > 1 ? $"획득한 카드 ({_offset / PAGE_SIZE + 1}/{t_pages})" : "획득한 카드";
+        Show(t_title, System.Array.Empty<int>(), () => {
+            if (t_next < _cards.Count) ShowGrantedPage(_cards, t_next);
+        });
+        this.m_continueGrantedPage = t_next < _cards.Count;
+        this.m_drawn.Clear();
+        for (int i = _offset; i < t_next; i++) this.m_drawn.Add(_cards[i]);
+        if (this.grid != null) this.grid.Show(this.m_drawn);
+    }
+
     // 잠금은 등장 안무가 푼다. Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서는 그 안무가 없어
     // [받기]가 잠긴 모달로 남으므로, 켜질 때 일단 열어 둔다(Show는 이 뒤에 다시 잠근다).
     void OnEnable()
@@ -132,6 +156,14 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
 
         this.SetInputEnabled(false);
         this.KillIntro();
+
+        // 중간 페이지는 완료가 아니다. 튜토리얼/로비의 닫힘 통지는 마지막 장에서만 보낸다.
+        if (this.m_continueGrantedPage)
+        {
+            this.m_continueGrantedPage = false;
+            t_callback.Invoke();
+            return;
+        }
 
         // 화면을 먼저 걷고 지급한다. 순서가 뒤집히면 지급이 트는 획득 연출의 종료 신호를 기다리는 쪽이
         // "보상 화면이 떠 있는 동안 온 신호"로 오인해 흘려보낸다(OutgameTutorialBridge.OnCardGainFinished).

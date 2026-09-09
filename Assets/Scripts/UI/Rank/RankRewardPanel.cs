@@ -152,7 +152,7 @@ public class RankRewardPanel : PooledUIBase
         if (!RewardClaimPopup.TryGet(out var t_popup))
         {
             // 팝업이 없으면 연출도 없다 — 지급 결과를 볼 곳이 없으니 결과를 기다릴 이유도 없다.
-            this.ClaimAsync(_tierIndex).Forget();
+            RewardClaimPopup.ClaimWithoutPopup(() => this.ClaimAsync(_tierIndex)).Forget();
             return;
         }
 

@@ -17,7 +17,7 @@ public static class AlbumRewardClaimFlow
         if (!RewardClaimPopup.TryGet(out var t_popup))
         {
             // 표시 잔액에 낙관분이 먼저 서므로 왕복을 붙들 이유가 없다 — 붙들면 화면이 그 시간만큼 무반응이다.
-            if (_onConfirm != null) _onConfirm.Invoke().Forget();
+            RewardClaimPopup.ClaimWithoutPopup(_onConfirm).Forget();
             return UniTask.CompletedTask;
         }
 
@@ -38,7 +38,7 @@ public static class AlbumRewardClaimFlow
             // 0짜리는 칸만 잡는다 — 표시에서 뺀다(실제 지급 목록은 서버가 정한다).
             if (_rewards[t_i].amount <= 0) continue;
 
-            t_lines.Add(new RewardLine(new CurrencyGain(_rewards[t_i].currency, _rewards[t_i].amount)));
+            t_lines.Add(new RewardLine(_rewards[t_i]));
         }
 
         return t_lines;

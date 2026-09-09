@@ -43,6 +43,8 @@ const aiDeckDraw_1 = require("../matchmaking/aiDeckDraw");
 const matchPairing_1 = require("../matchPairing");
 const countedTransaction_1 = require("../observability/countedTransaction");
 const payout_1 = require("../payout");
+const rankSeason_1 = require("../rank/rankSeason");
+const rankStore_1 = require("../rank/rankStore");
 const payloadGuards_1 = require("../match/payloadGuards");
 const receiptId_1 = require("../save/receiptId");
 const saveDocument_1 = require("../save/saveDocument");
@@ -77,7 +79,7 @@ function parseData(raw) {
         // 정상 클라는 ServerSaveCommands가 같은 재시도에 같은 유효 txId를 싣는다. fallback UUID는
         // txId가 없는 수동 호출용일 뿐이며 clientReceiptId는 유효한 원본을 그대로 반환한다.
         txId: (0, receiptId_1.clientReceiptId)(data?.txId, (0, node_crypto_1.randomUUID)()),
-        resultProtocol: data?.resultProtocol === 1 ? 1 : 0,
+        resultProtocol: 1,
     };
 }
 function shuffle(cards) {
@@ -121,7 +123,7 @@ function storedResponse(raw, data) {
         cardLevel: aiDeck.cardLevel,
         playerBoardOrder,
         enemyBoardOrder,
-        resultProtocol: raw.resultProtocol === 1 ? 1 : 0,
+        resultProtocol: 1,
     };
 }
 /**
@@ -131,19 +133,21 @@ function storedResponse(raw, data) {
 exports.findAiMatch = (0, https_1.onCall)(async (request) => {
     const uid = (0, saveDocument_1.requireUid)(request.auth);
     const data = parseData(request.data);
-    const [snapshot, rankRows, deckRows] = await Promise.all([
-        (0, saveDocument_1.saveDocument)(data.env, uid).get(),
+    const [rankRows, deckRows, seasonRows] = await Promise.all([
         (0, specBlobReader_1.readSpecRows)(data.env, "RankGrade"),
         (0, specBlobReader_1.readSpecRows)(data.env, "AIDeck"),
+        (0, specBlobReader_1.readSpecRows)(data.env, "PassSeason"),
     ]);
-    if (!snapshot.exists)
-        throw new https_1.HttpsError("failed-precondition", "Save document is missing.");
-    const rank = snapshot.data()?.rank;
-    const rawPoints = rank?.points;
-    const points = Number.isSafeInteger(rawPoints) ? rawPoints : 0;
     const grades = (0, payout_1.parseRankGradeRows)(rankRows);
     if (grades.length === 0)
         throw new https_1.HttpsError("failed-precondition", "RankGrade spec is empty.");
+    const season = (0, rankSeason_1.currentRankSeason)(seasonRows, Date.now());
+    if (season === null)
+        throw new https_1.HttpsError("failed-precondition", "No rank season is active.");
+    const rankState = await (0, rankStore_1.ensureRankState)(firebaseApp_1.db, data.env, uid, season.seasonId, grades);
+    if (rankState === null)
+        throw new https_1.HttpsError("failed-precondition", "Save document is missing.");
+    const points = rankState.points;
     try {
         const parsed = (0, aiDeckDraw_1.parseAiDeckRows)(deckRows);
         if (parsed.skipped.length > 0) {
@@ -177,6 +181,9 @@ exports.findAiMatch = (0, https_1.onCall)(async (request) => {
                 const stored = storedResponse(prior.data() ?? {}, authoredData);
                 if (stored == null)
                     throw new https_1.HttpsError("already-exists", "AI match receipt was reused");
+                if (prior.data()?.resultProtocol !== 1) {
+                    tx.set(matchRef, { resultProtocol: 1 }, { merge: true });
+                }
                 return stored;
             }
             tx.set(matchRef, {

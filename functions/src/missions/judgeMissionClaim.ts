@@ -6,7 +6,7 @@
  * `lib/` 를 직접 require 하는 순수 회귀라, 판정이 여기 있어야 회귀가 붙는다.
  */
 
-import {findMission, MissionDef} from "./catalog";
+import {findMission, missionCatalog, MissionDef} from "./catalog";
 import {isClaimed, MissionState, progressOf} from "./missionStore";
 
 /**
@@ -52,6 +52,10 @@ export function judgeMissionClaim(missionId: string, state: MissionState): Missi
   }
   if (isClaimed(state, mission.id)) {
     return {allow: false, reason: "AlreadyClaimed", mission, progress};
+  }
+  if (mission.period === "guide" && missionCatalog().some((entry) => entry.enabled &&
+    entry.period === "guide" && entry.sortOrder < mission.sortOrder && !isClaimed(state, entry.id))) {
+    return {allow: false, reason: "NotEligible", mission, progress};
   }
   if (progress < mission.target) {
     return {allow: false, reason: "NotEligible", mission, progress};

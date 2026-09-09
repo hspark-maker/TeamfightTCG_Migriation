@@ -114,7 +114,7 @@ assert.equal(tx.writes[0].value.dailyKey, period.daily, "문서에는 이번 기
 assert.equal(progressOf(bump.state, findMission("daily.openPack1")), 1);
 
 // ── 3) 미완료 수령 거절 ──────────────────────────────────────────────────────
-const notYet = judgeMissionClaim("daily.openPack3", bump.state);
+const notYet = judgeMissionClaim("weekly.openPack10", bump.state);
 assert.equal(notYet.allow, false);
 assert.equal(notYet.reason, "NotEligible");
 assert.equal(notYet.progress, 1, "같은 OpenPack 이벤트를 쓰는 단계형 미션은 진행도를 공유한다");
@@ -127,11 +127,12 @@ assert.ok(disabled, "전투 축이 꺼진 채로 저작돼 있어야 한다(켜�
 assert.equal(enabledMissions().some((m) => m.id === disabled.id), false,
   "꺼진 미션은 목록에서 빠진다");
 // 진행도는 그래도 쌓인다 — bump 는 enabled 를 보지 않는다.
-commitMissionBump(fakeTx(), bump, disabled.event, disabled.target, "now");
-assert.equal(progressOf(bump.state, disabled), disabled.target,
+const disabledBump = bumpOf(applyPeriodReset(readMissions(snapshotOf(undefined)), period), period);
+commitMissionBump(fakeTx(), disabledBump, disabled.event, disabled.target, "now");
+assert.equal(progressOf(disabledBump.state, disabled), disabled.target,
   "꺼져 있어도 진행도는 쌓인다 — 안 그러면 켜는 날 전 유저가 0부터 시작한다");
 // 그런데도 수령은 거절된다. 목록에서만 빼면 구 클라가 id 를 직접 보내 받는다.
-assert.equal(judgeMissionClaim(disabled.id, bump.state).reason, "MissionDisabled");
+assert.equal(judgeMissionClaim(disabled.id, disabledBump.state).reason, "MissionDisabled");
 
 // ── 2) 진행도 상한: 초과 누적이 중복 수령으로 이어지지 않는다 ────────────────
 const target = findMission("daily.openPack1");
@@ -193,7 +194,7 @@ const readSheet = (name) => {
 };
 
 const sheetMissions = readSheet("Mission");
-const sheetRewards = readSheet("Reward").filter((row) => row.ownerType === "Mission");
+const sheetRewards = readSheet("Reward").filter((row) => ["Mission", "Guide"].includes(row.ownerType));
 
 assert.equal(sheetMissions.length, missionCatalog().length,
   "Mission 시트 행 수와 런타임 카탈로그 수가 같아야 한다");
@@ -215,6 +216,7 @@ for (const row of sheetMissions) {
 // 짝 검사: 보상 행이 없으면 켜는 순간 RewardNotFound 로 막힌다. 꺼진 미션도 미리 저작해야 한다.
 const rewardOwners = new Set(sheetRewards.map((row) => row.ownerId));
 for (const row of sheetMissions) {
+  if (row.enabled !== "1") continue;
   assert.ok(rewardOwners.has(row.missionId),
     `Reward 시트에 ownerType=Mission / ownerId=${row.missionId} 행이 없다`);
 }
@@ -224,8 +226,8 @@ for (const owner of rewardOwners) {
 }
 
 // sortOrder 는 같은 주기 안에서 유일해야 한다 — 겹치면 화면 순서가 비결정적이다.
-for (const kind of ["daily", "weekly"]) {
-  const orders = sheetMissions.filter((row) => row.period === kind).map((row) => row.sortOrder);
+for (const kind of ["daily", "weekly", "guide"]) {
+  const orders = sheetMissions.filter((row) => row.enabled === "1" && row.period === kind).map((row) => row.sortOrder);
   assert.equal(new Set(orders).size, orders.length, `${kind} sortOrder 가 중복된다`);
 }
 

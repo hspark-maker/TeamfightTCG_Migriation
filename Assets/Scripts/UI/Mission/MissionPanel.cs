@@ -37,6 +37,12 @@ public class MissionPanel : PooledUIBase
     [Tooltip("주간 미션 행이 쌓일 Content(VerticalLayoutGroup).")]
     [SerializeField] Transform weeklyContent;
 
+    [Tooltip("탭 전환 때 켜고 끌 스크롤 래퍼(ScrollRect+RectMask2D). 비면 Content 자체를 토글한다 —\n" +
+             "래퍼가 있는데 Content 를 토글하면 겹친 빈 ScrollRect 가 반대 탭의 드래그를 삼킨다.")]
+    [SerializeField] GameObject dailyListRoot;
+
+    [SerializeField] GameObject weeklyListRoot;
+
     [Tooltip("행 프리팹. Content 안의 목업 행을 물려도 된다 — 원본은 지우지 않고 숨긴다.")]
     [SerializeField] MissionRowView rowPrefab;
 
@@ -51,8 +57,25 @@ public class MissionPanel : PooledUIBase
 
     [SerializeField] TMP_Text weeklyResetText;
 
+    [Tooltip("탭형 저작의 단일 리셋 라벨 — 지금 보이는 탭의 주기를 그린다. 위 두 라벨과 택일이다.")]
+    [SerializeField] TMP_Text resetText;
+
+    [Header("탭")]
+    [Tooltip("일일·주간 탭. 둘 다 배선하면 탭 모드 — 목록이 하나씩만 보이고 버튼이 갈아끼운다.\n" +
+             "하나라도 비면 구판처럼 두 목록을 같이 그린다.")]
+    [SerializeField] Button dailyTabButton;
+
+    [SerializeField] Button weeklyTabButton;
+
+    [Tooltip("선택 안 된 탭 그림에 씌울 틴트. 선택 탭은 저작 색(백색 곱)으로 돌아간다.")]
+    [SerializeField] Color tabDimColor = new Color(0.6f, 0.6f, 0.6f, 1f);
+
     [Header("버튼")]
     [SerializeField] Button closeButton;
+
+    [Tooltip("모두 받기. 받을 수 있는 미션이 있을 때만 눌린다. 서버에 일괄 창구가 없어 미션별 왕복을 순차로 돈다 —\n" +
+             "도는 동안은 ServerWaitOverlay 가 입력을 막는다.")]
+    [SerializeField] Button claimAllButton;
 
     [Tooltip("패널 밖(딤)을 눌러 닫는 판. 알파 0 Image 의 Button 에 배선한다.")]
     [SerializeField] Button dimButton;
@@ -71,19 +94,23 @@ public class MissionPanel : PooledUIBase
     // 다시 깐다 — 개수만 보면 활성 미션이 교체됐을 때 옛 제목이 남는다.
     string m_builtSignature;
 
+    // 탭 모드에서 지금 주간 탭인가. 열 때마다 일일로 돌아간다 — 미션의 주 무대가 일일이다.
+    bool m_weeklyTab;
+
     const string PERIOD_DAILY = "daily";
     const string PERIOD_WEEKLY = "weekly";
 
     // 씬 버튼 UnityEvent 가 인자 없는 이 시그니처에 바인딩된다 — 매개변수를 붙이면 배선이 끊긴다.
     public void Open()
     {
+        this.m_weeklyTab = false;
         this.SetVisible(true);
         this.Rebuild();
 
         // 정상 경로의 조회는 초기화(MissionPreloadStep)가 이미 했다 — 열 때마다 왕복하지 않는다.
         // 여기 조회는 그 왕복이 실패해 캐시가 빈 경우의 안전망뿐이다. 던져만 두므로 화면은 기다리지 않고,
         // 응답이 오면 OnChanged 가 다시 그린다.
-        if (!MissionManager.IsReady) MissionCommands.RefreshAsync().Forget();
+        MissionCommands.RefreshAsync().Forget();
     }
 
     public void Close() => this.SetVisible(false);
@@ -100,6 +127,20 @@ public class MissionPanel : PooledUIBase
         {
             this.dimButton.onClick.RemoveAllListeners();
             this.dimButton.onClick.AddListener(this.Close);
+        }
+        if (this.claimAllButton != null)
+        {
+            this.claimAllButton.onClick.RemoveAllListeners();
+            this.claimAllButton.onClick.AddListener(this.HandleClaimAll);
+        }
+        // 탭 모드는 둘 다 배선됐을 때만 선다 — 한쪽만 배선된 오저작에서 리스너만 붙으면
+        // ApplyTab 은 비켜서는데 m_weeklyTab 만 갈려 resetText 가 다른 주기를 그린다.
+        if (this.dailyTabButton != null && this.weeklyTabButton != null)
+        {
+            this.dailyTabButton.onClick.RemoveAllListeners();
+            this.dailyTabButton.onClick.AddListener(this.SelectDailyTab);
+            this.weeklyTabButton.onClick.RemoveAllListeners();
+            this.weeklyTabButton.onClick.AddListener(this.SelectWeeklyTab);
         }
 
         MissionManager.OnChanged += this.HandleMissionsChanged;
@@ -133,7 +174,41 @@ public class MissionPanel : PooledUIBase
         BuildSection(this.dailyContent, this.m_dailyRows, PERIOD_DAILY, this.dailyEmptyNotice);
         BuildSection(this.weeklyContent, this.m_weeklyRows, PERIOD_WEEKLY, this.weeklyEmptyNotice);
         this.m_builtSignature = BuildSignature();
+        this.ApplyTab();
+        this.RefreshClaimAllButton();
         this.RefreshResetLabels();
+    }
+
+    void SelectDailyTab() => this.SelectTab(false);
+
+    void SelectWeeklyTab() => this.SelectTab(true);
+
+    void SelectTab(bool _weekly)
+    {
+        if (this.m_weeklyTab == _weekly) return;
+
+        this.m_weeklyTab = _weekly;
+        this.ApplyTab();
+        this.RefreshResetLabels();
+    }
+
+    /// <summary>탭 모드면 목록을 하나만 남긴다. 빈 안내는 BuildSection 이 개수로 켠 것을
+    /// 탭 가시성으로 한 번 더 거른다 — 안내가 목록 밖 형제라 탭 전환이 스스로 끄지 못한다.</summary>
+    void ApplyTab()
+    {
+        if (this.dailyTabButton == null || this.weeklyTabButton == null) return;
+
+        GameObject t_daily = this.dailyListRoot != null ? this.dailyListRoot : this.dailyContent != null ? this.dailyContent.gameObject : null;
+        GameObject t_weekly = this.weeklyListRoot != null ? this.weeklyListRoot : this.weeklyContent != null ? this.weeklyContent.gameObject : null;
+        if (t_daily != null) t_daily.SetActive(!this.m_weeklyTab);
+        if (t_weekly != null) t_weekly.SetActive(this.m_weeklyTab);
+
+        if (this.dailyEmptyNotice != null) this.dailyEmptyNotice.SetActive(!this.m_weeklyTab && this.m_dailyRows.Count == 0);
+        if (this.weeklyEmptyNotice != null) this.weeklyEmptyNotice.SetActive(this.m_weeklyTab && this.m_weeklyRows.Count == 0);
+
+        // 선택 표시는 그림 틴트 하나다. Button 의 ColorTint 전이는 canvasRenderer 색을 곱하므로 여기와 충돌하지 않는다.
+        if (this.dailyTabButton.targetGraphic != null) this.dailyTabButton.targetGraphic.color = this.m_weeklyTab ? this.tabDimColor : Color.white;
+        if (this.weeklyTabButton.targetGraphic != null) this.weeklyTabButton.targetGraphic.color = this.m_weeklyTab ? Color.white : this.tabDimColor;
     }
 
     void BuildSection(Transform _content, List<MissionRowView> _rows, string _period, GameObject _emptyNotice)
@@ -155,7 +230,9 @@ public class MissionPanel : PooledUIBase
         for (int i = 0; i < t_definitions.Count; i++)
         {
             MissionDefinition t_definition = t_definitions[i];
-            if (!string.Equals(t_definition.Period, _period, StringComparison.Ordinal)) continue;
+            bool t_guide = _period == PERIOD_DAILY && t_definition.Period == "guide";
+            if (t_guide && (MissionManager.IsClaimed(t_definition.Id) || !MissionManager.IsGuideUnlocked(t_definition))) continue;
+            if (!t_guide && !string.Equals(t_definition.Period, _period, StringComparison.Ordinal)) continue;
 
             MissionRowView t_row = Instantiate(this.rowPrefab, _content);
             t_row.gameObject.SetActive(true);   // 위에서 원본을 숨겼을 수 있다 — 사본은 항상 보이게.
@@ -172,6 +249,56 @@ public class MissionPanel : PooledUIBase
             if (this.m_dailyRows[i] != null) this.m_dailyRows[i].Refresh();
         for (int i = 0; i < this.m_weeklyRows.Count; i++)
             if (this.m_weeklyRows[i] != null) this.m_weeklyRows[i].Refresh();
+        this.RefreshClaimAllButton();
+    }
+
+    /// <summary>받을 수 있는 미션이 하나라도 있을 때만 모두 받기를 살린다.
+    /// 판정은 행과 같은 MissionManager.CanClaim 하나다 — 버튼과 목록이 다른 눈으로 보면 갈린다.</summary>
+    void RefreshClaimAllButton()
+    {
+        if (this.claimAllButton == null) return;
+
+        this.claimAllButton.interactable = AnyClaimable();
+    }
+
+    static bool AnyClaimable()
+    {
+        IReadOnlyList<MissionDefinition> t_definitions = MissionManager.Definitions;
+        for (int i = 0; i < t_definitions.Count; i++)
+            if (MissionManager.CanClaim(t_definitions[i])) return true;
+        return false;
+    }
+
+    void HandleClaimAll() => this.ClaimAllAsync().Forget();
+
+    async UniTaskVoid ClaimAllAsync()
+    {
+        var t_ids = new List<string>();
+        IReadOnlyList<MissionDefinition> t_definitions = MissionManager.Definitions;
+        for (int i = 0; i < t_definitions.Count; i++)
+            if (MissionManager.CanClaim(t_definitions[i])) t_ids.Add(t_definitions[i].Id);
+        if (t_ids.Count == 0) return;
+
+        // 서버에 일괄 수령 창구가 없어 미션별 왕복을 순차로 돈다. 카드 팝업은 모아서 한 번만 —
+        // 왕복마다 띄우면 수령 n건에 팝업 n장이 겹친다.
+        var t_cards = new List<OpenPackCard>();
+        ServerWaitOverlay.Hold(this);
+        try
+        {
+            for (int i = 0; i < t_ids.Count; i++)
+            {
+                // 한 건이 거절돼도 나머지는 계속 간다 — 채택은 응답 봉투가 중앙에서 하고, 실패 줄은 화면에 남는다.
+                ClaimMissionResult t_result = await MissionCommands.ClaimAsync(t_ids[i]);
+                if (t_result?.Cards != null) t_cards.AddRange(t_result.Cards);
+            }
+        }
+        finally
+        {
+            // 팝업보다 먼저 걷는다 — ClaimAsync 와 같은 계약.
+            ServerWaitOverlay.Release(this);
+        }
+        if (t_cards.Count > 0 && CardSetRewardOverlay.TryGet(out var t_overlay))
+            t_overlay.ShowGranted(RewardItemDisplay.ToDrawn(t_cards));
     }
 
     // 정의 목록의 신원. id 와 순서가 그대로면 다시 깔 이유가 없다.
@@ -181,7 +308,7 @@ public class MissionPanel : PooledUIBase
         if (t_definitions.Count == 0) return string.Empty;
 
         var t_builder = new System.Text.StringBuilder(t_definitions.Count * 24);
-        for (int i = 0; i < t_definitions.Count; i++) t_builder.Append(t_definitions[i].Id).Append('|');
+        for (int i = 0; i < t_definitions.Count; i++) t_builder.Append(t_definitions[i].Id).Append(MissionManager.IsClaimed(t_definitions[i].Id)).Append('|');
         return t_builder.ToString();
     }
 
@@ -193,12 +320,13 @@ public class MissionPanel : PooledUIBase
     async UniTaskVoid ClaimAsync(string _missionId)
     {
         // 왕복 동안 입력을 막는다. 딤·스피너는 임계 뒤에만 뜨므로 빠른 응답에서는 깜빡이지 않는다.
+        ClaimMissionResult t_result = null;
         ServerWaitOverlay.Hold(this);
         try
         {
             // 진행도·낙인은 낙관 갱신하지 않는다 — 응답 봉투를 ServerSaveCommands 가 중앙에서 채택하고,
             // 그 채택이 OnChanged 를 태워 화면이 갱신된다. 실패하면 화면은 그대로 남는다.
-            await MissionCommands.ClaimAsync(_missionId);
+            t_result = await MissionCommands.ClaimAsync(_missionId);
         }
         finally
         {
@@ -206,6 +334,8 @@ public class MissionPanel : PooledUIBase
             // (PackPurchaseFlow 와 같은 계약 — ServerWaitOverlay 는 자기 캔버스가 없다).
             ServerWaitOverlay.Release(this);
         }
+        if (t_result?.Cards != null && t_result.Cards.Count > 0 && CardSetRewardOverlay.TryGet(out var t_cards))
+            t_cards.ShowGranted(RewardItemDisplay.ToDrawn(t_result.Cards));
     }
 
     // 리셋 시각의 진실원은 서버가 준 epoch ms 다. 남은 시간 표시에만 기기 시계를 쓴다 —
@@ -215,6 +345,7 @@ public class MissionPanel : PooledUIBase
         long t_nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         SetResetLabel(this.dailyResetText, MissionManager.DailyResetAtMs, t_nowMs);
         SetResetLabel(this.weeklyResetText, MissionManager.WeeklyResetAtMs, t_nowMs);
+        SetResetLabel(this.resetText, this.m_weeklyTab ? MissionManager.WeeklyResetAtMs : MissionManager.DailyResetAtMs, t_nowMs);
     }
 
     static void SetResetLabel(TMP_Text _label, long _resetAtMs, long _nowMs)

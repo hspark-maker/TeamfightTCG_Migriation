@@ -78,7 +78,13 @@ static class PayoutInbox
                 if (!s_applied.Contains(t_payout.MatchId))
                 {
                     // 잔액은 건드리지 않는다 — 크레딧의 진실원은 아래 ack 응답의 지갑이다.
-                    RankApplyResult t_rank = RankManager.ApplyServerPayout(t_payout.Rank.Before, t_payout.Rank.After);
+                    RankProgressResult t_progress = t_payout.RankProgress;
+                    RankApplyResult t_rank = RankManager.ApplyServerPayout(
+                        t_payout.Rank.Before,
+                        t_payout.Rank.After,
+                        t_progress?.SeasonId,
+                        t_progress?.BestTierIndex ?? -1,
+                        null);
                     DataSaveManager.SaveImmediate();
                     RankResultHandoff.Set(t_rank);
                     s_applied.Add(t_payout.MatchId);

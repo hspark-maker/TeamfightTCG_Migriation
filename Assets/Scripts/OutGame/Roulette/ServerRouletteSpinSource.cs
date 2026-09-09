@@ -55,7 +55,7 @@ public sealed class ServerRouletteSpinSource : IRouletteSpinSource
         }
         catch (ServerAdoptionException t_adoption)
         {
-            // 이 명령은 세이브를 쓰지 않아 계약상 도달하지 않는다. 세션은 이미 접혔고 팝업은 CloudSyncStatusWatcher 담당이다.
+            // 팩 보상의 슬롯 채택 실패는 CloudSyncStatusWatcher가 안내한다.
             Debug.LogWarning($"[ServerRouletteSpinSource] Adopting the response closed the session — {t_adoption.Message}");
             return RouletteSpinOutcome.CreateFailure(ERouletteSpinResult.Rejected);
         }
@@ -93,6 +93,18 @@ public sealed class ServerRouletteSpinSource : IRouletteSpinSource
     // 못 읽는 상품을 골드로 떨어뜨리면 화면이 거짓말을 한다.
     RouletteSpinOutcome ToOutcome(SpinRouletteResult _result)
     {
+        if (_result?.RewardType == "Pack")
+        {
+            var t_cards = RewardItemDisplay.ToDrawn(_result.Cards);
+            if (string.IsNullOrEmpty(_result.RewardId) || _result.Amount <= 0 || t_cards.Count == 0)
+                return RouletteSpinOutcome.CreateFailure(ERouletteSpinResult.RewardUnreadable);
+            var t_granted = new System.Collections.Generic.List<CurrencyGain>();
+            if (_result.Granted != null)
+                foreach (var t_line in _result.Granted)
+                    if (t_line != null && t_line.Amount > 0 && CurrencyCode.TryParse(t_line.Currency, out var t_currency))
+                        t_granted.Add(new CurrencyGain(t_currency, t_line.Amount));
+            return RouletteSpinOutcome.CreatePack(_result.SlotIndex, _result.RewardId, _result.Amount, t_cards, t_granted);
+        }
         ClaimRewardGain t_gain = _result?.Gain;
         if (t_gain == null || t_gain.Amount <= 0)
         {

@@ -22,7 +22,7 @@ public static class RankRewardManager
     {
         get
         {
-            int t_from = Mathf.Min(RankManager.GetInfo().TierIndex, TierCount - 1);
+            int t_from = Mathf.Min(RankManager.BestTierIndex, TierCount - 1);
             for (int t_i = t_from; t_i >= 0; t_i--)
                 if (StateOf(t_i) == ERankRewardState.Claimable) return t_i;
 
@@ -39,16 +39,6 @@ public static class RankRewardManager
         {
             if (s_config != null) return s_config;
             return RankGradeSpec.UninitializedConfig;
-        }
-    }
-
-    static RankSaveData Slot
-    {
-        get
-        {
-            var t_data = DataSaveManager.Data;
-            if (t_data.Rank == null) t_data.Rank = new RankSaveData();
-            return t_data.Rank;
         }
     }
 
@@ -114,8 +104,7 @@ public static class RankRewardManager
     // 수령 낙인만 지운다(디버그 전용, 지급된 골드는 회수하지 않는다)
     public static void ResetForDebug()
     {
-        Slot.ClaimedTiers.Clear();
-        DataSaveManager.Save();
+        RankManager.ResetRewardClaimsForDebug();
         OnChanged?.Invoke();
     }
 
@@ -125,7 +114,7 @@ public static class RankRewardManager
     static ERankRewardState StateOf(int _tierIndex)
     {
         if (_tierIndex < 0 || _tierIndex >= TierCount) return ERankRewardState.Locked;
-        if (Slot.ClaimedTiers.Contains(_tierIndex)) return ERankRewardState.Claimed;
+        if (RankManager.IsTierRewardClaimed(_tierIndex)) return ERankRewardState.Claimed;
 
         // 서버가 낙인을 돌려주기 전까지의 틈 — 이걸 안 보면 행이 왕복 내내 "받을 수 있음"으로 남는다.
         // HasAnyInFlight 선검사가 평상시 문자열 할당을 막는다(GetInfo가 행마다 TopClaimableIndex를 돈다).
@@ -133,9 +122,9 @@ public static class RankRewardManager
             && RewardClaimCommand.IsInFlight(RewardClaimCommand.OwnerRank, _tierIndex.ToString()))
             return ERankRewardState.Claimed;
 
-        if (!Config.TryGetTier(_tierIndex, out RankTier t_tier)) return ERankRewardState.Locked;
+        if (!Config.TryGetTier(_tierIndex, out _)) return ERankRewardState.Locked;
 
-        return RankManager.Points >= t_tier.RequiredPoints
+        return RankManager.BestTierIndex >= _tierIndex
             ? ERankRewardState.Claimable
             : ERankRewardState.Locked;
     }

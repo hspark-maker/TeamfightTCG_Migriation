@@ -48,7 +48,7 @@ public static class AdventureRewardFlow
         // 팝업이 씬에 없을 때도 같은 자리로 떨어진다(앨범·랭크와 같은 폴백 — 배선 전에도 루프가 닫히도록).
         if (t_lines.Count == 0 || !RewardClaimPopup.TryGet(out var t_popup))
         {
-            ClaimThenNotifyAsync(_nodeId, _onClaimed).Forget();
+            RewardClaimPopup.ClaimWithoutPopup(() => ClaimThenNotifyAsync(_nodeId, _onClaimed)).Forget();
             return true;
         }
 

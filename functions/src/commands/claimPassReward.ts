@@ -5,6 +5,8 @@ import * as logger from "firebase-functions/logger";
 import {EVENTS} from "../analytics/eventNames";
 import {CurrencyGain, grant} from "../currency/wallet";
 import {nextWallet} from "../currency/walletStore";
+import {GrantedItems, grantRewardItems, loadItemGrantContext} from "../rewards/itemGrant";
+import {rankRef} from "../rank/rankStore";
 import {db} from "../firebaseApp";
 import {recordEvent} from "../observability/analyticsEvent";
 import {readSpecRows} from "../packs/packSpecReader";
@@ -22,7 +24,7 @@ import {
   passProgressResponse,
   PassProgressResponse,
 } from "../pass/passStore";
-import {parseRewardRows, resolveRewards} from "../rewardTable";
+import {parseRewardRows, resolveRewards, RewardRow, RewardItem} from "../rewardTable";
 import {clientReceiptId, isClientReceiptId} from "../save/receiptId";
 import {isKnownEnv, mutateSave, requireUid, SaveMutation} from "../save/saveDocument";
 
@@ -40,6 +42,8 @@ export const claimPassReward = onCall(async (request) => {
   let season: PassSeasonDef;
   let authoredLevel: PassLevelDef;
   let authoredRewards: CurrencyGain[] = [];
+  let rewardRows: RewardRow[] = [];
+  let items: RewardItem[] = [];
   try {
     const [seasonRows, levelRows, rawRewardRows] = await Promise.all([
       readSpecRows(env, "PassSeason"),
@@ -57,14 +61,15 @@ export const claimPassReward = onCall(async (request) => {
     }
     authoredLevel = levelDef;
 
-    const rewards = resolveRewards(
-      parseRewardRows(rawRewardRows), "Pass", passRewardOwnerId(season.seasonId, level));
+    rewardRows = parseRewardRows(rawRewardRows);
+    const rewards = resolveRewards(rewardRows, "Pass", passRewardOwnerId(season.seasonId, level));
+    items = rewards.items;
     if (rewards.dropped.length > 0) {
       logger.warn("pass reward rows dropped", {
         uid, env, seasonId: season.seasonId, level, dropped: rewards.dropped,
       });
     }
-    if (rewards.gains.length === 0) {
+    if (rewards.gains.length === 0 && items.length === 0) {
       throw new HttpsError(
         "failed-precondition", `PASS_REWARD_NOT_FOUND owner=${season.seasonId}:${level}`);
     }
@@ -75,13 +80,16 @@ export const claimPassReward = onCall(async (request) => {
   }
 
   const txId = clientReceiptId(request.data?.txId, randomUUID());
+  const itemContext = items.length ? await loadItemGrantContext(env, items) : null;
+  let itemGrant: GrantedItems = {slots: {}, cards: [], currencies: []};
   let replayed = true;
   let progress: PassProgressResponse | undefined;
   let granted: CurrencyGain[] = [];
 
   const result = await mutateSave(env, uid, "claimPassReward", {kind: "client", txId},
-    async (_current, transaction, wallet): Promise<SaveMutation> => {
+    async (current, transaction, wallet): Promise<SaveMutation> => {
       const pass = await beginPassMutation(transaction, db, env, uid, season.seasonId);
+      const rankSnapshot = itemContext === null ? null : await transaction.get(rankRef(db, env, uid));
       if (pass.state.claimed[String(level)] === true) {
         throw new HttpsError("already-exists", `PASS_ALREADY_CLAIMED level=${level}`);
       }
@@ -92,17 +100,20 @@ export const claimPassReward = onCall(async (request) => {
         );
       }
 
-      granted = authoredRewards;
+      itemGrant = itemContext === null ? {slots: {}, cards: [], currencies: []} :
+        grantRewardItems(current, items, itemContext, rewardRows, String(request.data?.selectedPackId ?? ""),
+          Number(rankSnapshot?.data()?.points ?? (current.rank as {points?: number})?.points ?? 0));
+      granted = [...authoredRewards, ...itemGrant.currencies];
       commitPassClaim(transaction, pass, level, FieldValue.serverTimestamp());
       progress = passProgressResponse(pass.state);
       return {
-        slots: {},
-        wallet: nextWallet(wallet, grant(wallet.balances, granted), "claimPassReward"),
+        slots: itemGrant.slots,
+        wallet: granted.length ? nextWallet(wallet, grant(wallet.balances, granted), "claimPassReward") : undefined,
       };
     },
     (adopted) => {
       replayed = false;
-      return {...adopted, seasonId: season.seasonId, level, granted, progress};
+      return {...adopted, seasonId: season.seasonId, level, granted, cards: itemGrant.cards, progress};
     });
 
   if (replayed) {

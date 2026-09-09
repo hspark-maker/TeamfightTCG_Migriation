@@ -16,6 +16,8 @@ internal sealed class PayoutEntry
 
     [JsonProperty("rank")] public PayoutRankLine Rank { get; set; }
 
+    [JsonProperty("rankProgress")] public RankProgressResult RankProgress { get; set; }
+
     [JsonProperty("rankSequence")] public long RankSequence { get; set; }
 
     [JsonProperty("settledAtMs")] public long SettledAtMs { get; set; }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public enum ERewardOwnerType { Album, Adventure, Rank, Battle }
-public enum ERewardType { Currency }
+public enum ERewardType { Currency, Card, Pack, PackChoice }
 
 /// <summary>
 /// Reward 표에 있지만 **클라가 색인하지 않는** 소유 영역. 서버만 소비하는 축이다.
@@ -18,7 +18,7 @@ public enum ERewardType { Currency }
 public static class ServerOwnedRewardOwners
 {
     // Pass 도 같은 성격이다 — 지급은 claimPassReward 가 하고, 화면 값은 getPass 응답의 levels[].reward 로 온다.
-    static readonly string[] NAMES = { "Mission", "Pass" };
+    static readonly string[] NAMES = { "Mission", "Pass", "Guide", "CardDuplicate" };
 
     public static bool Contains(string _ownerType)
     {
@@ -129,7 +129,7 @@ public static class RewardSpec
                 continue;
             }
             if (!Enum.TryParse(t_row.rewardType, false, out ERewardType t_rewardType)
-                || t_rewardType != ERewardType.Currency)
+                || !Enum.IsDefined(typeof(ERewardType), t_rewardType))
             {
                 Debug.LogWarning($"[RewardSpec] Reward id {t_row.id}: skipping a row with unsupported rewardType '{t_row.rewardType}'.");
                 continue;
@@ -143,7 +143,16 @@ public static class RewardSpec
             }
             t_lastOrderKey = t_orderKey;
 
-            if (!TryConvert(t_row.rewardId, t_row.amount, $"Reward id {t_row.id}", out AlbumRewardDef t_def)) continue;
+            AlbumRewardDef t_def;
+            if (t_rewardType == ERewardType.Currency)
+            {
+                if (!TryConvert(t_row.rewardId, t_row.amount, $"Reward id {t_row.id}", out t_def)) continue;
+            }
+            else
+            {
+                if (t_row.amount <= 0 || string.IsNullOrEmpty(t_row.rewardId)) continue;
+                t_def = new AlbumRewardDef { rewardType = t_rewardType, rewardId = t_row.rewardId, amount = t_row.amount };
+            }
             string t_key = KeyOf(t_ownerType, t_row.ownerId);
             if (!s_rewards.TryGetValue(t_key, out List<AlbumRewardDef> t_list))
                 s_rewards[t_key] = t_list = new List<AlbumRewardDef>();

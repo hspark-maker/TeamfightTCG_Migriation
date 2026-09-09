@@ -20,7 +20,7 @@ import {CURRENCY_KEYS, CurrencyKey} from "../currency/currencyKeys";
 /** 판 하나의 칸 수. 클라 RouletteConfig.SLOT_COUNT 와 같아야 한다 — 판 그림이 8쐐기다. */
 export const ROULETTE_SLOT_COUNT = 8;
 
-/** 상품 종류. 지금은 재화 하나뿐이고, 다른 값이 실린 행은 버린다. */
+/** 지원하는 상품 종류. */
 export const REWARD_TYPE_CURRENCY = "Currency";
 
 /** 룰렛 티켓 키. 티켓 칸은 회전이 스스로를 재생산하므로 상품이 될 수 없다. */
@@ -53,7 +53,9 @@ export interface RouletteSlotRow {
 /** 판 위의 칸 하나. */
 export interface RouletteSlot {
   slotIndex: number;
-  currency: CurrencyKey;
+  rewardType: "Currency" | "Pack";
+  rewardId: string;
+  currency: CurrencyKey | null;
   amount: number;
   weight: number;
 }
@@ -110,20 +112,23 @@ export function resolveRouletteBoard(
   let droppedRows = 0;
 
   for (const row of slotRows) {
-    if (String(row.rewardType).trim().toLowerCase() !== REWARD_TYPE_CURRENCY.toLowerCase()) {
+    const type = String(row.rewardType).trim().toLowerCase();
+    if (type !== "currency" && type !== "pack") {
       droppedRows++;
       continue;
     }
 
     const amount = Number(row.amount);
-    if (!Number.isInteger(amount) || amount <= 0) {
+    if (!Number.isSafeInteger(amount) || amount <= 0 || (type === "pack" && amount > 100)) {
       droppedRows++;
       continue;
     }
 
-    const currency = exactCurrency(String(row.rewardId));
+    const rewardId = String(row.rewardId ?? "");
+    const currency = type === "currency" ? exactCurrency(rewardId) : null;
     // 티켓 상품 차단의 두 번째 관문이다(첫 관문은 시트 저작 안내다).
-    if (currency === null || currency === ROULETTE_TICKET_KEY) {
+    if ((type === "currency" && (currency === null || currency === ROULETTE_TICKET_KEY)) ||
+        (type === "pack" && !/^[A-Za-z0-9_-]{1,128}$/.test(rewardId))) {
       droppedRows++;
       continue;
     }
@@ -141,7 +146,8 @@ export function resolveRouletteBoard(
     }
     taken.add(slotIndex);
 
-    slots.push({slotIndex, currency, amount, weight: Number(row.weight)});
+    slots.push({slotIndex, rewardType: type === "pack" ? "Pack" : "Currency",
+      rewardId, currency, amount, weight: Number(row.weight)});
   }
 
   return {
@@ -174,4 +180,25 @@ export function drawRouletteSlot(slots: RouletteSlot[], roll: RollFn): RouletteS
     if (remaining < 0) return slot;
   }
   return slots[slots.length - 1];
+}
+
+/**
+ * 배포 전에 발행된 재화 전용 영수증만 허용한다. 새 슬롯 영수증의 검증은 우회하지 않는다.
+ * @param {unknown} value 저장된 응답
+ * @return {boolean} 검증된 옛 재화 영수증인가
+ */
+export function isLegacyRouletteReceipt(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const body = value as Record<string, unknown>;
+  const gain = body.gain as {currency?: string; amount?: number} | undefined;
+  const wallet = body.wallet as {rev?: number; balances?: Record<string, unknown>} | undefined;
+  return body.revision === undefined && body.slotKeys === undefined && body.updatedSlots === undefined &&
+    body.rewardType === undefined && body.cards === undefined &&
+    typeof body.rouletteId === "string" && body.rouletteId.length > 0 &&
+    Number.isInteger(body.slotIndex) && Number(body.slotIndex) >= 0 && Number(body.slotIndex) < ROULETTE_SLOT_COUNT &&
+    !!gain && CURRENCY_KEYS.includes(gain.currency as CurrencyKey) && gain.currency !== ROULETTE_TICKET_KEY &&
+    Number.isSafeInteger(gain.amount) && Number(gain.amount) > 0 &&
+    !!wallet && Number.isSafeInteger(wallet.rev) && Number(wallet.rev) >= 0 &&
+    !!wallet.balances && CURRENCY_KEYS.every((key) =>
+    Number.isSafeInteger(wallet.balances![key]) && Number(wallet.balances![key]) >= 0);
 }

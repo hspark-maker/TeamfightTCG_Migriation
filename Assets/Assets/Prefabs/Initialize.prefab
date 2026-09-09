@@ -24,6 +24,7 @@ GameObject:
   - component: {fileID: 1581884920793774152}
   - component: {fileID: 1581884920793774153}
   - component: {fileID: 1581884920793774160}
+  - component: {fileID: 1581884920793774161}
   m_Layer: 0
   m_Name: Initialize
   m_TagString: Untagged
@@ -78,6 +79,7 @@ MonoBehaviour:
   - {fileID: 1581884920793774152}
   - {fileID: 1581884920793774153}
   - {fileID: 1581884920793774160}
+  - {fileID: 1581884920793774161}
 --- !u!114 &1581884920793774142
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -324,6 +326,23 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionPreloadStep
   initializerId: MissionPreload
+  required: 0
+  requiredIds:
+  - SaveDependentManagers
+  retryEntry: 0
+--- !u!114 &1581884920793774161
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2449901017464239670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9db6a6c28f574e40a199679e5fb4e9a1, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::PassPreloadStep
+  initializerId: PassPreload
   required: 0
   requiredIds:
   - SaveDependentManagers

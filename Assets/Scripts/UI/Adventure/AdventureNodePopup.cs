@@ -124,7 +124,7 @@ public class AdventureNodePopup : PooledUIBase
             if (this.rewardSlots[t_i] == null) continue;
 
             if (t_i < this.m_rewards.Count)
-                this.rewardSlots[t_i].Bind(this.m_rewards[t_i].Icon, this.m_rewards[t_i].Gain.Amount);
+                this.rewardSlots[t_i].Bind(this.m_rewards[t_i]);
             else
                 this.rewardSlots[t_i].Hide();
         }

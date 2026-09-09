@@ -21,7 +21,10 @@ import {
 import {loadCatalogIds} from "../packs/cardCatalog";
 import {DrawnCard, drawPack, resolveDropPool} from "../packs/packDraw";
 import {buildOwnershipSlot, readOwnedIds} from "../packs/packSlots";
-import {canAfford, spend} from "../currency/wallet";
+import {canAfford, spend, grant, CurrencyGain} from "../currency/wallet";
+import {duplicateGains} from "../rewards/itemGrant";
+import {parseRewardRows} from "../rewardTable";
+import {rankRef} from "../rank/rankStore";
 import {nextWallet} from "../currency/walletStore";
 import {addSnack, growthSlot, readGrowthEntries} from "../growth/cardGrowth";
 import {rejectDomain} from "../save/domainReject";
@@ -30,6 +33,7 @@ import {
   readCardPackRow,
   readDropRows,
   readRankGradeRows,
+  readSpecRows,
 } from "../packs/packSpecReader";
 import {
   entryPointsFromRows,
@@ -86,11 +90,16 @@ export const openPack = onCall(async (request) => {
     logger.warn("pack authors a refund that is never paid out", {env, packId, refundAmount: pack.refundAmount});
   }
 
-  const [dropRows, gradeRows, catalogIds] = await Promise.all([
+  const [dropRows, gradeRows, catalogIds, cardRows, rawRewards] = await Promise.all([
     readDropRows(env, packId),
     readRankGradeRows(env),
     loadCatalogIds(env),
+    readSpecRows(env, "Card"),
+    pack.price > 0 ? readSpecRows(env, "Reward") : Promise.resolve([]),
   ]);
+  const duplicateRows = parseRewardRows(rawRewards);
+  const cardGrades = new Map(cardRows.map((row) => [Number(row.id), String(row.grade)]));
+  let granted: CurrencyGain[] = [];
 
   const entryPoints = entryPointsFromRows(gradeRows);
   if (entryPoints === null) {
@@ -120,7 +129,8 @@ export const openPack = onCall(async (request) => {
       // 미션 읽기가 콜백의 첫 줄이다 — 아래 쓰기보다 반드시 앞이어야 한다(Firestore 트랜잭션 규칙).
       const missions = await beginMissionBump(transaction, db, env, uid, period);
       // 트랜잭션이 재실행되면 이전 추첨을 버리고 다시 뽑는다 — 잔액·소유와 정합해야 한다.
-      const points = Number((current.rank as {points?: unknown} | undefined)?.points ?? 0);
+      const rankSnapshot = await transaction.get(rankRef(db, env, uid));
+      const points = Number(rankSnapshot.data()?.points ?? (current.rank as {points?: unknown} | undefined)?.points ?? 0);
       const grade = gradeOf(thresholds, points);
 
       const required = parseRequiredGrade(pack.minRankGrade);
@@ -146,7 +156,8 @@ export const openPack = onCall(async (request) => {
       const ownedSet = new Set(owned);
       drawn = drawPack(pool, pack.drawCount, pack.uniqueDraw, catalogIds, ownedSet, randomInt);
 
-      const paid = spend(balances, pack.priceType, pack.price);
+      granted = pack.price > 0 ? duplicateGains(drawn, cardGrades, duplicateRows) : [];
+      const paid = grant(spend(balances, pack.priceType, pack.price), granted);
       goldBefore = balances[pack.priceType];
       goldAfter = paid[pack.priceType];
 
@@ -167,7 +178,7 @@ export const openPack = onCall(async (request) => {
     },
     (adopted) => {
       replayed = false;
-      return {...adopted, packId, cards: drawn, refundType: pack.refundType, missions: missionState};
+      return {...adopted, packId, cards: drawn, granted, refundType: pack.refundType, missions: missionState};
     });
 
   if (replayed) {

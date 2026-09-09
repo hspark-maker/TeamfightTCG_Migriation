@@ -18,6 +18,7 @@ internal sealed class PassSeasonDefinition
 /// <summary>레벨 하나의 문턱과 무료 트랙 보상. requiredExp 는 누적 총량이다.</summary>
 internal sealed class PassLevelDefinition
 {
+    [JsonProperty("items")] public List<ClaimRewardItem> Items { get; set; }
     [JsonProperty("level")] public int Level { get; set; }
 
     [JsonProperty("requiredExp")] public long RequiredExp { get; set; }
@@ -38,6 +39,7 @@ internal sealed class PassProgress
 /// <summary>getPass 응답. 화면이 그릴 것을 한 번에 담는다 — 추가 왕복이 없다.</summary>
 internal sealed class PassGetResponse
 {
+    [JsonProperty("packChoices")] public List<string> PackChoices { get; set; }
     [JsonProperty("season")] public PassSeasonDefinition Season { get; set; }
 
     [JsonProperty("progress")] public PassProgress Progress { get; set; }
@@ -52,6 +54,7 @@ internal sealed class PassGetResponse
 /// <summary>claimPassReward 응답. 지갑·세이브 채택은 공통 배관이 하고 여기 값은 표시용이다.</summary>
 internal sealed class ClaimPassRewardResult : ServerCommandResult
 {
+    [JsonProperty("cards")] public List<OpenPackCard> Cards { get; set; }
     [JsonProperty("seasonId")] public string SeasonId { get; set; }
 
     [JsonProperty("level")] public int Level { get; set; }

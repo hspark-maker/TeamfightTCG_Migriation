@@ -55,6 +55,13 @@ public readonly struct MatchmakingProfile
                 return t_local;
             }
 
+            if (!string.IsNullOrEmpty(t_result.SeasonId))
+                RankManager.AdoptServerProgress(
+                    t_result.Points,
+                    t_result.SeasonId,
+                    t_result.BestTierIndex,
+                    t_result.ClaimedTierIndexes);
+
             if (t_result.TierIndex != t_local.TierIndex)
                 Debug.Log($"[Matchmaking] Aligning the tier to the server value: local {t_local.TierIndex} → server {t_result.TierIndex}");
 

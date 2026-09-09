@@ -98,7 +98,7 @@ public static class AlbumRewardManager
         for (int t_i = 0; t_i < _rewards.Count; t_i++)
         {
             AlbumRewardDef t_def = _rewards[t_i];
-            if (t_def.amount <= 0) continue;
+            if (t_def.amount <= 0 || t_def.rewardType != ERewardType.Currency) continue;
             t_gains.Add(new CurrencyGain(t_def.currency, t_def.amount));
         }
 

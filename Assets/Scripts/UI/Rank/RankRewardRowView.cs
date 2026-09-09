@@ -105,7 +105,7 @@ public class RankRewardRowView : MonoBehaviour
         {
             if (this.rewardSlots[t_i] == null) continue;
 
-            if (t_i < _rewards.Count) this.rewardSlots[t_i].Bind(_rewards[t_i].Icon, _rewards[t_i].Gain.Amount);
+            if (t_i < _rewards.Count) this.rewardSlots[t_i].Bind(_rewards[t_i]);
             else this.rewardSlots[t_i].Hide();
         }
 

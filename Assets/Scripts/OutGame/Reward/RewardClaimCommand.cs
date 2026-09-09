@@ -69,8 +69,15 @@ internal static class RewardClaimCommand
                 new { env = ContentProfileConfig.Active.CloudEnvId, ownerType = _ownerType, ownerId = _ownerId },
                 _pending);
 
+            if (_ownerType == OwnerRank && t_result?.RankProgress != null)
+                RankManager.AdoptServerProgress(
+                    t_result.RankProgress.Points,
+                    t_result.RankProgress.SeasonId,
+                    t_result.RankProgress.BestTierIndex,
+                    t_result.RankProgress.ClaimedTierIndexes);
+
             Debug.Log($"[RewardClaimCommand] {_ownerType}/{_ownerId} claimed — {Describe(t_result)}");
-            return new RewardClaimOutcome(ToGains(t_result, _ownerType, _ownerId));
+            return new RewardClaimOutcome(ToGains(t_result, _ownerType, _ownerId), RewardItemDisplay.ToDrawn(t_result?.Cards));
         }
         catch (ServerCommandRejectedException t_rejected)
         {

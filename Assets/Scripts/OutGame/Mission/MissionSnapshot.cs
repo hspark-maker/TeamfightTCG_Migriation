@@ -28,6 +28,7 @@ internal sealed class MissionDefinition
 
 internal sealed class MissionReward
 {
+    [JsonProperty("items")] public List<ClaimRewardItem> Items { get; set; }
     [JsonProperty("currencies")] public List<ClaimRewardGain> Currencies { get; set; }
     [JsonProperty("passExp")] public long PassExp { get; set; }
 }
@@ -40,6 +41,7 @@ internal sealed class MissionGetResponse
 
 internal sealed class ClaimMissionResult : ServerCommandResult
 {
+    [JsonProperty("cards")] public List<OpenPackCard> Cards { get; set; }
     [JsonProperty("missionId")] public string MissionId { get; set; }
     [JsonProperty("granted")] public List<ClaimRewardGain> Granted { get; set; }
     [JsonProperty("grantedPassExp")] public long GrantedPassExp { get; set; }

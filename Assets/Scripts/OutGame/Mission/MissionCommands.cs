@@ -61,6 +61,7 @@ internal static class MissionCommands
             ClaimMissionResult t_result = await ServerSaveCommands.InvokeAsync<ClaimMissionResult>(
                 CLAIM_COMMAND,
                 new { env = ContentProfileConfig.Active.CloudEnvId, missionId = t_missionId });
+            if (t_result != null && t_result.GrantedPassExp > 0L) PassCommands.Invalidate();
             Debug.Log($"[MissionCommands] {t_missionId} claimed — {t_result?.Granted?.Count ?? 0} currency line(s), pass exp {t_result?.GrantedPassExp ?? 0}");
             return t_result;
         }
