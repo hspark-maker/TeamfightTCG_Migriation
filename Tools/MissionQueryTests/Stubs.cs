@@ -24,6 +24,7 @@ namespace Cysharp.Threading.Tasks
         internal Task Inner;
         public UniTask(Task task) { Inner = task; }
         public TaskAwaiter GetAwaiter() => (Inner ?? Task.CompletedTask).GetAwaiter();
+        public static UniTask<T> FromResult<T>(T value) => new UniTask<T>(System.Threading.Tasks.Task.FromResult(value));
         public static UniTask CompletedTask => new UniTask(Task.CompletedTask);
         public static UniTask WaitUntil(Func<bool> predicate) => new UniTask(FakeClock.WaitUntil(predicate));
         public static UniTask Delay(TimeSpan delay, DelayType type = DelayType.DeltaTime)
@@ -84,6 +85,12 @@ namespace Cysharp.Threading.Tasks
         public UniTask Task => new UniTask(inner.Task);
         public bool TrySetResult() => inner.TrySetResult(true);
     }
+    public sealed class UniTaskCompletionSource<T>
+    {
+        readonly TaskCompletionSource<T> inner = new TaskCompletionSource<T>();
+        public UniTask<T> Task => new UniTask<T>(inner.Task);
+        public bool TrySetResult(T value) => inner.TrySetResult(value);
+    }
 }
 
 static class FakeClock
@@ -113,7 +120,9 @@ static class FakeClock
 namespace UnityEngine
 {
     public static class Time { public static double realtimeSinceStartupAsDouble; }
-    public static class Debug { public static void LogWarning(object value) { } public static void LogError(object value) { } }
+    public enum RuntimeInitializeLoadType { SubsystemRegistration }
+    public sealed class RuntimeInitializeOnLoadMethodAttribute : Attribute { public RuntimeInitializeOnLoadMethodAttribute(RuntimeInitializeLoadType type) { } }
+    public static class Debug { public static void Log(object value) { } public static void LogException(Exception value) { } public static void LogWarning(object value) { } public static void LogError(object value) { } }
     public static class JsonUtility
     {
         // Only the private AppliedStore persistence DTO is used in these tests.
@@ -127,21 +136,31 @@ namespace UnityEngine
     }
 }
 #endif
-static class LocalPrefs
+namespace Newtonsoft.Json
 {
-    public static readonly Dictionary<string, string> Values = new Dictionary<string, string>();
-    public static string GetString(string key, string fallback) => Values.TryGetValue(key, out string value) ? value : fallback;
-    public static void SetString(string key, string value) => Values[key] = value;
-    public static void DeleteKey(string key) => Values.Remove(key);
-    public static void Save() { }
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
+    sealed class JsonPropertyAttribute : Attribute { public JsonPropertyAttribute(string name) { } }
 }
-static class SaveDependentManagersStep { public static bool IsInstalled = true; }
-static class GameInitialization { public static bool IsTerminated; }
-static class MatchResultSubmission
+sealed class ContentProfileConfig
 {
-    public static bool SignedIn = true;
-    public static Cysharp.Threading.Tasks.UniTask<bool> EnsureSignedIn() => TestTask.Wrap(Task.FromResult(SignedIn));
+    public static ContentProfileConfig Active = new ContentProfileConfig();
+    public string CloudEnvId = "test";
 }
+sealed class FirebaseAuthService
+{
+    public static FirebaseAuthService Instance = new FirebaseAuthService();
+    public string UserId = "user-1";
+}
+static class PlayerSaveCloud { public static bool HasPendingUpload; public static long Revision; }
+class ServerCommandResult { public MissionSnapshot Missions; }
+sealed class ClaimRewardItem { }
+sealed class ClaimRewardGain { }
+sealed class ClaimRewardPack { }
+sealed class OpenPackCard { }
+sealed class PassProgress { }
+static class PassCommands { public static void ApplyMissionProgress(PassProgress progress) { } }
+sealed class ServerCommandRejectedException : Exception { public string Reason; }
+sealed class ServerAdoptionException : Exception { }
 static class TestTask
 {
     public static Cysharp.Threading.Tasks.UniTask<T> Wrap<T>(Task<T> task)
@@ -153,62 +172,45 @@ static class TestTask
 #endif
     }
 }
-sealed class PayoutListResult { public List<PayoutEntry> Payouts; }
-sealed class PayoutAckResult { public List<string> Acked; }
-sealed class PayoutEntry
-{
-    public string MatchId;
-    public long RankSequence, SettledAtMs;
-    public PayoutCurrency Currency;
-    public PayoutRank Rank;
-    public RankProgressResult RankProgress;
-}
-sealed class PayoutCurrency { public string Currency = "gold"; public int Amount = 10; }
-sealed class PayoutRank { public int Before = 1, After = 2; }
-sealed class RankProgressResult { public string SeasonId; public int BestTierIndex; }
-struct RankApplyResult { }
-enum ECurrencyType { Gold }
-struct CurrencyGain
-{
-    public static CurrencyGain None => default;
-    public int Amount;
-    public CurrencyGain(ECurrencyType type, int amount) { Amount = amount; }
-}
-static class CurrencyCode { public static bool TryParse(string value, out ECurrencyType type) { type = ECurrencyType.Gold; return value == "gold"; } }
-static class RankManager
-{
-    public static bool IsConfigured = true;
-    public static int Applied;
-    public static RankApplyResult ApplyServerPayout(int before, int after, string season, int bestTier, object ignored) { Applied++; return default; }
-}
-static class DataSaveManager { public static void SaveImmediate() { } }
-static class MissionCommands { public static int Invalidations; public static void Invalidate() { Invalidations++; } }
-static class RankResultHandoff { public static void Set(RankApplyResult value) { } }
-static class BattleRewardHandoff { public static int Amount; public static void Set(CurrencyGain value) { Amount += value.Amount; } }
 static class ServerSaveCommands
 {
-    public static readonly Queue<TaskCompletionSource<PayoutListResult>> Lists = new Queue<TaskCompletionSource<PayoutListResult>>();
-    public static readonly Queue<TaskCompletionSource<PayoutAckResult>> Acks = new Queue<TaskCompletionSource<PayoutAckResult>>();
-    public static int ListCalls, AckCalls;
+    public static readonly Queue<TaskCompletionSource<MissionGetResponse>> Reads = new Queue<TaskCompletionSource<MissionGetResponse>>();
+    public static readonly Queue<TaskCompletionSource<ClaimMissionResult>> Claims = new Queue<TaskCompletionSource<ClaimMissionResult>>();
+    public static readonly Queue<TaskCompletionSource<ServerCommandResult>> Resets = new Queue<TaskCompletionSource<ServerCommandResult>>();
+    public static int ReadCalls, ClaimCalls, ResetCalls;
+    public static readonly List<string> Environments = new List<string>();
     public static Cysharp.Threading.Tasks.UniTask<T> InvokeReadOnlyAsync<T>(string command, object payload)
     {
-        if (typeof(T) != typeof(PayoutListResult)) throw new Exception("Unexpected read DTO");
-        ListCalls++;
-        return TestTask.Wrap((Task<T>)(object)Lists.Dequeue().Task);
+        if (command == "getMissions")
+        {
+            ReadCalls++;
+            Environments.Add((string)payload.GetType().GetProperty("env").GetValue(payload));
+            return TestTask.Wrap((Task<T>)(object)Reads.Dequeue().Task);
+        }
+        if (command == "devResetDailyMissions")
+        {
+            ResetCalls++;
+            return TestTask.Wrap((Task<T>)(object)Resets.Dequeue().Task);
+        }
+        throw new Exception("Unexpected query " + command);
     }
     public static Cysharp.Threading.Tasks.UniTask<T> InvokeAsync<T>(string command, object payload)
     {
-        if (typeof(T) != typeof(PayoutAckResult)) throw new Exception("Unexpected write DTO");
-        AckCalls++;
-        return TestTask.Wrap((Task<T>)(object)Acks.Dequeue().Task);
+        if (command != "claimMission") throw new Exception("Unexpected mutation " + command);
+        ClaimCalls++;
+        return TestTask.Wrap((Task<T>)(object)Claims.Dequeue().Task);
     }
-    public static TaskCompletionSource<PayoutListResult> QueueList()
+    public static TaskCompletionSource<MissionGetResponse> QueueRead()
     {
-        var source = new TaskCompletionSource<PayoutListResult>(); Lists.Enqueue(source); return source;
+        var source = new TaskCompletionSource<MissionGetResponse>(); Reads.Enqueue(source); return source;
     }
-    public static TaskCompletionSource<PayoutAckResult> QueueAck()
+    public static TaskCompletionSource<ClaimMissionResult> QueueClaim()
     {
-        var source = new TaskCompletionSource<PayoutAckResult>(); Acks.Enqueue(source); return source;
+        var source = new TaskCompletionSource<ClaimMissionResult>(); Claims.Enqueue(source); return source;
     }
-    public static void Reset() { Lists.Clear(); Acks.Clear(); ListCalls = AckCalls = 0; }
+    public static TaskCompletionSource<ServerCommandResult> QueueReset()
+    {
+        var source = new TaskCompletionSource<ServerCommandResult>(); Resets.Enqueue(source); return source;
+    }
+    public static void Reset() { Reads.Clear(); Claims.Clear(); Resets.Clear(); Environments.Clear(); ReadCalls = ClaimCalls = ResetCalls = 0; }
 }

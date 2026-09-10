@@ -53,7 +53,7 @@ public sealed class PackGradeFxPalette
 // 흐름: 입장 → 스와이프 대기 → 자리잡기(팩이 화면 아래로) → 씰 찢기 → 뽑기(뭉치째 솟아오름)
 //       → 한 장씩 밀어내기 → 결과 격자 → OnRevealComplete.
 //
-// 유저가 손을 대는 지점은 둘뿐이다 — 개봉을 여는 스와이프 한 번과, 그 뒤 카드를 넘기는 스와이프.
+// 개봉은 스와이프, 카드 한 장 넘기기는 탭·스와이프, 전체 넘기기는 스킵 버튼으로 조작한다.
 // 그 사이(자리잡기 → 씰 찢기 → 뽑기)는 손을 떼는 순간 끊기지 않고 자동으로 이어진다.
 //
 // 이 연출의 전제는 단 하나 — 카드는 처음부터 팩 속에 들어 있다.
@@ -347,7 +347,6 @@ public class PackRevealView : MonoBehaviour
         {
             cardStack.OnCardRevealed  += HandleCardRevealed;
             cardStack.OnEmptied       += HandleStackEmptied;
-            cardStack.OnSkipRequested += RequestSkip;
         }
 
         if (skipButton != null) skipButton.onClick.AddListener(RequestSkip);
@@ -365,7 +364,6 @@ public class PackRevealView : MonoBehaviour
         {
             cardStack.OnCardRevealed  -= HandleCardRevealed;
             cardStack.OnEmptied       -= HandleStackEmptied;
-            cardStack.OnSkipRequested -= RequestSkip;
         }
 
         if (skipButton != null) skipButton.onClick.RemoveListener(RequestSkip);

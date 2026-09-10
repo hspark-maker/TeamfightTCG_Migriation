@@ -69,7 +69,7 @@ if (manifest.minAppMajor > manifest.major) {
 if (manifest.major !== csharpMajor || manifest.major !== typescriptMajor ||
     manifest.minAppMajor !== csharpMinAppMajor ||
     !sameSet(manifest.supported, csharpSupported) ||
-    !sameSet(manifest.supported, typescriptSupported)) {
+    !manifest.supported.every(value => typescriptSupported.includes(value))) {
   throw new Error(
     `content version mismatch: manifest=${JSON.stringify(manifest)}` +
     ` C#=${csharpMajor}/${csharpMinAppMajor}/[${csharpSupported}]` +

@@ -4,7 +4,7 @@ using DG.Tweening;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
-// 개봉 카드 더미. 카드를 한 자리에 겹쳐 쌓고, 맨 위부터 스와이프로 한 장씩 밀어낸다.
+// 개봉 카드 더미. 카드를 한 자리에 겹쳐 쌓고, 탭 또는 스와이프로 맨 위 한 장씩 넘긴다.
 // 카드는 앞면이라 맨 위가 처음부터 보인다 — 서스펜스는 "밀어냈을 때 그 아래 뭐가 있나"에 있다.
 // 방향은 가리지 않는다(좌우·위아래·대각 전부) — 민 쪽으로 그대로 날아간다. 짧아도 빠르게 튕기면 넘어간다.
 // 밀린 카드는 민 방향으로 날아가며 사라진다. 결과 라인업은 더미가 다 빈 뒤 PackResultGrid가 따로 세운다 —
@@ -22,9 +22,6 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     // 마지막 장까지 밀려 더미가 비었다.
     public event Action OnEmptied;
-
-    // 드래그가 아닌 단순 탭 — 스킵 요청. 이 컴포넌트가 입력을 먹으므로 상위로 올려준다.
-    public event Action OnSkipRequested;
 
     [Header("배치")]
     [Tooltip("카드·앵커가 함께 사는 좌표계 루트. 카드는 전부 이 아래 생성된다.")]
@@ -335,7 +332,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             });
     }
 
-    /// <summary>일반 카드는 즉시 치우고 성장 카드는 순서대로 완주한 뒤 치운다. 연타도 같은 요청이다.</summary>
+    /// <summary>일반 카드는 즉시 치우고 성장 카드는 결과 확인 탭을 받은 뒤 치운다.</summary>
     public void FlickAllImmediate()
     {
         m_skipRemaining = true;
@@ -413,7 +410,8 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     public void OnBeginDrag(PointerEventData _e)
     {
-        if (!m_interactable || m_growthPlaying || m_stack.Count == 0 || m_stack[0].HasPendingSnackGrowth) return;
+        if (!m_interactable || m_growthPlaying || m_stack.Count == 0 ||
+            m_stack[0] == null || m_stack[0].HasPendingSnackGrowth) return;
         m_dragging = true;
         m_dragSpeed = 0f;
 
@@ -472,9 +470,18 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             return;
         }
 
+        DismissTop(t_offset / Mathf.Max(0.0001f, t_dist));
+    }
+
+    void DismissTop(Vector2 _direction)
+    {
+        if (!m_interactable || m_growthPlaying || m_stack.Count == 0 ||
+            m_stack[0] == null || m_stack[0].HasPendingSnackGrowth) return;
+
+        var t_top = m_stack[0];
         m_stack.RemoveAt(0);
         m_revealedTop = null;
-        DismissCard(t_top, t_offset / Mathf.Max(0.0001f, t_dist));   // 민 방향 그대로 날려보낸다.
+        DismissCard(t_top, _direction);
 
         // 위 장이 비켜난 순간 아래 장은 이미 완전히 드러나 있다.
         if (m_stack.Count == 0)
@@ -489,18 +496,31 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     public void OnPointerClick(PointerEventData _e)
     {
-        // 드래그로 소비된 포인터는 클릭으로 오지 않는다 — 순수 탭만 스킵으로 본다.
-        if (_e.dragging) return;
-        OnSkipRequested?.Invoke();
+        // 탭은 한 장만 넘긴다. 전체 스킵은 PackRevealView의 전용 버튼이 맡는다.
+        if (_e.dragging || m_dragging || _e.button != PointerEventData.InputButton.Left) return;
+        if (m_growthPlaying)
+        {
+            if (m_stack.Count == 0 || m_stack[0] == null) return;
+            var t_view = m_stack[0];
+            // 연출 중 탭은 결과까지만. 결과를 확인하는 다음 탭에서 현재 카드를 넘긴다.
+            if (t_view.SkipSnackGrowth()) return;
+            bool t_skipping = m_skipRemaining;
+            if (t_view.ConfirmSnackGrowthResult() && !t_skipping)
+                DismissTop(new Vector2(1f, 0f));
+            return;
+        }
+        DismissTop(new Vector2(1f, 0f));
     }
 
     // 밀려난 카드를 민 방향으로 날려보내며 지운다. 결과는 남기지 않는다 — 전부 넘긴 뒤 결과 격자가 다시 보여준다.
     void DismissCard(PackCardView _view, Vector2 _dir)
     {
         if (_view == null) return;
+        _view.HidePackText();
 
         var t_rt = (RectTransform)_view.transform;
         t_rt.DOKill();
+        _view.SnapPunchToRest();
 
         var t_target = t_rt.anchoredPosition + _dir * dismissDistance;
         var t_group  = _view.Group;

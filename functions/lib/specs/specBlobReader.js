@@ -59,12 +59,13 @@ const node_crypto_1 = require("node:crypto");
 const logger = __importStar(require("firebase-functions/logger"));
 const firebaseApp_1 = require("../firebaseApp");
 const requestMetrics_1 = require("../observability/requestMetrics");
-/** 앱이 해석할 수 있는 콘텐츠 세대. C# ContentVersion.Major 및 앱 버전 첫 자리와 같아야 한다. */
+/** 현재 테이블 세대. C# ContentVersion.Major와 같으며 앱 빌드 버전과는 별개다. */
 // content-version:major
-const CONTENT_MAJOR = 4;
-// 새 테이블 세대 배포에서는 실제로 해석 가능한 직전 세대를 함께 넣어 pointer 롤백을 허용한다.
+const CONTENT_MAJOR = 5;
+// 서버는 열 이름으로 읽고 제거된 강화 확률 열을 무시하므로 v4 라이브와 v5 테스트를 함께 처리한다.
+// 클라이언트는 열 구조가 정확히 같아야 하므로 서버의 지원 목록이 더 넓을 수 있다.
 // content-version:supported
-const SUPPORTED_CONTENT_MAJORS = new Set([CONTENT_MAJOR]);
+const SUPPORTED_CONTENT_MAJORS = new Set([CONTENT_MAJOR, 4]);
 exports.BATTLE_REPLAY_SPEC_TABLES = [
     "Card", "SynergyDef", "SynergyTierDef", "SynergyEffectDef",
 ];

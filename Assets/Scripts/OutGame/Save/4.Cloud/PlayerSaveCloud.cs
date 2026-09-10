@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using Firebase.Firestore;
@@ -149,6 +150,45 @@ static class PlayerSaveCloud
 
         s_sessionImmediateRequests++;
         await UploadAsync(s_generation, true);
+    }
+
+    /// <summary>전투 입장에 필요한 세이브만 확정한다. 업로드 봉인 중의 조기 반환을 성공으로 보지 않고,
+    /// 대기 중 추가된 변경분까지 올린다. 결과 제출·보상함 회수는 시작하지 않는다.</summary>
+    internal static async UniTask<bool> FlushForBattleEntryAsync(CancellationToken _ct)
+    {
+        int t_generation = s_generation;
+        while (true)
+        {
+            _ct.ThrowIfCancellationRequested();
+            if (t_generation != s_generation || !s_initialized || !s_uploadApproved || !CanRunServerCommand)
+                return false;
+
+            UniTaskCompletionSource t_inFlight = s_uploadCompletion;
+            if (t_inFlight != null)
+            {
+                await t_inFlight.Task.AttachExternalCancellation(_ct);
+                _ct.ThrowIfCancellationRequested();
+                if (t_generation != s_generation || State != EPlayerSaveCloudState.Ready) return false;
+                continue;
+            }
+
+            if (s_serverCommandDepth > 0)
+            {
+                await UniTask.WaitUntil(() => s_serverCommandDepth == 0 || t_generation != s_generation ||
+                    !s_uploadApproved || !CanRunServerCommand, cancellationToken: _ct);
+                continue;
+            }
+
+            if (!HasPendingUpload) return State == EPlayerSaveCloudState.Ready;
+
+            // 입장 상한은 호출자가 관리한다. 실패한 업로드를 여기서 무한 재시도하지 않는다.
+            s_pendingVersion++;
+            s_pendingUploadDeadlineTicks = 0;
+            s_sessionImmediateRequests++;
+            await UploadAsync(t_generation, true).AttachExternalCancellation(_ct);
+            _ct.ThrowIfCancellationRequested();
+            if (t_generation != s_generation || State != EPlayerSaveCloudState.Ready) return false;
+        }
     }
 
     /// <summary>서버 호출이 끝날 때까지 업로드를 봉인한다. 진행 중이던 업로드는 끝날 때까지 기다린다.</summary>

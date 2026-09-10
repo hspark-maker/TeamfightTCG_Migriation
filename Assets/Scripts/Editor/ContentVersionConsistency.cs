@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
@@ -25,6 +27,104 @@ public static class ContentVersionConsistency
         public int major;
         public int minAppMajor;
         public int[] supported;
+    }
+
+    /// <summary>호환 계약 변경용 새 세대를 준비한다. 공개·산출물 생성은 하지 않는다.</summary>
+    public static bool TryAdvanceGeneration(out int _nextMajor, out string _error)
+    {
+        _nextMajor = ContentVersion.Major;
+        Invalidate();
+        if (!TryValidate(out _error)) return false;
+        try
+        {
+            string t_root = Directory.GetParent(Application.dataPath)?.FullName;
+            AdvanceGeneration(t_root, ContentVersion.Major);
+            _nextMajor = checked(ContentVersion.Major + 1);
+            Invalidate();
+            return true;
+        }
+        catch (Exception t_exception)
+        {
+            Invalidate();
+            _error = "테이블 세대 변경 실패: " + t_exception.Message;
+            return false;
+        }
+    }
+
+    // 모든 선언을 먼저 검사한 뒤 쓴다. 실패하면 이미 쓴 파일도 원래 바이트로 복원한다.
+    internal static void AdvanceGeneration(string _root, int _expectedMajor)
+    {
+        int t_next = checked(_expectedMajor + 1);
+        string[] t_paths =
+        {
+            Path.Combine(_root, "content-version.json"),
+            Path.Combine(_root, "Assets/Scripts/OutGame/Spec/ContentVersion.cs"),
+            Path.Combine(_root, "functions/src/specs/specBlobReader.ts"),
+        };
+        var t_original = new byte[t_paths.Length][];
+        var t_text = new string[t_paths.Length];
+        for (int i = 0; i < t_paths.Length; i++)
+        {
+            t_original[i] = File.ReadAllBytes(t_paths[i]);
+            t_text[i] = File.ReadAllText(t_paths[i]);
+        }
+        Manifest t_manifest = JsonUtility.FromJson<Manifest>(t_text[0]);
+        if (t_manifest == null || t_manifest.major != _expectedMajor)
+            throw new InvalidOperationException("테이블 세대가 이미 변경됐다. 컴파일 완료 후 다시 확인할 것.");
+
+        string t_number = t_next.ToString(CultureInfo.InvariantCulture);
+        t_text[0] = ReplaceVersionValue(t_text[0], "(\"major\"\\s*:\\s*)(\\d+)", t_number);
+        t_text[0] = ReplaceVersionValue(t_text[0], "(\"minAppMajor\"\\s*:\\s*)(\\d+)", t_number);
+        t_text[0] = ReplaceVersionValue(t_text[0], "(\"supported\"\\s*:\\s*\\[)([^\\]]*)", t_number);
+        t_text[1] = ReplaceVersionValue(t_text[1],
+            @"(content-version:major\s*[\r\n]+\s*public const int Major = )(\d+)", t_number);
+        t_text[1] = ReplaceVersionValue(t_text[1],
+            @"(content-version:min-app-major\s*[\r\n]+\s*public const int MinAppMajor = )(\d+)", t_number);
+        t_text[1] = ReplaceVersionValue(t_text[1],
+            @"(content-version:supported\s*[\r\n]+\s*static readonly int\[\] SupportedMajors = \{)([^}]*)", " Major ");
+        t_text[2] = ReplaceVersionValue(t_text[2],
+            @"(content-version:major\s*[\r\n]+\s*const CONTENT_MAJOR = )(\d+)", t_number);
+        t_text[2] = ReplaceVersionValue(t_text[2],
+            @"(content-version:supported\s*[\r\n]+\s*const SUPPORTED_CONTENT_MAJORS = new Set<number>\(\[)([^\]]*)", "CONTENT_MAJOR");
+
+        int t_writing = -1;
+        try
+        {
+            for (int i = 0; i < t_paths.Length; i++)
+            {
+                // 미리보기 이후 외부 편집이 끼어들면 덮어쓰지 않는다.
+                if (File.ReadAllText(t_paths[i]) != Encoding.UTF8.GetString(t_original[i]).TrimStart('\uFEFF'))
+                    throw new IOException($"파일이 변경됐다: {t_paths[i]}");
+                t_writing = i;
+                bool t_bom = t_original[i].Length >= 3 && t_original[i][0] == 0xEF &&
+                             t_original[i][1] == 0xBB && t_original[i][2] == 0xBF;
+                File.WriteAllText(t_paths[i], t_text[i], new UTF8Encoding(t_bom));
+            }
+        }
+        catch (Exception t_writeError)
+        {
+            var t_errors = new System.Collections.Generic.List<Exception> { t_writeError };
+            for (int i = t_writing; i >= 0; i--)
+            {
+                try
+                {
+                    if (!File.ReadAllBytes(t_paths[i]).SequenceEqual(t_original[i]))
+                        File.WriteAllBytes(t_paths[i], t_original[i]);
+                }
+                catch (Exception t_restoreError) { t_errors.Add(t_restoreError); }
+            }
+            if (t_errors.Count > 1)
+                throw new AggregateException("테이블 세대 파일 복원 실패. 파일 상태를 확인할 것.", t_errors);
+            throw;
+        }
+    }
+
+    static string ReplaceVersionValue(string _source, string _pattern, string _value)
+    {
+        var t_regex = new Regex(_pattern);
+        if (t_regex.Matches(_source).Count != 1)
+            throw new InvalidOperationException("버전 선언을 하나로 찾을 수 없다: " + _pattern);
+        return t_regex.Replace(_source, t_match => t_match.Groups[1].Value + _value);
     }
 
     public static bool TryValidate(out string _error)
@@ -81,15 +181,13 @@ public static class ContentVersionConsistency
                 !int.TryParse(t_major.Groups[1].Value, out int t_serverMajor) ||
                 t_serverMajor != t_manifest.major)
                 throw new InvalidOperationException("서버 테이블 세대 선언이 content-version.json과 다르다.");
-            if (!TryParseMajorList(t_supported.Groups[1].Value, "CONTENT_MAJOR", t_serverMajor, out int[] t_serverSupported) ||
-                t_serverSupported.Length != t_manifest.supported.Length)
-                throw new InvalidOperationException("서버 supported 목록이 content-version.json과 다르다.");
-            var t_manifestSupported = (int[])t_manifest.supported.Clone();
-            Array.Sort(t_serverSupported);
-            Array.Sort(t_manifestSupported);
-            for (int i = 0; i < t_serverSupported.Length; i++)
-                if (t_serverSupported[i] != t_manifestSupported[i])
-                    throw new InvalidOperationException("서버 supported 목록이 content-version.json과 다르다.");
+            if (!TryParseMajorList(t_supported.Groups[1].Value, "CONTENT_MAJOR", t_serverMajor, out int[] t_serverSupported))
+                throw new InvalidOperationException("서버 supported 목록을 읽을 수 없다.");
+            // 환경별 테이블 전환 중 서버는 구 세대도 처리할 수 있다. 클라이언트가
+            // 지원하는 모든 세대를 서버가 포함해야 하며, 역방향 포함은 요구하지 않는다.
+            foreach (int t_required in t_manifest.supported)
+                if (Array.IndexOf(t_serverSupported, t_required) < 0)
+                    throw new InvalidOperationException($"서버 supported 목록에 클라이언트 테이블 세대 {t_required}가 없다.");
             return true;
         }
         catch (Exception t_exception)

@@ -20,6 +20,9 @@ internal static class MissionCommands
     static long s_cachedSaveRevision;
     static string s_cachedEnv;
     static string s_cachedUserId;
+    static string s_requestEnv;
+    static string s_requestUserId;
+    enum RefreshOutcome { Failed, Invalidated, Success }
 
     internal static void Invalidate()
     {
@@ -31,11 +34,12 @@ internal static class MissionCommands
     {
         unchecked { s_sessionGeneration++; s_claimGeneration++; }
         Invalidate();
-        s_refreshInFlight?.TrySetResult(false);
+        var t_previous = s_refreshInFlight;
         s_refreshInFlight = null;
         s_cachedEnv = s_cachedUserId = null;
         s_inFlightClaims.Clear();
         s_debugResetInFlight = false;
+        t_previous?.TrySetResult(false);
     }
 
     internal static bool IsInFlight(string _missionId)
@@ -47,7 +51,8 @@ internal static class MissionCommands
         string t_env = ContentProfileConfig.Active?.CloudEnvId;
         string t_userId = FirebaseAuthService.Instance.UserId;
         if (string.IsNullOrEmpty(t_env) || string.IsNullOrEmpty(t_userId)) return UniTask.FromResult(false);
-        // 初期化と画面の要求は同じ完了を待つ。forceも進行中の同じ要求を共有する。
+        if (s_refreshInFlight != null && (s_requestEnv != t_env || s_requestUserId != t_userId)) ResetSession();
+        // 초기화와 화면 요청은 같은 완료를 기다린다. force도 진행 중인 동일 요청을 공유한다.
         if (s_refreshInFlight != null) return s_refreshInFlight.Task;
         if (s_debugResetInFlight || s_inFlightClaims.Count > 0) return UniTask.FromResult(false);
         long t_now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -58,7 +63,10 @@ internal static class MissionCommands
             return UniTask.FromResult(true);
 
         var t_gate = new UniTaskCompletionSource<bool>();
+        s_refreshValidUntil = 0;
         s_refreshInFlight = t_gate;
+        s_requestEnv = t_env;
+        s_requestUserId = t_userId;
         RefreshCoreAsync(t_gate, t_env, t_userId, s_sessionGeneration).Forget();
         return t_gate.Task;
     }
@@ -72,10 +80,11 @@ internal static class MissionCommands
             for (int t_attempt = 0; t_attempt < 2; t_attempt++)
             {
                 if (s_debugResetInFlight || s_inFlightClaims.Count > 0) return;
-                t_success = await ReadAndAdoptAsync(_env, _userId, _session);
+                RefreshOutcome t_outcome = await ReadAndAdoptAsync(_env, _userId, _session);
+                t_success = t_outcome == RefreshOutcome.Success;
                 if (t_success || _session != s_sessionGeneration) return;
                 // 무효화로 버린 응답만 다시 읽는다. 통신 실패는 별도 자동 재시도를 만들지 않는다.
-                if (!s_retryInvalidatedRead) return;
+                if (t_outcome != RefreshOutcome.Invalidated) return;
             }
         }
         finally
@@ -85,14 +94,11 @@ internal static class MissionCommands
         }
     }
 
-    static bool s_retryInvalidatedRead;
-
-    static async UniTask<bool> ReadAndAdoptAsync(string _env, string _userId, int _session)
+    static async UniTask<RefreshOutcome> ReadAndAdoptAsync(string _env, string _userId, int _session)
     {
-        s_retryInvalidatedRead = false;
         // 수령 중 읽은 봉투가 수령 완료 뒤 도착하면 claimed=true를 옛 false로 되돌린다.
         // 시작부터 겹친 조회는 생략하고, 왕복 중 수령이 시작된 경우는 세대 대조로 응답을 버린다.
-        if (s_debugResetInFlight || s_inFlightClaims.Count > 0) return false;
+        if (s_debugResetInFlight || s_inFlightClaims.Count > 0) return RefreshOutcome.Failed;
         int t_claimGeneration = s_claimGeneration;
         int t_refreshGeneration = s_refreshGeneration;
         long t_stateVersion = MissionManager.StateVersion;
@@ -103,19 +109,18 @@ internal static class MissionCommands
             MissionGetResponse t_result = await ServerSaveCommands.InvokeReadOnlyAsync<MissionGetResponse>(
                 GET_COMMAND, new { env = _env });
             if (_session != s_sessionGeneration || _env != ContentProfileConfig.Active?.CloudEnvId ||
-                _userId != FirebaseAuthService.Instance.UserId) return false;
-            if (t_result?.Missions == null)
+                _userId != FirebaseAuthService.Instance.UserId) return RefreshOutcome.Failed;
+            if (t_result?.Missions == null || t_result.Definitions == null)
             {
                 Debug.LogWarning("[MissionCommands] getMissions did not return a state.");
-                return false;
+                return RefreshOutcome.Failed;
             }
             if (s_debugResetInFlight || s_inFlightClaims.Count > 0 || t_claimGeneration != s_claimGeneration ||
                 t_refreshGeneration != s_refreshGeneration || t_stateVersion != MissionManager.StateVersion ||
                 t_saveRevision != PlayerSaveCloud.Revision)
             {
-                s_retryInvalidatedRead = true;
                 Debug.Log("[MissionCommands] Discarding a mission query response that overlapped with a state change.");
-                return false;
+                return RefreshOutcome.Invalidated;
             }
 
             s_cachedEnv = _env;
@@ -125,12 +130,12 @@ internal static class MissionCommands
             s_refreshValidUntil = !t_pendingUpload && !PlayerSaveCloud.HasPendingUpload
                 ? Time.realtimeSinceStartupAsDouble + RefreshCacheSeconds : 0;
             MissionManager.Adopt(t_result.Missions, t_result.Definitions);
-            return true;
+            return RefreshOutcome.Success;
         }
         catch (Exception t_exception)
         {
             Debug.LogWarning($"[MissionCommands] Mission query failed — {t_exception.GetBaseException().Message}");
-            return false;
+            return RefreshOutcome.Failed;
         }
     }
 
@@ -141,7 +146,9 @@ internal static class MissionCommands
         if (string.IsNullOrWhiteSpace(_missionId)) return null;
         string t_missionId = _missionId.Trim();
         if (!s_inFlightClaims.Add(t_missionId)) return null;
+        int t_session = s_sessionGeneration;
         unchecked { s_claimGeneration++; }
+        Invalidate();
         MissionManager.NotifyCommandStateChanged();
 
         try
@@ -149,6 +156,7 @@ internal static class MissionCommands
             ClaimMissionResult t_result = await ServerSaveCommands.InvokeAsync<ClaimMissionResult>(
                 CLAIM_COMMAND,
                 new { env = ContentProfileConfig.Active.CloudEnvId, missionId = t_missionId });
+            if (t_session != s_sessionGeneration) return null;
             if (t_result != null && t_result.GrantedPassExp > 0L)
                 PassCommands.ApplyMissionProgress(t_result.Pass);
             Debug.Log($"[MissionCommands] {t_missionId} claimed — {t_result?.Granted?.Count ?? 0} currency line(s), pass exp {t_result?.GrantedPassExp ?? 0}");
@@ -171,8 +179,11 @@ internal static class MissionCommands
         }
         finally
         {
-            s_inFlightClaims.Remove(t_missionId);
-            MissionManager.NotifyCommandStateChanged();
+            if (t_session == s_sessionGeneration)
+            {
+                s_inFlightClaims.Remove(t_missionId);
+                MissionManager.NotifyCommandStateChanged();
+            }
         }
     }
 
@@ -191,13 +202,16 @@ internal static class MissionCommands
         }
 
         s_debugResetInFlight = true;
+        int t_session = s_sessionGeneration;
         unchecked { s_claimGeneration++; }
+        Invalidate();
         MissionManager.NotifyCommandStateChanged();
         try
         {
             // 세이브·지갑을 변경하지 않는 디버그 명령이다. 실패를 전체 저장 세션 차단으로 전파하지 않는다.
             ServerCommandResult t_result = await ServerSaveCommands.InvokeReadOnlyAsync<ServerCommandResult>(
                 "devResetDailyMissions", new { env = ContentProfileConfig.Active.CloudEnvId });
+            if (t_session != s_sessionGeneration) return false;
             if (t_result?.Missions == null)
                 throw new InvalidOperationException("Daily reset did not return a mission state.");
             MissionManager.Adopt(t_result.Missions);
@@ -205,8 +219,11 @@ internal static class MissionCommands
         }
         finally
         {
-            s_debugResetInFlight = false;
-            MissionManager.NotifyCommandStateChanged();
+            if (t_session == s_sessionGeneration)
+            {
+                s_debugResetInFlight = false;
+                MissionManager.NotifyCommandStateChanged();
+            }
         }
     }
 

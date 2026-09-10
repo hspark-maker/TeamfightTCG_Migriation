@@ -234,7 +234,8 @@ public static class OutgameDebugActions
                 new { env = ContentProfileConfig.Active.CloudEnvId });
 
             // 채운 진행도는 미션 문서에만 있다 — 재조회로 캐시를 갈아야 화면(OnChanged)이 따라온다.
-            await MissionCommands.RefreshAsync();
+            MissionCommands.Invalidate();
+            await MissionCommands.RefreshAsync(_force: true);
             Debug.Log("[OutgameDebug] devCompleteMissions done — mission cache refreshed.");
         }
         catch (ServerCommandRejectedException t_rejected)
@@ -280,12 +281,12 @@ public static class OutgameDebugActions
         Debug.Log($"[OutgameDebug] Max enhance on every card — {t_changed} card(s) at {CardGrowthManager.MaxStar} star(s)");
     }
 
-    // 강화 레벨·진화 단계 재설정 (소유·재화는 유지)
+    // 강화 레벨·진화·한계돌파·간식 재설정 (소유·지갑 재화는 유지)
     public static void ResetCardGrowth()
     {
         CardGrowthManager.DebugResetAll();
 
-        Debug.Log("[OutgameDebug] Card growth reset — every card at 0 stars, unevolved");
+        Debug.Log("[OutgameDebug] Card growth reset — every card at 0 stars, unevolved, limit break 0, snacks 0");
     }
 
     // 카탈로그 전량 지급

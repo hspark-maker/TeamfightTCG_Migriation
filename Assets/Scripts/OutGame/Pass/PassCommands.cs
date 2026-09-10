@@ -10,10 +10,9 @@ internal static class PassCommands
 
     internal static void ApplyMissionProgress(PassProgress _progress)
     {
+        bool t_reuseDefinitions = CanReuseDefinitions && s_inFlightClaims.Count == 0;
         Invalidate();
-        if (_progress != null && PassManager.HasSeason && PassManager.Season.SeasonId == _progress.SeasonId)
-            PassManager.Adopt(_progress);
-        else if (!s_missionRefreshPending)
+        if (!TryAdoptProgress(_progress, t_reuseDefinitions) && !s_missionRefreshPending)
             RefreshAfterMissionAsync().Forget();
     }
 
@@ -47,6 +46,26 @@ internal static class PassCommands
 
     internal static bool NeedsRefresh => !PassManager.IsReady ||
         s_loadedGeneration != s_stateGeneration || s_loadedRankPoints != RankManager.Points;
+
+    // 진행도만 받는 응답은 기존 시즌·곡선·팩 선택 목록이 최신일 때만 조회를 대신한다.
+    static bool CanReuseDefinitions => !NeedsRefresh && PassManager.HasSeason &&
+        PassManager.Levels.Count > 0 &&
+        (PassManager.Season.EndAtMs <= 0L ||
+         PassManager.Season.EndAtMs > DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+
+    static bool TryAdoptProgress(PassProgress _progress, bool _markFresh)
+    {
+        if (_progress == null || !PassManager.HasSeason || PassManager.Levels.Count == 0 ||
+            string.IsNullOrEmpty(_progress.SeasonId) || PassManager.Season.SeasonId != _progress.SeasonId)
+            return false;
+
+        // 랭크 기준은 마지막 getPass의 값으로 둔다. 진행 응답에는 새 팩 선택 목록이 없다.
+        if (_markFresh && (PassManager.Season.EndAtMs <= 0L ||
+            PassManager.Season.EndAtMs > DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()))
+            s_loadedGeneration = s_stateGeneration;
+        PassManager.Adopt(_progress);
+        return true;
+    }
 
     // 경험치·수령 상태가 바뀌면 진행 중인 옛 조회도 캐시로 채택하지 않는다.
     internal static void Invalidate()
@@ -96,8 +115,10 @@ internal static class PassCommands
     internal static async UniTask<ClaimPassRewardResult> ClaimAsync(int _level, string _selectedPackId = null)
     {
         if (_level <= 0) return null;
+        bool t_reuseDefinitions = CanReuseDefinitions && s_inFlightClaims.Count == 0;
         if (!s_inFlightClaims.Add(_level)) return null;
         Invalidate();
+        int t_generation = s_stateGeneration;
         PassManager.NotifyCommandStateChanged();
 
         try
@@ -105,7 +126,8 @@ internal static class PassCommands
             ClaimPassRewardResult t_result = await ServerSaveCommands.InvokeAsync<ClaimPassRewardResult>(
                 CLAIM_COMMAND,
                 new { env = ContentProfileConfig.Active.CloudEnvId, level = _level, selectedPackId = _selectedPackId });
-            PassManager.Adopt(t_result?.Progress);
+            TryAdoptProgress(t_result?.Progress,
+                t_reuseDefinitions && t_generation == s_stateGeneration && s_inFlightClaims.Count == 1);
             Debug.Log($"[PassCommands] Level {_level} claimed — {t_result?.Granted?.Count ?? 0} currency line(s)");
             return t_result;
         }

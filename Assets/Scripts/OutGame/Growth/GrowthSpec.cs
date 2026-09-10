@@ -31,7 +31,6 @@ public static class GrowthSpec
     /// <summary>키워드 강화 레벨의 천장. 세이브 코덱 상한이라 그 위 레벨은 결제가 헛돈다.</summary>
     public const int KeywordMaxLevelCeiling = 10;
 
-    const int Permille = 1000;
     const ECurrencyType CardFallbackCurrency    = ECurrencyType.Shard;
     const ECurrencyType KeywordFallbackCurrency = ECurrencyType.Energy;
 
@@ -40,8 +39,6 @@ public static class GrowthSpec
     static int  s_cardMaxLevel;
     static long s_baseEnhanceCost;
     static long s_costGrowthPerLevel;
-    static int  s_baseSuccessPermille;
-    static int  s_rateDropPerLevelPermille;
     static int  s_ruleMaxLimitBreak;
     static int  s_maxLimitBreak;
 
@@ -69,8 +66,7 @@ public static class GrowthSpec
 
         int t_steps   = _level - CardGrowth.BaseLevel - 1;
         long t_amount = s_baseEnhanceCost + t_steps * s_costGrowthPerLevel;
-        _cost = new EnhanceCost(CardFallbackCurrency, t_amount > 0 ? t_amount : 0,
-                                RateOf(s_baseSuccessPermille - t_steps * s_rateDropPerLevelPermille));
+        _cost = new EnhanceCost(CardFallbackCurrency, t_amount > 0 ? t_amount : 0, 1f);
         return true;
     }
 
@@ -171,8 +167,6 @@ public static class GrowthSpec
         s_cardMaxLevel             = t_rule.maxLevel > CardMaxLevelCeiling ? CardMaxLevelCeiling : t_rule.maxLevel;
         s_baseEnhanceCost          = t_rule.baseEnhanceCost;
         s_costGrowthPerLevel       = t_rule.costGrowthPerLevel;
-        s_baseSuccessPermille      = ClampPermille(t_rule.baseSuccessPermille);
-        s_rateDropPerLevelPermille = t_rule.rateDropPerLevelPermille;
 
         // 한계돌파 열이 비었다고 규칙 전체를 버리지 않는다 — 0은 "그 축이 닫혀 있다"이지 강화 불가가 아니다.
         int t_maxLimitBreak = t_rule.maxLimitBreak > 0 ? t_rule.maxLimitBreak : 0;
@@ -189,7 +183,7 @@ public static class GrowthSpec
             s_cardCosts[t_row.level] = new EnhanceCost(
                 ParseCurrency(t_row.costCurrency, CardFallbackCurrency),
                 t_row.cost > 0 ? t_row.cost : 0,
-                RateOf(t_row.successPermille));
+                1f); // 카드 강화는 확정 성공이며, 이전 산출물의 확률 열도 읽지 않는다.
         }
     }
 
@@ -273,10 +267,6 @@ public static class GrowthSpec
                && _keyword != CardKeyword.None && Enum.IsDefined(typeof(CardKeyword), _keyword);
     }
 
-    static int ClampPermille(int _permille) => _permille < 0 ? 0 : _permille > Permille ? Permille : _permille;
-
-    static float RateOf(int _permille) => ClampPermille(_permille) / (float)Permille;
-
     readonly struct KeywordCostCurve
     {
         public readonly int MaxLevel;
@@ -301,8 +291,6 @@ public static class GrowthSpec
         s_cardMaxLevel             = 0;
         s_baseEnhanceCost          = 0;
         s_costGrowthPerLevel       = 0;
-        s_baseSuccessPermille      = 0;
-        s_rateDropPerLevelPermille = 0;
         s_ruleMaxLimitBreak        = 0;
         s_maxLimitBreak            = 0;
         s_cardCosts.Clear();
