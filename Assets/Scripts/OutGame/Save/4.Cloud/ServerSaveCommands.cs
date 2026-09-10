@@ -17,8 +17,8 @@ internal static class ServerSaveCommands
     /// <summary>Firebase 모듈이 서비스를 꽂는다(해제 시 null).</summary>
     internal static void SetService(ICallableService _service)
     {
-        MissionCommands.ResetSession();
         s_service = _service;
+        MissionCommands.ResetSession();
     }
 
     /// <summary>세이브를 쓰는 서버 호출. 업로드를 봉인하고 응답의 revision·슬롯을 채택한 뒤 봉인을 푼다.

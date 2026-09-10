@@ -20,6 +20,7 @@ static class Tests
         FakeClock.Reset();
         ServerSaveCommands.Reset();
         RankManager.Applied = BattleRewardHandoff.Amount = 0;
+        MissionCommands.Invalidations = 0;
         RankManager.IsConfigured = SaveDependentManagersStep.IsInstalled = MatchResultSubmission.SignedIn = true;
         GameInitialization.IsTerminated = false;
     }
@@ -33,6 +34,7 @@ static class Tests
         PayoutInbox.Initialize("test");
         Check(ServerSaveCommands.ListCalls == 1, "Initialization must fetch once");
         first.SetResult(Empty());
+        Check(MissionCommands.Invalidations == 0, "Empty inbox must not invalidate mission cache");
         Check(PayoutInbox.FlushAsync().GetAwaiter().IsCompleted, "Empty flush should complete");
         FakeClock.Advance(59.9);
         PayoutInbox.RefreshOnResume();
@@ -90,6 +92,7 @@ static class Tests
     {
         var first = ServerSaveCommands.QueueList(); var ack = ServerSaveCommands.QueueAck();
         PayoutInbox.Initialize("test"); first.SetResult(One());
+        Check(MissionCommands.Invalidations == 1, "Observed server payout must invalidate mission cache");
         Check(RankManager.Applied == 1 && BattleRewardHandoff.Amount == 0, "Rank once; reward only after ack");
         ack.SetException(new Exception("ack lost"));
         var retry = ServerSaveCommands.QueueList(); var retryAck = ServerSaveCommands.QueueAck();

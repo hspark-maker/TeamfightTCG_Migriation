@@ -182,6 +182,7 @@ static class RankManager
     public static RankApplyResult ApplyServerPayout(int before, int after, string season, int bestTier, object ignored) { Applied++; return default; }
 }
 static class DataSaveManager { public static void SaveImmediate() { } }
+static class MissionCommands { public static int Invalidations; public static void Invalidate() { Invalidations++; } }
 static class RankResultHandoff { public static void Set(RankApplyResult value) { } }
 static class BattleRewardHandoff { public static int Amount; public static void Set(CurrencyGain value) { Amount += value.Amount; } }
 static class ServerSaveCommands

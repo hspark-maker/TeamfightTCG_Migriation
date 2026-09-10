@@ -189,12 +189,17 @@ public static partial class CardGrowthManager
         return t_changed;
     }
 
-    // 성장 전체 재설정(디버그 전용, 진행도 손실)
+    // 강화·한계돌파·남은 간식을 함께 재설정한다(디버그 전용, 진행도 손실).
     public static void DebugResetAll()
     {
+        if (!s_initialized) return;
+
+        // 세 축은 같은 CardGrowthEntry에 있다. 항목을 비워 한계돌파 체력까지 기본값으로 돌린다.
         s_growth.Clear();
         OutgameTutorialGuide.ResetFreeShotForDebug();   // 강화를 처음부터 다시 보는 상태다
-        Save();
+        FlushToData();
+        // 직후 개봉 명령이 이전 성장값을 다시 채택하지 않게 디바운스 없이 업로드를 시작한다.
+        DataSaveManager.SaveImmediate();
         OnGrowthChanged?.Invoke();
     }
 

@@ -43,13 +43,13 @@ const {
 
 // ── 실측 스펙 행 (envs/test 에서 확인한 저작 그대로) ─────────────────────────
 const CARD_RULE_ROWS = [{
-  id: 1, baseEnhanceCost: 25, costGrowthPerLevel: 50, baseSuccessPermille: 1000,
-  rateDropPerLevelPermille: 0, maxLevel: 4, hpPerLevel: 4, maxLimitBreak: 3,
+  id: 1, baseEnhanceCost: 25, costGrowthPerLevel: 50,
+  maxLevel: 4, hpPerLevel: 4, maxLimitBreak: 3,
 }];
 const CARD_ENHANCE_ROWS = [
-  {id: 1, level: 2, cost: 25, costCurrency: "Shard", successPermille: 1000},
-  {id: 2, level: 3, cost: 75, costCurrency: "Shard", successPermille: 1000},
-  {id: 3, level: 4, cost: 150, costCurrency: "Shard", successPermille: 1000},
+  {id: 1, level: 2, cost: 25, costCurrency: "Shard"},
+  {id: 2, level: 3, cost: 75, costCurrency: "Shard"},
+  {id: 3, level: 4, cost: 150, costCurrency: "Shard"},
 ];
 const KEYWORD_ROWS = ["Ranged", "Peerless", "Execution", "Taunt", "Cunning", "Healer"].map(
   (keyword, index) => ({
@@ -100,9 +100,50 @@ assert.equal(parseCardEnhanceRule([{maxLevel: 4, baseEnhanceCost: 25}]).maxLimit
 // 표가 천장보다 큰 상한을 말해도 잘라 읽는다 — 클라 체력 곡선이 거기까지만 저작돼 있다.
 assert.equal(parseCardEnhanceRule([{maxLevel: 99, baseEnhanceCost: 25}]).maxLevel, CARD_MAX_LEVEL_CEILING);
 
-// 성공률 1000분율은 0~1000 으로 조인다.
-assert.equal(parseCardEnhanceRule([{maxLevel: 4, baseSuccessPermille: 5000}]).baseSuccessPermille, PERMILLE);
-assert.equal(parseCardEnhanceRule([{maxLevel: 4, baseSuccessPermille: -1}]).baseSuccessPermille, 0);
+// ── 카드: 제거된 확률 열은 없거나 어떤 구값이 남아도 항상 성공 ──────────────
+{
+  const explode = () => {
+    throw new Error("카드 강화는 확률 열을 읽거나 난수를 뽑으면 안 된다");
+  };
+  const legacyValues = [undefined, null, 0, -1, 500, 1000, 5000, "invalid"];
+  for (const value of legacyValues) {
+    const ruleRow = {...CARD_RULE_ROWS[0]};
+    const rows = CARD_ENHANCE_ROWS.map((row) => ({...row}));
+    if (value !== undefined) {
+      ruleRow.baseSuccessPermille = value;
+      ruleRow.rateDropPerLevelPermille = value;
+      for (const row of rows) row.successPermille = value;
+    }
+    const rule = parseCardEnhanceRule([ruleRow]);
+    assert.deepEqual(rule, {maxLevel: 4, maxLimitBreak: 3, baseEnhanceCost: 25, costGrowthPerLevel: 50});
+    const overrides = parseCardEnhanceOverrides(rows);
+    for (const level of [2, 3, 4]) {
+      assert.equal(overrides.get(level).successPermille, PERMILLE);
+      for (const steps of [overrides, new Map()]) {
+        const step = cardEnhanceStep(rule, steps, level);
+        assert.deepEqual(step, {
+          level, currency: "Shard",
+          cost: steps.size ? [25, 75, 150][level - 2] : [25, 75, 125][level - 2],
+          successPermille: PERMILLE,
+        });
+        assert.equal(rollSucceeded(step.successPermille, explode), true);
+      }
+    }
+    const legacyStep = {level: 2, currency: "Gold", cost: 37, successPermille: value};
+    assert.deepEqual(cardEnhanceStep(rule, new Map([[2, legacyStep]]), 2),
+      {...legacyStep, successPermille: PERMILLE}, "구 스텝도 비용·재화는 유지하고 항상 성공한다");
+    assert.equal(legacyStep.successPermille, value, "입력 스텝은 변경하지 않는다");
+  }
+
+  const ruleRow = {...CARD_RULE_ROWS[0]};
+  Object.defineProperty(ruleRow, "baseSuccessPermille", {get: explode});
+  Object.defineProperty(ruleRow, "rateDropPerLevelPermille", {get: explode});
+  const row = {...CARD_ENHANCE_ROWS[0]};
+  Object.defineProperty(row, "successPermille", {get: explode});
+  const rule = parseCardEnhanceRule([ruleRow]);
+  assert.equal(cardEnhanceStep(rule, parseCardEnhanceOverrides([row]), 2).successPermille, PERMILLE);
+  assert.equal(cardEnhanceStep(rule, new Map(), 2).successPermille, PERMILLE);
+}
 
 // ── 카드: 오버라이드 파싱 ───────────────────────────────────────────────────
 {

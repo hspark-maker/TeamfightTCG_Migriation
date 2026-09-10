@@ -1,5 +1,6 @@
 // Real metrics, spec cache, transaction proxy and replay client; no remote I/O.
 const assert = require("node:assert/strict");
+const {major: CONTENT_MAJOR} = require("../../content-version.json");
 const Module = require("node:module");
 const logs = [];
 const reads = [];
@@ -66,11 +67,11 @@ async function main() {
   const a = withRequestMetrics("specCreator", () => specs.readSpecRows("test", "Card"));
   const b = withRequestMetrics("specJoiner", () => specs.readSpecRows("test", "Card"));
   assert.equal(reads.length, 1);
-  reads[0].resolve({exists: true, data: () => ({major: 4, minor: 0,
+  reads[0].resolve({exists: true, data: () => ({major: CONTENT_MAJOR, minor: 0,
     tables: {Card: {blobPath, payloadHash}}})});
   await drain();
   assert.equal(reads.length, 2);
-  reads[1].resolve({exists: true, data: () => ({major: 4, payload, payloadHash, rowCount: 1})});
+  reads[1].resolve({exists: true, data: () => ({major: CONTENT_MAJOR, payload, payloadHash, rowCount: 1})});
   assert.deepEqual(await a, [{id: 1}]);
   assert.deepEqual(await b, [{id: 1}]);
   assert.equal(report("specCreator").counts.specIndexReads, 1);

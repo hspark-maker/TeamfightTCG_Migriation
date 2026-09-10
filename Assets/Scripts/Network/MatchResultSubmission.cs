@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using Firebase;
 using Firebase.Functions;
@@ -68,10 +69,12 @@ static class MatchResultSubmission
     static string s_envId;
     static bool s_sending;
     static int s_generation;
+    static CancellationTokenSource s_retryCancellation;
 
     internal static void Initialize(string _envId)
     {
         s_generation++;
+        CancelRetry();
         s_sending = false;
         s_envId = _envId;
         LoadPending();
@@ -80,12 +83,16 @@ static class MatchResultSubmission
     internal static void Shutdown()
     {
         s_generation++;
+        CancelRetry();
         SavePending();
         s_envId = null;
     }
 
     internal static void DiscardPending()
     {
+        s_generation++;
+        CancelRetry();
+        s_sending = false;
         s_pending.Clear();
         SavePending();
     }
@@ -155,7 +162,8 @@ static class MatchResultSubmission
 
     static async UniTask SendPending()
     {
-        if (s_sending || s_pending.Count == 0) return;
+        if (s_sending || s_pending.Count == 0 || string.IsNullOrEmpty(s_envId)) return;
+        CancelRetry();
         s_sending = true;
         int t_generation = s_generation;
         try
@@ -165,6 +173,7 @@ static class MatchResultSubmission
             // 물러나고 아래 finally가 재시도를 건다. PlayerSaveCloud·BattleContentSync와 같은 관문이다.
             if (!await EnsureSignedIn())
             {
+                if (t_generation != s_generation) return;
                 ChargeAttempt();
                 return;
             }
@@ -191,6 +200,7 @@ static class MatchResultSubmission
                 }
                 catch (Exception t_exception)
                 {
+                    if (t_generation != s_generation) return;
                     // 영구 거절은 재시도해도 같은 답이 온다. 큐에 남기면 같은 실패를 영원히 반복한다.
                     if (IsPermanentRejection(t_exception, out FunctionsErrorCode t_code))
                     {
@@ -221,7 +231,7 @@ static class MatchResultSubmission
             {
                 s_sending = false;
                 SavePending();
-                if (s_pending.Count > 0) RetryAfterDelay(t_generation, NextDelaySeconds()).Forget();
+                if (s_pending.Count > 0) ScheduleRetry(t_generation);
             }
         }
     }
@@ -278,9 +288,39 @@ static class MatchResultSubmission
         return s_backoffSeconds[t_index];
     }
 
-    static async UniTaskVoid RetryAfterDelay(int _generation, int _delaySeconds)
+    static void CancelRetry()
     {
-        await UniTask.Delay(TimeSpan.FromSeconds(_delaySeconds));
+        CancellationTokenSource t_retry = s_retryCancellation;
+        s_retryCancellation = null;
+        // The waiting task owns disposal, including cancellation observed on the next player loop.
+        t_retry?.Cancel();
+    }
+
+    static void ScheduleRetry(int _generation)
+    {
+        CancelRetry();
+        var t_retry = new CancellationTokenSource();
+        s_retryCancellation = t_retry;
+        RetryAfterDelay(_generation, NextDelaySeconds(), t_retry).Forget();
+    }
+
+    static async UniTaskVoid RetryAfterDelay(int _generation, int _delaySeconds,
+        CancellationTokenSource _retry)
+    {
+        try
+        {
+            await UniTask.Delay(TimeSpan.FromSeconds(_delaySeconds), cancellationToken: _retry.Token);
+            if (_retry.IsCancellationRequested || !ReferenceEquals(s_retryCancellation, _retry)) return;
+        }
+        catch (OperationCanceledException) when (_retry.IsCancellationRequested)
+        {
+            return;
+        }
+        finally
+        {
+            if (ReferenceEquals(s_retryCancellation, _retry)) s_retryCancellation = null;
+            _retry.Dispose();
+        }
         if (_generation == s_generation) RetryPending();
     }
 
@@ -327,6 +367,7 @@ static class MatchResultSubmission
             return true;
         }
         if (t_status != "confirmed") return false;
+        MissionCommands.Invalidate();
 
         // confirmed 트랜잭션이 양쪽 payout을 함께 만들었고 별도 inbox가 적용·ack한다.
         // 제출 큐를 내린 뒤 PayoutInbox가 서버 원장을 로컬 세이브에 반영한다.
@@ -389,6 +430,8 @@ sealed class MatchResultFirebaseModule : IFirebaseModule
     {
         MatchResultSubmission.Initialize(_context.EnvId);
         PayoutInbox.Initialize(_context.EnvId);
+        // 입장 flush에 기대지 않고, 앱 재시작으로 복원한 미제출 결과도 회수한다.
+        MatchResultSubmission.RetryPending();
     }
 
     public void RetryPending()

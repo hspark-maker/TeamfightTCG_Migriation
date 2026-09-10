@@ -9,11 +9,11 @@ public static class ContentVersion
 {
     /// <summary>테이블 세대. 컬럼 계약이 바뀌거나 앱이 못 읽는 내용이 들어갈 때 올린다.</summary>
     // content-version:major
-    public const int Major = 4;
+    public const int Major = 5;
 
     /// <summary>새 테이블을 해석하는 데 필요한 최소 테이블 세대.</summary>
     // content-version:min-app-major
-    public const int MinAppMajor = 4;
+    public const int MinAppMajor = 5;
 
     // 직전 테이블 세대 롤백을 지원하는 빌드는 실제로 해석 가능한 세대를 함께 둔다.
     // content-version:supported

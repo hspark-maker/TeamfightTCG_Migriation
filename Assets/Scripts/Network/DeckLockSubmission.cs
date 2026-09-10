@@ -176,14 +176,12 @@ internal static class DeckLockSubmission
             using (var t_flushTimeout = CancellationTokenSource.CreateLinkedTokenSource(_ct, FirebaseManager.Lifetime))
             {
                 t_flushTimeout.CancelAfter(FlushFallbackTimeout);
-                await FirebaseManager.FlushPendingAsync()
-                    .AttachExternalCancellation(t_flushTimeout.Token);
-            }
-            if (PlayerSaveCloud.State != EPlayerSaveCloudState.Ready)
-            {
-                Debug.LogError(
-                    $"[LockDeck] Cannot confirm the latest save upload (state={PlayerSaveCloud.State}).");
-                return DeckLockResult.Unavailable;
+                if (!await PlayerSaveCloud.FlushForBattleEntryAsync(t_flushTimeout.Token))
+                {
+                    Debug.LogError(
+                        $"[LockDeck] Cannot confirm the latest save upload (state={PlayerSaveCloud.State}).");
+                    return DeckLockResult.Unavailable;
+                }
             }
         }
         catch (OperationCanceledException)

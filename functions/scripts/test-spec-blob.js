@@ -7,6 +7,7 @@
 //  2) 반쪽 업로드된 payload 를 조용히 넘기지 않는가. 여기서 통과시키면 서버가 클라와 다른 표로
 //     보상·덱을 판정하고, 그 갈림은 로그에 안 남는다.
 const assert = require("node:assert/strict");
+const {major: CONTENT_MAJOR} = require("../../content-version.json");
 const {createHash} = require("node:crypto");
 const Module = require("node:module");
 const requests = [];
@@ -74,13 +75,13 @@ function fixture(env, version, value = version) {
   const payloadHash = specPayloadHash(text);
   return {
     pin: {blobPath: `envs/${env}/specs/Card/releases/${version}`, payloadHash},
-    blob: {major: 4, payload: text, payloadHash, rowCount: 2},
+    blob: {major: CONTENT_MAJOR, payload: text, payloadHash, rowCount: 2},
     rows: [{id: 1, value}, {id: 2, value}],
   };
 }
 
 function indexOf(tables) {
-  return {major: 4, minor: 0, tables};
+  return {major: CONTENT_MAJOR, minor: 0, tables};
 }
 
 function resolve(request, data) {
@@ -304,6 +305,33 @@ async function testClearWhilePending() {
   assert.deepEqual(await joinedBlob, first.rows);
 }
 
+async function testGenerationTransition() {
+  // Both deployed environments remain readable without touching user save documents.
+  for (const [env, major] of [["live", 4], ["test", 5]]) {
+    reset();
+    const card = fixture(env, `${major}.0`);
+    const pending = readSpecRows(env, "Card");
+    await drain();
+    resolve(requests[0], {...indexOf({Card: card.pin}), major});
+    await drain();
+    resolve(requests[1], {...card.blob, major});
+    assert.deepEqual(await pending, card.rows);
+  }
+  for (const major of [3, 6]) {
+    reset();
+    const rejectedIndex = assert.rejects(readSpecRows("test", "Card"), /incompatible/);
+    await drain();
+    resolve(requests[0], {major, minor: 0, tables: {}});
+    await rejectedIndex;
+    reset();
+    const card = fixture("test", `${major}.0`);
+    const rejectedBlob = assert.rejects(readPinnedSpecRows("test", "Card", card.pin), /content major/);
+    await drain();
+    resolve(requests[0], {...card.blob, major});
+    await rejectedBlob;
+  }
+}
+
 // A missing mock response must fail CI rather than leave an unresolved promise and exit successfully.
 const timeout = setTimeout(() => {
   console.error("test-spec-blob: timed out waiting for a mocked read");
@@ -315,7 +343,8 @@ const timeout = setTimeout(() => {
   await testFailuresRetry();
   await testIsolation();
   await testClearWhilePending();
-  console.log("test-spec-blob: ok (parser, single-flight, TTL, retry, isolation, clear races)");
+  await testGenerationTransition();
+  console.log("test-spec-blob: ok (parser, single-flight, TTL, retry, isolation, clear races, v4/v5 transition)");
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;

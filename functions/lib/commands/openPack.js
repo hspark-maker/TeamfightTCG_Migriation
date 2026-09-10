@@ -56,6 +56,8 @@ const rewardTable_1 = require("../rewardTable");
 const rankStore_1 = require("../rank/rankStore");
 const walletStore_1 = require("../currency/walletStore");
 const cardGrowth_1 = require("../growth/cardGrowth");
+const snackGrowthSpec_1 = require("../growth/snackGrowthSpec");
+const snackGrowthProgress_1 = require("../missions/snackGrowthProgress");
 const domainReject_1 = require("../save/domainReject");
 const receiptId_1 = require("../save/receiptId");
 const packSpecReader_1 = require("../packs/packSpecReader");
@@ -97,14 +99,17 @@ exports.openPack = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)("o
         // 환급 경로는 클라·서버 양쪽에서 죽어 있다(중복 보상은 간식). 저작 실수를 조용히 삼키지 않는다.
         logger.warn("pack authors a refund that is never paid out", { env, packId, refundAmount: pack.refundAmount });
     }
-    const [dropRows, gradeRows, catalogIds, cardRows, rawRewards, catalog] = await Promise.all([
+    const [dropRows, gradeRows, catalogIds, cardRows, rawRewards, catalog, ruleRows, curveRows] = await Promise.all([
         (0, packSpecReader_1.readDropRows)(env, packId),
         (0, packSpecReader_1.readRankGradeRows)(env),
         (0, cardCatalog_1.loadCatalogIds)(env),
         (0, packSpecReader_1.readSpecRows)(env, "Card"),
         pack.price > 0 ? (0, packSpecReader_1.readSpecRows)(env, "Reward") : Promise.resolve([]),
         (0, missionSpec_1.readMissionCatalog)(env),
+        (0, packSpecReader_1.readSpecRows)(env, "CardEnhanceRule"),
+        (0, packSpecReader_1.readSpecRows)(env, "CardLimitBreak"),
     ]);
+    const snackGrowthCurve = (0, snackGrowthSpec_1.requireSnackGrowthCurve)(ruleRows, curveRows);
     const duplicateRows = (0, rewardTable_1.parseRewardRows)(rawRewards);
     const cardGrades = new Map(cardRows.map((row) => [Number(row.id), String(row.grade)]));
     let granted = [];
@@ -157,9 +162,10 @@ exports.openPack = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)("o
         goldAfter = paid[pack.priceType];
         const slots = {
             ownership: (0, packSlots_1.buildOwnershipSlot)(owned, drawn),
-            cardGrowth: (0, cardGrowth_1.growthSlot)(drawn.reduce((entries, card) => (0, cardGrowth_1.addSnack)(entries, card.cardId, card.snack), (0, cardGrowth_1.readGrowthEntries)(current.cardGrowth))),
+            cardGrowth: (0, cardGrowth_1.growthSlot)((0, itemGrant_1.applyDrawnSnackGrowth)((0, cardGrowth_1.readGrowthEntries)(current.cardGrowth), drawn, snackGrowthCurve)),
         };
         (0, guideMutation_1.applyGuideProgress)(missions, current, slots, cardRows, catalog);
+        (0, snackGrowthProgress_1.applySnackGrowthProgress)(missions, drawn);
         // 진행도는 콜백 **안**에서 올린다 — mutateSave 는 영수증이 히트하면 이 콜백을 통째로 건너뛰므로,
         // 그 덕에 재시도가 진행도를 두 번 올리지 않는다. 콜백 밖으로 옮기면 그 보장이 사라진다.
         (0, missionStore_1.commitMissionBump)(transaction, missions, eventNames_1.EVENTS.packOpened.missionKey, 1, firestore_1.FieldValue.serverTimestamp());

@@ -17,8 +17,10 @@ exports.addSnack = addSnack;
 exports.canAffordSnack = canAffordSnack;
 exports.spendSnack = spendSnack;
 exports.applyLimitBreak = applyLimitBreak;
+exports.addSnackAndGrow = addSnackAndGrow;
 exports.growthSlot = growthSlot;
 const saveValues_1 = require("../save/saveValues");
+const limitBreakTable_1 = require("./limitBreakTable");
 /** 미강화 카드의 레벨. 클라 CardGrowth.BaseLevel 과 같아야 한다. */
 exports.BASE_LEVEL = 1;
 /** 먹이 보유 상한. 클라 CardGrowthEntry.Snack 이 int 이고 AddSnack 이 여기서 자른다. */
@@ -146,6 +148,38 @@ function applyLimitBreak(entries, cardId, stage, snackCost) {
     return withEntry(spendSnack(entries, cardId, snackCost), cardId, (entry) => {
         entry.limitBreak = stage;
     });
+}
+/**
+ * 간식을 적립하고 가능한 모든 한계돌파를 수동 명령과 같은 차감 규칙으로 적용한다.
+ * @param {GrowthEntries} entries 현재 성장
+ * @param {number} cardId 적립할 카드
+ * @param {number} amount 이번 중복 간식
+ * @param {LimitBreakCurve} curve 트랜잭션 밖에서 검증한 단계표
+ * @return {object} 갱신할 성장과 이번 카드에만 귀속되는 연출 정보
+ */
+function addSnackAndGrow(entries, cardId, amount, curve) {
+    if (cardId <= 0 || amount <= 0)
+        return { entries };
+    let next = addSnack(entries, cardId, amount);
+    const fromStage = Math.max(0, next[String(cardId)].limitBreak);
+    let toStage = fromStage;
+    let hpGain = 0;
+    let snackCost = 0;
+    while (toStage < curve.maxStage) {
+        const step = (0, limitBreakTable_1.limitBreakStep)(curve, toStage + 1);
+        if (step === null)
+            throw new Error(`Missing limit break stage: ${toStage + 1}`);
+        if (!canAffordSnack(next, cardId, step.snackCost))
+            break;
+        next = applyLimitBreak(next, cardId, step.stage, step.snackCost);
+        toStage = step.stage;
+        hpGain += step.hpGain;
+        snackCost += step.snackCost;
+    }
+    return toStage === fromStage ? { entries: next } : {
+        entries: next,
+        snackGrowth: { fromStage, toStage, hpGain, snackCost, snackLeft: snackOf(next, cardId) },
+    };
 }
 /**
  * 세이브의 cardGrowth 슬롯 **전체 값**. 기본값뿐인 항목은 버린다
