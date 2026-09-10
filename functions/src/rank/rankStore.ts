@@ -84,7 +84,8 @@ export function readRank(
   const data = snapshot.exists ? snapshot.data() : undefined;
   const tierCount = rankTierCount(grades);
   const rawPoints = Number(data?.points);
-  const points = Number.isSafeInteger(rawPoints) && rawPoints >= 0 ? rawPoints : fallbackPoints;
+  const points = Number.isSafeInteger(rawPoints) && rawPoints >= 0 ?
+    rawPoints : snapshot.exists ? 0 : fallbackPoints;
   const fallbackMap = Object.fromEntries(
     normalizeTierIndexes(fallbackClaimed, tierCount).map((tier) => [String(tier), true]),
   );
@@ -116,20 +117,30 @@ export function applyRankSeason(
   return {seasonId, points: resetPoints, bestTierIndex: resetTier, claimed: {}};
 }
 
-/**
- * Adopts a completed tutorial's legacy Bronze entry before the first ranked settlement.
- * @param {RankState} state Current rank state.
- * @param {number} fallbackPoints Legacy points from save/payoutState.
- * @param {RankGradeRow[]} grades Rank grade spec rows.
- * @return {RankState} State with the legacy entry adopted, or the input untouched.
- */
-export function adoptLegacyEntry(
-  state: RankState, fallbackPoints: number, grades: RankGradeRow[],
+// Contract with OutgameTutorial.asset: chapter 3 starts with EnterFirstRank (stepId 23).
+// Coordinates are committed before executing a step; step IDs are not ordered numbers.
+export const FIRST_RANK_CHAPTER_INDEX = 3;
+
+export function canEnterFirstRank(save: unknown): boolean {
+  const tutorial = (save as {tutorial?: {
+    outgameCompleted?: unknown; chapterIndex?: unknown; chapterStepIndex?: unknown;
+  }} | null)?.tutorial;
+  if (!tutorial) return false;
+  if (tutorial.outgameCompleted === true) return true;
+  const {chapterIndex, chapterStepIndex} = tutorial;
+  return typeof chapterIndex === "number" && Number.isSafeInteger(chapterIndex) &&
+    chapterIndex >= FIRST_RANK_CHAPTER_INDEX &&
+    typeof chapterStepIndex === "number" && Number.isSafeInteger(chapterStepIndex) &&
+    chapterStepIndex >= 0;
+}
+
+// Server decides tutorial entry from saved progress, never from client rank points.
+export function applyTutorialRankEntry(
+  state: RankState, save: unknown, grades: RankGradeRow[],
 ): RankState {
   if (grades.length === 0 || state.points >= grades[0].entryPoints ||
-      fallbackPoints < grades[0].entryPoints) return state;
-  const points = fallbackPoints;
-  return {...state, points, bestTierIndex: Math.max(state.bestTierIndex, resolveTierIndex(points, grades))};
+      !canEnterFirstRank(save)) return state;
+  return {...state, points: grades[0].entryPoints, bestTierIndex: Math.max(state.bestTierIndex, 0)};
 }
 
 export function writeRank(
@@ -184,7 +195,7 @@ export async function ensureRankState(
       seasonId,
       grades,
     );
-    state = adoptLegacyEntry(state, fallbackPoints, grades);
+    state = applyTutorialRankEntry(state, saveSnapshot.data(), grades);
 
     // 원본과 두 사본이 모두 맞으면 timestamp만 갱신하는 3회 쓰기를 생략한다.
     // 정규화 전 저장값과 비교해야 손상된 값도 복구된다. 색인도 같은 트랜잭션에서

@@ -376,7 +376,7 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
             const fallbackPoints = (0, rankStore_1.legacyRankPoints)(payoutSnapshot.data(), current);
             const fallbackClaimed = (0, rankStore_1.legacyClaimedTiers)(current, tierCount);
             rankState = (0, rankStore_1.applyRankSeason)((0, rankStore_1.readRank)(rankSnapshot, fallbackPoints, fallbackClaimed, rankGrades), rankSeason.seasonId, rankGrades);
-            rankState = (0, rankStore_1.adoptLegacyEntry)(rankState, fallbackPoints, rankGrades);
+            rankState = (0, rankStore_1.applyTutorialRankEntry)(rankState, current, rankGrades);
         }
         // 지급은 자격 판정보다 먼저 계산해도 안전하다 — 거절은 아래 낙인 함수들이 던지고, 던지면 트랜잭션 전체가 없던 일이 된다.
         // 줄 것이 없으면 지갑을 아예 쓰지 않는다(claimBattleReward·claimPayout 과 같은 정책) — 보상 미저작 정점의

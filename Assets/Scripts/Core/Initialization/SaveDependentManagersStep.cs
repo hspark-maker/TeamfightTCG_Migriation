@@ -79,7 +79,6 @@ public sealed class SaveDependentManagersStep : MainInitializer
             TriggeredTutorialRunner.Abort();
             OutgameFeatureLock.ClearStall();
             OutgameTutorialProgress.Init();
-            if (OutgameTutorialProgress.IsCompleted) RankManager.TryEnterFirstTier(out _);
             KeywordGrowthManager.Init();
             CardGrowthManager.Init();
             DeckSaveManager.LoadFromSave();

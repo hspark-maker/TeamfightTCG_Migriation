@@ -33,6 +33,8 @@ public static class RankManager
     /// 티어 인덱스는 미도달도 0으로 폴백하므로 인덱스로는 구분되지 않는다.</summary>
     public static bool IsRanked => s_configured && Points >= Config.FirstTierPoints;
 
+    internal static bool HasEnteredRank(long _points) => s_configured && _points >= Config.FirstTierPoints;
+
     /// <summary>다음 판이 승급전(단판 관문)인가. 일반 전투 천장이 '등급 천장 - 1'이라
     /// "등급 마지막 단계를 꽉 채웠지만 아직 승급은 아닌" 상태가 points 하나로 표현된다(세이브 필드 없음).</summary>
     public static bool IsPromoPending => s_configured && PromoPendingAt(Points);
@@ -152,29 +154,6 @@ public static class RankManager
         return _badge != null;
     }
 
-    /// <summary>첫 티어(브론즈 1)로 진입시킨다 — 튜토리얼 졸업 보상. 이미 도달했으면 false(멱등).
-    /// 반환 결과는 PrevTierIndex가 -1이라 IsTierUp이 참이 된다(진입 연출이 티어 상승과 같은 길을 탄다).</summary>
-    public static bool TryEnterFirstTier(out RankApplyResult _result)
-    {
-        _result = default;
-        if (IsRanked) return false;
-
-        var t_slot = Slot;
-        long t_points = t_slot.Points;
-
-        t_slot.Points = Config.FirstTierPoints;
-        s_bestTierIndex = Math.Max(s_bestTierIndex, Config.ResolveTierIndex(t_slot.Points));
-        Save();
-
-        _result = new RankApplyResult(
-            t_slot.Points - t_points,
-            -1,
-            Config.ResolveTierIndex(t_slot.Points),
-            false,
-            PromoPendingAt(t_slot.Points));
-        return true;
-    }
-
     /// <summary>전투 1회 정산 + 즉시 저장. _tutorial = 이 전투가 튜토리얼 시나리오 전투인가
     /// (호출자가 TutorialConfig.IsActive를 넘긴다 — 랭크가 튜토리얼 도메인을 직접 보지 않게).</summary>
     public static RankApplyResult ApplyBattleResult(bool _won, bool _tutorial)
@@ -200,7 +179,7 @@ public static class RankManager
         // 최고 등급이면 GradeCeilingPoints가 long.MaxValue라 사실상 천장이 없다.
         long t_ceiling = t_config.GradeCeilingPoints(t_points) - 1;
 
-        // 튜토리얼 전투는 첫 티어도 넘지 못한다 — 랭크 진입은 졸업(TryEnterFirstTier)만이 결정한다.
+        // 튜토리얼 전투는 첫 티어도 넘지 못한다 — 첫 진입은 서버가 저장된 튜토리얼 진행으로 결정한다.
         // 마지막 튜토 전투의 승점까지 살도록 졸업은 그 전투 뒤로 미뤄져 있다(OutgameTutorialRunner.NotifyStepSatisfied).
         // 그래도 천장을 현재 포인트 아래로는 내리지 않는다 — 이미 랭크에 오른 세이브로 튜토 전투를 돌면(디버그 승급 등)
         // 고정 천장이 곧 강등이 된다.
@@ -349,6 +328,20 @@ public static class RankManager
         Save();
     }
 
+    // 튜토리얼은 실패를 삼키면 좌표가 먼저 넘어간다. 조회와 선택적 실패 처리를 분리한다.
+    internal static async UniTask<RankSnapshotResult> FetchServerProgressAsync()
+    {
+        string t_env = ContentProfileConfig.Active != null ? ContentProfileConfig.Active.CloudEnvId : null;
+        if (string.IsNullOrEmpty(t_env)) throw new InvalidOperationException("Rank environment is missing.");
+
+        var t_result = await ServerSaveCommands.InvokeReadOnlyAsync<RankSnapshotResult>(
+            "getRankSnapshot", new { env = t_env, issueTicket = false });
+        if (t_result == null || t_result.Points < 0 || string.IsNullOrEmpty(t_result.SeasonId) ||
+            !TryGetTier(t_result.TierIndex, out _) || Config.ResolveTierIndex(t_result.Points) != t_result.TierIndex)
+            throw new InvalidOperationException("The server rank snapshot is invalid.");
+        return t_result;
+    }
+
     public static async UniTask RefreshServerProgressAsync()
     {
         string t_env = ContentProfileConfig.Active != null ? ContentProfileConfig.Active.CloudEnvId : null;
@@ -356,9 +349,7 @@ public static class RankManager
 
         try
         {
-            RankSnapshotResult t_result = await ServerSaveCommands.InvokeReadOnlyAsync<RankSnapshotResult>(
-                "getRankSnapshot", new { env = t_env, issueTicket = false });
-            if (t_result == null || !TryGetTier(t_result.TierIndex, out _)) return;
+            RankSnapshotResult t_result = await FetchServerProgressAsync();
             if (!string.IsNullOrEmpty(t_result.SeasonId))
                 AdoptServerProgress(
                     t_result.Points,

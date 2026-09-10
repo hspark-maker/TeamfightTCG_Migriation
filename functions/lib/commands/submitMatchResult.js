@@ -558,7 +558,7 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
             const fallbackPoints = (0, rankStore_1.legacyRankPoints)(rankStateSnapshots[i].data(), saveSnapshots[i].data());
             const fallbackClaimed = (0, rankStore_1.legacyClaimedTiers)(saveSnapshots[i].data(), (0, payout_1.rankTierCount)(rankRows));
             let rankState = (0, rankStore_1.applyRankSeason)((0, rankStore_1.readRank)(rankSnapshots[i], fallbackPoints, fallbackClaimed, rankRows), rankSeason.seasonId, rankRows);
-            rankState = (0, rankStore_1.adoptLegacyEntry)(rankState, fallbackPoints, rankRows);
+            rankState = (0, rankStore_1.applyTutorialRankEntry)(rankState, saveSnapshots[i].data(), rankRows);
             const rankBefore = rankState.points;
             const rankSequence = Number.isSafeInteger(storedSequence) ? storedSequence + 1 : 1;
             const owner = ownerIndexByUid?.[entry.uid] ?? -1;
@@ -624,32 +624,36 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
             const outcome = settleOutcomes[i];
             const owner = ownerIndexByUid?.[entries[i].uid] ?? (solo ? 0 : -1);
             const bump = missionBumps[i];
-            (0, missionStore_1.commitMissionBump)(tx, bump, eventNames_1.EVENTS.battleCompleted.missionKey, 1, missionNow);
+            const increments = [
+                { event: eventNames_1.EVENTS.battleCompleted.missionKey, amount: 1 },
+            ];
             if (outcome.won && serverReplay?.ok === true) {
-                (0, missionStore_1.commitMissionBump)(tx, bump, "WinBattle", 1, missionNow);
+                increments.push({ event: "WinBattle", amount: 1 });
             }
             if (!solo && outcome.won && serverReplay?.ok === true) {
-                (0, missionStore_1.commitMissionBump)(tx, bump, eventNames_1.EVENTS.rankedBattleWon.missionKey, 1, missionNow);
+                increments.push({ event: eventNames_1.EVENTS.rankedBattleWon.missionKey, amount: 1 });
             }
-            if (owner < 0 || owner > 1)
-                continue;
-            const destroyed = destroyedByOwner?.[owner] ?? 0;
-            const attacks = replayStats?.attacksByOwner[owner] ?? 0;
-            const synergies = replayStats?.synergyFiredByOwner[owner] ?? 0;
-            const keywords = replayStats == null ? 0 :
-                Object.values(replayStats.keywordsByOwner[owner] ?? {}).reduce((sum, count) => sum + count, 0);
-            if (destroyed > 0) {
-                (0, missionStore_1.commitMissionBump)(tx, bump, eventNames_1.EVENTS.battleCardsDestroyed.missionKey, destroyed, missionNow);
+            if (owner >= 0 && owner <= 1) {
+                const destroyed = destroyedByOwner?.[owner] ?? 0;
+                const attacks = replayStats?.attacksByOwner[owner] ?? 0;
+                const synergies = replayStats?.synergyFiredByOwner[owner] ?? 0;
+                const keywords = replayStats == null ? 0 :
+                    Object.values(replayStats.keywordsByOwner[owner] ?? {}).reduce((sum, count) => sum + count, 0);
+                if (destroyed > 0) {
+                    increments.push({ event: eventNames_1.EVENTS.battleCardsDestroyed.missionKey, amount: destroyed });
+                }
+                if (attacks > 0) {
+                    increments.push({ event: eventNames_1.EVENTS.battleAttacksPerformed.missionKey, amount: attacks });
+                }
+                if (synergies > 0) {
+                    increments.push({ event: eventNames_1.EVENTS.battleSynergiesTriggered.missionKey, amount: synergies });
+                }
+                if (keywords > 0) {
+                    increments.push({ event: eventNames_1.EVENTS.battleKeywordsTriggered.missionKey, amount: keywords });
+                }
             }
-            if (attacks > 0) {
-                (0, missionStore_1.commitMissionBump)(tx, bump, eventNames_1.EVENTS.battleAttacksPerformed.missionKey, attacks, missionNow);
-            }
-            if (synergies > 0) {
-                (0, missionStore_1.commitMissionBump)(tx, bump, eventNames_1.EVENTS.battleSynergiesTriggered.missionKey, synergies, missionNow);
-            }
-            if (keywords > 0) {
-                (0, missionStore_1.commitMissionBump)(tx, bump, eventNames_1.EVENTS.battleKeywordsTriggered.missionKey, keywords, missionNow);
-            }
+            // 참가자별 모든 카운터를 누적한 뒤 정산과 같은 커밋에 한 번만 저장한다.
+            (0, missionStore_1.commitMissionBumps)(tx, bump, increments, missionNow);
         }
         // 클라 발산율의 유일한 조회 수단이다. 문서에만 쌓으면 집계할 방법이 없다.
         // simulateRules 가 false 여도 찍는다 — 로그가 아예 없으면 "재생이 실패했다"와

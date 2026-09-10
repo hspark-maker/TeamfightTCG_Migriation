@@ -1,4 +1,5 @@
 using System;
+using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
@@ -27,6 +28,14 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 이 씬에서 대기 중인 스텝. null이면 걸 게이트가 없다(자동 스텝·씬 전환·완료).
     TutorialStepDef m_step;
     bool m_subscribed;
+
+    static OutgameTutorialBridge s_rankEntryOwner;
+    internal static bool IsRankEntryPending => s_rankEntryOwner != null;
+    TutorialStepDef m_rankEntryStep;
+    bool m_rankPreparing;
+    bool m_rankPrepared;
+    bool m_rankFailed;
+    bool m_rankCompleting;
 
     // 억제 모드에서 클릭을 직접 듣는 타깃. 게이트가 없으니 리스너 부착·해제를 브리지가 진다.
     Button m_silentButton;
@@ -74,6 +83,8 @@ public class OutgameTutorialBridge : MonoBehaviour
 
     void OnDestroy()
     {
+        if (s_rankEntryOwner == this) s_rankEntryOwner = null;
+        ServerWaitOverlay.Release(this);
         // static 이벤트에 죽은 씬 오브젝트가 남으면 다음 씬에서 오발화한다.
         Unsubscribe();
         CloseGate();
@@ -181,10 +192,22 @@ public class OutgameTutorialBridge : MonoBehaviour
         // 연출이 끝나는 신호만 기다린다.
         if (m_step.Completion == EOutgameTutorialCompletion.RankEffect)
         {
+            if (m_rankEntryStep != m_step)
+            {
+                m_rankEntryStep = m_step;
+                m_rankPrepared = false;
+                m_rankFailed = false;
+            }
+            if (!m_rankPrepared)
+            {
+                s_rankEntryOwner = this;
+                if (!m_rankPreparing && !m_rankFailed) PrepareFirstRankAsync().Forget();
+                return;
+            }
             // 놓아줄 디렉터가 이 씬에 없으면 기다릴 신호도 없다 — 여기서 끊지 않으면 영구 정지다.
             // 완료만 넘기면 안 된다: 트리거 튜토리얼의 문은 졸업이 아니라 이 연출의 종료가 여는데,
             // 그 자리를 건너뛰면 문이 닫힌 채 남아 뒤따르는 트리거 안내가 통째로 사라진다(OnRankEffectFinished가 그 짝이다).
-            if (!LobbyRankEffectDirector.Exists) OnRankEffectFinished();
+            if (!LobbyRankEffectDirector.Exists || !LobbyRankEffectDirector.Playing) OnRankEffectFinished();
             return;
         }
 
@@ -388,11 +411,111 @@ public class OutgameTutorialBridge : MonoBehaviour
     void OnRankEffectFinished()
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.RankEffect) return;
+        if (!m_rankPrepared || m_rankCompleting) return;
 
-        // 승급 연출까지 다 봤다 — 트리거 튜토리얼의 문은 졸업이 아니라 여기서 열린다.
-        TriggeredTutorialRunner.NotifyRankPromotionFinished();
+        // 트리거 알림은 OnTriggeredChanged → PresentStep을 동기 호출한다.
+        // 그 안에서 같은 완료가 재진입해 다음 메시지까지 넘기지 않도록 먼저 잠근다.
+        m_rankCompleting = true;
+        try
+        {
+            TriggeredTutorialRunner.NotifyRankPromotionFinished();
+            OnGateSatisfied();
+        }
+        finally
+        {
+            m_rankCompleting = false;
+        }
+    }
 
-        OnGateSatisfied();
+    // 진행 좌표 저장과 서버 확정이 끝날 때까지 디렉터와 스텝 모두 기다린다.
+    async UniTask PrepareFirstRankAsync()
+    {
+        if (m_rankPreparing || m_rankPrepared) return;
+        m_rankPreparing = true;
+        m_rankFailed = false;
+        s_rankEntryOwner = this;
+        var t_token = this.GetCancellationTokenOnDestroy();
+        var t_step = m_step;
+        var t_save = DataSaveManager.Data;
+        int t_chapter = OutgameTutorialProgress.ChapterIndex;
+        int t_index = OutgameTutorialProgress.StepIndex;
+        Exception t_failure = null;
+        bool t_abandoned = false;
+        bool IsCurrentRequest() => !t_token.IsCancellationRequested && t_save == DataSaveManager.Data &&
+            OutgameTutorialRunner.IsRunning && t_chapter == OutgameTutorialProgress.ChapterIndex &&
+            t_index == OutgameTutorialProgress.StepIndex &&
+            OutgameTutorialRunner.TryGetCurrentStep(out var t_current) && t_current == t_step;
+        ServerWaitOverlay.Hold(this);
+        try
+        {
+            await PlayerSaveCloud.FlushAsync().AttachExternalCancellation(t_token);
+            if (!IsCurrentRequest()) { t_abandoned = true; return; }
+            if (!PlayerSaveCloud.CanRunServerCommand || PlayerSaveCloud.HasPendingUpload)
+                throw new InvalidOperationException("Tutorial progress has not reached the server.");
+
+            var t_result = await RankManager.FetchServerProgressAsync().AttachExternalCancellation(t_token);
+            if (!IsCurrentRequest()) { t_abandoned = true; return; }
+
+            // 서버 미반영을 성공으로 읽으면 연출만 먼저 지나가므로 점수도 확인한다.
+            if (!RankManager.HasEnteredRank(t_result.Points))
+                throw new InvalidOperationException("The server has not confirmed first rank entry.");
+
+            RankManager.AdoptServerProgress(t_result.Points, t_result.SeasonId,
+                t_result.BestTierIndex, t_result.ClaimedTierIndexes);
+            m_rankPrepared = true;
+            if (s_rankEntryOwner == this) s_rankEntryOwner = null;
+
+            // 초기화에서 채택했더라도 이 스텝에 서 있다면 첫 진입 연출을 재개한다.
+            if (LobbyRankEffectDirector.Exists)
+            {
+                RankResultHandoff.Set(new RankApplyResult(0, -1, t_result.TierIndex));
+                LobbyRankEffectDirector.ResumePending();
+            }
+        }
+        catch (OperationCanceledException) when (t_token.IsCancellationRequested) { }
+        catch (Exception t_exception)
+        {
+            if (!IsCurrentRequest()) { t_abandoned = true; return; }
+            t_failure = t_exception;
+            m_rankFailed = true;
+        }
+        finally
+        {
+            ServerWaitOverlay.Release(this);
+            m_rankPreparing = false;
+            if ((t_abandoned || t_token.IsCancellationRequested) && s_rankEntryOwner == this)
+                s_rankEntryOwner = null;
+        }
+
+        if (t_token.IsCancellationRequested) return;
+        if (t_failure != null)
+        {
+            Debug.LogWarning($"[Tutorial] First rank confirmation failed: {t_failure.GetBaseException().Message}");
+            UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
+            {
+                titleText = "랭크 진입을 확인하지 못했습니다.\n연결을 확인한 뒤 다시 시도해 주세요.",
+                yesText = "재시도",
+                yesAction = () => { if (this != null) RetryFirstRankAsync().Forget(); },
+                noText = "종료",
+                noAction = () =>
+                {
+#if UNITY_EDITOR
+                    UnityEditor.EditorApplication.isPlaying = false;
+#else
+                    Application.Quit();
+#endif
+                },
+            });
+            return;
+        }
+        if (m_rankPrepared && !LobbyRankEffectDirector.Exists) OnRankEffectFinished();
+    }
+
+    async UniTask RetryFirstRankAsync()
+    {
+        // SimpleYNPopup는 콜백 뒤에 Hide하므로 새 대기를 열기 전에 한 프레임 비운다.
+        await UniTask.Yield(this.GetCancellationTokenOnDestroy());
+        await PrepareFirstRankAsync();
     }
 
     // 획득 연출 종료 신호. 실을 것이 없어 지나간 경우도 같은 신호로 온다.

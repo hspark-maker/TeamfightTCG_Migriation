@@ -28,16 +28,13 @@ public static class OutgameTutorialRunner
 
     /// <summary>온보딩 졸업 처리의 유일한 창구(멱등).
     ///
-    /// 첫 랭크 티어 진입은 <b>여기가 아니라 시퀀스가 저작한 자리</b>(EnterFirstRank 스텝)에서 일어난다 —
-    /// 진입 연출은 마지막 전투에서 로비로 돌아온 그 순간에 서야 하고, 졸업은 그보다 뒤로 밀릴 수 있기 때문이다.
-    /// 여기 남은 호출은 그 스텝을 거치지 않고 닫히는 경로(디버그 스킵·좌표 이탈)의 안전망이다(TryEnterFirstTier는 멱등).</summary>
+    /// 첫 랭크 진입은 서버가 저장된 튜토리얼 진행으로 확정한다.
+    /// 졸업은 로컬 점수를 올리거나 승급 연출을 예약하지 않는다.</summary>
     public static void CompleteSequence()
     {
         if (OutgameTutorialProgress.IsCompleted) return;
 
         OutgameTutorialProgress.Complete();
-
-        if (RankManager.TryEnterFirstTier(out var t_entry)) RankResultHandoff.Set(t_entry);
 
         // 졸업으로 전 기능이 열린다. 게이트를 거치지 않고 닫히는 경로(전투에서 돌아와 확정하는 졸업·디버그 스킵)에도
         // 잠김 룩이 따라오게 여기서 알린다 — FeatureLockView는 OnChanged로만 다시 그린다.

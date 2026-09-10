@@ -73,7 +73,31 @@ async function main() {
   await assert.rejects(getRankLeaderboard({data: {env: "live"}}), {code: "unauthenticated"});
   await assert.rejects(getRankLeaderboard({auth: {uid: "me"}, data: {env: "other"}}), {code: "invalid-argument"});
 
-  const {writeRank, ensureRankState} = require("../lib/rank/rankStore");
+  const {writeRank, ensureRankState, canEnterFirstRank, applyTutorialRankEntry,
+    FIRST_RANK_CHAPTER_INDEX} = require("../lib/rank/rankStore");
+  const tutorialAsset = require("node:fs").readFileSync(require("node:path").join(__dirname,
+    "../../Assets/SO/TutorialConfig/Outgame/OutgameTutorial.asset"), "utf8");
+  const chapters = tutorialAsset.split(/^  - label:/m).slice(1);
+  const entry = chapters.flatMap((chapter, chapterIndex) =>
+    [...chapter.matchAll(/    - stepId: (\d+)\r?\n      action: (\d+)/g)]
+      .map((match, chapterStepIndex) => ({chapterIndex, chapterStepIndex,
+        stepId: Number(match[1]), action: Number(match[2])})))
+    .filter(step => step.action === 13);
+  assert.deepEqual(entry, [{chapterIndex: FIRST_RANK_CHAPTER_INDEX, chapterStepIndex: 0,
+    stepId: 23, action: 13}], "server eligibility must follow authored EnterFirstRank coordinates");
+  for (const tutorial of [undefined, {}, {outgameCompleted: "true"},
+    {chapterIndex: 2, chapterStepIndex: 999, stepId: 999},
+    {chapterIndex: "3", chapterStepIndex: 0}, {chapterIndex: 3, chapterStepIndex: -1},
+    {chapterIndex: 3.5, chapterStepIndex: 0}, {chapterIndex: 3},
+    {chapterIndex: Infinity, chapterStepIndex: 0}]) {
+    assert.equal(canEnterFirstRank({tutorial}), false, JSON.stringify(tutorial));
+  }
+  assert.equal(canEnterFirstRank(null), false);
+  for (const tutorial of [{chapterIndex: 3, chapterStepIndex: 0, stepId: 23},
+    {chapterIndex: 3, chapterStepIndex: 1, stepId: 24},
+    {chapterIndex: 5, chapterStepIndex: 5, stepId: 17}, {outgameCompleted: true}]) {
+    assert.equal(canEnterFirstRank({tutorial}), true);
+  }
   function doc(path) {
     const parts = path.split("/");
     return {path, id: parts.at(-1), parent: {parent: parts.length > 2 ? doc(parts.slice(0, -2).join("/")) : null},
@@ -89,6 +113,16 @@ async function main() {
 
   const grades = [100, 500, 900].map((entryPoints, id) =>
     ({id, entryPoints, pointsPerDivision: 100, winPoints: 20, losePoints: 10}));
+  const unranked = {seasonId: "S1", points: 0, bestTierIndex: -1, claimed: {}};
+  const eligibleSave = {tutorial: {chapterIndex: 3, chapterStepIndex: 0, stepId: 23},
+    rank: {points: 900}};
+  const entered = applyTutorialRankEntry(unranked, eligibleSave, grades);
+  assert.deepEqual(entered, {...unranked, points: 100, bestTierIndex: 0});
+  assert.equal(applyTutorialRankEntry(entered, eligibleSave, grades), entered);
+  assert.equal(applyTutorialRankEntry(unranked, {rank: {points: 900}}, grades), unranked);
+  assert.equal(applyTutorialRankEntry(unranked, eligibleSave, []), unranked);
+  const ranked = {...entered, points: 500, bestTierIndex: 4};
+  assert.equal(applyTutorialRankEntry(ranked, eligibleSave, grades), ranked);
   for (const env of ["live", "test"]) {
     const rankPath = `envs/${env}/users/me/rank/current`;
     const payoutPath = `envs/${env}/users/me/payoutState/current`;
@@ -166,7 +200,16 @@ async function main() {
     assert.equal((await repaired()).points, 100, "first adoption uses legacy save when payout is absent");
     reset();
     documents.set(rankPath, {...canonical, points: 0, bestTierIndex: -1, claimed: {}});
-    assert.equal((await repaired()).points, 600, "tutorial entry is adopted before no-op detection");
+    assert.equal((await repaired()).points, 0, "legacy save/payout cannot raise an existing rank");
+    for (const tutorial of [eligibleSave.tutorial, {chapterIndex: 5, chapterStepIndex: 0},
+      {outgameCompleted: true}]) {
+      reset();
+      documents.set(rankPath, {...canonical, points: 0, bestTierIndex: -1, claimed: {}});
+      documents.set(payoutPath, {currentPoints: 0});
+      documents.set(savePath, {...eligibleSave, tutorial});
+      assert.equal((await repaired()).points, 100, "eligible progress enters only first tier");
+      assert.equal((await repaired("S2")).points, 100, "season change cannot duplicate entry points");
+    }
     for (const [path, patch] of [
       [rankPath, {schemaVersion: 0}],
       [rankPath, {points: "600"}],
