@@ -102,6 +102,7 @@ public class LobbyTabController : MonoBehaviour
 
     void Awake()
     {
+        GuidanceCoordinator.Install(gameObject);
         if (tabBar != null) tabBar.Selected += HandleTabSelected;
 
         // 로비 버튼 전체에 공통 클릭음을 한 번에 건다. 꺼져 있는 탭 패널까지 훑으므로 여기 한 번으로 끝난다.

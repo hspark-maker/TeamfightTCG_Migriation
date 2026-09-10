@@ -77,6 +77,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
     /// <summary>이 씬에서 획득 연출을 재생할 수 있는가. 꺼져 있으면 코루틴이 돌지 못해
     /// 통지가 영영 오지 않으므로, 있기만 한 것으로는 부족하다.</summary>
     public static bool Exists => s_instance != null && s_instance.isActiveAndEnabled;
+    public static bool Playing => Exists && s_instance.m_runId != s_instance.m_finishedRunId;
 
     /// <summary>씬을 다시 열지 않고 지금 실린 캐리어를 재생한다. 로비에 머문 채 지급하는 쪽이 쓴다
     /// (Start·오버레이 닫힘은 이미 지나갔으므로 그 둘로는 닿지 않는다).

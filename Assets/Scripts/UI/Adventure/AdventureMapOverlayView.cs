@@ -235,6 +235,7 @@ public class AdventureMapOverlayView : MonoBehaviour, IPointerClickHandler
     /// <summary>맵을 닫는다. 하단바는 퇴장 트윈과 나란히 돌려준다 — OnDisable을 기다리면 늦는다.</summary>
     public void Close()
     {
+        AdventureTutorialRunner.Pause();
         // 퇴장 트윈이 도는 동안에도 오브젝트는 켜져 있다 — 그 사이 진행 통지가 앵커를 되살리지 않게 먼저 내린다.
         this.m_closing = true;
 

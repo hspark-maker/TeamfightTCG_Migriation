@@ -40,6 +40,8 @@ using UnityEngine.UI;
 public class OutgameTutorialGateUI : MonoBehaviour
 {
     public static OutgameTutorialGateUI Instance { get; private set; }
+    public static bool IsShowing => Instance != null && Instance.m_gateRoot != null
+        && Instance.m_gateRoot.activeInHierarchy;
 
     // 정렬 불변식: TutorialOverlay(200) < 딤(350) < 타깃(351) < 안내 요소(352) < UIPoolManager 팝업(400) < Mulligan(999) < LoadingCover(1000).
     // 400을 넘기면 안 된다 — 플레이 스텝의 "유효한 덱이 없습니다"(LobbyMatchLauncher)와 구매 실패 팝업

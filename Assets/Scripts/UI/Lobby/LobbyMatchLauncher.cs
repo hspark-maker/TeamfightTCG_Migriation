@@ -216,6 +216,7 @@ public class LobbyMatchLauncher : MonoBehaviour
     public void StartAdventureBattle(int _nodeIndex)
     {
         if (m_running) return;
+        if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure)) return;
 
         if (!AdventureProgress.CanEnter(_nodeIndex)) return;
         if (!AdventureProgress.TryGetNode(_nodeIndex, out AdventureNodeDef t_node)) return;
@@ -620,8 +621,10 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure)) return;
 
         adventurePanel?.Open();
+        AdventureTutorialRunner.NotifyMapOpened();
         // 복귀 재오픈(HandleAdventureReturn)은 이 자리를 거치지 않는다 — 안내가 전투 복귀 연출 위에 겹치지 않는 이유다.
-        TriggeredTutorialRunner.Fire(EOutgameTutorialTrigger.AdventureMapFirstOpen);
+        if (!AdventureTutorialRunner.IsRunning)
+            TriggeredTutorialRunner.Fire(EOutgameTutorialTrigger.AdventureMapFirstOpen);
     }
 
     // 정점 전투 복귀 — 떠났던 화면(배틀 탭 + 맵)을 되돌린다. 승패 무관하게 맵으로 온다.

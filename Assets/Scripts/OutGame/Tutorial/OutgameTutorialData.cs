@@ -11,6 +11,14 @@ public class OutgameTutorialData : ScriptableObject
            + "— 겹친 번호를 걷어 새로 매긴다. 그러지 않으면 두 행이 같은 스텝으로 보인다")]
     public List<OutgameTutorialChapter> chapters = new List<OutgameTutorialChapter>();
 
+    [Header("Adventure introduction")]
+    [Tooltip("모험을 해금할 최소 랭크 등급. 이미 해금된 계정은 유지됩니다.")]
+    public ERankGrade adventureUnlockGrade = ERankGrade.Bronze;
+    [Range(1, RankConfig.DivisionsPerGrade)]
+    [Tooltip("모험을 해금할 랭크 단계. 해당 랭크 이상 도달 시 해금됩니다.")]
+    public int adventureUnlockDivision = 2;
+    public OutgameTutorialChapter adventureIntroduction;
+
     // 다음에 내줄 번호. 단조 증가만 하고 지운 번호를 재사용하지 않는다 —
     // 재사용하면 삭제된 스텝에 서 있던 세이브가 "삭제 경고" 없이 무관한 새 스텝으로 조용히 옮겨간다.
     // 이 줄을 지우거나 머지에서 떨어뜨리지 마라: 값을 잃으면 남은 최댓값에서 다시 세는데,
@@ -37,9 +45,9 @@ public class OutgameTutorialData : ScriptableObject
 
         // 1패스 — 살아 있는 번호를 먼저 전부 모은다. 한 번에 훑으면서 나눠 주면 아직 안 본 뒤쪽 번호를
         // 새 칸에 내주게 되고, 그러면 그 뒤가 전부 한 칸씩 밀린다(이 도구가 막으려던 바로 그 사고다).
-        for (int t_c = 0; t_c < chapters.Count; t_c++)
+        for (int t_c = 0; t_c <= chapters.Count; t_c++)
         {
-            var t_chapter = chapters[t_c];
+            var t_chapter = t_c < chapters.Count ? chapters[t_c] : adventureIntroduction;
             if (t_chapter == null) continue;
 
             for (int t_s = 0; t_s < t_chapter.StepCount; t_s++)

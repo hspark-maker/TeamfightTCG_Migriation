@@ -69,7 +69,11 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 트리거가 무대를 쥐어 진입을 미뤄 둔 상태. 트리거가 끝나면 여기서부터 이어간다.
     bool m_deferred;
 
-    void Awake() => OutgameTutorialRunner.EnsureData(data);
+    void Awake()
+    {
+        OutgameTutorialRunner.EnsureData(data);
+        AdventureTutorialBridge.Install(gameObject, gatePrefab);
+    }
 
     void Start()
     {
@@ -384,6 +388,8 @@ public class OutgameTutorialBridge : MonoBehaviour
     void OnDeckSaved()
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.DeckSave) return;
+
+        GuideMissionNoticeService.RequestFromOnboardingDeckSave();
 
         OnGateSatisfied();
     }

@@ -33,6 +33,7 @@ public static class OutgameTutorialProgress
     // 초기화에서 클라우드 세이브 채택 이후 1회 호출 — 진행 정지 판정
     public static void Init()
     {
+        AdventureTutorialRunner.Initialize();
         DetectStall();
     }
 

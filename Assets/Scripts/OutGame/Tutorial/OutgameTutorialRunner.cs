@@ -57,6 +57,7 @@ public static class OutgameTutorialRunner
         }
 
         s_data = _data;
+        AdventureTutorialRunner.EnsureData(_data);
         WarnOnMisauthoredChapters();
     }
 

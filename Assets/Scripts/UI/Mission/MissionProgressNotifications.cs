@@ -44,6 +44,7 @@ internal static class MissionProgressNotifications
 
     internal static bool IsCurrent(MissionProgressNotification _notification)
     {
+        if (GuideMissionNoticeService.OwnsNotification(_notification.MissionId)) return false;
         if (!MissionManager.IsReady || string.IsNullOrEmpty(_notification.MissionId) ||
             _notification.UserId != FirebaseAuthService.Instance.UserId) return false;
         MissionDefinition t_definition = MissionManager.Find(_notification.MissionId);

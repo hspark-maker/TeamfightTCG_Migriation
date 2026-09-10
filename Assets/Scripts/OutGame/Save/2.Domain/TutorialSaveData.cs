@@ -26,4 +26,12 @@ public class TutorialSaveData
 
     // 완주한 트리거 튜토리얼 키(EOutgameTutorialTrigger 이름)
     [FirestoreProperty("completedTriggers")] public List<string> CompletedTriggers { get; set; } = new List<string>();
+    [FirestoreProperty("adventureFlowVersion")] public int AdventureFlowVersion { get; set; }
+    [FirestoreProperty("adventureUnlocked")] public bool AdventureUnlocked { get; set; }
+    [FirestoreProperty("adventureIntroStarted")] public bool AdventureIntroStarted { get; set; }
+    [FirestoreProperty("adventureIntroDeferred")] public bool AdventureIntroDeferred { get; set; }
+    [FirestoreProperty("adventureIntroCompleted")] public bool AdventureIntroCompleted { get; set; }
+    [FirestoreProperty("adventureIntroStepId")] public int AdventureIntroStepId { get; set; }
+    [FirestoreProperty("guideNotices")] public GuideNoticeSaveData GuideNotices { get; set; } = new GuideNoticeSaveData();
+    [FirestoreProperty("synergyIntroduction")] public SynergyIntroductionSaveData SynergyIntroduction { get; set; } = new SynergyIntroductionSaveData();
 }

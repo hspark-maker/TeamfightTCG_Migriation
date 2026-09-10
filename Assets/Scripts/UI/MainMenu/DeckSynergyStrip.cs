@@ -48,23 +48,7 @@ public class DeckSynergyStrip : MonoBehaviour
 
     public void Refresh(IEnumerable<int> _deck)
     {
-        this.eligibleCards.Clear();
-        if (_deck != null)
-        {
-            foreach (int t_card in _deck)
-            {
-                if (t_card <= 0) continue;
-                if (DeckConfig.IsMultiplayer)
-                {
-                    this.eligibleCards.Add(t_card);
-                    continue;
-                }
-
-                CardGrowth t_growth = CardGrowthManager.GrowthOf(t_card);
-                if (!t_growth.Applied || t_growth.SynergyUnlocked)
-                    this.eligibleCards.Add(t_card);
-            }
-        }
+        DeckSynergyEligibility.Collect(_deck, this.eligibleCards, DeckConfig.IsMultiplayer);
 
         List<SynergyProgress> t_all = SynergyPreview.Resolve(this.eligibleCards);
 
@@ -103,6 +87,15 @@ public class DeckSynergyStrip : MonoBehaviour
     }
 
     public void Clear() => Refresh(null);
+
+    public RectTransform FindSynergyAnchor(SynergyData _synergy)
+    {
+        if (this.icons == null) return null;
+        foreach (SynergyCountIcon t_icon in this.icons)
+            if (t_icon != null && t_icon.gameObject.activeInHierarchy && t_icon.Progress?.Synergy == _synergy)
+                return t_icon.transform as RectTransform;
+        return null;
+    }
 
     void OnDisable() => HideExplain();
 

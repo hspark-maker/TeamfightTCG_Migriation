@@ -46,6 +46,8 @@ public static class OutgameFeatureLock
     public static bool IsUnlocked(EOutgameFeature _feature)
     {
         if (_feature == EOutgameFeature.None) return true;
+        if (_feature == EOutgameFeature.Adventure)
+            return s_forceUnlockAll || AdventureTutorialRunner.IsUnlocked;
 
         Refresh();
 
@@ -73,6 +75,12 @@ public static class OutgameFeatureLock
         if (!Recalculate()) return;
 
         OnChanged?.Invoke();
+    }
+
+    public static void RefreshAdventure()
+    {
+        s_valid = false;
+        Refresh();
     }
 
     /// <summary>튜토리얼이 더 나아갈 수 없다고 판정됐다 — 남은 기능을 전부 연다(멱등).

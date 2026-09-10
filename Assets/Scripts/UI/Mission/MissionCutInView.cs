@@ -69,6 +69,8 @@ public sealed class MissionCutInView : SingletonOverlayBase
     bool CanShow => GameInitialization.IsReady
         && SceneManager.GetActiveScene().name == "LobbyScene"
         && !CurtainView.IsBusy
+        && !AdventureTutorialRunner.IsRunning && !SynergyIntroduction.IsActive
+        && (UIPoolManager.instance == null || !UIPoolManager.instance.HasVisibleUIExcept())
         && (m_matchLauncher == null || !m_matchLauncher.IsRunning)
         && !OutgameTutorialRunner.IsRunning && !TriggeredTutorialRunner.IsRunning;
 

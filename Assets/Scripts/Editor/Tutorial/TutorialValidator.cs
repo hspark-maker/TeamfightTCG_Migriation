@@ -135,6 +135,24 @@ public static class TutorialValidator
             }
         }
 
+        // The detached chapter retains persistent IDs but does not derive feature locks.
+        var t_adventure = _data.adventureIntroduction;
+        if (t_adventure != null)
+        {
+            for (int i = 0; i < t_adventure.StepCount; i++)
+            {
+                if (!t_adventure.TryGetStep(i, out var step)) continue;
+                ValidateStepId(step, _data.chapters.Count, i, t_ids, t_issues);
+                if (step.Action != EOutgameTutorialAction.Message
+                    && step.Action != EOutgameTutorialAction.WaitClick
+                    && step.Action != EOutgameTutorialAction.BattleStart
+                    && step.Action != EOutgameTutorialAction.CloseCardDetail)
+                    Add(t_issues, ETutorialIssueLevel.Error, step, _data.chapters.Count, i,
+                        "Unsupported adventure action", "AdventureTutorialBridge cannot execute this action.",
+                        "Use Message, WaitClick, BattleStart or CloseCardDetail.");
+            }
+        }
+
         return t_issues;
     }
 

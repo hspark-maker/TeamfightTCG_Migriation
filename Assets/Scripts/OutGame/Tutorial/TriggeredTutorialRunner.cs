@@ -78,6 +78,7 @@ public static class TriggeredTutorialRunner
         if (_trigger == EOutgameTutorialTrigger.None) return;
         if (s_data == null) return;
         if (IsRunning) return;
+        if (AdventureTutorialRunner.IsRunning) return;
         if (!IsOpen) return;
         if (OutgameTutorialProgress.IsTriggerDone(_trigger)) return;
 

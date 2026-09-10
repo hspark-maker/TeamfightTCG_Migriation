@@ -12,6 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 75657545e05445d458099476ddb662f3, type: 3}
   m_Name: OutgameTutorial
   m_EditorClassIdentifier: Assembly-CSharp::OutgameTutorialData
+  adventureUnlockGrade: 0
+  adventureUnlockDivision: 2
   chapters:
   - label: "\uCCAB \uAC8C\uC784 \uC2DC\uC791"
     stepDefs:
@@ -740,8 +742,6 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-  - label: "\uD1A0\uB108\uBA3C\uD2B8 \uC624\uD508"
-    stepDefs:
     - stepId: 34
       action: 14
       anchor: 0
@@ -765,6 +765,9 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
+  adventureIntroduction:
+    label: Adventure introduction
+    stepDefs:
     - stepId: 35
       action: 1
       anchor: 0
