@@ -11,6 +11,11 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "rankings",
+      "fieldPath": "profile",
+      "indexes": []
+    },
+    {
       "collectionGroup": "blob",
       "fieldPath": "payload",
       "indexes": []

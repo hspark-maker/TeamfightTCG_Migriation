@@ -52,6 +52,9 @@ interface IndexCacheEntry {
 
 const cache = new Map<string, CacheEntry>();
 const indexCache = new Map<string, IndexCacheEntry>();
+const indexLoads = new Map<string, Promise<IndexCacheEntry>>();
+const blobLoads = new Map<string, Promise<CacheEntry>>();
+let cacheGeneration = 0;
 const INDEX_CACHE_TTL_MS = 30 * 1000;
 
 /**
@@ -67,43 +70,61 @@ const UNINDEXED_TABLES = new Set<string>();
 const UNINDEXED_CACHE_TTL_MS = 30 * 1000;
 
 async function readPublishedSpec(env: string, table: string): Promise<PublishedSpec> {
-  const now = Date.now();
   let cached = indexCache.get(env);
-  if (cached === undefined || cached.expiresAt <= now) {
-    const snapshot = await db.doc(`envs/${env}/specs/_index`).get();
-    if (!snapshot.exists) {
-      throw new Error(`published content index is missing for env ${env}`);
-    } else {
-      const data = snapshot.data() ?? {};
-      const major = Number(data.major);
-      const minor = Number(data.minor);
-      if (!SUPPORTED_CONTENT_MAJORS.has(major) || !Number.isInteger(minor) || minor < 0) {
-        throw new Error(`published content ${major}.${minor} is incompatible`);
-      }
-      const rawTables = data.tables;
-      if (rawTables == null || typeof rawTables !== "object") {
-        throw new Error("published content index has no tables map");
-      }
-      const tables: Record<string, PublishedSpec> = {};
-      for (const [name, raw] of Object.entries(rawTables as Record<string, unknown>)) {
-        if (raw == null || typeof raw !== "object") {
-          throw new Error(`published content index entry ${name} is invalid`);
-        }
-        const entry = raw as Record<string, unknown>;
-        const blobPath = String(entry.blobPath ?? "");
-        const payloadHash = String(entry.payloadHash ?? "");
-        if (blobPath === "" || payloadHash === "") {
-          throw new Error(`published content index entry ${name} has no blobPath or payloadHash`);
-        }
-        tables[name] = {blobPath, payloadHash};
-      }
-      cached = {expiresAt: now + INDEX_CACHE_TTL_MS, tables};
-    }
-    indexCache.set(env, cached);
+  if (cached === undefined || cached.expiresAt <= Date.now()) {
+    cached = await loadOnce(indexLoads, env, () => loadPublishedIndex(env));
   }
   const published = cached.tables[table];
   if (published === undefined) throw new Error(`published content index has no ${table} entry`);
   return published;
+}
+
+async function loadPublishedIndex(env: string): Promise<IndexCacheEntry> {
+  const generation = cacheGeneration;
+  const now = Date.now();
+  const snapshot = await db.doc(`envs/${env}/specs/_index`).get();
+  if (!snapshot.exists) throw new Error(`published content index is missing for env ${env}`);
+  const data = snapshot.data() ?? {};
+  const major = Number(data.major);
+  const minor = Number(data.minor);
+  if (!SUPPORTED_CONTENT_MAJORS.has(major) || !Number.isInteger(minor) || minor < 0) {
+    throw new Error(`published content ${major}.${minor} is incompatible`);
+  }
+  const rawTables = data.tables;
+  if (rawTables == null || typeof rawTables !== "object") {
+    throw new Error("published content index has no tables map");
+  }
+  const tables: Record<string, PublishedSpec> = {};
+  for (const [name, raw] of Object.entries(rawTables as Record<string, unknown>)) {
+    if (raw == null || typeof raw !== "object") {
+      throw new Error(`published content index entry ${name} is invalid`);
+    }
+    const entry = raw as Record<string, unknown>;
+    const blobPath = String(entry.blobPath ?? "");
+    const payloadHash = String(entry.payloadHash ?? "");
+    if (blobPath === "" || payloadHash === "") {
+      throw new Error(`published content index entry ${name} has no blobPath or payloadHash`);
+    }
+    tables[name] = {blobPath, payloadHash};
+  }
+  const loaded = {expiresAt: now + INDEX_CACHE_TTL_MS, tables};
+  if (generation === cacheGeneration) indexCache.set(env, loaded);
+  return loaded;
+}
+
+// 실패한 Promise는 남기지 않는다. clear 뒤 같은 키로 시작한 새 조회도 지우지 않는다.
+async function loadOnce<T>(
+  pending: Map<string, Promise<T>>, key: string, load: () => Promise<T>,
+): Promise<T> {
+  const existing = pending.get(key);
+  if (existing !== undefined) return existing;
+  const loading = load();
+  pending.set(key, loading);
+  try {
+    return await loading;
+  } finally {
+    if (pending.get(key) === loading) pending.delete(key);
+  }
 }
 
 /**
@@ -153,15 +174,7 @@ export async function readPinnedSpecRows(env: string, table: string, pin: SpecPi
   if (!pin.blobPath.startsWith(expectedPrefix) || pin.payloadHash === "") {
     throw new Error(`invalid spec pin for ${table}`);
   }
-  const key = `${env}/${table}/${pin.payloadHash}`;
-  const cached = cache.get(key);
-  if (cached !== undefined && cached.expiresAt === null && cached.payloadHash === pin.payloadHash) {
-    return cached.rows;
-  }
-  const read = await readFromBlob(env, table, pin.blobPath, pin.payloadHash);
-  const rows = sortById(read.rows);
-  cache.set(key, {payloadHash: read.payloadHash, rows, expiresAt: null});
-  return rows;
+  return readCachedBlob(env, table, pin.blobPath, pin.payloadHash, true);
 }
 
 /**
@@ -293,37 +306,57 @@ function sortById(raw: SpecRow[]): SpecRow[] {
  * @return {Promise<SpecRow[]>} id 오름차순 행
  */
 export async function readSpecRows(env: string, table: string): Promise<SpecRow[]> {
-  const key = `${env}/${table}`;
-  const cached = cache.get(key);
-
   if (UNINDEXED_TABLES.has(table)) {
-    const now = Date.now();
-    if (cached !== undefined && cached.expiresAt !== null && cached.expiresAt > now) return cached.rows;
-
     const blobPath = `envs/${env}/specs/${table}/blob/current`;
-    const read = await readFromBlob(env, table, blobPath, null);
-    const rows = sortById(read.rows);
-    cache.set(key, {payloadHash: read.payloadHash, rows, expiresAt: now + UNINDEXED_CACHE_TTL_MS});
-    logger.info("spec table loaded", {env, table, source: "unindexed-blob", rowCount: rows.length});
-    return rows;
+    return readCachedBlob(env, table, blobPath, null);
   }
 
   const published = await readPublishedSpec(env, table);
-  // 릴리스 블롭은 불변이라 해시가 같으면 내용도 같다 — 시간 만료가 필요 없다.
-  if (cached !== undefined && cached.expiresAt === null &&
-      cached.payloadHash === published.payloadHash) {
+  return readCachedBlob(env, table, published.blobPath, published.payloadHash);
+}
+
+async function readCachedBlob(
+  env: string, table: string, blobPath: string, payloadHash: string | null, pinned = false,
+): Promise<SpecRow[]> {
+  const currentKey = `${env}/${table}`;
+  const pinnedKey = `${env}/${table}/${payloadHash}`;
+  const key = pinned ? pinnedKey : currentKey;
+  // 완료 캐시는 기존처럼 해시로 재사용한다. 발행 때 경로만 바뀐 표를 다시 읽지 않고,
+  // 현재 표는 env/table당 한 벌만 보관한다. 이전 버전은 고정 pin 조회에만 보관한다.
+  const cached = [cache.get(key), cache.get(pinned ? currentKey : pinnedKey)].find((entry) =>
+    entry !== undefined && (payloadHash === null ? entry.expiresAt !== null && entry.expiresAt > Date.now() :
+      entry.expiresAt === null && entry.payloadHash === payloadHash));
+  if (cached !== undefined) {
+    cache.set(key, cached);
     return cached.rows;
   }
-
-  const read = await readFromBlob(env, table, published.blobPath, published.payloadHash);
-  const rows = sortById(read.rows);
-  cache.set(key, {payloadHash: read.payloadHash, rows, expiresAt: null});
-  logger.info("spec table loaded", {env, table, source: "published-blob", rowCount: rows.length});
-  return rows;
+  // 진행 중 요청은 경로·기대 해시까지 같아야 다운로드·검증·정렬을 공유한다.
+  const loadKey = JSON.stringify([env, table, blobPath, payloadHash]);
+  const generation = cacheGeneration;
+  const loaded = await loadOnce(blobLoads, loadKey, async () => {
+    const now = Date.now();
+    const read = await readFromBlob(env, table, blobPath, payloadHash);
+    const rows = sortById(read.rows);
+    const entry = {
+      payloadHash: read.payloadHash, rows,
+      expiresAt: payloadHash === null ? now + UNINDEXED_CACHE_TTL_MS : null,
+    };
+    if (generation === cacheGeneration) cache.set(key, entry);
+    logger.info("spec table loaded", {
+      env, table, source: payloadHash === null ? "unindexed-blob" : "published-blob", rowCount: rows.length,
+    });
+    return entry;
+  });
+  // 같은 조회를 기다린 current/pin 소비자 각각의 캐시에도 검증된 결과를 채운다.
+  if (generation === cacheGeneration) cache.set(key, loaded);
+  return loaded.rows;
 }
 
 /** 캐시를 비운다. 배포 직후 반영을 앞당기거나 테스트에서 격리할 때 쓴다. */
 export function clearSpecCache(): void {
+  cacheGeneration++;
   cache.clear();
   indexCache.clear();
+  indexLoads.clear();
+  blobLoads.clear();
 }

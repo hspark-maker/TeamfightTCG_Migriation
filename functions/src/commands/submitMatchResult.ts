@@ -636,7 +636,7 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
         expiresAt: payoutExpiresAt,
       };
       tx.set(db.doc(`envs/${data.env}/users/${entry.uid}/payouts/${data.matchId}`), payout);
-      writeRank(tx, rankRefs[i], rankState, settledAt);
+      writeRank(tx, rankRefs[i], rankState, settledAt, saveSnapshots[i].data()?.profile);
       tx.set(rankStateRefs[i], {
         currentPoints: rank.after,
         sequence: rankSequence,

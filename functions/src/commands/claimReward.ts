@@ -488,6 +488,7 @@ export const claimReward = onCall(async (request) => {
           currentRankRef!,
           rankState!,
           FieldValue.serverTimestamp(),
+          current.profile,
         );
         transaction.set(
           payoutStateRef!,

@@ -1,4 +1,5 @@
 import {isDeepStrictEqual} from "node:util";
+import {publicRankProfile, RankPublicProfile} from "./publicProfile";
 import {
   DocumentReference,
   DocumentSnapshot,
@@ -133,7 +134,7 @@ export function adoptLegacyEntry(
 }
 
 export function writeRank(
-  transaction: Transaction, ref: DocumentReference, state: RankState, now: unknown,
+  transaction: Transaction, ref: DocumentReference, state: RankState, now: unknown, profile: unknown,
 ): void {
   transaction.set(ref, {
     schemaVersion: RANK_SCHEMA_VERSION,
@@ -148,6 +149,7 @@ export function writeRank(
   transaction.set(user.parent.parent!.collection("rankings").doc(user.id), {
     seasonId: state.seasonId,
     points: state.points,
+    profile: publicRankProfile(profile),
     updatedAt: now,
   });
 }
@@ -168,6 +170,14 @@ export async function ensureRankState(
   seasonId: string,
   grades: RankGradeRow[],
 ): Promise<RankState | null> {
+  const snapshot = await ensureRankSnapshot(db, env, uid, seasonId, grades);
+  return snapshot?.state ?? null;
+}
+
+// 이미 읽는 세이브에서 내 공개 프로필도 반환해 랭킹 조회의 추가 읽기를 없앤다.
+export async function ensureRankSnapshot(
+  db: Firestore, env: string, uid: string, seasonId: string, grades: RankGradeRow[],
+): Promise<{state: RankState; profile: RankPublicProfile} | null> {
   return db.runTransaction(async (transaction) => {
     const currentRankRef = rankRef(db, env, uid);
     const payoutRef = db.doc(`envs/${env}/users/${uid}/payoutState/current`);
@@ -185,6 +195,7 @@ export async function ensureRankState(
       grades,
     );
     state = adoptLegacyEntry(state, fallbackPoints, grades);
+    const profile = publicRankProfile(saveSnapshot.data()?.profile);
 
     // 원본과 두 사본이 모두 맞으면 timestamp만 갱신하는 3회 쓰기를 생략한다.
     // 정규화 전 저장값과 비교해야 손상된 값도 복구된다. 색인도 같은 트랜잭션에서
@@ -196,13 +207,16 @@ export async function ensureRankState(
         stored.bestTierIndex === state.bestTierIndex && isDeepStrictEqual(stored.claimed, state.claimed) &&
         board?.seasonId === state.seasonId && board.points === state.points &&
         payoutSnapshot.data()?.currentPoints === state.points) {
-      return state;
+      if (!isDeepStrictEqual(board.profile, profile)) {
+        transaction.set(boardRef, {profile}, {mergeFields: ["profile"]});
+      }
+      return {state, profile};
     }
 
     const now = FieldValue.serverTimestamp();
-    writeRank(transaction, currentRankRef, state, now);
+    writeRank(transaction, currentRankRef, state, now, profile);
     // Keep rollback compatibility while payoutState remains deployed.
     transaction.set(payoutRef, {currentPoints: state.points, updatedAt: now}, {merge: true});
-    return state;
+    return {state, profile};
   });
 }

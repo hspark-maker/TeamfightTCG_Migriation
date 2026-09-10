@@ -25,6 +25,7 @@ export {spinRoulette} from "./commands/spinRoulette";
 export {getMissions} from "./commands/getMissions";
 export {claimMission} from "./commands/claimMission";
 export {syncGuideProgress} from "./commands/syncGuideProgress";
+export {syncRankProfile} from "./commands/syncRankProfile";
 export {getPass} from "./commands/getPass";
 export {claimPassReward} from "./commands/claimPassReward";
 export {getReplayDivergence} from "./commands/getReplayDivergence";

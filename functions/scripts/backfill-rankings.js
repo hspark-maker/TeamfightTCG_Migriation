@@ -1,12 +1,12 @@
 // Projection only. Source ranks, seasons, wallets and saves are never changed.
 const assert = require("node:assert/strict");
-const {client} = require("./publish-local-spec");
+const {isDeepStrictEqual} = require("node:util");
+const {client, valueOf} = require("./publish-local-spec");
+const {publicRankProfile} = require("../lib/rank/publicProfile");
 const DATABASE = "projects/bm-cardbattle/databases/cardbattle/documents";
 const pattern = /^envs\/(live|test)\/users\/([^/]+)\/rank\/current$/;
 
-async function main() {
-  const apply = process.argv.includes("--apply");
-  const request = await client();
+async function backfillRankings(request, apply) {
   let cursor;
   let scanned = 0;
   let changed = 0;
@@ -33,10 +33,11 @@ async function main() {
     for (let attempt = 0; ; attempt++) {
       const {transaction} = await request(`${DATABASE}:beginTransaction`, {});
       try {
-        // Re-read source and projection inside the transaction. A concurrent rank settlement forces a retry.
+        // Re-read both sources and projection. Concurrent rank/profile changes force a retry.
         const target = name => name.replace(/\/users\/([^/]+)\/rank\/current$/, "/rankings/$1");
+        const save = name => name.replace(/\/rank\/current$/, "/save/current");
         const snapshots = await request(`${DATABASE}:batchGet`, {
-          documents: [...names, ...names.map(target)], transaction,
+          documents: [...names, ...names.map(save), ...names.map(target)], transaction,
         });
         const byName = new Map(snapshots.filter(row => row.found).map(row => [row.found.name, row.found]));
         const writes = [];
@@ -47,10 +48,16 @@ async function main() {
           const seasonId = fields?.seasonId?.stringValue;
           const points = Number(fields?.points?.integerValue);
           assert(typeof seasonId === "string" && Number.isSafeInteger(points) && points >= 0, "Invalid rank source; no writes committed");
+          const savedProfile = byName.get(save(name))?.fields?.profile?.mapValue?.fields;
+          const profile = valueOf(publicRankProfile(Object.fromEntries(
+            ["nickname", "avatarId", "frameId"].map(key => [key, savedProfile?.[key]?.stringValue])
+          )));
           const current = byName.get(target(name))?.fields;
-          if (current?.seasonId?.stringValue === seasonId && Number(current?.points?.integerValue) === points) continue;
+          if (current?.seasonId?.stringValue === seasonId && Number(current?.points?.integerValue) === points &&
+              isDeepStrictEqual(current?.profile, profile)) continue;
           writes.push({update: {name: target(name), fields: {
             seasonId: {stringValue: seasonId}, points: {integerValue: String(points)},
+            profile,
             ...(fields.updatedAt ? {updatedAt: fields.updatedAt} : {}),
           }}});
         }
@@ -64,6 +71,13 @@ async function main() {
       }
     }
   }
-  console.log(JSON.stringify({mode: apply ? "apply" : "plan", scanned, changed, seasons}));
+  return {mode: apply ? "apply" : "plan", scanned, changed, seasons};
 }
-main().catch(error => {console.error(error.message); process.exitCode = 1;});
+async function main() {
+  const result = await backfillRankings(await client(), process.argv.includes("--apply"));
+  console.log(JSON.stringify(result));
+}
+if (require.main === module) {
+  main().catch(error => {console.error(error.message); process.exitCode = 1;});
+}
+module.exports = {backfillRankings};
