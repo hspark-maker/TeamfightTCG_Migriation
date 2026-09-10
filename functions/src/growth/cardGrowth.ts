@@ -9,6 +9,16 @@
  */
 
 import {intOf} from "../save/saveValues";
+import {LimitBreakCurve, limitBreakStep} from "./limitBreakTable";
+
+/** 이번 간식 적립으로 오른 단계 전체. hpGain/snackCost는 이번 상승분 합계다. */
+export interface SnackGrowth {
+  fromStage: number;
+  toStage: number;
+  hpGain: number;
+  snackCost: number;
+  snackLeft: number;
+}
 
 /** 미강화 카드의 레벨. 클라 CardGrowth.BaseLevel 과 같아야 한다. */
 export const BASE_LEVEL = 1;
@@ -166,6 +176,38 @@ export function applyLimitBreak(
   return withEntry(spendSnack(entries, cardId, snackCost), cardId, (entry) => {
     entry.limitBreak = stage;
   });
+}
+
+/**
+ * 간식을 적립하고 가능한 모든 한계돌파를 수동 명령과 같은 차감 규칙으로 적용한다.
+ * @param {GrowthEntries} entries 현재 성장
+ * @param {number} cardId 적립할 카드
+ * @param {number} amount 이번 중복 간식
+ * @param {LimitBreakCurve} curve 트랜잭션 밖에서 검증한 단계표
+ * @return {object} 갱신할 성장과 이번 카드에만 귀속되는 연출 정보
+ */
+export function addSnackAndGrow(
+  entries: GrowthEntries, cardId: number, amount: number, curve: LimitBreakCurve,
+): {entries: GrowthEntries; snackGrowth?: SnackGrowth} {
+  if (cardId <= 0 || amount <= 0) return {entries};
+  let next = addSnack(entries, cardId, amount);
+  const fromStage = Math.max(0, next[String(cardId)].limitBreak);
+  let toStage = fromStage;
+  let hpGain = 0;
+  let snackCost = 0;
+  while (toStage < curve.maxStage) {
+    const step = limitBreakStep(curve, toStage + 1);
+    if (step === null) throw new Error(`Missing limit break stage: ${toStage + 1}`);
+    if (!canAffordSnack(next, cardId, step.snackCost)) break;
+    next = applyLimitBreak(next, cardId, step.stage, step.snackCost);
+    toStage = step.stage;
+    hpGain += step.hpGain;
+    snackCost += step.snackCost;
+  }
+  return toStage === fromStage ? {entries: next} : {
+    entries: next,
+    snackGrowth: {fromStage, toStage, hpGain, snackCost, snackLeft: snackOf(next, cardId)},
+  };
 }
 
 /**

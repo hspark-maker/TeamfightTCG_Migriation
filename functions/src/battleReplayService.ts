@@ -1,4 +1,5 @@
 import * as logger from "firebase-functions/logger";
+import {measurePhase, recordMetric} from "./observability/requestMetrics";
 import {objectRecord, safeInteger} from "./match/payloadGuards";
 import {BATTLE_REPLAY_SPEC_TABLES, SpecPin, SpecPins} from "./specs/specBlobReader";
 
@@ -81,14 +82,20 @@ export function parseSpecPins(env: string, raw: unknown): SpecPins | null {
 }
 
 export async function callBattleReplay(request: ReplayRequestPayload): Promise<ReplayVerdict> {
+  return measurePhase("replayTotal", () => callBattleReplayWithRetries(request));
+}
+
+async function callBattleReplayWithRetries(request: ReplayRequestPayload): Promise<ReplayVerdict> {
   const serviceUrl = (process.env.BATTLE_REPLAY_URL ?? "").replace(/\/+$/, "");
   if (serviceUrl === "") return {kind: "unavailable", reason: "replay_url_missing"};
 
   let lastTransportReason = "replay_transport";
   for (let attempt = 0; attempt < REPLAY_TRANSPORT_ATTEMPTS; attempt++) {
     try {
-      return await postReplay(serviceUrl, request);
+      recordMetric("replayAttempts");
+      return await measurePhase("replayAttempt", () => postReplay(serviceUrl, request));
     } catch (error) {
+      recordMetric("replayTransportFailures");
       lastTransportReason = transportReason(error);
       logger.warn("battle_replay_transport_failed", {
         attempt, reason: lastTransportReason, error,
@@ -103,19 +110,24 @@ export async function callBattleReplay(request: ReplayRequestPayload): Promise<R
 
 async function postReplay(serviceUrl: string, request: ReplayRequestPayload): Promise<ReplayVerdict> {
   const audience = process.env.BATTLE_REPLAY_AUDIENCE ?? serviceUrl;
-  const token = await identityToken(audience);
+  const token = await measurePhase("replayIdentity", () => identityToken(audience));
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REPLAY_TIMEOUT_MS);
   let response: Response;
   let data: Record<string, unknown>;
   try {
-    response = await fetch(`${serviceUrl}/v1/battle/replay`, {
-      method: "POST",
-      headers: {"content-type": "application/json", "authorization": `Bearer ${token}`},
-      body: JSON.stringify(request),
-      signal: controller.signal,
+    recordMetric("replayHttpCalls");
+    const received = await measurePhase("replayHttp", async () => {
+      const response = await fetch(`${serviceUrl}/v1/battle/replay`, {
+        method: "POST",
+        headers: {"content-type": "application/json", "authorization": `Bearer ${token}`},
+        body: JSON.stringify(request),
+        signal: controller.signal,
+      });
+      const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+      return {response, data};
     });
-    data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+    ({response, data} = received);
   } finally {
     clearTimeout(timeout);
   }

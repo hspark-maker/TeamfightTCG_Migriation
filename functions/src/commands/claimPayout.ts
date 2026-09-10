@@ -1,3 +1,4 @@
+import {measuredCallable, measurePhase, recordMetric} from "../observability/requestMetrics";
 import {randomUUID} from "node:crypto";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
@@ -51,7 +52,7 @@ function readPayoutGain(payout: unknown): CurrencyGain | null {
   return {currency, amount};
 }
 
-export const claimPayout = onCall({enforceAppCheck: false}, async (request) => {
+export const claimPayout = onCall({enforceAppCheck: false}, measuredCallable("claimPayout", async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "authentication required");
   const data = parseClaimPayoutData(request.data);
@@ -62,7 +63,8 @@ export const claimPayout = onCall({enforceAppCheck: false}, async (request) => {
     // 그 전제로 firestore.indexes.json 이 save 슬롯 9개 · matches 대형 필드 · payouts 의
     // status 외 필드를 자동 색인에서 뺐다 — 쿼리를 새로 추가하려면 그 파일부터 보고,
     // 면제된 필드로는 where·orderBy 를 걸 수 없다는 것을 전제로 설계해라.
-    const snapshot = await collection.where("status", "==", "ready").limit(20).get();
+    const snapshot = await measurePhase("payoutList", () => collection.where("status", "==", "ready").limit(20).get());
+    recordMetric("payoutListDocuments", snapshot.size);
     logger.info("firestore_query_cost", {
       command: "claimPayout.list",
       env: data.env,
@@ -101,10 +103,10 @@ export const claimPayout = onCall({enforceAppCheck: false}, async (request) => {
   // 보상이 증발하거나, 크레딧만 성공해 무한 재지급이 열린다.
   const result = await withCountedTransaction("claimPayout", async (tx) => {
     const refs = data.matchIds.map((matchId) => collection.doc(matchId));
-    // Firestore 는 모든 읽기가 모든 쓰기보다 앞서야 한다 — 낙인 대상과 지갑을 먼저 다 읽는다.
+    // Firestore 는 모든 읽기가 모든 쓰기보다 앞서야 한다 — 낙인 대상·지갑·영수증을 함께 읽는다.
     // getAll 로 묶는 이유는 과금이 아니라 체류시간이다. 순차 await 는 문서 수만큼 왕복해
     // 트랜잭션이 길어지고, 길어진 만큼 경합 재시도(= 읽기·쓰기 전부 재실행)를 더 맞는다.
-    const allSnapshots = await tx.getAll(...refs, reference);
+    const allSnapshots = await tx.getAll(...refs, reference, receiptRef(reference, receipt.txId));
     const snapshots = allSnapshots.slice(0, refs.length);
     const walletSnapshot = allSnapshots[refs.length];
     if (!walletSnapshot.exists) {
@@ -116,9 +118,8 @@ export const claimPayout = onCall({enforceAppCheck: false}, async (request) => {
       );
     }
 
-    // 영수증이 마지막 읽기다 — 아래 낙인(claimed)이 첫 쓰기라 여기보다 뒤로 밀 수 없다.
-    // 히트면 쓰기를 하나도 하지 않고 첫 응답을 그대로 돌려준다.
-    const lookup = readReceipt(await tx.get(receiptRef(reference, receipt.txId)));
+    // 지갑 존재 검증 뒤에 영수증을 해석한다. 히트면 쓰기 없이 첫 응답을 그대로 돌려준다.
+    const lookup = readReceipt(allSnapshots[refs.length + 1]);
     if (lookup.hit) {
       if (lookup.source !== "claimPayout") {
         rejectDomain("TxIdReused",
@@ -177,4 +178,4 @@ export const claimPayout = onCall({enforceAppCheck: false}, async (request) => {
     });
   }
   return result;
-});
+}));

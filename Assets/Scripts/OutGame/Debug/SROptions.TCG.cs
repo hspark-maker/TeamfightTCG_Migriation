@@ -69,6 +69,9 @@ public partial class SROptions
     [Category("미션"), DisplayName("미션 모두 완료 (서버)")]
     public void CompleteMissions() => OutgameDebugActions.CompleteMissions();
 
+    [Category("미션"), DisplayName("일일 미션 초기화 (서버·테스트 전용)")]
+    public void ResetDailyMissions() => OutgameDebugActions.ResetDailyMissions();
+
     [Category("카드"), DisplayName("소유 카드")]
     public string OwnedCards => $"{OwnershipManager.OwnedCount} / {CardCatalog.Count}";
 

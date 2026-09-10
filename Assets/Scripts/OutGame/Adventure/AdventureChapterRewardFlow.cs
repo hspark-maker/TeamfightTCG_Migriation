@@ -29,7 +29,7 @@ public static class AdventureChapterRewardFlow
         if (!RewardClaimPopup.TryGet(out var t_popup))
         {
             // 폴백도 서버 응답을 기다린다 — 던져 두면 낙인이 서기 전에 호출부가 다음 연출을 이어 붙인다.
-            await AdventureProgress.ClaimChapterRewardAsync(t_chapter.chapterId);
+            await RewardClaimPopup.ClaimWithoutPopup(() => AdventureProgress.ClaimChapterRewardAsync(t_chapter.chapterId));
             return;
         }
 

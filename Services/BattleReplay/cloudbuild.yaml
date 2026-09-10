@@ -57,7 +57,10 @@ steps:
           --image "asia-northeast3-docker.pkg.dev/$PROJECT_ID/backend/battle-replay:${_TAG}" \
           --region "${_REGION}" \
           --no-allow-unauthenticated \
-          --min-instances=1 \
+          --scaling=auto \
+          --min=0 \
+          --min-instances=0 \
+          --cpu-throttling \
           --set-env-vars "FIRESTORE_DATABASE_ID=cardbattle"
 
 images:

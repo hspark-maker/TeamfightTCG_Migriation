@@ -66,9 +66,9 @@ public static class CardVisualRules
     public static Sprite PickBattleArt(CardInstance _card)
         => _card == null ? null : PickCardArt(_card.cardId, _card.evolutionStage);
 
-    /// <summary>카드 한 장에 그릴 테두리(프레임). 등급 × 시너지 개수로 갈리며 표는 CardFrameConfig 하나다.
+    /// <summary>카드 한 장에 그릴 테두리(프레임). 미해금은 키워드 전용(시너지 0개), 해금 후에는 등급 × 시너지 개수로 고른다.
     /// 표가 없거나(초기화 프리팹을 거치지 않은 씬) 그 칸이 비면 null — 호출부는 프리팹 저작 그림을 그대로 둔다.</summary>
-    public static Sprite PickFrame(int _cardId)
+    public static Sprite PickFrame(int _cardId, bool _synergyUnlocked)
     {
         if (_cardId <= 0) return null;
         if (!CardCatalog.TryGetSpec(_cardId, out CardSpec t_spec)) return null;
@@ -76,7 +76,7 @@ public static class CardVisualRules
         CardFrameConfig t_config = DataLibrary.instance != null ? DataLibrary.instance.cardFrameConfig : null;
         if (t_config == null) return null;
 
-        int t_synergies = t_spec.SynergyNames != null ? t_spec.SynergyNames.Count : 0;
+        int t_synergies = _synergyUnlocked && t_spec.SynergyNames != null ? t_spec.SynergyNames.Count : 0;
         return t_config.TryGetFrame(t_spec.Grade, t_synergies, out Sprite t_frame) ? t_frame : null;
     }
 

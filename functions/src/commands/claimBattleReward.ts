@@ -1,3 +1,4 @@
+import {measuredCallable} from "../observability/requestMetrics";
 import {randomUUID} from "node:crypto";
 import {DocumentSnapshot, FieldValue} from "firebase-admin/firestore";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
@@ -151,7 +152,7 @@ function matchGuard(
  * 지급량이 0 이하로 나오면 **아무것도 쓰지 않는다** — 빈 지급으로 지갑 rev 만 올리면
  * 클라가 잔액을 갈아끼우고도 달라진 것이 없어 사고를 못 알아챈다.
  */
-export const claimBattleReward = onCall(async (request) => {
+export const claimBattleReward = onCall(measuredCallable("claimBattleReward", async (request) => {
   const uid = requireUid(request.auth);
   const env = String(request.data?.env ?? "");
   const won = request.data?.won === true;
@@ -220,4 +221,4 @@ export const claimBattleReward = onCall(async (request) => {
   }
 
   return result;
-});
+}));

@@ -34,7 +34,10 @@ gcloud run deploy battle-replay `
   --region asia-northeast3 `
   --image asia-northeast3-docker.pkg.dev/bm-cardbattle/backend/battle-replay:manual `
   --no-allow-unauthenticated `
-  --min 1 `
+  --scaling auto `
+  --min 0 `
+  --min-instances 0 `
+  --cpu-throttling `
   --set-env-vars FIRESTORE_DATABASE_ID=cardbattle
 ```
 
@@ -44,20 +47,25 @@ Functions의 호출 스위치는 Firestore `envs/{envId}/config/battleReplay.ena
 Functions 인스턴스별로 최대 60초 캐시한다. Unity의 `Tools > Card Battle > 릴리즈 관리`에서 환경별로
 상태 조회와 켜기/끄기, 최근 7일 발산 집계를 확인할 수 있다.
 
-켜는 순서는 Cloud Run 최소 인스턴스를 1로 올린 뒤 Firestore 토글을 켜는 것이다. 끌 때는 반대로
-Firestore 토글을 먼저 끄고 60초 기다린 뒤 최소 인스턴스를 0으로 내린다. 토글이 off면 Cloud Run 호출
-자체가 생략되므로 대역폭도 발생하지 않지만, 정산 권위는 두 클라이언트 합의로 후퇴한다.
+기본 운영은 자동 확장·최소 인스턴스 0·요청 기반 과금(`--cpu-throttling`)이다.
+검증 토글을 켜둔 채 요청이 오면 자동 기동한다. 요청 처리 후 Cloud Run이 유휴 인스턴스를 최대 약 15분
+유지할 수 있지만 유지 시간은 보장되지 않으며, 이후 0개로 축소한다. 이 구성의 유휴 시간에는 과금되지 않는다.
+종료 후 첫 검증 요청에는 콜드 스타트 지연이 추가된다. 비용을 줄이기 위해 검증 토글을 끌 필요는 없다.
+토글을 off로 바꾸면 최대 60초 뒤 검증 호출이 생략되고 정산 권위는 두 클라이언트 합의로 후퇴한다.
 현재 `live`와 `test`는 같은 `BATTLE_REPLAY_URL`을 공유하며 요청의 `env`로 데이터만 분리한다. 따라서 두 환경은
 같은 Cloud Run 인스턴스 예산과 장애 범위를 공유한다.
 
 최소 인스턴스는 릴리즈 관리 창이 `gcloud` CLI 를 **직접 실행**해 조회·변경한다(`CloudRunControl`).
-"상태 조회" 가 읽는 `minScale` 이 Cloud Run 의 실측값이므로, 창의 토글 상태와 실제 과금 상태를 따로 본다.
+"상태 조회"는 서비스·리비전 양쪽 `minScale`의 큰 값을 표시한다. 변경 명령은 서비스 최소값을 제어하고
+리비전 최소값은 0으로 해제한다. 배포도 두 최소값을 0으로 설정해 상시 대기가 다시 켜지지 않게 한다.
 gcloud 인증이 만료되면 창이 그 사유를 표시하고 `gcloud auth login` 을 띄우는 버튼을 내놓는다.
 CLI 가 없는 환경을 위해 같은 명령을 복사하는 버튼도 남겨 뒀다.
 
 ```powershell
-gcloud run services update battle-replay --project bm-cardbattle --region asia-northeast3 --min 1
-gcloud run services update battle-replay --project bm-cardbattle --region asia-northeast3 --min 0
+gcloud run services update battle-replay --project bm-cardbattle --region asia-northeast3 --scaling auto --min 0 --min-instances 0 --cpu-throttling
+
+# 콜드 스타트를 줄이기 위해 유휴 과금을 감수하는 경우에만 상시 대기 사용
+gcloud run services update battle-replay --project bm-cardbattle --region asia-northeast3 --scaling auto --min 1 --min-instances 0 --cpu-throttling
 ```
 
 이 서비스는 `live` 와 `test` 가 공유하므로 최소 인스턴스 변경은 두 환경에 함께 적용된다.

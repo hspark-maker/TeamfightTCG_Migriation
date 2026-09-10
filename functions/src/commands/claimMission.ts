@@ -16,6 +16,8 @@ import {db} from "../firebaseApp";
 import {CurrencyGain, grant} from "../currency/wallet";
 import {nextWallet} from "../currency/walletStore";
 import {GrantedItems, grantRewardItems, loadItemGrantContext} from "../rewards/itemGrant";
+import {applyGuideProgress} from "../missions/guideMutation";
+import {applySnackGrowthProgress} from "../missions/snackGrowthProgress";
 import {findMission, MAX_MISSION_ID_LENGTH} from "../missions/catalog";
 import {readMissionCatalog} from "../missions/missionSpec";
 import {rankRef} from "../rank/rankStore";
@@ -187,14 +189,23 @@ export const claimMission = onCall(async (request) => {
         });
       }
       if (!rewardJudgement.allow) {
-        // 사유를 뭉개지 않는다(claimReward 와 같은 정책) — 표를 통째로 못 읽은 것(NotEligible)과
-        // 그 미션에만 보상이 없는 것(RewardNotFound)은 운영이 할 일이 다르다.
-        // 전자는 배포/업로드 사고이고 후자는 저작 누락이다.
-        reject(rewardJudgement.reason,
-          rewardJudgement.specEmpty ?
-            "Mission reward spec is unreadable." :
-            `No reward is authored for Mission/${missionId}.`,
-          {uid, env, missionId, specEmpty: rewardJudgement.specEmpty});
+        const passExpOnly = !rewardJudgement.specEmpty && mission.passExp > 0 &&
+          rewardJudgement.gains.length === 0 && rewardJudgement.items.length === 0 &&
+          rewardJudgement.dropped.length === 0;
+        if (!passExpOnly) {
+          // 사유를 뭉개지 않는다(claimReward 와 같은 정책) — 표를 통째로 못 읽은 것(NotEligible)과
+          // 그 미션에만 보상이 없는 것(RewardNotFound)은 운영이 할 일이 다르다.
+          // 전자는 배포/업로드 사고이고 후자는 저작 누락이다.
+          reject(rewardJudgement.reason,
+            rewardJudgement.specEmpty ?
+              "Mission reward spec is unreadable." :
+              `No reward is authored for Mission/${missionId}.`,
+            {uid, env, missionId, specEmpty: rewardJudgement.specEmpty});
+        }
+        if (pass === undefined) {
+          reject("NotEligible", "An active battle pass is required to claim this XP-only mission. Try again when the pass is available.",
+            {uid, env, missionId});
+        }
       }
 
       missionPeriodKind = mission.period;
@@ -205,6 +216,8 @@ export const claimMission = onCall(async (request) => {
           Number(rankSnapshot?.data()?.points ?? (current.rank as {points?: number})?.points ?? 0));
       grantedCurrencies = [...rewardJudgement.gains, ...itemGrant.currencies];
       grantedPassExp = mission.passExp;
+      if (itemContext) applyGuideProgress(missions, current, itemGrant.slots, itemContext.cards, catalog);
+      applySnackGrowthProgress(missions, itemGrant.cards);
 
       // 낙인과 패스 경험치를 함께 찍는다 — 카운터는 깎지 않는다.
       // 깎으면 같은 이벤트를 세는 주간 미션이 함께 무너진다.
@@ -236,6 +249,7 @@ export const claimMission = onCall(async (request) => {
         missionId,
         granted: grantedCurrencies,
         cards: itemGrant.cards,
+        packs: itemGrant.packs ?? [],
         grantedPassExp,
         missions: missionState,
         pass: passProgress,

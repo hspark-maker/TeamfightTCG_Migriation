@@ -91,6 +91,23 @@ public sealed class FirebaseAuthService
         return this.initializationTask.AsUniTask();
     }
 
+    /// <summary>현재 계정을 유지한 채 서버에서 새 ID 토큰을 받는다. 계정을 새로 만들지 않는다.</summary>
+    internal async UniTask RefreshTokenAsync()
+    {
+        if (!this.IsCurrentUserActive)
+            throw new InvalidOperationException("There is no active Firebase user to refresh.");
+
+        FirebaseUser t_user = this.auth.CurrentUser;
+        int t_generation = this.generation;
+        await t_user.TokenAsync(true).AsUniTask()
+            .Timeout(TimeSpan.FromMilliseconds(FirebaseTimeouts.AuthAndReadMilliseconds), DelayType.Realtime)
+            .AttachExternalCancellation(FirebaseManager.Lifetime);
+        await UniTask.SwitchToMainThread();
+
+        if (t_generation != this.generation || !this.IsCurrentUserActive || this.UserId != t_user.UserId)
+            throw new OperationCanceledException("Firebase account changed during token refresh.");
+    }
+
     /// <summary>이미 있는 이메일 계정으로 로그인한다.</summary>
     public UniTask<bool> SignInWithEmailAndPasswordAsync(string _email, string _password)
         => SwitchToEmailAccountAsync(_email, _password, false);

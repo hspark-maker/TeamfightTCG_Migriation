@@ -261,7 +261,7 @@ MonoBehaviour:
   isShow: 0
   root: {fileID: 3375942486813688512}
   listContent: {fileID: 9100000000000000002}
-  rowPrefab: {fileID: 9100000000000000024, guid: bdeddef46b0f4b7db9358a1deccc3a95, type: 3}
+  rowPrefab: {fileID: 9100000000000000024, guid: 5b2074d3365f43eea16ffa8324468415, type: 3}
   emptyNotice: {fileID: 9100000000000000031}
   closeButton: {fileID: 0}
   dimButton: {fileID: 7547680357580154284}

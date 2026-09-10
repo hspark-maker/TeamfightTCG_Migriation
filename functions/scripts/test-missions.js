@@ -396,12 +396,12 @@ for (const row of sheetMissions) {
   assert.equal(String(mission.sortOrder), row.sortOrder, `${row.missionId} sortOrder 불일치`);
 }
 
-// 짝 검사: 보상 행이 없으면 켜는 순간 RewardNotFound 로 막힌다. 꺼진 미션도 미리 저작해야 한다.
+// 활성 미션은 Reward 행 또는 양수 패스 경험치가 있어야 수령할 수 있다.
 const rewardOwners = new Set(sheetRewards.map((row) => row.ownerId));
 for (const row of sheetMissions) {
   if (row.enabled !== "1") continue;
-  assert.ok(rewardOwners.has(row.missionId),
-    `Reward 시트에 ownerType=Mission / ownerId=${row.missionId} 행이 없다`);
+  assert.ok(rewardOwners.has(row.missionId) || Number(row.passExp) > 0,
+    `Mission/${row.missionId} 에 Reward 행과 양수 passExp가 모두 없다`);
 }
 const missionIds = new Set(sheetMissions.map((row) => row.missionId));
 for (const owner of rewardOwners) {

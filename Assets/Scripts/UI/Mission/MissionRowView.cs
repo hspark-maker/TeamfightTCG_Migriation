@@ -19,6 +19,12 @@ public class MissionRowView : MonoBehaviour
     [Tooltip("진행도 표시. 비워 두면 그리지 않는다.")]
     [SerializeField] TMP_Text progressText;
 
+    [Tooltip("채워진 구간에 겹쳐 그릴 숫자. progressText와 같은 서체·배치, 다른 색으로 저작한다.")]
+    [SerializeField] TMP_Text filledProgressText;
+
+    [Tooltip("filledProgressText의 RectMask2D 부모. progressText와 같은 부모 아래에 둔다.")]
+    [SerializeField] RectTransform progressTextFillMask;
+
     [Tooltip("Sliced 채움 이미지. 부모는 게이지 최대 영역, 이미지는 부모 전체에 Stretch로 배선한다. 너비로 진행도를 표시한다.")]
     [SerializeField] Image progressFill;
 
@@ -40,6 +46,16 @@ public class MissionRowView : MonoBehaviour
     [SerializeField] TMP_Text secondRewardCountText;
 
     [SerializeField] Button claimButton;
+    [SerializeField] GameObject claimAlertDot;
+
+    [Header("보상 수령 버튼 배경")]
+    [SerializeField] Image claimBackground;
+    [Tooltip("보상 획득 가능 상태의 배경.")]
+    [SerializeField] Sprite claimableBackgroundSprite;
+    [Tooltip("보상 획득 완료 상태의 배경.")]
+    [SerializeField] Sprite claimedBackgroundSprite;
+    [Tooltip("미완료 또는 아직 해금되지 않은 미션의 배경.")]
+    [SerializeField] Sprite incompleteBackgroundSprite;
 
     [Tooltip("수령 버튼 라벨. 상태에 따라 문구가 바뀐다.")]
     [SerializeField] TMP_Text claimLabel;
@@ -54,6 +70,9 @@ public class MissionRowView : MonoBehaviour
 
     MissionDefinition m_definition;
     System.Action<string> m_onClaim;
+
+    readonly Vector3[] m_fillCorners = new Vector3[4];
+    readonly Vector3[] m_textCorners = new Vector3[4];
 
     // 매 프레임 문자열을 새로 만들지 않으려고 재사용한다. 행이 8개까지 늘 수 있고
     // OnChanged 마다 전 행이 다시 그려지므로 여기서 GC 를 만들면 그대로 누적된다.
@@ -90,6 +109,9 @@ public class MissionRowView : MonoBehaviour
         bool t_complete = MissionManager.IsComplete(this.m_definition);
         bool t_claimed = MissionManager.IsClaimed(this.m_definition.Id);
         bool t_canClaim = MissionManager.CanClaim(this.m_definition);
+        if (this.claimAlertDot != null) this.claimAlertDot.SetActive(t_canClaim);
+        // 요청 중 입력 잠금은 표시 상태와 분리해 배경이 미완료로 깜빡이지 않게 한다.
+        bool t_rewardAvailable = t_complete && MissionManager.IsGuideUnlocked(this.m_definition);
 
         if (this.progressText != null)
         {
@@ -98,6 +120,7 @@ public class MissionRowView : MonoBehaviour
             s_text.Clear();
             s_text.Append(t_shown).Append(" / ").Append(t_target);
             this.progressText.text = s_text.ToString();
+            if (this.filledProgressText != null) this.filledProgressText.text = this.progressText.text;
         }
 
         if (this.progressFill != null)
@@ -112,12 +135,51 @@ public class MissionRowView : MonoBehaviour
 
         if (this.claimedMark != null) this.claimedMark.SetActive(t_claimed);
 
+        if (this.claimBackground != null)
+        {
+            Sprite t_background = t_claimed ? this.claimedBackgroundSprite
+                : t_rewardAvailable ? this.claimableBackgroundSprite : this.incompleteBackgroundSprite;
+            if (t_background != null) this.claimBackground.sprite = t_background;
+        }
+
         if (this.claimLabel != null)
-            this.claimLabel.text = t_claimed ? "완료" : t_complete ? "받기" : "진행 중";
+            this.claimLabel.text = t_claimed ? "완료" : t_rewardAvailable ? "받기" : "진행 중";
 
         // 버튼은 끄지 않고 상호작용만 막는다 — 꺼 버리면 레이아웃이 흔들리고 "받은 줄"이 사라진 것처럼 보인다.
         if (this.claimButton != null) this.claimButton.interactable = t_canClaim;
         if (this.claimGroup != null) this.claimGroup.alpha = t_canClaim ? 1f : this.disabledAlpha;
+    }
+
+    void LateUpdate()
+    {
+        if (this.progressText == null || this.filledProgressText == null ||
+            this.progressFill == null || this.progressTextFillMask == null) return;
+
+        RectTransform t_source = this.progressText.rectTransform;
+        RectTransform t_mask = this.progressTextFillMask;
+        Transform t_parent = t_mask.parent;
+        this.progressFill.rectTransform.GetWorldCorners(this.m_fillCorners);
+        t_source.GetWorldCorners(this.m_textCorners);
+
+        // 글자 위치는 고정하고 채움 경계까지만 다른 색을 노출한다.
+        // 부모 좌표계에서 계산하므로 팝업 확대·해상도 변경에도 두 글자가 포개진다.
+        Vector3 t_fillLeft = t_parent.InverseTransformPoint(this.m_fillCorners[0]);
+        Vector3 t_fillRight = t_parent.InverseTransformPoint(this.m_fillCorners[2]);
+        Vector3 t_textBottom = t_parent.InverseTransformPoint(this.m_textCorners[0]);
+        Vector3 t_textTop = t_parent.InverseTransformPoint(this.m_textCorners[2]);
+        float t_width = Mathf.Max(0f, t_fillRight.x - t_fillLeft.x);
+        bool t_visible = this.progressFill.gameObject.activeSelf && t_width > 0f;
+        t_mask.gameObject.SetActive(t_visible);
+        if (!t_visible) return;
+
+        t_mask.localPosition = new Vector3(t_fillLeft.x, t_textBottom.y, t_textBottom.z);
+        t_mask.sizeDelta = new Vector2(t_width, Mathf.Max(0f, t_textTop.y - t_textBottom.y));
+
+        RectTransform t_filledText = this.filledProgressText.rectTransform;
+        t_filledText.pivot = t_source.pivot;
+        t_filledText.sizeDelta = t_source.rect.size;
+        t_filledText.localScale = t_source.localScale;
+        t_filledText.SetPositionAndRotation(t_source.position, t_source.rotation);
     }
 
     void HandleClaim()
@@ -206,8 +268,9 @@ public class MissionRowView : MonoBehaviour
                 s_text.Append(CurrencyLabel(t_gain.Currency)).Append(' ').Append(t_gain.Amount);
             }
         }
-        // 패스 경험치는 표시하지 않는다 — 보상 표기는 유저가 받는 실물(재화·아이템)만 말한다.
         RewardItemDisplay.Append(s_text, _definition.Reward.Items);
+        if (s_text.Length == 0 && _definition.Reward.PassExp > 0)
+            s_text.Append("패스 경험치 +").Append(_definition.Reward.PassExp);
         return s_text.ToString();
     }
 

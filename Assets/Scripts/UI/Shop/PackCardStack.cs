@@ -78,6 +78,10 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     Canvas m_canvas;
     bool m_interactable;
     bool m_dragging;
+    bool m_skipRemaining;
+    bool m_growthPlaying;
+    int m_generation;
+    PackCardView m_revealedTop;
 
     // 등장(따라붙기)이 카드 자리를 쥐고 있는 동안만 참. 중첩된 트윈은 끊을 수 없으니 이 플래그로 손을 떼게 한다.
     bool m_emerging;
@@ -280,12 +284,28 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     public void BeginInteraction()
     {
         m_interactable = true;
-        if (m_stack.Count == 0) return;
+        RevealTop();
+    }
 
-        // 알림이 먼저다 — 구독자의 등장 강조(스케일 펀치)가 부유(위치)보다 뒤에 걸리면
-        // 그쪽이 이 트랜스폼을 DOKill하며 부유까지 함께 끊는다. 두 축은 타깃이 같다.
-        OnCardRevealed?.Invoke(m_stack[0]);
-        StartFloat(m_stack[0]);
+    void RevealTop()
+    {
+        if (m_stack.Count == 0 || m_stack[0] == null) return;
+        var t_view = m_stack[0];
+        if (m_revealedTop == t_view) return;
+        m_revealedTop = t_view;
+        m_growthPlaying = t_view.HasPendingSnackGrowth;
+        int t_generation = m_generation;
+        OnCardRevealed?.Invoke(t_view);
+        if (t_generation != m_generation) return;
+        StartFloat(t_view);
+        if (!m_growthPlaying) return;
+
+        t_view.PlaySnackGrowth(() =>
+        {
+            if (t_generation != m_generation || m_stack.Count == 0 || m_stack[0] != t_view) return;
+            m_growthPlaying = false;
+            if (m_skipRemaining) DrainSkippedCards();
+        });
     }
 
     // 맨 위 카드만 제자리에서 미세하게 뜬다. 아래 카드는 건드리지 않는다 — 하나만 살아 있어야 그 대비가 읽힌다.
@@ -315,39 +335,72 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             });
     }
 
-    /// <summary>남은 카드를 전부 즉시 치운다(스킵). 결과는 곧이어 뜨는 결과 격자가 보여준다.</summary>
+    /// <summary>일반 카드는 즉시 치우고 성장 카드는 순서대로 완주한 뒤 치운다. 연타도 같은 요청이다.</summary>
     public void FlickAllImmediate()
     {
+        m_skipRemaining = true;
         m_interactable = false;
         m_dragging = false;
-        m_emerging = false;   // 카드를 지우는 중이다 — 등장 setter가 더 손대지 않게 먼저 뗀다.
+        m_emerging = false;
+        DrainSkippedCards();
+    }
 
+    void DrainSkippedCards()
+    {
+        if (m_growthPlaying) return;
         while (m_stack.Count > 0)
         {
             var t_view = m_stack[0];
-            m_stack.RemoveAt(0);
-
-            if (t_view != null)
+            if (t_view != null && t_view.HasPendingSnackGrowth)
             {
-                t_view.transform.DOKill();
-                Destroy(t_view.gameObject);
+                RevealTop();
+                return;
             }
+
+            m_stack.RemoveAt(0);
+            m_revealedTop = null;
+            DestroyCard(t_view);
         }
 
+        m_skipRemaining = false;
         OnEmptied?.Invoke();
+    }
+
+    // 입장/찢기 중 direct skip도 팩 안쪽 배율·위치에서 성장하지 않게 완성된 더미로 세운다.
+    public void SettleForSkip(Vector2 _center, float _scale)
+    {
+        m_emerging = false;
+        CaptureLayerHome();
+        m_layerSettled = LayerPosFor(_center, _scale);
+        m_layerSettledScale = m_layerScaleHome * _scale;
+        SnapEmerged();
+        SnapCardsHome();
+    }
+
+    static void DestroyCard(PackCardView _view)
+    {
+        if (_view == null) return;
+        _view.transform.DOKill();
+        // Destroy는 프레임 끝까지 지연된다. 먼저 비활성화해 이전 성장 완료 콜백을 즉시 폐기한다.
+        _view.gameObject.SetActive(false);
+        Destroy(_view.gameObject);
     }
 
     /// <summary>생성된 카드를 모두 제거(다음 개봉 세션 대비). 날아가는 중인 카드도 함께 걷는다.</summary>
     public void Clear()
     {
+        m_generation++;
+        m_skipRemaining = false;
+        m_growthPlaying = false;
+        m_revealedTop = null;
         // 파괴보다 먼저 뗀다 — 등장 setter는 이 클래스가 끊을 수 없는 중첩 트윈이 굴린다(PlayEmerge의 ⚠ 참고).
         m_emerging = false;
 
         for (int t_i = 0; t_i < m_stack.Count; t_i++)
-            if (m_stack[t_i] != null) Destroy(m_stack[t_i].gameObject);
+            DestroyCard(m_stack[t_i]);
 
         for (int t_i = 0; t_i < m_dismissing.Count; t_i++)
-            if (m_dismissing[t_i] != null) Destroy(m_dismissing[t_i].gameObject);
+            DestroyCard(m_dismissing[t_i]);
 
         m_stack.Clear();
         m_dismissing.Clear();
@@ -360,7 +413,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     public void OnBeginDrag(PointerEventData _e)
     {
-        if (!m_interactable || m_stack.Count == 0) return;
+        if (!m_interactable || m_growthPlaying || m_stack.Count == 0 || m_stack[0].HasPendingSnackGrowth) return;
         m_dragging = true;
         m_dragSpeed = 0f;
 
@@ -375,7 +428,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     public void OnDrag(PointerEventData _e)
     {
-        if (!m_dragging || m_stack.Count == 0) return;
+        if (!m_dragging || m_growthPlaying || m_stack.Count == 0) return;
 
         var t_rt = TopRect();
         if (t_rt == null) return;
@@ -398,7 +451,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     public void OnEndDrag(PointerEventData _e)
     {
-        if (!m_dragging || m_stack.Count == 0) return;
+        if (!m_dragging || m_growthPlaying || m_stack.Count == 0) return;
         m_dragging = false;
 
         var t_top = m_stack[0];
@@ -420,6 +473,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         }
 
         m_stack.RemoveAt(0);
+        m_revealedTop = null;
         DismissCard(t_top, t_offset / Mathf.Max(0.0001f, t_dist));   // 민 방향 그대로 날려보낸다.
 
         // 위 장이 비켜난 순간 아래 장은 이미 완전히 드러나 있다.
@@ -430,8 +484,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         }
 
         // 알림 → 부유 순서는 BeginInteraction과 같다(강조의 DOKill이 부유를 삼키지 않게).
-        OnCardRevealed?.Invoke(m_stack[0]);
-        StartFloat(m_stack[0]);
+        RevealTop();
     }
 
     public void OnPointerClick(PointerEventData _e)
@@ -498,6 +551,10 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     void OnDisable()
     {
+        m_generation++;
+        m_skipRemaining = false;
+        m_growthPlaying = false;
+        m_revealedTop = null;
         // 등장 setter가 먼저 손을 떼야 아래 SnapCardsHome이 실제로 남는다 — 트윈 쪽은 끊을 수 없다.
         m_emerging = false;
 

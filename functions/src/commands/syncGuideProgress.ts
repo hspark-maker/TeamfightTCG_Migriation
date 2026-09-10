@@ -9,7 +9,7 @@ import {missionsRef, readMissions} from "../missions/missionStore";
 
 /** 직접 저장한 덱도 기록한다. 이벤트 순서/중복과 무관하게 최고 진행도만 합친다. */
 export const syncGuideProgress = onDocumentWritten({
-  document: "envs/{env}/users/{uid}/save/current", database: DATABASE_ID,
+  document: "envs/{env}/users/{uid}/save/current", database: DATABASE_ID, retry: true,
 }, async (event) => {
   const {env, uid} = event.params;
   const after = event.data?.after;
@@ -24,7 +24,8 @@ export const syncGuideProgress = onDocumentWritten({
   await db.runTransaction(async (transaction) => {
     const state = readMissions(await transaction.get(reference));
     const progress = evaluateGuideProgress(current, cards, catalog, state.progress);
-    if (JSON.stringify(progress) !== JSON.stringify(state.progress)) {
+    // readMissions는 0을 생략한다. 미달성 가이드의 missing과 0은 같은 값이다.
+    if (Object.entries(progress).some(([key, value]) => value !== (state.progress[key] ?? 0))) {
       transaction.set(reference, {progress, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
     }
   });

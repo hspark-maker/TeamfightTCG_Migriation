@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.enhanceCard = void 0;
+const requestMetrics_1 = require("../observability/requestMetrics");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
 const node_crypto_1 = require("node:crypto");
@@ -44,6 +45,7 @@ const analyticsEvent_1 = require("../observability/analyticsEvent");
 const missionStore_1 = require("../missions/missionStore");
 const period_1 = require("../missions/period");
 const missionSpec_1 = require("../missions/missionSpec");
+const guideMutation_1 = require("../missions/guideMutation");
 const saveDocument_1 = require("../save/saveDocument");
 const domainReject_1 = require("../save/domainReject");
 const receiptId_1 = require("../save/receiptId");
@@ -71,7 +73,7 @@ function reject(reason, message, context) {
  * 무료 한 방은 **비용만 0으로** 만들고 성공률은 건드리지 않으며, 성공했을 때만 소진으로 찍는다
  * — 실패로 닫으면 온보딩이 시킨 성장을 유저가 제 돈으로 다시 해야 한다.
  */
-exports.enhanceCard = (0, https_1.onCall)(async (request) => {
+exports.enhanceCard = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)("enhanceCard", async (request) => {
     const uid = (0, saveDocument_1.requireUid)(request.auth);
     const env = String(request.data?.env ?? "");
     const cardId = Number(request.data?.cardId ?? 0);
@@ -83,10 +85,11 @@ exports.enhanceCard = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError("invalid-argument", "cardId must be a positive integer.");
     }
     // 스펙 읽기는 트랜잭션 밖이다 — 유저 문서와 무관하고, 재실행마다 다시 읽으면 비용만 는다.
-    const [ruleRows, overrideRows, catalog] = await Promise.all([
+    const [ruleRows, overrideRows, catalog, guideCards] = await Promise.all([
         (0, packSpecReader_1.readSpecRows)(env, "CardEnhanceRule"),
         (0, packSpecReader_1.readSpecRows)(env, "CardEnhance"),
         (0, missionSpec_1.readMissionCatalog)(env),
+        (0, guideMutation_1.readGuideCards)(env),
     ]);
     const rule = (0, enhanceRules_1.parseCardEnhanceRule)(ruleRows);
     if (rule === null) {
@@ -143,15 +146,17 @@ exports.enhanceCard = (0, https_1.onCall)(async (request) => {
         currency = step.currency;
         cost = charged;
         freeShotUsed = succeeded && freeShot !== null;
+        const slots = {
+            cardGrowth: (0, cardGrowth_1.growthSlot)(succeeded ? (0, cardGrowth_1.applyEnhanceLevel)(entries, cardId, step.level) : entries),
+        };
+        (0, guideMutation_1.applyGuideProgress)(missions, current, slots, guideCards, catalog);
         // 실패한 강화도 센다 — 재화는 이미 나갔고, 미션이 확률에 좌우되면 같은 횟수를 굴린 두 유저가
         // 서로 다른 진행도를 갖는다. 진행도는 "시도"의 축이다.
         // 이 쓰기는 위 grants 읽기보다 뒤여야 한다(Firestore 트랜잭션 규칙).
         (0, missionStore_1.commitMissionBump)(transaction, missions, eventNames_1.EVENTS.cardEnhanceResolved.missionKey, 1, firestore_1.FieldValue.serverTimestamp());
         missionState = (0, missionStore_1.missionResponse)(missions.state, period, catalog);
         return {
-            slots: {
-                cardGrowth: (0, cardGrowth_1.growthSlot)(succeeded ? (0, cardGrowth_1.applyEnhanceLevel)(entries, cardId, step.level) : entries),
-            },
+            slots,
             wallet: (0, walletStore_1.nextWallet)(wallet, (0, wallet_1.spend)(balances, step.currency, charged), "enhanceCard"),
         };
     }, (adopted) => {
@@ -171,5 +176,5 @@ exports.enhanceCard = (0, https_1.onCall)(async (request) => {
         });
     }
     return result;
-});
+}));
 //# sourceMappingURL=enhanceCard.js.map

@@ -11,6 +11,51 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "receipts",
+      "fieldPath": "result",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "receipts",
+      "fieldPath": "before",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "receipts",
+      "fieldPath": "after",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "receipts",
+      "fieldPath": "changes",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "wallet",
+      "fieldPath": "balances",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "wallet",
+      "fieldPath": "paidBalances",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "missions",
+      "fieldPath": "progress",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "missions",
+      "fieldPath": "claimed",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "rankings",
+      "fieldPath": "profile",
+      "indexes": []
+    },
+    {
       "collectionGroup": "blob",
       "fieldPath": "payload",
       "indexes": []

@@ -394,7 +394,7 @@ sealed class MatchResultFirebaseModule : IFirebaseModule
     public void RetryPending()
     {
         MatchResultSubmission.RetryPending();
-        PayoutInbox.RetryPending();
+        PayoutInbox.RefreshOnResume();
     }
 
     public async UniTask FlushPendingAsync()

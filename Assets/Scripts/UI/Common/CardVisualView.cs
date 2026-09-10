@@ -170,14 +170,7 @@ public class CardVisualView : MonoBehaviour
 
         RefreshArt(_card, _mine, _owned);
 
-        // 프레임은 등급 × 시너지 개수로 갈린다(표는 CardFrameConfig 하나). 못 고르면 프리팹 저작 그림을
-        // 그대로 두고, 그마저 미배선이면 흰 사각형이 뜨지 않게 렌더러를 끈다.
-        if (this.frame != null)
-        {
-            Sprite t_frame = CardVisualRules.PickFrame(_card);
-            if (t_frame != null) this.frame.sprite = t_frame;
-            this.frame.enabled = this.frame.sprite != null;
-        }
+        RefreshFrame(_card, _owned, _mine);
 
         {
             bool t_showName = _owned && this.ShowName;
@@ -201,13 +194,15 @@ public class CardVisualView : MonoBehaviour
             this.lockOverlay.SetActive(!_owned && (this.portrait == null || this.portrait.sprite == null));
     }
 
-    /// <summary>강화로 바뀌는 값(최대 체력·레벨)만 다시 그린다. 인자 의미는 <see cref="Bind"/>와 같다.</summary>
+    /// <summary>강화로 바뀌는 최대 체력·레벨·해금 프레임을 다시 그린다. 인자 의미는 <see cref="Bind"/>와 같다.</summary>
     // Bind를 통째로 부르면 바뀌지도 않은 아이콘·배지가 매번 Destroy + Instantiate 된다.
     // 카드·소유여부를 캐싱하지 않고 인자로 받는 이유는 바인딩 상태의 진실원을 둘로 만들지 않기 위함이다.
     public void RefreshHp(int _card, bool _owned, bool _mine = true)
     {
         if (_card <= 0) return;
 
+        // 시너지만 해금되면 키워드 목록 갱신은 생략될 수 있으므로 성장 갱신에서도 프레임을 맞춘다.
+        RefreshFrame(_card, _owned, _mine);
         SetHpDisplay(_card, _owned && this.ShowHp, _mine);
         SetLevelDisplay(_card, _owned && this.ShowLevel, _mine);
     }
@@ -233,12 +228,27 @@ public class CardVisualView : MonoBehaviour
     {
         if (_card <= 0) return;
 
+        RefreshFrame(_card, _owned, _mine: true);
         RefreshKeywordIcons(_card, _owned && this.ShowKeywords);
         RefreshKeywordFrames(_card, _owned && this.ShowKeywords);
         // 시너지 해금(1차 진화 레벨)도 이 프레임에 같이 일어난다 — 여기서 안 다시 그리면
         // 강화 화면에서 레벨만 오르고 시너지는 다음 재바인딩까지 안 보인다.
         RefreshSynergyBadges(_card, _owned && this.ShowSynergies, _mine: true);
         RefreshKeywordBg(_card, _owned && this.ShowSynergies, _mine: true);
+    }
+
+    void RefreshFrame(int _card, bool _owned, bool _mine)
+    {
+        if (this.frame == null) return;
+
+        // 전투·상대 카드는 해당 카드의 해금 상태를 사용한다.
+        bool t_synergyUnlocked = _owned && (this.m_instance != null
+            ? this.m_instance.synergyEnabled
+            : DeckPower.SynergyUnlockedOf(_card, _mine));
+        Sprite t_frame = CardVisualRules.PickFrame(_card, t_synergyUnlocked);
+        // 표가 미배선이면 프리팹의 기존 그림을 유지한다.
+        if (t_frame != null) this.frame.sprite = t_frame;
+        this.frame.enabled = this.frame.sprite != null;
     }
 
     /// <summary>지금 꺼져 있지만 _card 기준으로는 켜져야 할 프레임 장식들 = 이번 성장으로 새로 열릴 문양.</summary>

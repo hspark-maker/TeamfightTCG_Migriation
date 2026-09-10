@@ -247,6 +247,25 @@ public static class OutgameDebugActions
         }
     }
 
+    public static void ResetDailyMissions() => ResetDailyMissionsAsync().Forget();
+
+    static async UniTaskVoid ResetDailyMissionsAsync()
+    {
+        try
+        {
+            if (await MissionCommands.ResetDailyForDebugAsync())
+                Debug.Log("[OutgameDebug] Daily mission progress and claims reset; mission UI refreshed.");
+        }
+        catch (ServerCommandRejectedException t_rejected)
+        {
+            Debug.LogWarning($"[OutgameDebug] devResetDailyMissions rejected — {t_rejected.Message}");
+        }
+        catch (System.Exception t_exception)
+        {
+            Debug.LogError($"[OutgameDebug] devResetDailyMissions failed — {t_exception.GetBaseException().Message}");
+        }
+    }
+
     // 전 카드 만렙 (재화·성공률 무시 — 진화 단계·키워드 해금도 레벨에서 파생돼 같이 열린다)
     public static void MaxCardGrowth()
     {

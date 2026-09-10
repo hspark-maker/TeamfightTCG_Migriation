@@ -6,6 +6,36 @@ using UnityEngine;
 /// <summary>배틀패스 조회·수령 callable 의 클라이언트 단일 창구.</summary>
 internal static class PassCommands
 {
+    static bool s_missionRefreshPending;
+
+    internal static void ApplyMissionProgress(PassProgress _progress)
+    {
+        Invalidate();
+        if (_progress != null && PassManager.HasSeason && PassManager.Season.SeasonId == _progress.SeasonId)
+            PassManager.Adopt(_progress);
+        else if (!s_missionRefreshPending)
+            RefreshAfterMissionAsync().Forget();
+    }
+
+    // 초기 조회 중이거나 시즌이 달라졌으면 정의까지 다시 받는다. 일괄 수령 중의 요청은 합친다.
+    static async UniTaskVoid RefreshAfterMissionAsync()
+    {
+        s_missionRefreshPending = true;
+        try
+        {
+            while (true)
+            {
+                await UniTask.WaitUntil(() => !s_refreshInFlight && s_inFlightClaims.Count == 0,
+                    cancellationToken: FirebaseManager.Lifetime);
+                int t_generation = s_stateGeneration;
+                await RefreshAsync();
+                // 왕복 중 다른 미션 수령이 옛 조회를 무효화한 경우만 다시 조회한다.
+                if (t_generation == s_stateGeneration) break;
+            }
+        }
+        finally { s_missionRefreshPending = false; }
+    }
+
     const string GET_COMMAND = "getPass";
     const string CLAIM_COMMAND = "claimPassReward";
 
@@ -104,6 +134,7 @@ internal static class PassCommands
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetRuntimeState()
     {
+        s_missionRefreshPending = false;
         s_inFlightClaims.Clear();
         s_refreshInFlight = false;
         s_stateGeneration = 0;

@@ -1,13 +1,15 @@
+import {measuredCallable, measurePhase, recordMetric} from "../observability/requestMetrics";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import {db} from "../firebaseApp";
 import {parseRankGradeRows} from "../payout";
 import {currentRankSeason} from "../rank/rankSeason";
-import {ensureRankState} from "../rank/rankStore";
+import {ensureRankSnapshot} from "../rank/rankStore";
+import {hasRankPublicProfile, publicRankProfile} from "../rank/publicProfile";
 import {isKnownEnv, requireUid} from "../save/saveDocument";
 import {readSpecRows} from "../specs/specBlobReader";
 
 /** 환경·시즌별 상위 100명과 내 공동순위. 비공개 세이브 필드는 응답에 포함하지 않는다. */
-export const getRankLeaderboard = onCall(async (request) => {
+export const getRankLeaderboard = onCall(measuredCallable("getRankLeaderboard", async (request) => {
   const uid = requireUid(request.auth);
   const env = String(request.data?.env ?? "");
   if (!isKnownEnv(env)) throw new HttpsError("invalid-argument", "Unknown environment.");
@@ -17,25 +19,34 @@ export const getRankLeaderboard = onCall(async (request) => {
   const grades = parseRankGradeRows(gradeRows);
   const season = currentRankSeason(seasonRows, Date.now());
   if (!grades.length || !season) throw new HttpsError("failed-precondition", "Rank season is unavailable.");
-  const state = await ensureRankState(db, env, uid, season.seasonId, grades);
-  if (!state) throw new HttpsError("failed-precondition", "Save document is missing.");
+  const snapshot = await ensureRankSnapshot(db, env, uid, season.seasonId, grades);
+  if (!snapshot) throw new HttpsError("failed-precondition", "Save document is missing.");
+  const {state, profile: selfProfile} = snapshot;
 
   const minimum = grades[0].entryPoints;
   const board = db.collection(`envs/${env}/rankings`).where("seasonId", "==", season.seasonId);
   const [top, ahead] = await Promise.all([
-    board.where("points", ">=", minimum).orderBy("points", "desc").limit(100).get(),
-    state.points >= minimum ? board.where("points", ">", state.points).orderBy("points", "desc").count().get() : null,
+    measurePhase("leaderboardTop", () => board.where("points", ">=", minimum).orderBy("points", "desc").limit(100).get()),
+    state.points >= minimum ? measurePhase("leaderboardCount", () => {
+      recordMetric("leaderboardCountCalls");
+      return board.where("points", ">", state.points).orderBy("points", "desc").count().get();
+    }) : null,
   ]);
-  const ids = [...new Set([...top.docs.map((doc) => doc.id), uid])];
-  const profiles = await db.getAll(...ids.map((id) => db.doc(`envs/${env}/users/${id}/save/current`)));
-  const profileById = new Map(ids.map((id, index) => [id, profiles[index].data()?.profile]));
+  recordMetric("leaderboardTopDocuments", top.docs.length);
+  const profileById = new Map(top.docs.map((doc) => [doc.id, doc.data().profile as unknown]));
+  profileById.set(uid, selfProfile);
+  // 아직 프로필이 없는 구 색인만 보완한다. 보정 완료 후 일반 경로의 추가 읽기는 0회다.
+  const legacyIds = top.docs.filter((doc) => !hasRankPublicProfile(profileById.get(doc.id))).map((doc) => doc.id);
+  if (legacyIds.length > 0) {
+    const profiles = await measurePhase("leaderboardProfiles", () => db.getAll(
+      ...legacyIds.map((id) => db.doc(`envs/${env}/users/${id}/save/current`)), {fieldMask: ["profile"]}));
+    recordMetric("leaderboardProfileReads", profiles.length);
+    legacyIds.forEach((id, index) => profileById.set(id, profiles[index].data()?.profile));
+  }
   const entry = (id: string, points: number, rank: number) => {
-    const profile = profileById.get(id);
     return {
       rank, points, isSelf: id === uid,
-      nickname: typeof profile?.nickname === "string" ? profile.nickname.slice(0, 12) : "플레이어",
-      avatarId: typeof profile?.avatarId === "string" ? profile.avatarId : "",
-      frameId: typeof profile?.frameId === "string" ? profile.frameId : "",
+      ...publicRankProfile(profileById.get(id)),
     };
   };
   let previousPoints = -1;
@@ -51,4 +62,4 @@ export const getRankLeaderboard = onCall(async (request) => {
     entries,
     self: entry(uid, state.points, ahead ? ahead.data().count + 1 : 0),
   };
-});
+}));

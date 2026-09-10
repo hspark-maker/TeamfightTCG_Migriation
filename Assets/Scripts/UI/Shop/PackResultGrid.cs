@@ -45,12 +45,47 @@ public class PackResultGrid : MonoBehaviour
     readonly List<int> m_order = new List<int>();
 
     CanvasGroup m_panel;
+    int m_growthGeneration;
+
+    /// <summary>직접 카드 보상은 개봉 더미가 없으므로 결과판에서 성장을 순서대로 보여준다.</summary>
+    public void PlaySnackGrowth(System.Action _onComplete)
+    {
+        int t_generation = ++m_growthGeneration;
+        SetCardInput(false);
+        PlayNext(0);
+
+        void PlayNext(int _index)
+        {
+            if (t_generation != m_growthGeneration || !isActiveAndEnabled) return;
+            while (_index < m_views.Count)
+            {
+                var t_view = m_views[_index++];
+                if (t_view == null || !t_view.HasPendingSnackGrowth) continue;
+                int t_next = _index;
+                t_view.PlaySnackGrowth(() => PlayNext(t_next));
+                return;
+            }
+            SetCardInput(true);
+            _onComplete?.Invoke();
+        }
+    }
+
+    void SetCardInput(bool _enabled)
+    {
+        foreach (var t_view in m_views)
+        {
+            if (t_view == null || t_view.Visual == null) continue;
+            var t_press = t_view.Visual.GetComponent<LongPressDetector>();
+            if (t_press != null) t_press.enabled = _enabled;
+        }
+    }
 
     /// <summary>결과 카드를 3열로 세우고 패널을 띄운다. _instant면 페이드도 팝도 없이 곧장 최종 상태(스킵 경로).</summary>
-    public void Show(IReadOnlyList<DrawnCard> _cards, bool _instant = false)
+    public void Show(IReadOnlyList<DrawnCard> _cards, bool _instant = false, bool _holdForSnackGrowth = false)
     {
         Clear();
-        Build(_cards, _instant);
+        Build(_cards, _instant, _holdForSnackGrowth);
+        if (_holdForSnackGrowth) SetCardInput(false);
 
         // 패널의 표시 여부(SetActive)는 진행자가 쥔다 — 여기서는 페이드만 맡아 소유권이 갈리지 않게 한다.
         var t_panel = ResolvePanel();
@@ -79,7 +114,7 @@ public class PackResultGrid : MonoBehaviour
     // ── 내부 ────────────────────────────────────────────────────
 
     // 카드를 만들어 격자 자리에 앉힌다. 신규/중복 강조는 즉시 모드로 — 결과판이지 다시 여는 연출이 아니다.
-    void Build(IReadOnlyList<DrawnCard> _cards, bool _instant)
+    void Build(IReadOnlyList<DrawnCard> _cards, bool _instant, bool _holdForSnackGrowth)
     {
         if (cardPrefab == null)
         {
@@ -105,7 +140,7 @@ public class PackResultGrid : MonoBehaviour
             if (t_drawn.CardId <= 0) continue;
 
             var t_view = Instantiate(cardPrefab, t_parent);
-            t_view.Bind(t_drawn);
+            t_view.Bind(t_drawn, _showFinalGrowth: !_holdForSnackGrowth);
             t_view.PlayRevealAccent(true);
 
             // 결과판의 본론. 위 한 줄이 "연출 없이 최종 상태로 세운다"라면 이 한 줄이 "그래서 뭘 건졌나"다 —
@@ -201,6 +236,7 @@ public class PackResultGrid : MonoBehaviour
     //   지금은 개봉 중에 다른 경로로 상세를 열 길이 없어 문제가 되지 않는다.
     void Clear()
     {
+        ++m_growthGeneration;
         CardDetailOverlayView.Close();
 
         for (int t_i = 0; t_i < m_views.Count; t_i++)
@@ -212,6 +248,8 @@ public class PackResultGrid : MonoBehaviour
 
     RectTransform ResolveContent()
         => content != null ? content : (RectTransform)transform;
+
+    void OnDisable() => ++m_growthGeneration;
 
     CanvasGroup ResolvePanel()
     {

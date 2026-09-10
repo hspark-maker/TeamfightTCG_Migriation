@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.openPack = void 0;
+const requestMetrics_1 = require("../observability/requestMetrics");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
 const firestore_1 = require("firebase-admin/firestore");
@@ -44,6 +45,7 @@ const analyticsEvent_1 = require("../observability/analyticsEvent");
 const missionStore_1 = require("../missions/missionStore");
 const period_1 = require("../missions/period");
 const missionSpec_1 = require("../missions/missionSpec");
+const guideMutation_1 = require("../missions/guideMutation");
 const saveDocument_1 = require("../save/saveDocument");
 const cardCatalog_1 = require("../packs/cardCatalog");
 const packDraw_1 = require("../packs/packDraw");
@@ -54,6 +56,8 @@ const rewardTable_1 = require("../rewardTable");
 const rankStore_1 = require("../rank/rankStore");
 const walletStore_1 = require("../currency/walletStore");
 const cardGrowth_1 = require("../growth/cardGrowth");
+const snackGrowthSpec_1 = require("../growth/snackGrowthSpec");
+const snackGrowthProgress_1 = require("../missions/snackGrowthProgress");
 const domainReject_1 = require("../save/domainReject");
 const receiptId_1 = require("../save/receiptId");
 const packSpecReader_1 = require("../packs/packSpecReader");
@@ -73,7 +77,7 @@ function reject(reason, message, context) {
  * 클라(CardPackOpener)는 같은 검사를 사전에 한 번 더 하지만 그건 왕복을 아끼는 낙관 검사이고,
  * 판정의 진실원은 여기다.
  */
-exports.openPack = (0, https_1.onCall)(async (request) => {
+exports.openPack = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)("openPack", async (request) => {
     const uid = (0, saveDocument_1.requireUid)(request.auth);
     const env = String(request.data?.env ?? "");
     const packId = String(request.data?.packId ?? "");
@@ -95,14 +99,17 @@ exports.openPack = (0, https_1.onCall)(async (request) => {
         // 환급 경로는 클라·서버 양쪽에서 죽어 있다(중복 보상은 간식). 저작 실수를 조용히 삼키지 않는다.
         logger.warn("pack authors a refund that is never paid out", { env, packId, refundAmount: pack.refundAmount });
     }
-    const [dropRows, gradeRows, catalogIds, cardRows, rawRewards, catalog] = await Promise.all([
+    const [dropRows, gradeRows, catalogIds, cardRows, rawRewards, catalog, ruleRows, curveRows] = await Promise.all([
         (0, packSpecReader_1.readDropRows)(env, packId),
         (0, packSpecReader_1.readRankGradeRows)(env),
         (0, cardCatalog_1.loadCatalogIds)(env),
         (0, packSpecReader_1.readSpecRows)(env, "Card"),
         pack.price > 0 ? (0, packSpecReader_1.readSpecRows)(env, "Reward") : Promise.resolve([]),
         (0, missionSpec_1.readMissionCatalog)(env),
+        (0, packSpecReader_1.readSpecRows)(env, "CardEnhanceRule"),
+        (0, packSpecReader_1.readSpecRows)(env, "CardLimitBreak"),
     ]);
+    const snackGrowthCurve = (0, snackGrowthSpec_1.requireSnackGrowthCurve)(ruleRows, curveRows);
     const duplicateRows = (0, rewardTable_1.parseRewardRows)(rawRewards);
     const cardGrades = new Map(cardRows.map((row) => [Number(row.id), String(row.grade)]));
     let granted = [];
@@ -126,10 +133,11 @@ exports.openPack = (0, https_1.onCall)(async (request) => {
     // 경계에 걸린 호출이 어느 기간에 실릴지가 재실행 운에 달린다.
     const period = (0, period_1.missionPeriod)(Date.now());
     const result = await (0, saveDocument_1.mutateSave)(env, uid, "openPack", { kind: "client", txId }, async (current, transaction, wallet) => {
-        // 미션 읽기가 콜백의 첫 줄이다 — 아래 쓰기보다 반드시 앞이어야 한다(Firestore 트랜잭션 규칙).
-        const missions = await (0, missionStore_1.beginMissionBump)(transaction, firebaseApp_1.db, env, uid, period);
+        // 독립 문서는 함께 읽고, 미션·지갑 쓰기 전에 모두 확보한다.
+        const missionReference = (0, missionStore_1.missionsRef)(firebaseApp_1.db, env, uid);
+        const [missionSnapshot, rankSnapshot] = await transaction.getAll(missionReference, (0, rankStore_1.rankRef)(firebaseApp_1.db, env, uid));
+        const missions = (0, missionStore_1.missionBumpFromSnapshot)(missionReference, missionSnapshot, period);
         // 트랜잭션이 재실행되면 이전 추첨을 버리고 다시 뽑는다 — 잔액·소유와 정합해야 한다.
-        const rankSnapshot = await transaction.get((0, rankStore_1.rankRef)(firebaseApp_1.db, env, uid));
         const points = Number(rankSnapshot.data()?.points ?? current.rank?.points ?? 0);
         const grade = (0, rankGrade_1.gradeOf)(thresholds, points);
         const required = (0, rankGrade_1.parseRequiredGrade)(pack.minRankGrade);
@@ -152,15 +160,18 @@ exports.openPack = (0, https_1.onCall)(async (request) => {
         const paid = (0, wallet_1.grant)((0, wallet_1.spend)(balances, pack.priceType, pack.price), granted);
         goldBefore = balances[pack.priceType];
         goldAfter = paid[pack.priceType];
+        const slots = {
+            ownership: (0, packSlots_1.buildOwnershipSlot)(owned, drawn),
+            cardGrowth: (0, cardGrowth_1.growthSlot)((0, itemGrant_1.applyDrawnSnackGrowth)((0, cardGrowth_1.readGrowthEntries)(current.cardGrowth), drawn, snackGrowthCurve)),
+        };
+        (0, guideMutation_1.applyGuideProgress)(missions, current, slots, cardRows, catalog);
+        (0, snackGrowthProgress_1.applySnackGrowthProgress)(missions, drawn);
         // 진행도는 콜백 **안**에서 올린다 — mutateSave 는 영수증이 히트하면 이 콜백을 통째로 건너뛰므로,
         // 그 덕에 재시도가 진행도를 두 번 올리지 않는다. 콜백 밖으로 옮기면 그 보장이 사라진다.
         (0, missionStore_1.commitMissionBump)(transaction, missions, eventNames_1.EVENTS.packOpened.missionKey, 1, firestore_1.FieldValue.serverTimestamp());
         missionState = (0, missionStore_1.missionResponse)(missions.state, period, catalog);
         return {
-            slots: {
-                ownership: (0, packSlots_1.buildOwnershipSlot)(owned, drawn),
-                cardGrowth: (0, cardGrowth_1.growthSlot)(drawn.reduce((entries, card) => (0, cardGrowth_1.addSnack)(entries, card.cardId, card.snack), (0, cardGrowth_1.readGrowthEntries)(current.cardGrowth))),
-            },
+            slots,
             wallet: (0, walletStore_1.nextWallet)(wallet, paid, "openPack"),
         };
     }, (adopted) => {
@@ -183,5 +194,5 @@ exports.openPack = (0, https_1.onCall)(async (request) => {
         });
     }
     return result;
-});
+}));
 //# sourceMappingURL=openPack.js.map

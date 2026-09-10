@@ -86,8 +86,7 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
     {
         if (_claim == null) return;
         var t_outcome = await _claim();
-        if (t_outcome.Succeeded && t_outcome.Cards != null && t_outcome.Cards.Count > 0 &&
-            CardSetRewardOverlay.TryGet(out var t_cards)) t_cards.ShowGranted(t_outcome.Cards);
+        if (t_outcome.Succeeded) RewardPackPresentation.Show(t_outcome);
     }
 
     /// <summary>
@@ -144,6 +143,7 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
             else this.dimButton.onClick.AddListener(this.Hide);
         }
 
+        MarkOpen();
         this.SetVisible(true);
 
         this.dimTint.Capture();
@@ -159,6 +159,7 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
 
     public void Hide()
     {
+        bool t_wasOpen = ConsumeOpen();
         this.m_showVersion++;
         this.m_onConfirm = null;
         this.KillIntro();
@@ -168,6 +169,7 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
         var t_closed = this.m_onClosed;
         this.m_onClosed = null;
         t_closed?.Invoke();
+        NotifyClosed(t_wasOpen);
     }
 
     // 잠금은 등장 안무가 푼다. Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서는 그 안무가 없어
@@ -181,6 +183,7 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
     // 분출 시퀀스는 죽이지 않는다(팝업 밖 노드에서 도는 연출이라 끊으면 코인이 허공에 굳는다).
     void OnDisable()
     {
+        ClearOpen();
         this.transition.HandleDisabled(this.ResolveTarget());
         this.RestoreReveal();
     }
@@ -202,12 +205,8 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
                 // 로컬 가드의 즉시 거절과 이미 지급된 보상은 같은 프레임에 처리한다.
                 var t_outcome = t_claim.GetAwaiter().GetResult();
                 if (!t_outcome.Succeeded) { this.Hide(); return; }
-                if (t_outcome.Cards != null && t_outcome.Cards.Count > 0)
-                {
-                    this.Hide();
-                    if (CardSetRewardOverlay.TryGet(out var t_cards)) t_cards.ShowGranted(t_outcome.Cards);
-                    return;
-                }
+                // 재화 합산 연출을 끝낸 뒤 팩 개봉·카드 표시를 잇는다.
+                if (t_outcome.HasCards) this.PresentCardsAfterClose(t_outcome);
             }
             else
             {
@@ -284,15 +283,25 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
         try
         {
             var t_outcome = await _claim;
-            if (!t_outcome.Succeeded || t_outcome.Cards == null || t_outcome.Cards.Count == 0) return;
+            if (!t_outcome.Succeeded || !t_outcome.HasCards) return;
 
-            if (this != null && this.m_showVersion == _showVersion) this.Hide();
-            if (CardSetRewardOverlay.TryGet(out var t_cards)) t_cards.ShowGranted(t_outcome.Cards);
+            if (this != null && this.m_showVersion == _showVersion) this.PresentCardsAfterClose(t_outcome);
+            else RewardPackPresentation.Show(t_outcome);
         }
         catch (Exception t_error)
         {
             Debug.LogException(t_error);
         }
+    }
+
+    void PresentCardsAfterClose(RewardClaimOutcome _outcome)
+    {
+        var t_closed = this.m_onClosed;
+        this.m_onClosed = () =>
+        {
+            t_closed?.Invoke();
+            RewardPackPresentation.Show(_outcome);
+        };
     }
 
     // 팝업을 먼저 닫고 퇴장 길이만큼 뒤에 빛을 띄운다. 시퀀스를 팝업에 링크하지 않는 이유는 분출과 같다(꺼질 때 죽으면 빛이 굳는다).

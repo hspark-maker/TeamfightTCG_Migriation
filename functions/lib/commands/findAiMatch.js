@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.findAiMatch = void 0;
+const requestMetrics_1 = require("../observability/requestMetrics");
 const firestore_1 = require("firebase-admin/firestore");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
@@ -130,7 +131,7 @@ function storedResponse(raw, data) {
  * 실시간 상대가 없을 때 AI 덱과 재시뮬 입력을 한 매치 문서에 봉인한다.
  * 플레이어 덱의 성장·소유 검증은 이어지는 lockDeck이 같은 matchId에서 수행한다.
  */
-exports.findAiMatch = (0, https_1.onCall)(async (request) => {
+exports.findAiMatch = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)("findAiMatch", async (request) => {
     const uid = (0, saveDocument_1.requireUid)(request.auth);
     const data = parseData(request.data);
     const [rankRows, deckRows, seasonRows] = await Promise.all([
@@ -240,5 +241,5 @@ exports.findAiMatch = (0, https_1.onCall)(async (request) => {
         logger.error("AI match creation failed", { uid, env: data.env, error });
         throw new https_1.HttpsError("failed-precondition", "AI match could not be created.");
     }
-});
+}));
 //# sourceMappingURL=findAiMatch.js.map
