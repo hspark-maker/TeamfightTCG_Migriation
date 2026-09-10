@@ -6,8 +6,6 @@ public sealed class GuidanceCoordinator : MonoBehaviour
     static GuidanceCoordinator s_instance;
     LobbyMatchLauncher m_launcher;
     GuideMissionNoticePopup m_notice;
-    SimpleYNPopup m_invitation;
-    bool m_invitationAccepted;
     bool m_initialized;
     float m_nextEvaluation;
 
@@ -47,15 +45,6 @@ public sealed class GuidanceCoordinator : MonoBehaviour
             if (!m_notice.IsClaiming && !SafeToPresent(m_notice)) m_notice.Yield();
             return;
         }
-        if (m_invitation != null && m_invitation.isShow)
-        {
-            if (!SafeToPresent(m_invitation))
-            {
-                m_invitationAccepted = false;
-                m_invitation.Hide();
-            }
-            return;
-        }
         if (SynergyIntroduction.IsActive)
         {
             if (!GameInitialization.IsReady || CurtainView.IsBusy || LoadingCoverView.IsCovering
@@ -92,32 +81,13 @@ public sealed class GuidanceCoordinator : MonoBehaviour
             return;
         }
         if (OutgameTutorialRunner.IsRunning) return;
-        if (AdventureTutorialRunner.NeedsInvitation)
-        {
-            m_invitationAccepted = false;
-            m_invitation = UIPoolManager.instance.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
-            {
-                titleText = "안개숲 모험이 열렸어요!\n모험에서 성장 재화를 얻고 덱을 강화해 보세요.",
-                yesText = "모험으로 이동",
-                noText = "나중에",
-                yesAction = () => m_invitationAccepted = true,
-                noAction = AdventureTutorialRunner.DeferInvitation,
-                onHide = () =>
-                {
-                    m_invitation = null;
-                    if (m_invitationAccepted) AdventureTutorialRunner.TryBegin();
-                },
-            });
-            return;
-        }
+        if (AdventureTutorialRunner.TryBegin()) return;
         if (SynergyIntroduction.HasPending) SynergyIntroduction.TryBegin();
     }
 
     void OnDisable()
     {
         m_notice?.Yield();
-        m_invitationAccepted = false;
-        if (m_invitation != null && m_invitation.isShow) m_invitation.Hide();
         SynergyIntroduction.CancelPresentation();
         if (s_instance == this) s_instance = null;
     }

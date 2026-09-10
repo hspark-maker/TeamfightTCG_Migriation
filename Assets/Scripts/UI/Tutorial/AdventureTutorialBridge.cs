@@ -97,8 +97,9 @@ public sealed class AdventureTutorialBridge : MonoBehaviour
 
     void Satisfied()
     {
+        // Advance invokes OnChanged synchronously, which applies the next gate once.
+        // Applying again reuses its Canvas pending Destroy and loses the highlight at frame end.
         AdventureTutorialRunner.Advance();
-        Apply();
     }
     void Clear()
     {
