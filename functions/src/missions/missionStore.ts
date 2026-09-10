@@ -9,7 +9,7 @@
  *
  * ## 읽기·쓰기 순서 (이 파일이 두 단계로 갈린 이유)
  * Firestore 트랜잭션은 **모든 읽기가 모든 쓰기보다 앞**이어야 한다. `mutateSave` 의 무조건 읽기
- * 3개(save → wallet → receipt)는 콜백 전에 끝나지만, `enhanceCard` 처럼 콜백 안에서 또 읽는 명령이 있다.
+ * 3개(save · wallet · receipt)는 콜백 전에 끝나지만, `enhanceCard` 처럼 콜백 안에서 또 읽는 명령이 있다.
  * 그래서 미션도 **읽기는 콜백 맨 앞(beginMissionBump), 쓰기는 콜백 맨 끝(commitMissionBump)** 으로 갈라 둔다.
  * 한 함수로 뭉치면 그 함수 뒤에 오는 다른 읽기가 순서를 깬다.
  *
@@ -242,8 +242,22 @@ export async function beginMissionBump(
   period: MissionPeriod,
 ): Promise<MissionBump> {
   const ref = missionsRef(db, env, uid);
-  const state = applyPeriodReset(readMissions(await transaction.get(ref)), period);
-  return {ref, state, period};
+  return missionBumpFromSnapshot(ref, await transaction.get(ref), period);
+}
+
+/**
+ * 일괄 조회한 미션 문서에도 단일 조회와 같은 기간 리셋을 적용한다. 읽기·쓰기는 하지 않는다.
+ * @param {DocumentReference} ref 조회한 미션 문서 참조
+ * @param {DocumentSnapshot} snapshot 같은 트랜잭션에서 읽은 스냅샷
+ * @param {MissionPeriod} period 이번 호출의 기간
+ * @return {MissionBump} 쓰기에 쓸 손잡이
+ */
+export function missionBumpFromSnapshot(
+  ref: DocumentReference,
+  snapshot: DocumentSnapshot,
+  period: MissionPeriod,
+): MissionBump {
+  return {ref, state: applyPeriodReset(readMissions(snapshot), period), period};
 }
 
 /**

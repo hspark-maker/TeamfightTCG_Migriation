@@ -14,6 +14,7 @@ export {getRankLeaderboard} from "./commands/getRankLeaderboard";
 export {findAiMatch} from "./commands/findAiMatch";
 export {verifyMatchTicket} from "./commands/verifyMatchTicket";
 export {submitMatchResult} from "./commands/submitMatchResult";
+export {aggregateReplayDaily} from "./commands/aggregateReplayDaily";
 export {claimPayout} from "./commands/claimPayout";
 export {enhanceCard} from "./commands/enhanceCard";
 export {enhanceKeyword} from "./commands/enhanceKeyword";

@@ -40,14 +40,14 @@ public class PassPanel : PooledUIBase
     [Tooltip("경험치 표시(현재/다음 문턱).")]
     [SerializeField] TMP_Text expText;
 
-    [Tooltip("0~1 로 채우는 게이지(Image.Type = Filled). 비워 두면 그리지 않는다.")]
+    [Tooltip("Sliced 채움 이미지. 최대 영역 부모 안에서 너비로 진행도를 표시한다.")]
     [SerializeField] Image expFill;
 
     [Header("목록")]
     [Tooltip("레벨 행이 쌓일 Content(VerticalLayoutGroup).")]
     [SerializeField] Transform levelContent;
 
-    [Tooltip("행 프리팹. Content 안의 목업 행을 물려도 된다 — 원본은 지우지 않고 숨긴다.")]
+    [Tooltip("독립 패스 레벨 행 프리팹.")]
     [SerializeField] PassLevelRowView rowPrefab;
 
     [Tooltip("활성 시즌이 없거나 아직 조회 전일 때 켤 안내.")]
@@ -55,6 +55,8 @@ public class PassPanel : PooledUIBase
 
     [Header("버튼")]
     [SerializeField] Button closeButton;
+
+    [SerializeField] Button claimAllButton;
 
     [Tooltip("패널 밖(딤)을 눌러 닫는 판. 알파 0 Image 의 Button 에 배선한다.")]
     [SerializeField] Button dimButton;
@@ -100,6 +102,11 @@ public class PassPanel : PooledUIBase
             this.dimButton.onClick.RemoveAllListeners();
             this.dimButton.onClick.AddListener(this.Close);
         }
+        if (this.claimAllButton != null)
+        {
+            this.claimAllButton.onClick.RemoveAllListeners();
+            this.claimAllButton.onClick.AddListener(this.HandleClaimAll);
+        }
 
         PassManager.OnChanged += this.HandlePassChanged;
     }
@@ -117,7 +124,7 @@ public class PassPanel : PooledUIBase
     {
         // 남은 기간만 매 프레임 갱신한다. 행 다시 그리기는 OnChanged 가 유발한다.
         if (!this.isShow) return;
-        this.RefreshHeader();
+        this.RefreshRemainLabel(PassManager.Season);
     }
 
     void HandlePassChanged()
@@ -139,13 +146,11 @@ public class PassPanel : PooledUIBase
         if (this.levelContent == null || this.rowPrefab == null) return;
 
         // Destroy 는 프레임 끝에 처리되므로 먼저 비활성화한다 — 레이아웃 계산에서 빠져야 이번 프레임 배치가 맞는다.
-        // rowPrefab 이 Content 안 목업 행으로 배선되는 저작도 허용해야 하므로 원본은 지우지 않고 숨긴다.
-        GameObject t_template = this.rowPrefab.gameObject;
         for (int i = this.levelContent.childCount - 1; i >= 0; i--)
         {
             GameObject t_child = this.levelContent.GetChild(i).gameObject;
             t_child.SetActive(false);
-            if (t_child != t_template) Destroy(t_child);
+            Destroy(t_child);
         }
 
         IReadOnlyList<PassLevelDefinition> t_levels = PassManager.Levels;
@@ -155,8 +160,9 @@ public class PassPanel : PooledUIBase
             if (t_level == null) continue;
 
             PassLevelRowView t_row = Instantiate(this.rowPrefab, this.levelContent);
-            t_row.gameObject.SetActive(true);   // 위에서 원본을 숨겼을 수 있다 — 사본은 항상 보이게.
-            t_row.Bind(t_level, this.HandleClaim);
+            t_row.gameObject.SetActive(true);
+            long? t_next = i + 1 < t_levels.Count ? t_levels[i + 1]?.RequiredExp : null;
+            t_row.Bind(t_level, t_next, this.HandleClaim);
             this.m_rows.Add(t_row);
         }
 
@@ -188,17 +194,29 @@ public class PassPanel : PooledUIBase
 
         if (this.levelText != null)
             this.levelText.text = t_season != null
-                ? $"Lv.{PassManager.CurrentLevel} / {t_season.MaxLevel}"
+                ? PassManager.CurrentLevel.ToString()
                 : string.Empty;
 
         long t_exp = PassManager.Exp;
         long? t_next = PassManager.NextRequiredExp;
+        long t_floor = FloorOf(t_exp);
         if (this.expText != null)
             this.expText.text = t_season == null ? string.Empty
-                : t_next.HasValue ? $"{t_exp} / {t_next.Value} EXP" : $"{t_exp} EXP (MAX)";
+                : t_next.HasValue ? $"{t_exp - t_floor:N0} / {t_next.Value - t_floor:N0}" : "MAX";
 
         if (this.expFill != null)
-            this.expFill.fillAmount = FillOf(t_exp, t_next);
+        {
+            float t_fill = t_season == null ? 0f : FillOf(t_exp, t_next);
+            this.expFill.rectTransform.anchorMax = new Vector2(t_fill, 1f);
+            this.expFill.gameObject.SetActive(t_fill > 0f);
+        }
+        if (this.claimAllButton != null)
+        {
+            bool t_claimable = false;
+            foreach (PassLevelDefinition t_level in PassManager.Levels)
+                t_claimable |= PassManager.CanClaim(t_level);
+            this.claimAllButton.interactable = !this.m_claiming && t_season != null && t_claimable;
+        }
 
         this.RefreshRemainLabel(t_season);
     }
@@ -208,6 +226,14 @@ public class PassPanel : PooledUIBase
     {
         if (!_next.HasValue) return 1f;
 
+        long t_floor = FloorOf(_exp);
+        long t_span = _next.Value - t_floor;
+        if (t_span <= 0L) return 1f;
+        return Mathf.Clamp01((float)(_exp - t_floor) / t_span);
+    }
+
+    static long FloorOf(long _exp)
+    {
         long t_floor = 0L;
         IReadOnlyList<PassLevelDefinition> t_levels = PassManager.Levels;
         for (int i = 0; i < t_levels.Count; i++)
@@ -217,9 +243,7 @@ public class PassPanel : PooledUIBase
             t_floor = t_level.RequiredExp;
         }
 
-        long t_span = _next.Value - t_floor;
-        if (t_span <= 0L) return 1f;
-        return Mathf.Clamp01((float)(_exp - t_floor) / t_span);
+        return t_floor;
     }
 
     // 종료 시각의 진실원은 서버가 준 epoch ms 다. 남은 시간 표시에만 기기 시계를 쓴다 —
@@ -242,40 +266,55 @@ public class PassPanel : PooledUIBase
             : $"{(int)t_span.TotalHours}시간 {t_span.Minutes}분 남음";
     }
 
-    void HandleClaim(int _level) => this.ClaimAsync(_level).Forget();
+    void HandleClaim(int _level) => this.ClaimAsync(new List<int> { _level }).Forget();
 
-    async UniTaskVoid ClaimAsync(int _level)
+    void HandleClaimAll()
     {
-        if (this.m_claiming) return;
+        var t_levels = new List<int>();
+        foreach (PassLevelDefinition t_level in PassManager.Levels)
+            if (PassManager.CanClaim(t_level)) t_levels.Add(t_level.Level);
+        this.ClaimAsync(t_levels).Forget();
+    }
+
+    async UniTaskVoid ClaimAsync(List<int> _levels)
+    {
+        if (this.m_claiming || _levels.Count == 0) return;
         this.m_claiming = true;
-        ClaimPassRewardResult t_result = null;
+        this.RefreshHeader();
+        string t_season = PassManager.Season?.SeasonId;
+        var t_rewards = new List<ClaimMissionResult>();
         try
         {
-            string t_selected = null;
-            foreach (var t_level in PassManager.Levels)
+            foreach (int t_levelNumber in _levels)
             {
-                if (t_level.Level != _level || t_level.Items == null) continue;
-                if (!t_level.Items.Exists(t_item => t_item.RewardType == "PackChoice")) break;
-                t_selected = await RewardPackChoice.ChooseAsync(PassManager.PackChoices);
-                if (string.IsNullOrEmpty(t_selected)) return;
-                break;
+                if (PassManager.Season?.SeasonId != t_season) break;
+                PassLevelDefinition t_definition = null;
+                foreach (PassLevelDefinition t_level in PassManager.Levels)
+                    if (t_level != null && t_level.Level == t_levelNumber) { t_definition = t_level; break; }
+                if (!PassManager.CanClaim(t_definition)) continue;
+
+                string t_selected = null;
+                if (t_definition.Items != null && t_definition.Items.Exists(t_item => t_item != null && t_item.RewardType == "PackChoice"))
+                {
+                    t_selected = await RewardPackChoice.ChooseAsync(PassManager.PackChoices);
+                    if (string.IsNullOrEmpty(t_selected)) break;
+                }
+
+                ClaimPassRewardResult t_result;
+                ServerWaitOverlay.Hold(this);
+                try { t_result = await PassCommands.ClaimAsync(t_levelNumber, t_selected); }
+                finally { ServerWaitOverlay.Release(this); }
+                // 실패 이후 요청을 계속 보내지 않는다. 앞서 성공한 보상은 아래에서 표시한다.
+                if (t_result == null) break;
+                t_rewards.Add(new ClaimMissionResult { Granted = t_result.Granted, Cards = t_result.Cards });
             }
-        // 왕복 동안 입력을 막는다. 딤·스피너는 임계 뒤에만 뜨므로 빠른 응답에서는 깜빡이지 않는다.
-        ServerWaitOverlay.Hold(this);
-        try
-        {
-            // 낙관 갱신하지 않는다 — 응답의 진행 상태를 PassCommands 가 채택하고 OnChanged 가 화면을 갱신한다.
-            t_result = await PassCommands.ClaimAsync(_level, t_selected);
         }
         finally
         {
-            // **팝업보다 먼저 걷는다.** 순서를 뒤집으면 안내가 대기 딤에 묻힌다.
-            ServerWaitOverlay.Release(this);
+            this.m_claiming = false;
+            this.RefreshHeader();
+            if (t_rewards.Count > 0) MissionPanel.ShowClaimedRewards(t_rewards, "패스 보상");
         }
-        if (t_result?.Cards != null && t_result.Cards.Count > 0 && CardSetRewardOverlay.TryGet(out var t_cards))
-            t_cards.ShowGranted(RewardItemDisplay.ToDrawn(t_result.Cards));
-        }
-        finally { this.m_claiming = false; }
     }
 
     // 여는 순간 오버레이 자신을 켠다 — 저작본은 루트가 꺼진 채로 들어오므로, 켜 주지 않으면

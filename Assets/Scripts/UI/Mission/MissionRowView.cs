@@ -47,6 +47,15 @@ public class MissionRowView : MonoBehaviour
 
     [SerializeField] Button claimButton;
 
+    [Header("보상 수령 버튼 배경")]
+    [SerializeField] Image claimBackground;
+    [Tooltip("보상 획득 가능 상태의 배경.")]
+    [SerializeField] Sprite claimableBackgroundSprite;
+    [Tooltip("보상 획득 완료 상태의 배경.")]
+    [SerializeField] Sprite claimedBackgroundSprite;
+    [Tooltip("미완료 또는 아직 해금되지 않은 미션의 배경.")]
+    [SerializeField] Sprite incompleteBackgroundSprite;
+
     [Tooltip("수령 버튼 라벨. 상태에 따라 문구가 바뀐다.")]
     [SerializeField] TMP_Text claimLabel;
 
@@ -99,6 +108,8 @@ public class MissionRowView : MonoBehaviour
         bool t_complete = MissionManager.IsComplete(this.m_definition);
         bool t_claimed = MissionManager.IsClaimed(this.m_definition.Id);
         bool t_canClaim = MissionManager.CanClaim(this.m_definition);
+        // 요청 중 입력 잠금은 표시 상태와 분리해 배경이 미완료로 깜빡이지 않게 한다.
+        bool t_rewardAvailable = t_complete && MissionManager.IsGuideUnlocked(this.m_definition);
 
         if (this.progressText != null)
         {
@@ -122,8 +133,15 @@ public class MissionRowView : MonoBehaviour
 
         if (this.claimedMark != null) this.claimedMark.SetActive(t_claimed);
 
+        if (this.claimBackground != null)
+        {
+            Sprite t_background = t_claimed ? this.claimedBackgroundSprite
+                : t_rewardAvailable ? this.claimableBackgroundSprite : this.incompleteBackgroundSprite;
+            if (t_background != null) this.claimBackground.sprite = t_background;
+        }
+
         if (this.claimLabel != null)
-            this.claimLabel.text = t_claimed ? "완료" : t_complete ? "받기" : "진행 중";
+            this.claimLabel.text = t_claimed ? "완료" : t_rewardAvailable ? "받기" : "진행 중";
 
         // 버튼은 끄지 않고 상호작용만 막는다 — 꺼 버리면 레이아웃이 흔들리고 "받은 줄"이 사라진 것처럼 보인다.
         if (this.claimButton != null) this.claimButton.interactable = t_canClaim;

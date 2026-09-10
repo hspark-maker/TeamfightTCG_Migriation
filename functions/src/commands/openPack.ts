@@ -6,10 +6,11 @@ import {db} from "../firebaseApp";
 import {EVENTS} from "../analytics/eventNames";
 import {recordEvent} from "../observability/analyticsEvent";
 import {
-  beginMissionBump,
   commitMissionBump,
+  missionBumpFromSnapshot,
   missionResponse,
   MissionResponse,
+  missionsRef,
 } from "../missions/missionStore";
 import {missionPeriod} from "../missions/period";
 import {readMissionCatalog} from "../missions/missionSpec";
@@ -128,10 +129,12 @@ export const openPack = onCall(async (request) => {
 
   const result = await mutateSave(env, uid, "openPack", {kind: "client", txId},
     async (current, transaction, wallet): Promise<SaveMutation> => {
-      // 미션 읽기가 콜백의 첫 줄이다 — 아래 쓰기보다 반드시 앞이어야 한다(Firestore 트랜잭션 규칙).
-      const missions = await beginMissionBump(transaction, db, env, uid, period);
+      // 독립 문서는 함께 읽고, 미션·지갑 쓰기 전에 모두 확보한다.
+      const missionReference = missionsRef(db, env, uid);
+      const [missionSnapshot, rankSnapshot] = await transaction.getAll(
+        missionReference, rankRef(db, env, uid));
+      const missions = missionBumpFromSnapshot(missionReference, missionSnapshot, period);
       // 트랜잭션이 재실행되면 이전 추첨을 버리고 다시 뽑는다 — 잔액·소유와 정합해야 한다.
-      const rankSnapshot = await transaction.get(rankRef(db, env, uid));
       const points = Number(rankSnapshot.data()?.points ?? (current.rank as {points?: unknown} | undefined)?.points ?? 0);
       const grade = gradeOf(thresholds, points);
 

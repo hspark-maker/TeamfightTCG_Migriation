@@ -30,7 +30,7 @@ public class GuideMissionPanel : PooledUIBase
     [Tooltip("가이드 미션 행이 쌓일 Content(VerticalLayoutGroup).")]
     [SerializeField] Transform listContent;
 
-    [Tooltip("가이드 미션 행 프리팹 에셋.")]
+    [Tooltip("가이드·일일·주간이 공유하는 미션 행 프리팹 에셋.")]
     [SerializeField] MissionRowView rowPrefab;
 
     [Tooltip("가이드 미션이 하나도 없을 때 켤 안내(서버 정의 미도착 포함).")]

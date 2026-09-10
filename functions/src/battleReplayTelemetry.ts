@@ -1,5 +1,4 @@
-import * as logger from "firebase-functions/logger";
-import {DocumentReference, FieldValue} from "firebase-admin/firestore";
+import {DocumentReference, FieldValue, Timestamp, Transaction} from "firebase-admin/firestore";
 import {db} from "./firebaseApp";
 
 export type ReplayDailyDelta = {
@@ -37,22 +36,43 @@ export function replayDayRef(env: string, day: string): DocumentReference {
 }
 
 /**
- * 정산 트랜잭션과 분리된 best-effort 집계다. 실패해도 보상 정산은 되돌리지 않는다.
+ * 정산과 같은 커밋에 집계 이벤트를 남긴다. 일별 카운터의 경합은 응답 경로에서 분리한다.
+ * @param {Transaction} transaction 정산 트랜잭션
  * @param {string} env 환경 id
+ * @param {string} eventId 호출마다 발급하고 트랜잭션 재시도 동안 유지하는 고유 ID
  * @param {ReplayDailyDelta} delta 이번 제출이 더할 카운터
- * @return {Promise<void>} 실패는 로그로만 남는다
+ * @return {void}
  */
-export async function recordReplayDaily(env: string, delta: ReplayDailyDelta): Promise<void> {
-  try {
+export function enqueueReplayDaily(
+  transaction: Transaction, env: string, eventId: string, delta: ReplayDailyDelta,
+): void {
+  const createdAt = Timestamp.now();
+  transaction.create(db.doc(`envs/${env}/replayTelemetryEvents/${eventId}`), {
+    day: new Date(createdAt.toMillis()).toISOString().slice(0, 10), delta, createdAt,
+  });
+}
+
+/**
+ * 카운터 증가와 이벤트 삭제를 원자적으로 처리한다. 중복 배달은 삭제된 이벤트를 보고 끝난다.
+ * 실패는 트리거에 전파해 재시도하며, 미처리 이벤트는 삭제하지 않는다.
+ * @param {string} env 환경 id
+ * @param {DocumentReference} eventRef 집계 이벤트 문서 참조
+ * @return {Promise<void>} 집계 커밋 완료
+ */
+export async function consumeReplayDaily(env: string, eventRef: DocumentReference): Promise<void> {
+  await db.runTransaction(async (transaction) => {
+    // 생성 이벤트의 사본이 아니라 현재 문서를 읽어 중복·동시 배달을 걸러 낸다.
+    const snapshot = await transaction.get(eventRef);
+    if (!snapshot.exists) return;
+    const {day, delta} = snapshot.data() as {day: string; delta: ReplayDailyDelta};
     const increments: Record<string, unknown> = {
-      day: utcDay(),
+      day, // 배달이 자정을 넘겨도 정산 당시 UTC 날짜로 집계한다.
       updatedAt: FieldValue.serverTimestamp(),
     };
     for (const [key, value] of Object.entries(delta)) {
       if (value !== 0) increments[key] = FieldValue.increment(value);
     }
-    await replayDayRef(env, increments.day as string).set(increments, {merge: true});
-  } catch (error) {
-    logger.error("battle_replay_telemetry_write_failed", {env, delta, error});
-  }
+    transaction.set(replayDayRef(env, day), increments, {merge: true});
+    transaction.delete(eventRef);
+  });
 }

@@ -970,8 +970,7 @@ MonoBehaviour:
   weeklyContent: {fileID: 9100000000000000012}
   dailyListRoot: {fileID: 9200000000000000001}
   weeklyListRoot: {fileID: 9200000000000000011}
-  dailyRowPrefab: {fileID: 9100000000000000024, guid: 5b2074d3365f43eea16ffa8324468415, type: 3}
-  weeklyRowPrefab: {fileID: 9100000000000000024, guid: f27c5b4965f6457f8ef061606a63211a, type: 3}
+  rowPrefab: {fileID: 9100000000000000024, guid: 5b2074d3365f43eea16ffa8324468415, type: 3}
   dailyEmptyNotice: {fileID: 9100000000000000031}
   weeklyEmptyNotice: {fileID: 9100000000000000041}
   dailyResetText: {fileID: 0}

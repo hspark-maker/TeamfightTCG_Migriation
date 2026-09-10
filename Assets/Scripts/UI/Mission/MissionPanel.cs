@@ -43,11 +43,9 @@ public class MissionPanel : PooledUIBase
 
     [SerializeField] GameObject weeklyListRoot;
 
-    [Tooltip("일일 미션 행 프리팹 에셋.")]
-    [SerializeField] MissionRowView dailyRowPrefab;
-
-    [Tooltip("주간 미션 행 프리팹 에셋.")]
-    [SerializeField] MissionRowView weeklyRowPrefab;
+    [Tooltip("가이드·일일·주간이 공유하는 미션 행 프리팹 에셋.")]
+    [UnityEngine.Serialization.FormerlySerializedAs("dailyRowPrefab")]
+    [SerializeField] MissionRowView rowPrefab;
 
     [Tooltip("해당 주기에 미션이 하나도 없을 때 켤 안내. 지금은 활성 미션이 팩 개봉 축뿐이라 자주 빈다.")]
     [SerializeField] GameObject dailyEmptyNotice;
@@ -174,8 +172,8 @@ public class MissionPanel : PooledUIBase
 
     void Rebuild()
     {
-        BuildSection(this.dailyContent, this.dailyRowPrefab, this.m_dailyRows, PERIOD_DAILY, this.dailyEmptyNotice);
-        BuildSection(this.weeklyContent, this.weeklyRowPrefab, this.m_weeklyRows, PERIOD_WEEKLY, this.weeklyEmptyNotice);
+        BuildSection(this.dailyContent, this.rowPrefab, this.m_dailyRows, PERIOD_DAILY, this.dailyEmptyNotice);
+        BuildSection(this.weeklyContent, this.rowPrefab, this.m_weeklyRows, PERIOD_WEEKLY, this.weeklyEmptyNotice);
         this.m_builtSignature = BuildSignature();
         this.ApplyTab();
         this.RefreshClaimAllButton();
@@ -337,7 +335,7 @@ public class MissionPanel : PooledUIBase
     }
 
     // GuideMissionPanel 도 같은 보상 표시 경로를 쓴다 — 미션 보상 팝업 조립의 단일 지점.
-    internal static void ShowClaimedRewards(IReadOnlyList<ClaimMissionResult> _results)
+    internal static void ShowClaimedRewards(IReadOnlyList<ClaimMissionResult> _results, string _title = "미션 보상")
     {
         if (_results.Count == 0) return;
 
@@ -375,7 +373,7 @@ public class MissionPanel : PooledUIBase
         var t_outcome = new RewardClaimOutcome(t_gains, t_drawn);
         if (RewardClaimPopup.TryGet(out var t_popup) && t_popup.RewardSlotCount > 0)
         {
-            string t_title = t_passExp > 0 ? $"미션 보상 · 패스 경험치 +{t_passExp:N0}" : "미션 보상";
+            string t_title = t_passExp > 0 ? $"{_title} · 패스 경험치 +{t_passExp:N0}" : _title;
             ShowRewardPage(t_popup, t_title, t_lines, t_outcome, 0);
         }
         else
