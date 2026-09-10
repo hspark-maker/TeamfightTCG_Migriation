@@ -59,17 +59,6 @@ public class OutgameTutorialGateUI : MonoBehaviour
     [SerializeField] TouchEffectItem tapFx;         // 손끝에서 터지는 접촉 이펙트. Hand 자식이라 좌표를 따로 옮기지 않는다(옵션)
     [SerializeField] RectTransform   messageRect;   // 안내 문구 프레임
     [SerializeField] TextMeshProUGUI messageText;
-    [SerializeField] Button hintActionButton;
-    [SerializeField] TextMeshProUGUI hintActionText;
-    [SerializeField] Button hintDismissButton;
-
-    GraphicRaycaster m_hintRaycaster;
-    Action m_hintAction;
-    Action m_hintDismiss;
-    bool m_hintMode;
-    Vector2 m_messageSize;
-    Vector2 m_textOffsetMin;
-    Vector2 m_textOffsetMax;
 
     [Header("배치")]
     [Tooltip("Hand 기준점을 놓을 위치 = 타깃 중앙 + 이 값. 손끝 방향·각도는 프리팹의 HandIcon(자식)에서 저작하고, " +
@@ -229,49 +218,6 @@ public class OutgameTutorialGateUI : MonoBehaviour
         RefreshVisibility();   // 첫 프레임 깜빡임 방지(LateUpdate 이전에 1회)
     }
 
-    public bool IsOwnedBy(MonoBehaviour owner) => owner != null && m_owner == owner;
-
-    /// <summary>기존 안내가 사용 중이면 양보한다. 선택 버튼 외에는 입력을 차단하지 않는다.</summary>
-    public bool TryShowHint(MonoBehaviour owner, string message, string actionLabel, Action onAction, Action onDismiss)
-    {
-        if (owner == null || string.IsNullOrEmpty(message) || hintDismissButton == null
-            || (m_owner != null && m_owner != owner && (IsShowing || m_armed))) return false;
-
-        ShowBanner(owner, message);
-        m_hintMode = true;
-        m_hintAction = onAction;
-        m_hintDismiss = onDismiss;
-        if (messageRect != null) messageRect.sizeDelta = m_messageSize + new Vector2(0f, 112f);
-        if (messageText != null)
-        {
-            messageText.rectTransform.offsetMin = m_textOffsetMin + new Vector2(0f, 112f);
-            messageText.rectTransform.offsetMax = m_textOffsetMax;
-        }
-        if (m_hintRaycaster != null) m_hintRaycaster.enabled = true;
-        bool hasAction = onAction != null && !string.IsNullOrEmpty(actionLabel);
-        if (hintActionButton != null)
-        {
-            hintActionButton.gameObject.SetActive(hasAction);
-            if (hintActionButton.targetGraphic != null) hintActionButton.targetGraphic.raycastTarget = true;
-            if (hasAction) hintActionButton.onClick.AddListener(OnHintAction);
-        }
-        if (hintActionText != null) hintActionText.text = actionLabel;
-        hintDismissButton.gameObject.SetActive(true);
-        if (hintDismissButton.targetGraphic != null) hintDismissButton.targetGraphic.raycastTarget = true;
-        hintDismissButton.onClick.AddListener(OnHintDismiss);
-        return true;
-    }
-
-    void OnHintAction() => CompleteHint(m_hintAction);
-    void OnHintDismiss() => CompleteHint(m_hintDismiss);
-
-    void CompleteHint(Action callback)
-    {
-        if (!m_hintMode) return;
-        Clear(m_owner);
-        callback?.Invoke();
-    }
-
     /// <summary>딤 없이 안내 문구만 띄운다. 걸 타깃이 아예 없거나(개봉 대기처럼 클릭이 아닌 신호로 끝나는 스텝),
     /// 타깃에 Button이 없어 ShowGate가 거부하는 경우용.
     /// 딤을 켜지 않는 것이 이 모드의 계약이다 — 개봉 스와이프(PackTearHandle)가 EventSystem.IsPointerOverGameObject로
@@ -397,7 +343,6 @@ public class OutgameTutorialGateUI : MonoBehaviour
         CacheBlockerButton();  // blocker가 확정된 뒤여야 한다(폴백 경로도 여기서 함께 처리된다)
         LiftOrnaments();       // 승격된 타깃(351)에 안내가 덮이지 않도록 352로 올린다
         NormalizeGraphics();   // 안내 요소의 raycastTarget을 런타임에서 한 번 바로잡는다
-        CacheHintControls();
         EnsureEventSystem();
 
         m_gateRoot.SetActive(false);
@@ -413,7 +358,6 @@ public class OutgameTutorialGateUI : MonoBehaviour
     // 타깃이 레이아웃 애니메이션·스크롤로 움직여도 손가락·문구가 따라가도록 매 프레임 재계산.
     void LateUpdate()
     {
-        if (m_hintMode && (m_owner == null || !m_owner.isActiveAndEnabled)) { ClearForce(); return; }
         if (!m_armed) return;
         if (m_target == null) { HideGateInternal(); return; }   // 타깃 파괴(씬 전환 등) 시 화면 잠김 방지
 
@@ -824,29 +768,6 @@ public class OutgameTutorialGateUI : MonoBehaviour
     void Release()
     {
         Demote();
-        if (hintActionButton != null)
-        {
-            hintActionButton.onClick.RemoveListener(OnHintAction);
-            hintActionButton.gameObject.SetActive(false);
-        }
-        if (hintDismissButton != null)
-        {
-            hintDismissButton.onClick.RemoveListener(OnHintDismiss);
-            hintDismissButton.gameObject.SetActive(false);
-        }
-        if (m_hintRaycaster != null) m_hintRaycaster.enabled = false;
-        if (m_hintMode)
-        {
-            if (messageRect != null) messageRect.sizeDelta = m_messageSize;
-            if (messageText != null)
-            {
-                messageText.rectTransform.offsetMin = m_textOffsetMin;
-                messageText.rectTransform.offsetMax = m_textOffsetMax;
-            }
-        }
-        m_hintMode = false;
-        m_hintAction = null;
-        m_hintDismiss = null;
 
         if (m_targetButton != null) m_targetButton.onClick.RemoveListener(OnTargetClicked);
         m_targetButton = null;
@@ -876,23 +797,6 @@ public class OutgameTutorialGateUI : MonoBehaviour
         if (this.blocker == null) return;
 
         m_dimColor = this.blocker.color;
-    }
-
-    void CacheHintControls()
-    {
-        if (messageRect == null) return;
-        m_messageSize = messageRect.sizeDelta;
-        if (messageText != null)
-        {
-            m_textOffsetMin = messageText.rectTransform.offsetMin;
-            m_textOffsetMax = messageText.rectTransform.offsetMax;
-        }
-        // 메시지는 별도 Canvas이므로 선택 버튼을 위한 raycaster도 이 Canvas에 둔다.
-        m_hintRaycaster = messageRect.GetComponent<GraphicRaycaster>();
-        if (m_hintRaycaster == null) m_hintRaycaster = messageRect.gameObject.AddComponent<GraphicRaycaster>();
-        m_hintRaycaster.enabled = false;
-        if (hintActionButton != null) hintActionButton.gameObject.SetActive(false);
-        if (hintDismissButton != null) hintDismissButton.gameObject.SetActive(false);
     }
 
     void CacheRoots()

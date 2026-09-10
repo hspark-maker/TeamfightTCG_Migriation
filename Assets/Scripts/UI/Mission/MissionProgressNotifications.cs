@@ -7,7 +7,6 @@ internal static class MissionProgressNotifications
 {
     static Dictionary<string, MissionProgressNotification> s_observed = new Dictionary<string, MissionProgressNotification>();
     static readonly List<MissionProgressNotification> s_pending = new List<MissionProgressNotification>();
-    static readonly HashSet<string> s_unlockedGuides = new HashSet<string>();
     static string s_userId;
     static bool s_installed;
 
@@ -45,9 +44,6 @@ internal static class MissionProgressNotifications
 
     internal static bool IsCurrent(MissionProgressNotification _notification)
     {
-        // 가이드 달성은 진행 팝업 한 곳에서만 표시한다. 일반 진행 컷인과 중복하지 않는다.
-        if (_notification.Period == "guide" && _notification.IsComplete) return false;
-        if (GuideMissionNoticeService.OwnsNotification(_notification.MissionId)) return false;
         if (!MissionManager.IsReady || string.IsNullOrEmpty(_notification.MissionId) ||
             _notification.UserId != FirebaseAuthService.Instance.UserId) return false;
         MissionDefinition t_definition = MissionManager.Find(_notification.MissionId);
@@ -61,15 +57,12 @@ internal static class MissionProgressNotifications
         if (!MissionManager.IsReady) return;
 
         var t_next = new Dictionary<string, MissionProgressNotification>();
-        var t_unlockedGuides = new HashSet<string>();
         foreach (MissionDefinition t_definition in MissionManager.Definitions)
         {
             if (t_definition.Target <= 0L) continue;
             long t_progress = Math.Min(MissionManager.ProgressOf(t_definition), t_definition.Target);
             string t_periodKey = PeriodKey(t_definition.Period);
             var t_current = new MissionProgressNotification(t_definition, s_userId, t_periodKey, t_progress, t_progress);
-            bool t_unlocked = MissionManager.IsGuideUnlocked(t_definition);
-            if (t_definition.Period == "guide" && t_unlocked) t_unlockedGuides.Add(t_definition.Id);
 
             // 첫 조회·새 정의·기간 변경은 기준선이다. 로그인하자마자 과거 달성을 쏟아내지 않는다.
             if (s_observed.TryGetValue(t_definition.Id, out MissionProgressNotification t_previous) &&
@@ -78,11 +71,6 @@ internal static class MissionProgressNotifications
                 long t_before = t_previous.Progress;
                 t_current = new MissionProgressNotification(t_definition, s_userId, t_periodKey,
                     t_before, Math.Max(t_before, t_progress));
-                // 최초 조회는 기준선. 이후 달성 또는 선행 수령으로 해금된 달성만 팝업에 등록한다.
-                if (t_definition.Period == "guide" && t_unlocked && MissionManager.IsComplete(t_definition)
-                    && !MissionManager.IsClaimed(t_definition.Id)
-                    && (t_before < t_definition.Target || !s_unlockedGuides.Contains(t_definition.Id)))
-                    GuideMissionNoticeService.RequestGuidePopup(t_definition.Id);
                 if (t_progress > t_before && MissionManager.IsGuideUnlocked(t_definition) &&
                     !MissionManager.IsClaimed(t_definition.Id))
                     Enqueue(t_current);
@@ -93,8 +81,6 @@ internal static class MissionProgressNotifications
             t_next[t_definition.Id] = t_current;
         }
         s_observed = t_next;
-        s_unlockedGuides.Clear();
-        s_unlockedGuides.UnionWith(t_unlockedGuides);
         s_pending.RemoveAll(t_item => !IsCurrent(t_item));
     }
 
@@ -129,7 +115,6 @@ internal static class MissionProgressNotifications
         if (s_userId == t_userId) return;
         s_userId = t_userId;
         s_observed.Clear();
-        s_unlockedGuides.Clear();
         s_pending.Clear();
     }
 
@@ -139,7 +124,6 @@ internal static class MissionProgressNotifications
         MissionManager.OnChanged -= HandleChanged;
         FirebaseAuthService.Instance.OnStateChanged -= SynchronizeAccount;
         s_observed.Clear();
-        s_unlockedGuides.Clear();
         s_pending.Clear();
         s_userId = null;
         s_installed = false;

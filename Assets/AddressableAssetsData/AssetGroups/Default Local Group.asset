@@ -151,12 +151,6 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 46ab29cfb8654ca58cda7837ad1c5b24
-    m_Address: GuideMissionNoticePopup
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - UIPrefab
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e1f5b07b5d4d84344a0e499946bdaa69
     m_Address: GuideMissionOverlay
     m_ReadOnly: 0

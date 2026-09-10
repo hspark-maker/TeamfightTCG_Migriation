@@ -6,7 +6,7 @@ using Newtonsoft.Json.Serialization;
 using UnityEditor;
 using UnityEngine;
 
-/// <summary>실제 세이브·서버를 변경하지 않는 안내 저장 및 팝업 계약 회귀 검사.</summary>
+/// <summary>실제 세이브·서버를 변경하지 않는 안내 저장 계약 회귀 검사.</summary>
 public static class GuidanceIntegrationValidation
 {
     [MenuItem("Tools/Tutorial/Validate Guidance Integration")]
@@ -34,59 +34,20 @@ public static class GuidanceIntegrationValidation
             ChapterIndex = 2, ChapterStepIndex = 12, StepId = 38,
             AdventureFlowVersion = 1, AdventureUnlocked = true, AdventureIntroStarted = true,
             AdventureIntroStepId = 37, AdventureIntroDeferred = true,
-            GuideNotices = new GuideNoticeSaveData
-            {
-                Version = 1, Guide1Pending = true, Guide2Shown = true,
-                PendingMissionIds = new System.Collections.Generic.List<string> { "guide.03" },
-                ShownMissionIds = new System.Collections.Generic.List<string> { "guide.04" },
-            },
             SynergyIntroduction = new SynergyIntroductionSaveData { DeckSlot = 2, SynergyId = "Caretaker" },
         };
         string json = JsonConvert.SerializeObject(original, settings);
         var fields = JObject.Parse(json);
-        Require((bool)fields["guideNotices"]["guide1Pending"], "Guide pending wire key missing.");
-        Require((string)fields["guideNotices"]["pendingMissionIds"][0] == "guide.03"
-            && (string)fields["guideNotices"]["shownMissionIds"][0] == "guide.04",
-            "Guide notice ID list wire keys missing.");
         Require((int)fields["synergyIntroduction"]["deckSlot"] == 2, "Synergy target wire key missing.");
         var restored = JsonConvert.DeserializeObject<TutorialSaveData>(json, settings);
-        Require(restored.GuideNotices.Guide1Pending && restored.GuideNotices.Guide2Shown
-            && restored.GuideNotices.PendingMissionIds.Contains("guide.03")
-            && restored.GuideNotices.ShownMissionIds.Contains("guide.04")
-            && restored.AdventureIntroStepId == 37 && restored.AdventureIntroDeferred
+        Require(restored.AdventureIntroStepId == 37 && restored.AdventureIntroDeferred
             && restored.SynergyIntroduction.SynergyId == "Caretaker",
             "Guidance state did not survive snapshot round trip.");
         var legacy = JsonConvert.DeserializeObject<TutorialSaveData>("{\"outgameCompleted\":true}", settings);
-        Require(legacy.GuideNotices != null && legacy.GuideNotices.Version == 0
-            && legacy.GuideNotices.PendingMissionIds.Count == 0 && legacy.GuideNotices.ShownMissionIds.Count == 0
-            && legacy.SynergyIntroduction != null && legacy.SynergyIntroduction.DeckSlot == -1,
+        Require(legacy.SynergyIntroduction != null && legacy.SynergyIntroduction.DeckSlot == -1,
             "Missing legacy fields must retain migration defaults.");
-        var previousNotices = JsonConvert.DeserializeObject<GuideNoticeSaveData>(
-            "{\"version\":1,\"guide1Pending\":true,\"guide2Shown\":true}", settings);
-        Require(previousNotices.Guide1Pending && previousNotices.Guide2Shown
-            && previousNotices.PendingMissionIds.Count == 0 && previousNotices.ShownMissionIds.Count == 0,
-            "Existing notice flags must survive adding guide ID lists.");
 
-        GameObject contents = PrefabUtility.LoadPrefabContents(
-            "Assets/Assets/Prefabs/UI/PooledUI/GuideMissionNoticePopup.prefab");
-        try
-        {
-            var popup = contents.GetComponent<GuideMissionNoticePopup>();
-            Require(popup != null, "Guide notice component missing.");
-            int completed = 0;
-            popup.Initialization(new GuideMissionNoticeData { MissionId = "guide.01", OnCompleted = () => completed++ });
-            popup.isShow = true;
-            popup.Yield();
-            Require(!popup.isShow && completed == 0, "Yield must preserve pending notice.");
-            popup.Close();
-            Require(completed == 0, "Hidden notice must not complete.");
-            popup.isShow = true;
-            popup.Close();
-            popup.Close();
-            Require(completed == 1, "User close must complete exactly once.");
-        }
-        finally { PrefabUtility.UnloadPrefabContents(contents); }
-        Debug.Log("[GuidanceIntegrationValidation] PASS: save round trip, legacy defaults, popup yield/close once.");
+        Debug.Log("[GuidanceIntegrationValidation] PASS: save round trip, legacy defaults.");
     }
 
     static void Require(bool condition, string message)

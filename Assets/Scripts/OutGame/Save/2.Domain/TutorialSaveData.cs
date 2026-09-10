@@ -32,6 +32,5 @@ public class TutorialSaveData
     [FirestoreProperty("adventureIntroDeferred")] public bool AdventureIntroDeferred { get; set; }
     [FirestoreProperty("adventureIntroCompleted")] public bool AdventureIntroCompleted { get; set; }
     [FirestoreProperty("adventureIntroStepId")] public int AdventureIntroStepId { get; set; }
-    [FirestoreProperty("guideNotices")] public GuideNoticeSaveData GuideNotices { get; set; } = new GuideNoticeSaveData();
     [FirestoreProperty("synergyIntroduction")] public SynergyIntroductionSaveData SynergyIntroduction { get; set; } = new SynergyIntroductionSaveData();
 }

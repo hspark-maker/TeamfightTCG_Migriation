@@ -9,8 +9,7 @@ public sealed class AdventureTutorialBridge : MonoBehaviour
     bool m_deferred;
     bool m_gateArmed;
 
-    static bool StageBlocked => GuidanceCoordinator.IsMissionNoticeShowing
-        || OutgameTutorialRunner.IsRunning || TriggeredTutorialRunner.IsRunning
+    static bool StageBlocked => OutgameTutorialRunner.IsRunning || TriggeredTutorialRunner.IsRunning
         || CurtainView.IsBusy || LoadingCoverView.IsCovering || LobbyRankEffectDirector.Playing
         || LobbyGainEffectDirector.Playing || AdventureRewardFlow.IsClaiming
         || RewardClaimPopup.IsOpen || CardRewardOverlay.IsOpen || CardSetRewardOverlay.IsOpen
@@ -29,7 +28,6 @@ public sealed class AdventureTutorialBridge : MonoBehaviour
         AdventureTutorialRunner.OnChanged += Apply;
         TutorialAnchorRegistry.OnRegistered += OnAnchorRegistered;
         TriggeredTutorialRunner.OnChanged += Apply;
-        GuidanceCoordinator.OnMissionNoticePresentationChanged += OnMissionNoticePresentationChanged;
     }
     void Start() => Apply();
     void Update()
@@ -47,7 +45,6 @@ public sealed class AdventureTutorialBridge : MonoBehaviour
         AdventureTutorialRunner.OnChanged -= Apply;
         TutorialAnchorRegistry.OnRegistered -= OnAnchorRegistered;
         TriggeredTutorialRunner.OnChanged -= Apply;
-        GuidanceCoordinator.OnMissionNoticePresentationChanged -= OnMissionNoticePresentationChanged;
         Clear();
     }
     void OnAnchorRegistered(EOutgameTutorialAnchor key)
@@ -100,20 +97,9 @@ public sealed class AdventureTutorialBridge : MonoBehaviour
 
     void Satisfied()
     {
-        if (GuidanceCoordinator.IsMissionNoticeShowing) return;
         // Advance invokes OnChanged synchronously, which applies the next gate once.
         // Applying again reuses its Canvas pending Destroy and loses the highlight at frame end.
         AdventureTutorialRunner.Advance();
-    }
-    void OnMissionNoticePresentationChanged()
-    {
-        if (GuidanceCoordinator.IsMissionNoticeShowing)
-        {
-            m_deferred = true;
-            m_gateArmed = false;
-            if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear(this);
-        }
-        else if (AdventureTutorialRunner.IsRunning) Apply();
     }
     void Clear()
     {

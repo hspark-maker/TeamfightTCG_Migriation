@@ -25,8 +25,6 @@ public class TriggeredTutorialBridge : MonoBehaviour
     // 스텝 진입이 다시 ApplyCurrentStep을 부르는 경로를 막는다(예약 후 재실행).
     bool m_applying;
     bool m_pendingApply;
-    bool m_missionEntryPending;
-    TutorialStepDef m_missionSatisfiedStep;
 
     // 강화 연출이 무대를 쥔 구간. 이 동안의 앵커 재등록은 무시한다 —
     // 진화 연출은 공개 시점에 다음 단계(진화 아님)로 버튼을 갈아끼워 같은 키를 다시 등록하는데,
@@ -43,7 +41,6 @@ public class TriggeredTutorialBridge : MonoBehaviour
         TriggeredTutorialRunner.EnsureData(this.data);
 
         TriggeredTutorialRunner.OnActivated  += OnActivated;
-        GuidanceCoordinator.OnMissionNoticePresentationChanged += OnMissionNoticePresentationChanged;
         TutorialAnchorRegistry.OnRegistered  += OnAnchorRegistered;
 
         CardDetailOverlayView.OnAnyEnhanceStarted     += OnEnhanceStarted;
@@ -68,7 +65,6 @@ public class TriggeredTutorialBridge : MonoBehaviour
     {
         // static 이벤트에 죽은 씬 오브젝트가 남으면 다음 씬에서 오발화한다.
         TriggeredTutorialRunner.OnActivated  -= OnActivated;
-        GuidanceCoordinator.OnMissionNoticePresentationChanged -= OnMissionNoticePresentationChanged;
         TutorialAnchorRegistry.OnRegistered  -= OnAnchorRegistered;
 
         CardDetailOverlayView.OnAnyEnhanceStarted     -= OnEnhanceStarted;
@@ -89,12 +85,6 @@ public class TriggeredTutorialBridge : MonoBehaviour
     // 그 시점엔 이미 다음 스텝으로 넘어간 뒤라 버리면 그 스텝이 영영 적용되지 않는다.
     void ApplyCurrentStep()
     {
-        if (GuidanceCoordinator.IsMissionNoticeShowing)
-        {
-            m_missionEntryPending = true;
-            HideGuide();
-            return;
-        }
         if (m_applying) { m_pendingApply = true; return; }
 
         m_applying = true;
@@ -120,7 +110,6 @@ public class TriggeredTutorialBridge : MonoBehaviour
     // 현재 스텝 1회 진입. 게이트가 필요하면 앵커를 찾아 건다(없으면 등록 대기).
     void ApplyStepOnce()
     {
-        if (GuidanceCoordinator.IsMissionNoticeShowing) { m_missionEntryPending = true; return; }
         // 이전 스텝의 딤·배너를 먼저 내린다 — 새 타깃이 아직 등장 전이면 옛 안내가 화면에 남는다.
         CloseGate();
 
@@ -144,13 +133,6 @@ public class TriggeredTutorialBridge : MonoBehaviour
 
         m_step = t_step;
 
-        PresentStep();
-    }
-
-    void PresentStep()
-    {
-        if (GuidanceCoordinator.IsMissionNoticeShowing || m_step == null) return;
-
         // 유저가 열어 둔 화면을 스스로 닫기를 기다리는 구간 — 그 위에 안내를 얹지 않는다.
         // 어디까지 걷혀야 하는지는 완료 조건이 정한다. 이미 걷혀 있으면 기다릴 것이 없다.
         if (IsSurfaceWait(m_step.Completion))
@@ -172,7 +154,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
             if (m_step.Anchor == EOutgameTutorialAnchor.None)
             {
                 OutgameTutorialGateUI.Ensure(this.gatePrefab)
-                    .ShowMessageGate(this, null, m_step.GuideMessage, OnGateInputSatisfied, m_step.MessageAtBottom, m_step.UseDim);
+                    .ShowMessageGate(this, null, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
                 return;
             }
 
@@ -204,7 +186,6 @@ public class TriggeredTutorialBridge : MonoBehaviour
     // 타깃이 이미 등록돼 있으면 즉시 게이트, 아니면 등록 통지를 기다린다.
     void TryOpenGate()
     {
-        if (GuidanceCoordinator.IsMissionNoticeShowing) return;
         if (m_step == null || m_step.Anchor == EOutgameTutorialAnchor.None) return;
         if (!TutorialAnchorRegistry.TryGet(m_step.Anchor, out var t_rect, out var t_button)) return;
 
@@ -212,7 +193,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
         if (m_step.Completion == EOutgameTutorialCompletion.Confirm)
         {
             OutgameTutorialGateUI.Ensure(this.gatePrefab)
-                .ShowMessageGate(this, t_rect, m_step.GuideMessage, OnGateInputSatisfied, m_step.MessageAtBottom, m_step.UseDim, SpotlightRect());
+                .ShowMessageGate(this, t_rect, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim, SpotlightRect());
             return;
         }
 
@@ -221,7 +202,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
         Action t_onSatisfied = m_step.Completion == EOutgameTutorialCompletion.Enhance
                             || m_step.Completion == EOutgameTutorialCompletion.KeywordEnhance
             ? null
-            : (Action)OnGateInputSatisfied;
+            : (Action)OnGateSatisfied;
 
         OutgameTutorialGateUI.Ensure(this.gatePrefab)
             .ShowGate(this, t_rect, t_button, m_step.GuideMessage, t_onSatisfied, m_step.UseDim, SpotlightRect());
@@ -376,19 +357,8 @@ public class TriggeredTutorialBridge : MonoBehaviour
     }
 
     // 완료 → 다음 스텝을 같은 씬에서 이어간다(트리거 튜토는 씬을 떠나지 않는다).
-    void OnGateInputSatisfied()
-    {
-        if (!GuidanceCoordinator.IsMissionNoticeShowing) OnGateSatisfied();
-    }
-
     void OnGateSatisfied()
     {
-        if (m_step == null) return;
-        if (GuidanceCoordinator.IsMissionNoticeShowing)
-        {
-            m_missionSatisfiedStep = m_step;
-            return;
-        }
         TriggeredTutorialRunner.NotifyStepSatisfied();
 
         if (!TriggeredTutorialRunner.IsRunning) { CloseGate(); return; }
@@ -398,28 +368,6 @@ public class TriggeredTutorialBridge : MonoBehaviour
 
     // 안내 표시만 접는다 — 스텝은 그대로 서 있고, TryOpenGate로 언제든 다시 세울 수 있다.
     // CloseGate와 갈라 둔다: 그쪽은 m_step까지 비워 완료 신호를 받을 주체가 사라진다.
-    void OnMissionNoticePresentationChanged()
-    {
-        if (GuidanceCoordinator.IsMissionNoticeShowing) { HideGuide(); return; }
-        if (!TriggeredTutorialRunner.IsRunning) return;
-
-        var completed = m_missionSatisfiedStep;
-        m_missionSatisfiedStep = null;
-        bool enterPending = m_missionEntryPending;
-        m_missionEntryPending = false;
-        if (completed != null && completed == m_step &&
-            TriggeredTutorialRunner.TryGetCurrentStep(out var current) && current == completed)
-        {
-            OnGateSatisfied();
-            return;
-        }
-        if (enterPending && (m_step == null ||
-            !TriggeredTutorialRunner.TryGetCurrentStep(out var waiting) || waiting != m_step))
-            ApplyCurrentStep();
-        else if (!m_enhancing && !m_awaitingUnlockFx)
-            PresentStep();
-    }
-
     void HideGuide()
     {
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear(this);
