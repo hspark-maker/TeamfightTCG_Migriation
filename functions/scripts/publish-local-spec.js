@@ -76,6 +76,10 @@ function localSnapshot() {
   const codec = read(sourceFiles[3]).match(/TableNames\s*=\s*\{([\s\S]*?)\}/);
   assert(codec, "Table list declaration changed");
   const names = [...codec[1].matchAll(/"(\w+)"/g)].map((m) => m[1]);
+  const serverOnly = read(sourceFiles[3]).match(/ServerOnlyTableNames\s*=\s*\{([\s\S]*?)\}/);
+  assert(serverOnly, "Server-only table list declaration changed");
+  names.push(...[...serverOnly[1].matchAll(/"(\w+)"/g)].map((m) => m[1]));
+  assert.equal(new Set(names).size, names.length, "Duplicate published table");
   const version = read(sourceFiles[4]);
   const major = Number(version.match(/const int Major\s*=\s*(\d+)/)[1]);
   const minAppMajor = Number(version.match(/const int MinAppMajor\s*=\s*(\d+)/)[1]);

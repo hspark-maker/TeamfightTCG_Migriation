@@ -4,6 +4,7 @@ import {db} from "../firebaseApp";
 import {FieldValue} from "firebase-admin/firestore";
 import {evaluateGuideProgress} from "../missions/guideProgress";
 import {enabledMissions} from "../missions/catalog";
+import {readMissionCatalog} from "../missions/missionSpec";
 import {
   applyPeriodReset,
   missionsRef,
@@ -24,9 +25,7 @@ import {parseRewardRows, resolveRewards} from "../rewardTable";
  * 필요할 때만 이 명령을 부른다. 영수증 재생은 같은 save revision 에서만 성공하므로,
  * 캐시된 봉투도 그 시점 문서와 어긋나지 않는다.
  *
- * 쓰기가 없다 — `mutateSave` 를 타지 않고 영수증도 끊지 않는다. 기간 리셋은 **메모리에서만** 반영한다.
- * 조회가 문서를 쓰기 시작하면 화면을 열어 두기만 해도 쓰기 비용이 나간다. 실제 리셋은 다음
- * bump·수령이 확정하고, 그때까지 이 응답과 문서가 달라도 유저가 보는 값은 옳다.
+ * 가이드 최고 진행도가 바뀌면 기록한다. 기간 리셋은 메모리에서만 반영하며 다음 bump·수령이 확정한다.
  */
 export const getMissions = onCall(async (request) => {
   const uid = requireUid(request.auth);
@@ -38,15 +37,16 @@ export const getMissions = onCall(async (request) => {
 
   const period = missionPeriod(Date.now());
   // 문서 부재는 정상이다 — ensureAccount 가 만들지 않으므로 첫 조회는 항상 빈 상태다.
-  const [guideCards, rewardSpecRows] = await Promise.all([
+  const [guideCards, rewardSpecRows, catalog] = await Promise.all([
     readSpecRows(env, "Card"),
     readSpecRows(env, "Reward"),
+    readMissionCatalog(env),
   ]);
   const state = await db.runTransaction(async (transaction) => {
     const reference = missionsRef(db, env, uid);
     const [missionSnapshot, saveSnapshot] = await transaction.getAll(reference, saveDocument(env, uid));
     const stored = readMissions(missionSnapshot);
-    const progress = evaluateGuideProgress(saveSnapshot.data() ?? {}, guideCards, stored.progress);
+    const progress = evaluateGuideProgress(saveSnapshot.data() ?? {}, guideCards, catalog, stored.progress);
     if (JSON.stringify(progress) !== JSON.stringify(stored.progress)) {
       transaction.set(reference, {progress, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
     }
@@ -57,13 +57,13 @@ export const getMissions = onCall(async (request) => {
   return {
     // `missions` 는 변경 커맨드의 선택 필드와 **같은 타입**이다. 이름이 같은데 모양이 다르면
     // 클라가 응답마다 다른 파싱을 해야 하고, 그 분기는 언젠가 한쪽만 갱신된다.
-    missions: missionResponse(state, period),
+    missions: missionResponse(state, period, catalog),
     // 정의만 싣는다 — 진행도·수령 여부는 위 봉투가 유일한 출처다. 같은 응답에 두 벌을 실으면
     // 클램프 유무 같은 사소한 차이로 둘이 어긋나고, 화면은 둘 중 아무거나 읽는다.
     // 완료 판정은 `missions.progress[period + "." + event] >= target` 이다.
     // 꺼진 미션은 목록에서 뺀다. 진행도는 그래도 쌓이고 있으므로(bump 는 enabled 를 보지 않는다)
     // 나중에 켜는 날 유저가 0부터 시작하지 않는다.
-    definitions: enabledMissions().map((mission) => ({
+    definitions: enabledMissions(catalog).map((mission) => ({
       id: mission.id,
       period: mission.period,
       event: mission.event,

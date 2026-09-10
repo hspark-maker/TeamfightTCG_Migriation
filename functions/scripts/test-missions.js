@@ -13,15 +13,23 @@ const assert = require("node:assert/strict");
 
 const {missionPeriod, MISSION_TIME_ZONE} = require("../lib/missions/period.js");
 const {
-  readMissions, applyPeriodReset, commitMissionBump, commitMissionClaim,
-  progressKey, progressOf, isClaimed, missionResponse, DAILY_MISSION_COMPLETION_EVENT,
+  readMissions, applyPeriodReset, commitMissionBump, commitMissionBumps, commitMissionClaim,
+  progressKey, progressOf: progressOfCatalog, isClaimed, missionResponse: responseOfCatalog, DAILY_MISSION_COMPLETION_EVENT,
   WEEKLY_MISSION_COMPLETION_EVENT,
 } = require("../lib/missions/missionStore.js");
 const {
-  missionCatalog, enabledMissions, findMission, missionCatalogIssues,
+  enabledMissions: enabledInCatalog, findMission: findInCatalog, missionCatalogIssues: catalogIssues,
 } = require("../lib/missions/catalog.js");
-const {judgeMissionClaim} = require("../lib/missions/judgeMissionClaim.js");
+const {judgeMissionClaim: judgeWithCatalog} = require("../lib/missions/judgeMissionClaim.js");
 const {judgeRewardClaim, parseRewardRows} = require("../lib/rewardTable.js");
+const {readSheet, catalog} = require("./mission-fixture");
+const missionCatalog = () => catalog;
+const enabledMissions = () => enabledInCatalog(catalog);
+const findMission = id => findInCatalog(id, catalog);
+const missionCatalogIssues = (definitions = catalog) => catalogIssues(definitions);
+const judgeMissionClaim = (id, state) => judgeWithCatalog(id, state, catalog);
+const progressOf = (state, mission) => progressOfCatalog(state, mission, catalog);
+const missionResponse = (state, period) => responseOfCatalog(state, period, catalog);
 
 const snapshotOf = (data) => ({exists: data !== undefined, data: () => data});
 // 트랜잭션 스텁. commitMission* 는 set 한 번만 부른다.
@@ -113,6 +121,57 @@ assert.equal(bump.state.progress[progressKey("weekly", "OpenPack")], 1,
 assert.equal(tx.writes.length, 1, "쓰기는 한 번이다");
 assert.equal(tx.writes[0].value.dailyKey, period.daily, "문서에는 이번 기간 키가 실린다");
 assert.equal(progressOf(bump.state, findMission("daily.openPack1")), 1);
+
+// 전투 한 번의 여러 이벤트는 같은 문서에 한 번만 저장한다.
+const battleIncrements = [
+  {event: "CompleteBattle", amount: 1}, {event: "WinBattle", amount: 1},
+  {event: "WinRankedBattle", amount: 1}, {event: "DestroyCards", amount: 6},
+  {event: "AttackTimes", amount: 12}, {event: "TriggerSynergy", amount: 3},
+  {event: "TriggerKeyword", amount: 4},
+];
+for (const increments of [battleIncrements, battleIncrements.slice(0, 1), battleIncrements.slice(0, 2)]) {
+  const persisted = {
+    dailyKey: "old-day", weeklyKey: period.weekly,
+    progress: {"daily.CompleteBattle": 99, "weekly.CompleteBattle": 8, "guide.Keep": 1},
+    claimed: {"daily.old": true, "weekly.keep": true, "guide.keep": true}, passExp: 70,
+  };
+  let firstWrite;
+  // 충돌로 버린 시도의 메모리를 재사용하지 않고, 재시도마다 저장 스냅샷에서 시작한다.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const batch = bumpOf(applyPeriodReset(readMissions(snapshotOf(persisted)), period), period);
+    const batchTx = fakeTx();
+    commitMissionBumps(batchTx, batch, increments, "now");
+    assert.equal(batchTx.writes.length, 1, `${increments.length}개 이벤트도 쓰기 1회`);
+    const saved = batchTx.writes[0].value;
+    assert.equal(saved.progress["daily.CompleteBattle"], 1, "리셋한 일일 카운터에는 이번 전투만 반영한다");
+    assert.equal(saved.progress["weekly.CompleteBattle"], 9, "주간 누적은 유지한다");
+    assert.equal(saved.progress["guide.Keep"], 1);
+    assert.deepEqual(saved.claimed, {"weekly.keep": true, "guide.keep": true});
+    assert.equal(saved.passExp, 70);
+    for (const {event, amount} of increments.slice(1)) {
+      assert.equal(saved.progress[`daily.${event}`], amount);
+      assert.equal(saved.progress[`weekly.${event}`], amount);
+    }
+    if (attempt === 0) firstWrite = structuredClone(saved);
+    else assert.deepEqual(saved, firstWrite, "트랜잭션 재시도가 이벤트를 중복 누적하지 않는다");
+  }
+  assert.equal(persisted.progress["weekly.CompleteBattle"], 8, "읽은 저장값은 변경하지 않는다");
+}
+const cappedBatch = bumpOf(applyPeriodReset(readMissions(snapshotOf(undefined)), period), period);
+const cappedTx = fakeTx();
+commitMissionBumps(cappedTx, cappedBatch, [
+  {event: "AttackTimes", amount: 999999}, {event: "AttackTimes", amount: 10},
+  {event: "CompleteBattle", amount: 0}, {event: "CompleteBattle", amount: -1},
+  {event: "CompleteBattle", amount: 0.5},
+], "now");
+assert.equal(cappedTx.writes.length, 1);
+for (const kind of ["daily", "weekly"]) {
+  assert.equal(cappedBatch.state.progress[`${kind}.AttackTimes`], 1000000, "반복 이벤트도 상한 유지");
+  assert.equal(cappedBatch.state.progress[`${kind}.CompleteBattle`], 3, "잘못된 증가량은 기존처럼 1로 보정");
+}
+const emptyTx = fakeTx();
+commitMissionBumps(emptyTx, cappedBatch, [], "now");
+assert.equal(emptyTx.writes.length, 0, "이벤트가 없으면 쓰지 않는다");
 
 // ── 3) 미완료 수령 거절 ──────────────────────────────────────────────────────
 const notYet = judgeMissionClaim("weekly.openPack10", bump.state);
@@ -298,30 +357,7 @@ assert.equal(judgeRewardClaim(rewardRows, "Mission", "daily.missing").allow, fal
   "Mission 시트와 짝이 없는 Reward 행은 수령을 막는다");
 
 // ── 시트 ↔ 런타임 카탈로그 이중 진실원 방어 ──────────────────────────────────
-// Mission 시트가 서버 상수(catalog.ts)와 손으로 동기화되는 동안, 둘이 갈리면
-// 화면에 보이는 목표와 집행되는 목표가 달라진다. 그 어긋남은 유저 거절로만 드러나므로
-// 여기서 행 단위로 묶는다. 시트 연동이 끝나면 이 블록은 통째로 사라진다.
-//
-// 파서는 일부러 단순하다 — 이 두 시트에는 따옴표로 감싼 필드가 없다. 생기면 여기가 먼저 깨진다.
-const fs = require("node:fs");
-const path = require("node:path");
-
-const readSheet = (name) => {
-  const text = fs.readFileSync(
-    path.join(__dirname, "..", "..", "docs", "SpecData", `${name}_sheet.csv`), "utf8");
-  // BOM 은 코드포인트로 지운다 — 정규식 이스케이프가 편집 과정에서 깨지기 쉽다.
-  const body = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
-  const lines = body.split(String.fromCharCode(10))
-    .map((line) => line.replace(String.fromCharCode(13), ""))
-    .filter((line) => line.length > 0);
-  const fields = lines[1].split(",");
-  // 0=한글설명 1=필드명 2=타입, 그 뒤가 데이터다.
-  return lines.slice(3).map((line) => {
-    const cells = line.split(",");
-    return Object.fromEntries(fields.map((key, i) => [key, cells[i] ?? ""]));
-  });
-};
-
+// 실제 저작 CSV가 파싱 규약·보상 연결을 만족하는지 검증한다.
 const sheetMissions = readSheet("Mission");
 const sheetRewards = readSheet("Reward").filter((row) => ["Mission", "Guide"].includes(row.ownerType));
 

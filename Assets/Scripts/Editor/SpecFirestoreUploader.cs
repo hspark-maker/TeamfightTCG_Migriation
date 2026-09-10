@@ -199,7 +199,7 @@ public static partial class SpecFirestoreUploader
         var t_hashes = new Dictionary<string, string>(StringComparer.Ordinal);
         var t_snapshots = new Dictionary<string, TableSnapshot>(StringComparer.Ordinal);
         if (!TryLoadManager(out object t_manager, out _error)) return null;
-        foreach (string t_table in SpecPayloadCodec.TableNames)
+        foreach (string t_table in SpecPayloadCodec.PublishedTableNames)
         {
             if (!TryBuildSnapshot(t_manager, t_table, out TableSnapshot t_snapshot, out _error)) return null;
             if (!TryReadMeta(t_client, t_projectId, t_apiKey, _envId, t_table,
@@ -901,7 +901,7 @@ public static partial class SpecFirestoreUploader
             _error = "릴리스 스냅샷의 tablesJson이 올바르지 않다.";
             return false;
         }
-        foreach (string t_table in SpecPayloadCodec.TableNames)
+        foreach (string t_table in SpecPayloadCodec.PublishedTableNames)
             if (_tablesJson.IndexOf("\"" + t_table + "\":", StringComparison.Ordinal) < 0)
             {
                 _error = $"릴리스 스냅샷 tablesJson에 '{t_table}' 표가 없다.";
@@ -1010,7 +1010,7 @@ public static partial class SpecFirestoreUploader
         var t_builder = new StringBuilder(4096);
         t_builder.Append("{\"writes\":[");
         bool t_firstWrite = true;
-        foreach (string t_table in SpecPayloadCodec.TableNames)
+        foreach (string t_table in SpecPayloadCodec.PublishedTableNames)
         {
             if (!t_firstWrite) t_builder.Append(',');
             t_firstWrite = false;
@@ -1089,7 +1089,7 @@ public static partial class SpecFirestoreUploader
         var t_builder = new StringBuilder(2048);
         t_builder.Append("{\"mapValue\":{\"fields\":{");
         bool t_first = true;
-        foreach (string t_table in SpecPayloadCodec.TableNames)
+        foreach (string t_table in SpecPayloadCodec.PublishedTableNames)
         {
             if (!t_first) t_builder.Append(',');
             t_first = false;

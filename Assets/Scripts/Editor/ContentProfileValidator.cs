@@ -166,6 +166,8 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
 
             foreach (CardSpec t_spec in t_specs.Values)
             {
+                // 미보유 카드 실루엣도 런타임과 같은 주소 규칙으로 허용한다.
+                t_expected.Add(CardArtCache.SilhouetteAddressOf(t_spec));
                 string t_missingAddress = null;
                 for (int t_stage = 0; t_stage <= CardSpec.MaxEvolutionStage; t_stage++)
                 {

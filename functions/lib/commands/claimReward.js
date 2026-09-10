@@ -41,6 +41,7 @@ const eventNames_1 = require("../analytics/eventNames");
 const analyticsEvent_1 = require("../observability/analyticsEvent");
 const missionStore_1 = require("../missions/missionStore");
 const period_1 = require("../missions/period");
+const missionSpec_1 = require("../missions/missionSpec");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
 const saveDocument_1 = require("../save/saveDocument");
@@ -325,7 +326,8 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
     }
     // 랭크는 티어 인덱스를 정규 표기로 되돌려 조회한다 — 클라 RankConfig.FillRewards 가 쓰는 키와 같아야 한다.
     const specOwnerId = ownerType === "Rank" ? String(tierIndex) : ownerId;
-    const rewardRows = (0, rewardTable_1.parseRewardRows)(await (0, packSpecReader_1.readSpecRows)(env, "Reward"));
+    const [rawRewardRows, catalog] = await Promise.all([(0, packSpecReader_1.readSpecRows)(env, "Reward"), (0, missionSpec_1.readMissionCatalog)(env)]);
+    const rewardRows = (0, rewardTable_1.parseRewardRows)(rawRewardRows);
     const judgement = (0, rewardTable_1.judgeRewardClaim)(rewardRows, ownerType, specOwnerId);
     const { gains, items, dropped } = judgement;
     const itemContext = items.length ? await (0, itemGrant_1.loadItemGrantContext)(env, items) : null;
@@ -392,7 +394,7 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
         // 진행도를 올리는 것은 이 명령뿐이다 — claimMission 은 ClaimReward 를 올리지 않는다.
         // 올리면 미션 수령이 미션을 낳는 자기참조가 된다.
         (0, missionStore_1.commitMissionBump)(transaction, missions, eventNames_1.EVENTS.rewardClaimed.missionKey, 1, firestore_1.FieldValue.serverTimestamp());
-        missionState = (0, missionStore_1.missionResponse)(missions.state, period);
+        missionState = (0, missionStore_1.missionResponse)(missions.state, period, catalog);
         if (ownerType === "Rank") {
             claimRankTier(rankState, tierIndex, context);
             rankProgress = (0, rankStore_1.rankProgressResponse)(rankState);

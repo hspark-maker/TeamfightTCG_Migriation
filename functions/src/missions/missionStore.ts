@@ -284,10 +284,30 @@ export function commitMissionBump(
   amount: number,
   now: unknown,
 ): void {
-  const step = Number.isInteger(amount) && amount > 0 ? amount : 1;
-  for (const kind of ["daily", "weekly"] as const) {
-    const key = progressKey(kind, event);
-    bump.state.progress[key] = Math.min((bump.state.progress[key] ?? 0) + step, COUNTER_MAX);
+  commitMissionBumps(transaction, bump, [{event, amount}], now);
+}
+
+/**
+ * 여러 이벤트의 일일·주간 카운터를 누적하고 같은 트랜잭션에서 문서를 한 번만 쓴다.
+ * @param {Transaction} transaction 진행 중인 트랜잭션
+ * @param {MissionBump} bump 기간 리셋까지 반영한 손잡이
+ * @param {Array} increments 이벤트별 증가량. 빈 목록이면 쓰지 않는다
+ * @param {unknown} now 서버 시각
+ * @return {void}
+ */
+export function commitMissionBumps(
+  transaction: Transaction,
+  bump: MissionBump,
+  increments: readonly {event: string; amount: number}[],
+  now: unknown,
+): void {
+  if (increments.length === 0) return;
+  for (const {event, amount} of increments) {
+    const step = Number.isInteger(amount) && amount > 0 ? amount : 1;
+    for (const kind of ["daily", "weekly"] as const) {
+      const key = progressKey(kind, event);
+      bump.state.progress[key] = Math.min((bump.state.progress[key] ?? 0) + step, COUNTER_MAX);
+    }
   }
   write(transaction, bump, now);
 }
@@ -321,10 +341,11 @@ export function commitMissionClaim(
  * 해당 주기의 활성 일반 미션 달성 수. 보상 수령 여부와 무관하며 누적 보상은 제외한다.
  * @param {MissionState} state 리셋을 반영한 상태
  * @param {MissionPeriodKind} period 집계할 주기
+ * @param {Array} catalog 이번 요청의 정의 목록
  * @return {number} 달성한 일반 미션 수
  */
-function completedMissions(state: MissionState, period: MissionPeriodKind): number {
-  return enabledMissions().filter((mission) => mission.period === period &&
+function completedMissions(state: MissionState, period: MissionPeriodKind, catalog: readonly MissionDef[]): number {
+  return enabledMissions(catalog).filter((mission) => mission.period === period &&
     mission.event !== DAILY_MISSION_COMPLETION_EVENT &&
     mission.event !== WEEKLY_MISSION_COMPLETION_EVENT &&
     (state.progress[progressKey(period, mission.event)] ?? 0) >= mission.target).length;
@@ -334,12 +355,13 @@ function completedMissions(state: MissionState, period: MissionPeriodKind): numb
  * 이 미션의 현재 진행도. 누적 완료 보상은 일반 미션 카운터에서 파생한다.
  * @param {MissionState} state 리셋을 반영한 상태
  * @param {MissionDef} mission 미션 정의
+ * @param {Array} catalog 이번 요청의 정의 목록
  * @return {number} 누적 횟수
  */
-export function progressOf(state: MissionState, mission: MissionDef): number {
+export function progressOf(state: MissionState, mission: MissionDef, catalog: readonly MissionDef[]): number {
   if ((mission.period === "daily" && mission.event === DAILY_MISSION_COMPLETION_EVENT) ||
       (mission.period === "weekly" && mission.event === WEEKLY_MISSION_COMPLETION_EVENT)) {
-    return completedMissions(state, mission.period);
+    return completedMissions(state, mission.period, catalog);
   }
   return state.progress[progressKey(mission.period, mission.event)] ?? 0;
 }
@@ -361,16 +383,19 @@ export function isClaimed(state: MissionState, missionId: string): boolean {
  * 응답이 나중 변형을 따라간다.
  * @param {MissionState} state 리셋·bump 까지 반영한 상태
  * @param {MissionPeriod} period 이번 호출의 기간
+ * @param {Array} catalog 이번 요청의 정의 목록
  * @return {MissionResponse} 응답에 실을 상태 봉투
  */
-export function missionResponse(state: MissionState, period: MissionPeriod): MissionResponse {
+export function missionResponse(
+  state: MissionState, period: MissionPeriod, catalog: readonly MissionDef[],
+): MissionResponse {
   return {
     dailyKey: period.daily,
     weeklyKey: period.weekly,
     progress: {
       ...state.progress,
-      [progressKey("daily", DAILY_MISSION_COMPLETION_EVENT)]: completedMissions(state, "daily"),
-      [progressKey("weekly", WEEKLY_MISSION_COMPLETION_EVENT)]: completedMissions(state, "weekly"),
+      [progressKey("daily", DAILY_MISSION_COMPLETION_EVENT)]: completedMissions(state, "daily", catalog),
+      [progressKey("weekly", WEEKLY_MISSION_COMPLETION_EVENT)]: completedMissions(state, "weekly", catalog),
     },
     claimed: {...state.claimed},
     passExp: state.passExp,

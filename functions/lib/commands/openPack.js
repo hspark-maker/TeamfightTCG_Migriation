@@ -43,6 +43,7 @@ const eventNames_1 = require("../analytics/eventNames");
 const analyticsEvent_1 = require("../observability/analyticsEvent");
 const missionStore_1 = require("../missions/missionStore");
 const period_1 = require("../missions/period");
+const missionSpec_1 = require("../missions/missionSpec");
 const saveDocument_1 = require("../save/saveDocument");
 const cardCatalog_1 = require("../packs/cardCatalog");
 const packDraw_1 = require("../packs/packDraw");
@@ -94,12 +95,13 @@ exports.openPack = (0, https_1.onCall)(async (request) => {
         // 환급 경로는 클라·서버 양쪽에서 죽어 있다(중복 보상은 간식). 저작 실수를 조용히 삼키지 않는다.
         logger.warn("pack authors a refund that is never paid out", { env, packId, refundAmount: pack.refundAmount });
     }
-    const [dropRows, gradeRows, catalogIds, cardRows, rawRewards] = await Promise.all([
+    const [dropRows, gradeRows, catalogIds, cardRows, rawRewards, catalog] = await Promise.all([
         (0, packSpecReader_1.readDropRows)(env, packId),
         (0, packSpecReader_1.readRankGradeRows)(env),
         (0, cardCatalog_1.loadCatalogIds)(env),
         (0, packSpecReader_1.readSpecRows)(env, "Card"),
         pack.price > 0 ? (0, packSpecReader_1.readSpecRows)(env, "Reward") : Promise.resolve([]),
+        (0, missionSpec_1.readMissionCatalog)(env),
     ]);
     const duplicateRows = (0, rewardTable_1.parseRewardRows)(rawRewards);
     const cardGrades = new Map(cardRows.map((row) => [Number(row.id), String(row.grade)]));
@@ -153,7 +155,7 @@ exports.openPack = (0, https_1.onCall)(async (request) => {
         // 진행도는 콜백 **안**에서 올린다 — mutateSave 는 영수증이 히트하면 이 콜백을 통째로 건너뛰므로,
         // 그 덕에 재시도가 진행도를 두 번 올리지 않는다. 콜백 밖으로 옮기면 그 보장이 사라진다.
         (0, missionStore_1.commitMissionBump)(transaction, missions, eventNames_1.EVENTS.packOpened.missionKey, 1, firestore_1.FieldValue.serverTimestamp());
-        missionState = (0, missionStore_1.missionResponse)(missions.state, period);
+        missionState = (0, missionStore_1.missionResponse)(missions.state, period, catalog);
         return {
             slots: {
                 ownership: (0, packSlots_1.buildOwnershipSlot)(owned, drawn),

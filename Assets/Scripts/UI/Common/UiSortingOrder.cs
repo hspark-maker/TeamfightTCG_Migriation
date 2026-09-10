@@ -87,6 +87,9 @@ public static class UiSortingOrder
     /// 입력은 먹지 않는다(raycastTarget 없음).</summary>
     public const int GainLight = 420;
 
+    /// <summary>미션 진행·달성 컷인(MissionCutIn.prefab). 입력을 가로채지 않는 로비 알림.</summary>
+    public const int MissionCutIn = 430;
+
     /// <summary>설정 화면(SettingUI.prefab·SettingsPanel).</summary>
     public const int Setting = 900;
 

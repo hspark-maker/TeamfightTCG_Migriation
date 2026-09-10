@@ -17,6 +17,7 @@ import {CurrencyGain, grant} from "../currency/wallet";
 import {nextWallet} from "../currency/walletStore";
 import {GrantedItems, grantRewardItems, loadItemGrantContext} from "../rewards/itemGrant";
 import {findMission, MAX_MISSION_ID_LENGTH} from "../missions/catalog";
+import {readMissionCatalog} from "../missions/missionSpec";
 import {rankRef} from "../rank/rankStore";
 import {evaluateGuideProgress} from "../missions/guideProgress";
 import {judgeMissionClaim, MissionClaimReject} from "../missions/judgeMissionClaim";
@@ -108,8 +109,9 @@ export const claimMission = onCall(async (request) => {
 
   // 스펙 읽기는 트랜잭션 밖에서 끝낸다. 재화 보상의 진실원은 Reward 표이고,
   // MissionDef 는 조건·표시·passExp 만 소유한다.
-  const [rawRewardRows, passSeasonRows] = await Promise.all([
+  const [rawRewardRows, catalog, passSeasonRows] = await Promise.all([
     readSpecRows(env, "Reward"),
+    readMissionCatalog(env),
     // 표가 아직 발행되지 않은 상태(패스 출시 전)는 정상 경로다 — 미션 수령마다 error 를 찍으면
     // 진짜 장애가 그 소음에 묻힌다. 저작이 깨진 경우(PASS_SPEC_INVALID)만 error 로 남긴다.
     readSpecRows(env, "PassSeason").catch((error) => {
@@ -120,7 +122,7 @@ export const claimMission = onCall(async (request) => {
     }),
   ]);
   const rewardRows = parseRewardRows(rawRewardRows);
-  const definition = findMission(missionId);
+  const definition = findMission(missionId, catalog);
   const guideCards = definition?.period === "guide" ? await readSpecRows(env, "Card") : [];
   const rewardOwner = definition?.period === "guide" ? "Guide" : "Mission";
   const authored = judgeSpecRewardClaim(rewardRows, rewardOwner, missionId);
@@ -161,7 +163,7 @@ export const claimMission = onCall(async (request) => {
       // beginMissionBump 이 기간 리셋까지 반영하므로, 어제 진행도로 오늘 보상을 타는 경로가 없다.
       const missions = await beginMissionBump(transaction, db, env, uid, period);
       if (definition?.period === "guide") {
-        missions.state.progress = evaluateGuideProgress(current, guideCards, missions.state.progress);
+        missions.state.progress = evaluateGuideProgress(current, guideCards, catalog, missions.state.progress);
       }
       const rankSnapshot = itemContext === null ? null : await transaction.get(rankRef(db, env, uid));
       // Keep this read before commitMissionClaim and all other transaction writes.
@@ -169,7 +171,7 @@ export const claimMission = onCall(async (request) => {
         await beginPassMutation(transaction, db, env, uid, activePassSeason.seasonId);
 
       // 판정은 순수 모듈이 한다 — 여기서 다시 재면 테스트가 보는 규칙과 집행되는 규칙이 갈린다.
-      const verdict = judgeMissionClaim(missionId, missions.state);
+      const verdict = judgeMissionClaim(missionId, missions.state, catalog);
       progress = verdict.progress;
       if (!verdict.allow) {
         reject(verdict.reason, rejectMessage(verdict.reason, missionId, verdict.progress,
@@ -212,7 +214,7 @@ export const claimMission = onCall(async (request) => {
         commitPassExp(transaction, pass, mission.passExp, FieldValue.serverTimestamp());
         passProgress = passProgressResponse(pass.state);
       }
-      missionState = missionResponse(missions.state, period);
+      missionState = missionResponse(missions.state, period, catalog);
 
       // 세이브 슬롯은 하나도 건드리지 않는다. mutateSave 가 revision 만 올리고,
       // 그 쓰기가 영수증의 근거가 된다.

@@ -1,3 +1,4 @@
+import {isDeepStrictEqual} from "node:util";
 import {
   DocumentReference,
   DocumentSnapshot,
@@ -171,8 +172,9 @@ export async function ensureRankState(
     const currentRankRef = rankRef(db, env, uid);
     const payoutRef = db.doc(`envs/${env}/users/${uid}/payoutState/current`);
     const saveRef = db.doc(`envs/${env}/users/${uid}/save/current`);
-    const [rankSnapshot, payoutSnapshot, saveSnapshot] =
-      await transaction.getAll(currentRankRef, payoutRef, saveRef);
+    const boardRef = db.doc(`envs/${env}/rankings/${uid}`);
+    const [rankSnapshot, payoutSnapshot, saveSnapshot, boardSnapshot] =
+      await transaction.getAll(currentRankRef, payoutRef, saveRef, boardRef);
     if (!saveSnapshot.exists) return null;
 
     const fallbackPoints = legacyRankPoints(payoutSnapshot.data(), saveSnapshot.data());
@@ -183,6 +185,20 @@ export async function ensureRankState(
       grades,
     );
     state = adoptLegacyEntry(state, fallbackPoints, grades);
+
+    // 원본과 두 사본이 모두 맞으면 timestamp만 갱신하는 3회 쓰기를 생략한다.
+    // 정규화 전 저장값과 비교해야 손상된 값도 복구된다. 색인도 같은 트랜잭션에서
+    // 읽어야 원본이 정상인 계정의 색인 누락·불일치 복구를 건너뛰지 않는다.
+    const stored = rankSnapshot.data();
+    const board = boardSnapshot.data();
+    if (stored?.schemaVersion === RANK_SCHEMA_VERSION &&
+        stored.seasonId === state.seasonId && stored.points === state.points &&
+        stored.bestTierIndex === state.bestTierIndex && isDeepStrictEqual(stored.claimed, state.claimed) &&
+        board?.seasonId === state.seasonId && board.points === state.points &&
+        payoutSnapshot.data()?.currentPoints === state.points) {
+      return state;
+    }
+
     const now = FieldValue.serverTimestamp();
     writeRank(transaction, currentRankRef, state, now);
     // Keep rollback compatibility while payoutState remains deployed.

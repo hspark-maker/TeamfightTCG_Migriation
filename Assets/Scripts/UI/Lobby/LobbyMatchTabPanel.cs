@@ -33,6 +33,10 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     [Tooltip("일일·주간 미션을 여는 버튼. 잠금 축이 없어 항상 눌린다 — 목록이 비는 주기는 화면이 스스로 안내한다.")]
     [SerializeField] Button missionButton;
 
+    [Tooltip("가이드 미션(1회성 순차)을 여는 버튼. 정의가 없거나 전부 수령했으면 버튼째 감춘다 —\n" +
+             "가이드는 끝나면 다시 오지 않는 축이라 빈 화면 안내보다 사라지는 게 맞다.")]
+    [SerializeField] Button guideMissionButton;
+
     [Tooltip("배틀패스를 여는 버튼. 시즌 공백기에도 눌린다 — 시즌이 없다는 것은 화면이 안내한다.")]
     [SerializeField] Button passButton;
 
@@ -60,6 +64,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (keywordGrowthButton != null) keywordGrowthButton.onClick.AddListener(OpenKeywordGrowth);
         if (rouletteButton != null) rouletteButton.onClick.AddListener(OpenRoulette);
         if (missionButton != null) missionButton.onClick.AddListener(OpenMissions);
+        if (guideMissionButton != null) guideMissionButton.onClick.AddListener(OpenGuideMissions);
         if (passButton != null) passButton.onClick.AddListener(OpenPass);
         if (rankBadgeButton != null) rankBadgeButton.onClick.AddListener(ReplayRankPromote);
         if (adventureButton != null) adventureButton.onClick.AddListener(HandleAdventureRequested);
@@ -74,6 +79,9 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         // 탭이 꺼져 있는 동안에도 신호를 받아야 한다 — 놓치면 다른 탭에 있던 사이 끝난 연출을 영영 못 따라간다.
         OutgameFeatureLock.OnChanged += ApplyFeatureLocks;
         LobbyRankEffectDirector.OnAnyFinished += RefreshPlayLabel;
+
+        // 첫 getMissions 응답이 탭보다 늦게 도착해도 버튼이 스스로 나타나야 한다.
+        MissionManager.OnChanged += RefreshGuideMissionButton;
     }
 
     // 첫 반영은 Awake가 아니라 여기다 — 디렉터의 Awake보다 먼저 물으면 "연출 없음"으로 읽혀 결말을 미리 말한다.
@@ -81,6 +89,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     {
         RefreshPlayLabel();
         ApplyFeatureLocks();
+        RefreshGuideMissionButton();
     }
 
     void OnDestroy()
@@ -91,18 +100,21 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (keywordGrowthButton != null) keywordGrowthButton.onClick.RemoveListener(OpenKeywordGrowth);
         if (rouletteButton != null) rouletteButton.onClick.RemoveListener(OpenRoulette);
         if (missionButton != null) missionButton.onClick.RemoveListener(OpenMissions);
+        if (guideMissionButton != null) guideMissionButton.onClick.RemoveListener(OpenGuideMissions);
         if (passButton != null) passButton.onClick.RemoveListener(OpenPass);
         if (rankBadgeButton != null) rankBadgeButton.onClick.RemoveListener(ReplayRankPromote);
         if (adventureButton != null) adventureButton.onClick.RemoveListener(HandleAdventureRequested);
 
         OutgameFeatureLock.OnChanged -= ApplyFeatureLocks;
         LobbyRankEffectDirector.OnAnyFinished -= RefreshPlayLabel;
+        MissionManager.OnChanged -= RefreshGuideMissionButton;
     }
 
     public override void OnEnter()
     {
         RefreshPlayLabel();
         ApplyFeatureLocks();
+        RefreshGuideMissionButton();
     }
 
     /// <summary>승급전 대기면 버튼 문구를 갈고, 아니면 저작 문구로 되돌린다.
@@ -180,6 +192,15 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     /// 화면이 스스로 안내한다(활성 미션이 현재 팩 개봉 축뿐이라 실제로 비는 주기가 있다).</summary>
     public void OpenMissions() => OpenPooled<MissionPanel>();
 
+    /// <summary>가이드 미션. 버튼을 감추는 것만으로는 부족하다 — 진입을 실제로 막는 주체는 여기다
+    /// (감추기는 표현이고, 다른 경로로 이 메서드를 부를 수 있다).</summary>
+    public void OpenGuideMissions()
+    {
+        if (!AnyGuideMissionOpen()) return;
+
+        OpenPooled<GuideMissionPanel>();
+    }
+
     /// <summary>배틀패스. 미션과 같은 이유로 잠금 게이트가 없다 — 활성 시즌이 없으면
     /// 화면이 그 사실을 그린다(빈 목록으로 두지 않는다).</summary>
     public void OpenPass() => OpenPooled<PassPanel>();
@@ -198,6 +219,21 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     public void SetPlayInteractable(bool _interactable)
     {
         if (playButton != null) playButton.interactable = _interactable;
+    }
+
+    /// <summary>미수령 가이드 미션이 남았을 때만 버튼을 보인다. 판정은 패널·행과 같은
+    /// MissionManager 낙인 하나다 — 버튼과 화면이 다른 눈으로 보면 갈린다.</summary>
+    void RefreshGuideMissionButton()
+    {
+        if (guideMissionButton != null) guideMissionButton.gameObject.SetActive(AnyGuideMissionOpen());
+    }
+
+    static bool AnyGuideMissionOpen()
+    {
+        System.Collections.Generic.IReadOnlyList<MissionDefinition> t_definitions = MissionManager.Definitions;
+        for (int i = 0; i < t_definitions.Count; i++)
+            if (t_definitions[i].Period == "guide" && !MissionManager.IsClaimed(t_definitions[i].Id)) return true;
+        return false;
     }
 
     void HandlePlayRequested() => PlayRequested?.Invoke();

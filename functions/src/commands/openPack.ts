@@ -12,6 +12,7 @@ import {
   MissionResponse,
 } from "../missions/missionStore";
 import {missionPeriod} from "../missions/period";
+import {readMissionCatalog} from "../missions/missionSpec";
 import {
   isKnownEnv,
   mutateSave,
@@ -90,12 +91,13 @@ export const openPack = onCall(async (request) => {
     logger.warn("pack authors a refund that is never paid out", {env, packId, refundAmount: pack.refundAmount});
   }
 
-  const [dropRows, gradeRows, catalogIds, cardRows, rawRewards] = await Promise.all([
+  const [dropRows, gradeRows, catalogIds, cardRows, rawRewards, catalog] = await Promise.all([
     readDropRows(env, packId),
     readRankGradeRows(env),
     loadCatalogIds(env),
     readSpecRows(env, "Card"),
     pack.price > 0 ? readSpecRows(env, "Reward") : Promise.resolve([]),
+    readMissionCatalog(env),
   ]);
   const duplicateRows = parseRewardRows(rawRewards);
   const cardGrades = new Map(cardRows.map((row) => [Number(row.id), String(row.grade)]));
@@ -164,7 +166,7 @@ export const openPack = onCall(async (request) => {
       // 진행도는 콜백 **안**에서 올린다 — mutateSave 는 영수증이 히트하면 이 콜백을 통째로 건너뛰므로,
       // 그 덕에 재시도가 진행도를 두 번 올리지 않는다. 콜백 밖으로 옮기면 그 보장이 사라진다.
       commitMissionBump(transaction, missions, EVENTS.packOpened.missionKey, 1, FieldValue.serverTimestamp());
-      missionState = missionResponse(missions.state, period);
+      missionState = missionResponse(missions.state, period, catalog);
 
       return {
         slots: {

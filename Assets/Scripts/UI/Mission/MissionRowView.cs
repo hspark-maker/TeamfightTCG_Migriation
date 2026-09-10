@@ -19,7 +19,7 @@ public class MissionRowView : MonoBehaviour
     [Tooltip("진행도 표시. 비워 두면 그리지 않는다.")]
     [SerializeField] TMP_Text progressText;
 
-    [Tooltip("0~1 로 채우는 게이지(Image.Type = Filled). 비워 두면 그리지 않는다.")]
+    [Tooltip("Sliced 채움 이미지. 부모는 게이지 최대 영역, 이미지는 부모 전체에 Stretch로 배선한다. 너비로 진행도를 표시한다.")]
     [SerializeField] Image progressFill;
 
     [Tooltip("보상 문구. 재화·아이템 목록을 한 줄로 적는다. 비워 두면 그리지 않는다.")]
@@ -101,9 +101,14 @@ public class MissionRowView : MonoBehaviour
         }
 
         if (this.progressFill != null)
-            this.progressFill.fillAmount = t_target > 0
+        {
+            float t_ratio = t_target > 0
                 ? Mathf.Clamp01((float)t_progress / t_target)
                 : (t_complete ? 1f : 0f);
+            // Sliced의 테두리 두께를 유지하며, 고정된 최대 영역 안에서 너비만 바꾼다.
+            this.progressFill.rectTransform.anchorMax = new Vector2(t_ratio, 1f);
+            this.progressFill.gameObject.SetActive(t_ratio > 0f);
+        }
 
         if (this.claimedMark != null) this.claimedMark.SetActive(t_claimed);
 

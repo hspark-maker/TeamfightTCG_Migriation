@@ -44,9 +44,12 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
     // 등장 안무. 수령·닫기가 등장 도중에 와도 저작 상태로 되돌린 뒤 이어가야 한다.
     Sequence m_intro;
 
-    // 확인 콜백. 던지고 기다리지 않으므로 반환값은 즉시 완료된 경우(로컬 가드 거절)에만 본다.
+    // 확인 콜백. 즉시 완료된 거절은 연출 전에 확인하고, 서버 확정 카드는 응답 뒤 별도로 표시한다.
     // 중복 클릭 방지를 위해 한 번 쓰면 비운다.
     Func<UniTask<RewardClaimOutcome>> m_onConfirm;
+
+    // 늦게 도착한 카드 결과가 그 사이 새로 연 보상 팝업을 닫지 않도록 표시 회차를 구분한다.
+    int m_showVersion;
 
     // 닫힘 콜백. 연 쪽이 팝업 뒤에 연출을 이을 때만 쓴다(공용 팝업이라 static 이벤트로 두면 다른 소비처에 샌다).
     Action m_onClosed;
@@ -77,6 +80,8 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
     public static bool TryGet(out RewardClaimPopup _popup)
         => TryGetExisting(out _popup);
 
+    public int RewardSlotCount => this.rewardSlots?.Length ?? 0;
+
     public static async UniTask ClaimWithoutPopup(Func<UniTask<RewardClaimOutcome>> _claim)
     {
         if (_claim == null) return;
@@ -87,7 +92,7 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
 
     /// <summary>
     /// 보상을 띄운다. _onConfirm은 던지고 기다리지 않는다 — 수령을 누르면 서버 왕복이 뒤에서 도는 동안
-    /// 화면은 곧장 획득 연출로 넘어간다(그래서 반환값도 보지 않는다).
+    /// 화면은 곧장 획득 연출로 넘어간다. 즉시 완료된 거절만 연출 전에 확인한다.
     /// <para>_rewards는 <b>수령 전 예고</b>다(클라 스펙). 분출·롤업이 이 목록으로 서므로 실지급과 갈릴 수 있고,
     /// 그때는 연출이 끝나 고정이 풀릴 때 HUD가 서버 잔액으로 맞춰진다.</para>
     /// <para>_gainSlotsAfterClose를 넘기면 획득 연출이 <b>팝업이 닫힌 뒤</b> 그 칸에서 피어 HUD로 흐른다 —
@@ -97,6 +102,7 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
                      bool _claimOnDim = false, Action _onClosed = null,
                      IReadOnlyList<CurrencyRewardSlotView> _gainSlotsAfterClose = null)
     {
+        this.m_showVersion++;
         this.m_onConfirm = _onConfirm;
         this.m_onClosed = _onClosed;
         this.m_gainSlotsAfterClose = _gainSlotsAfterClose;
@@ -153,6 +159,7 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
 
     public void Hide()
     {
+        this.m_showVersion++;
         this.m_onConfirm = null;
         this.KillIntro();
         this.SetVisible(false);
@@ -178,34 +185,40 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
         this.RestoreReveal();
     }
 
-    void ClaimClicked() => ClaimClickedAsync().Forget();
-
-    async UniTaskVoid ClaimClickedAsync()
+    void ClaimClicked()
     {
         // 콜백을 먼저 비워 연타로 두 번 지급되는 경로를 막는다(매니저 가드와 이중 방어).
         var t_callback = this.m_onConfirm;
+        if (t_callback == null) return;
         this.m_onConfirm = null;
 
         this.SetInputEnabled(false);
 
-        RewardClaimOutcome t_outcome;
-        ServerWaitOverlay.Hold(this);
         try
         {
-            t_outcome = t_callback != null ? await t_callback.Invoke() : default;
+            var t_claim = t_callback.Invoke();
+            if (t_claim.Status != UniTaskStatus.Pending)
+            {
+                // 로컬 가드의 즉시 거절과 이미 지급된 보상은 같은 프레임에 처리한다.
+                var t_outcome = t_claim.GetAwaiter().GetResult();
+                if (!t_outcome.Succeeded) { this.Hide(); return; }
+                if (t_outcome.Cards != null && t_outcome.Cards.Count > 0)
+                {
+                    this.Hide();
+                    if (CardSetRewardOverlay.TryGet(out var t_cards)) t_cards.ShowGranted(t_outcome.Cards);
+                    return;
+                }
+            }
+            else
+            {
+                // 재화 예고·수령 상태는 호출자가 첫 await 전에 적용한다. 연출은 서버 왕복을 기다리지 않는다.
+                this.ObserveClaimAsync(t_claim, this.m_showVersion).Forget();
+            }
         }
         catch (Exception t_error)
         {
             Debug.LogException(t_error);
             this.Hide();
-            return;
-        }
-        finally { ServerWaitOverlay.Release(this); }
-        if (!t_outcome.Succeeded) { this.Hide(); return; }
-        if (t_outcome.Cards != null && t_outcome.Cards.Count > 0)
-        {
-            this.Hide();
-            if (CardSetRewardOverlay.TryGet(out var t_cards)) t_cards.ShowGranted(t_outcome.Cards);
             return;
         }
 
@@ -262,6 +275,24 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
 
         // BuildLightGain은 재생을 호출자에게 맡긴다 — 전역 autoPlay 설정에 기대지 않고 여기서 명시적으로 돌린다.
         t_burst.Play();
+    }
+
+    // 낙관 재화의 확정·실패 보정은 서버 응답 채택과 CurrencyPendingTicket이 처리한다.
+    // 추첨 카드만 응답이 필요하다. 이전 요청의 완료가 새 팝업의 수령·닫힘 콜백을 건드리면 안 된다.
+    async UniTaskVoid ObserveClaimAsync(UniTask<RewardClaimOutcome> _claim, int _showVersion)
+    {
+        try
+        {
+            var t_outcome = await _claim;
+            if (!t_outcome.Succeeded || t_outcome.Cards == null || t_outcome.Cards.Count == 0) return;
+
+            if (this != null && this.m_showVersion == _showVersion) this.Hide();
+            if (CardSetRewardOverlay.TryGet(out var t_cards)) t_cards.ShowGranted(t_outcome.Cards);
+        }
+        catch (Exception t_error)
+        {
+            Debug.LogException(t_error);
+        }
     }
 
     // 팝업을 먼저 닫고 퇴장 길이만큼 뒤에 빛을 띄운다. 시퀀스를 팝업에 링크하지 않는 이유는 분출과 같다(꺼질 때 죽으면 빛이 굳는다).

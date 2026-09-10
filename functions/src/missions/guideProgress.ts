@@ -1,16 +1,18 @@
 import {readOwnedIds} from "../packs/packSlots";
 import {readGrowthEntries, levelOfCard} from "../growth/cardGrowth";
-import {missionCatalog} from "./catalog";
+import {MissionDef} from "./catalog";
 
 /**
  * 서버 세이브에서 판정한다. 잠긴 단계도 기록하고, 덱을 바꿔도 최대 달성값은 유지한다.
  * @param {Record<string, unknown>} current 서버 세이브
  * @param {Record<string, unknown>[]} cards 카드 표
+ * @param {Array} catalog 이번 요청의 정의 목록
  * @param {Record<string, number>} previous 영구 진행도를 포함한 기존 카운터
  * @return {Record<string, number>} 최고 달성값을 합친 카운터
  */
 export function evaluateGuideProgress(
-  current: Record<string, unknown>, cards: Record<string, unknown>[], previous: Record<string, number> = {},
+  current: Record<string, unknown>, cards: Record<string, unknown>[], catalog: readonly MissionDef[],
+  previous: Record<string, number> = {},
 ): Record<string, number> {
   const result = {...previous};
   const owned = new Set(readOwnedIds(current.ownership));
@@ -27,7 +29,7 @@ export function evaluateGuideProgress(
     .map((row) => Number(row.id));
   const adventure = current.adventure as {clearedNodeIds?: string[]} | undefined;
   const cleared = new Set(adventure?.clearedNodeIds ?? []);
-  for (const mission of missionCatalog().filter((entry) => entry.period === "guide")) {
+  for (const mission of catalog.filter((entry) => entry.period === "guide")) {
     let progress = 0;
     const event = mission.event;
     if (event === "Guide.DeckSaved6") progress = validDecks.length ? 1 : 0;

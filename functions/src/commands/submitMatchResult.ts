@@ -10,7 +10,7 @@ import {db} from "../firebaseApp";
 import {withCountedTransaction} from "../observability/countedTransaction";
 import {EVENTS} from "../analytics/eventNames";
 import {recordEvent} from "../observability/analyticsEvent";
-import {beginMissionBump, commitMissionBump, MissionBump} from "../missions/missionStore";
+import {beginMissionBump, commitMissionBumps, MissionBump} from "../missions/missionStore";
 import {missionPeriod} from "../missions/period";
 import {
   decideMatch,
@@ -660,31 +660,36 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
       const outcome = settleOutcomes[i];
       const owner = ownerIndexByUid?.[entries[i].uid] ?? (solo ? 0 : -1);
       const bump = missionBumps[i];
-      commitMissionBump(tx, bump, EVENTS.battleCompleted.missionKey, 1, missionNow);
+      const increments: {event: string; amount: number}[] = [
+        {event: EVENTS.battleCompleted.missionKey, amount: 1},
+      ];
       if (outcome.won && serverReplay?.ok === true) {
-        commitMissionBump(tx, bump, "WinBattle", 1, missionNow);
+        increments.push({event: "WinBattle", amount: 1});
       }
       if (!solo && outcome.won && serverReplay?.ok === true) {
-        commitMissionBump(tx, bump, EVENTS.rankedBattleWon.missionKey, 1, missionNow);
+        increments.push({event: EVENTS.rankedBattleWon.missionKey, amount: 1});
       }
-      if (owner < 0 || owner > 1) continue;
-      const destroyed = destroyedByOwner?.[owner] ?? 0;
-      const attacks = replayStats?.attacksByOwner[owner] ?? 0;
-      const synergies = replayStats?.synergyFiredByOwner[owner] ?? 0;
-      const keywords = replayStats == null ? 0 :
-        Object.values(replayStats.keywordsByOwner[owner] ?? {}).reduce((sum, count) => sum + count, 0);
-      if (destroyed > 0) {
-        commitMissionBump(tx, bump, EVENTS.battleCardsDestroyed.missionKey, destroyed, missionNow);
+      if (owner >= 0 && owner <= 1) {
+        const destroyed = destroyedByOwner?.[owner] ?? 0;
+        const attacks = replayStats?.attacksByOwner[owner] ?? 0;
+        const synergies = replayStats?.synergyFiredByOwner[owner] ?? 0;
+        const keywords = replayStats == null ? 0 :
+          Object.values(replayStats.keywordsByOwner[owner] ?? {}).reduce((sum, count) => sum + count, 0);
+        if (destroyed > 0) {
+          increments.push({event: EVENTS.battleCardsDestroyed.missionKey, amount: destroyed});
+        }
+        if (attacks > 0) {
+          increments.push({event: EVENTS.battleAttacksPerformed.missionKey, amount: attacks});
+        }
+        if (synergies > 0) {
+          increments.push({event: EVENTS.battleSynergiesTriggered.missionKey, amount: synergies});
+        }
+        if (keywords > 0) {
+          increments.push({event: EVENTS.battleKeywordsTriggered.missionKey, amount: keywords});
+        }
       }
-      if (attacks > 0) {
-        commitMissionBump(tx, bump, EVENTS.battleAttacksPerformed.missionKey, attacks, missionNow);
-      }
-      if (synergies > 0) {
-        commitMissionBump(tx, bump, EVENTS.battleSynergiesTriggered.missionKey, synergies, missionNow);
-      }
-      if (keywords > 0) {
-        commitMissionBump(tx, bump, EVENTS.battleKeywordsTriggered.missionKey, keywords, missionNow);
-      }
+      // 참가자별 모든 카운터를 누적한 뒤 정산과 같은 커밋에 한 번만 저장한다.
+      commitMissionBumps(tx, bump, increments, missionNow);
     }
 
     // 클라 발산율의 유일한 조회 수단이다. 문서에만 쌓으면 집계할 방법이 없다.

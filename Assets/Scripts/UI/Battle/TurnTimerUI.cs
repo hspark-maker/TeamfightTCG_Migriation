@@ -3,9 +3,9 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 내 턴 생각시간 남은 초 + 바깥 링 게이지 표시. 시간은 TurnThinkTimer(단일 소스)가 소유하고,
+/// 플레이어·AI 생각시간 남은 초 + 바깥 링 게이지 표시. 시간은 TurnThinkTimer(단일 소스)가 소유하고,
 /// 여기선 읽어서 표시만 한다(자체 카운트 금지 → 드리프트 방지).
-/// TurnThinkTimer.Active(내 턴 InputAllowed 구간)일 때만 보이고 그 외엔 숨김.
+/// TurnThinkTimer.Active(플레이어 입력 대기 또는 AI 생각시간)일 때만 보이고 그 외엔 숨김.
 /// 표시 전용이라 결정론/멀티와 무관 — 프레임률·배속이 달라도 게임 상태에 영향 없다.
 ///
 /// 링은 Image.type=Filled + fillMethod=Radial360. 남은 비율(TurnThinkTimer.Normalized)을

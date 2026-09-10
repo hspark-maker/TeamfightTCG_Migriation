@@ -104,6 +104,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b694ca028ef9afa418ad1ee4737e4a2a
+    m_Address: MissionCutInView
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b8ffda38cc32cce4390406846a163820
     m_Address: MalgunGothic_TMP
     m_ReadOnly: 0
@@ -141,6 +147,12 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: dee8a2231ae459847a16e01635c0f514
     m_Address: AdventureNodePopup
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e1f5b07b5d4d84344a0e499946bdaa69
+    m_Address: GuideMissionOverlay
     m_ReadOnly: 0
     m_SerializedLabels:
     - UIPrefab

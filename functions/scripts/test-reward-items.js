@@ -5,6 +5,7 @@ const {evaluateGuideProgress} = require("../lib/missions/guideProgress");
 const {judgeMissionClaim} = require("../lib/missions/judgeMissionClaim");
 const {applyPeriodReset} = require("../lib/missions/missionStore");
 const {missionPeriod} = require("../lib/missions/period");
+const {catalog} = require("./mission-fixture");
 
 const row = (type, id, amount, order = 1, ownerType = "Pass", ownerId = "S1:3") =>
   ({id: order, ownerType, ownerId, order, rewardType: type, rewardId: id, amount});
@@ -49,17 +50,17 @@ const guideSave = {ownership: {cardIds: ids}, deck: {selectedSlot: 0, slots: [{c
   adventure: {clearedNodeIds: ["node_01", "node_02", "node_03", "node_04", "node_05", "node_06"]}};
 const cardSpecs = ids.map((id) => ({id, synergies: id <= 3 ? "Data_Synergy_Caretaker" : "",
   name: id === 8 ? "Data_Card_Nightchestnut" : id === 9 ? "Data_Card_MushroomCat" : ""}));
-const progress = evaluateGuideProgress(guideSave, cardSpecs);
+const progress = evaluateGuideProgress(guideSave, cardSpecs, catalog);
 assert.equal(progress["guide.Guide.DeckSaved6"], 1);
 assert.equal(progress["guide.Guide.CaretakerTraceDeck"], 2);
 assert.equal(progress["guide.Guide.DeckCardsAtStar3"], 6);
-assert.equal(evaluateGuideProgress({}, cardSpecs, progress)["guide.Guide.CaretakerTraceDeck"], 2,
+assert.equal(evaluateGuideProgress({}, cardSpecs, catalog, progress)["guide.Guide.CaretakerTraceDeck"], 2,
   "completed locked guide survives deck changes");
 const state = {dailyKey: "old", weeklyKey: "old", progress, claimed: {}, passExp: 0};
-assert.equal(judgeMissionClaim("guide.02", state).allow, false, "future guide cannot be claimed early");
-assert.equal(judgeMissionClaim("guide.01", state).allow, true);
+assert.equal(judgeMissionClaim("guide.02", state, catalog).allow, false, "future guide cannot be claimed early");
+assert.equal(judgeMissionClaim("guide.01", state, catalog).allow, true);
 state.claimed["guide.01"] = true;
-assert.equal(judgeMissionClaim("guide.02", state).allow, true);
+assert.equal(judgeMissionClaim("guide.02", state, catalog).allow, true);
 const reset = applyPeriodReset(state, missionPeriod(Date.now()));
 assert.equal(reset.claimed["guide.01"], true, "daily/weekly reset must preserve guide claims");
 assert.equal(reset.progress["guide.Guide.DeckSaved6"], 1);
