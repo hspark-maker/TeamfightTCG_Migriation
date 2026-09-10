@@ -19,7 +19,8 @@ async function run() {
     Array.from({length: 20}, (_, i) => `4.${i + 6}`), "Keep the newest 20 releases in ascending publication order");
 
   const local = localSnapshot();
-  assert.equal(local.names.length, 21);
+  assert.equal(local.names.length, 22);
+  assert(local.names.includes("Mission"), "Server-only Mission must be published");
   const rewards = parseRewardRows(local.tables.Reward.rows);
   for (const [grade, amount] of [["Common", 1], ["Rare", 2], ["Arcane", 5], ["Mythic", 10]]) {
     assert.deepEqual(duplicateGains([{cardId: 1, isNew: false, snack: 1}], new Map([[1, grade]]), rewards),
@@ -66,9 +67,9 @@ async function run() {
   assert.deepEqual(plan.changes.map((c) => c.table), ["Reward"]);
   assert.equal(plan.version, "4.13");
   assert.equal(commits, 0, "Dry-run cannot mutate remote state");
-  assert.equal(plan.writes.filter((w) => w.updateMask).length, 20);
+  assert.equal(plan.writes.filter((w) => w.updateMask).length, 21);
   const immutable = plan.writes.filter((w) => w.update?.name.includes("/_release_"));
-  assert.equal(immutable.length, 22);
+  assert.equal(immutable.length, 23);
   assert(immutable.every((w) => w.currentDocument?.exists === false));
   const release = plan.writes.find((w) => w.update?.name.endsWith("/_release_index_4_13"));
   const rollbackTables = JSON.parse(unpack(release.update.fields.tablesJson));

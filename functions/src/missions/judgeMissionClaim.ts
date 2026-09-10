@@ -6,7 +6,7 @@
  * `lib/` 를 직접 require 하는 순수 회귀라, 판정이 여기 있어야 회귀가 붙는다.
  */
 
-import {findMission, missionCatalog, MissionDef} from "./catalog";
+import {findMission, MissionDef} from "./catalog";
 import {isClaimed, MissionState, progressOf} from "./missionStore";
 
 /**
@@ -37,15 +37,18 @@ export type MissionClaimVerdict =
  * 꺼진 미션도 거절한다. 목록에서만 빼고 수령을 열어 두면 구 클라가 id 를 직접 보내 받는다.
  * @param {string} missionId 수령 요청한 미션 id
  * @param {MissionState} state 기간 리셋까지 반영한 상태
+ * @param {Array} catalog 이번 요청의 정의 목록
  * @return {MissionClaimVerdict} 판정
  */
-export function judgeMissionClaim(missionId: string, state: MissionState): MissionClaimVerdict {
-  const mission = findMission(missionId);
+export function judgeMissionClaim(
+  missionId: string, state: MissionState, catalog: readonly MissionDef[],
+): MissionClaimVerdict {
+  const mission = findMission(missionId, catalog);
   if (mission === null) {
     return {allow: false, reason: "MissionNotFound", mission: null, progress: 0};
   }
 
-  const progress = progressOf(state, mission);
+  const progress = progressOf(state, mission, catalog);
 
   if (!mission.enabled) {
     return {allow: false, reason: "MissionDisabled", mission, progress};
@@ -53,7 +56,7 @@ export function judgeMissionClaim(missionId: string, state: MissionState): Missi
   if (isClaimed(state, mission.id)) {
     return {allow: false, reason: "AlreadyClaimed", mission, progress};
   }
-  if (mission.period === "guide" && missionCatalog().some((entry) => entry.enabled &&
+  if (mission.period === "guide" && catalog.some((entry) => entry.enabled &&
     entry.period === "guide" && entry.sortOrder < mission.sortOrder && !isClaimed(state, entry.id))) {
     return {allow: false, reason: "NotEligible", mission, progress};
   }

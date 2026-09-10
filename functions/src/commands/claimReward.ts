@@ -10,6 +10,7 @@ import {
   MissionResponse,
 } from "../missions/missionStore";
 import {missionPeriod} from "../missions/period";
+import {readMissionCatalog} from "../missions/missionSpec";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {
@@ -393,7 +394,8 @@ export const claimReward = onCall(async (request) => {
 
   // 랭크는 티어 인덱스를 정규 표기로 되돌려 조회한다 — 클라 RankConfig.FillRewards 가 쓰는 키와 같아야 한다.
   const specOwnerId = ownerType === "Rank" ? String(tierIndex) : ownerId;
-  const rewardRows = parseRewardRows(await readSpecRows(env, "Reward"));
+  const [rawRewardRows, catalog] = await Promise.all([readSpecRows(env, "Reward"), readMissionCatalog(env)]);
+  const rewardRows = parseRewardRows(rawRewardRows);
   const judgement = judgeRewardClaim(rewardRows, ownerType, specOwnerId);
   const {gains, items, dropped} = judgement;
   const itemContext = items.length ? await loadItemGrantContext(env, items) : null;
@@ -476,7 +478,7 @@ export const claimReward = onCall(async (request) => {
       // 진행도를 올리는 것은 이 명령뿐이다 — claimMission 은 ClaimReward 를 올리지 않는다.
       // 올리면 미션 수령이 미션을 낳는 자기참조가 된다.
       commitMissionBump(transaction, missions, EVENTS.rewardClaimed.missionKey, 1, FieldValue.serverTimestamp());
-      missionState = missionResponse(missions.state, period);
+      missionState = missionResponse(missions.state, period, catalog);
 
       if (ownerType === "Rank") {
         claimRankTier(rankState!, tierIndex, context);

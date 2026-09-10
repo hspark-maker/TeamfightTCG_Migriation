@@ -33,14 +33,23 @@ public static class SpecPayloadCodec
     /// <summary>
     /// 매니저에 있지만 <b>일부러</b> 클라로 동기화하지 않는 표. 아래 경고에서 제외한다.
     ///
-    /// <para><c>Mission</c> — 미션 정의의 진실원은 서버다. 클라는 <c>getMissions</c> 응답으로 정의를
-    /// 받아 그리고 사본을 두지 않는다. 여기서 동기화하면 그 사본이 생겨 밸런스 수정이 앱 배포에 묶이고,
-    /// 서버 카탈로그와 갈리는 순간 화면에 보이는 목표와 실제 거절 조건이 달라진다.</para>
+    /// <para><c>Mission</c> — 서버의 발행 인덱스에는 포함하되, 클라는 <c>getMissions</c> 응답으로만
+    /// 정의를 받는다. 클라이언트 동기화 제외가 서버 발행 제외를 뜻하지는 않는다.</para>
     ///
     /// <para>목록으로 거르는 이유는 <see cref="ServerOwnedRewardOwners"/> 와 같다 — 통째로 조용히
     /// 만들면 진짜로 빠뜨린 표까지 묻힌다. 제외는 이름을 적는 의도적 행위여야 한다.</para>
     /// </summary>
-    static readonly string[] IntentionallyUnsynced = { "Mission" };
+    public static readonly string[] ServerOnlyTableNames = { "Mission" };
+
+    /// <summary>서버 발행·롤백 검증 대상. 클라이언트 동기화 목록과 구분한다.</summary>
+    public static IEnumerable<string> PublishedTableNames
+    {
+        get
+        {
+            foreach (string t_table in TableNames) yield return t_table;
+            foreach (string t_table in ServerOnlyTableNames) yield return t_table;
+        }
+    }
 
     /// <summary>
     /// 매니저가 들고 있는데 <see cref="TableNames"/> 에 없는 표를 찾아 알린다.
@@ -59,7 +68,7 @@ public static class SpecPayloadCodec
         if (_manager == null) return;
 
         var t_covered = new HashSet<string>(TableNames, StringComparer.Ordinal);
-        foreach (string t_skip in IntentionallyUnsynced) t_covered.Add(t_skip);
+        foreach (string t_skip in ServerOnlyTableNames) t_covered.Add(t_skip);
 
         foreach (PropertyInfo t_property in _manager.GetType()
                      .GetProperties(BindingFlags.Public | BindingFlags.Instance))
@@ -321,6 +330,7 @@ public static class SpecPayloadCodec
         "Roulette" => typeof(Roulette), "RouletteSlot" => typeof(RouletteSlot),
         "AdventureChapter" => typeof(AdventureChapter),
         "PassSeason" => typeof(PassSeason), "PassLevel" => typeof(PassLevel),
+        "Mission" => typeof(Mission),
         _ => null,
     };
 

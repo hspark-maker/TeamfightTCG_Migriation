@@ -78,7 +78,7 @@ public class AlbumCardSlotView : MonoBehaviour
         if (button != null)
         {
             this.NeutralizeDisabledTint();
-            button.interactable = t_show;
+            button.interactable = _cardId > 0 && !AlbumInsertMask.IsHidden(_cardId);
         }
 
         // 번호는 소유 여부로 끄지 않는다 — 꽂힌 카드가 위에서 덮는 것이 이 구조의 자연스러운 은닉이다.

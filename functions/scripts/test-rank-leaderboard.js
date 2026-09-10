@@ -73,7 +73,7 @@ async function main() {
   await assert.rejects(getRankLeaderboard({data: {env: "live"}}), {code: "unauthenticated"});
   await assert.rejects(getRankLeaderboard({auth: {uid: "me"}, data: {env: "other"}}), {code: "invalid-argument"});
 
-  const {writeRank} = require("../lib/rank/rankStore");
+  const {writeRank, ensureRankState} = require("../lib/rank/rankStore");
   function doc(path) {
     const parts = path.split("/");
     return {path, id: parts.at(-1), parent: {parent: parts.length > 2 ? doc(parts.slice(0, -2).join("/")) : null},
@@ -86,6 +86,111 @@ async function main() {
     assert.deepEqual(writes.map(write => write.path), [`envs/${env}/users/me/rank/current`, `envs/${env}/rankings/me`]);
     assert.deepEqual(writes[1].value, {seasonId: "S1", points: 234, updatedAt: "now"});
   }
+
+  const grades = [100, 500, 900].map((entryPoints, id) =>
+    ({id, entryPoints, pointsPerDivision: 100, winPoints: 20, losePoints: 10}));
+  for (const env of ["live", "test"]) {
+    const rankPath = `envs/${env}/users/me/rank/current`;
+    const payoutPath = `envs/${env}/users/me/payoutState/current`;
+    const savePath = `envs/${env}/users/me/save/current`;
+    const boardPath = `envs/${env}/rankings/me`;
+    const canonical = {schemaVersion: 1, seasonId: "S1", points: 600, bestTierIndex: 5, claimed: {"2": true}};
+    let documents;
+    let writes;
+    let reads;
+    const reset = () => {
+      documents = new Map([
+        [rankPath, {...structuredClone(canonical), updatedAt: "old-rank-time"}],
+        [payoutPath, {currentPoints: 600, sequence: 9, lastMatchId: "prior", updatedAt: "old-payout-time"}],
+        [savePath, {rank: {points: 100, claimedTiers: [0]}}],
+        [boardPath, {seasonId: "S1", points: 600, updatedAt: "old-board-time"}],
+      ]);
+      writes = [];
+      reads = [];
+    };
+    const store = {doc, runTransaction: async run => {
+      const pending = [];
+      const result = await run({
+        getAll: async (...refs) => {
+          assert.equal(pending.length, 0, "all reads precede writes");
+          return refs.map(ref => {
+            reads.push(ref.path);
+            const value = structuredClone(documents.get(ref.path));
+            return {exists: value !== undefined, data: () => value};
+          });
+        },
+        set: (ref, value, options) => pending.push({path: ref.path, value, options}),
+      });
+      for (const write of pending) {
+        documents.set(write.path, write.options?.merge ?
+          {...documents.get(write.path), ...write.value} : write.value);
+      }
+      writes.push(...pending);
+      return result;
+    }};
+    const ensure = (season = "S1") => ensureRankState(store, env, "me", season, grades);
+    const stable = async (season = "S1") => {
+      writes = [];
+      reads = [];
+      const before = new Map(documents);
+      const result = await ensure(season);
+      assert.equal(writes.length, 0, "unchanged rank lookup must not write");
+      assert.deepEqual(documents, before, "no-op must preserve timestamps and compatibility metadata");
+      assert.equal(reads.length, 4, "unchanged rank lookup reads each document exactly once");
+      assert.deepEqual(new Set(reads), new Set([rankPath, payoutPath, savePath, boardPath]));
+      return result;
+    };
+    const repaired = async (season = "S1") => {
+      const result = await ensure(season);
+      assert.deepEqual(writes.map(write => write.path), [rankPath, boardPath, payoutPath]);
+      assert.equal(documents.get(payoutPath).currentPoints, result.points);
+      assert.equal(documents.get(boardPath).points, result.points);
+      assert.equal(documents.get(boardPath).seasonId, season);
+      assert.deepEqual(await stable(season), result, "repair must converge to a read-only lookup");
+      return result;
+    };
+
+    reset();
+    assert.deepEqual(await stable(), {seasonId: "S1", points: 600, bestTierIndex: 5, claimed: {"2": true}});
+    reset();
+    assert.deepEqual(await repaired("S2"), {seasonId: "S2", points: 200, bestTierIndex: 1, claimed: {}});
+    assert.equal(documents.get(payoutPath).sequence, 9, "season reset preserves payout sequencing");
+    reset();
+    documents.delete(rankPath);
+    documents.delete(boardPath);
+    assert.deepEqual(await repaired(), {seasonId: "S1", points: 600, bestTierIndex: 5, claimed: {"0": true}});
+    reset();
+    documents.delete(rankPath);
+    documents.delete(payoutPath);
+    documents.delete(boardPath);
+    assert.equal((await repaired()).points, 100, "first adoption uses legacy save when payout is absent");
+    reset();
+    documents.set(rankPath, {...canonical, points: 0, bestTierIndex: -1, claimed: {}});
+    assert.equal((await repaired()).points, 600, "tutorial entry is adopted before no-op detection");
+    for (const [path, patch] of [
+      [rankPath, {schemaVersion: 0}],
+      [rankPath, {points: "600"}],
+      [rankPath, {bestTierIndex: -1}],
+      [rankPath, {claimed: {"2": true, invalid: true}}],
+      [boardPath, {seasonId: "old"}],
+      [boardPath, {points: 1}],
+      [payoutPath, {currentPoints: 1}],
+    ]) {
+      reset();
+      documents.set(path, {...documents.get(path), ...patch});
+      await repaired();
+    }
+    for (const path of [boardPath, payoutPath]) {
+      reset();
+      documents.delete(path);
+      await repaired();
+    }
+    reset();
+    documents.delete(savePath);
+    assert.equal(await ensure(), null);
+    assert.equal(writes.length, 0, "missing account must not create rank documents");
+  }
+  console.log("rank ensure: no-op 4R/0W, migration, season reset, normalization and projection/rollback repair OK");
   console.log("rank leaderboard: ties, top100, self, env/season, privacy and atomic projection OK");
 }
 main().catch(error => {console.error(error); process.exitCode = 1;});

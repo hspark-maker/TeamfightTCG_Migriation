@@ -747,6 +747,246 @@ MonoBehaviour:
     m_SerializedLabels:
     - Cards
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 18d6c8a5a8314236a26fcffe33a70f45
+    m_Address: Image_Card_BalloonPeng_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2d0e872462214b71bdd9d7318c222008
+    m_Address: Image_Card_Bombbat_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a23defc9ff1540bd82f5692629b83101
+    m_Address: Image_Card_Campbean_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: eda3909ad3e1407aa8b25b3672070389
+    m_Address: Image_Card_CaptainBeak_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c5b332dd3ec34c4d83b4a802814514e1
+    m_Address: Image_Card_Cloudmong_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 92a43a7092814c1a88b72e11a392296e
+    m_Address: Image_Card_Crackmon_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5cb462506492431a88ca3d8c66cff8eb
+    m_Address: Image_Card_Crystahorn_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 662f7a2170de4574b6cda988da42ea60
+    m_Address: Image_Card_Crystalhorn_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: de62fea8b6a936947bcbfce16bdc283b
+    m_Address: Image_Card_DizzyOctopus_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 38f2cb73a0d0ebe498b00529efeeb4b6
+    m_Address: Image_Card_Dreameater_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 54a817eb59b437042a985a55bfc629d9
+    m_Address: Image_Card_Flarelux_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 823d42e887635124aa3f05b0bfc348c6
+    m_Address: Image_Card_Gearmole_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2a30f7425f6c80140a495d9dd9097882
+    m_Address: Image_Card_Honeybee_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 31a2d46c87e640d48987b1ef77563400
+    m_Address: Image_Card_Icekomi_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 24e66237fd96481bbe6f6d447ede7983
+    m_Address: Image_Card_IronMongchi_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 865bc0e6c875487698daa9280dbbaf08
+    m_Address: Image_Card_KingChestnutHedgehog_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 426ebf6861d34d5592a14910d236c9ed
+    m_Address: Image_Card_Lumielk_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6a0d5903d8204b1f829c2271bba756da
+    m_Address: Image_Card_Magmole_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ffb4ce134d5c40d99c5fbed0914814ed
+    m_Address: Image_Card_MagnetCrab_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6b33f1daa0114ca28039afc55ec1bfc8
+    m_Address: Image_Card_Magnetos_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7bf920f8f89b448b907490fb34cee551
+    m_Address: Image_Card_Mapletail_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dc3f2c06844e0414bbd4a4098d26cae4
+    m_Address: Image_Card_Moonbite_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 11d16ed4b93c2da4b87531770daecf66
+    m_Address: Image_Card_MushroomCat_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1a6091c48f72df7469b758a520e074fd
+    m_Address: Image_Card_Nightchestnut_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ec9706caa546cf149b907d82e83467d9
+    m_Address: Image_Card_Phoenixia_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b389b79359477c444894e1450d766566
+    m_Address: Image_Card_Poslamb_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d27117bb773eb6448b971d22158b41c1
+    m_Address: Image_Card_Raigor_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c82f9b97dca649faaf951ae3cf6d137c
+    m_Address: Image_Card_Rockbean_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5757630224154a8fb05d55c9a11c585b
+    m_Address: Image_Card_Sandmong_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d8e3dd0c693d4f788d51a5be513028b4
+    m_Address: Image_Card_SnowballBear_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b740d198b90415c47a9c1a14c648f1c7
+    m_Address: Image_Card_Sparkfin_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a02fd441ce584e00aae96d4a799cccd9
+    m_Address: Image_Card_Startail_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3d1e9cbf313e47aeaa9c55de180c9d29
+    m_Address: Image_Card_Startori_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f47d342de0b644958f90b1a0a9d916de
+    m_Address: Image_Card_Swampfrog_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bdc1b6fa4efa8eb4eb70aa7daf6c3156
+    m_Address: Image_Card_Thunderhorn_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f51b3f932f5cf334198f2066ee238c6b
+    m_Address: Image_Card_Ticktockgon_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3237f43721c32384c9d309d7aa1b9f70
+    m_Address: Image_Card_Waggledodo_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4b431538a646b9b4d98d1f99c37554dd
+    m_Address: Image_Card_WaterdropLong_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9f6f376d7468fde40acf7acee435dc61
+    m_Address: Image_Card_Waveri_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7f0748b1e8e8c164397304a98735edf4
+    m_Address: Image_Card_Woodhorn_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 886280ed4ce95ea4fa7b0c1bf828dbdc, type: 2}
   m_SchemaSet:

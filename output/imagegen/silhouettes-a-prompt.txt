@@ -1,0 +1,6 @@
+Use case: style-transfer. Image 1 = edit target, image 2 = style reference only. Preserve image 1 aspect ratio, composition, size, position, pose, contour and attached equipment. Entire character and equipment solid #20202A; no eyes, interior lines, texture, highlights. Background uniform #B0B0B0. Remove cast shadows, floor, dust, particles and background effects. Crisp edge antialiasing only. No text, symbols, borders, gradients or vignette. Do not copy mushroom cat shape.
+
+Bombbat addition: Remove background tree branch and leaf, retain claws/body/ears/wings/attached fuse; remove sparks.
+Crackmon addition: Preserve attached crystal ears/spikes and attached large rocky crest; remove disconnected floating crystal debris.
+Crackmon result: image generation rejected by output safety system HTTP400 moderation_blocked(other); request ID d1704894-122d-4c3d-998f-5da2a76708ea.
+Dreameater addition: Retain cloud held in mouth as part of silhouette. 12 files generated successfully with built-in image_gen. Crackmon handled by main. DizzyOctopus has faint tentacle overlap lines; main handles ordinary editing per later user authorization.

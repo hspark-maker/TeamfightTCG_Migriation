@@ -784,7 +784,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     void RefreshGrowth(int _card, bool _owned)
     {
         // 진화 관문을 넘은 공개 프레임에 그림도 함께 바뀐다.
-        if (this.cardView != null) this.cardView.RefreshArt(_card);
+        if (this.cardView != null) this.cardView.RefreshArt(_card, _owned: _owned);
 
         // 진짜 바뀐 때만 다시 짓는다 — 아이콘·칩은 Destroy + Instantiate라 통지마다 지으면 매번 새로 짓는다.
         RefreshUnlockVisuals(_card, _owned);
@@ -806,7 +806,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     void RefreshUnlockVisuals(int _card, bool _owned)
     {
         CardKeyword t_trait = _owned ? CardVisualRules.TraitKeywords(_card) : CardKeyword.None;
-        CardKeyword t_info  = _owned ? CardVisualRules.InfoKeywordsWithLocked(_card) : CardKeyword.None;
+        CardKeyword t_info  = CardVisualRules.InfoKeywordsWithLocked(_card);
         bool        t_syn   = _owned && SynergyUnlocked(_card);
 
         bool t_sameCard = _card == this.m_keywordCard;
@@ -1534,7 +1534,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 지금 지은 내용의 기준값 — 카드 전환(Apply)도 이 길을 지나므로 감지가 곧바로 한 번 더 짓지 않는다.
         this.m_keywordCard = _card;
         this.m_shownTrait  = _owned ? CardVisualRules.TraitKeywords(_card) : CardKeyword.None;
-        this.m_shownInfo   = _owned ? CardVisualRules.InfoKeywordsWithLocked(_card) : CardKeyword.None;
+        this.m_shownInfo   = CardVisualRules.InfoKeywordsWithLocked(_card);
 
         // 카드 키워드는 keywordUnlockLevel 하나로 통째로 열린다 → 열린 것이 하나도 없으면 섹션 전체가 잠긴 것이다.
         this.m_shownKeywordLocked = KeywordSectionLocked(_card, _owned);
@@ -1544,11 +1544,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         var t_lines = new List<string>();
         int t_used  = 0;
 
-        if (_owned && this.keywordIconConfig != null && this.keywordChipRoot != null)
+        if (this.keywordIconConfig != null && this.keywordChipRoot != null)
         {
-            // 카드 타일과 달리 해금 전 키워드도 잠김 룩으로 목록에 넣는다 — 앞으로 무엇을 여는지도 읽는 자리다.
+            // 미보유도 효과를 미리 볼 수 있다. 보유 카드에만 실제 성장 단계의 잠김 룩을 적용한다.
             CardKeyword t_all    = CardVisualRules.InfoKeywordsWithLocked(_card);
-            CardKeyword t_locked = CardVisualRules.LockedKeywords(_card);
+            CardKeyword t_locked = _owned ? CardVisualRules.LockedKeywords(_card) : CardKeyword.None;
 
             // 순회 순서 = CardKeyword 선언 순. 카드 타일 아이콘 줄과 같은 순서다.
             foreach (CardKeyword t_kw in (CardKeyword[])Enum.GetValues(typeof(CardKeyword)))
@@ -1570,7 +1570,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         HideChipsFrom(this.keywordChipRoot, t_used);
 
         // 목록은 자동 안내와 같은 생성기(CollectIntros)로 만든다 — 다른 길로 만들면 문구·순서가 조용히 갈라진다.
-        ApplySection(this.keywordSection, this.keywordDescText, t_lines, _owned,
+        ApplySection(this.keywordSection, this.keywordDescText, t_lines, true,
                      IntroClick(_owned && !this.m_shownKeywordLocked
                                 ? CollectIntros(_card, CardVisualRules.InfoKeywords(_card), false)
                                 : null));
@@ -1592,9 +1592,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         var t_lines = new List<string>();
         int t_used  = 0;
 
-        if (_owned && t_synergies.Count > 0 && this.synergyChipRoot != null)
+        if (t_synergies.Count > 0 && this.synergyChipRoot != null)
         {
-            bool t_open = SynergyUnlocked(_card);
+            bool t_open = !_owned || SynergyUnlocked(_card);
 
             var t_seen = new HashSet<SynergyData>();
             foreach (SynergyData t_syn in t_synergies)
@@ -1620,7 +1620,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         HideChipsFrom(this.synergyChipRoot, t_used);
 
-        ApplySection(this.synergySection, this.synergyDescText, t_lines, _owned,
+        ApplySection(this.synergySection, this.synergyDescText, t_lines, true,
                      IntroClick(_owned && this.m_shownSynergyOpen
                                 ? CollectIntros(_card, CardKeyword.None, true)
                                 : null));

@@ -46,10 +46,10 @@ public class CardDecorView
 
     // ── 장식 상태 ──
 
-    // 저작된 첫 아이콘의 자리. **인스펙터에서 옮긴 위치가 곧 첫 칸**이라, 코드가 keywordIconStart로 덮지 않는다
-    // (덮으면 프리팹에서 아무리 옮겨도 실행하는 순간 다른 자리로 튄다). 저작 슬롯이 없을 때만 keywordIconStart를 쓴다.
-    readonly Vector3 iconSlotBase;
-    readonly bool    hasIconSlotBase;
+    // 저작 슬롯은 위치·크기·개수를 그대로 쓴다. 슬롯이 없는 구성에서만 기존 생성 좌표를 쓴다.
+    readonly int keywordSlotCount;
+    readonly SynergyBadgeView[] synergySlots;
+    readonly Vector3[] synergySlotScales;
 
     CardInstance lastBadgeCard;
     SynergyState lastBadgeState;
@@ -90,12 +90,20 @@ public class CardDecorView
         this.synergyBadgeYStep          = _synergyBadgeYStep;
         this.synergyMaxBadges           = _synergyMaxBadges;
 
-        // 첫 Refresh가 자리를 덮기 전에 저작값을 잡아 둔다 — 여기서 놓치면 되돌릴 원본이 없다.
-        if (_keywordIconRoot != null && _keywordIconRoot.childCount > 0)
+        this.keywordSlotCount = _keywordIconRoot != null ? _keywordIconRoot.childCount : 0;
+        var t_slots = new List<SynergyBadgeView>();
+        if (_synergyBadgeRoot != null)
         {
-            this.iconSlotBase    = _keywordIconRoot.GetChild(0).localPosition;
-            this.hasIconSlotBase = true;
+            foreach (Transform t_child in _synergyBadgeRoot)
+            {
+                SynergyBadgeView t_badge = t_child.GetComponent<SynergyBadgeView>();
+                if (t_badge != null) t_slots.Add(t_badge);
+            }
         }
+        this.synergySlots = t_slots.ToArray();
+        this.synergySlotScales = new Vector3[this.synergySlots.Length];
+        for (int t_i = 0; t_i < this.synergySlots.Length; t_i++)
+            this.synergySlotScales[t_i] = this.synergySlots[t_i].transform.localScale;
     }
 
     /// <summary>이 카드에 마지막으로 그려진 확정 시너지 스냅샷(없으면 null). 보유 장수 조회용 — 재계산 금지.
@@ -147,7 +155,7 @@ public class CardDecorView
     /// 매 Refresh마다 파괴·생성하지 않는다. 예전 방식은 프리팹에 저작해 둔 아이콘까지 첫 Refresh에 지워 버려
     /// 인스펙터에서 손본 것이 화면에 남지 않았고, 카드 한 장이 턴마다 오브젝트를 새로 만들었다.
     ///
-    /// 저작 슬롯보다 띄울 아이콘이 많을 때만 프리팹으로 한 번 늘리고, 늘린 것도 다음부터는 재사용한다.</summary>
+    /// 저작 슬롯 수까지만 표시한다. 저작 슬롯이 없는 구성만 프리팹으로 늘린 뒤 재사용한다.</summary>
     void RefreshKeywordIcons(CardInstance _card)
     {
         Transform t_root = this.keywordIconRoot;
@@ -161,22 +169,19 @@ public class CardDecorView
                 : CardVisualRules.CollectKeywordIcons(CardVisualRules.IconKeywords(_card), this.keywordIconConfig);
 
         int t_count = t_icons != null ? t_icons.Count : 0;
+        if (this.keywordSlotCount > 0) t_count = Mathf.Min(t_count, this.keywordSlotCount);
 
-        // 배치는 한 가지. keywordIconRoot(= 배경판의 큰 칸) 기준으로 keywordIconStart에서 시작해
-        // keywordIconStep만큼 밀며 나열한다. 시너지 배지 자리와는 서로 독립이다.
+        // 저작 슬롯은 움직이지 않는다. 자동 생성 구성만 시작 좌표·간격으로 배치한다.
         float t_alpha = CurrentBodyAlpha;
         for (int t_i = 0; t_i < t_count; t_i++)
         {
             GameObject t_obj = SlotAt(t_root, t_i);
             if (t_obj == null) break;   // 저작 슬롯도 없고 프리팹도 미배선 → 더 띄울 자리가 없다
 
-            // 기준점은 저작된 첫 슬롯이다(없을 때만 keywordIconStart). 간격만 코드가 준다.
-            Vector3 t_base = this.hasIconSlotBase
-                ? this.iconSlotBase
-                : new Vector3(this.keywordIconStart.x, this.keywordIconStart.y, 0f);
-            t_obj.transform.localPosition = new Vector3(
-                t_base.x + this.keywordIconStep.x * t_i,
-                t_base.y + this.keywordIconStep.y * t_i, t_base.z);
+            if (this.keywordSlotCount == 0)
+                t_obj.transform.localPosition = new Vector3(
+                    this.keywordIconStart.x + this.keywordIconStep.x * t_i,
+                    this.keywordIconStart.y + this.keywordIconStep.y * t_i, 0f);
 
             // prefab = 배경(루트 SpriteRenderer) + 아이콘(자식 SpriteRenderer). 배경 유지, 자식에만 키워드 스프라이트 주입.
             SpriteRenderer t_iconSr = t_obj.transform.childCount > 0
@@ -313,12 +318,14 @@ public class CardDecorView
     /// 배경판이 못 그릴 배지를 기다리며 시너지 칸을 열어두지 않게.</summary>
     List<SynergyData> CollectVisibleSynergyBadges(CardInstance _card, SynergyState _synergy)
     {
-        if (this.synergyBadgeRoot == null || this.synergyBadgePrefab == null) return new List<SynergyData>();
+        if (this.synergyBadgeRoot == null || (this.synergySlots.Length == 0 && this.synergyBadgePrefab == null)) return new List<SynergyData>();
         if (!TutorialConfig.SynergyVisible)                                   return new List<SynergyData>();
         if (_card == null || !CardCatalog.Contains(_card.cardId) || !_card.isRevealed) return new List<SynergyData>();
         if (!_card.synergyEnabled)                                            return new List<SynergyData>();
 
-        List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(CardCatalog.RequireSynergies(_card.cardId), _synergy, this.synergyMaxBadges);
+        int t_max = this.synergySlots.Length > 0
+            ? Mathf.Min(this.synergyMaxBadges, this.synergySlots.Length) : this.synergyMaxBadges;
+        List<SynergyData> t_tags = CardVisualRules.CollectSynergyBadges(CardCatalog.RequireSynergies(_card.cardId), _synergy, t_max);
         t_tags.RemoveAll(_tag => !CardVisualRules.IsSynergyActive(_synergy, _tag));
         return t_tags;
     }
@@ -335,7 +342,27 @@ public class CardDecorView
         this.lastBadgeCard  = _card;
         this.lastBadgeState = _synergy;
 
-        if (this.synergyBadgeRoot == null || this.synergyBadgePrefab == null) return;
+        if (this.synergyBadgeRoot == null) return;
+
+        if (this.synergySlots.Length > 0)
+        {
+            for (int t_i = 0; t_i < this.synergySlots.Length; t_i++)
+            {
+                SynergyBadgeView t_badge = this.synergySlots[t_i];
+                SynergyData t_tag = t_i < _badges.Count ? _badges[t_i] : null;
+                // 같은 표시가 유지되는 동안은 진행 중인 발동 pop/페이드를 건드리지 않는다.
+                if (t_sameAsBefore && t_badge.Synergy == t_tag && t_badge.gameObject.activeSelf == (t_tag != null)) continue;
+
+                KillTweens(t_badge.gameObject);
+                t_badge.transform.DOKill();
+                t_badge.transform.localScale = this.synergySlotScales[t_i];
+                t_badge.Set(t_tag, _active: t_tag != null);
+                ForceAlpha(t_badge.gameObject, CurrentBodyAlpha);
+            }
+            return;
+        }
+
+        if (this.synergyBadgePrefab == null) return;
 
         // 시너지는 덱 확정이라 전투 중 불변. 같은 카드+같은 SynergyState면 재생성 스킵 →
         // 매 Render(턴 시작 Refresh)마다 배지가 재-Set되어 pop이 반복되는 문제 방지.
@@ -368,14 +395,14 @@ public class CardDecorView
     }
 
     // 시너지 효과가 실제 발동한 순간, 이 카드의 해당 시너지 배지를 pop시킨다(순수 연출, 게임상태/RNG 무관).
-    // synergyBadgeRoot 자식에는 활성 배지만 존재하므로 Synergy 참조 일치 배지를 찾아 PlayPop. null/미발견이면 no-op.
+    // 저작 슬롯 중 표시 중인 Synergy 참조 일치 배지를 찾아 PlayPop. null/미발견이면 no-op.
     public void PopSynergyBadge(SynergyData _synergy)
     {
         if (this.synergyBadgeRoot == null || _synergy == null) return;
         foreach (Transform t_child in this.synergyBadgeRoot)
         {
             SynergyBadgeView t_badge = t_child.GetComponent<SynergyBadgeView>();
-            if (t_badge != null && t_badge.Synergy == _synergy)
+            if (t_badge != null && t_badge.gameObject.activeSelf && t_badge.Synergy == _synergy)
             {
                 t_badge.PlayPop();
                 return;

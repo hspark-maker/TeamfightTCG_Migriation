@@ -1,0 +1,10 @@
+Use case: style-transfer. Asset: locked collectible character card silhouette. Image 1 is the edit target. Image 2 is ONLY the established silhouette color/style reference, do NOT use its shape. Transform image 1 into a clean solid silhouette: keep its original character outline, pose, framing, position, relative scale, and original image aspect ratio exactly. Character and all attached equipment must be one completely flat dark fill #20202A. Remove every eye, face, internal line, pattern, highlight, and shading. Background must be completely flat uniform gray #B0B0B0 edge to edge. Remove cast shadows, ground, dust, detached background effects, textures, gradients, text and symbols. Two flat colors only with smooth antialiased edges. Preserve the distinctive original outer silhouette; do not redesign.
+Per-asset additions:
+Magmole: Remove smoke from the volcano and detached floating stones; retain the volcano physically attached to its back.
+MagnetCrab: Remove electric arcs. Keep the original edge cropping of the shell and claw.
+Moonbite: Remove detached floating crescent moon and floating stars around the character. Fill the entire mouth interior dark together with character, without internal mouth details.
+Phoenixia: Preserve original left and right edge cropping of the large wings and tail.
+Poslamb: Preserve original edge cropping of the wide ears.
+Raigor: Remove all electric arcs. Preserve original edge cropping of wings, paws, tail and attached cloudlike fur.
+Mapletail correction attempted: fill gray spiral-shaped interior stem mark only, retain genuine oval holes. Output moderation blocked (other); first generation retained.
+Mode: built-in image_gen only.

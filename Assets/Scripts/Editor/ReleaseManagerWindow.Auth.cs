@@ -28,7 +28,7 @@ public partial class ReleaseManagerWindow
         Header("관리자 로그인");
         EditorGUILayout.HelpBox(
             "Firestore 운영 규칙이 스펙 쓰기와 전투 재생 설정을 admin 클레임에만 허용한다. " +
-            "이 창의 업로드·토글은 전부 여기서 로그인한 계정으로 나간다. " +
+            "Firestore 업로드·토글은 여기서 로그인한 계정으로 나간다. Google Sheets 연결은 Google Sheet 탭에서 따로 한다. " +
             "비밀번호는 저장하지 않고 토큰은 유니티 세션 동안만 산다.",
             MessageType.Info);
         DrawAdminAuth();

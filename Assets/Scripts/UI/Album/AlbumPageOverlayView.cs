@@ -477,17 +477,18 @@ public class AlbumPageOverlayView : MonoBehaviour
             // 자리 소비는 버튼 유무보다 먼저다 — 미배선 칸에서 건너뛰면 이후 칸의 인덱스가 통째로 밀린다
             int t_orderIndex = t_owned ? t_orderOffset + t_ownedInPage++ : -1;
 
-            // interactable은 건드리지 않는다 — 그 값의 주인은 AlbumCardSlotView.Bind(소유 여부)다.
+            // interactable은 건드리지 않는다 — 그 값의 주인은 AlbumCardSlotView.Bind다.
             // 뒤쪽 버퍼의 입력 차단은 칸마다가 아니라 Grid_Slots_Under의 CanvasGroup이 통째로 맡는다.
             var t_button = t_slot.Button;
             if (t_button == null) continue;
             t_button.onClick.RemoveAllListeners();
-            if (!_interactive || t_orderIndex < 0) continue;
+            if (!_interactive || AlbumInsertMask.IsHidden(t_card)) continue;
 
             t_button.onClick.AddListener(() =>
             {
                 if (IsLocked || m_dragging || m_flipping) return;
-                CardDetailOverlayView.Open(m_order, t_orderIndex);
+                if (t_orderIndex >= 0) CardDetailOverlayView.Open(m_order, t_orderIndex);
+                else CardDetailOverlayView.Open(t_card);
             });
         }
     }

@@ -347,7 +347,8 @@ public class CardView : MonoBehaviour
         else if (this.hpPendingHeal > 0 || (this.hpRollSeq != null && this.hpRollSeq.IsActive()))
             WriteHpDisplay(this.shownHp, this.shownBonusHp);
         else SnapHpDisplay(_card);
-        this.nameText.text = t_isFaceDown ? "???" : _card.spec.DisplayName;
+        if (this.nameText != null)
+            this.nameText.text = t_isFaceDown ? "???" : _card.spec.DisplayName;
 
         // 뒷면이면 덱 뒷면 그림으로 갈아 끼운다 — 앞면 일러스트가 남아 있으면 뒷면 그림 밖으로 비친다.
         Sprite t_art = CardVisualRules.PickBattleArt(_card);

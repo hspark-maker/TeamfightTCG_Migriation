@@ -168,7 +168,7 @@ public class CardVisualView : MonoBehaviour
         // 앞 카드의 강조(물든 색·부푼 배율)가 이 카드 위에 남게 두지 않는다.
         RestoreGrowthFlash();
 
-        RefreshArt(_card, _mine);
+        RefreshArt(_card, _mine, _owned);
 
         // 프레임은 등급 × 시너지 개수로 갈린다(표는 CardFrameConfig 하나). 못 고르면 프리팹 저작 그림을
         // 그대로 두고, 그마저 미배선이면 흰 사각형이 뜨지 않게 렌더러를 끈다.
@@ -197,7 +197,8 @@ public class CardVisualView : MonoBehaviour
         RefreshSynergyBadges(_card, _owned && this.ShowSynergies, _mine);
         RefreshKeywordBg(_card, _owned && this.ShowSynergies, _mine);
 
-        if (this.lockOverlay != null) this.lockOverlay.SetActive(!_owned);
+        if (this.lockOverlay != null)
+            this.lockOverlay.SetActive(!_owned && (this.portrait == null || this.portrait.sprite == null));
     }
 
     /// <summary>강화로 바뀌는 값(최대 체력·레벨)만 다시 그린다. 인자 의미는 <see cref="Bind"/>와 같다.</summary>
@@ -211,13 +212,15 @@ public class CardVisualView : MonoBehaviour
         SetLevelDisplay(_card, _owned && this.ShowLevel, _mine);
     }
 
-    /// <summary>현재 표시 주체의 레벨에 맞는 진화 아트만 다시 그린다.</summary>
-    public void RefreshArt(int _card, bool _mine = true)
+    /// <summary>보유 카드는 진화 아트, 미보유 카드는 전용 실루엣을 다시 그린다.</summary>
+    public void RefreshArt(int _card, bool _mine = true, bool _owned = true)
     {
         if (_card <= 0 || this.portrait == null) return;
 
         // 인스턴스가 있으면 진화 단계도 그 인스턴스의 값이다 — 적 카드에 내 진화 단계를 얹지 않는다.
-        Sprite t_art = this.m_instance != null
+        Sprite t_art = !_owned
+            ? CardVisualRules.PickCardSilhouette(_card)
+            : this.m_instance != null
             ? CardVisualRules.PickBattleArt(this.m_instance)
             : CardVisualRules.PickCardArt(_card, DeckPower.EvolutionStageOf(_card, _mine));
         this.portrait.sprite  = t_art;

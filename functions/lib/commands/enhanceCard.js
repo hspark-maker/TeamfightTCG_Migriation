@@ -43,6 +43,7 @@ const eventNames_1 = require("../analytics/eventNames");
 const analyticsEvent_1 = require("../observability/analyticsEvent");
 const missionStore_1 = require("../missions/missionStore");
 const period_1 = require("../missions/period");
+const missionSpec_1 = require("../missions/missionSpec");
 const saveDocument_1 = require("../save/saveDocument");
 const domainReject_1 = require("../save/domainReject");
 const receiptId_1 = require("../save/receiptId");
@@ -82,9 +83,10 @@ exports.enhanceCard = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError("invalid-argument", "cardId must be a positive integer.");
     }
     // 스펙 읽기는 트랜잭션 밖이다 — 유저 문서와 무관하고, 재실행마다 다시 읽으면 비용만 는다.
-    const [ruleRows, overrideRows] = await Promise.all([
+    const [ruleRows, overrideRows, catalog] = await Promise.all([
         (0, packSpecReader_1.readSpecRows)(env, "CardEnhanceRule"),
         (0, packSpecReader_1.readSpecRows)(env, "CardEnhance"),
+        (0, missionSpec_1.readMissionCatalog)(env),
     ]);
     const rule = (0, enhanceRules_1.parseCardEnhanceRule)(ruleRows);
     if (rule === null) {
@@ -145,7 +147,7 @@ exports.enhanceCard = (0, https_1.onCall)(async (request) => {
         // 서로 다른 진행도를 갖는다. 진행도는 "시도"의 축이다.
         // 이 쓰기는 위 grants 읽기보다 뒤여야 한다(Firestore 트랜잭션 규칙).
         (0, missionStore_1.commitMissionBump)(transaction, missions, eventNames_1.EVENTS.cardEnhanceResolved.missionKey, 1, firestore_1.FieldValue.serverTimestamp());
-        missionState = (0, missionStore_1.missionResponse)(missions.state, period);
+        missionState = (0, missionStore_1.missionResponse)(missions.state, period, catalog);
         return {
             slots: {
                 cardGrowth: (0, cardGrowth_1.growthSlot)(succeeded ? (0, cardGrowth_1.applyEnhanceLevel)(entries, cardId, step.level) : entries),

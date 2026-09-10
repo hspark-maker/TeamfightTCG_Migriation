@@ -12,6 +12,7 @@ import {
   MissionResponse,
 } from "../missions/missionStore";
 import {missionPeriod} from "../missions/period";
+import {readMissionCatalog} from "../missions/missionSpec";
 import {
   isKnownEnv,
   mutateSave,
@@ -82,9 +83,10 @@ export const enhanceCard = onCall(async (request) => {
   }
 
   // 스펙 읽기는 트랜잭션 밖이다 — 유저 문서와 무관하고, 재실행마다 다시 읽으면 비용만 는다.
-  const [ruleRows, overrideRows] = await Promise.all([
+  const [ruleRows, overrideRows, catalog] = await Promise.all([
     readSpecRows(env, "CardEnhanceRule"),
     readSpecRows(env, "CardEnhance"),
+    readMissionCatalog(env),
   ]);
 
   const rule = parseCardEnhanceRule(ruleRows);
@@ -159,7 +161,7 @@ export const enhanceCard = onCall(async (request) => {
       // 서로 다른 진행도를 갖는다. 진행도는 "시도"의 축이다.
       // 이 쓰기는 위 grants 읽기보다 뒤여야 한다(Firestore 트랜잭션 규칙).
       commitMissionBump(transaction, missions, EVENTS.cardEnhanceResolved.missionKey, 1, FieldValue.serverTimestamp());
-      missionState = missionResponse(missions.state, period);
+      missionState = missionResponse(missions.state, period, catalog);
 
       return {
         slots: {

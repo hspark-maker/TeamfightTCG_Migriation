@@ -4,8 +4,12 @@ import {FieldValue} from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
 import {requireUid} from "../save/saveDocument";
 import {enabledMissions} from "../missions/catalog";
+import {readMissionCatalog} from "../missions/missionSpec";
 import {missionPeriod} from "../missions/period";
-import {beginMissionBump, commitMissionBump, progressKey} from "../missions/missionStore";
+import {
+  beginMissionBump, commitMissionBump, DAILY_MISSION_COMPLETION_EVENT, progressKey,
+  WEEKLY_MISSION_COMPLETION_EVENT,
+} from "../missions/missionStore";
 
 /**
  * 디버그 전용: 활성 일일·주간 미션의 진행도를 목표까지 채운다.
@@ -28,6 +32,7 @@ export const devCompleteMissions = onCall(async (request) => {
     );
   }
 
+  const catalog = await readMissionCatalog(env);
   const period = missionPeriod(Date.now());
   const bumped = await db.runTransaction(async (transaction) => {
     const bump = await beginMissionBump(transaction, db, env, uid, period);
@@ -35,8 +40,9 @@ export const devCompleteMissions = onCall(async (request) => {
     // 같은 이벤트를 일일·주간이 공유하므로 이벤트별로 부족량의 최대치를 모은다.
     // commitMissionBump 가 두 축을 같이 올려 한쪽이 목표를 넘칠 수 있지만, 표시는 목표에서 멈춘다.
     const steps = new Map<string, number>();
-    for (const mission of enabledMissions()) {
-      if (mission.period === "guide") continue;
+    for (const mission of enabledMissions(catalog)) {
+      if (mission.period === "guide" || mission.event === DAILY_MISSION_COMPLETION_EVENT ||
+          mission.event === WEEKLY_MISSION_COMPLETION_EVENT) continue;
       const key = progressKey(mission.period, mission.event);
       const needed = mission.target - (bump.state.progress[key] ?? 0);
       if (needed <= 0) continue;

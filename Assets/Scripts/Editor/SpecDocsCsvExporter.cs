@@ -400,7 +400,7 @@ public static class SpecDocsCsvExporter
     }
 
     /// <summary>RFC4180 형태의 CSV를 셀 행렬로 읽는다(따옴표 안의 쉼표·줄바꿈 포함).</summary>
-    static bool TryParseCsv(string _text, out List<List<string>> _matrix)
+    internal static bool TryParseCsv(string _text, out List<List<string>> _matrix)
     {
         _matrix = new List<List<string>>();
         if (_text == null) return false;
@@ -409,6 +409,8 @@ public static class SpecDocsCsvExporter
         var t_row = new List<string>();
         var t_cell = new StringBuilder();
         bool t_quoted = false;
+        bool t_closedQuote = false;
+        bool t_started = false;
 
         for (int i = 0; i < t_text.Length; i++)
         {
@@ -418,25 +420,34 @@ public static class SpecDocsCsvExporter
                 if (t_char != '"') { t_cell.Append(t_char); continue; }
                 if (i + 1 < t_text.Length && t_text[i + 1] == '"') { t_cell.Append('"'); i++; continue; }
                 t_quoted = false;
+                t_closedQuote = true;
                 continue;
             }
 
+            if (t_closedQuote && t_char != ',' && t_char != '\r' && t_char != '\n') return false;
+
             switch (t_char)
             {
-                case '"': t_quoted = true; break;
-                case ',': t_row.Add(t_cell.ToString()); t_cell.Clear(); break;
+                case '"':
+                    if (t_cell.Length > 0 || t_closedQuote) return false;
+                    t_quoted = true; t_started = true; break;
+                case ',':
+                    t_row.Add(t_cell.ToString()); t_cell.Clear(); t_closedQuote = false; t_started = true; break;
                 case '\r': break;
                 case '\n':
                     t_row.Add(t_cell.ToString());
                     t_cell.Clear();
                     _matrix.Add(t_row);
                     t_row = new List<string>();
+                    t_closedQuote = false;
+                    t_started = false;
                     break;
-                default: t_cell.Append(t_char); break;
+                default: t_cell.Append(t_char); t_started = true; break;
             }
         }
 
-        if (t_cell.Length > 0 || t_row.Count > 0)
+        if (t_quoted) return false;
+        if (t_started || t_cell.Length > 0 || t_row.Count > 0)
         {
             t_row.Add(t_cell.ToString());
             _matrix.Add(t_row);

@@ -43,8 +43,11 @@ public class MissionPanel : PooledUIBase
 
     [SerializeField] GameObject weeklyListRoot;
 
-    [Tooltip("행 프리팹. Content 안의 목업 행을 물려도 된다 — 원본은 지우지 않고 숨긴다.")]
-    [SerializeField] MissionRowView rowPrefab;
+    [Tooltip("일일 미션 행 프리팹 에셋.")]
+    [SerializeField] MissionRowView dailyRowPrefab;
+
+    [Tooltip("주간 미션 행 프리팹 에셋.")]
+    [SerializeField] MissionRowView weeklyRowPrefab;
 
     [Tooltip("해당 주기에 미션이 하나도 없을 때 켤 안내. 지금은 활성 미션이 팩 개봉 축뿐이라 자주 빈다.")]
     [SerializeField] GameObject dailyEmptyNotice;
@@ -171,8 +174,8 @@ public class MissionPanel : PooledUIBase
 
     void Rebuild()
     {
-        BuildSection(this.dailyContent, this.m_dailyRows, PERIOD_DAILY, this.dailyEmptyNotice);
-        BuildSection(this.weeklyContent, this.m_weeklyRows, PERIOD_WEEKLY, this.weeklyEmptyNotice);
+        BuildSection(this.dailyContent, this.dailyRowPrefab, this.m_dailyRows, PERIOD_DAILY, this.dailyEmptyNotice);
+        BuildSection(this.weeklyContent, this.weeklyRowPrefab, this.m_weeklyRows, PERIOD_WEEKLY, this.weeklyEmptyNotice);
         this.m_builtSignature = BuildSignature();
         this.ApplyTab();
         this.RefreshClaimAllButton();
@@ -211,31 +214,29 @@ public class MissionPanel : PooledUIBase
         if (this.weeklyTabButton.targetGraphic != null) this.weeklyTabButton.targetGraphic.color = this.m_weeklyTab ? Color.white : this.tabDimColor;
     }
 
-    void BuildSection(Transform _content, List<MissionRowView> _rows, string _period, GameObject _emptyNotice)
+    void BuildSection(Transform _content, MissionRowView _rowPrefab, List<MissionRowView> _rows,
+                      string _period, GameObject _emptyNotice)
     {
         _rows.Clear();
-        if (_content == null || this.rowPrefab == null) return;
+        if (_content == null || _rowPrefab == null) return;
 
         // Destroy 는 프레임 끝에 처리되므로 먼저 비활성화한다 — 레이아웃 계산에서 빠져야 이번 프레임 배치가 맞는다.
-        // rowPrefab 이 Content 안 목업 행으로 배선되는 저작도 허용해야 하므로 원본은 지우지 않고 숨긴다.
-        GameObject t_template = this.rowPrefab.gameObject;
         for (int i = _content.childCount - 1; i >= 0; i--)
         {
             GameObject t_child = _content.GetChild(i).gameObject;
             t_child.SetActive(false);
-            if (t_child != t_template) Destroy(t_child);
+            Destroy(t_child);
         }
 
         IReadOnlyList<MissionDefinition> t_definitions = MissionManager.Definitions;
         for (int i = 0; i < t_definitions.Count; i++)
         {
             MissionDefinition t_definition = t_definitions[i];
-            bool t_guide = _period == PERIOD_DAILY && t_definition.Period == "guide";
-            if (t_guide && (MissionManager.IsClaimed(t_definition.Id) || !MissionManager.IsGuideUnlocked(t_definition))) continue;
-            if (!t_guide && !string.Equals(t_definition.Period, _period, StringComparison.Ordinal)) continue;
+            // 가이드 미션은 전용 화면(GuideMissionPanel)이 그린다 — 여기서는 정확히 해당 주기만.
+            if (!string.Equals(t_definition.Period, _period, StringComparison.Ordinal)) continue;
 
-            MissionRowView t_row = Instantiate(this.rowPrefab, _content);
-            t_row.gameObject.SetActive(true);   // 위에서 원본을 숨겼을 수 있다 — 사본은 항상 보이게.
+            MissionRowView t_row = Instantiate(_rowPrefab, _content);
+            t_row.gameObject.SetActive(true);
             t_row.Bind(t_definition, this.HandleClaim);
             _rows.Add(t_row);
         }
@@ -279,9 +280,8 @@ public class MissionPanel : PooledUIBase
             if (MissionManager.CanClaim(t_definitions[i])) t_ids.Add(t_definitions[i].Id);
         if (t_ids.Count == 0) return;
 
-        // 서버에 일괄 수령 창구가 없어 미션별 왕복을 순차로 돈다. 카드 팝업은 모아서 한 번만 —
-        // 왕복마다 띄우면 수령 n건에 팝업 n장이 겹친다.
-        var t_cards = new List<OpenPackCard>();
+        // 서버에 일괄 수령 창구가 없어 순차 요청하고, 성공한 보상만 모아 한 번 표시한다.
+        var t_results = new List<ClaimMissionResult>();
         ServerWaitOverlay.Hold(this);
         try
         {
@@ -289,7 +289,7 @@ public class MissionPanel : PooledUIBase
             {
                 // 한 건이 거절돼도 나머지는 계속 간다 — 채택은 응답 봉투가 중앙에서 하고, 실패 줄은 화면에 남는다.
                 ClaimMissionResult t_result = await MissionCommands.ClaimAsync(t_ids[i]);
-                if (t_result?.Cards != null) t_cards.AddRange(t_result.Cards);
+                if (t_result != null) t_results.Add(t_result);
             }
         }
         finally
@@ -297,8 +297,7 @@ public class MissionPanel : PooledUIBase
             // 팝업보다 먼저 걷는다 — ClaimAsync 와 같은 계약.
             ServerWaitOverlay.Release(this);
         }
-        if (t_cards.Count > 0 && CardSetRewardOverlay.TryGet(out var t_overlay))
-            t_overlay.ShowGranted(RewardItemDisplay.ToDrawn(t_cards));
+        ShowClaimedRewards(t_results);
     }
 
     // 정의 목록의 신원. id 와 순서가 그대로면 다시 깔 이유가 없다.
@@ -334,8 +333,68 @@ public class MissionPanel : PooledUIBase
             // (PackPurchaseFlow 와 같은 계약 — ServerWaitOverlay 는 자기 캔버스가 없다).
             ServerWaitOverlay.Release(this);
         }
-        if (t_result?.Cards != null && t_result.Cards.Count > 0 && CardSetRewardOverlay.TryGet(out var t_cards))
-            t_cards.ShowGranted(RewardItemDisplay.ToDrawn(t_result.Cards));
+        if (t_result != null) ShowClaimedRewards(new[] { t_result });
+    }
+
+    // GuideMissionPanel 도 같은 보상 표시 경로를 쓴다 — 미션 보상 팝업 조립의 단일 지점.
+    internal static void ShowClaimedRewards(IReadOnlyList<ClaimMissionResult> _results)
+    {
+        if (_results.Count == 0) return;
+
+        var t_bucket = new CurrencyGainBucket();
+        var t_cards = new List<OpenPackCard>();
+        long t_passExp = 0;
+        for (int i = 0; i < _results.Count; i++)
+        {
+            var t_result = _results[i];
+            if (t_result.Granted != null)
+                foreach (var t_gain in t_result.Granted)
+                    if (t_gain != null && CurrencyCode.TryParse(t_gain.Currency, out var t_type))
+                        t_bucket.Add(t_type, t_gain.Amount);
+            if (t_result.Cards != null) t_cards.AddRange(t_result.Cards);
+            t_passExp += t_result.GrantedPassExp;
+        }
+
+        var t_gains = new List<CurrencyGain>();
+        var t_lines = new List<RewardLine>();
+        for (int i = 0; i < (int)ECurrencyType.Count; i++)
+        {
+            var t_type = (ECurrencyType)i;
+            if (t_bucket[t_type] <= 0) continue;
+            var t_gain = new CurrencyGain(t_type, t_bucket[t_type]);
+            t_gains.Add(t_gain);
+            t_lines.Add(new RewardLine(t_gain));
+        }
+
+        var t_drawn = RewardItemDisplay.ToDrawn(t_cards);
+        // 팩도 서버가 개봉한 카드로 응답한다. 여기서는 장수, 다음 카드 화면에서는 개별 결과를 보여 준다.
+        if (t_drawn.Count > 0)
+            t_lines.Add(new RewardLine(new AlbumRewardDef { rewardType = ERewardType.Card, amount = t_drawn.Count }));
+
+        // 이미 지급된 응답이다. 팝업 확인에서는 서버 수령을 다시 호출하지 않는다.
+        var t_outcome = new RewardClaimOutcome(t_gains, t_drawn);
+        if (RewardClaimPopup.TryGet(out var t_popup) && t_popup.RewardSlotCount > 0)
+        {
+            string t_title = t_passExp > 0 ? $"미션 보상 · 패스 경험치 +{t_passExp:N0}" : "미션 보상";
+            ShowRewardPage(t_popup, t_title, t_lines, t_outcome, 0);
+        }
+        else
+            RewardClaimPopup.ClaimWithoutPopup(() => UniTask.FromResult(t_outcome)).Forget();
+    }
+
+    static void ShowRewardPage(RewardClaimPopup _popup, string _title, List<RewardLine> _lines,
+                               RewardClaimOutcome _outcome, int _offset)
+    {
+        int t_count = Math.Min(_popup.RewardSlotCount, _lines.Count - _offset);
+        int t_next = _offset + t_count;
+        bool t_hasNext = t_next < _lines.Count;
+        // 카드 상세는 마지막 페이지를 확인한 뒤에만 연다.
+        var t_pageOutcome = new RewardClaimOutcome(_outcome.Granted, t_hasNext ? null : _outcome.Cards);
+        int t_pages = Math.Max(1, (_lines.Count + _popup.RewardSlotCount - 1) / _popup.RewardSlotCount);
+        string t_title = t_pages > 1 ? $"{_title} ({_offset / _popup.RewardSlotCount + 1}/{t_pages})" : _title;
+        _popup.Show(t_title, _lines.GetRange(_offset, t_count), () => UniTask.FromResult(t_pageOutcome),
+            _claimOnDim: true,
+            _onClosed: t_hasNext ? () => ShowRewardPage(_popup, _title, _lines, _outcome, t_next) : (Action)null);
     }
 
     // 리셋 시각의 진실원은 서버가 준 epoch ms 다. 남은 시간 표시에만 기기 시계를 쓴다 —

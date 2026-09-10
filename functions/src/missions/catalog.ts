@@ -1,6 +1,4 @@
-/** Mission CSV의 서버 번들 사본. prebuild 생성기로 동기화한다. */
-import * as logger from "firebase-functions/logger";
-import {GENERATED_MISSIONS} from "./catalogData";
+/** 발행된 Mission 표의 파싱·검증과 순수 조회. 요청마다 같은 정의 목록을 전달한다. */
 
 /** 미션 주기. 낙인·카운터가 서로 다른 리셋 축을 타므로 값 하나로 뭉치지 않는다. */
 export type MissionPeriodKind = "daily" | "weekly" | "guide";
@@ -41,32 +39,53 @@ export const MISSION_ID_PREFIX: Record<MissionPeriodKind, string> = {
 /** 미션 id 최대 길이. 문서 키로 쓰이므로 상한을 둔다. */
 export const MAX_MISSION_ID_LENGTH = 64;
 
-const CATALOG: MissionDef[] = GENERATED_MISSIONS;
-
 /**
- * 저작된 정의 전부(꺼진 것 포함). 수령 판정이 "없는 미션"과 "꺼진 미션"을 갈라야 해서
- * 꺼진 것도 조회할 수 있어야 한다.
- * @return {Array} 전체 미션 정의(읽기 전용으로 다룬다)
+ * 발행된 Mission 행을 해석한다. 결손·잘못된 저작은 이전 번들로 대체하지 않고 거절한다.
+ * @param {Array} rows 스펙 리더가 읽은 행
+ * @return {Array} 검증된 전체 미션 정의
  */
-export function missionCatalog(): readonly MissionDef[] {
-  return CATALOG;
+export function parseMissionCatalog(rows: readonly Record<string, unknown>[]): MissionDef[] {
+  if (rows.length === 0) throw new Error("Mission spec has no rows.");
+  const integer = (value: unknown): number =>
+    (typeof value === "number" || (typeof value === "string" && value.trim() !== "")) ?
+      Number(value) : Number.NaN;
+  const catalog = rows.map((row): MissionDef => {
+    const enabled = integer(row.enabled);
+    if (enabled !== 0 && enabled !== 1) throw new Error(`Mission '${row.missionId}' has invalid enabled.`);
+    return {
+      id: String(row.missionId ?? ""),
+      period: String(row.period ?? "") as MissionPeriodKind,
+      event: String(row.eventKey ?? ""),
+      target: integer(row.targetCount),
+      title: String(row.title ?? ""),
+      description: String(row.description ?? ""),
+      passExp: integer(row.passExp),
+      sortOrder: integer(row.sortOrder),
+      enabled: enabled === 1,
+    };
+  });
+  const issues = missionCatalogIssues(catalog);
+  if (issues.length > 0) throw new Error(`Invalid Mission spec: ${issues.join("; ")}`);
+  return catalog;
 }
 
 /**
  * 화면에 낼 정의만. 꺼진 미션은 목록에서 빠진다.
+ * @param {Array} catalog 이번 요청의 정의 목록
  * @return {Array} 켜진 미션 정의
  */
-export function enabledMissions(): readonly MissionDef[] {
-  return CATALOG.filter((mission) => mission.enabled);
+export function enabledMissions(catalog: readonly MissionDef[]): readonly MissionDef[] {
+  return catalog.filter((mission) => mission.enabled);
 }
 
 /**
  * id 로 정의 하나를 찾는다. **꺼진 미션도 찾힌다** — 수령 거절 사유를 가르기 위해서다.
  * @param {string} missionId 미션 id
+ * @param {Array} catalog 이번 요청의 정의 목록
  * @return {MissionDef | null} 없으면 null
  */
-export function findMission(missionId: string): MissionDef | null {
-  return CATALOG.find((mission) => mission.id === missionId) ?? null;
+export function findMission(missionId: string, catalog: readonly MissionDef[]): MissionDef | null {
+  return catalog.find((mission) => mission.id === missionId) ?? null;
 }
 
 /**
@@ -74,12 +93,12 @@ export function findMission(missionId: string): MissionDef | null {
  *
  * **모듈 적재 시점에 던지지 않는다** — Cloud Functions 에서 적재 중 예외는 그 인스턴스의
  * 모든 callable 을 죽인다. 미션 저작 실수 하나가 팩 개봉·강화까지 함께 멈추면 안 된다.
- * 대신 테스트가 이 함수를 "비어 있음"으로 강제하고, 시트로 옮긴 뒤에는 파싱 시점 fail-closed 가 된다.
+ * 표를 읽은 요청의 파싱 시점에만 검증한다.
  * @param {Array} catalog 검사할 정의 목록
  * @return {Array} 문제 설명 목록
  */
 export function missionCatalogIssues(
-  catalog: readonly MissionDef[] = CATALOG,
+  catalog: readonly MissionDef[],
 ): string[] {
   const issues: string[] = [];
   const seen = new Set<string>();
@@ -88,7 +107,9 @@ export function missionCatalogIssues(
     if (seen.has(mission.id)) issues.push(`Duplicated mission id: ${mission.id}`);
     seen.add(mission.id);
 
-    if (!mission.id.startsWith(MISSION_ID_PREFIX[mission.period])) {
+    if (!["daily", "weekly", "guide"].includes(mission.period)) {
+      issues.push(`Mission '${mission.id}' has an invalid period.`);
+    } else if (!mission.id.startsWith(MISSION_ID_PREFIX[mission.period])) {
       issues.push(`Mission '${mission.id}' must start with '${MISSION_ID_PREFIX[mission.period]}'.`);
     }
     if (mission.id.length > MAX_MISSION_ID_LENGTH) {
@@ -97,26 +118,18 @@ export function missionCatalogIssues(
     if (mission.event.trim().length === 0) {
       issues.push(`Mission '${mission.id}' has an empty event key.`);
     }
-    if (!Number.isInteger(mission.target) || mission.target <= 0) {
+    if (!Number.isSafeInteger(mission.target) || mission.target <= 0) {
       issues.push(`Mission '${mission.id}' has a non-positive target.`);
     }
     if (mission.title.trim().length === 0 || mission.description.trim().length === 0) {
       issues.push(`Mission '${mission.id}' has empty display text.`);
     }
-    if (!Number.isInteger(mission.passExp) || mission.passExp < 0) {
+    if (!Number.isSafeInteger(mission.passExp) || mission.passExp < 0) {
       issues.push(`Mission '${mission.id}' has an invalid passExp.`);
     }
-    if (!Number.isInteger(mission.sortOrder) || mission.sortOrder <= 0) {
+    if (!Number.isSafeInteger(mission.sortOrder) || mission.sortOrder <= 0) {
       issues.push(`Mission '${mission.id}' has an invalid sortOrder.`);
     }
   }
   return issues;
-}
-
-// 적재 시점 검사. **던지지 않고 로그만 남긴다** — 여기서 throw 하면 미션 저작 실수 하나가
-// 그 인스턴스의 팩 개봉·강화까지 함께 죽인다. 테스트(test-missions.js)가 이 목록을 비어 있음으로
-// 강제하지만, npm test 가 앞선 실패에서 끊기면 그 게이트가 안 돌기 때문에 런타임에도 남긴다.
-{
-  const issues = missionCatalogIssues();
-  if (issues.length > 0) logger.error("mission catalog is misauthored", {issues});
 }
