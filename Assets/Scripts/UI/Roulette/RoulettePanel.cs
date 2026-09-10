@@ -333,8 +333,7 @@ public class RoulettePanel : PooledUIBase
             this.Close();
             await UniTask.Delay(Mathf.CeilToInt(this.transition.CloseDuration * 1000f),
                 DelayType.UnscaledDeltaTime, cancellationToken: this.GetCancellationTokenOnDestroy());
-            if (_outcome.Cards != null && _outcome.Cards.Count > 0 && CardSetRewardOverlay.TryGet(out var t_cards))
-                t_cards.ShowGranted(_outcome.Cards);
+            RewardPackPresentation.Show(new RewardClaimOutcome(_outcome.Granted, _outcome.Cards, _outcome.Packs));
             if (_outcome.Granted != null)
             {
                 var t_bucket = new CurrencyGainBucket();

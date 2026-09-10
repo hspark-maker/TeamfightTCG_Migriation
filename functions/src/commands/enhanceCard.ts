@@ -1,3 +1,4 @@
+import {measuredCallable} from "../observability/requestMetrics";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {randomInt, randomUUID} from "node:crypto";
@@ -13,6 +14,7 @@ import {
 } from "../missions/missionStore";
 import {missionPeriod} from "../missions/period";
 import {readMissionCatalog} from "../missions/missionSpec";
+import {applyGuideProgress, readGuideCards} from "../missions/guideMutation";
 import {
   isKnownEnv,
   mutateSave,
@@ -69,7 +71,7 @@ function reject(reason: EnhanceReject, message: string, context: Record<string, 
  * 무료 한 방은 **비용만 0으로** 만들고 성공률은 건드리지 않으며, 성공했을 때만 소진으로 찍는다
  * — 실패로 닫으면 온보딩이 시킨 성장을 유저가 제 돈으로 다시 해야 한다.
  */
-export const enhanceCard = onCall(async (request) => {
+export const enhanceCard = onCall(measuredCallable("enhanceCard", async (request) => {
   const uid = requireUid(request.auth);
   const env = String(request.data?.env ?? "");
   const cardId = Number(request.data?.cardId ?? 0);
@@ -83,10 +85,11 @@ export const enhanceCard = onCall(async (request) => {
   }
 
   // 스펙 읽기는 트랜잭션 밖이다 — 유저 문서와 무관하고, 재실행마다 다시 읽으면 비용만 는다.
-  const [ruleRows, overrideRows, catalog] = await Promise.all([
+  const [ruleRows, overrideRows, catalog, guideCards] = await Promise.all([
     readSpecRows(env, "CardEnhanceRule"),
     readSpecRows(env, "CardEnhance"),
     readMissionCatalog(env),
+    readGuideCards(env),
   ]);
 
   const rule = parseCardEnhanceRule(ruleRows);
@@ -157,6 +160,11 @@ export const enhanceCard = onCall(async (request) => {
       cost = charged;
       freeShotUsed = succeeded && freeShot !== null;
 
+      const slots = {
+        cardGrowth: growthSlot(succeeded ? applyEnhanceLevel(entries, cardId, step.level) : entries),
+      };
+      applyGuideProgress(missions, current, slots, guideCards, catalog);
+
       // 실패한 강화도 센다 — 재화는 이미 나갔고, 미션이 확률에 좌우되면 같은 횟수를 굴린 두 유저가
       // 서로 다른 진행도를 갖는다. 진행도는 "시도"의 축이다.
       // 이 쓰기는 위 grants 읽기보다 뒤여야 한다(Firestore 트랜잭션 규칙).
@@ -164,9 +172,7 @@ export const enhanceCard = onCall(async (request) => {
       missionState = missionResponse(missions.state, period, catalog);
 
       return {
-        slots: {
-          cardGrowth: growthSlot(succeeded ? applyEnhanceLevel(entries, cardId, step.level) : entries),
-        },
+        slots,
         wallet: nextWallet(wallet, spend(balances, step.currency, charged), "enhanceCard"),
       };
     },
@@ -188,4 +194,4 @@ export const enhanceCard = onCall(async (request) => {
   }
 
   return result;
-});
+}));

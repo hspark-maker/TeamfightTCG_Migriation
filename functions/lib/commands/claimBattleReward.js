@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.claimBattleReward = void 0;
+const requestMetrics_1 = require("../observability/requestMetrics");
 const node_crypto_1 = require("node:crypto");
 const firestore_1 = require("firebase-admin/firestore");
 const https_1 = require("firebase-functions/v2/https");
@@ -168,7 +169,7 @@ function matchGuard(env, uid, matchId, context) {
  * 지급량이 0 이하로 나오면 **아무것도 쓰지 않는다** — 빈 지급으로 지갑 rev 만 올리면
  * 클라가 잔액을 갈아끼우고도 달라진 것이 없어 사고를 못 알아챈다.
  */
-exports.claimBattleReward = (0, https_1.onCall)(async (request) => {
+exports.claimBattleReward = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)("claimBattleReward", async (request) => {
     const uid = (0, saveDocument_1.requireUid)(request.auth);
     const env = String(request.data?.env ?? "");
     const won = request.data?.won === true;
@@ -225,5 +226,5 @@ exports.claimBattleReward = (0, https_1.onCall)(async (request) => {
         });
     }
     return result;
-});
+}));
 //# sourceMappingURL=claimBattleReward.js.map

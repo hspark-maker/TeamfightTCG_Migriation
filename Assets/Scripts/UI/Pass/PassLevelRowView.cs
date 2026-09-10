@@ -30,6 +30,7 @@ public class PassLevelRowView : MonoBehaviour
     [SerializeField] TMP_Text rewardText;
 
     [SerializeField] Button claimButton;
+    [SerializeField] GameObject claimAlertDot;
 
     [SerializeField] TMP_Text claimLabel;
 
@@ -77,6 +78,7 @@ public class PassLevelRowView : MonoBehaviour
         bool t_claimed = PassManager.IsClaimed(this.m_definition.Level);
         bool t_reached = PassManager.Exp >= this.m_definition.RequiredExp;
         bool t_canClaim = PassManager.CanClaim(this.m_definition);
+        if (this.claimAlertDot != null) this.claimAlertDot.SetActive(t_canClaim);
 
         if (this.reachedLevelRoot != null) this.reachedLevelRoot.SetActive(t_reached);
         if (this.lockedLevelRoot != null) this.lockedLevelRoot.SetActive(!t_reached);

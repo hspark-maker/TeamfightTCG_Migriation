@@ -1,3 +1,4 @@
+import {measuredCallable} from "../observability/requestMetrics";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {createHash, randomUUID} from "node:crypto";
@@ -274,7 +275,7 @@ function parseSubmitData(raw: unknown): SubmitData {
 
 
 // 기본 60초로는 재생 왕복(최악 40초) + 트랜잭션 2회를 못 견딘다.
-export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds: 120}, async (request) => {
+export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds: 120}, measuredCallable("submitMatchResult", async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "authentication required");
   const data = parseSubmitData(request.data);
@@ -799,4 +800,4 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
   // 제출은 그대로 다시 보낼 수 있다.
   logger.error("battle_replay_fingerprint_unstable", {matchId: data.matchId, env: data.env});
   throw new HttpsError("unavailable", "battle replay could not be resolved");
-});
+}));

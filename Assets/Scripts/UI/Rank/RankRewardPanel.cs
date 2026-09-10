@@ -174,9 +174,17 @@ public class RankRewardPanel : PooledUIBase
     // 판정·지급·낙인은 서버가 하고 응답 채택 후 매니저의 OnChanged가 RefreshRows를 유발한다.
     // 팝업 닫기는 여기서 하지 않는다 — 팝업이 획득 연출을 태운 뒤 스스로 닫는다.
     // 팝업은 왕복을 기다리지 않으므로, 서버까지 가서 거절당한 수령은 연출이 이미 다 돈 뒤에 잔액으로만 드러난다.
-    UniTask<RewardClaimOutcome> ClaimAsync(int _tierIndex)
+    async UniTask<RewardClaimOutcome> ClaimAsync(int _tierIndex)
     {
-        return RankRewardManager.ClaimAsync(_tierIndex);
+        var t_outcome = await RankRewardManager.ClaimAsync(_tierIndex);
+        if (t_outcome.HasCards && this != null)
+        {
+            // 팩 개봉보다 높은 목록만 걷는다. 공용 보상 팝업의 합산 연출은 계속 재생한다.
+            this.SetVisible(false);
+            LobbyShellBars.DropTopAfter(this, this.transition.CloseDuration);
+            await UniTask.Delay(Mathf.CeilToInt(this.transition.CloseDuration * 1000f), DelayType.UnscaledDeltaTime);
+        }
+        return t_outcome;
     }
 
     // 지정한 행으로 스크롤. 레이아웃이 확정되기 전에 세팅하면 무시되므로 강제 리빌드 후 적용한다.

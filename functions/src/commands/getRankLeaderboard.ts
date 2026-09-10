@@ -1,3 +1,4 @@
+import {measuredCallable, measurePhase, recordMetric} from "../observability/requestMetrics";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import {db} from "../firebaseApp";
 import {parseRankGradeRows} from "../payout";
@@ -8,7 +9,7 @@ import {isKnownEnv, requireUid} from "../save/saveDocument";
 import {readSpecRows} from "../specs/specBlobReader";
 
 /** 환경·시즌별 상위 100명과 내 공동순위. 비공개 세이브 필드는 응답에 포함하지 않는다. */
-export const getRankLeaderboard = onCall(async (request) => {
+export const getRankLeaderboard = onCall(measuredCallable("getRankLeaderboard", async (request) => {
   const uid = requireUid(request.auth);
   const env = String(request.data?.env ?? "");
   if (!isKnownEnv(env)) throw new HttpsError("invalid-argument", "Unknown environment.");
@@ -25,16 +26,21 @@ export const getRankLeaderboard = onCall(async (request) => {
   const minimum = grades[0].entryPoints;
   const board = db.collection(`envs/${env}/rankings`).where("seasonId", "==", season.seasonId);
   const [top, ahead] = await Promise.all([
-    board.where("points", ">=", minimum).orderBy("points", "desc").limit(100).get(),
-    state.points >= minimum ? board.where("points", ">", state.points).orderBy("points", "desc").count().get() : null,
+    measurePhase("leaderboardTop", () => board.where("points", ">=", minimum).orderBy("points", "desc").limit(100).get()),
+    state.points >= minimum ? measurePhase("leaderboardCount", () => {
+      recordMetric("leaderboardCountCalls");
+      return board.where("points", ">", state.points).orderBy("points", "desc").count().get();
+    }) : null,
   ]);
+  recordMetric("leaderboardTopDocuments", top.docs.length);
   const profileById = new Map(top.docs.map((doc) => [doc.id, doc.data().profile as unknown]));
   profileById.set(uid, selfProfile);
   // 아직 프로필이 없는 구 색인만 보완한다. 보정 완료 후 일반 경로의 추가 읽기는 0회다.
   const legacyIds = top.docs.filter((doc) => !hasRankPublicProfile(profileById.get(doc.id))).map((doc) => doc.id);
   if (legacyIds.length > 0) {
-    const profiles = await db.getAll(
-      ...legacyIds.map((id) => db.doc(`envs/${env}/users/${id}/save/current`)), {fieldMask: ["profile"]});
+    const profiles = await measurePhase("leaderboardProfiles", () => db.getAll(
+      ...legacyIds.map((id) => db.doc(`envs/${env}/users/${id}/save/current`)), {fieldMask: ["profile"]}));
+    recordMetric("leaderboardProfileReads", profiles.length);
     legacyIds.forEach((id, index) => profileById.set(id, profiles[index].data()?.profile));
   }
   const entry = (id: string, points: number, rank: number) => {
@@ -56,4 +62,4 @@ export const getRankLeaderboard = onCall(async (request) => {
     entries,
     self: entry(uid, state.points, ahead ? ahead.data().count + 1 : 0),
   };
-});
+}));

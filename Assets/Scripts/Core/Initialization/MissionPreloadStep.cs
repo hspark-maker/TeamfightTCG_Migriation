@@ -16,7 +16,7 @@ public sealed class MissionPreloadStep : MainInitializer
 {
     public override UniTask Initialize(InitializationContext _context)
     {
-        MissionCommands.RefreshAsync().Forget();
+        MissionCommands.RefreshAsync(_force: true).Forget();
         return UniTask.CompletedTask;
     }
 }

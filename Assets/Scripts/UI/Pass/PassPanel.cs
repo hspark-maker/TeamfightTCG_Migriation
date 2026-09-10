@@ -57,6 +57,7 @@ public class PassPanel : PooledUIBase
     [SerializeField] Button closeButton;
 
     [SerializeField] Button claimAllButton;
+    [SerializeField] GameObject claimAllAlertDot;
 
     [Tooltip("패널 밖(딤)을 눌러 닫는 판. 알파 0 Image 의 Button 에 배선한다.")]
     [SerializeField] Button dimButton;
@@ -210,13 +211,9 @@ public class PassPanel : PooledUIBase
             this.expFill.rectTransform.anchorMax = new Vector2(t_fill, 1f);
             this.expFill.gameObject.SetActive(t_fill > 0f);
         }
-        if (this.claimAllButton != null)
-        {
-            bool t_claimable = false;
-            foreach (PassLevelDefinition t_level in PassManager.Levels)
-                t_claimable |= PassManager.CanClaim(t_level);
-            this.claimAllButton.interactable = !this.m_claiming && t_season != null && t_claimable;
-        }
+        bool t_claimable = !this.m_claiming && PassManager.HasAnyClaimable;
+        if (this.claimAllButton != null) this.claimAllButton.interactable = t_claimable;
+        if (this.claimAllAlertDot != null) this.claimAllAlertDot.SetActive(t_claimable);
 
         this.RefreshRemainLabel(t_season);
     }
@@ -306,13 +303,14 @@ public class PassPanel : PooledUIBase
                 finally { ServerWaitOverlay.Release(this); }
                 // 실패 이후 요청을 계속 보내지 않는다. 앞서 성공한 보상은 아래에서 표시한다.
                 if (t_result == null) break;
-                t_rewards.Add(new ClaimMissionResult { Granted = t_result.Granted, Cards = t_result.Cards });
+                t_rewards.Add(new ClaimMissionResult { Granted = t_result.Granted, Cards = t_result.Cards, Packs = t_result.Packs });
             }
         }
         finally
         {
             this.m_claiming = false;
             this.RefreshHeader();
+            if (t_rewards.Exists(t_reward => (t_reward.Cards?.Count ?? 0) > 0)) this.Close();
             if (t_rewards.Count > 0) MissionPanel.ShowClaimedRewards(t_rewards, "패스 보상");
         }
     }

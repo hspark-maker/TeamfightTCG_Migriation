@@ -5,12 +5,16 @@ using UnityEngine;
 /// <summary>서버 미션 봉투의 메모리 진실원. 완료 공식과 수령 낙인 해석은 이곳만 소유한다.</summary>
 internal static class MissionManager
 {
+    const string DAILY_COMPLETION_EVENT = "CompleteDailyMissions";
+    const string WEEKLY_COMPLETION_EVENT = "CompleteWeeklyMissions";
+
     static MissionSnapshot s_snapshot;
     static readonly List<MissionDefinition> s_definitions = new List<MissionDefinition>();
 
     internal static event Action OnChanged;
 
     internal static bool IsReady => s_snapshot != null;
+    internal static long StateVersion { get; private set; }
     internal static IReadOnlyList<MissionDefinition> Definitions => s_definitions;
     internal static string DailyKey => s_snapshot?.DailyKey ?? string.Empty;
     internal static string WeeklyKey => s_snapshot?.WeeklyKey ?? string.Empty;
@@ -24,6 +28,7 @@ internal static class MissionManager
         if (_snapshot == null) return;
         Normalize(_snapshot);
         s_snapshot = _snapshot;
+        unchecked { StateVersion++; }
         NotifyChanged();
     }
 
@@ -33,6 +38,7 @@ internal static class MissionManager
         if (_snapshot == null) return;
         Normalize(_snapshot);
         s_snapshot = _snapshot;
+        unchecked { StateVersion++; }
 
         s_definitions.Clear();
         if (_definitions != null)
@@ -57,11 +63,27 @@ internal static class MissionManager
     internal static long ProgressOf(MissionDefinition _definition)
     {
         if (_definition == null || s_snapshot?.Progress == null) return 0L;
+        if ((_definition.Period == "daily" && _definition.Event == DAILY_COMPLETION_EVENT) ||
+            (_definition.Period == "weekly" && _definition.Event == WEEKLY_COMPLETION_EVENT))
+        {
+            // 서버 completedMissions와 동일: 활성 정의의 일반 미션만 집계하고 수령 여부는 보지 않는다.
+            // 변경 응답의 파생 키가 없거나 오래되어도 최신 일반 카운터로 계산한다.
+            long t_completed = 0L;
+            foreach (var t_mission in s_definitions)
+            {
+                if (t_mission.Period != _definition.Period ||
+                    t_mission.Event == DAILY_COMPLETION_EVENT || t_mission.Event == WEEKLY_COMPLETION_EVENT)
+                    continue;
+                if (ProgressOf(t_mission) >= t_mission.Target) t_completed++;
+            }
+            return t_completed;
+        }
+
         string t_key = ProgressKey(_definition.Period, _definition.Event);
         return s_snapshot.Progress.TryGetValue(t_key, out long t_progress) ? Math.Max(0L, t_progress) : 0L;
     }
 
-    /// <summary>완료 공식의 유일한 구현: progress[period+'.'+event] &gt;= target.</summary>
+    /// <summary>완료 공식의 유일한 구현: 일반 카운터 또는 파생 달성 수가 목표 이상인지 판정한다.</summary>
     internal static bool IsComplete(MissionDefinition _definition)
         => _definition != null && ProgressOf(_definition) >= _definition.Target;
 
@@ -72,6 +94,15 @@ internal static class MissionManager
     internal static bool CanClaim(MissionDefinition _definition)
         => IsComplete(_definition) && !IsClaimed(_definition.Id) && !MissionCommands.IsInFlight(_definition.Id)
            && IsGuideUnlocked(_definition);
+
+    internal static bool HasAnyClaimable(string _period)
+    {
+        foreach (var t_mission in s_definitions)
+            if (t_mission.Period == _period && CanClaim(t_mission)) return true;
+        return false;
+    }
+
+    internal static bool HasAnyRegularClaimable => HasAnyClaimable("daily") || HasAnyClaimable("weekly");
 
     internal static bool IsGuideUnlocked(MissionDefinition _definition)
     {
@@ -97,6 +128,7 @@ internal static class MissionManager
     static void ResetRuntimeState()
     {
         s_snapshot = null;
+        unchecked { StateVersion++; }
         s_definitions.Clear();
         OnChanged = null;
     }

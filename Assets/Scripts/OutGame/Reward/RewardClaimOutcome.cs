@@ -12,11 +12,40 @@ public readonly struct RewardClaimOutcome
     /// <summary>지급 목록. 성사돼도 비어 있을 수 있다(보상 미저작 정점처럼 지급 0건인 수령).</summary>
     public readonly IReadOnlyList<CurrencyGain> Granted;
     public readonly IReadOnlyList<DrawnCard> Cards;
+    public readonly IReadOnlyList<GrantedRewardPack> Packs;
+    // null이면 기존 팩 → 직접 지급 순서. 서버 flat 순서가 있으면 그 순서로 재생한다.
+    public readonly IReadOnlyList<RewardPresentationBatch> PresentationBatches;
+    public bool HasCards => (Cards?.Count ?? 0) > 0 || (Packs?.Count ?? 0) > 0;
 
-    public RewardClaimOutcome(IReadOnlyList<CurrencyGain> _granted, IReadOnlyList<DrawnCard> _cards = null)
+    public RewardClaimOutcome(IReadOnlyList<CurrencyGain> _granted, IReadOnlyList<DrawnCard> _cards = null,
+        IReadOnlyList<GrantedRewardPack> _packs = null,
+        IReadOnlyList<RewardPresentationBatch> _presentationBatches = null)
     {
         Succeeded = true;
         Granted = _granted;
         Cards = _cards;
+        Packs = _packs;
+        PresentationBatches = _presentationBatches;
     }
+}
+
+/// <summary>팩 한 개 또는 연속된 직접 지급 카드 묶음. PackId가 없으면 직접 지급이다.</summary>
+public readonly struct RewardPresentationBatch
+{
+    public readonly string PackId;
+    public readonly IReadOnlyList<DrawnCard> Cards;
+    public bool IsPack => !string.IsNullOrEmpty(PackId);
+
+    public RewardPresentationBatch(IReadOnlyList<DrawnCard> _cards, string _packId = null)
+    {
+        Cards = _cards;
+        PackId = _packId;
+    }
+}
+
+/// <summary>서버에서 지급이 끝난 팩 한 개의 개봉 결과. 화면에서 다시 추첨하지 않는다.</summary>
+public sealed class GrantedRewardPack
+{
+    public string PackId;
+    public List<DrawnCard> Cards;
 }

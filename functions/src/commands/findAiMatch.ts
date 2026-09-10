@@ -1,3 +1,4 @@
+import {measuredCallable} from "../observability/requestMetrics";
 import {FieldValue, Timestamp} from "firebase-admin/firestore";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
@@ -121,7 +122,7 @@ function storedResponse(raw: Record<string, unknown>, data: AuthoredFindAiMatchD
  * 실시간 상대가 없을 때 AI 덱과 재시뮬 입력을 한 매치 문서에 봉인한다.
  * 플레이어 덱의 성장·소유 검증은 이어지는 lockDeck이 같은 matchId에서 수행한다.
  */
-export const findAiMatch = onCall(async (request) => {
+export const findAiMatch = onCall(measuredCallable("findAiMatch", async (request) => {
   const uid = requireUid(request.auth);
   const data = parseData(request.data);
   const [rankRows, deckRows, seasonRows] = await Promise.all([
@@ -229,4 +230,4 @@ export const findAiMatch = onCall(async (request) => {
     logger.error("AI match creation failed", {uid, env: data.env, error});
     throw new HttpsError("failed-precondition", "AI match could not be created.");
   }
-});
+}));

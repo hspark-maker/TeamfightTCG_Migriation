@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 // wallet과 updatedSlots 채택으로 티켓·카드·중복 보상을 함께 반영한다.
 internal sealed class SpinRouletteResult : ServerCommandResult
 {
+    [JsonProperty("packs")] public ClaimRewardPack[] Packs { get; set; }
     // 요청한 판과 같은지 대조하는 용도다. 어긋나도 지갑은 이미 움직였으므로 실패로 접지 않는다.
     [JsonProperty("rouletteId")] public string RouletteId { get; set; }
 

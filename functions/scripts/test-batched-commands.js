@@ -105,7 +105,9 @@ const packMocks = {
   "../packs/packSpecReader": {
     readCardPackRow: async () => ({price: 0, priceType: "Gold", drawCount: 1,
       uniqueDraw: false, minRankGrade: "", refundAmount: 0}),
-    readDropRows: async () => [], readRankGradeRows: async () => [], readSpecRows: async () => [],
+    readDropRows: async () => [], readRankGradeRows: async () => [], readSpecRows: async (_, table) =>
+      table === "CardEnhanceRule" ? [{maxLevel: 4, maxLimitBreak: 1}] :
+        table === "CardLimitBreak" ? [{stage: 1, hpGain: 10, snackCost: 100}] : [],
   },
   "../packs/rankGrade": {
     entryPointsFromRows: () => [0], gradeOf: (_, points) => points,

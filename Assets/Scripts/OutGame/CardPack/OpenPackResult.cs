@@ -24,4 +24,5 @@ internal sealed class OpenPackCard
     [JsonProperty("isNew")] public bool IsNew { get; set; }
 
     [JsonProperty("snack")] public int Snack { get; set; }
+    [JsonProperty("snackGrowth")] public SnackGrowthResult SnackGrowth { get; set; }
 }

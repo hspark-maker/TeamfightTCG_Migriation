@@ -1,4 +1,5 @@
 import {isDeepStrictEqual} from "node:util";
+import {withCountedTransaction} from "../observability/countedTransaction";
 import {publicRankProfile, RankPublicProfile} from "./publicProfile";
 import {
   DocumentReference,
@@ -178,7 +179,7 @@ export async function ensureRankState(
 export async function ensureRankSnapshot(
   db: Firestore, env: string, uid: string, seasonId: string, grades: RankGradeRow[],
 ): Promise<{state: RankState; profile: RankPublicProfile} | null> {
-  return db.runTransaction(async (transaction) => {
+  return withCountedTransaction("ensureRankSnapshot", async (transaction) => {
     const currentRankRef = rankRef(db, env, uid);
     const payoutRef = db.doc(`envs/${env}/users/${uid}/payoutState/current`);
     const saveRef = db.doc(`envs/${env}/users/${uid}/save/current`);
@@ -218,5 +219,5 @@ export async function ensureRankSnapshot(
     // Keep rollback compatibility while payoutState remains deployed.
     transaction.set(payoutRef, {currentPoints: state.points, updatedAt: now}, {merge: true});
     return {state, profile};
-  });
+  }, {}, db);
 }

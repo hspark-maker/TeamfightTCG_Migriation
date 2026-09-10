@@ -116,7 +116,7 @@ public static class CardPackOpener
                 OpenPackCard t_card = t_cards[t_i];
                 if (t_card == null || t_card.CardId <= 0) continue;
 
-                t_drawn.Add(new DrawnCard(t_card.CardId, t_card.IsNew, t_card.Snack));
+                t_drawn.Add(new DrawnCard(t_card.CardId, t_card.IsNew, t_card.Snack, t_card.SnackGrowth));
             }
         }
 

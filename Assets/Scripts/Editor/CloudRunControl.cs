@@ -96,15 +96,17 @@ public static class CloudRunControl
     public static void Describe(string _projectId, Action<Result> _onDone)
     {
         Run($"run services describe {SERVICE} --project {_projectId} --region {REGION} " +
-            "--format \"value(spec.template.metadata.annotations['autoscaling.knative.dev/minScale']," +
-            "status.url,spec.template.spec.containers[0].image)\"",
+            "--format \"value(metadata.annotations['run.googleapis.com/minScale']," +
+            "status.url,spec.template.spec.containers[0].image," +
+            "spec.template.metadata.annotations['autoscaling.knative.dev/minScale'])\"",
             TIMEOUT_SECONDS, null, _onDone);
     }
 
     /// <summary>최소 인스턴스를 바꾼다. 0 이면 유휴 과금이 멈추고 대신 콜드 스타트를 감수한다.</summary>
     public static void SetMinInstances(string _projectId, int _min, Action<Result> _onDone)
     {
-        Run($"run services update {SERVICE} --project {_projectId} --region {REGION} --min {_min}",
+        Run($"run services update {SERVICE} --project {_projectId} --region {REGION} " +
+            $"--scaling auto --min {_min} --min-instances 0 --cpu-throttling",
             TIMEOUT_SECONDS, null, _onDone);
     }
 
@@ -185,28 +187,12 @@ public static class CloudRunControl
         }
     }
 
-    /// <summary>
-    /// 재인증. 브라우저를 띄워야 해서 출력을 가로채지 않고 콘솔 창을 그대로 보여 준다 —
-    /// 리다이렉트하면 gcloud 가 프롬프트를 못 띄우고 그대로 멎는다.
-    /// </summary>
-    public static bool TryOpenLogin(out string _error)
+    /// <summary>브라우저에서 재인증하고 CLI 종료 결과를 에디터에 돌려준다.</summary>
+    public static void Login(Action<Result> _onDone)
     {
-        if (!TryResolve(out string t_gcloud, out _error)) return false;
-        try
-        {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                Arguments = $"/k \"\"{t_gcloud}\" auth login\"",
-                UseShellExecute = true,
-            });
-            return true;
-        }
-        catch (Exception t_exception)
-        {
-            _error = "gcloud auth login 실행 실패: " + t_exception.Message;
-            return false;
-        }
+        // 저장된 계정이 있어도 브라우저 인증을 다시 실행한다. CLI 확인 질문은 생략하되
+        // 브라우저의 계정 선택·동의는 사용자가 직접 마친다. CMD 창을 따로 남기지 않는다.
+        Run("auth login --force --quiet --launch-browser", 600, null, _onDone);
     }
 
     // ── 실행기 ─────────────────────────────────────────────────────────────
@@ -231,7 +217,7 @@ public static class CloudRunControl
             // .cmd 는 CreateProcess 로 직접 못 띄운다. 출력을 가로채려면 UseShellExecute 를 꺼야 하므로
             // cmd.exe 를 한 겹 두른다.
             FileName = "cmd.exe",
-            Arguments = $"/c \"\"{t_gcloud}\" {_arguments}\"",
+            Arguments = $"/d /s /c \"\"{t_gcloud}\" {_arguments}\"",
             UseShellExecute = false,
             CreateNoWindow = true,
             WorkingDirectory = _workingDirectory ?? string.Empty,
@@ -287,8 +273,7 @@ public static class CloudRunControl
             lock (t_err) t_stderr = t_err.ToString().Trim();
             int t_code = t_process.ExitCode;
             bool t_needsLogin = t_stderr.IndexOf("auth login", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                t_stderr.IndexOf("Reauthentication failed", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                t_stderr.IndexOf("do not have permission", StringComparison.OrdinalIgnoreCase) >= 0;
+                                t_stderr.IndexOf("Reauthentication failed", StringComparison.OrdinalIgnoreCase) >= 0;
             Finish(new Result
             {
                 Ok = t_code == 0,
@@ -298,7 +283,8 @@ public static class CloudRunControl
                 NeedsLogin = t_code != 0 && t_needsLogin,
                 Error = t_code == 0 ? null :
                     t_needsLogin
-                        ? "gcloud 인증이 만료됐다. 아래 'gcloud 로그인' 을 눌러 다시 로그인한 뒤 재시도할 것."
+                        ? "gcloud 재인증이 필요합니다. 'gcloud 로그인' 후 브라우저 인증을 완료하십시오.\n" +
+                          Short(t_stderr.Length > 0 ? t_stderr : t_stdout)
                         : $"gcloud 실패 (exit {t_code}):\n{Short(t_stderr.Length > 0 ? t_stderr : t_stdout)}",
             });
         }

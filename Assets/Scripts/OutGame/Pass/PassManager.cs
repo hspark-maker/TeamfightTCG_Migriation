@@ -19,6 +19,16 @@ internal static class PassManager
     /// <summary>활성 시즌이 있는가. 시즌 공백기에는 false다(응답은 왔지만 season 이 null).</summary>
     internal static bool HasSeason => s_snapshot?.Season != null;
 
+    internal static bool HasAnyClaimable
+    {
+        get
+        {
+            foreach (var t_level in Levels)
+                if (CanClaim(t_level)) return true;
+            return false;
+        }
+    }
+
     internal static PassSeasonDefinition Season => s_snapshot?.Season;
     internal static IReadOnlyList<string> PackChoices => (IReadOnlyList<string>)s_snapshot?.PackChoices ?? Array.Empty<string>();
 
@@ -59,8 +69,12 @@ internal static class PassManager
 
     /// <summary>수령 가능한가. 서버가 다시 판정하므로 이 값은 버튼 표시용 낙관 검사다.</summary>
     internal static bool CanClaim(PassLevelDefinition _level)
-        => _level != null && !PassCommands.IsInFlight(_level.Level) &&
+        => HasSeason && _level != null && HasReward(_level) && !PassCommands.IsInFlight(_level.Level) &&
            Exp >= _level.RequiredExp && !IsClaimed(_level.Level);
+
+    static bool HasReward(PassLevelDefinition _level)
+        => (_level.Reward?.Exists(t_gain => t_gain != null && t_gain.Amount > 0) ?? false)
+           || (_level.Items?.Exists(t_item => t_item != null && t_item.Amount > 0) ?? false);
 
     internal static void NotifyCommandStateChanged() => NotifyChanged();
 

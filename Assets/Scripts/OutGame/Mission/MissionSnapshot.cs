@@ -41,6 +41,8 @@ internal sealed class MissionGetResponse
 
 internal sealed class ClaimMissionResult : ServerCommandResult
 {
+    [JsonProperty("pass")] public PassProgress Pass { get; set; }
+    [JsonProperty("packs")] public List<ClaimRewardPack> Packs { get; set; }
     [JsonProperty("cards")] public List<OpenPackCard> Cards { get; set; }
     [JsonProperty("missionId")] public string MissionId { get; set; }
     [JsonProperty("granted")] public List<ClaimRewardGain> Granted { get; set; }

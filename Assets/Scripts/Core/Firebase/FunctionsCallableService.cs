@@ -45,10 +45,10 @@ internal sealed class FunctionsCallableService : ICallableService
             }
             catch (Exception t_exception) when (!t_reauthenticated && IsUnauthenticated(t_exception))
             {
-                // 일시적인 토큰 갱신 실패가 곧장 세션 차단 모달이 되지 않도록 딱 1회만 재인증하고 다시 태운다.
+                // InitializeAsync는 로그인 상태면 즉시 반환한다. 캐시 토큰을 실제로 갱신한 뒤 1회 재시도한다.
                 t_reauthenticated = true;
                 await UniTask.SwitchToMainThread();
-                await FirebaseAuthService.Instance.InitializeAsync();
+                await FirebaseAuthService.Instance.RefreshTokenAsync();
             }
         }
     }

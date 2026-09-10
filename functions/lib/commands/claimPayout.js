@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.claimPayout = void 0;
+const requestMetrics_1 = require("../observability/requestMetrics");
 const node_crypto_1 = require("node:crypto");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
@@ -75,7 +76,7 @@ function readPayoutGain(payout) {
         return null;
     return { currency, amount };
 }
-exports.claimPayout = (0, https_1.onCall)({ enforceAppCheck: false }, async (request) => {
+exports.claimPayout = (0, https_1.onCall)({ enforceAppCheck: false }, (0, requestMetrics_1.measuredCallable)("claimPayout", async (request) => {
     const uid = request.auth?.uid;
     if (!uid)
         throw new https_1.HttpsError("unauthenticated", "authentication required");
@@ -87,7 +88,8 @@ exports.claimPayout = (0, https_1.onCall)({ enforceAppCheck: false }, async (req
         // 그 전제로 firestore.indexes.json 이 save 슬롯 9개 · matches 대형 필드 · payouts 의
         // status 외 필드를 자동 색인에서 뺐다 — 쿼리를 새로 추가하려면 그 파일부터 보고,
         // 면제된 필드로는 where·orderBy 를 걸 수 없다는 것을 전제로 설계해라.
-        const snapshot = await collection.where("status", "==", "ready").limit(20).get();
+        const snapshot = await (0, requestMetrics_1.measurePhase)("payoutList", () => collection.where("status", "==", "ready").limit(20).get());
+        (0, requestMetrics_1.recordMetric)("payoutListDocuments", snapshot.size);
         logger.info("firestore_query_cost", {
             command: "claimPayout.list",
             env: data.env,
@@ -125,10 +127,10 @@ exports.claimPayout = (0, https_1.onCall)({ enforceAppCheck: false }, async (req
     // 보상이 증발하거나, 크레딧만 성공해 무한 재지급이 열린다.
     const result = await (0, countedTransaction_1.withCountedTransaction)("claimPayout", async (tx) => {
         const refs = data.matchIds.map((matchId) => collection.doc(matchId));
-        // Firestore 는 모든 읽기가 모든 쓰기보다 앞서야 한다 — 낙인 대상과 지갑을 먼저 다 읽는다.
+        // Firestore 는 모든 읽기가 모든 쓰기보다 앞서야 한다 — 낙인 대상·지갑·영수증을 함께 읽는다.
         // getAll 로 묶는 이유는 과금이 아니라 체류시간이다. 순차 await 는 문서 수만큼 왕복해
         // 트랜잭션이 길어지고, 길어진 만큼 경합 재시도(= 읽기·쓰기 전부 재실행)를 더 맞는다.
-        const allSnapshots = await tx.getAll(...refs, reference);
+        const allSnapshots = await tx.getAll(...refs, reference, (0, walletStore_1.receiptRef)(reference, receipt.txId));
         const snapshots = allSnapshots.slice(0, refs.length);
         const walletSnapshot = allSnapshots[refs.length];
         if (!walletSnapshot.exists) {
@@ -136,9 +138,8 @@ exports.claimPayout = (0, https_1.onCall)({ enforceAppCheck: false }, async (req
             // 클라가 다시 초기화하는 것이 옳은 조치다(currency/walletTransaction 과 같은 판정).
             throw new https_1.HttpsError("failed-precondition", "Wallet document does not exist. Boot must call ensureWallet first.");
         }
-        // 영수증이 마지막 읽기다 — 아래 낙인(claimed)이 첫 쓰기라 여기보다 뒤로 밀 수 없다.
-        // 히트면 쓰기를 하나도 하지 않고 첫 응답을 그대로 돌려준다.
-        const lookup = (0, walletStore_1.readReceipt)(await tx.get((0, walletStore_1.receiptRef)(reference, receipt.txId)));
+        // 지갑 존재 검증 뒤에 영수증을 해석한다. 히트면 쓰기 없이 첫 응답을 그대로 돌려준다.
+        const lookup = (0, walletStore_1.readReceipt)(allSnapshots[refs.length + 1]);
         if (lookup.hit) {
             if (lookup.source !== "claimPayout") {
                 (0, domainReject_1.rejectDomain)("TxIdReused", `txId '${receipt.txId}' was already used by another command.`, { uid, env: data.env, source: "claimPayout", receiptSource: lookup.source, txId: receipt.txId });
@@ -192,5 +193,5 @@ exports.claimPayout = (0, https_1.onCall)({ enforceAppCheck: false }, async (req
         });
     }
     return result;
-});
+}));
 //# sourceMappingURL=claimPayout.js.map

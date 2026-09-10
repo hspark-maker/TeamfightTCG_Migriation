@@ -46,6 +46,7 @@ public class MissionRowView : MonoBehaviour
     [SerializeField] TMP_Text secondRewardCountText;
 
     [SerializeField] Button claimButton;
+    [SerializeField] GameObject claimAlertDot;
 
     [Header("보상 수령 버튼 배경")]
     [SerializeField] Image claimBackground;
@@ -108,6 +109,7 @@ public class MissionRowView : MonoBehaviour
         bool t_complete = MissionManager.IsComplete(this.m_definition);
         bool t_claimed = MissionManager.IsClaimed(this.m_definition.Id);
         bool t_canClaim = MissionManager.CanClaim(this.m_definition);
+        if (this.claimAlertDot != null) this.claimAlertDot.SetActive(t_canClaim);
         // 요청 중 입력 잠금은 표시 상태와 분리해 배경이 미완료로 깜빡이지 않게 한다.
         bool t_rewardAvailable = t_complete && MissionManager.IsGuideUnlocked(this.m_definition);
 
@@ -266,8 +268,9 @@ public class MissionRowView : MonoBehaviour
                 s_text.Append(CurrencyLabel(t_gain.Currency)).Append(' ').Append(t_gain.Amount);
             }
         }
-        // 패스 경험치는 표시하지 않는다 — 보상 표기는 유저가 받는 실물(재화·아이템)만 말한다.
         RewardItemDisplay.Append(s_text, _definition.Reward.Items);
+        if (s_text.Length == 0 && _definition.Reward.PassExp > 0)
+            s_text.Append("패스 경험치 +").Append(_definition.Reward.PassExp);
         return s_text.ToString();
     }
 

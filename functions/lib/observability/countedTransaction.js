@@ -36,13 +36,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.withCountedTransaction = withCountedTransaction;
 const logger = __importStar(require("firebase-functions/logger"));
 const firebaseApp_1 = require("../firebaseApp");
+const requestMetrics_1 = require("./requestMetrics");
 function createCountedTransaction(raw, attempt, onRead) {
     const proxy = new Proxy(raw, {
         get(target, property) {
             if (property === "get") {
                 return async (...args) => {
                     const method = target.get;
-                    const result = await method.apply(target, args);
+                    (0, requestMetrics_1.recordMetric)("txReadCalls");
+                    const result = await (0, requestMetrics_1.measurePhase)("txRead", () => method.apply(target, args));
                     const querySize = result?.size;
                     const count = typeof querySize === "number" ? Math.max(1, querySize) : 1;
                     attempt.reads += count;
@@ -53,7 +55,8 @@ function createCountedTransaction(raw, attempt, onRead) {
             if (property === "getAll") {
                 return async (...args) => {
                     const method = target.getAll;
-                    const result = await method.apply(target, args);
+                    (0, requestMetrics_1.recordMetric)("txReadCalls");
+                    const result = await (0, requestMetrics_1.measurePhase)("txRead", () => method.apply(target, args));
                     attempt.reads += result.length;
                     onRead(result.length);
                     return result;
@@ -64,6 +67,7 @@ function createCountedTransaction(raw, attempt, onRead) {
                     attempt.writes++;
                     const method = Reflect.get(target, property, target);
                     method.apply(target, args);
+                    (0, requestMetrics_1.recordMetric)("txQueuedWrites");
                     return proxy;
                 };
             }
@@ -83,22 +87,25 @@ function isDomainRejection(error) {
     const code = error?.code;
     return code === "permission-denied" || code === "already-exists";
 }
-async function withCountedTransaction(command, run, extra = {}) {
+async function withCountedTransaction(command, run, extra = {}, firestore = firebaseApp_1.db) {
     const startedAtMs = Date.now();
     let attempts = 0;
     let lastAttempt = { reads: 0, writes: 0 };
     let totalObservedReads = 0;
     try {
-        const result = await firebaseApp_1.db.runTransaction(async (raw) => {
+        const result = await (0, requestMetrics_1.measurePhase)("transaction", () => firestore.runTransaction(async (raw) => {
             attempts++;
+            (0, requestMetrics_1.recordMetric)("txAttempts");
             const attempt = { reads: 0, writes: 0 };
             lastAttempt = attempt;
             const transaction = createCountedTransaction(raw, attempt, (count) => {
                 totalObservedReads += count;
+                (0, requestMetrics_1.recordMetric)("txReadDocuments", count);
             });
             const value = await run(transaction);
             return value;
-        });
+        }));
+        (0, requestMetrics_1.recordMetric)("txCommittedWrites", lastAttempt.writes);
         logger.info("tx_cost", {
             ...extra,
             command,

@@ -2,6 +2,7 @@ export {ping} from "./commands/ping";
 export {devBumpRevision} from "./commands/devBumpRevision";
 export {devResetSave} from "./commands/devResetSave";
 export {devCompleteMissions} from "./commands/devCompleteMissions";
+export {devResetDailyMissions} from "./commands/devResetDailyMissions";
 export {ensureAccount} from "./commands/ensureAccount";
 export {ensureWallet} from "./commands/ensureWallet";
 export {repairSaveSlots} from "./commands/repairSaveSlots";

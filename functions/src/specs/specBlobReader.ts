@@ -16,6 +16,7 @@
 import {createHash} from "node:crypto";
 import * as logger from "firebase-functions/logger";
 import {db} from "../firebaseApp";
+import {measurePhase, recordMetric} from "../observability/requestMetrics";
 
 /** 앱이 해석할 수 있는 콘텐츠 세대. C# ContentVersion.Major 및 앱 버전 첫 자리와 같아야 한다. */
 // content-version:major
@@ -72,7 +73,9 @@ const UNINDEXED_CACHE_TTL_MS = 30 * 1000;
 async function readPublishedSpec(env: string, table: string): Promise<PublishedSpec> {
   let cached = indexCache.get(env);
   if (cached === undefined || cached.expiresAt <= Date.now()) {
-    cached = await loadOnce(indexLoads, env, () => loadPublishedIndex(env));
+    cached = await loadOnce(indexLoads, env, () => loadPublishedIndex(env), "specIndex");
+  } else {
+    recordMetric("specIndexCacheHits");
   }
   const published = cached.tables[table];
   if (published === undefined) throw new Error(`published content index has no ${table} entry`);
@@ -82,7 +85,8 @@ async function readPublishedSpec(env: string, table: string): Promise<PublishedS
 async function loadPublishedIndex(env: string): Promise<IndexCacheEntry> {
   const generation = cacheGeneration;
   const now = Date.now();
-  const snapshot = await db.doc(`envs/${env}/specs/_index`).get();
+  const snapshot = await measurePhase("specIndexRead", () => db.doc(`envs/${env}/specs/_index`).get());
+  recordMetric("specIndexReads");
   if (!snapshot.exists) throw new Error(`published content index is missing for env ${env}`);
   const data = snapshot.data() ?? {};
   const major = Number(data.major);
@@ -114,10 +118,14 @@ async function loadPublishedIndex(env: string): Promise<IndexCacheEntry> {
 
 // 실패한 Promise는 남기지 않는다. clear 뒤 같은 키로 시작한 새 조회도 지우지 않는다.
 async function loadOnce<T>(
-  pending: Map<string, Promise<T>>, key: string, load: () => Promise<T>,
+  pending: Map<string, Promise<T>>, key: string, load: () => Promise<T>, metric: string,
 ): Promise<T> {
   const existing = pending.get(key);
-  if (existing !== undefined) return existing;
+  if (existing !== undefined) {
+    recordMetric(`${metric}SharedLoads`);
+    return measurePhase(`${metric}SharedWait`, () => existing);
+  }
+  recordMetric(`${metric}Loads`);
   const loading = load();
   pending.set(key, loading);
   try {
@@ -246,7 +254,8 @@ export function parseSpecPayload(payload: string): SpecRow[] {
 async function readFromBlob(
   env: string, table: string, blobPath: string, indexHash: string | null
 ): Promise<{rows: SpecRow[], payloadHash: string}> {
-  const snapshot = await db.doc(blobPath).get();
+  const snapshot = await measurePhase("specBlobRead", () => db.doc(blobPath).get());
+  recordMetric("specBlobReads");
   if (!snapshot.exists) {
     throw new Error(`spec blob ${table} document is missing at ${blobPath}`);
   }
@@ -327,6 +336,7 @@ async function readCachedBlob(
     entry !== undefined && (payloadHash === null ? entry.expiresAt !== null && entry.expiresAt > Date.now() :
       entry.expiresAt === null && entry.payloadHash === payloadHash));
   if (cached !== undefined) {
+    recordMetric("specBlobCacheHits");
     cache.set(key, cached);
     return cached.rows;
   }
@@ -346,7 +356,7 @@ async function readCachedBlob(
       env, table, source: payloadHash === null ? "unindexed-blob" : "published-blob", rowCount: rows.length,
     });
     return entry;
-  });
+  }, "specBlob");
   // 같은 조회를 기다린 current/pin 소비자 각각의 캐시에도 검증된 결과를 채운다.
   if (generation === cacheGeneration) cache.set(key, loaded);
   return loaded.rows;

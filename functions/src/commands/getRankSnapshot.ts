@@ -1,3 +1,4 @@
+import {measuredCallable} from "../observability/requestMetrics";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 import {db} from "../firebaseApp";
@@ -14,7 +15,7 @@ import {readSpecRows} from "../specs/specBlobReader";
 const matchTicketSecret = defineSecret("MATCH_TICKET_SECRET");
 
 /** Returns server-owned seasonal rank progress and a signed matchmaking ticket. */
-export const getRankSnapshot = onCall({secrets: [matchTicketSecret]}, async (request) => {
+export const getRankSnapshot = onCall({secrets: [matchTicketSecret]}, measuredCallable("getRankSnapshot", async (request) => {
   const uid = requireUid(request.auth);
   const env = String(request.data?.env ?? "");
   if (!isKnownEnv(env)) throw new HttpsError("invalid-argument", `Unknown env: ${env}`);
@@ -47,4 +48,4 @@ export const getRankSnapshot = onCall({secrets: [matchTicketSecret]}, async (req
       {uid, tier: tierIndex, env, exp: nowSeconds + TICKET_TTL_SECONDS},
       matchTicketSecret.value()) : "",
   };
-});
+}));

@@ -1,3 +1,4 @@
+import {measuredCallable} from "../observability/requestMetrics";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {FieldValue} from "firebase-admin/firestore";
@@ -14,6 +15,7 @@ import {
 } from "../missions/missionStore";
 import {missionPeriod} from "../missions/period";
 import {readMissionCatalog} from "../missions/missionSpec";
+import {applyGuideProgress} from "../missions/guideMutation";
 import {
   isKnownEnv,
   mutateSave,
@@ -24,11 +26,13 @@ import {loadCatalogIds} from "../packs/cardCatalog";
 import {DrawnCard, drawPack, resolveDropPool} from "../packs/packDraw";
 import {buildOwnershipSlot, readOwnedIds} from "../packs/packSlots";
 import {canAfford, spend, grant, CurrencyGain} from "../currency/wallet";
-import {duplicateGains} from "../rewards/itemGrant";
+import {applyDrawnSnackGrowth, duplicateGains} from "../rewards/itemGrant";
 import {parseRewardRows} from "../rewardTable";
 import {rankRef} from "../rank/rankStore";
 import {nextWallet} from "../currency/walletStore";
-import {addSnack, growthSlot, readGrowthEntries} from "../growth/cardGrowth";
+import {growthSlot, readGrowthEntries} from "../growth/cardGrowth";
+import {requireSnackGrowthCurve} from "../growth/snackGrowthSpec";
+import {applySnackGrowthProgress} from "../missions/snackGrowthProgress";
 import {rejectDomain} from "../save/domainReject";
 import {clientReceiptId, isClientReceiptId} from "../save/receiptId";
 import {
@@ -67,7 +71,7 @@ function reject(reason: PackReject, message: string, context: Record<string, unk
  * 클라(CardPackOpener)는 같은 검사를 사전에 한 번 더 하지만 그건 왕복을 아끼는 낙관 검사이고,
  * 판정의 진실원은 여기다.
  */
-export const openPack = onCall(async (request) => {
+export const openPack = onCall(measuredCallable("openPack", async (request) => {
   const uid = requireUid(request.auth);
   const env = String(request.data?.env ?? "");
   const packId = String(request.data?.packId ?? "");
@@ -92,14 +96,17 @@ export const openPack = onCall(async (request) => {
     logger.warn("pack authors a refund that is never paid out", {env, packId, refundAmount: pack.refundAmount});
   }
 
-  const [dropRows, gradeRows, catalogIds, cardRows, rawRewards, catalog] = await Promise.all([
+  const [dropRows, gradeRows, catalogIds, cardRows, rawRewards, catalog, ruleRows, curveRows] = await Promise.all([
     readDropRows(env, packId),
     readRankGradeRows(env),
     loadCatalogIds(env),
     readSpecRows(env, "Card"),
     pack.price > 0 ? readSpecRows(env, "Reward") : Promise.resolve([]),
     readMissionCatalog(env),
+    readSpecRows(env, "CardEnhanceRule"),
+    readSpecRows(env, "CardLimitBreak"),
   ]);
+  const snackGrowthCurve = requireSnackGrowthCurve(ruleRows, curveRows);
   const duplicateRows = parseRewardRows(rawRewards);
   const cardGrades = new Map(cardRows.map((row) => [Number(row.id), String(row.grade)]));
   let granted: CurrencyGain[] = [];
@@ -166,18 +173,20 @@ export const openPack = onCall(async (request) => {
       goldBefore = balances[pack.priceType];
       goldAfter = paid[pack.priceType];
 
+      const slots = {
+        ownership: buildOwnershipSlot(owned, drawn),
+        cardGrowth: growthSlot(applyDrawnSnackGrowth(readGrowthEntries(current.cardGrowth), drawn, snackGrowthCurve)),
+      };
+      applyGuideProgress(missions, current, slots, cardRows, catalog);
+      applySnackGrowthProgress(missions, drawn);
+
       // 진행도는 콜백 **안**에서 올린다 — mutateSave 는 영수증이 히트하면 이 콜백을 통째로 건너뛰므로,
       // 그 덕에 재시도가 진행도를 두 번 올리지 않는다. 콜백 밖으로 옮기면 그 보장이 사라진다.
       commitMissionBump(transaction, missions, EVENTS.packOpened.missionKey, 1, FieldValue.serverTimestamp());
       missionState = missionResponse(missions.state, period, catalog);
 
       return {
-        slots: {
-          ownership: buildOwnershipSlot(owned, drawn),
-          cardGrowth: growthSlot(drawn.reduce(
-            (entries, card) => addSnack(entries, card.cardId, card.snack),
-            readGrowthEntries(current.cardGrowth))),
-        },
+        slots,
         wallet: nextWallet(wallet, paid, "openPack"),
       };
     },
@@ -202,4 +211,4 @@ export const openPack = onCall(async (request) => {
   }
 
   return result;
-});
+}));

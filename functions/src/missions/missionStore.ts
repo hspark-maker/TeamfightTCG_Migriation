@@ -268,7 +268,7 @@ export function missionBumpFromSnapshot(
  * @param {unknown} now 서버 시각(FieldValue.serverTimestamp()) — 호출부가 넘긴다
  * @return {void}
  */
-function write(transaction: Transaction, bump: MissionBump, now: unknown): void {
+export function commitMissionProgress(transaction: Transaction, bump: MissionBump, now: unknown): void {
   transaction.set(bump.ref, {
     schemaVersion: MISSION_SCHEMA_VERSION,
     dailyKey: bump.period.daily,
@@ -278,6 +278,20 @@ function write(transaction: Transaction, bump: MissionBump, now: unknown): void 
     passExp: bump.state.passExp,
     updatedAt: now,
   });
+}
+
+/**
+ * 디버그 초기화: 일일 진행도와 수령 낙인만 비운다. 지급된 보상과 패스 경험치는 유지한다.
+ * @param {Transaction} transaction 진행 중인 트랜잭션
+ * @param {MissionBump} bump 기간 리셋까지 반영한 손잡이
+ * @param {unknown} now 서버 시각
+ */
+export function commitDailyMissionReset(transaction: Transaction, bump: MissionBump, now: unknown): void {
+  bump.state.progress = Object.fromEntries(
+    Object.entries(bump.state.progress).filter(([key]) => !belongsTo(key, "daily")));
+  bump.state.claimed = Object.fromEntries(
+    Object.entries(bump.state.claimed).filter(([key]) => !belongsTo(key, "daily")));
+  commitMissionProgress(transaction, bump, now);
 }
 
 /**
@@ -317,13 +331,23 @@ export function commitMissionBumps(
 ): void {
   if (increments.length === 0) return;
   for (const {event, amount} of increments) {
-    const step = Number.isInteger(amount) && amount > 0 ? amount : 1;
-    for (const kind of ["daily", "weekly"] as const) {
-      const key = progressKey(kind, event);
-      bump.state.progress[key] = Math.min((bump.state.progress[key] ?? 0) + step, COUNTER_MAX);
-    }
+    applyMissionIncrement(bump, event, amount);
   }
-  write(transaction, bump, now);
+  commitMissionProgress(transaction, bump, now);
+}
+
+/**
+ * 기존 미션 쓰기에 함께 실을 이벤트를 누적한다. DB I/O는 하지 않는다.
+ * @param {MissionBump} bump 기간 리셋한 상태
+ * @param {string} event 이벤트 이름
+ * @param {number} amount 증가량
+ */
+export function applyMissionIncrement(bump: MissionBump, event: string, amount: number): void {
+  const step = Number.isInteger(amount) && amount > 0 ? amount : 1;
+  for (const kind of ["daily", "weekly"] as const) {
+    const key = progressKey(kind, event);
+    bump.state.progress[key] = Math.min((bump.state.progress[key] ?? 0) + step, COUNTER_MAX);
+  }
 }
 
 /**
@@ -348,7 +372,7 @@ export function commitMissionClaim(
   // "수령은 됐는데 경험치는 안 붙은" 상태가 저장되지 않는다.
   const gain = Number.isInteger(passExp) && passExp > 0 ? passExp : 0;
   bump.state.passExp = Math.min(bump.state.passExp + gain, PASS_EXP_MAX);
-  write(transaction, bump, now);
+  commitMissionProgress(transaction, bump, now);
 }
 
 /**
