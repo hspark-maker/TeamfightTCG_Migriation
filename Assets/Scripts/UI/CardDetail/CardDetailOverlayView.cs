@@ -165,6 +165,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     /// <summary>지금 이 창이 화면을 덮고 있는가.</summary>
     public static bool IsOpen => s_instance != null && s_instance.gameObject.activeInHierarchy;
+    public static bool IsGrowthPresentationBusy => IsOpen && (s_instance.m_ritualPlaying ||
+        (s_instance.resultPanel != null && s_instance.resultPanel.IsOpen));
 
     /// <summary>지금 해금 연출이 도는 중인가.</summary>
     public static bool IsUnlockFxPlaying => s_instance != null && s_instance.m_unlockFxPlaying;
@@ -437,6 +439,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         this.m_cards = _cards;
         this.m_index = t_index;
+        GrowthGuidanceBridge.BeginCardVisit();
 
         // 곧바로 Apply가 이어지므로 pending은 버린다(중간 카드에 칩을 한 번 더 짓지 않게).
         CancelSlide();
@@ -1008,6 +1011,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         bool t_canPayEnhance = t_hasStep && CurrencyManager.CanAfford(t_step.Currency, t_step.Cost);
         SetActionsEnabled(t_canPayEnhance && !this.m_ritualPlaying && t_unlocked);
+        GrowthGuidanceBridge.ObserveCard(_card, t_actions && t_hasStep && t_unlocked, t_canPayEnhance);
 
         ApplyCost(t_hasStep, t_step);
 

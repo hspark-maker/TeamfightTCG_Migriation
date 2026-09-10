@@ -44,6 +44,8 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 스텝 진입이 오버레이를 열어 ApplyCurrentStep이 자기 자신을 다시 부르는 경로를 막는다(예약 후 재실행).
     bool m_applying;
     bool m_pendingApply;
+    bool m_missionEntryPending;
+    TutorialStepDef m_missionSatisfiedStep;
 
     // 강화 연출이 무대를 쥔 구간. 이 동안의 앵커 재등록은 무시한다 —
     // 진화 연출은 공개 시점에 다음 단계(진화 아님)로 버튼을 갈아끼워 같은 키를 다시 등록하는데,
@@ -73,6 +75,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         OutgameTutorialRunner.EnsureData(data);
         AdventureTutorialBridge.Install(gameObject, gatePrefab);
+        GrowthGuidanceBridge.Install(gameObject, gatePrefab);
     }
 
     void Start()
@@ -98,6 +101,12 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 그 시점엔 이미 다음 스텝으로 커밋된 뒤라 버리면 개봉 대기 스텝이 영영 적용되지 않는다.
     void ApplyCurrentStep()
     {
+        if (GuidanceCoordinator.IsMissionNoticeShowing)
+        {
+            m_missionEntryPending = true;
+            HideGuide();
+            return;
+        }
         if (!OutgameTutorialRunner.IsRunning) return;   // 온보딩이 끝난 뒤엔 게이트를 건드리지 않는다 — 트리거 튜토리얼이 쓰고 있을 수 있다.
 
         // 트리거가 무대를 쥔 동안에는 진입도 표시도 미룬다. 우선순위가 트리거 우선이기도 하지만,
@@ -130,6 +139,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 현재 스텝 1회 진입. 게이트가 필요하면 앵커를 찾아 건다(없으면 등록 대기).
     void ApplyStepOnce()
     {
+        if (GuidanceCoordinator.IsMissionNoticeShowing) { m_missionEntryPending = true; return; }
         // 이전 스텝의 딤·배너를 먼저 내린다 — 새 타깃이 아직 등장 전이면(개봉 연출 중의 획득 버튼 등)
         // 옛 안내가 화면에 남는다.
         CloseGate();
@@ -181,6 +191,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     // (오버레이 닫힘 등)는 다시 오지 않으므로, 상태를 되물어야 진행이 되살아난다.
     void PresentStep()
     {
+        if (GuidanceCoordinator.IsMissionNoticeShowing) return;
         if (m_step == null) return;
 
         // 개봉 대기는 클릭이 아니라 개봉 신호로 완료된다 — 걸 앵커도 없다(개봉 화면의 팩엔 TutorialAnchor가 없다).
@@ -259,7 +270,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_step.Completion == EOutgameTutorialCompletion.Confirm && m_step.Anchor == EOutgameTutorialAnchor.None)
         {
             OutgameTutorialGateUI.Ensure(this.gatePrefab)
-                .ShowMessageGate(this, null, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
+                .ShowMessageGate(this, null, m_step.GuideMessage, OnGateInputSatisfied, m_step.MessageAtBottom, m_step.UseDim);
             return;
         }
 
@@ -277,6 +288,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 타깃이 이미 등록돼 있으면 즉시 게이트, 아니면 등록 통지를 기다린다.
     void TryOpenGate()
     {
+        if (GuidanceCoordinator.IsMissionNoticeShowing) return;
         if (m_step == null || m_step.Anchor == EOutgameTutorialAnchor.None) return;
         if (!TutorialAnchorRegistry.TryGet(m_step.Anchor, out var t_rect, out var t_button)) return;
 
@@ -285,7 +297,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_step.Completion == EOutgameTutorialCompletion.Confirm)
         {
             OutgameTutorialGateUI.Ensure(this.gatePrefab)
-                .ShowMessageGate(this, t_rect, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim, SpotlightRect());
+                .ShowMessageGate(this, t_rect, m_step.GuideMessage, OnGateInputSatisfied, m_step.MessageAtBottom, m_step.UseDim, SpotlightRect());
             return;
         }
 
@@ -296,7 +308,7 @@ public class OutgameTutorialBridge : MonoBehaviour
                             || m_step.Completion == EOutgameTutorialCompletion.DeckEquip
                             || m_step.Completion == EOutgameTutorialCompletion.DeckSave
             ? null
-            : (Action)OnGateSatisfied;
+            : (Action)OnGateInputSatisfied;
 
         // 억제 중에는 게이트가 없다 → 게이트가 대신 걸어주던 클릭 구독을 브리지가 직접 진다.
         if (SuppressGuideUI)
@@ -332,6 +344,7 @@ public class OutgameTutorialBridge : MonoBehaviour
 
     void OnSilentClicked()
     {
+        if (GuidanceCoordinator.IsMissionNoticeShowing) return;
         if (m_silentDone) return;
         m_silentDone = true;
 
@@ -630,8 +643,19 @@ public class OutgameTutorialBridge : MonoBehaviour
     void OnPackOverlayClosed() => ApplyCurrentStep();
 
     // 완료 → 커밋 후 다음 스텝을 같은 씬에서 이어간다(씬을 떠나는 스텝이면 다음 씬 브리지가 재개).
+    void OnGateInputSatisfied()
+    {
+        if (!GuidanceCoordinator.IsMissionNoticeShowing) OnGateSatisfied();
+    }
+
     void OnGateSatisfied()
     {
+        if (m_step == null) return;
+        if (GuidanceCoordinator.IsMissionNoticeShowing)
+        {
+            m_missionSatisfiedStep = m_step;
+            return;
+        }
         bool t_leftScene = m_step != null && m_step.LeavesScene;
 
         OutgameTutorialRunner.NotifyStepSatisfied();
@@ -691,6 +715,12 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (TriggeredTutorialRunner.IsRunning) return;
         if (!OutgameTutorialRunner.IsRunning) return;   // 완주 통지도 이 이벤트로 온다 — 끝난 시퀀스를 되세우지 않는다
 
+        if (m_missionSatisfiedStep != null || m_missionEntryPending)
+        {
+            OnMissionNoticePresentationChanged();
+            return;
+        }
+
         if (m_deferred)
         {
             m_deferred = false;
@@ -701,11 +731,35 @@ public class OutgameTutorialBridge : MonoBehaviour
         PresentStep();
     }
 
+    void OnMissionNoticePresentationChanged()
+    {
+        if (GuidanceCoordinator.IsMissionNoticeShowing) { HideGuide(); return; }
+        if (!OutgameTutorialRunner.IsRunning || StageTakenByTriggered) return;
+
+        var completed = m_missionSatisfiedStep;
+        m_missionSatisfiedStep = null;
+        bool enterPending = m_missionEntryPending;
+        m_missionEntryPending = false;
+        m_deferred = false;
+        if (completed != null && completed == m_step &&
+            OutgameTutorialRunner.TryGetCurrentStep(out var current) && current == completed)
+        {
+            OnGateSatisfied();
+            return;
+        }
+        if (enterPending && (m_step == null ||
+            !OutgameTutorialRunner.TryGetCurrentStep(out var waiting) || waiting != m_step))
+            ApplyCurrentStep();
+        else if (!m_enhancing && !m_awaitingUnlockFx)
+            PresentStep();
+    }
+
     void Subscribe()
     {
         if (m_subscribed) return;
 
         TutorialAnchorRegistry.OnRegistered   += OnAnchorRegistered;
+        GuidanceCoordinator.OnMissionNoticePresentationChanged += OnMissionNoticePresentationChanged;
         TriggeredTutorialRunner.OnChanged     += OnTriggeredChanged;
         PackRevealView.OnAnyPackOpened        += OnPackOpened;
         PackShowcaseController.OnAnyPurchased += OnPurchased;
@@ -734,6 +788,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (!m_subscribed) return;
 
         TutorialAnchorRegistry.OnRegistered   -= OnAnchorRegistered;
+        GuidanceCoordinator.OnMissionNoticePresentationChanged -= OnMissionNoticePresentationChanged;
         TriggeredTutorialRunner.OnChanged     -= OnTriggeredChanged;
         PackRevealView.OnAnyPackOpened        -= OnPackOpened;
         PackShowcaseController.OnAnyPurchased -= OnPurchased;

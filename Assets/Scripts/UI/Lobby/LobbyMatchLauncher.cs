@@ -614,6 +614,23 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (deckPanel != null) lobbyTabController?.Select(deckPanel);
     }
 
+    public void ReturnToRankedLobby()
+    {
+        adventurePanel?.Close();
+        if (matchPanel != null) lobbyTabController?.Select(matchPanel, false);
+    }
+
+    public bool IsAdventurePresentationBusy => adventurePanel != null && adventurePanel.IsPresentationBusy;
+
+    public void OpenAdventureForResource(int nodeIndex)
+    {
+        if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure)) return;
+        if (!AdventureProgress.IsRewardPending(nodeIndex) && !AdventureProgress.CanEnter(nodeIndex)) return;
+        if (matchPanel != null) lobbyTabController?.Select(matchPanel, false);
+        OpenAdventureMap();
+        adventurePanel?.FocusResourceNode(nodeIndex);
+    }
+
     void OpenAdventureMap()
     {
         // 버튼을 죽여 두는 것만으로는 부족하다 — 잠김 표시는 표현 레이어 몫이고, 진입을 실제로 막는 주체는 여기다.

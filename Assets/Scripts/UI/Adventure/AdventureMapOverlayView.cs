@@ -85,6 +85,8 @@ public class AdventureMapOverlayView : MonoBehaviour, IPointerClickHandler
 
     /// <summary>맵이 화면에 떠 있는가.</summary>
     public bool IsOpen => this.gameObject.activeInHierarchy;
+    public bool IsPresentationBusy => this.IsOpen && (this.IsIntroPending || this.m_claimSeq != null);
+    int m_resourceFocus = -1;
 
     // 정점 앵커가 등록돼 있어도 되는 상태 — 켜져 있고 퇴장 중이 아닐 때만.
     bool IsOnStage => this.IsOpen && !this.m_closing;
@@ -191,6 +193,7 @@ public class AdventureMapOverlayView : MonoBehaviour, IPointerClickHandler
 
     void OnDisable()
     {
+        this.m_resourceFocus = -1;
         AdventureProgress.OnChanged -= this.RefreshNodes;
 
         this.AbortClaimSequence();
@@ -649,6 +652,25 @@ public class AdventureMapOverlayView : MonoBehaviour, IPointerClickHandler
 
     // 인덱스 비례가 아니라 정점의 실제 y로 계산한다(저작 자리가 고르지 않아 비례식이 안 맞는다).
     // 생성 직후 프레임은 레이아웃이 서 있지 않아 rect가 0이므로 강제로 갱신한 뒤에 읽는다.
+    public void FocusResourceNode(int index)
+    {
+        if (!this.IsOpen) return;
+        this.m_resourceFocus = index;
+        this.ApplyResourceFocus();
+    }
+
+    void Update() => this.ApplyResourceFocus();
+
+    void ApplyResourceFocus()
+    {
+        if (this.m_resourceFocus < 0 || this.IsPresentationBusy || AdventureRewardFlow.IsClaiming) return;
+        int index = this.m_resourceFocus;
+        this.m_resourceFocus = -1;
+        this.ScrollToNode(index);
+        if (AdventureProgress.IsRewardPending(index) && AdventureProgress.TryGetNode(index, out var node))
+            this.OpenReturnReward(node.nodeId);
+    }
+
     void ScrollToNode(int _index)
     {
         if (_index < 0 || _index >= this.m_nodes.Count) return;
