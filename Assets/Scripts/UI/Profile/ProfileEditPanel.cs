@@ -3,11 +3,12 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
 // 프로필 편집 팝업(아바타·프레임·감정표현·닉네임). 풀(UIPoolManager)이 수명을 쥐고 로비 위에 덮인다.
 //
 // 편집 중에는 드래프트만 바꾸고 저장·닫기·외부 숨김 시 ProfileManager.Apply로 한 번 확정한다.
-public class ProfileEditPanel : PooledUIBase
+public class ProfileEditPanel : PooledUIBase, IPointerClickHandler
 {
     const int TAB_AVATAR = 0;
     const int TAB_FRAME  = 1;
@@ -55,9 +56,9 @@ public class ProfileEditPanel : PooledUIBase
 
     [Header("감정표현")]
     [SerializeField] ScrollRect emoteScroll;
-    [Tooltip("장착 줄(SLOT_COUNT칸)이 들어갈 자리. 누르면 그 슬롯이 '고르는 자리'가 된다.")]
+    [Tooltip("장착 줄(SLOT_COUNT칸). 평상시 탭은 해제, 목록 선택 후 탭은 교체.")]
     [SerializeField] Transform equippedEmoteContent;
-    [Tooltip("풀 전량이 깔리는 자리. 누르면 고른 슬롯에 끼워진다.")]
+    [Tooltip("이모티콘 목록. 첫 빈칸에 장착하고, 가득 차면 교체할 슬롯을 고른다.")]
     [SerializeField] Transform emoteContent;
     [Tooltip("장착 줄과 풀이 함께 쓰는 칸 프리팹.")]
     [SerializeField] EmoteItemCell emoteCellPrefab;
@@ -98,8 +99,9 @@ public class ProfileEditPanel : PooledUIBase
     string m_draftAvatarId;
     string m_draftFrameId;
     string m_draftNickname;
-    // 지금 고르고 있는 장착 칸. 풀에서 누른 감정표현이 이 자리에 들어간다.
-    int m_selectedEmoteSlot;
+    // 만석일 때 목록에서 고른 교체 후보. 0이면 평상시 편집.
+    int m_pendingEmoteId;
+    bool m_dragSwapVisual;
 
     /// <summary>드래프트를 현재 프로필로 리셋하고 팝업을 띄운다.</summary>
     public void Open()
@@ -112,7 +114,7 @@ public class ProfileEditPanel : PooledUIBase
         for (int t_i = 0; t_i < ProfileManager.EmoteIds.Count; t_i++)
             this.m_draftEmoteIds.Add(ProfileManager.EmoteIds[t_i]);
         while (this.m_draftEmoteIds.Count < EmoteCatalog.SLOT_COUNT) this.m_draftEmoteIds.Add(0);
-        this.m_selectedEmoteSlot = 0;
+        this.m_pendingEmoteId = 0;
 
         if (!this.m_built) this.Build();
 
@@ -192,7 +194,7 @@ public class ProfileEditPanel : PooledUIBase
         this.CancelEmoteDrag();
         if (this.m_emoteDrag == null)
             this.m_emoteDrag = this.GetComponent<EmoteEditDragController>() ?? this.gameObject.AddComponent<EmoteEditDragController>();
-        this.m_emoteDrag.Initialize((RectTransform)this.ResolveTarget().transform, this.m_equippedEmoteCells, this.OnEmoteDropped);
+        this.m_emoteDrag.Initialize((RectTransform)this.ResolveTarget().transform, this.m_equippedEmoteCells, this.OnEmoteDropped, this.OnEmoteDragEnded);
         this.m_avatarCells.Clear();
         this.m_frameCells.Clear();
         this.m_equippedEmoteCells.Clear();
@@ -308,17 +310,43 @@ public class ProfileEditPanel : PooledUIBase
         this.RefreshSaveButton();
     }
 
-    // 장착 칸을 눌렀다 — 고르는 자리만 옮긴다. 드래프트는 그대로라 저장 버튼도 움직이지 않는다.
+    // 덱 편집과 동일하게 평상시 해제, 후보를 고른 뒤에는 교체한다.
     void OnEquippedEmoteClicked(int _slot)
     {
-        this.m_selectedEmoteSlot = Mathf.Clamp(_slot, 0, EmoteCatalog.SLOT_COUNT - 1);
+        if (!this.m_sessionOpen || _slot < 0 || _slot >= this.m_draftEmoteIds.Count) return;
+        if (this.m_emoteDrag != null && this.m_emoteDrag.IsDragging) return;
+        if (this.m_pendingEmoteId > 0)
+        {
+            int t_id = this.m_pendingEmoteId;
+            this.CancelEmotePick(true);
+            if (_slot < this.m_equippedEmoteCells.Count && this.m_equippedEmoteCells[_slot] != null)
+            {
+                EmoteItemCell t_cell = this.m_equippedEmoteCells[_slot];
+                RectTransform t_list = this.emoteScroll != null && this.emoteScroll.viewport != null
+                    ? this.emoteScroll.viewport : this.emoteContent as RectTransform;
+                Vector2 t_size = this.m_emoteCells.Count > 0 ? this.m_emoteCells[0].Rect.rect.size : t_cell.Rect.rect.size;
+                this.m_emoteDrag?.FlyOut(t_cell.Sprite, t_cell.Rect, t_list, t_size);
+            }
+            this.AssignEmote(_slot, t_id);
+            if (_slot < this.m_equippedEmoteCells.Count) this.m_equippedEmoteCells[_slot]?.PlayEquipPunch();
+            return;
+        }
+        if (this.m_draftEmoteIds[_slot] == 0) return;
+        this.m_draftEmoteIds[_slot] = 0;
         this.RefreshEmotes();
+        this.RefreshSaveButton();
     }
 
-    // 풀에서 골랐다 — 지금 고르는 자리에 끼운다.
+    // 첫 빈칸 자동 장착. 만석이면 슬롯 선택을 기다린다.
     void OnEmoteClicked(int _id)
     {
-        this.AssignEmote(this.m_selectedEmoteSlot, _id);
+        if (!this.m_sessionOpen || this.m_draftEmoteIds.Contains(_id) || !ProfileManager.IsEmoteOwned(_id)) return;
+        if (this.m_emoteDrag != null && this.m_emoteDrag.IsDragging) return;
+        if (this.m_pendingEmoteId == _id) { this.CancelEmotePick(); return; }
+        int t_empty = this.m_draftEmoteIds.IndexOf(0);
+        if (t_empty >= 0) { this.AssignEmote(t_empty, _id); return; }
+        this.m_pendingEmoteId = _id;
+        this.RefreshEmoteFocus();
     }
 
     void AssignEmote(int _slot, int _id)
@@ -327,10 +355,9 @@ public class ProfileEditPanel : PooledUIBase
         if (t_catalog == null || !t_catalog.TryGet(_id, out _) || !ProfileManager.IsEmoteOwned(_id)) return;
         if (_slot < 0 || _slot >= this.m_draftEmoteIds.Count) return;
 
-        int t_existing = this.m_draftEmoteIds.IndexOf(_id);
-        if (t_existing >= 0) this.m_draftEmoteIds[t_existing] = this.m_draftEmoteIds[_slot];
+        if (this.m_draftEmoteIds.Contains(_id)) return;
         this.m_draftEmoteIds[_slot] = _id;
-        this.m_selectedEmoteSlot = _slot;
+        this.CancelEmotePick(true);
         this.RefreshEmotes();
         this.RefreshSaveButton();
     }
@@ -338,22 +365,57 @@ public class ProfileEditPanel : PooledUIBase
     void OnEmoteDragRequested(EmoteItemCell _cell, UnityEngine.EventSystems.PointerEventData _pointer)
     {
         if (!this.m_sessionOpen || this.m_currentTab != TAB_EMOTE) return;
+        if (_cell == null || _cell.IsSlot || this.m_draftEmoteIds.Contains(_cell.EmoteId) || !ProfileManager.IsEmoteOwned(_cell.EmoteId)) return;
+        this.CancelEmotePick(true);
         this.m_emoteDrag.Begin(_cell, _pointer, this.emoteScroll);
+        this.m_dragSwapVisual = this.m_emoteDrag.IsDragging && !this.m_draftEmoteIds.Contains(0);
+        this.RefreshEmoteFocus();
     }
 
     void OnEmoteDropped(int _slot, int _id, int _sourceSlot)
     {
         if (!this.m_sessionOpen || this.m_currentTab != TAB_EMOTE) return;
-        if (_sourceSlot >= 0 && (_sourceSlot >= this.m_draftEmoteIds.Count || this.m_draftEmoteIds[_sourceSlot] != _id)) return;
+        if (_sourceSlot >= 0) return;
         this.AssignEmote(_slot, _id);
     }
 
     void CancelEmoteDrag()
     {
         if (this.m_emoteDrag != null) this.m_emoteDrag.Cancel();
+        this.m_dragSwapVisual = false;
+        this.CancelEmotePick(true);
         foreach (EmoteItemCell t_cell in this.m_equippedEmoteCells) if (t_cell != null) t_cell.CancelGesture();
         foreach (EmoteItemCell t_cell in this.m_emoteCells) if (t_cell != null) t_cell.CancelGesture();
     }
+
+    void OnEmoteDragEnded()
+    {
+        this.m_dragSwapVisual = false;
+        this.RefreshEmoteFocus(true);
+    }
+
+    void CancelEmotePick(bool _instant = false)
+    {
+        this.m_pendingEmoteId = 0;
+        this.RefreshEmoteFocus(_instant);
+    }
+
+    void RefreshEmoteFocus(bool _instant = false)
+    {
+        bool t_picking = this.m_pendingEmoteId > 0;
+        foreach (EmoteItemCell t_cell in this.m_equippedEmoteCells)
+            if (t_cell != null) t_cell.SetSwapTarget(t_picking || this.m_dragSwapVisual, _instant);
+        foreach (EmoteItemCell t_cell in this.m_emoteCells)
+            if (t_cell != null) t_cell.SetFocus(t_picking, t_cell.Key == this.m_pendingEmoteId);
+    }
+
+    public void OnPointerClick(PointerEventData _pointer)
+    {
+        if (_pointer != null && _pointer.button != PointerEventData.InputButton.Left) return;
+        if (this.m_currentTab == TAB_EMOTE) this.CancelEmotePick();
+    }
+
+    void OnApplicationFocus(bool _focused) { if (!_focused) this.CancelEmoteDrag(); }
 
     void OnNicknameChanged(string _value)
     {
@@ -490,8 +552,7 @@ public class ProfileEditPanel : PooledUIBase
         this.RefreshEmotes();
     }
 
-    // 장착 줄과 풀의 표시를 드래프트 기준으로 다시 그린다. 풀의 선택 배지는 "고른 슬롯에 끼워진 것"을
-    // 가리키므로 슬롯을 옮기면 배지도 따라 옮겨간다.
+    // 장착 상태를 드래프트에서 재생성한 뒤 교체 후보 강조를 적용한다.
     void RefreshEmotes()
     {
         EmoteCatalog t_catalog = ProfileManager.EmoteCatalog;
@@ -504,19 +565,15 @@ public class ProfileEditPanel : PooledUIBase
             EmoteItemCell t_cell = this.m_equippedEmoteCells[t_i];
             if (t_cell == null) continue;
             t_cell.BindSlot(t_i, t_entry, this.OnEquippedEmoteClicked);
-            t_cell.SetSelected(t_i == this.m_selectedEmoteSlot);
         }
 
-        int t_selectedId = this.m_selectedEmoteSlot >= 0 && this.m_selectedEmoteSlot < this.m_draftEmoteIds.Count
-            ? this.m_draftEmoteIds[this.m_selectedEmoteSlot]
-            : 0;
         for (int t_i = 0; t_i < this.m_emoteCells.Count; t_i++)
         {
             EmoteItemCell t_cell = this.m_emoteCells[t_i];
             if (t_cell == null) continue;
-            t_cell.SetSelected(t_cell.Key == t_selectedId);
             t_cell.SetEquipped(this.m_draftEmoteIds.Contains(t_cell.Key));
         }
+        this.RefreshEmoteFocus(true);
     }
 
     // 미리보기 줄만 즉시 반영한다 — 팝업 밖(로비 버튼 등)은 저장 전까지 예전 값 그대로다.

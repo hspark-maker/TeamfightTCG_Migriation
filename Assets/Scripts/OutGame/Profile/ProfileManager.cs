@@ -93,7 +93,7 @@ public static class ProfileManager
         Nickname = RestoreNickname(t_slot.Nickname);
         AvatarId = IsKnownAvatar(t_slot.AvatarId) ? t_slot.AvatarId : DefaultAvatarId;
         FrameId  = IsKnownFrame(t_slot.FrameId)   ? t_slot.FrameId  : DefaultFrameId;
-        s_emoteIds = BuildLoadout(t_slot.EmoteIds);
+        s_emoteIds = t_slot.EmoteIds == null ? BuildDefaultLoadout() : BuildLoadout(t_slot.EmoteIds);
 
         // 로비는 세이브 의존 설치보다 먼저 그려진다 — 통지가 없으면 프로필 버튼이 기본값으로 굳는다.
         // 초기화 한복판이라 구독자 예외를 여기서 흘리면 나머지 설치가 통째로 중단된다.
@@ -173,8 +173,7 @@ public static class ProfileManager
 
     static bool IsKnownFrame(string _id) => Config != null && Config.TryGetFrame(_id, out _);
 
-    // 유효한 첫 등장과 슬롯 위치를 먼저 보존한다. 그 뒤 빈 칸만 풀의 미사용 ID로 채워야
-    // 앞쪽의 누락 칸이 뒤쪽에 저장된 ID를 먼저 가져가 순서를 바꾸는 일이 없다.
+    // 0은 사용자가 비운 칸이다. 유효한 첫 등장과 위치만 보존하고 자동으로 채우지 않는다.
     static List<int> BuildLoadout(IReadOnlyList<int> _source)
     {
         var t_result = new List<int>(global::EmoteCatalog.SLOT_COUNT);
@@ -188,6 +187,14 @@ public static class ProfileManager
             t_result.Add(t_id);
         }
 
+        return t_result;
+    }
+
+    // 장착 기록이 없는 계정에만 기본 구성을 준다. 명시적으로 저장한 빈 배열과 구분한다.
+    static List<int> BuildDefaultLoadout()
+    {
+        List<int> t_result = BuildLoadout(null);
+        var t_used = new HashSet<int>();
         int t_poolIndex = 0;
         for (int t_i = 0; t_i < t_result.Count; t_i++)
         {
