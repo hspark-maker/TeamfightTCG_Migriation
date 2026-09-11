@@ -17,8 +17,11 @@ public static class AdventureTutorialValidation
 
         OutgameTutorialChapter chapter = null;
         for (int i = 0; i < data.chapters.Count; i++)
-            if (data.chapters[i] != null && data.chapters[i].Trigger == EOutgameTutorialTrigger.AdventureMapFirstOpen) chapter = data.chapters[i];
-        Require(chapter != null && chapter.IsGuided, "Adventure introduction chapter (guided, AdventureMapFirstOpen) is missing");
+            if (data.chapters[i] != null && data.chapters[i].Trigger == EOutgameTutorialTrigger.AdventureUnlocked) chapter = data.chapters[i];
+        if (chapter == null)
+            for (int i = 0; i < data.chapters.Count; i++)
+                if (data.chapters[i] != null && data.chapters[i].Trigger == EOutgameTutorialTrigger.AdventureMapFirstOpen) chapter = data.chapters[i];
+        Require(chapter != null && chapter.IsGuided, "Adventure introduction chapter (guided, AdventureUnlocked or AdventureMapFirstOpen) is missing");
         const int oldChapter = 5;
 
         // v0 — 옛 온보딩의 모험 도입 챕터 도중이던 세이브: 해금은 되찾되 낙인은 없다(자율 챕터가 다시 부른다).

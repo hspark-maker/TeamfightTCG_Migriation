@@ -24,6 +24,7 @@ public static class TutorialStepExecutor
         {
             case EOutgameTutorialAction.WaitClick:
             case EOutgameTutorialAction.Message:
+            case EOutgameTutorialAction.ContentUnlockIntro:
             case EOutgameTutorialAction.WaitPurchase:
             case EOutgameTutorialAction.WaitPackOpen:
             case EOutgameTutorialAction.DeckAutoEquip:

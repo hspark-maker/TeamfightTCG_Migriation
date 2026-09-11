@@ -127,6 +127,11 @@ public class TutorialStepDef
            + "다른 액션은 실패해도 이 값을 보지 않는다")]
     [SerializeField] EOutgameTutorialFailure onFailure;
 
+    [Tooltip("해금 소개 화면에 표시할 콘텐츠. 목록 순서대로 하나씩 표시하며, 모두 확인하면 스텝이 완료된다. 이용 자격을 변경하거나 콘텐츠를 실행하지 않는다.")]
+    [SerializeField] List<EContentUnlockIntro> contentIntros = new List<EContentUnlockIntro>();
+
+    public IReadOnlyList<EContentUnlockIntro> ContentIntros => contentIntros;
+
     // 세이브가 이 스텝을 지목하는 불변 번호(0 = 미부여). 좌표는 런타임 커서일 뿐 세이브의 앵커는 이것이다.
     public int StepId => stepId;
 

@@ -37,6 +37,7 @@ public class LobbyMatchLauncher : MonoBehaviour
     bool m_running;
 
     public bool IsRunning => m_running;
+    public bool IsAdventureMapOpen => adventurePanel != null && adventurePanel.IsOpen;
 
     IMatchmaker      m_matchmaker;
     MatchmakingShell m_matchShell;
@@ -622,7 +623,8 @@ public class LobbyMatchLauncher : MonoBehaviour
 
         adventurePanel?.Open();
         // 복귀 재오픈(HandleAdventureReturn)은 이 자리를 거치지 않는다 — 안내가 전투 복귀 연출 위에 겹치지 않는 이유다.
-        GuidanceCoordinator.TryFire(EOutgameTutorialTrigger.AdventureMapFirstOpen);
+        if (AdventureUnlock.GuideTrigger == EOutgameTutorialTrigger.AdventureMapFirstOpen)
+            GuidanceCoordinator.TryFire(EOutgameTutorialTrigger.AdventureMapFirstOpen);
     }
 
     // 정점 전투 복귀 — 떠났던 화면(배틀 탭 + 맵)을 되돌린다. 승패 무관하게 맵으로 온다.

@@ -83,6 +83,8 @@ public static class OutgameTutorialRunner
         if (_trigger == EOutgameTutorialTrigger.None) return false;
         if (!IsGuidedOpen) return false;
         if (OutgameTutorialProgress.IsTriggerDone(_trigger)) return false;
+        if (_trigger == EOutgameTutorialTrigger.AdventureUnlocked
+            && OutgameTutorialProgress.IsTriggerDone(EOutgameTutorialTrigger.AdventureMapFirstOpen)) return false;
         if (s_deferred.Contains(_trigger)) return false;
         if (!TryGetGuidedChapter(_trigger, out _, out var t_chapter) || t_chapter.StepCount == 0) return false;
 
@@ -115,6 +117,31 @@ public static class OutgameTutorialRunner
 
     public static bool IsGuidedAction(EOutgameTutorialAction _action)
         => TryGetGuidedStep(out var t_step) && t_step.Action == _action;
+
+    /// <summary>해금 소개로 시작하는 자율 챕터 중 지금 보여줄 사건을 찾는다.</summary>
+    public static bool TryGetPendingContentIntro(out EOutgameTutorialTrigger _trigger)
+    {
+        _trigger = EOutgameTutorialTrigger.None;
+        if (IsGuidedRunning || !IsGuidedOpen) return false;
+        for (int t_i = ForcedChapterCount; t_i < ChapterCount; t_i++)
+        {
+            if (!TryGetChapterRaw(t_i, out var t_chapter) || !HasPending(t_chapter.Trigger)
+                || !t_chapter.TryGetStep(0, out var t_step)
+                || t_step.Action != EOutgameTutorialAction.ContentUnlockIntro) continue;
+            bool t_ready = t_step.ContentIntros != null && t_step.ContentIntros.Count > 0;
+            if (!t_ready) continue;
+            foreach (EContentUnlockIntro t_content in t_step.ContentIntros)
+            {
+                string t_key = ContentUnlockIntroDef.KeyOf(t_content);
+                t_ready &= t_key != null && ContentUnlockManager.IsUnlocked(t_key);
+            }
+            // 소개 확인 뒤 중단된 후속 안내도 완주 낙인 전까지 다시 시작할 수 있어야 한다.
+            if (!t_ready) continue;
+            _trigger = t_chapter.Trigger;
+            return true;
+        }
+        return false;
+    }
 
     // 자율 스텝 진입 — 결말은 반환값이 말한다(EnterCurrentStep과 같은 규약)
     public static EOutgameTutorialStepResult EnterGuidedStep()

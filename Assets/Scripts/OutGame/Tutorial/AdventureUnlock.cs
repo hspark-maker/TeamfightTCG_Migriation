@@ -11,12 +11,17 @@ public static class AdventureUnlock
 
     static TutorialSaveData Slot => DataSaveManager.Data.Tutorial;
 
+    /// <summary>해금부터 안내하는 챕터와 이전 맵 진입 챕터의 공통 발화 키.</summary>
+    public static EOutgameTutorialTrigger GuideTrigger
+        => OutgameTutorialRunner.TryGetGuidedChapter(EOutgameTutorialTrigger.AdventureUnlocked, out _, out _)
+            ? EOutgameTutorialTrigger.AdventureUnlocked : EOutgameTutorialTrigger.AdventureMapFirstOpen;
+
     /// <summary>클라우드 세이브 채택 뒤 옛 모험 진행도를 옮긴다.</summary>
     public static void Initialize()
     {
         if (DataSaveManager.Data.Tutorial == null) DataSaveManager.Data.Tutorial = new TutorialSaveData();
 
-        OutgameTutorialRunner.TryGetGuidedChapter(EOutgameTutorialTrigger.AdventureMapFirstOpen, out _, out var t_chapter);
+        OutgameTutorialRunner.TryGetGuidedChapter(GuideTrigger, out _, out var t_chapter);
         bool t_played = DataSaveManager.Data.Adventure?.ClearedNodeIds?.Count > 0;
         if (MigrateLegacyProgress(Slot, t_chapter, t_played)) Save();
 

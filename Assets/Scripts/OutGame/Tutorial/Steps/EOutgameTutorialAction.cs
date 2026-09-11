@@ -28,4 +28,5 @@ public enum EOutgameTutorialAction
     WaitDeckEquip   = 21,   // 지목한 카드가 덱에 장착될 때까지 대기(탭·드래그 어느 쪽으로 넣어도 완료)
     WaitDeckSave    = 22,   // 덱 편집의 저장이 확정될 때까지 대기(누르는 것만으로는 끝나지 않는다 — 6장이 안 차면 안내만 뜬다)
     CloseDeckEdit   = 23,   // 입력 없이 덱 편집을 닫아 로비 표면을 드러낸다(CloseCardDetail의 덱 편집 판)
+    ContentUnlockIntro = 24,
 }

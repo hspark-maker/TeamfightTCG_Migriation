@@ -290,8 +290,12 @@ public class TutorialAuthoringWindow : EditorWindow
                                     MessageType.Warning);
 
         if (this.serialized != null)
+        {
             EditorGUILayout.PropertyField(this.serialized.FindProperty("contentUnlocks"),
                 new GUIContent("콘텐츠 해금 조건"), true);
+            EditorGUILayout.PropertyField(this.serialized.FindProperty("contentIntros"),
+                new GUIContent("콘텐츠 해금 소개"), true);
+        }
 
         EditorGUILayout.Space(2);
     }

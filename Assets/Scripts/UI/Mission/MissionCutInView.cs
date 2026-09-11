@@ -76,6 +76,7 @@ public sealed class MissionCutInView : SingletonOverlayBase
         && !SynergyIntroduction.IsActive
         && (UIPoolManager.instance == null || !UIPoolManager.instance.HasVisibleUIExcept())
         && (m_matchLauncher == null || !m_matchLauncher.IsRunning)
+        && OutgameTutorialProgress.IsTriggerDone(EOutgameTutorialTrigger.ContentUnlocksAvailable)
         && OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission) && !OutgameTutorialRunner.IsGuidedRunning;
 
     void Update()

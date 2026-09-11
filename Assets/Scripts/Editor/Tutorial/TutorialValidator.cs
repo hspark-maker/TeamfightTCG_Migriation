@@ -75,6 +75,7 @@ public static class TutorialValidator
             (EStepField.FailurePolicy,    "onFailure",        "실패 정책"),
             (EStepField.Card,             "cardId",           "카드 ID"),
             (EStepField.Cards,            "cardIds",          "카드 ID 묶음"),
+            (EStepField.ContentIntros,    "contentIntros",    "콘텐츠 해금 소개"),
         };
 
         var t_probes = new List<(EStepField, FieldInfo, string)>(t_axes.Length);
@@ -97,6 +98,8 @@ public static class TutorialValidator
         if (!ContentUnlockConfig.TryValidate(_data.contentUnlocks, out string t_unlockError))
             t_issues.Add(new TutorialIssue(ETutorialIssueLevel.Error, 0, 0, 0, "ContentUnlock",
                 t_unlockError, "SO 최상위 콘텐츠 해금 조건을 수정하세요."));
+
+        ValidateContentIntroDefinitions(_data, t_issues);
 
         var t_state    = TutorialSequenceState.Build(_data);
         var t_ids      = new Dictionary<int, string>();
@@ -158,6 +161,7 @@ public static class TutorialValidator
                 }
 
                 ValidateStep(t_def, t_c, t_s, !t_guided, t_issues);
+                ValidateContentIntroStep(_data, t_def, t_c, t_s, t_issues);
             }
         }
 
@@ -165,6 +169,61 @@ public static class TutorialValidator
     }
 
     // ── 챕터 성격 규칙 ──────────────────────────────────────────────────────
+
+    static void ValidateContentIntroDefinitions(OutgameTutorialData _data, List<TutorialIssue> _issues)
+    {
+        if (_data.contentIntros == null) return;
+
+        var t_seen = new HashSet<EContentUnlockIntro>();
+        for (int t_i = 0; t_i < _data.contentIntros.Count; t_i++)
+        {
+            var t_intro = _data.contentIntros[t_i];
+            string t_error = null;
+            if (t_intro == null || t_intro.content == EContentUnlockIntro.None
+             || !Enum.IsDefined(typeof(EContentUnlockIntro), t_intro.content))
+                t_error = $"해금 소개 정의 {t_i}의 콘텐츠가 비어 있거나 유효하지 않습니다.";
+            else if (!t_seen.Add(t_intro.content))
+                t_error = $"{t_intro.content} 해금 소개 정의가 중복입니다.";
+            else if (string.IsNullOrWhiteSpace(t_intro.contentName)
+                  || string.IsNullOrWhiteSpace(t_intro.description) || t_intro.icon == null)
+                t_error = $"{t_intro.content} 해금 소개의 이름·본문·아이콘 중 빠진 값이 있습니다.";
+
+            if (t_error != null)
+                _issues.Add(new TutorialIssue(ETutorialIssueLevel.Error, 0, 0, 0, "해금 소개 정의",
+                    t_error, "SO 최상위 콘텐츠 해금 소개 목록을 수정하세요."));
+        }
+    }
+
+    static void ValidateContentIntroStep(OutgameTutorialData _data, TutorialStepDef _def,
+                                        int _chapter, int _index, List<TutorialIssue> _issues)
+    {
+        if (_def.Action != EOutgameTutorialAction.ContentUnlockIntro) return;
+
+        var t_contents = _def.ContentIntros;
+        if (t_contents == null || t_contents.Count == 0)
+        {
+            Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "해금 소개 대상 없음",
+                "해금 소개 스텝의 콘텐츠 목록이 비어 있습니다.", "소개할 콘텐츠를 하나 이상 지정하세요.");
+            return;
+        }
+
+        var t_seen = new HashSet<EContentUnlockIntro>();
+        for (int t_i = 0; t_i < t_contents.Count; t_i++)
+        {
+            var t_content = t_contents[t_i];
+            string t_error = null;
+            if (t_content == EContentUnlockIntro.None || !Enum.IsDefined(typeof(EContentUnlockIntro), t_content))
+                t_error = "해금 소개 대상에 None 또는 유효하지 않은 콘텐츠가 있습니다.";
+            else if (!t_seen.Add(t_content))
+                t_error = $"해금 소개 대상 {t_content}가 중복입니다.";
+            else if (!_data.TryGetContentIntro(t_content, out _))
+                t_error = $"{t_content} 해금 소개 정의가 없습니다.";
+
+            if (t_error != null)
+                Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "해금 소개 대상",
+                    t_error, "스텝 대상 목록과 SO 최상위 콘텐츠 해금 소개 목록을 맞추세요.");
+        }
+    }
 
     static void ValidateChapterKind(OutgameTutorialChapter _chapter, int _index,
                                     Dictionary<EOutgameTutorialTrigger, int> _triggers, List<TutorialIssue> _issues)
@@ -200,14 +259,15 @@ public static class TutorialValidator
             _triggers[t_trigger] = _index;
 
             // (25) 폐기된 발화 키. 발화처가 0이라 저작해도 아무도 깨우지 않는다
-            if (t_trigger == EOutgameTutorialTrigger.FirstEvolutionReady || t_trigger == EOutgameTutorialTrigger.AdventureUnlocked)
+            if (t_trigger == EOutgameTutorialTrigger.FirstEvolutionReady)
                 _issues.Add(new TutorialIssue(ETutorialIssueLevel.Warning, _index, 0, 0, "폐기된 발화 키",
                                               $"{t_trigger}는 발화처가 없는 폐기된 키입니다 — 이 챕터는 아무도 깨우지 않습니다.",
                                               "살아 있는 발화 키로 바꾸세요."));
         }
 
         // (26) 선행 기능이 없으면 알림 점이 졸업 직후부터 항상 뜬다 — 의도라면 그대로 두어도 된다
-        if (_chapter.Prerequisite == EOutgameFeature.None)
+        if (_chapter.Prerequisite == EOutgameFeature.None
+         && t_trigger != EOutgameTutorialTrigger.ContentUnlocksAvailable)
             _issues.Add(new TutorialIssue(ETutorialIssueLevel.Info, _index, 0, 0, "선행 기능 없음",
                                           "prerequisite가 None이라 졸업 직후부터 알림 점이 뜹니다.",
                                           "안내가 가리키는 화면을 여는 기능을 선행 기능으로 두면 잠긴 동안 점이 숨습니다."));

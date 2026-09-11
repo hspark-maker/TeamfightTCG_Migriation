@@ -29,6 +29,8 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 이 씬에서 대기 중인 스텝. null이면 걸 게이트가 없다(자동 스텝·씬 전환·완료).
     TutorialStepDef m_step;
     bool m_subscribed;
+    bool m_contentIntroStarted;
+    int m_contentIntroVersion;
 
     static OutgameTutorialBridge s_rankEntryOwner;
     internal static bool IsRankEntryPending => s_rankEntryOwner != null;
@@ -193,6 +195,12 @@ public class OutgameTutorialBridge : MonoBehaviour
     void PresentStep()
     {
         if (m_step == null) return;
+
+        if (m_step.Completion == EOutgameTutorialCompletion.ContentUnlockIntro)
+        {
+            TryPresentContentIntro();
+            return;
+        }
 
         // 개봉 대기는 클릭이 아니라 개봉 신호로 완료된다 — 걸 앵커도 없다(개봉 화면의 팩엔 TutorialAnchor가 없다).
         // 그래서 게이트를 건너뛰고 배너만 띄운다. 아래 앵커 조회에 도달하지 않는 유일한 스텝이다.
@@ -364,6 +372,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         if (m_enhancing || m_awaitingUnlockFx) return;
         if (m_step == null) return;
+        if (m_step.Completion == EOutgameTutorialCompletion.ContentUnlockIntro) return;
 
         // 함께 밝힐 영역이 늦게 등록되는 경우도 다시 세운다 — 안 그러면 그 스텝은 강조 없이 굳는다.
         if (_key != m_step.Anchor && _key != m_step.Spotlight) return;
@@ -712,6 +721,12 @@ public class OutgameTutorialBridge : MonoBehaviour
     void CloseGate()
     {
         m_step = null;
+        m_contentIntroVersion++;
+        if (m_contentIntroStarted)
+        {
+            m_contentIntroStarted = false;
+            ContentUnlockPresentation.CancelCurrent();
+        }
 
         // 안내가 삽입 세션을 몰던 상태를 여기서 되돌린다 — 스위치가 남으면 이후 일반 개봉의 탭 이탈까지 막는다.
         AlbumInsertSession.TutorialMode = false;
@@ -722,6 +737,51 @@ public class OutgameTutorialBridge : MonoBehaviour
         // 판정은 게이트가 소유권으로 한다(불변식 3): 무대가 남의 것이면 이 호출은 조용히 지나간다.
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear(this);
     }
+
+    void Update()
+    {
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.ContentUnlockIntro) return;
+        if (!TryGetCursorStep(out var t_current) || !ReferenceEquals(t_current, m_step))
+        {
+            CloseGate();
+            return;
+        }
+        TryPresentContentIntro();
+    }
+
+    void TryPresentContentIntro()
+    {
+        if (m_contentIntroStarted || SuppressGuideUI || m_step == null) return;
+        TutorialStepDef t_step = m_step;
+        int t_version = m_contentIntroVersion;
+        bool t_guided = GuidedCursor;
+        var t_trigger = OutgameTutorialRunner.GuidedTrigger;
+        m_contentIntroStarted = ContentUnlockPresentation.TryPresent(data, t_step, () =>
+        {
+            if (!IsCurrentContentIntro(t_step, t_version)) return;
+            m_contentIntroStarted = false;
+            foreach (EContentUnlockIntro t_content in t_step.ContentIntros)
+            {
+                string t_key = ContentUnlockIntroDef.KeyOf(t_content);
+                if (t_key != null) ContentUnlockManager.MarkPresented(t_key);
+            }
+            OnGateSatisfied();
+        }, () =>
+        {
+            if (!IsCurrentContentIntro(t_step, t_version)) return;
+            m_contentIntroStarted = false;
+            if (t_guided)
+            {
+                CloseGate();
+                OutgameTutorialRunner.AbortGuided(t_trigger);
+            }
+        });
+    }
+
+    bool IsCurrentContentIntro(TutorialStepDef _step, int _version)
+        => this != null && isActiveAndEnabled && m_contentIntroVersion == _version
+            && ReferenceEquals(m_step, _step) && TryGetCursorStep(out var t_current)
+            && ReferenceEquals(t_current, _step);
 
     void Subscribe()
     {

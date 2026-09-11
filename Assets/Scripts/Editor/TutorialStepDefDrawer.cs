@@ -134,6 +134,7 @@ public class TutorialStepDefDrawer : PropertyDrawer
         (EStepField.Scenario,         "scenario"),
         (EStepField.Card,             "cardId"),
         (EStepField.Cards,            "cardIds"),
+        (EStepField.ContentIntros,    "contentIntros"),
         (EStepField.RewardTitle,      "rewardTitle"),
         (EStepField.ParallelGain,     "parallelGain"),
         (EStepField.ShowDeckGate,     "showDeckGate"),
@@ -166,6 +167,16 @@ public class TutorialStepDefDrawer : PropertyDrawer
     // 문구가 있으면 문구, 없으면 이 액션을 식별하는 참조(팩·시나리오)를 보여준다 — 자동 스텝도 한 줄로 구분되게.
     static string TailLabel(SerializedProperty _property, EOutgameTutorialAction _action)
     {
+        if (_action == EOutgameTutorialAction.ContentUnlockIntro)
+        {
+            var t_contents = _property.FindPropertyRelative("contentIntros");
+            if (t_contents == null || t_contents.arraySize == 0) return "(소개 대상 없음)";
+            var t_names = new List<string>(t_contents.arraySize);
+            for (int t_i = 0; t_i < t_contents.arraySize; t_i++)
+                t_names.Add(((EContentUnlockIntro)t_contents.GetArrayElementAtIndex(t_i).intValue).ToString());
+            return string.Join(" · ", t_names);
+        }
+
         if (TutorialStepDef.ShowsGuideMessage(_action))
         {
             var t_message = _property.FindPropertyRelative("guideMessage");

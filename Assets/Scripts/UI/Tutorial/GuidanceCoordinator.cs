@@ -14,6 +14,12 @@ public sealed class GuidanceCoordinator : MonoBehaviour
     public static bool CanPresentContentUnlock => s_instance != null && s_instance.SafeToPresent()
         && !OutgameTutorialRunner.IsRunning && !MissionCutInView.IsPlaying;
 
+    /// <summary>해금 소개 스텝 자신의 커서는 무대 점유로 세지 않는다.</summary>
+    public static bool CanRunContentIntro => s_instance != null && s_instance.SafeToPresent(true)
+        && !MissionCutInView.IsPlaying && !s_instance.AdventureMapOpen;
+
+    bool AdventureMapOpen => m_launcher != null && m_launcher.IsAdventureMapOpen;
+
     public static void Install(GameObject owner)
     {
         if (owner.GetComponent<GuidanceCoordinator>() == null) owner.AddComponent<GuidanceCoordinator>();
@@ -54,10 +60,11 @@ public sealed class GuidanceCoordinator : MonoBehaviour
         || RankPromoteOverlay.IsOpen || RewardClaimPopup.IsOpen || AdventureRewardFlow.IsClaiming
         || PackOpenOverlay.IsOpen || CardDetailOverlayView.IsOpen || AlbumPageOverlayView.IsOpen
         || CardRewardOverlay.IsOpen || CardSetRewardOverlay.IsOpen || PackRewardOverlay.IsOpen
-        || OutgameTutorialGateUI.IsShowing || OutgameTutorialRunner.IsGuidedRunning;
+        || OutgameTutorialGateUI.IsShowing;
 
-    bool SafeToPresent()
-        => !HasPriorityActivity && !SynergyIntroduction.IsActive && UIPoolManager.instance != null
+    bool SafeToPresent(bool _contentIntro = false)
+        => !HasPriorityActivity && (_contentIntro || !OutgameTutorialRunner.IsGuidedRunning)
+        && !SynergyIntroduction.IsActive && UIPoolManager.instance != null
         && !UIPoolManager.instance.HasVisibleUIExcept();
 
     void Update()
@@ -80,6 +87,12 @@ public sealed class GuidanceCoordinator : MonoBehaviour
         }
         if (!CanPresent) return;
         if (OutgameTutorialRunner.IsRunning) return;
+        if (!AdventureMapOpen && ContentUnlockPresentation.IsReady
+            && OutgameTutorialRunner.TryGetPendingContentIntro(out var t_trigger))
+        {
+            TryFire(t_trigger);
+            if (OutgameTutorialRunner.IsGuidedRunning) return;
+        }
         if (SynergyIntroduction.HasPending) SynergyIntroduction.TryBegin();
     }
 
