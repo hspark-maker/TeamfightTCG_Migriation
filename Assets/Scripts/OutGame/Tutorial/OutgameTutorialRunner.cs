@@ -7,21 +7,28 @@ public static class OutgameTutorialRunner
 {
     static OutgameTutorialData s_data;
 
+    // 시퀀스 앞쪽에 연속으로 선 강제 챕터 수. 세이브 좌표·기능 잠금·졸업 판정은 전부 이 경계 안에서만 돈다 —
+    // 그 뒤의 자율 챕터를 강제 커서가 읽으면 졸업 센티널 좌표가 자율 스텝을 재생한다.
+    static int s_forcedCount;
+
     // 진행도가 다음 스텝으로 넘어갈 때 발화
     public static event Action OnStepChanged;
 
     // 데이터가 주입됐고 아직 완료 전인가
     public static bool IsRunning => s_data != null && !OutgameTutorialProgress.IsCompleted;
 
-    // 저작된 챕터("N편") 수(미주입·빈 시퀀스는 0)
+    // 저작된 챕터("N편") 총수 — 강제·자율을 다 센다(미주입·빈 시퀀스는 0). 강제 커서의 범위는 ForcedChapterCount다
     public static int ChapterCount => s_data != null && s_data.chapters != null ? s_data.chapters.Count : 0;
+
+    // 강제 시퀀스의 챕터 수 = 졸업 센티널 좌표의 챕터 인덱스
+    public static int ForcedChapterCount => s_forcedCount;
 
     static int TotalStepCount
     {
         get
         {
             int t_total = 0;
-            for (int i = 0; i < ChapterCount; i++) t_total += StepCountOf(i);
+            for (int i = 0; i < ForcedChapterCount; i++) t_total += StepCountOf(i);
             return t_total;
         }
     }
@@ -57,8 +64,35 @@ public static class OutgameTutorialRunner
         }
 
         s_data = _data;
+        s_forcedCount = CountForcedPrefix();
         AdventureTutorialRunner.EnsureData(_data);
         WarnOnMisauthoredChapters();
+    }
+
+    /// <summary>트리거가 깨우는 자율 챕터. 같은 트리거가 여럿이면 먼저 나온 챕터가 이긴다(검증기가 중복을 잡는다).</summary>
+    public static bool TryGetGuidedChapter(EOutgameTutorialTrigger _trigger, out int _index, out OutgameTutorialChapter _chapter)
+    {
+        _index   = -1;
+        _chapter = null;
+        if (_trigger == EOutgameTutorialTrigger.None) return false;
+
+        for (int t_c = ForcedChapterCount; t_c < ChapterCount; t_c++)
+        {
+            if (!TryGetChapterRaw(t_c, out var t_candidate) || !t_candidate.IsGuided || t_candidate.Trigger != _trigger) continue;
+
+            _index   = t_c;
+            _chapter = t_candidate;
+            return true;
+        }
+
+        return false;
+    }
+
+    static int CountForcedPrefix()
+    {
+        int t_count = 0;
+        while (TryGetChapterRaw(t_count, out var t_chapter) && !t_chapter.IsGuided) t_count++;
+        return t_count;
     }
 
     /// <summary>초기화가 1회 부르는 재개 정정(EnsureData 이후). 대본 전투가 연 화면(덱 게이트) 안의 좌표에 서 있는데
@@ -162,7 +196,7 @@ public static class OutgameTutorialRunner
     // 번호가 겹치면 먼저 나온 칸이 이긴다(CardCatalog.SetSource와 같은 규칙).
     static bool TryFindStepId(int _id, out int _chapter, out int _step)
     {
-        for (int t_c = 0; t_c < ChapterCount; t_c++)
+        for (int t_c = 0; t_c < ForcedChapterCount; t_c++)
         {
             if (!TryGetChapter(t_c, out var t_chapter)) continue;
 
@@ -330,7 +364,7 @@ public static class OutgameTutorialRunner
     // 시퀀스 처음부터 지정 좌표까지(그 칸 포함) 스텝을 순서대로 훑는다
     public static IEnumerable<TutorialStepDef> EnumerateUpTo(int _chapter, int _step)
     {
-        for (int t_c = 0; t_c <= _chapter && t_c < ChapterCount; t_c++)
+        for (int t_c = 0; t_c <= _chapter && t_c < ForcedChapterCount; t_c++)
         {
             if (!TryGetChapter(t_c, out var t_chapter)) continue;
 
@@ -341,7 +375,16 @@ public static class OutgameTutorialRunner
         }
     }
 
+    // 강제 커서가 쓰는 챕터 조회 — 자율 챕터는 범위 밖으로 취급한다
     static bool TryGetChapter(int _index, out OutgameTutorialChapter _chapter)
+    {
+        _chapter = null;
+        if (_index >= ForcedChapterCount) return false;
+
+        return TryGetChapterRaw(_index, out _chapter);
+    }
+
+    static bool TryGetChapterRaw(int _index, out OutgameTutorialChapter _chapter)
     {
         _chapter = null;
         if (s_data == null || s_data.chapters == null) return false;
@@ -351,7 +394,7 @@ public static class OutgameTutorialRunner
         return _chapter != null;
     }
 
-    // 반환 false = 시퀀스 끝(그때도 out은 끝 좌표를 준다 — 그대로 커밋되어야 하므로)
+    // 반환 false = 강제 시퀀스 끝(그때도 out은 끝 좌표를 준다 — 그대로 커밋되어야 하므로)
     static bool TryGetNext(int _chapter, int _step, out int _nextChapter, out int _nextStep)
     {
         _nextChapter = _chapter;
@@ -360,9 +403,9 @@ public static class OutgameTutorialRunner
 
         _nextStep    = 0;
         _nextChapter = _chapter + 1;
-        while (_nextChapter < ChapterCount && StepCountOf(_nextChapter) == 0) _nextChapter++;
+        while (_nextChapter < ForcedChapterCount && StepCountOf(_nextChapter) == 0) _nextChapter++;
 
-        return _nextChapter < ChapterCount;
+        return _nextChapter < ForcedChapterCount;
     }
 
     // 좌표가 가리키는 스텝이 없는 경우의 수습. 좌표를 정정하거나 졸업으로 닫았으면 Advanced,
@@ -373,19 +416,20 @@ public static class OutgameTutorialRunner
 
         if (TotalStepCount == 0)
         {
-            Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}' has no authored step ({ChapterCount} chapter(s)) — cannot proceed.");
+            Debug.LogWarning($"[OutgameTutorialRunner] '{s_data.name}' has no authored forced step ({ForcedChapterCount} forced chapter(s)) — cannot proceed.");
             return EOutgameTutorialStepResult.Failed;
         }
 
         int t_chapter = OutgameTutorialProgress.ChapterIndex;
         int t_index   = OutgameTutorialProgress.StepIndex;
 
-        if (t_chapter >= ChapterCount)
+        if (t_chapter >= ForcedChapterCount)
         {
-            // 끝 좌표(마지막 스텝 바로 다음 자리)는 정상이다 — 전투로 나간 마지막 스텝이 미뤄 둔 졸업을 여기서 확정한다.
+            // 끝 좌표(마지막 강제 스텝 바로 다음 자리)는 정상이다 — 전투로 나간 마지막 스텝이 미뤄 둔 졸업을 여기서 확정한다.
             // 브리지 Start에서 도는 자리라 로비 랭크 연출 디렉터의 캐리어 소비(다음 프레임)보다 앞선다.
-            if (t_chapter > ChapterCount || t_index != 0)
-                Debug.LogWarning($"[OutgameTutorialRunner] Position {t_chapter}-{t_index} is outside the {ChapterCount} chapter(s) of '{s_data.name}' — closing it as complete.");
+            // 저작이 강제 챕터를 줄여 좌표가 자율 챕터 안에 남은 세이브도 여기로 온다 — 그 안내는 낙인이 없으니 알림 점이 다시 부른다.
+            if (t_chapter > ForcedChapterCount || t_index != 0)
+                Debug.LogWarning($"[OutgameTutorialRunner] Position {t_chapter}-{t_index} is outside the {ForcedChapterCount} forced chapter(s) of '{s_data.name}' — closing it as complete.");
 
             CompleteSequence();
             return EOutgameTutorialStepResult.Advanced;
@@ -414,7 +458,7 @@ public static class OutgameTutorialRunner
 #if UNITY_EDITOR
         for (int i = 0; i < ChapterCount; i++)
         {
-            if (!TryGetChapter(i, out var t_chapter) || t_chapter.StepCount == 0)
+            if (!TryGetChapterRaw(i, out var t_chapter) || t_chapter.StepCount == 0)
             {
                 Debug.LogWarning($"[OutgameTutorialRunner] Chapter {i} of '{s_data.name}' has no step — progress stops until the authoring is finished.");
                 continue;
@@ -445,7 +489,7 @@ public static class OutgameTutorialRunner
 
         for (int t_c = 0; t_c < ChapterCount; t_c++)
         {
-            if (!TryGetChapter(t_c, out var t_chapter)) continue;
+            if (!TryGetChapterRaw(t_c, out var t_chapter)) continue;
 
             for (int t_s = 0; t_s < t_chapter.StepCount; t_s++)
             {

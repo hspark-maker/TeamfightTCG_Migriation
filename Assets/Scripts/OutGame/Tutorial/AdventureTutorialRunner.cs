@@ -5,6 +5,8 @@ public static class AdventureTutorialRunner
 {
     static OutgameTutorialChapter s_chapter;
     static OutgameTutorialData s_data;
+    // 모험 도입이 온보딩 시퀀스의 마지막 챕터(인덱스 5)로 저작되던 시절의 좌표. 자율 챕터가 뒤에 늘어나도 이 값은 변하지 않는다.
+    const int LEGACY_ADVENTURE_CHAPTER_INDEX = 5;
     static int s_oldChapterIndex;
     static bool s_initialized;
     static bool s_sessionActive;
@@ -20,7 +22,7 @@ public static class AdventureTutorialRunner
         if (data == null) return;
         s_data = data;
         s_chapter = data.adventureIntroduction;
-        s_oldChapterIndex = data.chapters.Count;
+        s_oldChapterIndex = LEGACY_ADVENTURE_CHAPTER_INDEX;
     }
 
     public static void Initialize()

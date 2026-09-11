@@ -342,14 +342,14 @@ public static class OutgameDebugActions
     // 첫실행 상태 그대로 보려면 에디터의 [Tools > Card Battle > 튜토리얼 저작 도구]에서 [여기부터]로 예약하고 재생한다.
     public static void RestartTutorialFromChapter(int _chapterIndex)
     {
-        int t_last    = OutgameTutorialRunner.ChapterCount - 1;
+        int t_last    = OutgameTutorialRunner.ForcedChapterCount - 1;
         int t_chapter = t_last < 0 ? 0 : Mathf.Clamp(_chapterIndex, 0, t_last);
 
         OutgameTutorialProgress.JumpForDebug(t_chapter, 0);
         TriggeredTutorialRunner.Abort();
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.ClearForce();
 
-        Debug.Log($"[OutgameDebug] Tutorial chapter {t_chapter + 1} back to the start — only the position is rewound (ownership and currency are kept). Applied on scene re-entry ({OutgameTutorialRunner.ChapterCount} chapter(s) authored in total)");
+        Debug.Log($"[OutgameDebug] Tutorial chapter {t_chapter + 1} back to the start — only the position is rewound (ownership and currency are kept). Applied on scene re-entry ({OutgameTutorialRunner.ForcedChapterCount} forced chapter(s) authored)");
     }
 
     // 계정 경험치 더하기. 만렙 구간은 전승 1,000판대라 이 문 없이는 확인할 수 없다.

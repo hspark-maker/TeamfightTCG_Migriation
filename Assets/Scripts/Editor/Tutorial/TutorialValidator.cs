@@ -97,9 +97,19 @@ public static class TutorialValidator
         var t_state = TutorialSequenceState.Build(_data);
         var t_ids   = new Dictionary<int, string>();
 
+        bool t_seenGuided = false;
+
         for (int t_c = 0; t_c < _data.chapters.Count; t_c++)
         {
             var t_chapter = _data.chapters[t_c];
+
+            // (19) 자율 챕터 뒤에 선 강제 챕터. 런타임은 선두의 연속 강제 챕터까지만 강제 커서로 읽으므로
+            //      이 챕터는 조용히 잘린다 — 졸업이 앞당겨지고 그 안의 지급·해금이 영영 돌지 않는다.
+            if (t_chapter != null && t_chapter.IsGuided) t_seenGuided = true;
+            else if (t_seenGuided)
+                t_issues.Add(new TutorialIssue(ETutorialIssueLevel.Error, t_c, 0, 0, "자율 뒤의 강제 챕터",
+                                               "자율 챕터 뒤에 강제 챕터가 있습니다 — 러너가 이 챕터를 강제 시퀀스로 읽지 않아 통째로 건너뜁니다.",
+                                               "강제 챕터를 자율 챕터 앞으로 옮기거나, 이 챕터를 자율로 바꾸세요."));
 
             // (8) 스텝이 없는 챕터. 진행이 막히지는 않는다 — OutgameTutorialRunner.TryGetNext가 빈 챕터를 건너뛰고,
             //     좌표가 서더라도 CloseOrWarnOnMissingStep이 다음 좌표로 정정해 Advanced를 준다(런타임 판정도 Warning이다).

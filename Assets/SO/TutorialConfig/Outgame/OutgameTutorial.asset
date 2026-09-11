@@ -12,10 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 75657545e05445d458099476ddb662f3, type: 3}
   m_Name: OutgameTutorial
   m_EditorClassIdentifier: Assembly-CSharp::OutgameTutorialData
-  adventureUnlockGrade: 0
-  adventureUnlockDivision: 2
   chapters:
   - label: "\uCCAB \uAC8C\uC784 \uC2DC\uC791"
+    kind: 0
+    trigger: 0
+    prerequisite: 0
     stepDefs:
     - stepId: 1
       action: 7
@@ -41,6 +42,9 @@ MonoBehaviour:
       deckName: 
       onFailure: 0
   - label: "\uB450 \uBC88\uCA30 \uC778\uAC8C\uC784 \uD29C\uD1A0 \uC9C4\uD589"
+    kind: 0
+    trigger: 0
+    prerequisite: 0
     stepDefs:
     - stepId: 2
       action: 17
@@ -136,6 +140,9 @@ MonoBehaviour:
       deckName: 
       onFailure: 0
   - label: "\uC138\uBC88\uC9F8 \uC778\uAC8C\uC784 \uD29C\uD1A0 \uC9C4\uD589"
+    kind: 0
+    trigger: 0
+    prerequisite: 0
     stepDefs:
     - stepId: 6
       action: 19
@@ -484,6 +491,9 @@ MonoBehaviour:
       deckName: 
       onFailure: 0
   - label: "\uCCAB \uB7AD\uD06C \uC2B9\uAE09"
+    kind: 0
+    trigger: 0
+    prerequisite: 0
     stepDefs:
     - stepId: 23
       action: 13
@@ -556,6 +566,9 @@ MonoBehaviour:
       deckName: 
       onFailure: 0
   - label: "\uCE74\uB4DC \uAC15\uD654"
+    kind: 0
+    trigger: 0
+    prerequisite: 0
     stepDefs:
     - stepId: 26
       action: 14
@@ -765,8 +778,112 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
+  - label: "\uD0A4\uC6CC\uB4DC \uAC15\uD654"
+    kind: 1
+    trigger: 4
+    prerequisite: 15
+    stepDefs:
+    - stepId: 47
+      action: 1
+      anchor: 30
+      spotlight: 0
+      guideMessage: "\uC774\uACF3\uC5D0\uC11C \uD0A4\uC6CC\uB4DC\uB97C \uC601\uAD6C\uC801\uC73C\uB85C
+        \uAC15\uD654\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4"
+      messageAtBottom: 1
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 1
+      packId: 
+      packPriceLabel: 
+      anchorCardId: 0
+      freeOfCharge: 0
+      waitUnlockIntro: 0
+      rewardTitle: 
+      parallelGain: 0
+      scenario: {fileID: 0}
+      cardId: 0
+      cardIds: 
+      showDeckGate: 0
+      deckName: 
+      onFailure: 0
+    - stepId: 48
+      action: 0
+      anchor: 22
+      spotlight: 30
+      guideMessage: "'\uC6D0\uAC70\uB9AC' \uD0A4\uC6CC\uB4DC\uB97C \uAC15\uD654\uD558\uC138\uC694"
+      messageAtBottom: 0
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 1
+      packId: 
+      packPriceLabel: 
+      anchorCardId: 0
+      freeOfCharge: 0
+      waitUnlockIntro: 0
+      rewardTitle: 
+      parallelGain: 0
+      scenario: {fileID: 0}
+      cardId: 0
+      cardIds: 
+      showDeckGate: 0
+      deckName: 
+      onFailure: 0
+    - stepId: 49
+      action: 18
+      anchor: 23
+      spotlight: 30
+      guideMessage: 
+      messageAtBottom: 0
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 1
+      packId: 
+      packPriceLabel: 
+      anchorCardId: 0
+      freeOfCharge: 1
+      waitUnlockIntro: 0
+      rewardTitle: 
+      parallelGain: 0
+      scenario: {fileID: 0}
+      cardId: 0
+      cardIds: 
+      showDeckGate: 0
+      deckName: 
+      onFailure: 0
+    - stepId: 50
+      action: 1
+      anchor: 0
+      spotlight: 0
+      guideMessage: "\uD574\uB2F9 \uD0A4\uC6CC\uB4DC\uB97C \uAC00\uC9C4 \uCE74\uB4DC\uAC00
+        \uAC15\uB825\uD574\uC84C\uC2B5\uB2C8\uB2E4!.\n\uC804\uD22C\uC5D0\uC11C \uC0AC\uC6A9\uD574\uBCF4\uC138\uC694!"
+      messageAtBottom: 1
+      unlocks: 
+      unlocksAll: 0
+      locks: 
+      useDim: 0
+      packId: 
+      packPriceLabel: 
+      anchorCardId: 0
+      freeOfCharge: 1
+      waitUnlockIntro: 0
+      rewardTitle: 
+      parallelGain: 0
+      scenario: {fileID: 0}
+      cardId: 0
+      cardIds: 
+      showDeckGate: 0
+      deckName: 
+      onFailure: 0
+  adventureUnlockGrade: 0
+  adventureUnlockDivision: 2
   adventureIntroduction:
     label: Adventure introduction
+    kind: 0
+    trigger: 0
+    prerequisite: 0
     stepDefs:
     - stepId: 35
       action: 1
@@ -955,4 +1072,4 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-  nextStepId: 47
+  nextStepId: 51
