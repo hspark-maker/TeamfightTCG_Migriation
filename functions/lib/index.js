@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getReplayDivergence = exports.claimPassRepeatReward = exports.claimPassReward = exports.getPass = exports.syncRankProfile = exports.syncGuideProgress = exports.claimMission = exports.getMissions = exports.spinRoulette = exports.limitBreakCard = exports.reportAdventureWin = exports.grantTutorialCards = exports.claimBattleReward = exports.enhanceKeyword = exports.enhanceCard = exports.claimPayout = exports.aggregateReplayDaily = exports.submitMatchResult = exports.verifyMatchTicket = exports.findAiMatch = exports.getRankLeaderboard = exports.getRankSnapshot = exports.lockDeck = exports.createMatch = exports.claimReward = exports.openPack = exports.repairSaveSlots = exports.ensureWallet = exports.ensureAccount = exports.devResetDailyMissions = exports.devCompleteMissions = exports.devResetSave = exports.devBumpRevision = exports.ping = void 0;
+exports.getReplayDivergence = exports.claimPassRepeatReward = exports.claimPassReward = exports.getPass = exports.syncRankProfile = exports.syncGuideProgress = exports.claimMission = exports.getMissions = exports.spinRoulette = exports.limitBreakCard = exports.reportAdventureWin = exports.grantTutorialCards = exports.claimBattleReward = exports.enhanceKeyword = exports.enhanceCard = exports.claimPayout = exports.aggregateReplayDaily = exports.submitMatchResult = exports.verifyMatchTicket = exports.findAiMatch = exports.getRankLeaderboard = exports.getRankSnapshot = exports.lockDeck = exports.createMatch = exports.claimReward = exports.openPack = exports.repairSaveSlots = exports.ensureWallet = exports.ensureAccount = exports.devSetRank = exports.devResetDailyMissions = exports.devCompleteMissions = exports.devResetSave = exports.devBumpRevision = exports.ping = void 0;
 var ping_1 = require("./commands/ping");
 Object.defineProperty(exports, "ping", { enumerable: true, get: function () { return ping_1.ping; } });
 var devBumpRevision_1 = require("./commands/devBumpRevision");
@@ -11,6 +11,8 @@ var devCompleteMissions_1 = require("./commands/devCompleteMissions");
 Object.defineProperty(exports, "devCompleteMissions", { enumerable: true, get: function () { return devCompleteMissions_1.devCompleteMissions; } });
 var devResetDailyMissions_1 = require("./commands/devResetDailyMissions");
 Object.defineProperty(exports, "devResetDailyMissions", { enumerable: true, get: function () { return devResetDailyMissions_1.devResetDailyMissions; } });
+var devSetRank_1 = require("./commands/devSetRank");
+Object.defineProperty(exports, "devSetRank", { enumerable: true, get: function () { return devSetRank_1.devSetRank; } });
 var ensureAccount_1 = require("./commands/ensureAccount");
 Object.defineProperty(exports, "ensureAccount", { enumerable: true, get: function () { return ensureAccount_1.ensureAccount; } });
 var ensureWallet_1 = require("./commands/ensureWallet");

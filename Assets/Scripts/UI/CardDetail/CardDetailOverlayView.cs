@@ -210,6 +210,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     float m_nextHoldFeed;
     int m_queuedShards;
     int m_inFlightShards;
+    int m_tutorialShardCard;
+    int m_tutorialShardLevel;
+    int m_tutorialQueuedShards;
     readonly List<CurrencyPendingTicket> m_queuedShardTickets = new List<CurrencyPendingTicket>();
 
     // 창이 열려 있는 동안만 순서를 덮어쓰고 닫히면 되돌린다 — 상시 최상단이면 로비 레이어와의 순서까지 뒤집힌다.
@@ -1043,11 +1046,16 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             this.successRateText.text = ShardProgressLabel(_card, t_hasStep);
     }
 
-    static string ShardProgressLabel(int _card, bool _hasStep)
+    string ShardProgressLabel(int _card, bool _hasStep)
     {
-        return _hasStep
-            ? $"{CardGrowthManager.ShardProgressOf(_card):N0}/{CardGrowthManager.ShardRequiredOf(_card):N0}"
-            : NoValue;
+        if (!_hasStep) return NoValue;
+        int t_progress = CardGrowthManager.ShardProgressOf(_card);
+        int t_required = CardGrowthManager.ShardRequiredOf(_card);
+        if (this.m_tutorialShardCard == _card && this.m_tutorialShardLevel == CardGrowthManager.LevelOf(_card)
+            && OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitEnhance))
+            t_progress = Mathf.Min(t_required, t_progress + this.m_tutorialQueuedShards
+                + this.m_queuedShards + this.m_inFlightShards);
+        return $"{t_progress:N0}/{t_required:N0}";
     }
 
     /// <summary>이번 강화(_from → _to)로 새로 열린 것을 한 문장으로. 아무것도 안 열렸으면 null.</summary>
@@ -1214,6 +1222,28 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     void BeginEnhance(int _card, int _amount)
     {
         if (!CanFeedShard(_card)) { StopEnhanceHold(); return; }
+        if (OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitEnhance))
+        {
+            // 무료 진화는 서버에서 한 번에 확정한다. 그 전에 같은 홀드 입력으로 샤드를 하나씩 모은다.
+            // 대기 수량은 이 뷰에만 두며, 상세를 닫거나 카드를 바꾸면 폐기한다.
+            if (this.m_enhanceRequestPending) return;
+            int t_level = CardGrowthManager.LevelOf(_card);
+            if (this.m_tutorialShardCard != _card || this.m_tutorialShardLevel != t_level)
+            {
+                this.m_tutorialShardCard = _card;
+                this.m_tutorialShardLevel = t_level;
+                this.m_tutorialQueuedShards = 0;
+            }
+            int t_remaining = CardGrowthManager.ShardRequiredOf(_card) - CardGrowthManager.ShardProgressOf(_card);
+            if (this.m_tutorialQueuedShards < t_remaining - 1)
+            {
+                this.m_tutorialQueuedShards++;
+                this.m_shardAbsorb?.Play(this.enhanceButton.transform as RectTransform,
+                    this.cardView != null ? this.cardView.transform as RectTransform : null);
+                RefreshGrowthActions(_card, true);
+                return;
+            }
+        }
         int t_count = Mathf.Min(_amount, CardGrowthManager.ShardRequiredOf(_card)
             - CardGrowthManager.ShardProgressOf(_card) - this.m_inFlightShards - this.m_queuedShards);
         if (CardGrowthManager.TryGetNextStep(_card, out GrowthStep t_step) && t_step.Cost > 0)
@@ -1223,6 +1253,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         this.m_enhanceRequestPending = true;
         this.m_queuedShards += t_count;
         this.m_queuedShardTickets.Add(CurrencyPendingTicket.Hold(t_step.Currency, -t_step.Cost * t_count));
+        if (this.m_tutorialShardCard == _card && this.successRateText != null)
+            this.successRateText.text = ShardProgressLabel(_card, true);
         // 홀드 중에는 Button의 Pressed 상태를 유지한다. 중복 요청은 pending 가드가 막는다.
         SetActionsEnabled(this.m_holdActive && this.m_holdInput != null && this.m_holdInput.IsPressed);
         this.m_shardAbsorb?.Play(this.enhanceButton.transform as RectTransform,
@@ -1276,6 +1308,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         this.m_holdInput?.Cancel();
         EndEnhanceHold();
         this.m_shardAbsorb?.Stop();
+        this.m_tutorialQueuedShards = 0;
+        this.m_tutorialShardCard = 0;
     }
 
     void EndEnhanceHold()

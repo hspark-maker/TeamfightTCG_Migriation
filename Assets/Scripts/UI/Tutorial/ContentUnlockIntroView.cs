@@ -73,6 +73,7 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
         _bodyText.text = body;
         for (int i = 0; i < _icons.Length; i++)
         {
+            if (_icons[i] == null) continue;
             bool visible = icons != null && i < icons.Count && icons[i] != null;
             _icons[i].gameObject.SetActive(visible);
             if (visible) _icons[i].sprite = icons[i];

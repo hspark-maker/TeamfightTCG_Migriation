@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 9118638744619936665}
   - component: {fileID: 7989963873070138093}
   m_Layer: 0
-  m_Name: SafeArea
+  m_Name: Contents
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -199,7 +199,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 192992088881093851}
-  - component: {fileID: 871497278930240007}
   - component: {fileID: 4557327939532412679}
   m_Layer: 0
   m_Name: MissionCutIn
@@ -228,29 +227,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
---- !u!223 &871497278930240007
-Canvas:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2926300901332291451}
-  m_Enabled: 1
-  serializedVersion: 3
-  m_RenderMode: 0
-  m_Camera: {fileID: 0}
-  m_PlaneDistance: 100
-  m_PixelPerfect: 0
-  m_ReceivesEvents: 1
-  m_OverrideSorting: 1
-  m_OverridePixelPerfect: 0
-  m_SortingBucketNormalizedSize: 0
-  m_VertexColorAlwaysGammaSpace: 0
-  m_AdditionalShaderChannelsFlag: 25
-  m_UpdateRectTransformForStandalone: 0
-  m_SortingLayerID: 0
-  m_SortingOrder: 430
-  m_TargetDisplay: 0
 --- !u!114 &4557327939532412679
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -266,7 +242,6 @@ MonoBehaviour:
   animator: {fileID: 0}
   contents: {fileID: 1408131601869690106}
   isShow: 0
-  overlayCanvas: {fileID: 871497278930240007}
   canvasGroup: {fileID: 4785757371795327935}
   panel: {fileID: 6537472462933917313}
   statusText: {fileID: 7579672118971043719}
@@ -892,7 +867,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 3.47
 --- !u!1 &7568713827887126939
 GameObject:
   m_ObjectHideFlags: 0

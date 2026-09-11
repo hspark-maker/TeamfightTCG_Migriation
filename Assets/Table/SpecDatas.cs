@@ -362,21 +362,22 @@ public partial class AlbumThemeInfo
 [GeneratorSpecData]
 public partial class AdventureChapter
 {
-    /// 행 고유 번호(부여 후 변경 금지)
+    /// id
     [GeneratorId(nameof(id), typeof(int))]
     public int id;
-    /// 챕터 안정 키 — 완주 판정과 완주 보상 낙인 키
+    /// chapterId
     public string chapterId;
-    /// 정점 안정 키 — 클리어 낙인 키. 전체에서 유일
+    /// nodeId
     public string nodeId;
-    /// 챕터 안 정점 순서(0부터)
+    /// order
     public int order;
-    /// 전역 직전 정점 — 해금 사슬. 첫 정점만 비우고 챕터 경계를 넘어 이어진다(비운 행이 둘이면 서버가 전면 차단)
+    /// prevNodeId
     public string prevNodeId;
-    /// 이 챕터에 들어갈 수 있는 rank.points 하한. 첫 등급 챕터는 0(신규 계정도 첫 등급으로 읽힌다)
+    /// requiredPoints
     public long requiredPoints;
-    /// 참고용 이름(데이터 아님)
+    /// aiDeckId
     public string aiDeckId;
+    /// aiCardLevel
     public int aiCardLevel;
 }
 
@@ -455,4 +456,44 @@ public partial class AIDeckCard
     public int slot;
     /// Card.id 참조
     public int cardId;
+}
+
+[GeneratorSpecData]
+public partial class RankAiEncounter
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 랭크 티어 인덱스(0~19)
+    public int tierIndex;
+    /// 전투 종류(Normal/DivisionFinal/GradeFinal)
+    public string battleKind;
+    /// AIDeck.deckId 참조
+    public string deckId;
+    /// card1 내부 레벨(1~4·표시 성급+1)
+    public int level1;
+    /// card2 내부 레벨(1~4·표시 성급+1)
+    public int level2;
+    /// card3 내부 레벨(1~4·표시 성급+1)
+    public int level3;
+    /// card4 내부 레벨(1~4·표시 성급+1)
+    public int level4;
+    /// card5 내부 레벨(1~4·표시 성급+1)
+    public int level5;
+    /// card6 내부 레벨(1~4·표시 성급+1)
+    public int level6;
+    /// card1 한계돌파(0~3·Lv4에서만)
+    public int limitBreak1;
+    /// card2 한계돌파(0~3·Lv4에서만)
+    public int limitBreak2;
+    /// card3 한계돌파(0~3·Lv4에서만)
+    public int limitBreak3;
+    /// card4 한계돌파(0~3·Lv4에서만)
+    public int limitBreak4;
+    /// card5 한계돌파(0~3·Lv4에서만)
+    public int limitBreak5;
+    /// card6 한계돌파(0~3·Lv4에서만)
+    public int limitBreak6;
+    /// 강조 에이스 슬롯(0=없음·1~6)
+    public int highlightSlot;
 }

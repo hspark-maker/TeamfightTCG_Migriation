@@ -374,53 +374,59 @@ public static class OutgameDebugActions
         Debug.Log("[OutgameDebug] Account level reset — Lv.1");
     }
 
-    // 티어 1단계 올리기/내리기
-    public static void RaiseTier() => StepTier(+1);
+    // 서버가 티어·최고 도달·랭킹 색인을 함께 확정한다. 로컬 점수를 먼저 바꾸지 않는다.
+    public static void RaiseTier() => ChangeRankAsync("step", +1).Forget();
+    public static void LowerTier() => ChangeRankAsync("step", -1).Forget();
+    public static void JumpToPromoStandby() => ChangeRankAsync("promo").Forget();
+    public static void ResetTier() => ChangeRankAsync("reset").Forget();
 
-    public static void LowerTier() => StepTier(-1);
+    static bool s_rankChangePending;
 
-    static void StepTier(int _step)
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetRankDebugState() => s_rankChangePending = false;
+
+    static async UniTaskVoid ChangeRankAsync(string _action, int _step = 0)
     {
-        int t_before  = RankManager.GetInfo().TierIndex;
-        long t_points = RankManager.Points;
-        int t_after   = RankManager.StepTierForDebug(_step);
-
-        RankInfo t_info = RankManager.GetInfo();
-
-        // 캐리어에 실어 두면 씬 재진입 때 로비 디렉터가 소비해 승급·강등 연출을 그대로 재생한다 —
-        // 이 버튼은 포인트만 옮기므로, 싣지 않으면 연출을 볼 방법이 전투밖에 없다.
-        RankResultHandoff.Set(new RankApplyResult(t_info.Points - t_points, t_before, t_after));
-
-        Debug.Log($"[OutgameDebug] Tier {t_before} → {t_after} ({t_info.DisplayName}) / points {t_info.Points} — the presentation plays on scene re-entry");
-    }
-
-    // 승급전 대기선으로 바로 점프. 티어 버튼은 임계치에 세우므로 이 상태엔 못 간다.
-    public static void JumpToPromoStandby()
-    {
-        int t_before  = RankManager.GetInfo().TierIndex;
-        long t_points = RankManager.Points;
-
-        if (!RankManager.SetPromoStandbyForDebug())
+        if (ContentProfileConfig.Active == null || ContentProfileConfig.Active.CloudEnvId != "test")
         {
-            Debug.Log("[OutgameDebug] Cannot go to promotion standby — unranked, or already at the top grade");
+            Debug.LogWarning("[OutgameDebug] Rank controls are available on the test env only.");
             return;
         }
-
-        RankInfo t_info = RankManager.GetInfo();
-
-        // StepTier와 같은 이유로 캐리어에 싣는다 — 실어야 씬 재진입 때 승급전 진입 연출이 재생된다.
-        RankResultHandoff.Set(new RankApplyResult(t_info.Points - t_points, t_before, t_info.TierIndex, false, true));
-
-        Debug.Log($"[OutgameDebug] Promotion standby — {t_info.DisplayName} / points {t_info.Points} — the presentation plays on scene re-entry");
+        if (s_rankChangePending)
+        {
+            Debug.Log("[OutgameDebug] Waiting for the previous rank change.");
+            return;
+        }
+        s_rankChangePending = true;
+        try
+        {
+            RankInfo t_before = RankManager.GetInfo();
+            bool t_wasPromo = RankManager.IsPromoPending;
+            var t_result = await ServerSaveCommands.InvokeAsync<DebugRankResult>(
+                "devSetRank", new { env = "test", action = _action, step = _step });
+            RankSnapshotResult t_rank = t_result.Rank;
+            if (t_rank == null || string.IsNullOrEmpty(t_rank.SeasonId) || t_rank.Points < 0
+                || !RankManager.TryGetTier(t_rank.TierIndex, out _))
+                throw new System.InvalidOperationException("The server rank response is invalid.");
+            RankManager.AdoptServerProgress(t_rank.Points, t_rank.SeasonId,
+                t_rank.BestTierIndex, t_rank.ClaimedTierIndexes);
+            RankResultHandoff.Set(new RankApplyResult(t_rank.Points - t_before.Points,
+                t_before.TierIndex, t_rank.TierIndex, t_wasPromo, RankManager.IsPromoPending));
+            Debug.Log($"[OutgameDebug] Server rank confirmed: {RankManager.GetInfo().DisplayName} / points {t_rank.Points}");
+        }
+        catch (System.Exception t_exception)
+        {
+            Debug.LogWarning($"[OutgameDebug] Rank change failed — {t_exception.GetBaseException().Message}");
+        }
+        finally
+        {
+            s_rankChangePending = false;
+        }
     }
 
-    // 랭크 포인트 재설정(브론즈 1로)
-    public static void ResetTier()
+    sealed class DebugRankResult : ServerCommandResult
     {
-        RankManager.ResetForDebug();
-
-        RankInfo t_info = RankManager.GetInfo();
-        Debug.Log($"[OutgameDebug] Rank reset — {t_info.DisplayName}");
+        [Newtonsoft.Json.JsonProperty("rank")] public RankSnapshotResult Rank { get; set; }
     }
 
     // 잠긴 기능 전체 해금 토글 (튜토리얼 딤은 별개 축이라 걷히지 않는다)

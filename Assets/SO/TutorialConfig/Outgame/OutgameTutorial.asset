@@ -635,7 +635,7 @@ MonoBehaviour:
       action: 0
       anchor: 19
       spotlight: 19
-      guideMessage: "\uCE74\uB4DC\uB97C \uAC15\uD654\uD574\uBD05\uC2DC\uB2E4."
+      guideMessage: "샤드를 하나씩 넣어 카드를 강화해 봅시다."
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
@@ -659,7 +659,7 @@ MonoBehaviour:
       action: 0
       anchor: 20
       spotlight: 0
-      guideMessage: "\uCE74\uB4DC\uB97C \uB20C\uB7EC \uC790\uC138\uD788 \uBD05\uB2C8\uB2E4."
+      guideMessage: "카드를 눌러 강화 화면을 열어 보세요."
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
@@ -683,7 +683,7 @@ MonoBehaviour:
       action: 11
       anchor: 21
       spotlight: 0
-      guideMessage: 
+      guideMessage: "강화 버튼을 꾹 누르세요!\n샤드가 점점 빠르게 들어가고, 필요량을 채우면 자동으로 진화해요.\n이번 진화에 필요한 샤드는 무료예요."
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
@@ -755,8 +755,7 @@ MonoBehaviour:
       action: 1
       anchor: 0
       spotlight: 0
-      guideMessage: "\uAC15\uD654\uD55C \uCE74\uB4DC\uB97C \uBC30\uD2C0\uC5D0\uC11C
-        \uC0AC\uC6A9\uD574\uBCF4\uC138\uC694!"
+      guideMessage: "샤드를 넣을수록 능력치가 조금씩 올라요.\n필요량을 채우면 별이 늘어나며 진화해요.\n이제 강화한 카드를 전투에서 사용해 보세요!"
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0

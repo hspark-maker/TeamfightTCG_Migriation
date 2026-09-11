@@ -83,7 +83,12 @@ public class UIPoolManager : MonoBehaviour
     public bool HasVisibleUIExcept(PooledUIBase except = null)
     {
         foreach (var ui in activeUIs.Values)
-            if (ui != null && ui != except && ui.isShow && ui.gameObject.activeInHierarchy) return true;
+        {
+            if (ui == null || ui == except || !ui.isShow || !ui.gameObject.activeInHierarchy) continue;
+            // 미션 컷인은 알림을 기다리기 위해 상시 열려 있다. 실제 재생 중일 때만 화면을 점유한다.
+            if (ui is MissionCutInView && !MissionCutInView.IsPlaying) continue;
+            return true;
+        }
         return false;
     }
 

@@ -11,7 +11,7 @@ using UnityEngine.UI;
 //          다음 목적지를 스스로 판정해 씬을 넘긴다.
 //  - 전환: LoadScene(scene)이 동기 UI 카탈로그에서 띄운 인스턴스. 전투 → 로비 복귀처럼 초기화가 이미 끝난
 //          상태의 씬 전환을 덮는다(BattleCleanup 경유).
-// 어느 쪽이든 로비로 들어오는 화면은 같은 커버를 탄다.
+// 초기화·계정 변경은 기존 커버, 전투에서 로비로 복귀할 때는 전용 커버를 쓴다.
 //
 // 커버를 제자리에서 페이드아웃하지 않는 이유: 초기화 씬에는 커버 말고 아무것도 없어(카메라도 검은 단색 배경)
 // 알파를 내리면 다음 씬이 오기 전에 검은 화면이 드러난다. 그래서 순서를 뒤집는다 —
@@ -97,12 +97,14 @@ public class LoadingCoverView : MonoBehaviour
     /// <param name="_onBeforeLoad">씬 교체 **직전** 1회 호출. 화면을 망가뜨리는 정리(오브젝트 파괴·풀 비우기)는
     /// 반드시 여기로 넘긴다 — 커버는 1초 넘게 도는데, 그 전에 정리하면 이전 씬이 파괴된 오브젝트를 붙잡은 채
     /// 그 시간만큼 더 살아 돌며 진행 중이던 연출 체인이 깨어나 그걸 만진다(MissingReferenceException).</param>
-    public static void LoadScene(string _scene, Action _onBeforeLoad = null)
+    public static void LoadScene(string _scene, Action _onBeforeLoad = null, bool _fromBattle = false)
     {
         // 씬을 벗어나는 모든 호출부가 이 창구를 지나므로 BGM 퇴장은 여기 한 곳에서 책임진다.
         SoundManager.Instance?.FadeOutBGM(BgmFadeOutSeconds);
 
-        var t_prefab = SyncUiPrefabs.Get(ESyncUiPrefab.LoadingCover);
+        var t_cover = _fromBattle && _scene == LobbyScene
+            ? ESyncUiPrefab.BattleReturnLoadingCover : ESyncUiPrefab.LoadingCover;
+        var t_prefab = SyncUiPrefabs.Get(t_cover);
         var t_view   = t_prefab != null ? Instantiate(t_prefab).GetComponent<LoadingCoverView>() : null;
 
         // 커버를 못 얻어도 전환 자체는 반드시 되게 한다 — 연출 때문에 화면이 갇히면 탈출로가 없다.
