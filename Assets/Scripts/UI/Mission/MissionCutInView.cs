@@ -72,7 +72,8 @@ public sealed class MissionCutInView : SingletonOverlayBase
         && !AdventureTutorialRunner.IsRunning && !SynergyIntroduction.IsActive
         && (UIPoolManager.instance == null || !UIPoolManager.instance.HasVisibleUIExcept())
         && (m_matchLauncher == null || !m_matchLauncher.IsRunning)
-        && !OutgameTutorialRunner.IsRunning && !TriggeredTutorialRunner.IsRunning;
+        // 로비 콘텐츠 전체 해금부터 알린다. 이후 튜토리얼 완료까지 기다리지 않는다.
+        && OutgameFeatureLock.AllUnlocked && !TriggeredTutorialRunner.IsRunning;
 
     void Update()
     {
