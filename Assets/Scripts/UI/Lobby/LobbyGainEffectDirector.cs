@@ -175,7 +175,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         if (CardPackRewardHandoff.HasPending) return;
 
         // 안내 중에도 비켜선다 — 늦게 오는 보상이 안내가 짠 순서에 끼어든다.
-        if (OutgameTutorialRunner.IsRunning || TriggeredTutorialRunner.IsRunning) return;
+        if (OutgameTutorialRunner.IsRunning || OutgameTutorialRunner.IsGuidedRunning) return;
 
         // 이 경로의 종료는 아무도 기다리지 않는다 — OnAnyFinished를 내면 그 신호를 기다리던 다른 스텝
         // (튜토리얼 CardGain · 모험 선물 등장)이 자기 차례로 오인해 조기 통과한다.

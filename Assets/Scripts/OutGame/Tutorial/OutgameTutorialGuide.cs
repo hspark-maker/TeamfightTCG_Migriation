@@ -24,7 +24,7 @@ public static class OutgameTutorialGuide
     }
 
     public static bool IsCurrentAction(EOutgameTutorialAction _action)
-        => TriggeredTutorialRunner.IsCurrentAction(_action)
+        => OutgameTutorialRunner.IsGuidedAction(_action)
         || OutgameTutorialRunner.IsCurrentAction(_action);
 
     /// <summary>지금 안내가 지목한 카드. 도감처럼 같은 종류의 자리가 여럿인 화면이 "어느 칸인가"를 여기서 받는다.
@@ -87,6 +87,6 @@ public static class OutgameTutorialGuide
     /// <summary>지금 서 있는 스텝. 둘 다 돌고 있으면 트리거 쪽이다(클래스 주석 참고).
     /// 무료 한 방의 소진 표식처럼 "그 스텝 하나"를 식별해야 하는 쪽도 이 참조를 그대로 쓴다.</summary>
     public static bool TryGetCurrentStep(out TutorialStepDef _step)
-        => TriggeredTutorialRunner.TryGetCurrentStep(out _step)
+        => OutgameTutorialRunner.TryGetGuidedStep(out _step)
         || OutgameTutorialRunner.TryGetCurrentStep(out _step);
 }

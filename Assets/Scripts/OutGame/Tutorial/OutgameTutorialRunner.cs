@@ -11,11 +11,38 @@ public static class OutgameTutorialRunner
     // 그 뒤의 자율 챕터를 강제 커서가 읽으면 졸업 센티널 좌표가 자율 스텝을 재생한다.
     static int s_forcedCount;
 
+    // 자율 세션(메모리 커서). 세이브에는 완주 시점에 트리거 키 하나만 남는다 — 앱을 껐다 켜면 처음부터.
+    static int s_guidedChapter = -1;
+    static int s_guidedStep;
+
+    // 이번 세션에 화면을 떠나 미뤄 둔 자율 안내. 저장하지 않는다 — 다음 세션에 알림 점이 다시 부른다.
+    static readonly HashSet<EOutgameTutorialTrigger> s_deferred = new HashSet<EOutgameTutorialTrigger>();
+
+    // 첫 랭크 승급 연출이 끝나 열린 문. 온보딩은 그 뒤로도 이어지지만(카드 강화 편) 그때부터는
+    // 자율 안내가 나란히 서도 되는 구간이라 졸업 낙인을 기다리지 않는다. 세이브하지 않는다.
+    static bool s_openedAtRankPromotion;
+
     // 진행도가 다음 스텝으로 넘어갈 때 발화
     public static event Action OnStepChanged;
 
-    // 데이터가 주입됐고 아직 완료 전인가
+    // 자율 안내가 실제로 시작됐을 때(세션 중간에 시작되므로 브리지가 pull만으로는 잡을 수 없다)
+    public static event Action OnGuidedActivated;
+
+    // 자율 안내의 남은 목록이 달라졌을 때(주입·발화·완주·미루기·중단·졸업) — 알림 점이 이걸 보고 다시 그린다
+    public static event Action OnGuidedChanged;
+
+    // 데이터가 주입됐고 강제 시퀀스가 아직 완료 전인가
     public static bool IsRunning => s_data != null && !OutgameTutorialProgress.IsCompleted;
+
+    public static bool IsGuidedRunning => s_guidedChapter >= 0;
+
+    // 실행 중인 자율 챕터의 트리거(없으면 None)
+    public static EOutgameTutorialTrigger GuidedTrigger
+        => IsGuidedRunning && TryGetChapterRaw(s_guidedChapter, out var t_chapter) ? t_chapter.Trigger : EOutgameTutorialTrigger.None;
+
+    // 졸업 전에는 자율 안내가 통째로 잠긴다 — 게이트는 하나뿐이라 두 안내가 겹치면 서로를 가로채고,
+    // 첫시작 동선 밖의 탭으로 부르는 점은 아직 못 가는 곳을 가리킨다.
+    static bool IsGuidedOpen => OutgameTutorialProgress.IsCompleted || s_openedAtRankPromotion;
 
     // 저작된 챕터("N편") 총수 — 강제·자율을 다 센다(미주입·빈 시퀀스는 0). 강제 커서의 범위는 ForcedChapterCount다
     public static int ChapterCount => s_data != null && s_data.chapters != null ? s_data.chapters.Count : 0;
@@ -47,8 +74,137 @@ public static class OutgameTutorialRunner
         // 잠김 룩이 따라오게 여기서 알린다 — FeatureLockView는 OnChanged로만 다시 그린다.
         OutgameFeatureLock.Refresh();
 
-        // 트리거 튜토리얼도 졸업과 함께 풀린다 — 그 답이 뒤집힌 것은 여기서만 알 수 있다.
-        TriggeredTutorialRunner.NotifyOnboardingCompleted();
+        // 자율 안내도 졸업과 함께 풀린다 — 그 전까지 전부 false였던 HasPending의 답이 한꺼번에 뒤집힌다.
+        OnGuidedChanged?.Invoke();
+    }
+
+    /// <summary>첫 랭크 승급 연출까지 끝났다 — 여기서부터 자율 안내가 열린다(졸업은 아직 남았다).</summary>
+    public static void NotifyRankPromotionFinished()
+    {
+        if (s_openedAtRankPromotion) return;
+
+        s_openedAtRankPromotion = true;
+        OnGuidedChanged?.Invoke();
+    }
+
+    // ───────────── 자율 안내(메모리 커서) ─────────────
+
+    /// <summary>이 트리거로 아직 볼 것이 남았는가. 판정은 Fire의 무시 조건과 같아야 한다 —
+    /// UI가 규칙을 복제하지 않도록 "띄울지"의 답을 여기서만 낸다(데이터 미주입이면 false).</summary>
+    public static bool HasPending(EOutgameTutorialTrigger _trigger)
+    {
+        if (_trigger == EOutgameTutorialTrigger.None) return false;
+        if (!IsGuidedOpen) return false;
+        if (OutgameTutorialProgress.IsTriggerDone(_trigger)) return false;
+        if (s_deferred.Contains(_trigger)) return false;
+        if (!TryGetGuidedChapter(_trigger, out _, out var t_chapter) || t_chapter.StepCount == 0) return false;
+
+        return OutgameFeatureLock.IsUnlocked(t_chapter.Prerequisite);
+    }
+
+    /// <summary>자율 안내 발화. 무대가 비었는지는 묻지 않는다 — 그 판정은 UI를 아는 GuidanceCoordinator.TryFire 몫이다.
+    /// 아래 무시 조건은 전부 정상 경로라 경고하지 않는다.</summary>
+    public static void Fire(EOutgameTutorialTrigger _trigger)
+    {
+        if (s_data == null) return;
+        if (IsGuidedRunning) return;
+        if (AdventureTutorialRunner.IsRunning) return;
+        if (!HasPending(_trigger)) return;
+
+        TryGetGuidedChapter(_trigger, out s_guidedChapter, out _);
+        s_guidedStep = 0;
+
+        OnGuidedActivated?.Invoke();
+        OnGuidedChanged?.Invoke();
+    }
+
+    // 자율 커서가 가리키는 스텝(미실행·범위 밖·빈 칸이면 false)
+    public static bool TryGetGuidedStep(out TutorialStepDef _step)
+    {
+        _step = null;
+        if (!IsGuidedRunning) return false;
+
+        return TryGetChapterRaw(s_guidedChapter, out var t_chapter) && t_chapter.TryGetStep(s_guidedStep, out _step);
+    }
+
+    public static bool IsGuidedAction(EOutgameTutorialAction _action)
+        => TryGetGuidedStep(out var t_step) && t_step.Action == _action;
+
+    // 자율 스텝 진입 — 결말은 반환값이 말한다(EnterCurrentStep과 같은 규약)
+    public static EOutgameTutorialStepResult EnterGuidedStep()
+    {
+        if (!TryGetGuidedStep(out var t_step))
+        {
+            Debug.LogWarning($"[OutgameTutorialRunner] Guided step {s_guidedChapter}-{s_guidedStep}({GuidedTrigger}) is empty — closing it as finished.");
+            FinishGuided();
+            return EOutgameTutorialStepResult.Advanced;
+        }
+
+        bool t_isLast = !TryGetChapterRaw(s_guidedChapter, out var t_chapter) || s_guidedStep + 1 >= t_chapter.StepCount;
+
+        return TutorialStepExecutor.Enter(t_step,
+            new OutgameTutorialStepContext(s_guidedChapter, s_guidedStep, s_guidedChapter, s_guidedStep + 1, t_isLast,
+                                           GuidedProgressSink.Instance));
+    }
+
+    // 자율 스텝 완료를 감지한 브리지가 호출 — 마지막이었으면 완주 낙인까지 찍는다
+    public static void NotifyGuidedStepSatisfied()
+    {
+        if (!IsGuidedRunning) return;
+
+        s_guidedStep++;
+        if (!TryGetChapterRaw(s_guidedChapter, out var t_chapter) || s_guidedStep >= t_chapter.StepCount) FinishGuided();
+    }
+
+    /// <summary>자율 안내를 낙인 없이 끊는다. 트리거를 주면 그 안내가 도는 중일 때만, 그리고 이번 세션은 미뤄 둔다(화면 이탈 = 미루기).
+    /// 인자 없이 부르면 무조건 끊고 미루기도 전부 걷는다(세이브 재로드·디버그 리셋용).</summary>
+    public static void AbortGuided(EOutgameTutorialTrigger _onlyIf = EOutgameTutorialTrigger.None)
+    {
+        if (_onlyIf != EOutgameTutorialTrigger.None)
+        {
+            if (!IsGuidedRunning || GuidedTrigger != _onlyIf) return;
+            s_deferred.Add(_onlyIf);
+        }
+        else
+        {
+            s_deferred.Clear();
+
+            // 되감기로 온보딩이 다시 진행 중이 되면 승급으로 연 문도 함께 닫혀야 한다 — 남으면 튜토 도중에 점이 뜬다.
+            s_openedAtRankPromotion = false;
+        }
+
+        s_guidedChapter = -1;
+        s_guidedStep    = 0;
+
+        OnGuidedChanged?.Invoke();
+    }
+
+    /// <summary>자율 안내 완주(낙인). 트리거를 주면 그 안내가 도는 중일 때만 — 안내 밖 경로로 목적을 이룬 화면이 부른다.</summary>
+    public static void FinishGuided(EOutgameTutorialTrigger _onlyIf = EOutgameTutorialTrigger.None)
+    {
+        if (!IsGuidedRunning) return;
+
+        var t_trigger = GuidedTrigger;
+        if (_onlyIf != EOutgameTutorialTrigger.None && t_trigger != _onlyIf) return;
+
+        OutgameTutorialProgress.MarkTriggerDone(t_trigger);
+
+        s_guidedChapter = -1;
+        s_guidedStep    = 0;
+
+        OnGuidedChanged?.Invoke();
+    }
+
+    // 자율 런의 진행 좌표를 메모리에만 두는 싱크(챕터는 세션 시작 때 정해져 _chapter는 무시)
+    sealed class GuidedProgressSink : ITutorialProgressSink
+    {
+        public static readonly ITutorialProgressSink Instance = new GuidedProgressSink();
+
+        GuidedProgressSink() { }
+
+        public void Commit(int _chapter, int _step) => s_guidedStep = _step;
+
+        public void Complete() => FinishGuided();
     }
 
     // 씬마다 브리지가 호출하는 멱등 주입(첫 주입만 유효)

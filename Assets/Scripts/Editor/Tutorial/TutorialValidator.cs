@@ -194,7 +194,7 @@ public static class TutorialValidator
 
             for (int t_s = 0; t_s < t_entry.StepCount; t_s++)
             {
-                // (17) 목록 중간의 빈 행 — TriggeredTutorialRunner.EnterCurrentStep이 남은 스텝을 버리고
+                // (17) 목록 중간의 빈 행 — OutgameTutorialRunner.EnterGuidedStep이 남은 스텝을 버리고
                 //      그 자리에서 "완주"로 닫는다. 완주 낙인은 계정당 1회라 이 트리거는 다시 뜨지 않는다.
                 if (!t_entry.TryGetStep(t_s, out var t_def))
                 {

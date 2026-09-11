@@ -76,7 +76,7 @@ public sealed class SaveDependentManagersStep : MainInitializer
             ProfileManager.Init();
             OwnershipManager.Init();
             // 정지 예외와 트리거의 메모리 진행은 이전 계정의 값이다. 새 세이브로 정지를 판정하기 전에 걷는다.
-            TriggeredTutorialRunner.Abort();
+            OutgameTutorialRunner.AbortGuided();
             OutgameFeatureLock.ClearStall();
             OutgameTutorialProgress.Init();
             KeywordGrowthManager.Init();

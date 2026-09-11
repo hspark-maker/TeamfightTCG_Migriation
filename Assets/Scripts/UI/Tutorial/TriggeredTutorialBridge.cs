@@ -7,9 +7,6 @@ using UnityEngine;
 // 표시(OutgameTutorialGateUI)·타깃(TutorialAnchorRegistry)은 온보딩과 같은 것을 그대로 쓴다.
 public class TriggeredTutorialBridge : MonoBehaviour
 {
-    [Tooltip("트리거 튜토리얼 목록 SO. 모든 씬의 브리지에 같은 에셋을 배선한다(주입은 멱등).")]
-    [SerializeField] TriggeredTutorialData data;
-
     [Tooltip("안내 UI 프리팹(OutgameTutorialGate). 미배선이면 딤+문구만 그리는 코드 폴백으로 떨어진다.")]
     [SerializeField] OutgameTutorialGateUI gatePrefab;
 
@@ -38,9 +35,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
     // (둘 다 DefaultExecutionOrder가 없다) 그러면 OnActivated를 통째로 놓쳐 게이트가 영영 안 뜬다.
     void Awake()
     {
-        TriggeredTutorialRunner.EnsureData(this.data);
-
-        TriggeredTutorialRunner.OnActivated  += OnActivated;
+        OutgameTutorialRunner.OnGuidedActivated  += OnActivated;
         TutorialAnchorRegistry.OnRegistered  += OnAnchorRegistered;
 
         CardDetailOverlayView.OnAnyEnhanceStarted     += OnEnhanceStarted;
@@ -58,13 +53,13 @@ public class TriggeredTutorialBridge : MonoBehaviour
     void Start()
     {
         // 씬 재진입 재개. 발화 자체는 OnActivated가 잡으므로 여기서는 이미 도는 런만 이어받는다.
-        if (TriggeredTutorialRunner.IsRunning) ApplyCurrentStep();
+        if (OutgameTutorialRunner.IsGuidedRunning) ApplyCurrentStep();
     }
 
     void OnDestroy()
     {
         // static 이벤트에 죽은 씬 오브젝트가 남으면 다음 씬에서 오발화한다.
-        TriggeredTutorialRunner.OnActivated  -= OnActivated;
+        OutgameTutorialRunner.OnGuidedActivated  -= OnActivated;
         TutorialAnchorRegistry.OnRegistered  -= OnAnchorRegistered;
 
         CardDetailOverlayView.OnAnyEnhanceStarted     -= OnEnhanceStarted;
@@ -114,22 +109,22 @@ public class TriggeredTutorialBridge : MonoBehaviour
         CloseGate();
 
         // 진입 "전" 스텝. 자동 스텝은 Enter 안에서 좌표를 커밋하므로 진입 뒤에는 다음 칸이 보인다.
-        TriggeredTutorialRunner.TryGetCurrentStep(out var t_entering);
+        OutgameTutorialRunner.TryGetGuidedStep(out var t_entering);
 
-        var t_result = TriggeredTutorialRunner.EnterCurrentStep();
+        var t_result = OutgameTutorialRunner.EnterGuidedStep();
 
         // Gated가 아니면 이 씬에서 걸 게이트가 없다. 씬에 남는 자동 스텝은 여기서 끊으면 다음 스텝이 영영
         // 진입하지 못하므로 같은 루프에서 이어 진입시킨다 — 완주로 닫힌 뒤라면 이을 곳이 없다.
         if (t_result != EOutgameTutorialStepResult.Gated)
         {
-            if (t_result == EOutgameTutorialStepResult.Advanced && TriggeredTutorialRunner.IsRunning
+            if (t_result == EOutgameTutorialStepResult.Advanced && OutgameTutorialRunner.IsGuidedRunning
                 && t_entering != null && !t_entering.LeavesScene)
                 m_pendingApply = true;
 
             return;
         }
 
-        if (!TriggeredTutorialRunner.TryGetCurrentStep(out var t_step)) return;
+        if (!OutgameTutorialRunner.TryGetGuidedStep(out var t_step)) return;
 
         m_step = t_step;
 
@@ -179,7 +174,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
         }
 
         // 이 브리지는 팩 개봉·구매 신호를 구독하지 않는다 → 그 스텝을 꽂으면 완료 신호가 없어 영구 정지다(저작 실수).
-        Debug.LogWarning($"[TriggeredTutorialBridge] The completion condition ({m_step.Completion}) of step {TriggeredTutorialRunner.StepIndex}({m_step.Action}) is not supported by triggered tutorials — aborting.");
+        Debug.LogWarning($"[TriggeredTutorialBridge] The completion condition ({m_step.Completion}) of step {m_step.Action} of {OutgameTutorialRunner.GuidedTrigger} is not supported by triggered tutorials — aborting.");
         CloseGate();
     }
 
@@ -351,7 +346,7 @@ public class TriggeredTutorialBridge : MonoBehaviour
     // 다시 적용하면 ApplyStepOnce의 프리체크가 통과 판정을 한다(응답을 잃어 완료 신호만 못 받은 자리).
     void OnServerFreeShotSpentChanged()
     {
-        if (!TriggeredTutorialRunner.IsRunning) return;
+        if (!OutgameTutorialRunner.IsGuidedRunning) return;
 
         ApplyCurrentStep();
     }
@@ -359,9 +354,9 @@ public class TriggeredTutorialBridge : MonoBehaviour
     // 완료 → 다음 스텝을 같은 씬에서 이어간다(트리거 튜토는 씬을 떠나지 않는다).
     void OnGateSatisfied()
     {
-        TriggeredTutorialRunner.NotifyStepSatisfied();
+        OutgameTutorialRunner.NotifyGuidedStepSatisfied();
 
-        if (!TriggeredTutorialRunner.IsRunning) { CloseGate(); return; }
+        if (!OutgameTutorialRunner.IsGuidedRunning) { CloseGate(); return; }
 
         ApplyCurrentStep();
     }

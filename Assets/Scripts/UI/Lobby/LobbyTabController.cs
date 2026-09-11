@@ -49,7 +49,7 @@ public class LobbyTabController : MonoBehaviour
         && m_pendingArrive == null && m_leaving == null
         // 미완주 상태라도 전체 해금된 로비는 자유 조작을 허용한다.
         && (!OutgameTutorialRunner.IsRunning || OutgameFeatureLock.AllUnlocked)
-        && !TriggeredTutorialRunner.IsRunning;
+        && !OutgameTutorialRunner.IsGuidedRunning;
 
     /// <summary>Moves one adjacent tab through the same policy as a tab button.</summary>
     public void TrySwipe(int _direction)
@@ -242,7 +242,7 @@ public class LobbyTabController : MonoBehaviour
         m_pendingArrive = () =>
         {
             t_next?.OnSettled();
-            if (_fireTrigger) TriggeredTutorialRunner.Fire(tabs[_index].tutorialTrigger);
+            if (_fireTrigger) GuidanceCoordinator.TryFire(tabs[_index].tutorialTrigger);
         };
 
         // 알약과 콘텐츠는 반드시 같은 프레임에 떠난다(LobbyTabBarView.focusSlideSeconds와 한 박자 계약).

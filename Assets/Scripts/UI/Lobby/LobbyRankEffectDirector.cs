@@ -129,7 +129,7 @@ public class LobbyRankEffectDirector : MonoBehaviour
             // 이 신호를 받은 온보딩 브리지라, 앞서 발화하면 문이 닫힌 채라 Fire가 조용히 거절된다.
             var t_trigger = this.m_promoteTrigger;
             this.m_promoteTrigger = EOutgameTutorialTrigger.None;
-            TriggeredTutorialRunner.Fire(t_trigger);
+            GuidanceCoordinator.TryFire(t_trigger);
         }
     }
 

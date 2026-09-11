@@ -40,7 +40,7 @@ public static class OutgameDebugActions
             Debug.LogWarning($"[OutgameDebug] Unsupported grade for the rarity test pack: {_grade}");
             return;
         }
-        if (OutgameTutorialRunner.IsRunning || TriggeredTutorialRunner.IsRunning)
+        if (OutgameTutorialRunner.IsRunning || OutgameTutorialRunner.IsGuidedRunning)
         {
             Debug.LogWarning("[OutgameDebug] The rarity test pack cannot be opened during the tutorial, in order to protect the progress events.");
             return;
@@ -311,7 +311,7 @@ public static class OutgameDebugActions
     public static void SkipTutorial()
     {
         OutgameTutorialRunner.CompleteSequence();   // 스킵도 졸업 — 첫 랭크 진입을 동일하게 받는다
-        TriggeredTutorialRunner.Abort();
+        OutgameTutorialRunner.AbortGuided();
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.ClearForce();
 
         Debug.Log("[OutgameDebug] Tutorial marked complete — gate released");
@@ -321,7 +321,7 @@ public static class OutgameDebugActions
     public static void ResetTutorial()
     {
         OutgameTutorialProgress.ResetForDebug();
-        TriggeredTutorialRunner.Abort();
+        OutgameTutorialRunner.AbortGuided();
         Debug.Log($"[OutgameDebug] Tutorial progress reset — {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex} / completed {OutgameTutorialProgress.IsCompleted}");
     }
 
@@ -330,7 +330,7 @@ public static class OutgameDebugActions
     {
         // 낙인을 먼저 걷는다 — Abort가 변경을 통지하므로, 순서를 뒤집으면 알림 점이 아직 완주 상태를 보고 안 뜬다.
         OutgameTutorialProgress.ClearTriggersForDebug();
-        TriggeredTutorialRunner.Abort();
+        OutgameTutorialRunner.AbortGuided();
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.ClearForce();
 
         Debug.Log("[OutgameDebug] Triggered tutorial marks reset — they play again when you re-enter the tab");
@@ -346,7 +346,7 @@ public static class OutgameDebugActions
         int t_chapter = t_last < 0 ? 0 : Mathf.Clamp(_chapterIndex, 0, t_last);
 
         OutgameTutorialProgress.JumpForDebug(t_chapter, 0);
-        TriggeredTutorialRunner.Abort();
+        OutgameTutorialRunner.AbortGuided();
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.ClearForce();
 
         Debug.Log($"[OutgameDebug] Tutorial chapter {t_chapter + 1} back to the start — only the position is rewound (ownership and currency are kept). Applied on scene re-entry ({OutgameTutorialRunner.ForcedChapterCount} forced chapter(s) authored)");

@@ -59,7 +59,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 무대를 트리거 튜토리얼이 쥐고 있는가. 강화·오버레이 신호는 두 브리지가 같은 static 이벤트로 함께 듣기 때문에,
     // 이 술어로 가르지 않으면 강화 성공 한 번이 온보딩과 트리거의 좌표를 동시에 민다.
     // 우선순위는 OutgameTutorialGuide와 같은 규칙이다(겹치면 트리거가 답).
-    static bool StageTakenByTriggered => TriggeredTutorialRunner.IsRunning;
+    static bool StageTakenByTriggered => OutgameTutorialRunner.IsGuidedRunning;
 
     // 지금 오는 강화 신호가 내 것인가. 무대 소유만으로 가르면 안 된다 — 내가 시작한 강화가 아직 끝나기 전에
     // 트리거가 발화하면 그 결말 신호까지 버려져, m_enhancing·m_awaitingUnlockFx가 내려가지 않고 굳는다
@@ -422,7 +422,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         m_rankCompleting = true;
         try
         {
-            TriggeredTutorialRunner.NotifyRankPromotionFinished();
+            OutgameTutorialRunner.NotifyRankPromotionFinished();
             OnGateSatisfied();
         }
         finally
@@ -686,7 +686,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 이것이 없으면 무대가 돌아오지 않아 안내가 사라진 채로 남는다(앵커 없는 설명 스텝은 그대로 영구 정지).
     void OnTriggeredChanged()
     {
-        if (TriggeredTutorialRunner.IsRunning) return;
+        if (OutgameTutorialRunner.IsGuidedRunning) return;
         if (!OutgameTutorialRunner.IsRunning) return;   // 완주 통지도 이 이벤트로 온다 — 끝난 시퀀스를 되세우지 않는다
 
         if (m_deferred)
@@ -704,7 +704,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_subscribed) return;
 
         TutorialAnchorRegistry.OnRegistered   += OnAnchorRegistered;
-        TriggeredTutorialRunner.OnChanged     += OnTriggeredChanged;
+        OutgameTutorialRunner.OnGuidedChanged += OnTriggeredChanged;
         PackRevealView.OnAnyPackOpened        += OnPackOpened;
         PackShowcaseController.OnAnyPurchased += OnPurchased;
         PackOpenOverlay.OnOpened              += OnPackOverlayOpened;
@@ -732,7 +732,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (!m_subscribed) return;
 
         TutorialAnchorRegistry.OnRegistered   -= OnAnchorRegistered;
-        TriggeredTutorialRunner.OnChanged     -= OnTriggeredChanged;
+        OutgameTutorialRunner.OnGuidedChanged -= OnTriggeredChanged;
         PackRevealView.OnAnyPackOpened        -= OnPackOpened;
         PackShowcaseController.OnAnyPurchased -= OnPurchased;
         PackOpenOverlay.OnOpened              -= OnPackOverlayOpened;

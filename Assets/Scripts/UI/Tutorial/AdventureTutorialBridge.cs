@@ -9,7 +9,7 @@ public sealed class AdventureTutorialBridge : MonoBehaviour
     bool m_deferred;
     bool m_gateArmed;
 
-    static bool StageBlocked => OutgameTutorialRunner.IsRunning || TriggeredTutorialRunner.IsRunning
+    static bool StageBlocked => OutgameTutorialRunner.IsRunning || OutgameTutorialRunner.IsGuidedRunning
         || CurtainView.IsBusy || LoadingCoverView.IsCovering || LobbyRankEffectDirector.Playing
         || LobbyGainEffectDirector.Playing || AdventureRewardFlow.IsClaiming
         || RewardClaimPopup.IsOpen || CardRewardOverlay.IsOpen || CardSetRewardOverlay.IsOpen
@@ -27,7 +27,7 @@ public sealed class AdventureTutorialBridge : MonoBehaviour
     {
         AdventureTutorialRunner.OnChanged += Apply;
         TutorialAnchorRegistry.OnRegistered += OnAnchorRegistered;
-        TriggeredTutorialRunner.OnChanged += Apply;
+        OutgameTutorialRunner.OnGuidedChanged += Apply;
     }
     void Start() => Apply();
     void Update()
@@ -44,7 +44,7 @@ public sealed class AdventureTutorialBridge : MonoBehaviour
     {
         AdventureTutorialRunner.OnChanged -= Apply;
         TutorialAnchorRegistry.OnRegistered -= OnAnchorRegistered;
-        TriggeredTutorialRunner.OnChanged -= Apply;
+        OutgameTutorialRunner.OnGuidedChanged -= Apply;
         Clear();
     }
     void OnAnchorRegistered(EOutgameTutorialAnchor key)
