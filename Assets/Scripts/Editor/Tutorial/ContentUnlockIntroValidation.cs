@@ -130,8 +130,12 @@ public static class ContentUnlockIntroValidation
             view.Show("모험 오픈 !", "스테이지를 클리어하고 보상을 받으세요.",
                 new[] { mission.icon }, () => confirmations++, () => cancellations++);
             Require(!button.interactable, "Reopening must reset entrance input.");
-            var secondIcon = (Image)serialized.FindProperty("_icons").GetArrayElementAtIndex(1).objectReferenceValue;
-            Require(!secondIcon.gameObject.activeSelf, "Single intro retained second grouped icon.");
+            // 소개는 콘텐츠를 하나씩 보여주므로 아이콘 칸은 하나다. 빈 칸은 Show에서 예외가 되어 스텝을 세우므로 저작 오류로 잡는다.
+            var iconSlots = serialized.FindProperty("_icons");
+            Require(iconSlots.arraySize == 1 && iconSlots.GetArrayElementAtIndex(0).objectReferenceValue != null,
+                "Intro prefab must keep exactly one icon slot, and it must not be empty.");
+            var firstIcon = (Image)iconSlots.GetArrayElementAtIndex(0).objectReferenceValue;
+            Require(firstIcon.gameObject.activeSelf && firstIcon.sprite == mission.icon, "Reopening must show its icon.");
             view.Close();
             view.Close();
             Require(confirmations == 1 && cancellations == 1 && !ContentUnlockIntroView.IsOpen,
@@ -156,8 +160,8 @@ public static class ContentUnlockIntroValidation
                 ShowNext();
             }
             Prepare();
-            Require(message.text == "미션 오픈 !" && !secondIcon.gameObject.activeSelf,
-                "First queued content must have its own panel and one icon.");
+            Require(message.text == "미션 오픈 !" && firstIcon.sprite == mission.icon,
+                "First queued content must have its own panel and icon.");
             DOTween.Complete(view, true);
             button.onClick.Invoke();
             DOTween.Complete(view, true);
@@ -165,9 +169,8 @@ public static class ContentUnlockIntroValidation
                 && (bool)ownerType.GetField("m_pendingIntro", flags).GetValue(owner),
                 "First confirmation must queue the next panel without completing the step.");
             ShowNext();
-            Require(message.text == "룰렛 오픈 !" && !secondIcon.gameObject.activeSelf && !button.interactable,
+            Require(message.text == "룰렛 오픈 !" && !button.interactable,
                 "Next content must reopen with its own title and entrance gate.");
-            var firstIcon = (Image)serialized.FindProperty("_icons").GetArrayElementAtIndex(0).objectReferenceValue;
             Require(firstIcon.sprite == roulette.icon, "Next content retained the previous icon.");
             DOTween.Complete(view, true);
             button.onClick.Invoke();
