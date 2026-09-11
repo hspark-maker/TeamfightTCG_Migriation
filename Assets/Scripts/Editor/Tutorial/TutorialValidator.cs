@@ -94,22 +94,30 @@ public static class TutorialValidator
         var t_issues = new List<TutorialIssue>();
         if (_data == null || _data.chapters == null) return t_issues;
 
-        var t_state = TutorialSequenceState.Build(_data);
-        var t_ids   = new Dictionary<int, string>();
+        if (!ContentUnlockConfig.TryValidate(_data.contentUnlocks, out string t_unlockError))
+            t_issues.Add(new TutorialIssue(ETutorialIssueLevel.Error, 0, 0, 0, "ContentUnlock",
+                t_unlockError, "SO 최상위 콘텐츠 해금 조건을 수정하세요."));
+
+        var t_state    = TutorialSequenceState.Build(_data);
+        var t_ids      = new Dictionary<int, string>();
+        var t_triggers = new Dictionary<EOutgameTutorialTrigger, int>();
 
         bool t_seenGuided = false;
 
         for (int t_c = 0; t_c < _data.chapters.Count; t_c++)
         {
-            var t_chapter = _data.chapters[t_c];
+            var  t_chapter = _data.chapters[t_c];
+            bool t_guided  = t_chapter != null && t_chapter.IsGuided;
 
             // (19) 자율 챕터 뒤에 선 강제 챕터. 런타임은 선두의 연속 강제 챕터까지만 강제 커서로 읽으므로
             //      이 챕터는 조용히 잘린다 — 졸업이 앞당겨지고 그 안의 지급·해금이 영영 돌지 않는다.
-            if (t_chapter != null && t_chapter.IsGuided) t_seenGuided = true;
+            if (t_guided) t_seenGuided = true;
             else if (t_seenGuided)
                 t_issues.Add(new TutorialIssue(ETutorialIssueLevel.Error, t_c, 0, 0, "자율 뒤의 강제 챕터",
                                                "자율 챕터 뒤에 강제 챕터가 있습니다 — 러너가 이 챕터를 강제 시퀀스로 읽지 않아 통째로 건너뜁니다.",
                                                "강제 챕터를 자율 챕터 앞으로 옮기거나, 이 챕터를 자율로 바꾸세요."));
+
+            if (t_chapter != null) ValidateChapterKind(t_chapter, t_c, t_triggers, t_issues);
 
             // (8) 스텝이 없는 챕터. 진행이 막히지는 않는다 — OutgameTutorialRunner.TryGetNext가 빈 챕터를 건너뛰고,
             //     좌표가 서더라도 CloseOrWarnOnMissingStep이 다음 좌표로 정정해 Advanced를 준다(런타임 판정도 Warning이다).
@@ -138,89 +146,115 @@ public static class TutorialValidator
                 }
 
                 ValidateStepId(t_def, t_c, t_s, t_ids, t_issues);
-                ValidateAnchorGate(t_def, t_c, t_s, t_state, t_issues);
-                ValidateDeckGate(t_def, t_c, t_s, t_gateOpen[t_s], t_gateUnclosed[t_s], t_issues);
 
-                ValidateStep(t_def, t_c, t_s, true, t_issues);
-            }
-        }
+                if (t_guided)
+                {
+                    ValidateGuidedStep(t_def, t_c, t_s, t_s == t_chapter.StepCount - 1, t_issues);
+                }
+                else
+                {
+                    ValidateAnchorGate(t_def, t_c, t_s, t_state, t_issues);
+                    ValidateDeckGate(t_def, t_c, t_s, t_gateOpen[t_s], t_gateUnclosed[t_s], t_issues);
+                }
 
-        // The detached chapter retains persistent IDs but does not derive feature locks.
-        var t_adventure = _data.adventureIntroduction;
-        if (t_adventure != null)
-        {
-            for (int i = 0; i < t_adventure.StepCount; i++)
-            {
-                if (!t_adventure.TryGetStep(i, out var step)) continue;
-                ValidateStepId(step, _data.chapters.Count, i, t_ids, t_issues);
-                if (step.Action != EOutgameTutorialAction.Message
-                    && step.Action != EOutgameTutorialAction.WaitClick
-                    && step.Action != EOutgameTutorialAction.BattleStart
-                    && step.Action != EOutgameTutorialAction.CloseCardDetail)
-                    Add(t_issues, ETutorialIssueLevel.Error, step, _data.chapters.Count, i,
-                        "Unsupported adventure action", "AdventureTutorialBridge cannot execute this action.",
-                        "Use Message, WaitClick, BattleStart or CloseCardDetail.");
+                ValidateStep(t_def, t_c, t_s, !t_guided, t_issues);
             }
         }
 
         return t_issues;
     }
 
-    /// <summary>트리거 시퀀스 점검. 좌표·해금에 기대는 규칙(스텝 ID·앵커 게이트·덱 게이트)은 빼고 본다 —
-    /// 트리거는 진행이 메모리에만 남고 OutgameFeatureLock이 열거하지도 않는다.</summary>
-    public static List<TutorialIssue> ValidateTriggered(TriggeredTutorialData _data)
+    // ── 챕터 성격 규칙 ──────────────────────────────────────────────────────
+
+    static void ValidateChapterKind(OutgameTutorialChapter _chapter, int _index,
+                                    Dictionary<EOutgameTutorialTrigger, int> _triggers, List<TutorialIssue> _issues)
     {
-        var t_issues = new List<TutorialIssue>();
-        if (_data == null || _data.entries == null) return t_issues;
-
-        for (int t_e = 0; t_e < _data.entries.Count; t_e++)
+        if (!_chapter.IsGuided)
         {
-            var t_entry = _data.entries[t_e];
-
-            // (18) 발화 키가 없으면 깨울 수단이 없다 — 완주 낙인의 식별도 이 값이 하므로 대체 경로도 없다
-            if (t_entry != null && t_entry.Trigger == EOutgameTutorialTrigger.None)
-                t_issues.Add(new TutorialIssue(ETutorialIssueLevel.Error, t_e, 0, 0, "발화 키 없음",
-                                               "trigger가 None이라 이 묶음은 영영 발화하지 않습니다 — 저작 전체가 죽은 값입니다.",
-                                               "trigger에 발화 키를 고르세요."));
-
-            // (8) 스텝이 없는 엔트리는 발화해도 아무 일이 없다(진행을 막지는 않는다 — 그 자리에서 완주로 닫힌다)
-            if (t_entry == null || t_entry.StepCount == 0)
-            {
-                t_issues.Add(new TutorialIssue(ETutorialIssueLevel.Warning, t_e, 0, 0, "빈 트리거",
-                                               "이 트리거 묶음에 스텝이 하나도 없습니다 — 발화해도 아무 일도 일어나지 않습니다.",
-                                               "스텝을 저작하거나 엔트리 행을 지우세요."));
-                continue;
-            }
-
-            for (int t_s = 0; t_s < t_entry.StepCount; t_s++)
-            {
-                // (17) 목록 중간의 빈 행 — OutgameTutorialRunner.EnterGuidedStep이 남은 스텝을 버리고
-                //      그 자리에서 "완주"로 닫는다. 완주 낙인은 계정당 1회라 이 트리거는 다시 뜨지 않는다.
-                if (!t_entry.TryGetStep(t_s, out var t_def))
-                {
-                    t_issues.Add(new TutorialIssue(ETutorialIssueLevel.Error, t_e, t_s, 0, "빈 스텝 행",
-                                                   "이 칸에 스텝이 없습니다 — 여기 닿으면 남은 스텝을 버리고 완주로 닫힙니다(낙인이 찍혀 다시 뜨지 않습니다).",
-                                                   "행을 지우거나 액션을 저작하세요."));
-                    continue;
-                }
-
-                // (14) 트리거 스텝의 해금/잠금은 완전히 무시된다 — OutgameFeatureLock은 온보딩 러너의 좌표만 열거한다
-                if (t_def.UnlocksAll || HasAny(t_def.Unlocks) || HasAny(t_def.Locks))
-                    Add(t_issues, ETutorialIssueLevel.Warning, t_def, t_e, t_s, "무시되는 해금",
-                        "트리거 스텝에 해금/잠금이 저작돼 있습니다 — 해금은 온보딩 좌표에서만 파생되어 이 값은 읽히지 않습니다.",
-                        "지우세요. 정말 필요한 잠금이면 온보딩 시퀀스로 옮겨야 합니다.");
-
-                // (15) 트리거 진행은 세이브에 남지 않는다(앱을 끄면 처음부터) — 스텝 ID가 붙잡을 대상이 없다
-                if (t_def.StepId > 0)
-                    Add(t_issues, ETutorialIssueLevel.Warning, t_def, t_e, t_s, "쓸모없는 스텝 ID",
-                        $"트리거 스텝에 ID #{t_def.StepId}가 붙어 있습니다 — 트리거는 stepId 개념이 없어 아무 데서도 읽지 않습니다.",
-                        "온보딩에서 복제해 온 행일 가능성이 큽니다. 나머지 저작도 함께 확인하세요.");
-
-                ValidateStep(t_def, t_e, t_s, false, t_issues);
-            }
+            // 강제 챕터의 발화 키는 읽히지 않는다 — 자율에서 강제로 되돌린 흔적일 가능성이 크다.
+            if (_chapter.EditorTrigger != EOutgameTutorialTrigger.None)
+                _issues.Add(new TutorialIssue(ETutorialIssueLevel.Warning, _index, 0, 0, "쓰지 않는 발화 키",
+                                              "강제 챕터에 trigger가 저작돼 있습니다 — 강제 챕터는 발화 키를 읽지 않습니다.",
+                                              "None으로 되돌리거나, 이 챕터를 자율로 바꾸세요."));
+            return;
         }
 
-        return t_issues;
+        var t_trigger = _chapter.Trigger;
+
+        // (20) 발화 키가 없으면 깨울 수단이 없다 — 완주 낙인의 식별도 이 값이 하므로 대체 경로도 없다
+        if (t_trigger == EOutgameTutorialTrigger.None)
+        {
+            _issues.Add(new TutorialIssue(ETutorialIssueLevel.Error, _index, 0, 0, "발화 키 없음",
+                                          "자율 챕터의 trigger가 None이라 영영 발화하지 않습니다 — 저작 전체가 죽은 값입니다.",
+                                          "trigger에 발화 키를 고르세요."));
+        }
+        else if (_triggers.TryGetValue(t_trigger, out int t_first))
+        {
+            // (24) 같은 트리거의 자율 챕터가 둘이면 먼저 나온 챕터가 이긴다(OutgameTutorialRunner.TryGetGuidedChapter) — 뒤는 죽은 저작이다
+            _issues.Add(new TutorialIssue(ETutorialIssueLevel.Error, _index, 0, 0, "발화 키 중복",
+                                          $"{t_first}편과 같은 발화 키 {t_trigger}입니다 — 먼저 나온 챕터만 발화하고 이 챕터는 영영 서지 않습니다.",
+                                          "발화 키를 다르게 고르거나 두 챕터를 합치세요."));
+        }
+        else
+        {
+            _triggers[t_trigger] = _index;
+
+            // (25) 폐기된 발화 키. 발화처가 0이라 저작해도 아무도 깨우지 않는다
+            if (t_trigger == EOutgameTutorialTrigger.FirstEvolutionReady || t_trigger == EOutgameTutorialTrigger.AdventureUnlocked)
+                _issues.Add(new TutorialIssue(ETutorialIssueLevel.Warning, _index, 0, 0, "폐기된 발화 키",
+                                              $"{t_trigger}는 발화처가 없는 폐기된 키입니다 — 이 챕터는 아무도 깨우지 않습니다.",
+                                              "살아 있는 발화 키로 바꾸세요."));
+        }
+
+        // (26) 선행 기능이 없으면 알림 점이 졸업 직후부터 항상 뜬다 — 의도라면 그대로 두어도 된다
+        if (_chapter.Prerequisite == EOutgameFeature.None)
+            _issues.Add(new TutorialIssue(ETutorialIssueLevel.Info, _index, 0, 0, "선행 기능 없음",
+                                          "prerequisite가 None이라 졸업 직후부터 알림 점이 뜹니다.",
+                                          "안내가 가리키는 화면을 여는 기능을 선행 기능으로 두면 잠긴 동안 점이 숨습니다."));
+    }
+
+    // 자율 챕터 스텝만의 규약. 메모리 커서·로비 안 완결·좌표 파생 없음이라는 세 전제에서 나온다.
+    static void ValidateGuidedStep(TutorialStepDef _def, int _chapter, int _index, bool _isLast, List<TutorialIssue> _issues)
+    {
+        // (21) 해금·잠금은 강제 좌표에서만 파생된다 — 자율 스텝의 값은 읽히지 않는데 저작자는 잠긴 줄 안다
+        if (_def.UnlocksAll || HasAny(_def.Unlocks) || HasAny(_def.Locks))
+            Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "자율 스텝의 해금/잠금",
+                "자율 챕터 스텝에 해금/잠금이 저작돼 있습니다 — 해금은 강제 좌표에서만 파생되어 이 값은 읽히지 않습니다.",
+                "지우세요. 정말 필요한 잠금이면 강제 시퀀스로 옮겨야 합니다.");
+
+        // (23) 강제 전용 액션. 지급·전투 진입·첫 랭크 준비는 세이브 좌표와 되감기를 전제로 하고, 자율에는 그 둘이 없다
+        switch (_def.Action)
+        {
+            case EOutgameTutorialAction.AutoPurchase:
+            case EOutgameTutorialAction.DeckGrant:
+            case EOutgameTutorialAction.CardGrant:
+            case EOutgameTutorialAction.CardSetGrant:
+            case EOutgameTutorialAction.PackNotice:
+            case EOutgameTutorialAction.EnterFirstRank:
+            case EOutgameTutorialAction.BattleEntry:
+            case EOutgameTutorialAction.AutoBattle:
+            case EOutgameTutorialAction.WaitPurchase:
+            case EOutgameTutorialAction.WaitPackOpen:
+            case EOutgameTutorialAction.WaitAlbumInsert:
+            case EOutgameTutorialAction.DeckAutoEquip:
+                Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "자율에서 못 쓰는 액션",
+                    $"{_def.Action}는 세이브 좌표·되감기·지급 재생을 전제로 하는 강제 전용 액션입니다 — 자율 챕터에서는 메모리 커서라 그 전제가 없습니다.",
+                    "강제 시퀀스로 옮기거나 다른 액션으로 바꾸세요.");
+                return;
+        }
+
+        // (22) 자율은 로비 안에서 시작해 로비 안에서 끝난다 — 씬을 떠나는 스텝은 마지막이어야 하고, 그때 낙인은 이탈 직전 클릭에서 찍힌다
+        if (_def.LeavesScene)
+        {
+            if (!_isLast)
+                Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "자율 도중 씬 이탈",
+                    $"{_def.Action}가 씬을 떠나는데 뒤에 스텝이 남아 있습니다 — 자율 커서는 메모리라 씬을 넘지 못하고 남은 스텝은 영영 서지 않습니다.",
+                    "씬을 떠나는 스텝을 챕터 마지막으로 옮기세요.");
+            else
+                Add(_issues, ETutorialIssueLevel.Info, _def, _chapter, _index, "이탈로 완주",
+                    "마지막 스텝이 씬을 떠납니다 — 완주 낙인은 이탈 직전 클릭에서 찍힙니다.",
+                    null);
+        }
     }
 
     // ── 좌표에 기대는 규칙 ──────────────────────────────────────────────────
@@ -325,21 +359,21 @@ public static class TutorialValidator
         }
     }
 
-    // ── 좌표와 무관한 규칙(온보딩·트리거 공용) ──────────────────────────────
+    // ── 좌표와 무관한 규칙(강제·자율 공용) ──────────────────────────────────
 
-    static void ValidateStep(TutorialStepDef _def, int _chapter, int _index, bool _onboarding, List<TutorialIssue> _issues)
+    static void ValidateStep(TutorialStepDef _def, int _chapter, int _index, bool _forced, List<TutorialIssue> _issues)
     {
         var t_action = _def.Action;
 
         // (5) Halt는 좌표를 되돌려 재시도를 노리는 정책인데, 앵커도 완료 신호도 없으면 되돌려 봐야 다시 세울 수단이 없다.
-        //     되돌린 좌표가 온보딩은 세이브에 남아 다음 초기화를 노릴 수라도 있지만, 트리거는 메모리 전용이라 그 기회조차 없다.
+        //     되돌린 좌표가 강제는 세이브에 남아 다음 초기화를 노릴 수라도 있지만, 자율은 메모리 전용이라 그 기회조차 없다.
         if (_def.OnFailure == EOutgameTutorialFailure.Halt
          && _def.Completion == EOutgameTutorialCompletion.Auto
          && _def.Anchor == EOutgameTutorialAnchor.None)
             Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "재개 불가 Halt",
-                $"{t_action}가 Halt인데 앵커도 완료 신호도 없습니다 — " + (_onboarding
+                $"{t_action}가 Halt인데 앵커도 완료 신호도 없습니다 — " + (_forced
                     ? "되돌려도 이 초기화에서 다시 세울 수단이 없어 그 자리에서 안내가 끝납니다(재시도는 다음 초기화뿐입니다)."
-                    : "트리거 좌표는 메모리 전용이라 되돌린 자리에서 이 안내가 그대로 끝납니다."),
+                    : "자율 커서는 메모리 전용이라 되돌린 자리에서 이 안내가 그대로 끝납니다."),
                 "onFailure를 Skip으로 바꾸거나, 되돌아왔을 때 진행을 다시 세울 앵커를 주세요.");
 
         // (7) 액션이 요구하는 참조가 비면 실행기가 실패 분기로 빠진다 — 기본 Skip이면 경고 한 줄 남기고 그냥 전진한다
@@ -376,8 +410,8 @@ public static class TutorialValidator
         }
 
         // (11) 폐기된 기능. 소비처가 0이라 여닫아도 아무 일도 일어나지 않는다
-        //      (트리거 스텝에서는 (14)가 이미 더 넓게 잡으므로 중복해서 쏟지 않는다)
-        if (_onboarding && (Contains(_def.Unlocks, EOutgameFeature.CollectionHarvest)
+        //      (자율 스텝에서는 (21)이 이미 더 넓게 잡으므로 중복해서 쏟지 않는다)
+        if (_forced && (Contains(_def.Unlocks, EOutgameFeature.CollectionHarvest)
                          || Contains(_def.Locks,   EOutgameFeature.CollectionHarvest)))
             Add(_issues, ETutorialIssueLevel.Warning, _def, _chapter, _index, "폐기된 기능",
                 "unlocks/locks에 CollectionHarvest(구 도감 수확)가 있습니다 — 소비처가 없어 아무 것도 여닫지 않습니다.",

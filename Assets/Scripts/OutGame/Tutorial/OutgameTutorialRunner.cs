@@ -95,7 +95,6 @@ public static class OutgameTutorialRunner
     {
         if (s_data == null) return;
         if (IsGuidedRunning) return;
-        if (AdventureTutorialRunner.IsRunning) return;
         if (!HasPending(_trigger)) return;
 
         TryGetGuidedChapter(_trigger, out s_guidedChapter, out _);
@@ -205,9 +204,11 @@ public static class OutgameTutorialRunner
 
         s_data = _data;
         s_forcedCount = CountForcedPrefix();
-        AdventureTutorialRunner.EnsureData(_data);
         WarnOnMisauthoredChapters();
     }
+
+    // 주입된 시퀀스 SO(모험 해금 이정표처럼 챕터 밖의 저작값을 읽는 쪽이 쓴다)
+    public static OutgameTutorialData Data => s_data;
 
     /// <summary>트리거가 깨우는 자율 챕터. 같은 트리거가 여럿이면 먼저 나온 챕터가 이긴다(검증기가 중복을 잡는다).</summary>
     public static bool TryGetGuidedChapter(EOutgameTutorialTrigger _trigger, out int _index, out OutgameTutorialChapter _chapter)
@@ -427,7 +428,7 @@ public static class OutgameTutorialRunner
         _cardId = 0;
 
         // 정지 fail-open으로 덱 탭이 좌표보다 먼저 열리면, 한참 앞 스텝의 카드가 빠진 5/6 덱이 떠 저장이 막힌다.
-        if (OutgameFeatureLock.AllUnlocked) return false;
+        if (OutgameFeatureLock.IsFtueFreeNavigation) return false;
 
         if (!IsRunning) return false;
 

@@ -31,6 +31,9 @@ public sealed class MissionCutInView : SingletonOverlayBase
     LobbyMatchLauncher m_matchLauncher;
     bool m_hasCurrent;
 
+    public static bool IsPlaying => s_instance != null && s_instance.isActiveAndEnabled
+        && s_instance.m_hasCurrent && s_instance.canvasGroup != null && s_instance.canvasGroup.alpha > 0f;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetRuntimeState() => s_instance = null;
 
@@ -67,13 +70,13 @@ public sealed class MissionCutInView : SingletonOverlayBase
     void FindLobby() => m_matchLauncher = FindFirstObjectByType<LobbyMatchLauncher>(FindObjectsInactive.Include);
 
     bool CanShow => GameInitialization.IsReady
+        && !ContentUnlockPresentation.IsPlaying
         && SceneManager.GetActiveScene().name == "LobbyScene"
         && !CurtainView.IsBusy
-        && !AdventureTutorialRunner.IsRunning && !SynergyIntroduction.IsActive
+        && !SynergyIntroduction.IsActive
         && (UIPoolManager.instance == null || !UIPoolManager.instance.HasVisibleUIExcept())
         && (m_matchLauncher == null || !m_matchLauncher.IsRunning)
-        // 로비 콘텐츠 전체 해금부터 알린다. 이후 튜토리얼 완료까지 기다리지 않는다.
-        && OutgameFeatureLock.AllUnlocked && !OutgameTutorialRunner.IsGuidedRunning;
+        && OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission) && !OutgameTutorialRunner.IsGuidedRunning;
 
     void Update()
     {

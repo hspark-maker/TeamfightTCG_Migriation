@@ -12,6 +12,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 75657545e05445d458099476ddb662f3, type: 3}
   m_Name: OutgameTutorial
   m_EditorClassIdentifier: Assembly-CSharp::OutgameTutorialData
+  contentUnlocks:
+  - feature: 17
+    requireFtue: 1
+    requireRank: 0
+    minRankGrade: 0
+    minRankDivision: 0
+    minAccountLevel: 0
+  - feature: 18
+    requireFtue: 1
+    requireRank: 0
+    minRankGrade: 0
+    minRankDivision: 0
+    minAccountLevel: 0
+  - feature: 16
+    requireFtue: 0
+    requireRank: 1
+    minRankGrade: 0
+    minRankDivision: 2
+    minAccountLevel: 0
   chapters:
   - label: "\uCCAB \uAC8C\uC784 \uC2DC\uC791"
     kind: 0
@@ -808,21 +827,18 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-  adventureUnlockGrade: 0
-  adventureUnlockDivision: 2
-  adventureIntroduction:
-    label: Adventure introduction
-    kind: 0
-    trigger: 0
-    prerequisite: 0
+  - label: "\uBAA8\uD5D8 \uC18C\uAC1C"
+    kind: 1
+    trigger: 6
+    prerequisite: 16
     stepDefs:
-    - stepId: 35
+    - stepId: 22
       action: 1
       anchor: 0
       spotlight: 0
-      guideMessage: "[\uBAA8\uD5D8 : \uC548\uAC1C\uC232] \uC774 \uD574\uAE08\uB418\uC5C8\uC2B5\uB2C8\uB2E4!"
+      guideMessage: "[\uBAA8\uD5D8] \uCEE8\uD150\uCE20\uAC00 \uD574\uAE08\uB418\uC5C8\uC2B5\uB2C8\uB2E4!"
       messageAtBottom: 0
-      unlocks: 10000000
+      unlocks: 
       unlocksAll: 0
       locks: 
       useDim: 1
@@ -839,10 +855,10 @@ MonoBehaviour:
       showDeckGate: 0
       deckName: 
       onFailure: 0
-    - stepId: 36
+    - stepId: 22
       action: 0
       anchor: 24
-      spotlight: 0
+      spotlight: 24
       guideMessage: 
       messageAtBottom: 0
       unlocks: 
@@ -906,7 +922,7 @@ MonoBehaviour:
       scenario: {fileID: 0}
       cardId: 0
       cardIds: 
-      showDeckGate: 1
+      showDeckGate: 0
       deckName: 
       onFailure: 0
     - stepId: 17

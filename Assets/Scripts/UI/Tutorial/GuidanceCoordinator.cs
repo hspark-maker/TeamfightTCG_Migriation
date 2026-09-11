@@ -8,7 +8,11 @@ public sealed class GuidanceCoordinator : MonoBehaviour
     bool m_initialized;
     float m_nextEvaluation;
 
-    public static bool CanPresent => s_instance != null && s_instance.SafeToPresent();
+    public static bool CanPresent => !ContentUnlockPresentation.IsPlaying && CanPresentContentUnlock;
+
+    /// <summary>해금 연출 자체를 제외한 로비 무대 준비 상태.</summary>
+    public static bool CanPresentContentUnlock => s_instance != null && s_instance.SafeToPresent()
+        && !OutgameTutorialRunner.IsRunning && !MissionCutInView.IsPlaying;
 
     public static void Install(GameObject owner)
     {
@@ -32,7 +36,7 @@ public sealed class GuidanceCoordinator : MonoBehaviour
     }
 
     static bool StageBusyForGuided
-        => SynergyIntroduction.IsActive || OutgameTutorialGateUI.IsShowing
+        => SynergyIntroduction.IsActive || ContentUnlockPresentation.IsPlaying || OutgameTutorialGateUI.IsShowing
         || CurtainView.IsBusy || LoadingCoverView.IsCovering
         || LobbyRankEffectDirector.Playing || LobbyGainEffectDirector.Playing;
 
@@ -50,8 +54,7 @@ public sealed class GuidanceCoordinator : MonoBehaviour
         || RankPromoteOverlay.IsOpen || RewardClaimPopup.IsOpen || AdventureRewardFlow.IsClaiming
         || PackOpenOverlay.IsOpen || CardDetailOverlayView.IsOpen || AlbumPageOverlayView.IsOpen
         || CardRewardOverlay.IsOpen || CardSetRewardOverlay.IsOpen || PackRewardOverlay.IsOpen
-        || OutgameTutorialGateUI.IsShowing || OutgameTutorialRunner.IsGuidedRunning
-        || AdventureTutorialRunner.IsRunning;
+        || OutgameTutorialGateUI.IsShowing || OutgameTutorialRunner.IsGuidedRunning;
 
     bool SafeToPresent()
         => !HasPriorityActivity && !SynergyIntroduction.IsActive && UIPoolManager.instance != null
@@ -63,7 +66,7 @@ public sealed class GuidanceCoordinator : MonoBehaviour
         {
             if (!GameInitialization.IsReady || CurtainView.IsBusy || LoadingCoverView.IsCovering
                 || (m_launcher != null && m_launcher.IsRunning) || OutgameTutorialRunner.IsRunning
-                || OutgameTutorialRunner.IsGuidedRunning || AdventureTutorialRunner.IsRunning)
+                || OutgameTutorialRunner.IsGuidedRunning)
                 SynergyIntroduction.CancelPresentation();
             return;
         }
@@ -73,11 +76,10 @@ public sealed class GuidanceCoordinator : MonoBehaviour
         {
             m_initialized = true;
             SynergyIntroduction.Reevaluate();
-            AdventureTutorialRunner.RefreshUnlock();
+            ContentUnlockManager.RequestRefresh();
         }
-        if (!SafeToPresent()) return;
+        if (!CanPresent) return;
         if (OutgameTutorialRunner.IsRunning) return;
-        if (AdventureTutorialRunner.TryBegin()) return;
         if (SynergyIntroduction.HasPending) SynergyIntroduction.TryBegin();
     }
 

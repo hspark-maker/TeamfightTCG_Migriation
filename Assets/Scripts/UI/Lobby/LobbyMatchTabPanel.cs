@@ -27,10 +27,10 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
 
     [SerializeField] Button keywordGrowthButton;
 
-    [Tooltip("룰렛을 여는 버튼. 잠김 룩(FeatureLockView)은 붙이지 않는다 — 룰렛 해금은 온보딩 축이라 아직 없다.")]
+    [Tooltip("룰렛을 여는 버튼. 콘텐츠 해금과 설정 준비 조건을 함께 따른다.")]
     [SerializeField] Button rouletteButton;
 
-    [Tooltip("일일·주간 미션을 여는 버튼. 잠금 축이 없어 항상 눌린다 — 목록이 비는 주기는 화면이 스스로 안내한다.")]
+    [Tooltip("일일·주간 미션을 여는 버튼. 강제 선형 FTUE 완료 시 해금한다.")]
     [SerializeField] Button missionButton;
 
     [Tooltip("가이드 미션(1회성 순차)을 여는 버튼. 정의가 없거나 전부 수령했으면 버튼째 감춘다 —\n" +
@@ -55,6 +55,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
 
     // 버튼의 저작 문구. 승급전 상태가 풀리면 여기로 돌아간다 — 평상시 문구를 코드가 다시 쓰지 않게.
     string m_defaultPlayText;
+    ContentUnlockPresentation m_unlockPresentation;
 
     void Awake()
     {
@@ -75,6 +76,14 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         // PlayBtn만 프리팹 저작인 것은 그쪽 잠금 주체가 LobbyMatchLauncher라 중립 지점이 필요했기 때문이다.
         if (keywordGrowthButton != null) FeatureLockView.Attach(keywordGrowthButton.gameObject, EOutgameFeature.KeywordGrowth);
         if (adventureButton != null) FeatureLockView.Attach(adventureButton.gameObject, EOutgameFeature.Adventure);
+        if (missionButton != null) FeatureLockView.Attach(missionButton.gameObject, EOutgameFeature.Mission);
+        if (guideMissionButton != null) FeatureLockView.Attach(guideMissionButton.gameObject, EOutgameFeature.Mission);
+        if (rouletteButton != null) FeatureLockView.Attach(rouletteButton.gameObject, EOutgameFeature.Roulette);
+        m_unlockPresentation = gameObject.AddComponent<ContentUnlockPresentation>();
+        m_unlockPresentation.Bind(
+            missionButton != null ? missionButton.GetComponent<FeatureLockView>() : null,
+            adventureButton != null ? adventureButton.GetComponent<FeatureLockView>() : null,
+            rouletteButton != null ? rouletteButton.GetComponent<FeatureLockView>() : null);
 
         // 탭이 꺼져 있는 동안에도 신호를 받아야 한다 — 놓치면 다른 탭에 있던 사이 끝난 연출을 영영 못 따라간다.
         OutgameFeatureLock.OnChanged += ApplyFeatureLocks;
@@ -117,6 +126,10 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         RefreshGuideMissionButton();
     }
 
+    public override void OnSettled() => m_unlockPresentation?.SetVisible(true);
+
+    public override void OnLeave() => m_unlockPresentation?.SetVisible(false);
+
     /// <summary>승급전 대기면 버튼 문구를 갈고, 아니면 저작 문구로 되돌린다.
     /// 랭크 정산 연출이 도는 중에는 갈지 않는다 — 별이 차고 배지에 광선이 붙는 결말을 버튼이 먼저 말해버린다.</summary>
     void RefreshPlayLabel()
@@ -132,16 +145,21 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     /// 두 축이 같은 컴포넌트에 있으면 어느 쪽이 이겼는지가 호출 순서에 달린다.</summary>
     void ApplyFeatureLocks()
     {
+        bool t_missionsUnlocked = OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission);
+        if (missionButton != null) missionButton.interactable = t_missionsUnlocked;
+        if (guideMissionButton != null) guideMissionButton.interactable = t_missionsUnlocked;
+
         if (keywordGrowthButton != null)
             keywordGrowthButton.interactable = OutgameFeatureLock.IsUnlocked(EOutgameFeature.KeywordGrowth);
 
         if (adventureButton != null)
             adventureButton.interactable = OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure);
 
-        // 룰렛만 기능잠금 축이 아니라 "설정과 소스가 섰는가"로 갈린다. 저작 결함이나 출시 빌드에서
-        // 버튼이 통째로 사라지는 것이 안전장치라, 잠김 룩을 씌우지 않고 감춘다.
         if (rouletteButton != null)
+        {
             rouletteButton.gameObject.SetActive(RouletteManager.IsAvailable);
+            rouletteButton.interactable = OutgameFeatureLock.IsUnlocked(EOutgameFeature.Roulette);
+        }
     }
 
     /// <summary>랭크 보상 목록. 풀이 없으면(초기화 미초기화) 조용히 지나가지 않고 드러낸다.</summary>
@@ -161,7 +179,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     /// (감추기는 표현이고, 다른 경로로 이 메서드를 부를 수 있다).</summary>
     public void OpenRoulette()
     {
-        if (!RouletteManager.IsAvailable) return;
+        if (!RouletteManager.IsAvailable || !OutgameFeatureLock.IsUnlocked(EOutgameFeature.Roulette)) return;
 
         OpenPooled<RoulettePanel>();
     }
@@ -188,20 +206,24 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         t_overlay.Show(RankTier.None, t_tier, EPromoteKind.FirstEntry, null, null, _browse: true);
     }
 
-    /// <summary>일일·주간 미션. 잠금 게이트가 없다 — 미션은 부가 기능이고, 목록이 비어도
-    /// 화면이 스스로 안내한다(활성 미션이 현재 팩 개봉 축뿐이라 실제로 비는 주기가 있다).</summary>
-    public void OpenMissions() => OpenPooled<MissionPanel>();
+    /// <summary>강제 선형 FTUE 완료 후 일일·주간 미션을 연다.</summary>
+    public void OpenMissions()
+    {
+        if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission)) return;
+        OpenPooled<MissionPanel>();
+    }
 
     /// <summary>가이드 미션. 버튼을 감추는 것만으로는 부족하다 — 진입을 실제로 막는 주체는 여기다
     /// (감추기는 표현이고, 다른 경로로 이 메서드를 부를 수 있다).</summary>
     public void OpenGuideMissions()
     {
+        if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission)) return;
         if (!AnyGuideMissionOpen()) return;
 
         OpenPooled<GuideMissionPanel>();
     }
 
-    /// <summary>배틀패스. 미션과 같은 이유로 잠금 게이트가 없다 — 활성 시즌이 없으면
+    /// <summary>배틀패스. 잠금 게이트가 없다 — 활성 시즌이 없으면
     /// 화면이 그 사실을 그린다(빈 목록으로 두지 않는다).</summary>
     public void OpenPass() => OpenPooled<PassPanel>();
 

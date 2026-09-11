@@ -325,7 +325,7 @@ public static class OutgameDebugActions
         Debug.Log($"[OutgameDebug] Tutorial progress reset — {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex} / completed {OutgameTutorialProgress.IsCompleted}");
     }
 
-    // 트리거 튜토리얼(탭 첫 진입 등) 낙인만 재설정
+    // 자율 안내(탭 첫 진입·패널 첫 열기 등) 완주 낙인만 재설정
     public static void ResetTriggeredTutorials()
     {
         // 낙인을 먼저 걷는다 — Abort가 변경을 통지하므로, 순서를 뒤집으면 알림 점이 아직 완주 상태를 보고 안 뜬다.
@@ -333,7 +333,7 @@ public static class OutgameDebugActions
         OutgameTutorialRunner.AbortGuided();
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.ClearForce();
 
-        Debug.Log("[OutgameDebug] Triggered tutorial marks reset — they play again when you re-enter the tab");
+        Debug.Log("[OutgameDebug] Guided tutorial marks reset — they play again on the next trigger");
     }
 
     // 튜토리얼 N편 처음으로 되감기 — 되돌리는 것은 좌표와 완료 낙인뿐이다(씬 재진입 시 적용).

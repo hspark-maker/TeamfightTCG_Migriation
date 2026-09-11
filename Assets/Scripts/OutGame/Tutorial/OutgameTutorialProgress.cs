@@ -33,7 +33,7 @@ public static class OutgameTutorialProgress
     // 초기화에서 클라우드 세이브 채택 이후 1회 호출 — 진행 정지 판정
     public static void Init()
     {
-        AdventureTutorialRunner.Initialize();
+        AdventureUnlock.Initialize();
         DetectStall();
     }
 
@@ -123,6 +123,7 @@ public static class OutgameTutorialProgress
         t_slot.ChapterStepIndex = _step;
         t_slot.StepId           = OutgameTutorialRunner.StepIdAt(_chapter, _step);
         t_slot.OutgameCompleted = false;
+        ContentUnlockManager.ResetForDebug();
         Save();
 
         // 손으로 되감은 좌표는 "막힌 좌표"가 아니다 — 옛 카운트를 이어 세면 몇 초기화 만에 오탐 정지가 뜬다.

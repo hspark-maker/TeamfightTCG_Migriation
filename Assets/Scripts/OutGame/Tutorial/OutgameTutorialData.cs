@@ -5,19 +5,15 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "OutgameTutorial", menuName = "Card Battle/Outgame Tutorial")]
 public class OutgameTutorialData : ScriptableObject
 {
+    [Header("콘텐츠 해금 조건")]
+    [Tooltip("조건은 모두 AND로 평가한다. 스텝 실행과 독립적이며, 한번 해금한 콘텐츠는 조건을 올려도 다시 잠기지 않는다.")]
+    public List<ContentUnlockDef> contentUnlocks = new List<ContentUnlockDef>();
+
     [Header("챕터 시퀀스 (순서 = 진행 순서, 세이브가 붙잡는 것은 스텝의 stepId)")]
     [Tooltip("챕터 하나 = 기획의 '튜토리얼 N편'.\n"
            + "행을 복제하면 stepId까지 복제되므로, 복제한 뒤에는 우클릭 메뉴 [스텝 ID 부여]를 다시 돌려라 "
            + "— 겹친 번호를 걷어 새로 매긴다. 그러지 않으면 두 행이 같은 스텝으로 보인다")]
     public List<OutgameTutorialChapter> chapters = new List<OutgameTutorialChapter>();
-
-    [Header("Adventure introduction")]
-    [Tooltip("모험을 해금할 최소 랭크 등급. 이미 해금된 계정은 유지됩니다.")]
-    public ERankGrade adventureUnlockGrade = ERankGrade.Bronze;
-    [Range(1, RankConfig.DivisionsPerGrade)]
-    [Tooltip("모험을 해금할 랭크 단계. 해당 랭크 이상 도달 시 해금됩니다.")]
-    public int adventureUnlockDivision = 2;
-    public OutgameTutorialChapter adventureIntroduction;
 
     // 다음에 내줄 번호. 단조 증가만 하고 지운 번호를 재사용하지 않는다 —
     // 재사용하면 삭제된 스텝에 서 있던 세이브가 "삭제 경고" 없이 무관한 새 스텝으로 조용히 옮겨간다.
@@ -45,9 +41,9 @@ public class OutgameTutorialData : ScriptableObject
 
         // 1패스 — 살아 있는 번호를 먼저 전부 모은다. 한 번에 훑으면서 나눠 주면 아직 안 본 뒤쪽 번호를
         // 새 칸에 내주게 되고, 그러면 그 뒤가 전부 한 칸씩 밀린다(이 도구가 막으려던 바로 그 사고다).
-        for (int t_c = 0; t_c <= chapters.Count; t_c++)
+        for (int t_c = 0; t_c < chapters.Count; t_c++)
         {
-            var t_chapter = t_c < chapters.Count ? chapters[t_c] : adventureIntroduction;
+            var t_chapter = chapters[t_c];
             if (t_chapter == null) continue;
 
             for (int t_s = 0; t_s < t_chapter.StepCount; t_s++)

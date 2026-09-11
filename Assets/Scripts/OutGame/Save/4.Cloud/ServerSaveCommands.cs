@@ -13,11 +13,13 @@ internal static class ServerSaveCommands
 
     static ICallableService s_service;
     static UniTaskCompletionSource s_inFlight;
+    internal static bool IsInFlight => s_inFlight != null;
 
     /// <summary>Firebase 모듈이 서비스를 꽂는다(해제 시 null).</summary>
     internal static void SetService(ICallableService _service)
     {
         s_service = _service;
+        ContentUnlockManager.ResetSession();
         MissionCommands.ResetSession();
     }
 
@@ -119,6 +121,7 @@ internal static class ServerSaveCommands
             PlayerSaveCloud.ResumeUploads();
             s_inFlight = null;
             t_gate.TrySetResult();
+            ContentUnlockManager.FlushPending();
         }
     }
 

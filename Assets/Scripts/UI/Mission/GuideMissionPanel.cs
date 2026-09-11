@@ -60,6 +60,8 @@ public class GuideMissionPanel : PooledUIBase
     // 씬 버튼 UnityEvent 가 인자 없는 이 시그니처에 바인딩된다 — 매개변수를 붙이면 배선이 끊긴다.
     public void Open()
     {
+        if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission)) return;
+
         this.SetVisible(true);
         this.Rebuild();
 

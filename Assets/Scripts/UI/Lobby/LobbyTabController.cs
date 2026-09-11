@@ -48,7 +48,7 @@ public class LobbyTabController : MonoBehaviour
         && m_pendingStart == null && m_startSlides == null
         && m_pendingArrive == null && m_leaving == null
         // 미완주 상태라도 전체 해금된 로비는 자유 조작을 허용한다.
-        && (!OutgameTutorialRunner.IsRunning || OutgameFeatureLock.AllUnlocked)
+        && (!OutgameTutorialRunner.IsRunning || OutgameFeatureLock.IsFtueFreeNavigation)
         && !OutgameTutorialRunner.IsGuidedRunning;
 
     /// <summary>Moves one adjacent tab through the same policy as a tab button.</summary>

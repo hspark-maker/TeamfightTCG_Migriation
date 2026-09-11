@@ -10,6 +10,11 @@ public sealed class TutorialDataStep : MainInitializer
 
     public override UniTask Initialize(InitializationContext _context)
     {
+        if (!ContentUnlockConfig.TrySetSource(tutorialData != null ? tutorialData.contentUnlocks : null, out string t_error))
+        {
+            FailToRecovery(_context, new System.InvalidOperationException(t_error));
+            return UniTask.CompletedTask;
+        }
         OutgameTutorialRunner.EnsureData(tutorialData);
         return UniTask.CompletedTask;
     }

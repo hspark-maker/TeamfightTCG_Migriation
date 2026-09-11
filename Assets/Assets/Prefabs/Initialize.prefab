@@ -243,7 +243,6 @@ MonoBehaviour:
   requiredIds: []
   retryEntry: 0
   tutorialData: {fileID: 11400000, guid: f8c1956156735bb4e8266fa5abf76d0c, type: 2}
-  triggeredTutorialData: {fileID: 11400000, guid: af7d8b417cb64f543acba89e6e31e427, type: 2}
 --- !u!114 &1581884920793774151
 MonoBehaviour:
   m_ObjectHideFlags: 0

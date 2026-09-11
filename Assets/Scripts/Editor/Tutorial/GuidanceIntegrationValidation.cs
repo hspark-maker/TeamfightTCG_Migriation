@@ -32,15 +32,17 @@ public static class GuidanceIntegrationValidation
         var original = new TutorialSaveData
         {
             ChapterIndex = 2, ChapterStepIndex = 12, StepId = 38,
-            AdventureFlowVersion = 1, AdventureUnlocked = true, AdventureIntroStarted = true,
-            AdventureIntroStepId = 37, AdventureIntroDeferred = true,
+            AdventureFlowVersion = 2, AdventureUnlocked = true,
+            CompletedTriggers = new System.Collections.Generic.List<string> { "KeywordGrowthFirstOpen", "AdventureMapFirstOpen" },
             SynergyIntroduction = new SynergyIntroductionSaveData { DeckSlot = 2, SynergyId = "Caretaker" },
         };
         string json = JsonConvert.SerializeObject(original, settings);
         var fields = JObject.Parse(json);
         Require((int)fields["synergyIntroduction"]["deckSlot"] == 2, "Synergy target wire key missing.");
+        Require(fields["completedTriggers"] is JArray t_triggers && t_triggers.Count == 2, "Completed trigger wire key missing.");
         var restored = JsonConvert.DeserializeObject<TutorialSaveData>(json, settings);
-        Require(restored.AdventureIntroStepId == 37 && restored.AdventureIntroDeferred
+        Require(restored.AdventureFlowVersion == 2 && restored.AdventureUnlocked
+            && restored.CompletedTriggers.Contains("AdventureMapFirstOpen")
             && restored.SynergyIntroduction.SynergyId == "Caretaker",
             "Guidance state did not survive snapshot round trip.");
         var legacy = JsonConvert.DeserializeObject<TutorialSaveData>("{\"outgameCompleted\":true}", settings);
