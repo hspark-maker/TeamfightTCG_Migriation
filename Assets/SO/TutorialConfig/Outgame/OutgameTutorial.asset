@@ -566,56 +566,10 @@ MonoBehaviour:
       deckName: 
       onFailure: 0
   - label: "\uCE74\uB4DC \uAC15\uD654"
-    kind: 0
-    trigger: 0
-    prerequisite: 0
+    kind: 1
+    trigger: 2
+    prerequisite: 14
     stepDefs:
-    - stepId: 26
-      action: 14
-      anchor: 0
-      spotlight: 0
-      guideMessage: 
-      messageAtBottom: 0
-      unlocks: 
-      unlocksAll: 0
-      locks: 0e00000010000000
-      useDim: 0
-      packId: 
-      packPriceLabel: 
-      anchorCardId: 0
-      freeOfCharge: 0
-      waitUnlockIntro: 0
-      rewardTitle: 
-      parallelGain: 0
-      scenario: {fileID: 0}
-      cardId: 0
-      cardIds: 
-      showDeckGate: 0
-      deckName: 
-      onFailure: 0
-    - stepId: 27
-      action: 0
-      anchor: 18
-      spotlight: 0
-      guideMessage: 
-      messageAtBottom: 0
-      unlocks: 
-      unlocksAll: 0
-      locks: 0e00000010000000
-      useDim: 1
-      packId: 
-      packPriceLabel: 
-      anchorCardId: 0
-      freeOfCharge: 0
-      waitUnlockIntro: 0
-      rewardTitle: 
-      parallelGain: 0
-      scenario: {fileID: 0}
-      cardId: 0
-      cardIds: 
-      showDeckGate: 0
-      deckName: 
-      onFailure: 0
     - stepId: 28
       action: 0
       anchor: 19
@@ -624,7 +578,7 @@ MonoBehaviour:
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
-      locks: 0e00000010000000
+      locks: 
       useDim: 0
       packId: 
       packPriceLabel: 
@@ -645,9 +599,9 @@ MonoBehaviour:
       spotlight: 0
       guideMessage: "\uCE74\uB4DC\uB97C \uB20C\uB7EC \uC790\uC138\uD788 \uBD05\uB2C8\uB2E4."
       messageAtBottom: 0
-      unlocks: 0e000000
+      unlocks: 
       unlocksAll: 0
-      locks: 10000000
+      locks: 
       useDim: 1
       packId: 
       packPriceLabel: 
@@ -670,7 +624,7 @@ MonoBehaviour:
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
-      locks: 10000000
+      locks: 
       useDim: 0
       packId: 
       packPriceLabel: 
@@ -693,7 +647,7 @@ MonoBehaviour:
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
-      locks: 10000000
+      locks: 
       useDim: 0
       packId: 
       packPriceLabel: 
@@ -716,7 +670,7 @@ MonoBehaviour:
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
-      locks: 10000000
+      locks: 
       useDim: 0
       packId: 
       packPriceLabel: 
@@ -741,29 +695,6 @@ MonoBehaviour:
       unlocks: 
       unlocksAll: 0
       locks: 
-      useDim: 0
-      packId: 
-      packPriceLabel: 
-      anchorCardId: 0
-      freeOfCharge: 0
-      waitUnlockIntro: 0
-      rewardTitle: 
-      parallelGain: 0
-      scenario: {fileID: 0}
-      cardId: 0
-      cardIds: 
-      showDeckGate: 0
-      deckName: 
-      onFailure: 0
-    - stepId: 34
-      action: 14
-      anchor: 0
-      spotlight: 0
-      guideMessage: 
-      messageAtBottom: 0
-      unlocks: 
-      unlocksAll: 0
-      locks: 0e00000010000000
       useDim: 0
       packId: 
       packPriceLabel: 

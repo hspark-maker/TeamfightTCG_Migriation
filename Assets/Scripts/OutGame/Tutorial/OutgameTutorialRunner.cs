@@ -18,10 +18,6 @@ public static class OutgameTutorialRunner
     // 이번 세션에 화면을 떠나 미뤄 둔 자율 안내. 저장하지 않는다 — 다음 세션에 알림 점이 다시 부른다.
     static readonly HashSet<EOutgameTutorialTrigger> s_deferred = new HashSet<EOutgameTutorialTrigger>();
 
-    // 첫 랭크 승급 연출이 끝나 열린 문. 온보딩은 그 뒤로도 이어지지만(카드 강화 편) 그때부터는
-    // 자율 안내가 나란히 서도 되는 구간이라 졸업 낙인을 기다리지 않는다. 세이브하지 않는다.
-    static bool s_openedAtRankPromotion;
-
     // 진행도가 다음 스텝으로 넘어갈 때 발화
     public static event Action OnStepChanged;
 
@@ -41,8 +37,8 @@ public static class OutgameTutorialRunner
         => IsGuidedRunning && TryGetChapterRaw(s_guidedChapter, out var t_chapter) ? t_chapter.Trigger : EOutgameTutorialTrigger.None;
 
     // 졸업 전에는 자율 안내가 통째로 잠긴다 — 게이트는 하나뿐이라 두 안내가 겹치면 서로를 가로채고,
-    // 첫시작 동선 밖의 탭으로 부르는 점은 아직 못 가는 곳을 가리킨다.
-    static bool IsGuidedOpen => OutgameTutorialProgress.IsCompleted || s_openedAtRankPromotion;
+    // 첫시작 동선 밖의 탭으로 부르는 점은 아직 못 가는 곳을 가리킨다. 문은 졸업 낙인 하나다.
+    static bool IsGuidedOpen => OutgameTutorialProgress.IsCompleted;
 
     // 저작된 챕터("N편") 총수 — 강제·자율을 다 센다(미주입·빈 시퀀스는 0). 강제 커서의 범위는 ForcedChapterCount다
     public static int ChapterCount => s_data != null && s_data.chapters != null ? s_data.chapters.Count : 0;
@@ -75,15 +71,6 @@ public static class OutgameTutorialRunner
         OutgameFeatureLock.Refresh();
 
         // 자율 안내도 졸업과 함께 풀린다 — 그 전까지 전부 false였던 HasPending의 답이 한꺼번에 뒤집힌다.
-        OnGuidedChanged?.Invoke();
-    }
-
-    /// <summary>첫 랭크 승급 연출까지 끝났다 — 여기서부터 자율 안내가 열린다(졸업은 아직 남았다).</summary>
-    public static void NotifyRankPromotionFinished()
-    {
-        if (s_openedAtRankPromotion) return;
-
-        s_openedAtRankPromotion = true;
         OnGuidedChanged?.Invoke();
     }
 
@@ -168,9 +155,6 @@ public static class OutgameTutorialRunner
         else
         {
             s_deferred.Clear();
-
-            // 되감기로 온보딩이 다시 진행 중이 되면 승급으로 연 문도 함께 닫혀야 한다 — 남으면 튜토 도중에 점이 뜬다.
-            s_openedAtRankPromotion = false;
         }
 
         s_guidedChapter = -1;

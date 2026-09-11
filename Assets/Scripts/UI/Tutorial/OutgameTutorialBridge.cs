@@ -417,12 +417,10 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.RankEffect) return;
         if (!m_rankPrepared || m_rankCompleting) return;
 
-        // 트리거 알림은 OnTriggeredChanged → PresentStep을 동기 호출한다.
-        // 그 안에서 같은 완료가 재진입해 다음 메시지까지 넘기지 않도록 먼저 잠근다.
+        // 완료 처리 안에서 같은 신호가 재진입해 다음 메시지까지 넘기지 않도록 먼저 잠근다.
         m_rankCompleting = true;
         try
         {
-            OutgameTutorialRunner.NotifyRankPromotionFinished();
             OnGateSatisfied();
         }
         finally

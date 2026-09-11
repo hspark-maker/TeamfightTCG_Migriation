@@ -232,15 +232,22 @@ public class TriggeredTutorialBridge : MonoBehaviour
             ? !CardDetailOverlayView.IsOpen
             : IsLobbySurfaceVisible();
 
-    // 이 스텝이 안내가 대주는 무료 한 방으로 성립하는 강화인가.
+    // 이 스텝이 안내가 대주는 무료 한 방으로 성립하는 강화인가(카드·키워드 두 축).
     static bool IsFreeShotWait(TutorialStepDef _step)
         => _step.FreeOfCharge
-        && _step.Completion == EOutgameTutorialCompletion.KeywordEnhance;
+        && (_step.Completion == EOutgameTutorialCompletion.KeywordEnhance
+         || _step.Completion == EOutgameTutorialCompletion.Enhance);
 
     // 서버가 그 무료 한 방을 이미 소진했는가(= 기다리던 강화는 이미 끝났다).
     static bool IsFreeShotSpent(EOutgameTutorialCompletion _completion)
-        => _completion == EOutgameTutorialCompletion.KeywordEnhance
-        && OutgameTutorialGuide.IsFreeShotSpentOnServer(EOutgameTutorialAction.WaitKeywordEnhance);
+    {
+        switch (_completion)
+        {
+            case EOutgameTutorialCompletion.KeywordEnhance: return OutgameTutorialGuide.IsFreeShotSpentOnServer(EOutgameTutorialAction.WaitKeywordEnhance);
+            case EOutgameTutorialCompletion.Enhance:        return OutgameTutorialGuide.IsFreeShotSpentOnServer(EOutgameTutorialAction.WaitEnhance);
+            default:                                        return false;
+        }
+    }
 
     // 로비 탭 화면이 그대로 보이는가(도감이 띄우는 팝업이 하나도 없는 상태).
     static bool IsLobbySurfaceVisible()

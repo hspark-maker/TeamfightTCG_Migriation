@@ -125,7 +125,7 @@ public class LobbyRankEffectDirector : MonoBehaviour
             s_finished = true;
             OnAnyFinished?.Invoke();
 
-            // 트리거 안내는 이 통지 "뒤"에 깨운다 — 트리거 문을 여는 것(NotifyRankPromotionFinished)이
+            // 자율 안내는 이 통지 "뒤"에 깨운다 — 미룬 졸업을 확정하는 것이
             // 이 신호를 받은 온보딩 브리지라, 앞서 발화하면 문이 닫힌 채라 Fire가 조용히 거절된다.
             var t_trigger = this.m_promoteTrigger;
             this.m_promoteTrigger = EOutgameTutorialTrigger.None;
