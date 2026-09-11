@@ -162,7 +162,7 @@ exports.openPack = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)("o
         goldAfter = paid[pack.priceType];
         const slots = {
             ownership: (0, packSlots_1.buildOwnershipSlot)(owned, drawn),
-            cardGrowth: (0, cardGrowth_1.growthSlot)((0, itemGrant_1.applyDrawnSnackGrowth)((0, cardGrowth_1.readGrowthEntries)(current.cardGrowth), drawn, snackGrowthCurve)),
+            cardGrowth: (0, cardGrowth_1.growthSlot)((0, itemGrant_1.applyDrawnSnackGrowth)((0, cardGrowth_1.readGrowthEntries)(current.cardGrowth), drawn, snackGrowthCurve, cardGrades)),
         };
         (0, guideMutation_1.applyGuideProgress)(missions, current, slots, cardRows, catalog);
         (0, snackGrowthProgress_1.applySnackGrowthProgress)(missions, drawn);

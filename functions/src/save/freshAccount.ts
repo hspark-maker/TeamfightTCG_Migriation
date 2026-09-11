@@ -1,6 +1,7 @@
 import {SlotPatch} from "./saveDocument";
 import {Balances, grant} from "../currency/wallet";
 import {generateNickname} from "../profile/generateNickname";
+import {applyAcquiredCardGrowth, growthSlot} from "../growth/cardGrowth";
 
 /**
  * 신규 계정 최초 지급 골드. 이 상수 하나가 진실원이다 — 클라 쪽 쌍둥이였던
@@ -35,11 +36,13 @@ export function buildFreshAccountBalances(): Balances {
  * serverFreshAccountDocument() 다 — 저기와 갈리면 신규 계정의 첫 클라 저장이 룰에 막힌다.
  * @param {number[]} starterCardIds 지급할 카드 id (STARTER_DECK_SIZE 장)
  * @param {string} nickname 문서에 굳힐 기본 닉네임 (기본: 낱말표에서 한 벌 추첨)
+ * @param {ReadonlyMap<number, string>} grades 카드별 등급
  * @return {SlotPatch} 슬롯 9개
  */
 export function buildFreshAccountSlots(
   starterCardIds: number[],
   nickname: string = generateNickname(),
+  grades: ReadonlyMap<number, string> = new Map(),
 ): SlotPatch {
   const slots = [];
   for (let i = 0; i < DECK_SLOT_COUNT; i++) {
@@ -53,7 +56,7 @@ export function buildFreshAccountSlots(
   return {
     ownership: {cardIds: [...starterCardIds]},
     deck: {slots},
-    cardGrowth: {entries: {}},
+    cardGrowth: growthSlot(applyAcquiredCardGrowth({}, starterCardIds, grades)),
     keywordGrowth: {levels: {}},
     rank: {points: 0, claimedTiers: []},
     albumReward: {claimedKeys: []},

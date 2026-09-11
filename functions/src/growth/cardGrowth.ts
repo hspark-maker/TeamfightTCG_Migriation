@@ -111,6 +111,26 @@ export function applyEnhanceLevel(entries: GrowthEntries, cardId: number, level:
 }
 
 /**
+ * 최초 획득한 서사·신화 카드는 1성(저장 레벨 2)으로 시작한다.
+ * 호출자가 신규 소유 카드만 넘긴다. 기존의 더 높은 성장값은 보존한다.
+ * @param {GrowthEntries} entries 기존 성장 항목
+ * @param {number[]} cardIds 최초 획득한 카드
+ * @param {ReadonlyMap<number, string>} grades 카드별 등급
+ * @return {GrowthEntries} 최초 성장값을 반영한 항목
+ */
+export function applyAcquiredCardGrowth(
+  entries: GrowthEntries, cardIds: number[], grades: ReadonlyMap<number, string>,
+): GrowthEntries {
+  for (const cardId of cardIds) {
+    const grade = grades.get(cardId);
+    if ((grade === "Arcane" || grade === "Mythic") && levelOfCard(entries, cardId) < BASE_LEVEL + 1) {
+      entries = applyEnhanceLevel(entries, cardId, BASE_LEVEL + 1);
+    }
+  }
+  return entries;
+}
+
+/**
  * 보유 먹이. 음수 세이브는 0으로 읽는다(클라 SnackOf 와 같다).
  * @param {GrowthEntries} entries 성장 항목
  * @param {number} cardId 카드 id

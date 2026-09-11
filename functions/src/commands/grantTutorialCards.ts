@@ -18,6 +18,7 @@ import {loadCatalogIds} from "../packs/cardCatalog";
 import {judgeTutorialGrant} from "../packs/tutorialGrantPack";
 import {buildOwnershipSlotFromIds, readOwnedIds} from "../packs/packSlots";
 import {grantsRef, readPackGrants, writePackGranted} from "../growth/tutorialGrants";
+import {applyAcquiredCardGrowth, growthSlot, readGrowthEntries} from "../growth/cardGrowth";
 
 /**
  * 도메인 거절 사유. **와이어 계약**이다 — 클라가 이 문자열을 그대로 대조한다.
@@ -63,12 +64,14 @@ export const grantTutorialCards = onCall(async (request) => {
 
   // 스펙 읽기는 트랜잭션 밖이다 — 유저 문서와 무관하고, 재실행마다 다시 읽으면 비용만 는다.
   const dropTable = await readSpecRows(env, "CardPackDrop");
-  const [dropRows, packRow, catalogIds] = await Promise.all([
+  const [dropRows, packRow, catalogIds, cardRows] = await Promise.all([
     readDropRows(env, packId),
     readCardPackRow(env, packId),
     // 카탈로그 대조는 openPack 과 같은 헬퍼를 쓴다 — 규칙이 두 벌이 되면 서버가 서로 다른 카드를 인정한다.
     loadCatalogIds(env),
+    readSpecRows(env, "Card"),
   ]);
+  const cardGrades = new Map(cardRows.map((row) => [Number(row.id), String(row.grade)]));
 
   const verdict = judgeTutorialGrant(packRow, dropRows, catalogIds);
   if (!verdict.ok) {
@@ -113,7 +116,11 @@ export const grantTutorialCards = onCall(async (request) => {
       // 낙인이 있어도 소유 유니온은 조건 없이 한다 — 낙인만 남고 소유가 빈 계정을 스스로 치유한다.
       // 지갑은 건드리지 않는다(claimReward 와 같은 정책) — 빈 지급으로 rev 만 올리면 클라가
       // 달라진 것 없는 잔액을 채택한다.
-      return {slots: {ownership: buildOwnershipSlotFromIds(owned, cardIds)}};
+      return {slots: {
+        ownership: buildOwnershipSlotFromIds(owned, cardIds),
+        ...(granted.length > 0 ? {cardGrowth: growthSlot(
+          applyAcquiredCardGrowth(readGrowthEntries(current.cardGrowth), granted, cardGrades))} : {}),
+      }};
     },
     (adopted) => {
       replayed = false;

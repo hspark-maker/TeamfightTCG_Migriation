@@ -5,6 +5,7 @@ exports.buildFreshAccountBalances = buildFreshAccountBalances;
 exports.buildFreshAccountSlots = buildFreshAccountSlots;
 const wallet_1 = require("../currency/wallet");
 const generateNickname_1 = require("../profile/generateNickname");
+const cardGrowth_1 = require("../growth/cardGrowth");
 /**
  * 신규 계정 최초 지급 골드. 이 상수 하나가 진실원이다 — 클라 쪽 쌍둥이였던
  * CurrencyManager.STARTING_GOLD 는 C6.4 에서 삭제됐고, 잔액은 서버 지갑만 정한다.
@@ -33,9 +34,10 @@ function buildFreshAccountBalances() {
  * serverFreshAccountDocument() 다 — 저기와 갈리면 신규 계정의 첫 클라 저장이 룰에 막힌다.
  * @param {number[]} starterCardIds 지급할 카드 id (STARTER_DECK_SIZE 장)
  * @param {string} nickname 문서에 굳힐 기본 닉네임 (기본: 낱말표에서 한 벌 추첨)
+ * @param {ReadonlyMap<number, string>} grades 카드별 등급
  * @return {SlotPatch} 슬롯 9개
  */
-function buildFreshAccountSlots(starterCardIds, nickname = (0, generateNickname_1.generateNickname)()) {
+function buildFreshAccountSlots(starterCardIds, nickname = (0, generateNickname_1.generateNickname)(), grades = new Map()) {
     const slots = [];
     for (let i = 0; i < exports.DECK_SLOT_COUNT; i++) {
         slots.push(i === 0 ?
@@ -47,7 +49,7 @@ function buildFreshAccountSlots(starterCardIds, nickname = (0, generateNickname_
     return {
         ownership: { cardIds: [...starterCardIds] },
         deck: { slots },
-        cardGrowth: { entries: {} },
+        cardGrowth: (0, cardGrowth_1.growthSlot)((0, cardGrowth_1.applyAcquiredCardGrowth)({}, starterCardIds, grades)),
         keywordGrowth: { levels: {} },
         rank: { points: 0, claimedTiers: [] },
         albumReward: { claimedKeys: [] },

@@ -3,7 +3,7 @@ import {HttpsError} from "firebase-functions/v2/https";
 import {RewardGain, RewardItem, RewardRow, resolveRewards} from "../rewardTable";
 import {DrawnCard, drawPack, resolveDropPool, DropRow, RollFn, SNACK_PER_DUPLICATE} from "../packs/packDraw";
 import {buildOwnershipSlot, readOwnedIds} from "../packs/packSlots";
-import {addSnackAndGrow, growthSlot, readGrowthEntries, GrowthEntries} from "../growth/cardGrowth";
+import {addSnackAndGrow, applyAcquiredCardGrowth, growthSlot, readGrowthEntries, GrowthEntries} from "../growth/cardGrowth";
 import {LimitBreakCurve} from "../growth/limitBreakTable";
 import {requireSnackGrowthCurve} from "../growth/snackGrowthSpec";
 import {CardPackRow, readCardPackRow, readDropRows, readRankGradeRows, readSpecRows} from "../packs/packSpecReader";
@@ -56,11 +56,13 @@ export async function loadItemGrantContext(env: string, items: RewardItem[]): Pr
  * @param {GrowthEntries} entries 기존 성장
  * @param {DrawnCard[]} cards 이번 지급 카드 (호출마다 새 추첨 객체)
  * @param {LimitBreakCurve} curve 사전 검증한 단계표
+ * @param {ReadonlyMap<number, string>} grades 카드별 등급
  * @return {GrowthEntries} 지급 이후 성장
  */
 export function applyDrawnSnackGrowth(
-  entries: GrowthEntries, cards: DrawnCard[], curve: LimitBreakCurve,
+  entries: GrowthEntries, cards: DrawnCard[], curve: LimitBreakCurve, grades: ReadonlyMap<number, string>,
 ): GrowthEntries {
+  entries = applyAcquiredCardGrowth(entries, cards.filter((card) => card.isNew).map((card) => card.cardId), grades);
   for (const card of cards) {
     const result = addSnackAndGrow(entries, card.cardId, card.snack, curve);
     entries = result.entries;
@@ -162,6 +164,7 @@ export function grantRewardItems(
   }
   return {cards, packs, currencies, slots: cards.length ? {
     ownership: buildOwnershipSlot(owned, cards),
-    cardGrowth: growthSlot(applyDrawnSnackGrowth(readGrowthEntries(current.cardGrowth), cards, context.snackGrowthCurve)),
+    cardGrowth: growthSlot(applyDrawnSnackGrowth(readGrowthEntries(current.cardGrowth), cards,
+      context.snackGrowthCurve, context.grades)),
   } : {}};
 }

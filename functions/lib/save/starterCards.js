@@ -40,20 +40,20 @@ const starterPool_1 = require("./starterPool");
 /** 카드 카탈로그 표. 클라·서버 모두 Card 하나만 읽는다(Card_Test 표는 폐기). */
 const CARD_TABLES = ["Card"];
 /**
- * 카드 카탈로그의 id 집합. 행 문서 id 가 곧 카드 id 다(업로더가 id 열로 문서를 만든다).
+ * 카드 카탈로그의 id와 등급. 최초 지급 성장값에도 같은 표를 쓴다.
  * @param {string} env 환경 id
- * @return {Promise<Set<number>>} 카탈로그에 있는 카드 id
+ * @return {Promise<Map<number, string>>} 카드 id별 등급
  */
-async function readKnownCardIds(env) {
-    const ids = new Set();
+async function readKnownCardGrades(env) {
+    const grades = new Map();
     for (const table of CARD_TABLES) {
         for (const row of await (0, specBlobReader_1.readSpecRows)(env, table)) {
             const id = Number(row.id);
             if (Number.isInteger(id) && id > 0)
-                ids.add(id);
+                grades.set(id, String(row.grade));
         }
     }
-    return ids;
+    return grades;
 }
 /**
  * 스펙 표에서 스타터 카드를 읽는다. 표가 없거나 읽지 못해도 계정 생성을 막지 않는다.
@@ -63,9 +63,10 @@ async function readKnownCardIds(env) {
  * 만들어진 계정만 다른 스타터를 갖게 된다 — 카드 존재 검사가 그 피해를 덱 무효화까지는 가지
  * 않게 막지만, 무결성 대조까지 옮기는 것은 R3(스펙 서버화)의 몫이다.
  * @param {string} env 환경 id
- * @return {Promise<{cardIds: number[], source: StarterSource}>} 카드 목록과 출처
+ * @return {Promise<object>} 카드 목록, 등급과 출처
  */
 async function resolveStarterCardIds(env) {
+    let grades = new Map();
     try {
         // 표를 블롭으로 통째 읽고 packId 는 메모리에서 거른다 — where 질의도 맞는 행 수만큼 과금되고,
         // CardPackDrop 은 300행이 넘어 계정 생성 1건이 수백 읽기가 됐다. 정렬은 리더가 id 숫자로 한다.
@@ -78,18 +79,19 @@ async function resolveStarterCardIds(env) {
         }));
         // 카탈로그를 못 읽으면 존재 검사 없이 뽑는 대신 폴백으로 간다 — 검증 없이 지급하면
         // 카탈로그에 없는 카드가 덱에 굳어 클라가 덱 0개로 초기화되고 복구 경로가 없다.
-        const knownCardIds = rows.length > 0 ? await readKnownCardIds(env) : new Set();
+        grades = await readKnownCardGrades(env);
+        const knownCardIds = new Set(grades.keys());
         const cardIds = knownCardIds.size > 0 ?
             (0, starterPool_1.resolveStarterCardsFromRows)(rows, starterPool_1.FRESH_ACCOUNT_GRADE, knownCardIds) :
             [];
         if (cardIds.length > 0)
-            return { cardIds, source: "spec" };
+            return { cardIds, source: "spec", grades };
         logger.info("starter cards fell back to the built-in list", {
             env,
             rowCount: rows.length,
             knownCardCount: knownCardIds.size,
         });
-        return { cardIds: [...starterPool_1.FALLBACK_STARTER_CARD_IDS], source: "fallback" };
+        return { cardIds: [...starterPool_1.FALLBACK_STARTER_CARD_IDS], source: "fallback", grades };
     }
     catch (error) {
         // 스펙을 못 읽는 것이 계정을 못 만들 이유는 아니다 — 어느 갈래였는지만 남기고 폴백으로 간다.
@@ -97,7 +99,7 @@ async function resolveStarterCardIds(env) {
             env,
             message: error instanceof Error ? error.message : String(error),
         });
-        return { cardIds: [...starterPool_1.FALLBACK_STARTER_CARD_IDS], source: "specError" };
+        return { cardIds: [...starterPool_1.FALLBACK_STARTER_CARD_IDS], source: "specError", grades };
     }
 }
 //# sourceMappingURL=starterCards.js.map

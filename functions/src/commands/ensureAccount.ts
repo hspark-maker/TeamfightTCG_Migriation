@@ -50,7 +50,7 @@ export const ensureAccount = onCall(async (request) => {
   const starter = await resolveStarterCardIds(env);
   const outcome = await ensureSaveDocument(
     env, uid, deviceId, appVersion,
-    () => buildFreshAccountSlots(starter.cardIds),
+    () => buildFreshAccountSlots(starter.cardIds, undefined, starter.grades),
     buildFreshAccountBalances(),
   );
 

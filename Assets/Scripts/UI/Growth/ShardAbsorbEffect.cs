@@ -5,14 +5,24 @@ using UnityEngine.UI;
 /// <summary>강화 버튼의 샤드가 카드로 흡수되는 짧은 연출. 서버 처리와 별도로 재생한다.</summary>
 public sealed class ShardAbsorbEffect : MonoBehaviour
 {
-    const int MaxIcons = 20;
+    const int MaxIcons = 8;
     readonly Image[] m_icons = new Image[MaxIcons];
     RectTransform m_layer;
-    Sequence m_sequence;
+    readonly Sequence[] m_sequences = new Sequence[MaxIcons];
+    int m_nextIcon;
 
-    public void Play(RectTransform source, RectTransform target, int count)
+    public bool IsPlaying
     {
-        Stop();
+        get
+        {
+            foreach (Sequence t_sequence in m_sequences)
+                if (t_sequence != null && t_sequence.IsActive()) return true;
+            return false;
+        }
+    }
+
+    public void Play(RectTransform source, RectTransform target)
+    {
         if (!isActiveAndEnabled || source == null || target == null) return;
 
         Sprite t_sprite = CurrencyLook.IconOf(ECurrencyType.Shard);
@@ -22,25 +32,30 @@ public sealed class ShardAbsorbEffect : MonoBehaviour
         EnsureLayer(t_canvas);
         if (!TryGetCenter(source, out Vector2 t_from) || !TryGetCenter(target, out Vector2 t_to)) return;
 
-        int t_count = Mathf.Clamp(count, 1, MaxIcons);
-        var t_settings = new UiGainBurst.Settings(t_count, 18f, 0.07f, 0.25f,
-            0.005f, 0.06f, 0f, 360f, _gatherScale: 0.15f, _spinDegrees: 30f, _arcHeight: 55f);
+        int t_slot = m_nextIcon;
+        m_nextIcon = (m_nextIcon + 1) % MaxIcons;
+        m_sequences[t_slot]?.Kill();
+        var t_settings = new UiGainBurst.Settings(1, 18f, 0.07f, 0.25f,
+            0f, 0.06f, 0f, 360f, _gatherScale: 0.15f, _spinDegrees: 30f, _arcHeight: 55f);
         m_layer.gameObject.SetActive(true);
         m_layer.SetAsLastSibling();
-        m_sequence = UiGainBurst.Build(m_layer, t_from, t_to, t_settings,
-            _spawn: _index => GetIcon(_index, t_sprite),
+        Sequence t_sequence = UiGainBurst.Build(m_layer, t_from, t_to, t_settings,
+            _spawn: _index => GetIcon(t_slot, t_sprite),
             _despawn: _icon => _icon.gameObject.SetActive(false));
-        m_sequence.SetUpdate(true).SetLink(gameObject).OnComplete(() =>
+        m_sequences[t_slot] = t_sequence;
+        t_sequence.SetUpdate(true).SetLink(gameObject).OnComplete(() =>
         {
-            m_sequence = null;
-            HideIcons();
+            m_sequences[t_slot] = null;
         });
     }
 
     public void Stop()
     {
-        m_sequence?.Kill();
-        m_sequence = null;
+        for (int t_i = 0; t_i < MaxIcons; t_i++)
+        {
+            m_sequences[t_i]?.Kill();
+            m_sequences[t_i] = null;
+        }
         HideIcons();
     }
 

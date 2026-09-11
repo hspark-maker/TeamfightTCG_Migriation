@@ -50,7 +50,7 @@ export const devResetSave = onCall(async (request) => {
       // 세이브 변이와 같은 트랜잭션이다 — 한쪽만 성공한 계정이 생기지 않는다(enhanceCard 선례).
       clearGrants(transaction, grantsRef(db, env, uid));
 
-      return {slots: buildFreshAccountSlots(starter.cardIds, nickname)} as SaveMutation;
+      return {slots: buildFreshAccountSlots(starter.cardIds, nickname, starter.grades)} as SaveMutation;
     },
     (adopted) => {
       replayed = false;

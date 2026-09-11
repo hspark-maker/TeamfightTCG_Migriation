@@ -175,7 +175,7 @@ export const openPack = onCall(measuredCallable("openPack", async (request) => {
 
       const slots = {
         ownership: buildOwnershipSlot(owned, drawn),
-        cardGrowth: growthSlot(applyDrawnSnackGrowth(readGrowthEntries(current.cardGrowth), drawn, snackGrowthCurve)),
+        cardGrowth: growthSlot(applyDrawnSnackGrowth(readGrowthEntries(current.cardGrowth), drawn, snackGrowthCurve, cardGrades)),
       };
       applyGuideProgress(missions, current, slots, cardRows, catalog);
       applySnackGrowthProgress(missions, drawn);

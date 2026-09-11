@@ -208,6 +208,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     int m_holdLevel;
     int m_viewVersion;
     float m_nextHoldFeed;
+    int m_queuedShards;
+    int m_inFlightShards;
+    readonly List<CurrencyPendingTicket> m_queuedShardTickets = new List<CurrencyPendingTicket>();
 
     // 창이 열려 있는 동안만 순서를 덮어쓰고 닫히면 되돌린다 — 상시 최상단이면 로비 레이어와의 순서까지 뒤집힌다.
     Canvas m_sortingCanvas;
@@ -1184,10 +1187,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     void OnEnhanceHold(float _seconds)
     {
-        if (this.m_enhanceRequestPending || this.m_ritualPlaying || Time.unscaledTime < this.m_nextHoldFeed) return;
+        if (this.m_ritualPlaying || Time.unscaledTime < this.m_nextHoldFeed) return;
+        if (this.m_enhanceRequestPending && !this.m_holdActive) return;
         int t_card = CardAt(this.m_index);
         if (!CanFeedShard(t_card) || (this.resultPanel != null && this.resultPanel.IsOpen))
-        { StopEnhanceHold(); return; }
+        { this.m_holdInput?.Cancel(); return; }
         if (!this.m_holdActive)
         {
             this.m_holdActive = true;
@@ -1195,10 +1199,11 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             this.m_holdLevel = CardGrowthManager.LevelOf(t_card);
         }
         if (this.m_holdCard != t_card || this.m_holdLevel != CardGrowthManager.LevelOf(t_card))
-        { StopEnhanceHold(); return; }
-        int t_amount = _seconds < 1f ? 1 : _seconds < 2f ? 5 : 20;
-        this.m_nextHoldFeed = Time.unscaledTime + 0.45f;
-        BeginEnhance(t_card, t_amount);
+        { this.m_holdInput?.Cancel(); return; }
+        float t_speed = Mathf.Clamp01(_seconds / 4f);
+        float t_interval = Mathf.Lerp(0.45f, 0.08f, t_speed * (2f - t_speed));
+        this.m_nextHoldFeed = Time.unscaledTime + t_interval;
+        BeginEnhance(t_card, 1);
     }
 
     bool CanFeedShard(int _card)
@@ -1209,34 +1214,79 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     void BeginEnhance(int _card, int _amount)
     {
         if (!CanFeedShard(_card)) { StopEnhanceHold(); return; }
-        int t_count = Mathf.Min(_amount, CardGrowthManager.ShardRequiredOf(_card) - CardGrowthManager.ShardProgressOf(_card));
+        int t_count = Mathf.Min(_amount, CardGrowthManager.ShardRequiredOf(_card)
+            - CardGrowthManager.ShardProgressOf(_card) - this.m_inFlightShards - this.m_queuedShards);
         if (CardGrowthManager.TryGetNextStep(_card, out GrowthStep t_step) && t_step.Cost > 0)
             t_count = (int)Math.Min(t_count, CurrencyManager.GetBalance(t_step.Currency));
-        if (t_count <= 0) { StopEnhanceHold(); return; }
+        if (t_count <= 0) { this.m_holdInput?.Cancel(); return; }
+        bool t_start = !this.m_enhanceRequestPending;
         this.m_enhanceRequestPending = true;
+        this.m_queuedShards += t_count;
+        this.m_queuedShardTickets.Add(CurrencyPendingTicket.Hold(t_step.Currency, -t_step.Cost * t_count));
         // 홀드 중에는 Button의 Pressed 상태를 유지한다. 중복 요청은 pending 가드가 막는다.
         SetActionsEnabled(this.m_holdActive && this.m_holdInput != null && this.m_holdInput.IsPressed);
         this.m_shardAbsorb?.Play(this.enhanceButton.transform as RectTransform,
-            this.cardView != null ? this.cardView.transform as RectTransform : null, t_count);
-        EnhanceAsync(_card, t_count, this.m_viewVersion).Forget();
+            this.cardView != null ? this.cardView.transform as RectTransform : null);
+        if (t_start) FlushShardQueueAsync(_card, this.m_viewVersion).Forget();
+    }
+
+    // 연출은 한 개씩, 통신은 직렬로 처리한다. 손을 떼거나 닫은 뒤에도 투입한 수량만 확정한다.
+    async UniTaskVoid FlushShardQueueAsync(int _card, int _viewVersion)
+    {
+        int t_level = CardGrowthManager.LevelOf(_card);
+        try
+        {
+            while (this.m_queuedShards > 0)
+            {
+                int t_amount = this.m_queuedShards;
+                this.m_queuedShards = 0;
+                this.m_inFlightShards = t_amount;
+                ReleaseQueuedShardTickets(false);
+                EnhanceResult t_result = await EnhanceAsync(_card, t_amount, _viewVersion);
+                this.m_inFlightShards = 0;
+                if (t_result.Outcome != EEnhanceOutcome.Success || t_result.Level != t_level) break;
+            }
+        }
+        catch (Exception t_exception)
+        {
+            Debug.LogException(t_exception);
+            if (this != null) StopEnhanceHold();
+        }
+        finally
+        {
+            ReleaseQueuedShardTickets();
+            this.m_queuedShards = this.m_inFlightShards = 0;
+            this.m_enhanceRequestPending = false;
+            if (this != null && this.isActiveAndEnabled && !this.m_ritualPlaying)
+            {
+                int t_card = CardAt(this.m_index);
+                if (t_card > 0) RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
+            }
+        }
+    }
+
+    void ReleaseQueuedShardTickets(bool _notify = true)
+    {
+        foreach (CurrencyPendingTicket t_ticket in this.m_queuedShardTickets) t_ticket.Settle(_notify);
+        this.m_queuedShardTickets.Clear();
     }
 
     void StopEnhanceHold()
     {
         this.m_holdInput?.Cancel();
         EndEnhanceHold();
+        this.m_shardAbsorb?.Stop();
     }
 
     void EndEnhanceHold()
     {
         this.m_holdActive = false;
         this.m_nextHoldFeed = 0f;
-        this.m_shardAbsorb?.Stop();
         if (this.m_enhanceRequestPending) SetActionsEnabled(false);
     }
 
     // 이전 수치는 왕복 전에 잡고, 진화 연출은 서버가 확정한 실제 레벨 변화로 고른다.
-    async UniTaskVoid EnhanceAsync(int _card, int _amount, int _viewVersion)
+    async UniTask<EnhanceResult> EnhanceAsync(int _card, int _amount, int _viewVersion)
     {
         int t_card = _card;
 
@@ -1247,10 +1297,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 왕복 전의 문지기. 진실원은 여전히 서버라 이 검사는 낙관일 뿐이고, 통과한 뒤 거절이 오는 갈래는 정상 동작이다.
         if (CardGrowthManager.Precheck(t_card) != EEnhanceOutcome.Success)
         {
-            this.m_enhanceRequestPending = false;
             StopEnhanceHold();
             AbortEnhance(t_card);
-            return;
+            return new EnhanceResult(EEnhanceOutcome.NotReady, t_fromLevel);
         }
 
         EnhanceResult t_result;
@@ -1265,13 +1314,17 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             Debug.LogException(t_exception);
             t_result = new EnhanceResult(EEnhanceOutcome.NotReady, CardGrowthManager.LevelOf(t_card));
         }
-        finally
+
+        // 마지막으로 투입한 샤드까지 도착한 뒤 진화한다. 닫기·카드 이동은 기다리지 않는다.
+        if (t_result.Outcome == EEnhanceOutcome.Success && t_result.Level > t_fromLevel)
         {
-            this.m_enhanceRequestPending = false;
+            while (this != null && this.isActiveAndEnabled && this.m_viewVersion == _viewVersion
+                && this.m_shardAbsorb != null && this.m_shardAbsorb.IsPlaying)
+                await UniTask.Yield();
         }
 
         // 왕복 중 이 창이 사라졌다면 되돌릴 화면도 태울 연출도 없다(레벨·잔액은 서버가 이미 확정했다).
-        if (this == null) { NotifyEnhanceSettled(t_result); return; }
+        if (this == null) { NotifyEnhanceSettled(t_result); return t_result; }
 
         // 저작 실수(초기화 누락)는 조용히 넘기지 않는다 — 재화는 소모되지 않았고 원인이 화면 밖에 있다.
         if (t_result.Outcome == EEnhanceOutcome.NotReady && !CardGrowthManager.IsReady)
@@ -1287,7 +1340,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             int t_visible = CardAt(this.m_index);
             if (this.isActiveAndEnabled && t_visible > 0) RefreshGrowth(t_visible, OwnershipManager.IsOwned(t_visible));
             if (t_played) NotifyEnhanceSettled(t_result);
-            return;
+            return t_result;
         }
 
         if (t_evolve || t_result.Outcome != EEnhanceOutcome.Success) StopEnhanceHold();
@@ -1296,7 +1349,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (t_result.Outcome == EEnhanceOutcome.Success && !t_evolve)
         {
             CompleteShardEnhance(t_card, t_result);
-            return;
+            return t_result;
         }
 
         // 결제 전에 막힌 경우엔 보여줄 결과가 없다. 미배선도 같은 길로 — 배선 실패가 소프트락이 되면 안 된다.
@@ -1306,7 +1359,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
             // 강화가 실제로 일어났는데 보여줄 연출만 없는 길이면 여기가 곧 "다 끝난" 시점이다.
             if (t_played) NotifyEnhanceSettled(t_result);
-            return;
+            return t_result;
         }
 
         this.m_activeRitual = t_ritual;
@@ -1373,6 +1426,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                 this.m_retryQueued = false;
                 OnEnhancePressed();
             });
+        return t_result;
     }
 
     void CompleteShardEnhance(int _card, EnhanceResult _result)
