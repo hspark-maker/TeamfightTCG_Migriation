@@ -73,8 +73,6 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
         _bodyText.text = body;
         for (int i = 0; i < _icons.Length; i++)
         {
-            // 빈 칸이 남은 프리팹에서 예외가 새면 재생 플래그가 켜진 채 굳어 스텝이 영구 정지한다.
-            if (_icons[i] == null) continue;
             bool visible = icons != null && i < icons.Count && icons[i] != null;
             _icons[i].gameObject.SetActive(visible);
             if (visible) _icons[i].sprite = icons[i];

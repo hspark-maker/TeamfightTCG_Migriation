@@ -584,6 +584,7 @@ MonoBehaviour:
   _bodyText: {fileID: 4335023454875974869}
   _icons:
   - {fileID: 8166215473050095353}
+  - {fileID: 0}
   _contentRoot: {fileID: 49140182612230803}
   _contentGroup: {fileID: 6433544703265717843}
   _confirmButton: {fileID: 6467030482586034364}
