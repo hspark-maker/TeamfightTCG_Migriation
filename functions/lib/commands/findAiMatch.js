@@ -221,8 +221,8 @@ exports.findAiMatch = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
             ]);
             const pinnedDecks = (0, aiDeckDraw_1.parseAiDeckRows)(pinnedDeckRows);
             const profiles = (0, rankAiEncounter_1.parseRankAiEncounters)(encounterRows, pinnedDecks.rows);
-            // 마지막전 판정은 별도 기능이다. 현재는 일반전 저작 프로필만 사용한다.
-            const selected = (0, rankAiEncounter_1.drawRankAiEncounter)(profiles, pinnedDecks.rows, tierIndex, "Normal", node_crypto_1.randomInt);
+            const battleKind = (0, rankAiEncounter_1.resolveRankAiBattleKind)(points, grades);
+            const selected = (0, rankAiEncounter_1.drawRankAiEncounter)(profiles, pinnedDecks.rows, tierIndex, battleKind, node_crypto_1.randomInt);
             encounter = selected.profile;
             draw = { deckId: selected.deck.deckId, deck: [...selected.deck.cardIds], cardLevel: 0 };
             const rule = (0, enhanceRules_1.parseCardEnhanceRule)(ruleRows);
@@ -312,6 +312,7 @@ exports.findAiMatch = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
         });
         logger.info("AI match created", {
             uid, env: authoredData.env, matchId, tierIndex, deckId: draw.deckId,
+            battleKind: encounter?.battleKind ?? "Normal",
         });
         return response;
     }

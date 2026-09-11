@@ -5,7 +5,8 @@ import * as logger from "firebase-functions/logger";
 import {createHash, randomBytes, randomInt, randomUUID} from "node:crypto";
 import {db} from "../firebaseApp";
 import {AiDeckDraw, drawAiDeck, parseAiDeckRows} from "../matchmaking/aiDeckDraw";
-import {drawRankAiEncounter, parseRankAiEncounters, RankAiEncounter} from "../matchmaking/rankAiEncounter";
+import {drawRankAiEncounter, parseRankAiEncounters, RankAiEncounter,
+  resolveRankAiBattleKind} from "../matchmaking/rankAiEncounter";
 import {AiCardGrowth, buildAiDeckSnapshots, CardSnapshot, parseCardSpecRow, readAiDeckSnapshots} from "../deckValidation";
 import {parseCardEnhanceRule} from "../growth/enhanceRules";
 import {parseLimitBreakCurve} from "../growth/limitBreakTable";
@@ -209,8 +210,8 @@ export const findAiMatch = onCall(measuredCallable("findAiMatch", async (request
       ]);
       const pinnedDecks = parseAiDeckRows(pinnedDeckRows);
       const profiles = parseRankAiEncounters(encounterRows, pinnedDecks.rows);
-      // 마지막전 판정은 별도 기능이다. 현재는 일반전 저작 프로필만 사용한다.
-      const selected = drawRankAiEncounter(profiles, pinnedDecks.rows, tierIndex, "Normal", randomInt);
+      const battleKind = resolveRankAiBattleKind(points, grades);
+      const selected = drawRankAiEncounter(profiles, pinnedDecks.rows, tierIndex, battleKind, randomInt);
       encounter = selected.profile;
       draw = {deckId: selected.deck.deckId, deck: [...selected.deck.cardIds], cardLevel: 0};
       const rule = parseCardEnhanceRule(ruleRows);
@@ -296,6 +297,7 @@ export const findAiMatch = onCall(measuredCallable("findAiMatch", async (request
     });
     logger.info("AI match created", {
       uid, env: authoredData.env, matchId, tierIndex, deckId: draw.deckId,
+      battleKind: encounter?.battleKind ?? "Normal",
     });
     return response;
   } catch (error) {
