@@ -30,6 +30,7 @@ public sealed class MissionCutInView : PooledUIBase
     MissionProgressNotification m_current;
     LobbyMatchLauncher m_matchLauncher;
     bool m_hasCurrent;
+    bool m_listening;
 
     public static bool IsPlaying => s_instance != null && s_instance.isActiveAndEnabled
         && s_instance.m_hasCurrent && s_instance.canvasGroup != null && s_instance.canvasGroup.alpha > 0f;
@@ -46,15 +47,17 @@ public sealed class MissionCutInView : PooledUIBase
 
     public override void Initialization(UIData _data) => data = _data;
 
+    // isShow는 켜지 않는다 — 이 뷰는 초기화 때 풀에 상주하는 수동 알림 층이라, 풀의 "보이는 UI" 판정
+    // (UIPoolManager.HasVisibleUIExcept)에 잡히면 해금 소개 같은 무대 안내가 영영 거절된다. 재생 중은 IsPlaying이 답한다.
     public override void Show()
     {
-        isShow = true;
+        m_listening = true;
         if (contents != null) contents.SetActive(true);
     }
 
     public override void Hide()
     {
-        isShow = false;
+        m_listening = false;
         Finish();
         if (contents != null) contents.SetActive(false);
     }
@@ -95,7 +98,7 @@ public sealed class MissionCutInView : PooledUIBase
 #if UNITY_EDITOR
         if (m_preview) return;
 #endif
-        if (!isShow) return;
+        if (!m_listening) return;
         if (m_hasCurrent && !MissionProgressNotifications.IsCurrent(m_current)) Finish();
         if (!CanShow)
         {
@@ -181,7 +184,7 @@ public sealed class MissionCutInView : PooledUIBase
     [ContextMenu("진단/미션 알림 상태")]
     public void LogNotificationState()
     {
-        Debug.Log($"[MissionCutIn] show={isShow}, active={gameObject.activeInHierarchy}, " +
+        Debug.Log($"[MissionCutIn] listening={m_listening}, active={gameObject.activeInHierarchy}, " +
             $"canShow={CanShow}, preview={m_preview}, current={m_hasCurrent}, alpha={canvasGroup.alpha}, " +
             $"ready={MissionManager.IsReady}, definitions={MissionManager.Definitions.Count}");
         foreach (MissionDefinition t_definition in MissionManager.Definitions)
