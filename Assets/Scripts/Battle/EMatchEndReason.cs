@@ -11,7 +11,7 @@ public enum EMatchEndReason
     /// <summary>한쪽 필드가 비어 정상적으로 갈린 승패. 여운(BattleResultBeat)을 타는 유일한 사유.</summary>
     Normal,
 
-    /// <summary>항복 = 즉시 패배. 보상·랭크는 정상 패배와 같은 경로를 탄다. 강조할 결정타가 없어 여운은 없다.</summary>
+    /// <summary>항복 = 즉시 패배. 보상·랭크는 정상 패배와 같은 경로를 타며, 결과 앞에 카드 순차 폭발과 안내를 표시한다.</summary>
     Surrender,
 
     /// <summary>보드가 서기 전(덱 교환·시드 합의) 상대가 연결을 끊었다. <b>무효 경기다.</b>

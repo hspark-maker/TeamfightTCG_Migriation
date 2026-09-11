@@ -4,12 +4,10 @@ using System.Collections.Generic;
 // 여기서 나오는 수는 전부 화면에 그릴 값이다.
 public static class DeckPower
 {
-    /// <summary>상대 카드 _card가 서 있는 레벨. 늘 바닥이다 — 적을 랭크로 강화하던 축은 제거됐고,
-    /// 멀티는 스탯을 와이어로 보내지 않는 lockstep이라 상대 강화분을 추측하면 표시가 거짓말이 된다.
-    /// 명시 레벨이 있는 모험 정점만 예외이고, 그쪽은 OfAtLevel로 레벨을 직접 넘긴다.</summary>
-    public static int OpponentLevelOf(int _cardId) => CardGrowth.BaseLevel;
+    /// <summary>상대 표시는 실제 필드와 같은 성장 공급자를 사용한다.</summary>
+    public static int OpponentLevelOf(int _cardId) => BattleGrowthBridge.EnemyGrowthOf(_cardId).Level;
 
-    /// <summary>표시용 레벨. _mine=false는 상대 덱이고, 적은 강화되지 않아 바닥으로 나온다.</summary>
+    /// <summary>표시용 레벨. _mine=false는 확정된 상대 성장값이다.</summary>
     public static int LevelOf(int _cardId, bool _mine = true)
     {
         if (_cardId <= 0) return CardGrowth.BaseLevel;
@@ -18,13 +16,16 @@ public static class DeckPower
     }
 
     public static int EvolutionStageOf(int _cardId, bool _mine = true)
-        => CardGrowthManager.GrowthAtLevel(_cardId, LevelOf(_cardId, _mine)).EvolutionStage;
+        => _mine ? CardGrowthManager.GrowthAtLevel(_cardId, LevelOf(_cardId)).EvolutionStage
+                 : BattleGrowthBridge.EnemyGrowthOf(_cardId).EvolutionStage;
 
     /// <summary>표시용 시너지 해금 여부. 시너지는 1차 진화 레벨에서 열린다(GrowthRules.SynergyUnlockedAt) →
     /// 그 전 카드는 실제로 시너지에 참여하지 않으므로 카드 위에 배지·시너지용 배경판을 띄우면 오정보다.
     /// 전투 인스턴스에는 이미 같은 게이트가 CardInstance.synergyEnabled로 박혀 있다 — 그쪽이 있으면 그쪽이 이긴다.</summary>
     public static bool SynergyUnlockedOf(int _cardId, bool _mine = true)
-        => _cardId > 0 && CardGrowthManager.GrowthAtLevel(_cardId, LevelOf(_cardId, _mine)).SynergyUnlocked;
+        => _cardId > 0 && (_mine
+            ? CardGrowthManager.GrowthAtLevel(_cardId, LevelOf(_cardId)).SynergyUnlocked
+            : BattleGrowthBridge.EnemyGrowthOf(_cardId).SynergyUnlocked);
 
     // 표시용 최대 체력. 내 카드는 내 강화 진행도, 상대 카드는 상대 레벨 기준이다.
     public static int MaxHpOf(int _cardId, bool _mine = true)
@@ -33,7 +34,7 @@ public static class DeckPower
 
         CardGrowth t_growth = _mine
             ? CardGrowthManager.GrowthOf(_cardId)
-            : CardGrowthManager.GrowthAtLevel(_cardId, LevelOf(_cardId, false));
+            : BattleGrowthBridge.EnemyGrowthOf(_cardId);
         return CardCatalog.RequireSpec(_cardId).MaxHp + t_growth.HpBonus;
     }
 

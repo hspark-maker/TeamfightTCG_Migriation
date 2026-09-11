@@ -44,6 +44,7 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
 
     public void Bind(int _card, Action<DeckEditCardTile, PointerEventData> _onDragRequest, Action<DeckEditCardTile> _onClick)
     {
+        ClearPointer();
         m_card          = _card;
         m_onDragRequest = _onDragRequest;
         m_onClick       = _onClick;
@@ -61,6 +62,26 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
         m_focusDimmed = false;
         ApplyFocusScale(false, true);   // 재바인딩은 강조 도중에도 일어난다 → 확대 잔상 제거(트윈 없이 즉시)
         SetInDeck(false);
+    }
+
+    internal void Unbind()
+    {
+        ClearPointer();
+        m_card = 0;
+        m_onDragRequest = null;
+        m_onClick = null;
+        m_focusDimmed = false;
+        ApplyFocusScale(false, true);
+        SetInDeck(false);
+        if (longPress != null) longPress.OnLongPress -= OnLongPressFired;
+    }
+
+    void ClearPointer()
+    {
+        // 같은 인스턴스가 다른 카드에 배정된 뒤 이전 누름의 클릭·롱프레스가 이어지지 않게 한다.
+        if (m_pointerData != null && m_pointerData.pointerPress == gameObject)
+            m_pointerData.eligibleForClick = false;
+        m_pointerData = null;
     }
 
     public void SetInDeck(bool _on)

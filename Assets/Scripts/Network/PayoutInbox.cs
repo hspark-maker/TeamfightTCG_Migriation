@@ -181,6 +181,9 @@ static class PayoutInbox
             if (t_gains.TryGetValue(t_matchId, out CurrencyGain t_credited)) BattleRewardHandoff.Set(t_credited);
         }
         SaveApplied();
+        // 전투 정산은 미션 카운터도 갱신하지만 지급 응답에는 그 상태가 없다.
+        // 미션 화면을 열기 전에도 변경 알림·컷인이 도착하도록 정산 후 한 번 조회한다.
+        MissionCommands.RefreshAsync().Forget();
         // 종료·입장마다 다시 조회하지 않으므로 쌓인 지급은 이번 회수에서 비운다.
         // 실제 ack가 없으면 재조회하지 않아 손상된 항목만 있는 페이지를 무한 반복하지 않는다.
         if (t_payouts.Count >= PayoutPageSize && t_ack.Acked.Count > 0) s_refreshRequested = true;

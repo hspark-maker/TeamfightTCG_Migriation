@@ -31,23 +31,27 @@ public static class TurnThinkTimer
     // 직전 턴 워처가 한 프레임 늦게 종료되어 새 턴의 표시를 끄지 않도록 소유자를 구분한다.
     static int s_generation;
 
-    /// <summary>AI 대기와 남은 시간 표시를 함께 진행한다. 입력 허용 상태와 전투 배속에는 영향 없다.</summary>
-    public static async UniTask WaitForEnemy(float _limitSec, CancellationToken _ct)
+    /// <summary>AI 대기와 남은 시간 표시를 함께 진행한다. 표시 총량은 _displayLimitSec(플레이어와 같은
+    /// TurnThinkTime)에서 내려가고, 실제 행동은 _actSec 경과 시점 — 남은 시간이 많이 남은 채 타이머가
+    /// 꺼지므로 사람 상대가 일찍 공격한 화면과 구분되지 않는다. 표시 총량을 행동 시간으로 쓰면
+    /// 링 만점·위험색 기준이 그대로 새 AI 티가 난다. 입력 허용 상태와 전투 배속에는 영향 없다.</summary>
+    public static async UniTask WaitForEnemy(float _actSec, float _displayLimitSec, CancellationToken _ct)
     {
         _ct.ThrowIfCancellationRequested();
         int t_generation = ++s_generation;
-        Limit = _limitSec;
-        Remaining = _limitSec;
+        Limit = _displayLimitSec;
+        Remaining = _displayLimitSec;
         Active = true;
-        double t_end = Time.realtimeSinceStartupAsDouble + _limitSec;
+        double t_start = Time.realtimeSinceStartupAsDouble;
 
         try
         {
-            while (Remaining > 0f && t_generation == s_generation)
+            while (t_generation == s_generation)
             {
+                double t_elapsed = Time.realtimeSinceStartupAsDouble - t_start;
+                if (t_elapsed >= _actSec) return;
+                Remaining = Mathf.Max(0f, (float)(_displayLimitSec - t_elapsed));
                 await UniTask.Yield(_ct);
-                if (t_generation != s_generation) return;
-                Remaining = Mathf.Max(0f, (float)(t_end - Time.realtimeSinceStartupAsDouble));
             }
         }
         finally

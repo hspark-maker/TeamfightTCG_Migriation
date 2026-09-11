@@ -133,11 +133,12 @@ export function passLevelOf(exp: number, levels: PassLevelDef[]): number {
 }
 
 /**
- * Builds the Reward table owner id for the free pass track.
+ * Builds the Reward table owner id for either pass track.
  * @param {string} seasonId Season key.
  * @param {number} level Pass level.
+ * @param {string} track Reward track; old callers retain the free owner id.
  * @return {string} Reward owner id.
  */
-export function passRewardOwnerId(seasonId: string, level: number): string {
-  return `${seasonId}:${level}`;
+export function passRewardOwnerId(seasonId: string, level: number, track: "free" | "premium" = "free"): string {
+  return track === "premium" ? `${seasonId}:premium:${level}` : `${seasonId}:${level}`;
 }

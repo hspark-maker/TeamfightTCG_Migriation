@@ -51,7 +51,9 @@ public sealed class BattleLoop
         {
             BattleField t_field = FieldOf(currentOwner);
             await BeginTurn(t_field);
+            if (_forcedEnd != null && _forcedEnd()) return EBattleLoopEnd.Forced;
             await _executeTurn(currentOwner);
+            if (_forcedEnd != null && _forcedEnd()) return EBattleLoopEnd.Forced;
             EndTurn(t_field);
 
             _afterTurnResolved?.Invoke(currentOwner);

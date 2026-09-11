@@ -1,6 +1,8 @@
 import {randomUUID} from "node:crypto";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
+import {FieldValue} from "firebase-admin/firestore";
+import {db} from "../firebaseApp";
 import {EVENTS} from "../analytics/eventNames";
 import {recordEvent} from "../observability/analyticsEvent";
 import {
@@ -12,6 +14,14 @@ import {
 import {rejectDomain} from "../save/domainReject";
 import {clientReceiptId, isClientReceiptId} from "../save/receiptId";
 import {readSpecRows} from "../packs/packSpecReader";
+import {readMissionCatalog} from "../missions/missionSpec";
+import {missionPeriod} from "../missions/period";
+import {
+  beginMissionBump,
+  commitMissionBumps,
+  missionResponse,
+  MissionResponse,
+} from "../missions/missionStore";
 import {
   judgeNodeUnlock,
   MAX_NODE_ID_LENGTH,
@@ -49,6 +59,8 @@ function reject(reason: ReportReject, message: string, context: Record<string, u
  *
  * won 을 받지 않는다 — 서버가 전투를 검증할 방법이 없어 "항상 true 인 인자"가 되고,
  * 그런 인자는 읽는 사람에게 검증되는 것처럼 보인다. 패배는 아예 호출하지 않는 것이 계약이다.
+ * 최초 승인한 정점만 전투 완료·승리 미션에 함께 기록한다. 보상 수령 때는 다시 세지 않는다.
+ * 전투 재생 증거는 없으므로 파괴·시너지·키워드 발동 수는 집계하지 않는다.
  */
 export const reportAdventureWin = onCall(async (request) => {
   const uid = requireUid(request.auth);
@@ -65,7 +77,15 @@ export const reportAdventureWin = onCall(async (request) => {
   const context = {uid, env, nodeId};
 
   // 스펙 읽기는 트랜잭션 밖이다 — 유저 문서와 무관하고, 재실행마다 다시 읽으면 비용만 는다.
-  const specRows = await readSpecRows(env, "AdventureChapter");
+  const [specRows, catalog] = await Promise.all([
+    readSpecRows(env, "AdventureChapter"),
+    // Mission 미발행 환경도 모험은 진행한다. 정의는 응답의 파생 완료 수에만
+    // 필요하며 CompleteBattle/WinBattle 카운터 저장에는 필요하지 않다.
+    readMissionCatalog(env).catch((error) => {
+      logger.warn("adventure_mission_catalog_unavailable", {...context, error: String(error)});
+      return null;
+    }),
+  ]);
   const chapterRows = parseChapterNodeRows(specRows);
   if (chapterRows.length === 0) {
     // 표를 통째로 못 읽은 것은 미저작과 다르다 — 배포/업로드 사고이고 유저 잘못이 아니다.
@@ -79,9 +99,11 @@ export const reportAdventureWin = onCall(async (request) => {
   let replayed = true;
   // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
   const txId = clientReceiptId(request.data?.txId, randomUUID());
+  const period = missionPeriod(Date.now());
+  let missionState: MissionResponse | undefined;
 
   const result = await mutateSave(env, uid, "reportAdventureWin", {kind: "client", txId},
-    (current): SaveMutation => {
+    async (current, transaction): Promise<SaveMutation> => {
       const adventure = current.adventure as Record<string, unknown> | undefined;
       const cleared = readNodeIdList(adventure?.clearedNodeIds);
       const pending = typeof adventure?.pendingRewardNodeId === "string" ?
@@ -112,6 +134,17 @@ export const reportAdventureWin = onCall(async (request) => {
           {...context, points, clearedCount: cleared.length});
       }
 
+      // pending/cleared 판정이 영수증 없는 재신고도 막는다. 최초 승인과 같은
+      // 트랜잭션에서만 집계하므로 커밋 실패·콜백 재실행에 카운터가 따로 남지 않는다.
+      const missions = await beginMissionBump(transaction, db, env, uid, period);
+      commitMissionBumps(transaction, missions, [
+        {event: EVENTS.battleCompleted.missionKey, amount: 1},
+        {event: "WinBattle", amount: 1},
+      ], FieldValue.serverTimestamp());
+      // 정의 없이 파생 완료 수를 0으로 채택시키지 않는다. 카운터는 위에서
+      // 그대로 저장하고, 정의가 돌아오면 getMissions가 저장값으로 응답한다.
+      missionState = catalog === null ? undefined : missionResponse(missions.state, period, catalog);
+
       // 슬롯 **전체 값**을 쓴다 — clearedNodeIds·claimedChapterIds 를 그대로 실어야 지워지지 않는다.
       return {
         slots: {
@@ -125,7 +158,7 @@ export const reportAdventureWin = onCall(async (request) => {
     },
     (adopted) => {
       replayed = false;
-      return {...adopted, nodeId};
+      return {...adopted, nodeId, ...(missionState === undefined ? {} : {missions: missionState})};
     });
 
   if (replayed) {

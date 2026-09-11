@@ -41,7 +41,7 @@ public class RankingBoardPanel : PooledUIBase
     public void Open()
     {
         SetVisible(true);
-        Refresh();
+        BeginRefresh(false);
     }
 
     public void Close()
@@ -68,7 +68,9 @@ public class RankingBoardPanel : PooledUIBase
         transition.HandleDisabled(ResolveTarget());
     }
 
-    void Refresh()
+    void Refresh() => BeginRefresh(true);
+
+    void BeginRefresh(bool _force)
     {
         if (m_loading) return;
         m_loading = true;
@@ -76,15 +78,14 @@ public class RankingBoardPanel : PooledUIBase
         if (seasonText != null) seasonText.text = string.Empty;
         ClearRows();
         SetStatus("랭킹을 불러오는 중…", false);
-        LoadAsync(++m_requestVersion).Forget();
+        LoadAsync(++m_requestVersion, _force).Forget();
     }
 
-    async UniTaskVoid LoadAsync(int _version)
+    async UniTaskVoid LoadAsync(int _version, bool _force)
     {
         try
         {
-            var t_result = await ServerSaveCommands.InvokeReadOnlyAsync<RankLeaderboardResult>(
-                "getRankLeaderboard", new { env = ContentProfileConfig.Active.CloudEnvId });
+            var t_result = await RankLeaderboardCommands.RefreshAsync(_force);
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"[RankingBoardPanel] Received env={ContentProfileConfig.Active.CloudEnvId}, entries={t_result?.Entries?.Length}\n"
                 + Newtonsoft.Json.JsonConvert.SerializeObject(t_result, Newtonsoft.Json.Formatting.Indented));

@@ -4,7 +4,11 @@ import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {createHash, randomBytes, randomInt, randomUUID} from "node:crypto";
 import {db} from "../firebaseApp";
-import {drawAiDeck, parseAiDeckRows} from "../matchmaking/aiDeckDraw";
+import {AiDeckDraw, drawAiDeck, parseAiDeckRows} from "../matchmaking/aiDeckDraw";
+import {drawRankAiEncounter, parseRankAiEncounters, RankAiEncounter} from "../matchmaking/rankAiEncounter";
+import {AiCardGrowth, buildAiDeckSnapshots, CardSnapshot, parseCardSpecRow, readAiDeckSnapshots} from "../deckValidation";
+import {parseCardEnhanceRule} from "../growth/enhanceRules";
+import {parseLimitBreakCurve} from "../growth/limitBreakTable";
 import {MATCH_PAIRING_TTL_MS, SERVER_RULESET_VERSION} from "../matchPairing";
 import {withCountedTransaction} from "../observability/countedTransaction";
 import {parseRankGradeRows, resolveTierIndex} from "../payout";
@@ -17,6 +21,7 @@ import {
   BATTLE_REPLAY_SPEC_TABLES,
   fingerprintOfSpecPins,
   readSpecPins,
+  readPinnedSpecRows,
   readSpecRows,
 } from "../specs/specBlobReader";
 
@@ -34,6 +39,7 @@ type AuthoredFindAiMatchData = {
   playerDeck: number[];
   txId: string;
   resultProtocol: 1;
+  aiGrowthVersion: 0 | 1;
 };
 
 type FindAiMatchData = LegacyFindAiMatchData | AuthoredFindAiMatchData;
@@ -47,9 +53,12 @@ function parseData(raw: unknown): FindAiMatchData {
 
   const fingerprint = data?.contentFingerprint;
   const rawPlayerDeck = data?.playerDeck;
+  if (data?.aiGrowthVersion != null && data.aiGrowthVersion !== 1) {
+    throw new HttpsError("invalid-argument", "unsupported AI growth version");
+  }
   // 서버 선배포 창. 구 클라는 env만 보내고 덱 선택만 받는다. 새 필드 중 하나만 보낸 반쪽
   // 페이로드는 구 버전으로 접지 않는다 — 매치가 봉인됐다고 믿는 클라를 만들 수 있다.
-  if (fingerprint == null && rawPlayerDeck == null) return {env, legacy: true};
+  if (fingerprint == null && rawPlayerDeck == null && data?.aiGrowthVersion == null) return {env, legacy: true};
   if (typeof fingerprint !== "string" || !HEX_64.test(fingerprint) ||
       !Array.isArray(rawPlayerDeck) || rawPlayerDeck.length !== DECK_SIZE) {
     throw new HttpsError("invalid-argument", "invalid AI match payload");
@@ -69,6 +78,7 @@ function parseData(raw: unknown): FindAiMatchData {
     // txId가 없는 수동 호출용일 뿐이며 clientReceiptId는 유효한 원본을 그대로 반환한다.
     txId: clientReceiptId(data?.txId, randomUUID()),
     resultProtocol: 1,
+    aiGrowthVersion: data?.aiGrowthVersion === 1 ? 1 : 0,
   };
 }
 
@@ -104,6 +114,10 @@ function storedResponse(raw: Record<string, unknown>, data: AuthoredFindAiMatchD
       !Array.isArray(deck) || !Array.isArray(playerBoardOrder) || !Array.isArray(enemyBoardOrder) ||
       deck.length !== DECK_SIZE || playerBoardOrder.length !== DECK_SIZE ||
       enemyBoardOrder.length !== DECK_SIZE || !Number.isInteger(aiDeck?.cardLevel)) return null;
+  if ((raw.aiGrowthVersion ?? 0) !== data.aiGrowthVersion) return null;
+  const snapshots = data.aiGrowthVersion === 1 ?
+    readAiDeckSnapshots(deck as number[], aiDeck.cardGrowth, aiDeck.snapshots) : null;
+  if (data.aiGrowthVersion === 1 && snapshots == null) return null;
 
   return {
     revision: 0,
@@ -112,10 +126,17 @@ function storedResponse(raw: Record<string, unknown>, data: AuthoredFindAiMatchD
     rulesetVersion: raw.rulesetVersion,
     deck,
     cardLevel: aiDeck.cardLevel,
+    ...(snapshots == null ? {} : growthResponse(aiDeck.cardGrowth as AiCardGrowth[], snapshots)),
     playerBoardOrder,
     enemyBoardOrder,
     resultProtocol: 1,
   };
+}
+
+function growthResponse(growth: readonly AiCardGrowth[], snapshots: readonly CardSnapshot[]) {
+  return {aiGrowthVersion: 1, cardGrowth: snapshots.map((snapshot) => ({
+    ...snapshot, limitBreak: growth.find((entry) => entry.cardId === snapshot.cardId)!.limitBreak,
+  }))};
 }
 
 /**
@@ -125,9 +146,21 @@ function storedResponse(raw: Record<string, unknown>, data: AuthoredFindAiMatchD
 export const findAiMatch = onCall(measuredCallable("findAiMatch", async (request) => {
   const uid = requireUid(request.auth);
   const data = parseData(request.data);
+  // 이미 발급한 매치는 현재 표·시즌을 다시 읽기 전에 반환한다. 재발행 뒤 재시도도 같은 계약이다.
+  const matchId = data.legacy ? null : createHash("sha256").update(`${uid}:${data.txId}`, "utf8")
+    .digest("hex").slice(0, 32);
+  const matchRef = matchId == null ? null : db.doc(`envs/${data.env}/matches/${matchId}`);
+  if (!data.legacy && matchRef != null) {
+    const prior = await matchRef.get();
+    if (prior.exists) {
+      const stored = storedResponse(prior.data() ?? {}, data);
+      if (stored == null) throw new HttpsError("already-exists", "AI match receipt was reused");
+      if (prior.data()?.resultProtocol === 1) return stored;
+    }
+  }
   const [rankRows, deckRows, seasonRows] = await Promise.all([
     readSpecRows(data.env, "RankGrade"),
-    readSpecRows(data.env, "AIDeck"),
+    !data.legacy && data.aiGrowthVersion === 1 ? Promise.resolve([]) : readSpecRows(data.env, "AIDeck"),
     readSpecRows(data.env, "PassSeason"),
   ]);
 
@@ -145,23 +178,58 @@ export const findAiMatch = onCall(measuredCallable("findAiMatch", async (request
       logger.warn("AIDeck rows skipped", {env: data.env, skipped: parsed.skipped});
     }
     const tierIndex = resolveTierIndex(points, grades);
-    const draw = drawAiDeck(parsed.rows, tierIndex, randomInt);
-    if (draw === null) throw new Error("AIDeck spec has no usable row");
     if (data.legacy) {
+      const draw = drawAiDeck(parsed.rows, tierIndex, randomInt);
+      if (draw === null) throw new Error("AIDeck spec has no usable row");
       logger.info("legacy AI deck selected", {uid, env: data.env, tierIndex, deckId: draw.deckId});
       return {revision: 0, deck: draw.deck, cardLevel: draw.cardLevel};
     }
     const authoredData: AuthoredFindAiMatchData = data;
-    const specPins = await readSpecPins(authoredData.env, BATTLE_REPLAY_SPEC_TABLES);
+    if (matchRef == null || matchId == null) throw new Error("AI match identity missing");
+    const specPins = await readSpecPins(authoredData.env, authoredData.aiGrowthVersion === 1 ?
+      [...BATTLE_REPLAY_SPEC_TABLES, "CardLimitBreak", "CardEnhanceRule", "AIDeck", "RankAiEncounter"] :
+      BATTLE_REPLAY_SPEC_TABLES);
     if (fingerprintOfSpecPins(authoredData.env, specPins, ["Card"]) !== authoredData.contentFingerprint) {
       throw new HttpsError("failed-precondition", "content_fingerprint_mismatch");
     }
 
     // 같은 txId 재시도는 같은 문서를 읽는다. callable 응답 유실 뒤 클라가 재시도해도
     // AI 덱·시드·보드 순서가 바뀐 유령 매치를 하나 더 만들지 않는다.
-    const matchId = createHash("sha256").update(`${uid}:${authoredData.txId}`, "utf8")
-      .digest("hex").slice(0, 32);
-    const matchRef = db.doc(`envs/${authoredData.env}/matches/${matchId}`);
+    let cardGrowth: AiCardGrowth[] = [];
+    let snapshots: CardSnapshot[] = [];
+    let encounter: RankAiEncounter | null = null;
+    let draw: AiDeckDraw | null = null;
+    if (authoredData.aiGrowthVersion === 1) {
+      const [cardRows, limitBreakRows, ruleRows, pinnedDeckRows, encounterRows] = await Promise.all([
+        readPinnedSpecRows(data.env, "Card", specPins.Card),
+        readPinnedSpecRows(data.env, "CardLimitBreak", specPins.CardLimitBreak),
+        readPinnedSpecRows(data.env, "CardEnhanceRule", specPins.CardEnhanceRule),
+        readPinnedSpecRows(data.env, "AIDeck", specPins.AIDeck),
+        readPinnedSpecRows(data.env, "RankAiEncounter", specPins.RankAiEncounter),
+      ]);
+      const pinnedDecks = parseAiDeckRows(pinnedDeckRows);
+      const profiles = parseRankAiEncounters(encounterRows, pinnedDecks.rows);
+      // 마지막전 판정은 별도 기능이다. 현재는 일반전 저작 프로필만 사용한다.
+      const selected = drawRankAiEncounter(profiles, pinnedDecks.rows, tierIndex, "Normal", randomInt);
+      encounter = selected.profile;
+      draw = {deckId: selected.deck.deckId, deck: [...selected.deck.cardIds], cardLevel: 0};
+      const rule = parseCardEnhanceRule(ruleRows);
+      if (rule == null) throw new Error("CardEnhanceRule spec is invalid");
+      const curve = parseLimitBreakCurve(limitBreakRows, rule.maxLimitBreak);
+      const specs = new Map(cardRows.map((row) => {
+        const spec = parseCardSpecRow(row);
+        if (spec == null) throw new Error(`invalid Card spec:${row.id}`);
+        return [spec.id, spec] as const;
+      }));
+      cardGrowth = encounter.cardGrowth;
+      const built = buildAiDeckSnapshots(draw.deck, cardGrowth, specs, curve);
+      if (built == null) throw new Error("AI card growth is invalid");
+      snapshots = built;
+    } else {
+      draw = drawAiDeck(parsed.rows, tierIndex, randomInt);
+    }
+    if (draw === null) throw new Error("AIDeck spec has no usable row");
+    const selectedDraw = draw;
     const seedHex = randomBytes(8).toString("hex");
     const playerBoardOrder = shuffle(authoredData.playerDeck);
     const enemyBoardOrder = shuffle(draw.deck);
@@ -193,12 +261,16 @@ export const findAiMatch = onCall(measuredCallable("findAiMatch", async (request
         expectedParticipants: 1,
         mode: "solo",
         resultProtocol: authoredData.resultProtocol,
+        ...(authoredData.aiGrowthVersion === 1 ? {aiGrowthVersion: 1} : {}),
         ownerIndexByUid: {[uid]: 0},
         playerDeckCardIds: [...authoredData.playerDeck].sort((a, b) => a - b),
         aiDeck: {
-          deckId: draw.deckId,
-          cardIds: draw.deck,
-          cardLevel: draw.cardLevel,
+          deckId: selectedDraw.deckId,
+          cardIds: selectedDraw.deck,
+          cardLevel: selectedDraw.cardLevel,
+          ...(authoredData.aiGrowthVersion === 1 ? {cardGrowth, snapshots} : {}),
+          ...(encounter == null ? {} : {encounterId: encounter.id, tierIndex: encounter.tierIndex,
+            battleKind: encounter.battleKind, highlightCardId: encounter.highlightCardId}),
         },
         serverBoardOrders: {
           owner0: playerBoardOrder,
@@ -214,8 +286,9 @@ export const findAiMatch = onCall(measuredCallable("findAiMatch", async (request
         matchId,
         seedHex,
         rulesetVersion: SERVER_RULESET_VERSION,
-        deck: draw.deck,
-        cardLevel: draw.cardLevel,
+        deck: selectedDraw.deck,
+        cardLevel: selectedDraw.cardLevel,
+        ...(authoredData.aiGrowthVersion === 1 ? growthResponse(cardGrowth, snapshots) : {}),
         playerBoardOrder,
         enemyBoardOrder,
         resultProtocol: authoredData.resultProtocol,

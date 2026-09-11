@@ -30,4 +30,5 @@ export {syncGuideProgress} from "./commands/syncGuideProgress";
 export {syncRankProfile} from "./commands/syncRankProfile";
 export {getPass} from "./commands/getPass";
 export {claimPassReward} from "./commands/claimPassReward";
+export {claimPassRepeatReward} from "./commands/claimPassRepeatReward";
 export {getReplayDivergence} from "./commands/getReplayDivergence";

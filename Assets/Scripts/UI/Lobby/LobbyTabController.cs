@@ -162,6 +162,19 @@ public class LobbyTabController : MonoBehaviour
 
     void HandleTabSelected(int _index) => Select(_index);
 
+    /// <summary>미션 등 외부 진입도 저작된 탭과 잠금 정책을 따라 선택한다.</summary>
+    public bool TrySelectFeature(EOutgameFeature _feature, Action _beforeSelect = null, Action _afterSelect = null)
+    {
+        if (!isActiveAndEnabled || _feature == EOutgameFeature.None) return false;
+        int t_index = tabs.FindIndex(_tab => _tab.panel != null &&
+            (_feature == EOutgameFeature.LobbyMatchTab
+                ? _tab.panel is LobbyMatchTabPanel : _tab.unlockFeature == _feature));
+        if (t_index < 0 || !OutgameFeatureLock.IsUnlocked(tabs[t_index].unlockFeature)) return false;
+
+        SelectInternal(t_index, true, _beforeSelect, _afterSelect);
+        return true;
+    }
+
     public void Select(LobbyTabPanel _panel, bool _fireTrigger = true)
     {
         int t_index = tabs.FindIndex(_tab => _tab.panel == _panel);
@@ -169,6 +182,9 @@ public class LobbyTabController : MonoBehaviour
     }
 
     public void Select(int _index, bool _fireTrigger = true)
+        => SelectInternal(_index, _fireTrigger, null, null);
+
+    void SelectInternal(int _index, bool _fireTrigger, Action _beforeSelect, Action _afterSelect)
     {
         if (_index < 0 || _index >= tabs.Count) return;
         if (_fireTrigger &&
@@ -176,21 +192,28 @@ public class LobbyTabController : MonoBehaviour
             return;
         if (_index == m_currentIndex)
         {
+            _beforeSelect?.Invoke();
             // 출발을 기다리는 중이면 손대지 않는다 — 여기서 알약을 먼저 보내면 콘텐츠와 박자가 갈라진다.
             if (m_pendingStart == null) tabBar?.SetSelected(_index);
+            _afterSelect?.Invoke();
             return;
         }
 
         LobbyTabPanel t_current = CurrentPanel;
         if (t_current == null)
         {
+            _beforeSelect?.Invoke();
             CommitSelection(_index, _fireTrigger);
+            _afterSelect?.Invoke();
             return;
         }
 
         t_current.RequestLeave(() =>
         {
-            if (this != null) CommitSelection(_index, _fireTrigger);
+            if (this == null) return;
+            _beforeSelect?.Invoke();
+            CommitSelection(_index, _fireTrigger);
+            _afterSelect?.Invoke();
         });
     }
 

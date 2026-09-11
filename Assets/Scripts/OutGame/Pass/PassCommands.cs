@@ -10,7 +10,7 @@ internal static class PassCommands
 
     internal static void ApplyMissionProgress(PassProgress _progress)
     {
-        bool t_reuseDefinitions = CanReuseDefinitions && s_inFlightClaims.Count == 0;
+        bool t_reuseDefinitions = CanReuseDefinitions && !IsRepeatInFlight;
         Invalidate();
         if (!TryAdoptProgress(_progress, t_reuseDefinitions) && !s_missionRefreshPending)
             RefreshAfterMissionAsync().Forget();
@@ -24,7 +24,7 @@ internal static class PassCommands
         {
             while (true)
             {
-                await UniTask.WaitUntil(() => !s_refreshInFlight && s_inFlightClaims.Count == 0,
+                await UniTask.WaitUntil(() => !s_refreshInFlight && !IsRepeatInFlight,
                     cancellationToken: FirebaseManager.Lifetime);
                 int t_generation = s_stateGeneration;
                 await RefreshAsync();
@@ -40,12 +40,27 @@ internal static class PassCommands
 
     static readonly HashSet<int> s_inFlightClaims = new HashSet<int>();
     static bool s_refreshInFlight;
+    static bool s_repeatClaimInFlight;
     static int s_stateGeneration;
     static int s_loadedGeneration = -1;
     static long s_loadedRankPoints;
+    internal static bool IsRefreshing => s_refreshInFlight;
 
     internal static bool NeedsRefresh => !PassManager.IsReady ||
-        s_loadedGeneration != s_stateGeneration || s_loadedRankPoints != RankManager.Points;
+        s_loadedGeneration != s_stateGeneration || s_loadedRankPoints != RankManager.Points ||
+        MissingPremiumDefinitions;
+
+    // 배포 전 응답에는 유료 트랙 필드 자체가 없다. 그 캐시를 최신 정의로 재사용하지 않는다.
+    // 새 응답의 빈 배열은 정상이다. 해당 시즌에 유료 보상을 저작하지 않은 경우일 수 있다.
+    static bool MissingPremiumDefinitions
+    {
+        get
+        {
+            foreach (PassLevelDefinition t_level in PassManager.Levels)
+                if (t_level != null && (t_level.PremiumReward == null || t_level.PremiumItems == null)) return true;
+            return false;
+        }
+    }
 
     // 진행도만 받는 응답은 기존 시즌·곡선·팩 선택 목록이 최신일 때만 조회를 대신한다.
     static bool CanReuseDefinitions => !NeedsRefresh && PassManager.HasSeason &&
@@ -73,13 +88,14 @@ internal static class PassCommands
         unchecked { s_stateGeneration++; }
     }
 
-    internal static bool IsInFlight(int _level) => s_inFlightClaims.Contains(_level);
+    internal static bool IsInFlight(int _level) => s_repeatClaimInFlight || s_inFlightClaims.Contains(_level);
+    internal static bool IsRepeatInFlight => s_repeatClaimInFlight || s_inFlightClaims.Count > 0;
 
     /// <summary>시즌·곡선·진행도를 한 번에 받는다. 실패는 부가 기능 실패라 세션을 막지 않는다.</summary>
     internal static async UniTask<bool> RefreshAsync()
     {
         // 수령 중 읽은 봉투가 수령 완료 뒤 도착하면 낙인을 옛 값으로 되돌린다(미션과 같은 함정).
-        if (s_refreshInFlight || s_inFlightClaims.Count > 0) return false;
+        if (s_refreshInFlight || IsRepeatInFlight) return false;
         s_refreshInFlight = true;
         int t_generation = s_stateGeneration;
         long t_rankPoints = RankManager.Points;
@@ -93,7 +109,7 @@ internal static class PassCommands
                 Debug.LogWarning("[PassCommands] getPass returned nothing.");
                 return false;
             }
-            if (s_inFlightClaims.Count > 0 || t_generation != s_stateGeneration) return false;
+            if (IsRepeatInFlight || t_generation != s_stateGeneration) return false;
 
             s_loadedGeneration = t_generation;
             s_loadedRankPoints = t_rankPoints;
@@ -112,9 +128,9 @@ internal static class PassCommands
     }
 
     /// <summary>레벨 하나의 무료 트랙 보상을 수령한다. 진행 상태는 서버 응답 채택만 따른다.</summary>
-    internal static async UniTask<ClaimPassRewardResult> ClaimAsync(int _level, string _selectedPackId = null)
+    internal static async UniTask<ClaimPassRewardResult> ClaimAsync(int _level, string _selectedPackId = null, bool _premium = false)
     {
-        if (_level <= 0) return null;
+        if (_level <= 0 || s_repeatClaimInFlight || (_premium && !PassManager.PremiumUnlocked)) return null;
         bool t_reuseDefinitions = CanReuseDefinitions && s_inFlightClaims.Count == 0;
         if (!s_inFlightClaims.Add(_level)) return null;
         Invalidate();
@@ -125,7 +141,8 @@ internal static class PassCommands
         {
             ClaimPassRewardResult t_result = await ServerSaveCommands.InvokeAsync<ClaimPassRewardResult>(
                 CLAIM_COMMAND,
-                new { env = ContentProfileConfig.Active.CloudEnvId, level = _level, selectedPackId = _selectedPackId });
+                new { env = ContentProfileConfig.Active.CloudEnvId, level = _level, selectedPackId = _selectedPackId,
+                    track = _premium ? "premium" : "free" });
             TryAdoptProgress(t_result?.Progress,
                 t_reuseDefinitions && t_generation == s_stateGeneration && s_inFlightClaims.Count == 1);
             Debug.Log($"[PassCommands] Level {_level} claimed — {t_result?.Granted?.Count ?? 0} currency line(s)");
@@ -153,12 +170,51 @@ internal static class PassCommands
         }
     }
 
+    internal static async UniTask<ClaimPassRepeatRewardResult> ClaimRepeatAsync()
+    {
+        if (!PassManager.CanClaimRepeat) return null;
+        string t_season = PassManager.Season.SeasonId;
+        long t_toClaimCount = PassManager.RepeatEarnedCount;
+        s_repeatClaimInFlight = true;
+        Invalidate();
+        PassManager.NotifyCommandStateChanged();
+        try
+        {
+            var t_result = await ServerSaveCommands.InvokeAsync<ClaimPassRepeatRewardResult>(
+                "claimPassRepeatReward",
+                new { env = ContentProfileConfig.Active.CloudEnvId, seasonId = t_season, toClaimCount = t_toClaimCount });
+            PassManager.AdoptRepeat(t_result);
+            return t_result;
+        }
+        catch (ServerCommandRejectedException t_rejected)
+        {
+            Debug.LogWarning($"[PassCommands] Repeat claim rejected ({t_rejected.Reason}): {t_rejected.Message}");
+            return null;
+        }
+        catch (ServerAdoptionException t_adoption)
+        {
+            Debug.LogWarning($"[PassCommands] Repeat claim adoption failed: {t_adoption.Message}");
+            return null;
+        }
+        catch (Exception t_exception)
+        {
+            Debug.LogError($"[PassCommands] claimPassRepeatReward failed: {t_exception.GetBaseException().Message}");
+            return null;
+        }
+        finally
+        {
+            s_repeatClaimInFlight = false;
+            PassManager.NotifyCommandStateChanged();
+        }
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetRuntimeState()
     {
         s_missionRefreshPending = false;
         s_inFlightClaims.Clear();
         s_refreshInFlight = false;
+        s_repeatClaimInFlight = false;
         s_stateGeneration = 0;
         s_loadedGeneration = -1;
         s_loadedRankPoints = 0L;

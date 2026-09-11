@@ -19,6 +19,8 @@ exports.spendSnack = spendSnack;
 exports.applyLimitBreak = applyLimitBreak;
 exports.addSnackAndGrow = addSnackAndGrow;
 exports.growthSlot = growthSlot;
+exports.shardRequirement = shardRequirement;
+exports.feedShard = feedShard;
 const saveValues_1 = require("../save/saveValues");
 const limitBreakTable_1 = require("./limitBreakTable");
 /** 미강화 카드의 레벨. 클라 CardGrowth.BaseLevel 과 같아야 한다. */
@@ -42,6 +44,7 @@ function readGrowthEntries(cardGrowth) {
             level: (0, saveValues_1.intOf)(value?.level),
             snack: (0, saveValues_1.intOf)(value?.snack),
             limitBreak: (0, saveValues_1.intOf)(value?.limitBreak),
+            ...(value?.shardProgress === undefined ? {} : { shardProgress: Math.max(0, (0, saveValues_1.intOf)(value.shardProgress)) }),
         };
     }
     return entries;
@@ -85,6 +88,8 @@ function levelOfCard(entries, cardId) {
 function applyEnhanceLevel(entries, cardId, level) {
     return withEntry(entries, cardId, (entry) => {
         entry.level = level < exports.BASE_LEVEL ? exports.BASE_LEVEL : level;
+        if (entry.shardProgress !== undefined)
+            entry.shardProgress = 0;
     });
 }
 /**
@@ -190,10 +195,39 @@ function addSnackAndGrow(entries, cardId, amount, curve) {
 function growthSlot(entries) {
     const pruned = {};
     for (const [key, entry] of Object.entries(entries)) {
-        if (entry.level <= exports.BASE_LEVEL && entry.snack <= 0 && entry.limitBreak <= 0)
+        if (entry.level <= exports.BASE_LEVEL && entry.snack <= 0 && entry.limitBreak <= 0 && (entry.shardProgress ?? 0) <= 0)
             continue;
         pruned[key] = { ...entry };
     }
     return { entries: pruned };
+}
+/** Keep the evolution threshold compatible with the client integer range.
+ * @param {number} cost Authored total cost
+ * @return {number} Positive shard threshold
+ */
+function shardRequirement(cost) {
+    return Math.max(1, Math.min(2147483647, cost));
+}
+/** Feed shards up to the next evolution; the tutorial grant fills the remainder.
+ * @param {GrowthEntries} entries Current growth
+ * @param {number} cardId Card identity
+ * @param {number} required Evolution threshold
+ * @param {boolean} freeShot Free tutorial evolution
+ * @param {number} amount Requested shard count, validated by the caller
+ * @return {object} Updated growth and evolution result
+ */
+function feedShard(entries, cardId, required, freeShot = false, amount = 1) {
+    const currentLevel = levelOfCard(entries, cardId);
+    const target = shardRequirement(required);
+    const currentProgress = Math.min(target - 1, Math.max(0, entries[String(cardId)]?.shardProgress ?? 0));
+    const appliedShards = freeShot ? target - currentProgress : Math.min(amount, target - currentProgress);
+    const progress = currentProgress + appliedShards;
+    const evolved = freeShot || progress >= target;
+    const level = currentLevel + (evolved ? 1 : 0);
+    const shardProgress = evolved ? 0 : progress;
+    return { entries: withEntry(entries, cardId, (entry) => {
+            entry.level = level;
+            entry.shardProgress = shardProgress;
+        }), level, shardProgress, evolved, appliedShards };
 }
 //# sourceMappingURL=cardGrowth.js.map

@@ -135,3 +135,19 @@ int,string,string,int,string,string,long,string
 186,Mission,daily.completeMissions5,2,Currency,Diamond,30,일일 미션 5개 완료 추가 보상
 187,Mission,weekly.completeMissions5,1,Currency,RouletteTicket,3,주간 미션 5개 완료 추가 보상
 188,Mission,weekly.completeMissions5,2,Currency,Diamond,100,주간 미션 5개 완료 추가 보상
+189,Pass,S1:repeat,1,Currency,Gold,100,만렙 이후 마지막 레벨 간격 EXP마다 반복 보상
+190,Pass,S1:premium:1,1,Currency,Gold,400,시즌 1 프리미엄 트랙 레벨 1
+191,Pass,S1:premium:2,1,Currency,Shard,120,시즌 1 프리미엄 트랙 레벨 2
+192,Pass,S1:premium:3,1,Pack,NormalPack_TEST,2,시즌 1 프리미엄 트랙 레벨 3
+193,Pass,S1:premium:3,2,Currency,RouletteTicket,4,시즌 1 프리미엄 트랙 레벨 3
+194,Pass,S1:premium:4,1,Currency,Diamond,20,시즌 1 프리미엄 트랙 레벨 4
+195,Pass,S1:premium:5,1,Currency,Shard,160,시즌 1 프리미엄 트랙 레벨 5
+196,Pass,S1:premium:5,2,Pack,SpecialPack,2,시즌 1 프리미엄 트랙 레벨 5
+197,Pass,S1:premium:6,1,Currency,Gold,600,시즌 1 프리미엄 트랙 레벨 6
+198,Pass,S1:premium:6,2,Currency,RouletteTicket,4,시즌 1 프리미엄 트랙 레벨 6
+199,Pass,S1:premium:7,1,Currency,Shard,200,시즌 1 프리미엄 트랙 레벨 7
+200,Pass,S1:premium:8,1,Currency,Diamond,40,시즌 1 프리미엄 트랙 레벨 8
+201,Pass,S1:premium:9,1,Currency,Shard,240,시즌 1 프리미엄 트랙 레벨 9
+202,Pass,S1:premium:9,2,Pack,NormalPack_TEST,4,시즌 1 프리미엄 트랙 레벨 9
+203,Pass,S1:premium:10,1,Currency,Diamond,100,시즌 1 프리미엄 트랙 레벨 10
+204,Pass,S1:premium:10,2,PackChoice,UnlockedThemePack,2,시즌 1 프리미엄 트랙 레벨 10

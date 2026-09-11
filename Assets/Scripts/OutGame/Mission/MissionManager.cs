@@ -12,6 +12,7 @@ internal static class MissionManager
     static readonly List<MissionDefinition> s_definitions = new List<MissionDefinition>();
 
     internal static event Action OnChanged;
+    internal static event Action<string> OnPeriodReset;
 
     internal static bool IsReady => s_snapshot != null;
     internal static long StateVersion { get; private set; }
@@ -30,6 +31,15 @@ internal static class MissionManager
         s_snapshot = _snapshot;
         unchecked { StateVersion++; }
         NotifyChanged();
+    }
+
+    /// <summary>명시적인 초기화 응답. 같은 기간의 감소도 새 진행으로 관측할 수 있게 알린다.</summary>
+    internal static void AdoptReset(MissionSnapshot _snapshot, string _period)
+    {
+        if (_snapshot == null) return;
+        try { OnPeriodReset?.Invoke(_period); }
+        catch (Exception t_exception) { Debug.LogException(t_exception); }
+        Adopt(_snapshot);
     }
 
     /// <summary>조회 응답의 상태와 정의를 함께 채택한다. 정의 순서도 서버 sortOrder를 따른다.</summary>
@@ -131,6 +141,7 @@ internal static class MissionManager
         unchecked { StateVersion++; }
         s_definitions.Clear();
         OnChanged = null;
+        OnPeriodReset = null;
     }
 
     static string ProgressKey(string _period, string _event) => (_period ?? string.Empty) + "." + (_event ?? string.Empty);

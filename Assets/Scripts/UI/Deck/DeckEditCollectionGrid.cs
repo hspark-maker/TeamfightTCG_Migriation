@@ -24,6 +24,8 @@ public class DeckEditCollectionGrid : MonoBehaviour
     [SerializeField, TextArea] string emptySearchMessage = "검색 결과가 없습니다.\n다른 이름으로 찾아보세요.";
 
     readonly List<DeckEditCardTile> m_tiles = new List<DeckEditCardTile>();
+    // 앞 m_tileCount개만 현재 목록이다. 나머지는 다음 편집에 재사용할 비활성 타일이다.
+    int m_tileCount;
 
     // m_tiles와 같은 순서로 카드 이름을 소문자로 눕혀 들고 있는다 — 타이핑 한 글자마다 스펙을 다시 조회하지 않으려는 캐시다.
     readonly List<string> m_tileNames = new List<string>();
@@ -65,15 +67,23 @@ public class DeckEditCollectionGrid : MonoBehaviour
 
     public void Build(Action<DeckEditCardTile, PointerEventData> _onDragRequest, Action<DeckEditCardTile> _onClick)
     {
-        Clear();
-        if (content == null || tilePrefab == null) return;
+        TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.DeckEditCollectionCard);
+        m_anchorCard = 0;
+        if (content == null || tilePrefab == null)
+        {
+            Clear();
+            return;
+        }
 
         if (!CardCatalog.IsReady)
         {
+            Clear();
             Debug.LogError("[DeckEditCollectionGrid] CardCatalog is not initialized — it did not go through initialization (InitializationRunner).");
             return;
         }
 
+        m_tileNames.Clear();
+        int t_count = 0;
         var t_cards = CardCatalog.AllIds;
         for (int t_i = 0; t_i < t_cards.Count; t_i++)
         {
@@ -81,11 +91,20 @@ public class DeckEditCollectionGrid : MonoBehaviour
             if (t_card <= 0) continue;
             if (!OwnershipManager.IsOwned(t_card)) continue;  // 소유 카드만 편성 가능
 
-            var t_tile = Instantiate(tilePrefab, content);
+            if (t_count == m_tiles.Count) m_tiles.Add(Instantiate(tilePrefab, content));
+            var t_tile = m_tiles[t_count];
+            // ID가 같아도 화면 밖에서 성장·키워드가 바뀔 수 있으므로 표시는 다시 바인딩한다.
             t_tile.Bind(t_card, _onDragRequest, _onClick);
-            m_tiles.Add(t_tile);
             m_tileNames.Add(NameOf(t_card));
+            t_count++;
         }
+
+        for (int t_i = t_count; t_i < m_tileCount; t_i++)
+        {
+            m_tiles[t_i].Unbind();
+            m_tiles[t_i].gameObject.SetActive(false);
+        }
+        m_tileCount = t_count;
 
         // 소유가 바뀌어 다시 그려도 걸려 있던 검색어가 풀리지 않게 여기서 재적용한다.
         // 재적용을 호출측에 흩뿌리면 Build 호출처 두 곳 중 하나를 반드시 빠뜨린다.
@@ -93,7 +112,11 @@ public class DeckEditCollectionGrid : MonoBehaviour
         ApplyFilter();
 
         // 이전 편집 세션의 스크롤 위치가 남아 첫 화면이 중간부터 보이는 것을 막는다.
-        if (scrollRect != null) scrollRect.verticalNormalizedPosition = 1f;
+        if (scrollRect != null)
+        {
+            scrollRect.StopMovement();
+            scrollRect.verticalNormalizedPosition = 1f;
+        }
     }
 
     /// <summary>카드 이름으로 목록을 거른다. 비우면(null·공백) 전부 다시 보인다.</summary>
@@ -114,7 +137,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
     void ApplyFilter()
     {
         int t_visible = 0;
-        for (int t_i = 0; t_i < m_tiles.Count; t_i++)
+        for (int t_i = 0; t_i < m_tileCount; t_i++)
         {
             var t_tile = m_tiles[t_i];
             if (t_tile == null) continue;
@@ -141,7 +164,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
     // _deck에 들어있는 카드 타일만 딤 처리. _deck이 null이면 전부 해제.
     public void RefreshInDeck(int[] _deck)
     {
-        for (int t_i = 0; t_i < m_tiles.Count; t_i++)
+        for (int t_i = 0; t_i < m_tileCount; t_i++)
         {
             var t_tile = m_tiles[t_i];
             if (t_tile == null) continue;
@@ -153,7 +176,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
     // 시너지 아이콘 롱프레스 중 해당 시너지를 가진 타일만 남기고 나머지를 죽인다. null이면 전부 해제.
     public void SetSynergyFocus(SynergyData _synergy)
     {
-        for (int t_i = 0; t_i < m_tiles.Count; t_i++)
+        for (int t_i = 0; t_i < m_tileCount; t_i++)
         {
             var t_tile = m_tiles[t_i];
             if (t_tile == null) continue;
@@ -166,7 +189,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
     // SetSynergyFocus와 같은 알파 축을 쓴다 — 두 강조는 배타라(컨트롤러가 보장) 서로 덮어써도 흐린 채 굳지 않는다.
     public void SetPickedCard(int _card)
     {
-        for (int t_i = 0; t_i < m_tiles.Count; t_i++)
+        for (int t_i = 0; t_i < m_tileCount; t_i++)
         {
             var t_tile = m_tiles[t_i];
             if (t_tile == null) continue;
@@ -261,7 +284,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
 
     DeckEditCardTile FindTile(int _card)
     {
-        for (int t_i = 0; t_i < m_tiles.Count; t_i++)
+        for (int t_i = 0; t_i < m_tileCount; t_i++)
             if (m_tiles[t_i] != null && m_tiles[t_i].Card == _card) return m_tiles[t_i];
 
         return null;
@@ -271,24 +294,21 @@ public class DeckEditCollectionGrid : MonoBehaviour
     {
         TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.DeckEditCollectionCard);
 
-        if (content != null)
+        SetScrollLocked(false);
+        for (int t_i = 0; t_i < m_tileCount; t_i++)
         {
-            // DeckListController.Build()와 동일한 순서: Destroy는 프레임 끝에 반영되므로
-            // 먼저 SetActive(false)로 꺼야 이번 프레임 GridLayoutGroup 배치에 옛 타일이 끼지 않는다.
-            for (int t_i = content.childCount - 1; t_i >= 0; t_i--)
-            {
-                var t_child = content.GetChild(t_i).gameObject;
-                t_child.SetActive(false);
-                Destroy(t_child);
-            }
+            m_tiles[t_i].Unbind();
+            m_tiles[t_i].gameObject.SetActive(false);
         }
 
-        m_tiles.Clear();
+        m_tileCount = 0;
         m_tileNames.Clear();
         m_anchorCard = 0;
 
         // m_filter는 남긴다 — 소유 변경 재빌드(DeckEditController.OnOwnershipChanged)에서 검색어가 풀리면 안 된다.
     }
+
+    void OnDisable() => Clear();
 
     static bool Contains(int[] _deck, int _card)
     {

@@ -39,6 +39,7 @@ import {
   CardSpecForValidation,
   computeDeckHash,
   parseCardSpecRow,
+  readAiDeckSnapshots,
 } from "../deckValidation";
 import {readSpecRows} from "../specs/specBlobReader";
 import {SERVER_AUTHORITATIVE_RULESET_VERSION} from "../matchPairing";
@@ -358,8 +359,12 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
     const aiDeck = solo ? objectRecord(match?.aiDeck) : null;
     const aiCardIds = aiDeck?.cardIds;
     const aiCardLevel = safeInteger(aiDeck?.cardLevel);
-    const soloAiSnapshots = solo && Array.isArray(aiCardIds) && aiCardLevel != null ?
-      buildAiDeckSnapshots(aiCardIds as number[], aiCardLevel, cardSpecs) : null;
+    // 새 계약은 발급 당시 스냅샷이 진실원이다. 누락·손상 시 구 공통 레벨로 우회하지 않는다.
+    const soloAiSnapshots = solo && Array.isArray(aiCardIds) ?
+      match?.aiGrowthVersion === 1 ?
+        readAiDeckSnapshots(aiCardIds as number[], aiDeck?.cardGrowth, aiDeck?.snapshots) :
+        match?.aiGrowthVersion == null && aiCardLevel != null ?
+          buildAiDeckSnapshots(aiCardIds as number[], aiCardLevel, cardSpecs) : null : null;
     let soloContractReason: string | null = null;
     if (solo) {
       const serverOrders = objectRecord(match?.serverBoardOrders);

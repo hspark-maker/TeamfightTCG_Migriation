@@ -117,6 +117,8 @@ public static class SpecDocsCsvExporter
 
         foreach (SpecLocalTables.SpecTable t_table in SpecLocalTables.EnumerateTables(t_manager))
         {
+            // 직접 저작·발행하는 서버 표는 향후 생성기에 등록돼도 낡은 bytes로 덮어쓰지 않는다.
+            if (t_table.Name == SpecLocalTables.CsvOnlyTableName) continue;
             string t_path = Path.Combine(t_directory, t_table.Name + FILE_SUFFIX).Replace('\\', '/');
             bool t_isNew = !File.Exists(t_path);
             string t_existing = t_isNew ? null : File.ReadAllText(t_path);

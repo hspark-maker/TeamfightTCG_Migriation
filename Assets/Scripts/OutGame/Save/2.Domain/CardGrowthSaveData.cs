@@ -15,6 +15,9 @@ public class CardGrowthEntry
 {
     [FirestoreProperty("level")] public int Level { get; set; }
 
+    // 현재 별 단계에서 다음 진화에 투자한 샤드. 기존 세이브는 0으로 읽는다.
+    [FirestoreProperty("shardProgress")] public int ShardProgress { get; set; }
+
     // 간식 보유량(카드팩 중복으로만 쌓인다). 카드별 재화라 전역 잔액 맵에 못 넣어 여기 얹었다.
     [FirestoreProperty("snack")] public int Snack { get; set; }
 

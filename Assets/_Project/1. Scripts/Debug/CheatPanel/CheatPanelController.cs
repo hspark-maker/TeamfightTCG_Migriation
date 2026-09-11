@@ -114,7 +114,7 @@ namespace HeroSiege.Debugging.CheatPanel
             if (area == null) return false;
             if (area.gameObject.activeInHierarchy == false) return false;
 
-            return SRDebug.Instance.IsDebugPanelVisible;
+            return CheatPanelBootstrap.IsDebugPanelVisible();
         }
 
         // uGUI 영역의 화면 좌표를 UI Toolkit 패널 좌표로 옮겨 루트 위치·크기를 맞춘다

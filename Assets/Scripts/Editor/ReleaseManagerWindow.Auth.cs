@@ -16,6 +16,7 @@ public partial class ReleaseManagerWindow
     string adminAuthError;
     bool adminOAuthOpen;
     bool adminPasswordOpen;
+    bool adminGoogleRetry;
 
     Vector2 authScroll;
 
@@ -75,19 +76,18 @@ public partial class ReleaseManagerWindow
                 SpecAdminAuth.SignOut();
                 this.adminPassword = string.Empty;
                 this.adminAuthError = null;
+                this.adminGoogleRetry = false;
             }
             return;
         }
 
+        EditorGUILayout.HelpBox(
+            "Google에 연동된 계정은 아래 Google 로그인으로 들어간다. 이메일·비밀번호 입력 없이 " +
+            "브라우저에서 기존 관리자 Google 계정을 선택하면 된다.", MessageType.Info);
         using (new EditorGUI.DisabledScope(!GoogleOAuthSignIn.IsConfigured))
         {
-            if (GUILayout.Button("구글 계정으로 로그인", GUILayout.Height(28)))
-            {
-                bool t_ok = SpecAdminAuth.TrySignInWithGoogle(out string t_error);
-                this.adminAuthError = t_ok ? null : t_error;
-                if (t_ok && !SpecAdminAuth.HasAdminClaim)
-                    this.adminAuthError = "로그인은 됐지만 admin 클레임이 없다.";
-            }
+            if (GUILayout.Button("Google 연동 계정으로 로그인", GUILayout.Height(28)))
+                SignInAdminWithGoogle();
         }
 
         this.adminOAuthOpen = EditorGUILayout.Foldout(this.adminOAuthOpen, "구글 OAuth 클라이언트 설정", true);
@@ -118,6 +118,7 @@ public partial class ReleaseManagerWindow
             {
                 bool t_ok = SpecAdminAuth.TrySignIn(this.adminEmail, this.adminPassword, out string t_error);
                 this.adminAuthError = t_ok ? null : t_error;
+                this.adminGoogleRetry = !t_ok;
                 // 성공하든 실패하든 비밀번호는 메모리에 남기지 않는다.
                 this.adminPassword = string.Empty;
                 if (t_ok && !SpecAdminAuth.HasAdminClaim)
@@ -126,10 +127,31 @@ public partial class ReleaseManagerWindow
         }
 
         if (!string.IsNullOrEmpty(this.adminAuthError))
+        {
             EditorGUILayout.HelpBox(this.adminAuthError, MessageType.Error);
+            if (this.adminGoogleRetry)
+            {
+                EditorGUILayout.HelpBox(
+                    "Google 로그인만 연결된 계정은 이메일·비밀번호로 인증할 수 없다. " +
+                    "Google 연동 계정이라면 Google 로그인으로 계속할 것.", MessageType.Info);
+                using (new EditorGUI.DisabledScope(!GoogleOAuthSignIn.IsConfigured))
+                    if (GUILayout.Button("Google 로그인으로 계속", GUILayout.Height(28)))
+                        SignInAdminWithGoogle();
+            }
+        }
         else if (!GoogleOAuthSignIn.IsConfigured)
             EditorGUILayout.HelpBox("구글 OAuth 클라이언트 ID를 넣으면 구글 로그인을 쓸 수 있다.", MessageType.Warning);
         else
             EditorGUILayout.HelpBox("스펙 업로드에는 admin 클레임을 가진 계정 로그인이 필요하다.", MessageType.Warning);
+    }
+
+    void SignInAdminWithGoogle()
+    {
+        this.adminPassword = string.Empty;
+        this.adminGoogleRetry = false;
+        bool t_ok = SpecAdminAuth.TrySignInWithGoogle(out string t_error);
+        this.adminAuthError = t_ok ? null : t_error;
+        if (t_ok && !SpecAdminAuth.HasAdminClaim)
+            this.adminAuthError = "로그인은 됐지만 admin 클레임이 없다.";
     }
 }

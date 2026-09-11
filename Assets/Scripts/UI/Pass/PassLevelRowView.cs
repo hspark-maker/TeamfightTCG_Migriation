@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -20,6 +18,22 @@ public class PassLevelRowView : MonoBehaviour
     [SerializeField] GameObject lockedOverlay;
     [SerializeField] Image rewardIcon;
     [SerializeField] TMP_Text rewardAmountText;
+    [SerializeField] GameObject dualRewardRoot;
+    [SerializeField] Image dualRewardIcon;
+    [SerializeField] TMP_Text dualRewardAmountText;
+    [SerializeField] Image secondRewardIcon;
+    [SerializeField] TMP_Text secondRewardAmountText;
+    [SerializeField] Image premiumRewardIcon;
+    [SerializeField] TMP_Text premiumRewardAmountText;
+    [SerializeField] GameObject premiumDualRewardRoot;
+    [SerializeField] Image premiumDualRewardIcon;
+    [SerializeField] TMP_Text premiumDualRewardAmountText;
+    [SerializeField] Image premiumSecondRewardIcon;
+    [SerializeField] TMP_Text premiumSecondRewardAmountText;
+    [SerializeField] Button premiumClaimButton;
+    [SerializeField] TMP_Text premiumClaimLabel;
+    [SerializeField] GameObject premiumClaimAlertDot;
+    [SerializeField] GameObject premiumLockedOverlay;
     [SerializeField] RectTransform levelFill;
     [SerializeField] GameObject connectorRoot;
 
@@ -44,16 +58,26 @@ public class PassLevelRowView : MonoBehaviour
 
     PassLevelDefinition m_definition;
     Action<int> m_onClaim;
+    Action<int> m_onPremiumClaim;
     long? m_nextRequiredExp;
+    Sprite m_authoredRewardIcon;
+    bool m_hasBound;
 
-    // 행이 최대 레벨 수만큼 늘고 OnChanged 마다 전부 다시 그려진다 — 여기서 만든 GC 는 그대로 쌓인다.
-    static readonly StringBuilder s_text = new StringBuilder(64);
-
-    internal void Bind(PassLevelDefinition _definition, long? _nextRequiredExp, Action<int> _onClaim)
+    internal void Bind(PassLevelDefinition _definition, long? _nextRequiredExp, Action<int> _onClaim, Action<int> _onPremiumClaim = null)
     {
-        this.m_definition = _definition;
         this.m_onClaim = _onClaim;
+        this.m_onPremiumClaim = _onPremiumClaim;
+        bool t_sameDefinition = this.m_hasBound && ReferenceEquals(this.m_definition, _definition);
         this.m_nextRequiredExp = _nextRequiredExp;
+        // 다음 레벨 문턱은 목록 변경 때 따로 갱신하고, 정의가 같으면 진행 상태만 그린다.
+        if (t_sameDefinition)
+        {
+            this.Refresh();
+            return;
+        }
+        if (!this.m_hasBound && this.rewardIcon != null) this.m_authoredRewardIcon = this.rewardIcon.sprite;
+        this.m_hasBound = true;
+        this.m_definition = _definition;
 
         if (this.claimButton != null)
         {
@@ -61,11 +85,18 @@ public class PassLevelRowView : MonoBehaviour
             this.claimButton.onClick.AddListener(this.HandleClaim);
         }
 
+        if (this.premiumClaimButton != null)
+        {
+            this.premiumClaimButton.onClick.RemoveAllListeners();
+            this.premiumClaimButton.onClick.AddListener(this.HandlePremiumClaim);
+        }
+
         if (this.levelText != null) this.levelText.text = (_definition?.Level ?? 0).ToString();
         if (this.lockedLevelText != null) this.lockedLevelText.text = (_definition?.Level ?? 0).ToString();
         if (this.requiredText != null) this.requiredText.text = $"{_definition?.RequiredExp ?? 0} EXP";
-        if (this.rewardText != null) this.rewardText.text = BuildRewardText(_definition);
+        if (this.rewardText != null) this.rewardText.gameObject.SetActive(false);
         this.RefreshRewardIcon();
+        this.RefreshPremiumRewardIcon();
 
         this.Refresh();
     }
@@ -75,6 +106,7 @@ public class PassLevelRowView : MonoBehaviour
     {
         if (this.m_definition == null) return;
 
+        this.RefreshPremium();
         bool t_claimed = PassManager.IsClaimed(this.m_definition.Level);
         bool t_reached = PassManager.Exp >= this.m_definition.RequiredExp;
         bool t_canClaim = PassManager.CanClaim(this.m_definition);
@@ -105,17 +137,96 @@ public class PassLevelRowView : MonoBehaviour
 
     void RefreshRewardIcon()
     {
-        if (this.rewardIcon == null) return;
-        ClaimRewardGain t_gain = this.m_definition?.Reward?.Find(t_reward => t_reward != null && t_reward.Amount > 0);
-        ClaimRewardItem t_item = this.m_definition?.Items?.Find(t_reward => t_reward != null && t_reward.Amount > 0);
-        Sprite t_icon = null;
-        if (t_gain != null && CurrencyCode.TryParse(t_gain.Currency, out ECurrencyType t_type))
-            t_icon = CurrencyLook.IconOf(t_type);
-        // 팩·카드 보상은 저작된 선물 아이콘과 서버 보상명으로 표시한다.
-        if (t_icon != null) this.rewardIcon.sprite = t_icon;
-        this.rewardIcon.gameObject.SetActive(t_gain != null || t_item != null);
-        if (this.rewardAmountText != null)
-            this.rewardAmountText.text = $"×{t_gain?.Amount ?? t_item?.Amount ?? 0:N0}";
+        bool t_dual = this.dualRewardRoot != null && this.TryRewardAt(1, out _, out _);
+        if (this.dualRewardRoot != null) this.dualRewardRoot.SetActive(t_dual);
+        this.ApplyRewardSlot(this.rewardIcon, this.rewardAmountText, 0);
+        if (t_dual)
+        {
+            if (this.rewardIcon != null) this.rewardIcon.gameObject.SetActive(false);
+            if (this.rewardAmountText != null) this.rewardAmountText.gameObject.SetActive(false);
+            this.ApplyRewardSlot(this.dualRewardIcon, this.dualRewardAmountText, 0);
+            this.ApplyRewardSlot(this.secondRewardIcon, this.secondRewardAmountText, 1);
+        }
+    }
+
+    void ApplyRewardSlot(Image _icon, TMP_Text _amountText, int _index, bool _premium = false)
+    {
+        bool t_found = this.TryRewardAt(_index, out string t_currency, out long t_amount, _premium);
+        if (_icon != null)
+        {
+            Sprite t_sprite = CurrencyCode.TryParse(t_currency, out ECurrencyType t_type)
+                ? CurrencyLook.IconOf(t_type) : null;
+            _icon.sprite = t_sprite != null ? t_sprite : this.m_authoredRewardIcon;
+            _icon.gameObject.SetActive(t_found);
+        }
+        if (_amountText != null)
+        {
+            _amountText.gameObject.SetActive(t_found);
+            _amountText.text = t_found ? t_amount.ToString("N0") : string.Empty;
+        }
+    }
+
+    bool TryRewardAt(int _index, out string _currency, out long _amount, bool _premium = false)
+    {
+        _currency = null;
+        _amount = 0;
+        var t_rewards = _premium ? this.m_definition?.PremiumReward : this.m_definition?.Reward;
+        var t_items = _premium ? this.m_definition?.PremiumItems : this.m_definition?.Items;
+        if (t_rewards != null)
+            foreach (ClaimRewardGain t_gain in t_rewards)
+                if (t_gain != null && t_gain.Amount > 0 && _index-- == 0)
+                {
+                    _currency = t_gain.Currency;
+                    _amount = t_gain.Amount;
+                    return true;
+                }
+        if (t_items != null)
+            foreach (ClaimRewardItem t_item in t_items)
+                if (t_item != null && t_item.Amount > 0 && _index-- == 0)
+                {
+                    _amount = t_item.Amount;
+                    return true;
+                }
+        return false;
+    }
+
+    void RefreshPremiumRewardIcon()
+    {
+        bool t_dual = this.premiumDualRewardRoot != null && this.TryRewardAt(1, out _, out _, true);
+        if (this.premiumDualRewardRoot != null) this.premiumDualRewardRoot.SetActive(t_dual);
+        this.ApplyRewardSlot(this.premiumRewardIcon, this.premiumRewardAmountText, 0, true);
+        if (t_dual)
+        {
+            if (this.premiumRewardIcon != null) this.premiumRewardIcon.gameObject.SetActive(false);
+            if (this.premiumRewardAmountText != null) this.premiumRewardAmountText.gameObject.SetActive(false);
+            this.ApplyRewardSlot(this.premiumDualRewardIcon, this.premiumDualRewardAmountText, 0, true);
+            this.ApplyRewardSlot(this.premiumSecondRewardIcon, this.premiumSecondRewardAmountText, 1, true);
+        }
+    }
+
+    void RefreshPremium()
+    {
+        bool t_hasReward = this.TryRewardAt(0, out _, out _, true);
+        bool t_unlocked = PassManager.PremiumUnlocked;
+        bool t_reached = this.m_definition != null && PassManager.Exp >= this.m_definition.RequiredExp;
+        bool t_claimed = this.m_definition != null && PassManager.IsPremiumClaimed(this.m_definition.Level);
+        bool t_canClaim = t_hasReward && PassManager.CanClaimPremium(this.m_definition);
+        if (this.premiumClaimButton != null)
+        {
+            this.premiumClaimButton.gameObject.SetActive(t_hasReward);
+            this.premiumClaimButton.interactable = t_canClaim;
+        }
+        if (this.premiumClaimAlertDot != null) this.premiumClaimAlertDot.SetActive(t_canClaim);
+        if (this.premiumLockedOverlay != null)
+            this.premiumLockedOverlay.SetActive(t_hasReward && (!t_unlocked || !t_reached));
+        if (this.premiumClaimLabel != null)
+            this.premiumClaimLabel.text = !t_unlocked ? "프리미엄 필요" : t_claimed ? "수령 완료" : t_reached ? "수령" : "잠김";
+    }
+
+    void HandlePremiumClaim()
+    {
+        if (this.m_definition == null || !PassManager.CanClaimPremium(this.m_definition)) return;
+        this.m_onPremiumClaim?.Invoke(this.m_definition.Level);
     }
 
     void HandleClaim()
@@ -126,22 +237,4 @@ public class PassLevelRowView : MonoBehaviour
         this.m_onClaim?.Invoke(this.m_definition.Level);
     }
 
-    static string BuildRewardText(PassLevelDefinition _definition)
-    {
-        List<ClaimRewardGain> t_gains = _definition?.Reward;
-        if (t_gains == null) t_gains = new List<ClaimRewardGain>();
-
-        s_text.Clear();
-        for (int t_i = 0; t_i < t_gains.Count; t_i++)
-        {
-            ClaimRewardGain t_gain = t_gains[t_i];
-            if (t_gain == null || t_gain.Amount <= 0) continue;
-            if (s_text.Length > 0) s_text.Append(", ");
-            string t_name = CurrencyCode.TryParse(t_gain.Currency, out ECurrencyType t_type)
-                ? CurrencyLook.NameOf(t_type) : t_gain.Currency;
-            s_text.Append(t_name).Append(' ').Append(t_gain.Amount.ToString("N0"));
-        }
-        RewardItemDisplay.Append(s_text, _definition?.Items);
-        return s_text.Length == 0 ? "-" : s_text.ToString();
-    }
 }

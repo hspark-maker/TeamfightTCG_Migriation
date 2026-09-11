@@ -24,6 +24,11 @@ public sealed class ServerMatchmaker : IMatchmaker
 
     public async UniTask<MatchOpponent?> FindOpponentAsync(CancellationToken _ct)
     {
+        if (!Application.isPlaying || _ct.IsCancellationRequested) return null;
+        CancellationToken t_ownerToken = _ct;
+        // Play 종료 시 Firebase가 먼저 내려간다. 화면의 토큰이 없어도 그 요청을 다음 실행으로 넘기지 않는다.
+        using var t_lifetime = CancellationTokenSource.CreateLinkedTokenSource(_ct, Application.exitCancellationToken);
+        _ct = t_lifetime.Token;
         // callable 왕복을 매칭 연출과 함께 시작한다. 서버가 먼저 답하면 기존 연출 길이는 유지되고,
         // 왕복이 더 길 때만 그만큼 매칭 화면이 이어진다.
         UniTask<FindAiMatchResult> t_request = RequestAsync();
@@ -43,6 +48,7 @@ public sealed class ServerMatchmaker : IMatchmaker
             // 취소를 함께 본다 — 그러지 않으면 유저가 취소한 뒤에도 callable 예산(최대 15초 + 재인증 1회)이
             // 끝날 때까지 매칭 화면이 남고, 그 다음 상대를 정상 확정해 취소한 전투가 시작된다.
             FindAiMatchResult t_result = await t_request.AttachExternalCancellation(_ct);
+            if (_ct.IsCancellationRequested || !Application.isPlaying) return null;
             if (t_result?.Deck == null || t_result.Deck.Count != DeckSaveManager.DECK_SIZE)
                 throw new InvalidOperationException("Server returned an invalid AI deck.");
             if (string.IsNullOrEmpty(t_result.MatchId) ||
@@ -53,21 +59,23 @@ public sealed class ServerMatchmaker : IMatchmaker
                 !SameCards(t_result.EnemyBoardOrder, t_result.Deck))
                 throw new InvalidOperationException("Server returned an invalid solo match identity.");
 
+            IReadOnlyDictionary<int, CardGrowth> t_growth = AiMatchGrowth.Read(
+                t_result.AiGrowthVersion, t_result.Deck, t_result.CardGrowth);
             SoloMatchHandoff.Set(
                 t_result.MatchId, t_result.SeedHex, t_seed, t_result.RulesetVersion,
                 t_result.PlayerBoardOrder, t_result.EnemyBoardOrder,
-                t_result.ResultProtocol, ComputeEnemyDeckHash(t_result.Deck, t_result.CardLevel));
+                t_result.ResultProtocol, ComputeEnemyDeckHash(t_result.Deck, t_result.CardLevel, t_growth));
 
             MatchProfile t_profile = MatchProfile.OfOpponent(
                 this.m_pool != null ? this.m_pool.PickName() : OpponentProfilePool.FALLBACK_NAME,
                 this.m_pool != null ? this.m_pool.PickAvatar() : null);
-            return new MatchOpponent(t_profile, t_result.Deck, t_result.CardLevel);
+            return new MatchOpponent(t_profile, t_result.Deck, t_result.CardLevel, t_growth);
         }
         catch (Exception t_exception)
         {
-            if (_ct.IsCancellationRequested) return null;
+            if (_ct.IsCancellationRequested || !Application.isPlaying) return null;
             Debug.LogError($"[ServerMatchmaker] Failed to confirm the AI opponent: {t_exception.GetBaseException().Message}");
-            ShowFailureNextFrameAsync().Forget();
+            ShowFailureNextFrameAsync(t_ownerToken).Forget();
             return null;
         }
     }
@@ -86,10 +94,12 @@ public sealed class ServerMatchmaker : IMatchmaker
             contentFingerprint = SpecSource.BattleFingerprint.ToLowerInvariant(),
             playerDeck = DeckConfig.PlayerDeck,
             resultProtocol = 1,
+            aiGrowthVersion = AiMatchGrowth.Version,
         });
     }
 
-    static string ComputeEnemyDeckHash(List<int> _deck, int _cardLevel)
+    internal static string ComputeEnemyDeckHash(List<int> _deck, int _cardLevel,
+                                              IReadOnlyDictionary<int, CardGrowth> _growth = null)
     {
         int[] t_ids = _deck.ToArray();
         Array.Sort(t_ids);
@@ -98,7 +108,8 @@ public sealed class ServerMatchmaker : IMatchmaker
         int t_level = CardGrowthManager.ClampLevel(_cardLevel);
         var t_growth = new CardGrowth[t_ids.Length];
         for (int i = 0; i < t_ids.Length; i++)
-            t_growth[i] = CardGrowthManager.GrowthAtLevel(t_ids[i], t_level);
+            t_growth[i] = _growth != null ? _growth[t_ids[i]]
+                : CardGrowthManager.GrowthAtLevel(t_ids[i], t_level);
         return NetworkGameController.ComputeDeckHash(t_ids, t_growth);
     }
 
@@ -117,9 +128,12 @@ public sealed class ServerMatchmaker : IMatchmaker
     /// <summary>매칭 화면이 내려간 뒤에 안내를 올린다.</summary>
     // 셸은 이 메서드가 null을 돌려준 뒤 같은 프레임에 스스로 닫는다(MatchmakingShell.RunMatchAsync의 finally).
     // 그 자리에서 바로 띄우면 안내가 아직 떠 있는 매칭 화면에 묻힌다 — 둘은 자기 캔버스가 없어 형제 순서로만 갈린다.
-    static async UniTaskVoid ShowFailureNextFrameAsync()
+    static async UniTaskVoid ShowFailureNextFrameAsync(CancellationToken _ct)
     {
+        if (_ct.IsCancellationRequested || !Application.isPlaying) return;
+        CancellationToken t_exitToken = Application.exitCancellationToken;
         await UniTask.Yield();
+        if (_ct.IsCancellationRequested || t_exitToken.IsCancellationRequested || !Application.isPlaying) return;
         NetworkFailurePopup.Show("AI 상대를 준비하지 못했습니다.");
     }
 
@@ -141,6 +155,8 @@ internal sealed class FindAiMatchResult : ServerCommandResult
     [JsonProperty("rulesetVersion")] public int RulesetVersion { get; set; }
     [JsonProperty("deck")] public List<int> Deck { get; set; }
     [JsonProperty("cardLevel")] public int CardLevel { get; set; }
+    [JsonProperty("aiGrowthVersion")] public int? AiGrowthVersion { get; set; }
+    [JsonProperty("cardGrowth")] public List<AiMatchCardGrowth> CardGrowth { get; set; }
     [JsonProperty("playerBoardOrder")] public List<int> PlayerBoardOrder { get; set; }
     [JsonProperty("enemyBoardOrder")] public List<int> EnemyBoardOrder { get; set; }
     [JsonProperty("resultProtocol")] public int ResultProtocol { get; set; }

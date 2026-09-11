@@ -1,5 +1,7 @@
 #if !DISABLE_SRDEBUGGER
 using SRDebugger.UI.Tabs;
+using SRDebugger.Services;
+using SRF.Service;
 using UnityEngine;
 
 namespace HeroSiege.Debugging.CheatPanel
@@ -10,6 +12,15 @@ namespace HeroSiege.Debugging.CheatPanel
     public static class CheatPanelBootstrap
     {
         private static CheatPanelController controller;
+
+        internal static bool IsDebugPanelVisible()
+        {
+            // Instance 조회는 서비스가 없으면 경고와 자동 생성을 유발한다.
+            // 재컴파일·종료 중에는 등록된 서비스만 확인하고 다음 프레임을 기다린다.
+            if (!Application.isPlaying || !SRServiceManager.HasService<IDebugService>()) return false;
+            var service = SRDebug.Instance;
+            return service != null && service.IsDebugPanelVisible;
+        }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Install()
@@ -50,7 +61,7 @@ namespace HeroSiege.Debugging.CheatPanel
     {
         private void Update()
         {
-            if (SRDebug.Instance.IsDebugPanelVisible == false) return;
+            if (CheatPanelBootstrap.IsDebugPanelVisible() == false) return;
             if (CheatPanelBootstrap.TryTakeOver() == false) return;
 
             enabled = false;

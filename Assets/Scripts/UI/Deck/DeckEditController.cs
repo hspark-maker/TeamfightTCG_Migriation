@@ -351,7 +351,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
 
         Close();
 
-        // 그리드 Clear의 Destroy는 프레임 끝이라 등록이 한 프레임 더 살아 있다 — 여기서 명시로 걷는다.
+        // 패널 재사용 전에 튜토리얼 앵커를 명시로 걷는다.
         if (this.collectionGrid != null) this.collectionGrid.ApplyTutorialAnchor(0);
         ClearSlotPickVisual();
         if (this.deckStrip      != null) this.deckStrip.Clear();

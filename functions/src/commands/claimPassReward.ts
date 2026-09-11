@@ -33,12 +33,16 @@ import {parseRewardRows, resolveRewards, RewardRow, RewardItem} from "../rewardT
 import {clientReceiptId, isClientReceiptId} from "../save/receiptId";
 import {isKnownEnv, mutateSave, requireUid, SaveMutation} from "../save/saveDocument";
 
-/** Claims one reached reward from the active free battle-pass track. */
+/** Claims one reached reward from either battle-pass track; premium entitlement is server-owned. */
 export const claimPassReward = onCall(async (request) => {
   const uid = requireUid(request.auth);
   const env = String(request.data?.env ?? "");
   const level = Number(request.data?.level);
+  const track = request.data?.track ?? "free";
   if (!isKnownEnv(env)) throw new HttpsError("invalid-argument", `Unknown env: ${env}`);
+  if (track !== "free" && track !== "premium") {
+    throw new HttpsError("invalid-argument", "PASS_INVALID_TRACK");
+  }
   if (!Number.isSafeInteger(level) || level <= 0 || level > 200) {
     throw new HttpsError("invalid-argument", "PASS_INVALID_LEVEL level must be 1..200.");
   }
@@ -57,7 +61,7 @@ export const claimPassReward = onCall(async (request) => {
     ]);
     const currentSeason = currentPassSeason(parsePassSeasons(seasonRows), nowMs);
     if (currentSeason === null) {
-      throw new HttpsError("failed-precondition", "PASS_NO_ACTIVE_SEASON");
+      throw new HttpsError("permission-denied", "PASS_NO_ACTIVE_SEASON");
     }
     season = currentSeason;
     const levelDef = parsePassLevels(levelRows, season).find((entry) => entry.level === level);
@@ -67,16 +71,16 @@ export const claimPassReward = onCall(async (request) => {
     authoredLevel = levelDef;
 
     rewardRows = parseRewardRows(rawRewardRows);
-    const rewards = resolveRewards(rewardRows, "Pass", passRewardOwnerId(season.seasonId, level));
+    const rewards = resolveRewards(rewardRows, "Pass", passRewardOwnerId(season.seasonId, level, track));
     items = rewards.items;
     if (rewards.dropped.length > 0) {
       logger.warn("pass reward rows dropped", {
-        uid, env, seasonId: season.seasonId, level, dropped: rewards.dropped,
+        uid, env, seasonId: season.seasonId, level, track, dropped: rewards.dropped,
       });
     }
     if (rewards.gains.length === 0 && items.length === 0) {
       throw new HttpsError(
-        "failed-precondition", `PASS_REWARD_NOT_FOUND owner=${season.seasonId}:${level}`);
+        "failed-precondition", `PASS_REWARD_NOT_FOUND owner=${passRewardOwnerId(season.seasonId, level, track)}`);
     }
     authoredRewards = rewards.gains;
   } catch (error) {
@@ -97,14 +101,19 @@ export const claimPassReward = onCall(async (request) => {
   const result = await mutateSave(env, uid, "claimPassReward", {kind: "client", txId},
     async (current, transaction, wallet): Promise<SaveMutation> => {
       const pass = await beginPassMutation(transaction, db, env, uid, season.seasonId);
+      if (Date.now() >= season.endAtMs) throw new HttpsError("permission-denied", "PASS_NO_ACTIVE_SEASON");
+      if (track === "premium" && !pass.state.premiumUnlocked) {
+        throw new HttpsError("permission-denied", "PASS_PREMIUM_LOCKED");
+      }
       const rankSnapshot = itemContext === null ? null : await transaction.get(rankRef(db, env, uid));
       const missions = itemContext ? await beginMissionBump(transaction, db, env, uid, period) : null;
-      if (pass.state.claimed[String(level)] === true) {
-        throw new HttpsError("already-exists", `PASS_ALREADY_CLAIMED level=${level}`);
+      const claims = track === "premium" ? pass.state.premiumClaimed : pass.state.claimed;
+      if (claims[String(level)] === true) {
+        throw new HttpsError("already-exists", `PASS_ALREADY_CLAIMED level=${level} track=${track}`);
       }
       if (pass.state.exp < authoredLevel.requiredExp) {
         throw new HttpsError(
-          "failed-precondition",
+          "permission-denied",
           `PASS_LEVEL_LOCKED level=${level} exp=${pass.state.exp}/${authoredLevel.requiredExp}`,
         );
       }
@@ -119,7 +128,7 @@ export const claimPassReward = onCall(async (request) => {
         commitMissionProgress(transaction, missions, FieldValue.serverTimestamp());
         missionState = missionResponse(missions.state, period, catalog);
       }
-      commitPassClaim(transaction, pass, level, FieldValue.serverTimestamp());
+      commitPassClaim(transaction, pass, level, FieldValue.serverTimestamp(), track);
       progress = passProgressResponse(pass.state);
       return {
         slots: itemGrant.slots,
@@ -128,7 +137,7 @@ export const claimPassReward = onCall(async (request) => {
     },
     (adopted) => {
       replayed = false;
-      return {...adopted, seasonId: season.seasonId, level, granted,
+      return {...adopted, seasonId: season.seasonId, level, track, granted,
         cards: itemGrant.cards, packs: itemGrant.packs ?? [], progress,
         ...(missionState ? {missions: missionState} : {})};
     });
@@ -140,7 +149,7 @@ export const claimPassReward = onCall(async (request) => {
   } else {
     recordEvent(EVENTS.passRewardClaimed.name, {
       uid, env, eventId: txId, sourceCommand: "claimPassReward", result: "success",
-      seasonId: season.seasonId, level,
+      seasonId: season.seasonId, level, track,
       granted: granted.map((gain) => `${gain.currency}+${gain.amount}`).join(","),
       revision: result.revision,
       txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",

@@ -1,4 +1,4 @@
-// Headless equivalent of SpecFirestoreUploader for an already imported SpecData.bytes.
+// Headless equivalent of SpecFirestoreUploader for imported SpecData.bytes plus CSV-only server tables.
 // Never writes CSV/bytes. Plan first; apply the exact reviewed plan with Firestore CAS.
 // node scripts/publish-local-spec.js plan test <plan.json>
 // node scripts/publish-local-spec.js apply <plan.json>
@@ -12,9 +12,11 @@ const ROOT = path.resolve(__dirname, "../..");
 const PROJECT = "bm-cardbattle";
 const DATABASE = `projects/${PROJECT}/databases/cardbattle/documents`;
 const ALLOWED = ["Reward", "CardEnhance", "RouletteSlot", "PassLevel"];
+const CSV_ONLY = {RankAiEncounter: "Assets/Scripts/OutGame/Spec/RankAiEncounterRow.cs"};
 const sourceFiles = ["Assets/Resources/SpecData.bytes", "Assets/Table/SpecDatas.cs",
   "Assets/Scripts/Editor/SpecLocalCsvImporter.cs", "Assets/Scripts/OutGame/Spec/SpecPayloadCodec.cs",
-  "Assets/Scripts/OutGame/Spec/ContentVersion.cs", ...ALLOWED.map((t) => `docs/SpecData/${t}_sheet.csv`)];
+  "Assets/Scripts/OutGame/Spec/ContentVersion.cs", ...ALLOWED.map((t) => `docs/SpecData/${t}_sheet.csv`),
+  ...Object.values(CSV_ONLY), ...Object.keys(CSV_ONLY).map((t) => `docs/SpecData/${t}_sheet.csv`)];
 const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
 const digest = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 const hash = (text) => crypto.createHash("md5").update(text, "utf8").digest("hex").slice(0, 16);
@@ -66,6 +68,40 @@ const unpackFields = (fields) => Object.fromEntries(Object.entries(fields || {})
 const snapshotSources = () => Object.fromEntries(sourceFiles.map((f) => [f, digest(fs.readFileSync(path.join(ROOT, f)))]));
 const releaseHistory = (history, version) => [...new Set(history.filter((v) => v !== version)), version].slice(-20);
 
+function csvOnlyRows(name, fields, text) {
+  const parsed = csv(text);
+  const header = parsed.findIndex((r) => r[0] === "id");
+  assert(header >= 0 && header <= 1 && parsed.length > header + 2, `CSV header/data: ${name}`);
+  const columns = parsed[header];
+  const types = parsed[header + 1];
+  assert.equal(columns.length, types.length, `CSV types: ${name}`);
+  assert.deepEqual(columns.slice(0, fields.length), fields.map(([, k]) => k), `CSV schema: ${name}`);
+  assert.deepEqual(types.slice(0, fields.length), fields.map(([type]) => type), `CSV types: ${name}`);
+  assert(columns.slice(fields.length).every((c, i) => c.startsWith("#") && types[fields.length + i] === "string"),
+    `Unexpected CSV column: ${name}`);
+  const keys = new Set();
+  return parsed.slice(header + 2).filter((r) => r.some((c) => c.trim())).map((r) => {
+    assert.equal(r.length, columns.length, `CSV row width: ${name}`);
+    const row = Object.fromEntries(fields.map(([type, key], i) => {
+      if (type === "string") return [key, r[i]];
+      assert(/^[+-]?\d+$/.test(r[i].trim()), `Invalid CSV integer: ${name}.${key}`);
+      const n = Number(r[i]);
+      assert(Number.isSafeInteger(n) && n >= -2147483648 && n <= 2147483647, `CSV integer range: ${name}.${key}`);
+      if (key.startsWith("level")) assert(n >= 1 && n <= 4, `CSV level: ${name}.${key}`);
+      if (key.startsWith("limitBreak")) assert(n >= 0 && n <= 3, `CSV limit break: ${name}.${key}`);
+      return [key, n];
+    }));
+    assert(row.id > 0 && row.deckId.trim().length > 0 && row.tierIndex >= 0 && row.tierIndex <= 19 &&
+      row.highlightSlot >= 0 && row.highlightSlot <= 6 &&
+      ["Normal", "DivisionFinal", "GradeFinal"].includes(row.battleKind), `Invalid encounter: ${name}`);
+    for (let slot = 1; slot <= 6; slot++)
+      assert(row[`limitBreak${slot}`] === 0 || row[`level${slot}`] === 4, `Limit break requires level 4: ${name}.${slot}`);
+    const key = `${row.tierIndex}:${row.battleKind}:${row.deckId}`;
+    assert(!keys.has(key), `Duplicate encounter: ${key}`); keys.add(key);
+    return row;
+  });
+}
+
 function localSnapshot() {
   const keyMatch = read(sourceFiles[2]).match(/ENCRYPT_KEY\s*=\s*"([^"]+)"/);
   assert(keyMatch, "Importer key declaration changed");
@@ -87,9 +123,11 @@ function localSnapshot() {
     .map((m) => [m[1], [...m[2].matchAll(/^\s*public (int|long|string) (\w+);/gm)].map((f) => [f[1], f[2]])]));
   const tables = {};
   for (const name of names) {
-    const fields = classes.get(name);
+    const fields = CSV_ONLY[name]
+      ? [...read(CSV_ONLY[name]).matchAll(/^\s*public (int|long|string) (\w+);/gm)].map((f) => [f[1], f[2]])
+      : classes.get(name);
     assert(fields?.length && fields.some(([t, k]) => t === "int" && k === "id"), `Invalid schema: ${name}`);
-    const rows = data[name];
+    const rows = CSV_ONLY[name] ? csvOnlyRows(name, fields, read(`docs/SpecData/${name}_sheet.csv`)) : data[name];
     assert(Array.isArray(rows) && rows.length, `Empty table: ${name}`);
     rows.sort((a, b) => a.id - b.id);
     assert.equal(new Set(rows.map((r) => r.id)).size, rows.length, `Duplicate ID: ${name}`);
@@ -272,7 +310,7 @@ async function main() {
   } else if (mode === "apply") await applyPlan(JSON.parse(fs.readFileSync(arg, "utf8")), await client());
   else throw new Error("Use: plan <test|live> <plan.json> | apply <plan.json>");
 }
-module.exports = {canonical, csv, hash, valueOf, unpack, localSnapshot, makePlan, applyPlan, checkCommit, releaseHistory, client};
+module.exports = {canonical, csv, csvOnlyRows, hash, valueOf, unpack, localSnapshot, makePlan, applyPlan, checkCommit, releaseHistory, client};
 if (require.main === module) main().catch((e) => {
   console.error(e.message, e.cause?.code || ""); process.exitCode = 1;
 });

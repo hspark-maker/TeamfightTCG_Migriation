@@ -185,8 +185,8 @@ public class CardVisualView : MonoBehaviour
         // 미소유는 실루엣만 노출한다 → 이름뿐 아니라 HP/키워드/시너지 같은 "정보"도 전부 숨긴다.
         SetHpDisplay(_card, _owned && this.ShowHp, _mine);
         SetLevelDisplay(_card, _owned && this.ShowLevel && this.m_instance == null, _mine);
-        RefreshKeywordIcons(_card, _owned && this.ShowKeywords);
-        RefreshKeywordFrames(_card, _owned && this.ShowKeywords);
+        RefreshKeywordIcons(_card, _owned && this.ShowKeywords, _mine);
+        RefreshKeywordFrames(_card, _owned && this.ShowKeywords, _mine);
         RefreshSynergyBadges(_card, _owned && this.ShowSynergies, _mine);
         RefreshKeywordBg(_card, _owned && this.ShowSynergies, _mine);
 
@@ -417,7 +417,7 @@ public class CardVisualView : MonoBehaviour
         }
     }
 
-    void RefreshKeywordIcons(int _card, bool _show)
+    void RefreshKeywordIcons(int _card, bool _show, bool _mine = true)
     {
         if (HasWiredSlot(this.keywordIconSlots))
         {
@@ -432,7 +432,7 @@ public class CardVisualView : MonoBehaviour
             if (!_show || this.keywordIconConfig == null) return;
 
             List<CardVisualRules.KeywordIcon> t_entries =
-                CardVisualRules.CollectKeywordIcons(KeywordIconSet(_card), this.keywordIconConfig);
+                CardVisualRules.CollectKeywordIcons(KeywordIconSet(_card, _mine), this.keywordIconConfig);
             int t_count = Mathf.Min(t_entries.Count, this.keywordIconSlots.Length);
             for (int t_i = 0; t_i < t_count; t_i++)
             {
@@ -454,7 +454,7 @@ public class CardVisualView : MonoBehaviour
 
         int t_index = 0;
         foreach (CardVisualRules.KeywordIcon t_entry in
-                 CardVisualRules.CollectKeywordIcons(KeywordIconSet(_card), this.keywordIconConfig))
+                 CardVisualRules.CollectKeywordIcons(KeywordIconSet(_card, _mine), this.keywordIconConfig))
         {
             CardKeywordIconView t_view = Instantiate(this.keywordIconPrefab, this.keywordIconRoot);
             t_view.SetIcon(t_entry.Icon);
@@ -483,12 +483,14 @@ public class CardVisualView : MonoBehaviour
     }
 
     // 인스턴스 경로에는 잠김 표시가 없다: 그 카드가 지금 실제로 가진 것이 곧 정답이다.
-    CardKeyword KeywordIconSet(int _card)
+    CardKeyword KeywordIconSet(int _card, bool _mine = true)
     {
         if (this.m_instance != null)
             return this.showLockedKeywords
                 ? CardVisualRules.InfoKeywords(this.m_instance)
                 : CardVisualRules.IconKeywords(this.m_instance);
+
+        if (!_mine) return CardVisualRules.IconKeywords(BattleGrowthBridge.EnemyGrowthOf(_card));
 
         return this.showLockedKeywords
             ? CardVisualRules.InfoKeywordsWithLocked(_card)
@@ -545,13 +547,14 @@ public class CardVisualView : MonoBehaviour
     }
 
     // 기준은 인게임 CardView.RefreshKeywordFrames와 같은 TraitKeywords(아이콘 줄만 표식을 더 뺀다).
-    void RefreshKeywordFrames(int _card, bool _show)
+    void RefreshKeywordFrames(int _card, bool _show, bool _mine = true)
     {
         if (this.keywordFrames == null) return;
 
         CardKeyword t_keywords = !_show ? CardKeyword.None
                                : this.m_instance != null ? CardVisualRules.TraitKeywords(this.m_instance)
-                                                         : CardVisualRules.TraitKeywords(_card);
+                               : !_mine ? CardVisualRules.TraitKeywords(BattleGrowthBridge.EnemyGrowthOf(_card))
+                                        : CardVisualRules.TraitKeywords(_card);
 
         foreach (KeywordFrame t_frame in this.keywordFrames)
         {

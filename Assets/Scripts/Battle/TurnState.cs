@@ -19,12 +19,21 @@ public enum InputGesture
 /// </summary>
 public static class TurnState
 {
+    static bool inputAllowed;
+
+    /// <summary>결과 확정 뒤에는 기존 턴의 비동기 후속 처리도 입력을 다시 열 수 없다.</summary>
+    public static bool BattleEnded { get; set; }
+
     /// <summary>로컬 플레이어 입력 허용 여부. false면 카드 조작 차단.
     ///
     /// <b>이 값은 "지금이 내 행동 차례인가"만 뜻한다.</b> 덱 보기처럼 잠시 화면을 덮는 창 때문에 끄지 말 것 —
     /// 생각시간 타이머가 false→true 엣지에서 예산을 리셋하므로, 창을 여닫을 때마다 시간이 만땅으로 돌아간다.
     /// 그런 용도는 <see cref="UiBlocking"/>을 쓴다.</summary>
-    public static bool InputAllowed { get; set; }
+    public static bool InputAllowed
+    {
+        get => inputAllowed && !BattleEnded;
+        set => inputAllowed = value;
+    }
 
     /// <summary>화면을 덮는 창(덱 보기 등)이 떠 있어 카드 조작만 막아야 하는 상태.
     /// 턴 진행·생각시간과는 무관하다 — 창을 닫아도 타이머가 리셋되지 않는다.</summary>
@@ -62,6 +71,7 @@ public static class TurnState
 
     public static void Reset()
     {
+        BattleEnded     = false;
         InputAllowed    = false;
         UiBlocking      = false;
         ForcedAttacker  = null;

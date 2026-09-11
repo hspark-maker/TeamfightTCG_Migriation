@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -32,6 +33,25 @@ public class BattleFieldView : MonoBehaviour
     public bool IsLocalSide => this.field != null && this.field.OwnerIndex == TurnState.LocalOwnerIndex;
 
     public CardView GetSlotView(int _index) => this.slotViews[_index];
+
+    /// <summary>항복한 필드의 남은 카드만 슬롯 순서로 터뜨린다. 보드·HP·사망 훅은 바꾸지 않는다.</summary>
+    public async UniTask PlaySurrender(CancellationToken _ct)
+    {
+        foreach (CardView t_view in this.slotViews)
+        {
+            _ct.ThrowIfCancellationRequested();
+            if (t_view == null || !t_view.gameObject.activeInHierarchy) continue;
+            if (t_view.BoundCard == null || !t_view.BoundCard.IsAlive)
+            {
+                t_view.HideSlot();
+                continue;
+            }
+
+            await t_view.PlayDeathAnim();
+            _ct.ThrowIfCancellationRequested();
+            if (t_view != null) t_view.HideSlot();
+        }
+    }
 
     /// <summary>이 필드의 가운데 자리(월드). 시네마에서 카드가 모이는 지점 —
     /// 화면 중앙(카메라 기준)이 아니라 **필드 격자 기준**이라 화면 비율이 바뀌어도 슬롯과 어긋나지 않는다.

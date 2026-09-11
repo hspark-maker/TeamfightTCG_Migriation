@@ -50,10 +50,8 @@ public class GuideMissionPanel : PooledUIBase
     [Range(0f, 1f)] [SerializeField] float dimAlpha = 0.72f;
 
     readonly List<MissionRowView> m_rows = new List<MissionRowView>();
-
-    // 지금 화면에 깔린 행이 어느 정의·수령 상태로 만들어졌는지. 바뀌면 다시 깐다 —
-    // 수령이 서명에 들어가는 이유는 앞 미션 수령이 다음 줄의 잠금 표시를 바꾸기 때문이다.
-    string m_builtSignature;
+    Action<string> m_claimHandler;
+    Action<string> m_navigateHandler;
 
     const string PERIOD_GUIDE = "guide";
 
@@ -95,65 +93,46 @@ public class GuideMissionPanel : PooledUIBase
         this.transition.HandleDisabled(this.ResolveTarget());
     }
 
-    void HandleMissionsChanged()
-    {
-        if (BuildSignature() != this.m_builtSignature) this.Rebuild();
-        else this.RefreshRows();
-    }
+    void HandleMissionsChanged() => this.Rebuild();
 
     void Rebuild()
     {
-        this.m_rows.Clear();
-        this.m_builtSignature = BuildSignature();
         if (this.listContent == null || this.rowPrefab == null) return;
 
-        // Destroy 는 프레임 끝에 처리되므로 먼저 비활성화한다 — 레이아웃 계산에서 빠져야 이번 프레임 배치가 맞는다.
-        for (int i = this.listContent.childCount - 1; i >= 0; i--)
-        {
-            GameObject t_child = this.listContent.GetChild(i).gameObject;
-            t_child.SetActive(false);
-            Destroy(t_child);
-        }
+        if (this.rowPrefab.transform.parent == this.listContent) this.rowPrefab.gameObject.SetActive(false);
 
+        int t_count = 0;
+        this.m_claimHandler ??= this.HandleClaim;
+        this.m_navigateHandler ??= this.HandleNavigate;
         IReadOnlyList<MissionDefinition> t_definitions = MissionManager.Definitions;
         for (int i = 0; i < t_definitions.Count; i++)
         {
             MissionDefinition t_definition = t_definitions[i];
             if (!string.Equals(t_definition.Period, PERIOD_GUIDE, StringComparison.Ordinal)) continue;
 
-            MissionRowView t_row = Instantiate(this.rowPrefab, this.listContent);
-            t_row.gameObject.SetActive(true);
-            t_row.Bind(t_definition, this.HandleClaim);
-            this.m_rows.Add(t_row);
+            if (t_count == this.m_rows.Count) this.m_rows.Add(null);
+            MissionRowView t_row = this.m_rows[t_count];
+            if (t_row == null) this.m_rows[t_count] = t_row = Instantiate(this.rowPrefab, this.listContent);
+            t_row.Bind(t_definition, this.m_claimHandler,
+                MissionContentNavigation.HasDestination(t_definition) ? this.m_navigateHandler : null);
+            if (!t_row.gameObject.activeSelf) t_row.gameObject.SetActive(true);
+            t_count++;
         }
 
-        if (this.emptyNotice != null) this.emptyNotice.SetActive(this.m_rows.Count == 0);
-    }
-
-    void RefreshRows()
-    {
-        for (int i = 0; i < this.m_rows.Count; i++)
-            if (this.m_rows[i] != null) this.m_rows[i].Refresh();
-    }
-
-    // 정의 목록의 신원 + 수령 낙인. MissionPanel 과 같은 모양이되 guide 줄만 본다.
-    static string BuildSignature()
-    {
-        IReadOnlyList<MissionDefinition> t_definitions = MissionManager.Definitions;
-        if (t_definitions.Count == 0) return string.Empty;
-
-        var t_builder = new System.Text.StringBuilder(t_definitions.Count * 24);
-        for (int i = 0; i < t_definitions.Count; i++)
-        {
-            if (t_definitions[i].Period != PERIOD_GUIDE) continue;
-            t_builder.Append(t_definitions[i].Id).Append(MissionManager.IsClaimed(t_definitions[i].Id)).Append('|');
-        }
-        return t_builder.ToString();
+        for (int i = t_count; i < this.m_rows.Count; i++)
+            if (this.m_rows[i] != null && this.m_rows[i].gameObject.activeSelf) this.m_rows[i].gameObject.SetActive(false);
+        if (this.emptyNotice != null) this.emptyNotice.SetActive(t_count == 0);
     }
 
     void HandleClaim(string _missionId)
     {
         this.ClaimAsync(_missionId).Forget();
+    }
+
+    void HandleNavigate(string _missionId)
+    {
+        if (!this.isShow) return;
+        MissionContentNavigation.TryNavigate(MissionManager.Find(_missionId), this.Close);
     }
 
     async UniTaskVoid ClaimAsync(string _missionId)

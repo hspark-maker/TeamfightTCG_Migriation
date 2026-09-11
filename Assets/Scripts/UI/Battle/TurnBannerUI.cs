@@ -70,4 +70,29 @@ public class TurnBannerUI : MonoBehaviour
 
         this.target.localEulerAngles = Vector3.zero;
     }
+
+    /// <summary>항복 안내는 중앙 턴 배너 자리에 남겨 카드 폭발과 함께 보여 준다.</summary>
+    public void ShowSurrender(bool _opponentSurrendered)
+    {
+        gameObject.SetActive(true);
+        this.target.DOKill();
+        this.target.position = CameraUtil.ScreenFractionToWorld(0.5f, 0.5f, this.target.position.z);
+        this.target.localEulerAngles = Vector3.zero;
+        this.target.localScale = this.baseScale * this.startScale;
+        if (this.background != null)
+        {
+            Sprite t_sprite = _opponentSurrendered ? this.enemySprite : this.playerSprite;
+            if (t_sprite != null) this.background.sprite = t_sprite;
+        }
+        if (this.whosTurnLabel != null)
+        {
+            // 긴 문구도 기존 배경 안에서 한 줄로 읽히게 한다.
+            this.whosTurnLabel.fontSizeMax = this.whosTurnLabel.fontSize;
+            this.whosTurnLabel.fontSizeMin = this.whosTurnLabel.fontSize * 0.4f;
+            this.whosTurnLabel.enableAutoSizing = true;
+            this.whosTurnLabel.textWrappingMode = TextWrappingModes.NoWrap;
+            this.whosTurnLabel.text = _opponentSurrendered ? "상대가 항복했습니다" : "항복했습니다";
+        }
+        this.target.DOScale(this.baseScale, 0.25f).SetEase(Ease.OutBack).SetLink(gameObject);
+    }
 }

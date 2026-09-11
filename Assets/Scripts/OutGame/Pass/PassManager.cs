@@ -24,8 +24,8 @@ internal static class PassManager
         get
         {
             foreach (var t_level in Levels)
-                if (CanClaim(t_level)) return true;
-            return false;
+                if (CanClaim(t_level) || CanClaimPremium(t_level)) return true;
+            return CanClaimRepeat;
         }
     }
 
@@ -36,6 +36,42 @@ internal static class PassManager
         => (IReadOnlyList<PassLevelDefinition>)s_snapshot?.Levels ?? Array.Empty<PassLevelDefinition>();
 
     internal static long Exp => s_snapshot?.Progress?.Exp ?? 0L;
+    internal static bool PremiumUnlocked => s_snapshot?.Progress?.PremiumUnlocked ?? false;
+
+    internal static PassRepeatDefinition Repeat => s_snapshot?.Repeat;
+    internal static long RepeatClaimedCount => s_snapshot?.Progress?.RepeatClaimed ?? 0L;
+    internal static long MaxRequiredExp => Levels.Count > 0 ? Levels[Levels.Count - 1].RequiredExp : 0L;
+    internal static bool HasRepeatReward => Repeat?.RequiredExp > 0 &&
+        (Repeat.Reward?.Exists(t_gain => t_gain != null && t_gain.Amount > 0) ?? false);
+    internal static long RepeatEarnedCount => HasRepeatReward && Levels.Count > 0
+        ? Math.Max(0L, Exp - MaxRequiredExp) / Repeat.RequiredExp : 0L;
+    internal static long RepeatAvailableClaims => Math.Max(0L, RepeatEarnedCount - RepeatClaimedCount);
+    internal static long RepeatProgressExp => HasRepeatReward
+        ? Math.Max(0L, Exp - MaxRequiredExp) % Repeat.RequiredExp : 0L;
+    internal static bool IsSeasonOpen => HasSeason && Season.StartAtMs <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+        && DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() < Season.EndAtMs;
+    internal static bool CanClaimRepeat => IsSeasonOpen && HasRepeatReward && RepeatAvailableClaims > 0
+        && !PassCommands.IsRepeatInFlight;
+
+    // 구매 UX의 예상치. 실제 결제·경험치 지급 경로는 아직 연결하지 않는다.
+    internal static long PremiumBaseExp => Levels.Count > 1
+        ? Math.Max(0L, MaxRequiredExp - Levels[Levels.Count - 2].RequiredExp) : MaxRequiredExp;
+
+    internal static long PremiumExpAt(long _nowMs)
+    {
+        if (!HasSeason || _nowMs < Season.StartAtMs || _nowMs >= Season.EndAtMs) return 0L;
+        double t_days = Math.Ceiling((Season.EndAtMs - Season.StartAtMs) / 86400000d);
+        double t_remainingDays = Math.Ceiling((Season.EndAtMs - _nowMs) / 86400000d);
+        double t_elapsed = t_days <= 1 ? 1 : Math.Max(0d, Math.Min(1d, (t_days - t_remainingDays) / (t_days - 1d)));
+        return PremiumBaseExp + (long)Math.Floor(PremiumBaseExp * 3d * t_elapsed);
+    }
+
+    internal static void AdoptRepeat(ClaimPassRepeatRewardResult _result)
+    {
+        if (_result?.Progress == null || !HasSeason || _result.Progress.SeasonId != Season.SeasonId) return;
+        if (_result.Repeat != null) s_snapshot.Repeat = _result.Repeat;
+        Adopt(_result.Progress);
+    }
 
     internal static int CurrentLevel => s_snapshot?.CurrentLevel ?? 0;
 
@@ -66,6 +102,18 @@ internal static class PassManager
         Dictionary<string, bool> t_claimed = s_snapshot?.Progress?.Claimed;
         return t_claimed != null && t_claimed.TryGetValue(_level.ToString(), out bool t_value) && t_value;
     }
+
+    internal static bool IsPremiumClaimed(int _level)
+    {
+        Dictionary<string, bool> t_claimed = s_snapshot?.Progress?.PremiumClaimed;
+        return t_claimed != null && t_claimed.TryGetValue(_level.ToString(), out bool t_value) && t_value;
+    }
+
+    internal static bool CanClaimPremium(PassLevelDefinition _level)
+        => IsSeasonOpen && PremiumUnlocked && _level != null &&
+           ((_level.PremiumReward?.Exists(t_gain => t_gain != null && t_gain.Amount > 0) ?? false) ||
+            (_level.PremiumItems?.Exists(t_item => t_item != null && t_item.Amount > 0) ?? false)) &&
+           !PassCommands.IsInFlight(_level.Level) && Exp >= _level.RequiredExp && !IsPremiumClaimed(_level.Level);
 
     /// <summary>수령 가능한가. 서버가 다시 판정하므로 이 값은 버튼 표시용 낙관 검사다.</summary>
     internal static bool CanClaim(PassLevelDefinition _level)

@@ -127,7 +127,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4278196028
   m_fontColor: {r: 0.236, g: 0.09, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -140,7 +140,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -200,7 +200,6 @@ GameObject:
   m_Component:
   - component: {fileID: 192992088881093851}
   - component: {fileID: 871497278930240007}
-  - component: {fileID: 734979548912478360}
   - component: {fileID: 4557327939532412679}
   m_Layer: 0
   m_Name: MissionCutIn
@@ -218,14 +217,14 @@ RectTransform:
   m_GameObject: {fileID: 2926300901332291451}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 9118638744619936665}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
@@ -243,38 +242,15 @@ Canvas:
   m_PlaneDistance: 100
   m_PixelPerfect: 0
   m_ReceivesEvents: 1
-  m_OverrideSorting: 0
+  m_OverrideSorting: 1
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 0
-  m_AdditionalShaderChannelsFlag: 0
+  m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
   m_SortingOrder: 430
   m_TargetDisplay: 0
---- !u!114 &734979548912478360
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2926300901332291451}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.CanvasScaler
-  m_UiScaleMode: 1
-  m_ReferencePixelsPerUnit: 100
-  m_ScaleFactor: 1
-  m_ReferenceResolution: {x: 1080, y: 1920}
-  m_ScreenMatchMode: 0
-  m_MatchWidthOrHeight: 0
-  m_PhysicalUnit: 3
-  m_FallbackScreenDPI: 96
-  m_DefaultSpriteDPI: 96
-  m_DynamicPixelsPerUnit: 1
-  m_PresetInfoIsWorld: 0
 --- !u!114 &4557327939532412679
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -287,6 +263,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9e007d5986fb252468f7a3341eb5bb54, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissionCutInView
+  animator: {fileID: 0}
+  contents: {fileID: 1408131601869690106}
+  isShow: 0
   overlayCanvas: {fileID: 871497278930240007}
   canvasGroup: {fileID: 4785757371795327935}
   panel: {fileID: 6537472462933917313}
@@ -300,7 +279,7 @@ MonoBehaviour:
   progressColor: {r: 0.87, g: 0.94, b: 1, a: 1}
   completeColor: {r: 1, g: 1, b: 1, a: 1}
   enterSeconds: 0.3
-  holdSeconds: 2.2
+  holdSeconds: 1.5
   exitSeconds: 0.22
 --- !u!1 &3994459685201207176
 GameObject:
@@ -376,7 +355,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4278196028
   m_fontColor: {r: 0.236, g: 0.09, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -389,7 +368,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -513,7 +492,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 2
+  m_PixelsPerUnitMultiplier: 4.67
 --- !u!1 &4503501136766095417
 GameObject:
   m_ObjectHideFlags: 0
@@ -701,7 +680,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4283198346
   m_fontColor: {r: 0.54, g: 0.42, b: 0.3, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -714,7 +693,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -1045,7 +1024,7 @@ CanvasGroup:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8641254802502396338}
   m_Enabled: 1
-  m_Alpha: 0
+  m_Alpha: 1
   m_Interactable: 0
   m_BlocksRaycasts: 0
   m_IgnoreParentGroups: 0
@@ -1176,7 +1155,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4278196028
   m_fontColor: {r: 0.236, g: 0.09, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -1189,7 +1168,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -1388,7 +1367,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4278196028
   m_fontColor: {r: 0.236, g: 0.09, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -1401,7 +1380,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2

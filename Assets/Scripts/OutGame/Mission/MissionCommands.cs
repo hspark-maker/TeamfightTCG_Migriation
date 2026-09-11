@@ -214,7 +214,7 @@ internal static class MissionCommands
             if (t_session != s_sessionGeneration) return false;
             if (t_result?.Missions == null)
                 throw new InvalidOperationException("Daily reset did not return a mission state.");
-            MissionManager.Adopt(t_result.Missions);
+            MissionManager.AdoptReset(t_result.Missions, "daily");
             return true;
         }
         finally

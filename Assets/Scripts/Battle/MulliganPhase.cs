@@ -17,6 +17,7 @@ public static class MulliganPhase
     /// _ct=씬 파괴/이탈 시 사람 선택 대기를 깨는 취소 토큰(TurnRunner 수명).</summary>
     public static async UniTask Run(TurnContext _ctx, int _firstOwner, CancellationToken _ct)
     {
+        if (_ct.IsCancellationRequested) return;
         // 튜토리얼/멀티는 스킵(스코프 밖). 스킵도 양측 대칭이라 RNG 스트림 교란 없음(draw 자체를 안 함).
         if (TutorialConfig.IsActive) return;
         if (DeckConfig.IsMultiplayer && DeckConfig.AiTakeover) return;
@@ -76,6 +77,7 @@ public static class MulliganPhase
         // 명령을 안 남기면 서버 재생기가 그 교체를 재현하지 못해 공용 스트림이 1칸 밀리고 보드도 1장 갈린다
         // (실측: 항복만 한 판이 draws 1!=2 + 해시 불일치, 처형 판은 derived_target_mismatch).
         // 스킵(t_slot < 0)도 남긴다 — 재생기는 A >= 0 일 때만 뽑으므로 소비 대칭이 유지된다.
+        if (_ct.IsCancellationRequested) return;
         BattleCommandLog.RecordMulligan(t_secondOwner, t_slot);
         if (t_slot < 0) return;   // 스킵/취소/무효 — 교환 없음(draw 미소비).
 

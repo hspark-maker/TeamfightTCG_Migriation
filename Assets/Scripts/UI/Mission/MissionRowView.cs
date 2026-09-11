@@ -46,6 +46,8 @@ public class MissionRowView : MonoBehaviour
     [SerializeField] TMP_Text secondRewardCountText;
 
     [SerializeField] Button claimButton;
+    [Tooltip("미달성 미션 행 전체의 콘텐츠 이동 버튼.")]
+    [SerializeField] Button navigateButton;
     [SerializeField] GameObject claimAlertDot;
 
     [Header("보상 수령 버튼 배경")]
@@ -70,6 +72,9 @@ public class MissionRowView : MonoBehaviour
 
     MissionDefinition m_definition;
     System.Action<string> m_onClaim;
+    System.Action<string> m_onNavigate;
+    Sprite m_authoredRewardIcon;
+    bool m_hasBound;
 
     readonly Vector3[] m_fillCorners = new Vector3[4];
     readonly Vector3[] m_textCorners = new Vector3[4];
@@ -79,16 +84,30 @@ public class MissionRowView : MonoBehaviour
     static readonly StringBuilder s_text = new StringBuilder(64);
 
     /// <summary>이 줄이 그릴 미션을 정한다. 수령 콜백은 미션 id 를 그대로 넘긴다.</summary>
-    internal void Bind(MissionDefinition _definition, System.Action<string> _onClaim)
+    internal void Bind(MissionDefinition _definition, System.Action<string> _onClaim, System.Action<string> _onNavigate = null)
     {
-        this.m_definition = _definition;
         this.m_onClaim = _onClaim;
+        this.m_onNavigate = _onNavigate;
+        // 상태만 채택한 응답은 같은 정의 객체를 유지한다. 새 조회의 같은 ID도 다시 바인딩한다.
+        if (this.m_hasBound && ReferenceEquals(this.m_definition, _definition))
+        {
+            this.Refresh();
+            return;
+        }
+        if (!this.m_hasBound && this.rewardIcon != null) this.m_authoredRewardIcon = this.rewardIcon.sprite;
+        this.m_hasBound = true;
+        this.m_definition = _definition;
 
         if (this.claimButton != null)
         {
             // 재바인딩마다 중복 등록 방지(RankRewardPanel 의 버튼 규약과 같다).
             this.claimButton.onClick.RemoveAllListeners();
             this.claimButton.onClick.AddListener(this.HandleClaim);
+        }
+        if (this.navigateButton != null)
+        {
+            this.navigateButton.onClick.RemoveAllListeners();
+            this.navigateButton.onClick.AddListener(this.HandleNavigate);
         }
 
         if (this.titleText != null) this.titleText.text = (_definition?.Period == "guide" ? "가이드 · " : "") + (_definition?.Title ?? string.Empty);
@@ -109,6 +128,8 @@ public class MissionRowView : MonoBehaviour
         bool t_complete = MissionManager.IsComplete(this.m_definition);
         bool t_claimed = MissionManager.IsClaimed(this.m_definition.Id);
         bool t_canClaim = MissionManager.CanClaim(this.m_definition);
+        bool t_canNavigate = this.CanNavigate();
+        if (this.navigateButton != null) this.navigateButton.interactable = t_canNavigate;
         if (this.claimAlertDot != null) this.claimAlertDot.SetActive(t_canClaim);
         // 요청 중 입력 잠금은 표시 상태와 분리해 배경이 미완료로 깜빡이지 않게 한다.
         bool t_rewardAvailable = t_complete && MissionManager.IsGuideUnlocked(this.m_definition);
@@ -137,17 +158,17 @@ public class MissionRowView : MonoBehaviour
 
         if (this.claimBackground != null)
         {
-            Sprite t_background = t_claimed ? this.claimedBackgroundSprite
-                : t_rewardAvailable ? this.claimableBackgroundSprite : this.incompleteBackgroundSprite;
+            this.claimBackground.enabled = !t_claimed;
+            Sprite t_background = t_rewardAvailable ? this.claimableBackgroundSprite : this.incompleteBackgroundSprite;
             if (t_background != null) this.claimBackground.sprite = t_background;
         }
 
         if (this.claimLabel != null)
-            this.claimLabel.text = t_claimed ? "완료" : t_rewardAvailable ? "받기" : "진행 중";
+            this.claimLabel.text = t_claimed ? "V 완료됨" : t_rewardAvailable ? "받기" : t_canNavigate ? "이동" : "진행 중";
 
         // 버튼은 끄지 않고 상호작용만 막는다 — 꺼 버리면 레이아웃이 흔들리고 "받은 줄"이 사라진 것처럼 보인다.
-        if (this.claimButton != null) this.claimButton.interactable = t_canClaim;
-        if (this.claimGroup != null) this.claimGroup.alpha = t_canClaim ? 1f : this.disabledAlpha;
+        if (this.claimButton != null) this.claimButton.interactable = t_canClaim || t_canNavigate;
+        if (this.claimGroup != null) this.claimGroup.alpha = t_canClaim || t_canNavigate ? 1f : this.disabledAlpha;
     }
 
     void LateUpdate()
@@ -188,9 +209,25 @@ public class MissionRowView : MonoBehaviour
 
         // 여기서도 막는다. 버튼 비활성만으로는 부족하다 — 왕복 중 통지로 다시 그려지기 전에
         // 두 번 눌리면 같은 미션이 두 번 나간다(서버 영수증이 막지만 화면이 먼저 막는 게 맞다).
-        if (!MissionManager.CanClaim(this.m_definition)) return;
+        if (!MissionManager.CanClaim(this.m_definition))
+        {
+            this.HandleNavigate();
+            return;
+        }
 
         this.m_onClaim?.Invoke(this.m_definition.Id);
+    }
+
+    bool CanNavigate()
+    {
+        return this.m_definition != null && this.m_onNavigate != null &&
+            !MissionManager.IsComplete(this.m_definition) && !MissionManager.IsClaimed(this.m_definition.Id) &&
+            MissionManager.IsGuideUnlocked(this.m_definition) && !MissionCommands.IsInFlight(this.m_definition.Id);
+    }
+
+    void HandleNavigate()
+    {
+        if (this.CanNavigate()) this.m_onNavigate.Invoke(this.m_definition.Id);
     }
 
     /// <summary>대표 보상 하나를 아이콘·개수로 그린다. 재화면 아이콘을 갈아끼우고,
@@ -211,6 +248,7 @@ public class MissionRowView : MonoBehaviour
 
         if (this.rewardIcon != null)
         {
+            this.rewardIcon.sprite = this.m_authoredRewardIcon;
             if (t_gain != null && System.Enum.TryParse(t_gain.Currency, out ECurrencyType t_type))
             {
                 Sprite t_sprite = CurrencyLook.IconOf(t_type);

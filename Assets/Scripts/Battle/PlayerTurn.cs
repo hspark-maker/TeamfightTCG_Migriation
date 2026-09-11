@@ -9,6 +9,7 @@ public class PlayerTurn : TurnBase
 {
     CardInstance forcedAttacker;
     bool turnDone;
+    int runningAttacks;
     bool scriptedStepAttack;   // 진행 중인 공격이 슬롯 지정 스텝대로인가(기준선 재동기 대상). 자유공격은 false
 
     public PlayerTurn(TurnContext _ctx) : base(_ctx) { }
@@ -22,6 +23,13 @@ public class PlayerTurn : TurnBase
 
     public override async UniTask Execute()
     {
+        try { await ExecuteCore(); }
+        catch (OperationCanceledException) when (TurnState.BattleEnded) { }
+    }
+
+    async UniTask ExecuteCore()
+    {
+        if (TurnState.BattleEnded) return;
         this.turnDone = false;
         // 튜토리얼: 선행 설명 스텝(탭 게이트) 소진 후 공격 스텝을 안내. 소진 상태면 hang 방지로 턴 스킵.
         if (TutorialConfig.IsActive)
@@ -47,9 +55,10 @@ public class PlayerTurn : TurnBase
         {
             // 생각시간 감시 기동. ct는 턴 수명(씬 파괴)에 묶고, turnDone 세팅 시 자연 종료.
             var t_ct = this.ctx.playerFieldView.GetCancellationTokenOnDestroy();
-            TurnThinkTimer.Watch(GameTiming.Battle.TurnThinkTime, () => this.turnDone, ForceTimeoutAttack, t_ct).Forget();
+            TurnThinkTimer.Watch(GameTiming.Battle.TurnThinkTime, () => this.turnDone || TurnState.BattleEnded, ForceTimeoutAttack, t_ct).Forget();
         }
-        await UniTask.WaitUntil(() => this.turnDone);
+        await UniTask.WaitUntil(() => (this.turnDone || TurnState.BattleEnded) && this.runningAttacks == 0,
+            cancellationToken: this.ctx.playerFieldView.GetCancellationTokenOnDestroy());
     }
 
     public override void OnExit()
@@ -73,7 +82,10 @@ public class PlayerTurn : TurnBase
     /// </summary>
     async UniTask<bool> PrepareTutorialStepsAsync(CardInstance _forced = null)
     {
-        var t_ct      = this.ctx.playerFieldView.GetCancellationTokenOnDestroy();
+        var t_ct      = TurnRunner.Instance != null
+            ? TurnRunner.Instance.BattleEndToken
+            : this.ctx.playerFieldView.GetCancellationTokenOnDestroy();
+        t_ct.ThrowIfCancellationRequested();
         var t_overlay = TutorialOverlayUI.Instance;
 
         TurnState.InputAllowed = false;   // 게이트/드레인 중 드래그 공격 차단(공격 스텝 준비 완료 시 재허용)
@@ -489,6 +501,15 @@ public class PlayerTurn : TurnBase
 
     async UniTask ExecuteAttackAsync(CardInstance _attacker, CardInstance _defender)
     {
+        if (TurnState.BattleEnded) return;
+        this.runningAttacks++;
+        try { await ExecuteAttackCore(_attacker, _defender); }
+        catch (OperationCanceledException) when (TurnState.BattleEnded) { }
+        finally { this.runningAttacks--; }
+    }
+
+    async UniTask ExecuteAttackCore(CardInstance _attacker, CardInstance _defender)
+    {
         TurnState.InputAllowed = false;
 
         // 처형 재공격인가. forcedAttacker 가 곧 "처형 연쇄 진행 중" 표식이라(재공격 직전에 세우고
@@ -507,10 +528,12 @@ public class PlayerTurn : TurnBase
             _attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
             this.ctx.playerFieldView, this.ctx.enemyFieldView,
             _forceCunningSwap: null, _derivedCommand: t_derivedCommand));
+        if (TurnState.BattleEnded) return;
         AttackResult t_result = t_attack.Result;
         CardView t_attackerView = t_attack.AttackerView;
 
         await this.ctx.FillAndAnimate();
+        if (TurnState.BattleEnded) return;
 
         // 튜토리얼: 슬롯 지정 스텝대로 끝난 공격의 결과 보드 = 스크립트가 기대하는 보드 → 기준선 재동기.
         // 자유공격/자유플레이 결과는 재동기하지 않는다(뒤 스텝이 어긋남을 감지해야 하므로).

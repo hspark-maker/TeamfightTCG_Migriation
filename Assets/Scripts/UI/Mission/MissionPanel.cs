@@ -47,6 +47,10 @@ public class MissionPanel : PooledUIBase
     [UnityEngine.Serialization.FormerlySerializedAs("dailyRowPrefab")]
     [SerializeField] MissionRowView rowPrefab;
 
+    [Tooltip("현재 탭의 일일·주간 달성 보상. 서버의 완료 미션 정의를 공용 뷰로 표시한다.")]
+    [UnityEngine.Serialization.FormerlySerializedAs("dailyCompletionRow")]
+    [SerializeField] MissionRowView completionRow;
+
     [Tooltip("해당 주기에 미션이 하나도 없을 때 켤 안내. 지금은 활성 미션이 팩 개봉 축뿐이라 자주 빈다.")]
     [SerializeField] GameObject dailyEmptyNotice;
 
@@ -92,9 +96,12 @@ public class MissionPanel : PooledUIBase
     readonly List<MissionRowView> m_dailyRows = new List<MissionRowView>();
     readonly List<MissionRowView> m_weeklyRows = new List<MissionRowView>();
 
-    // 지금 화면에 깔린 행이 어느 정의 목록으로 만들어졌는지. 정의가 바뀌면(첫 조회 응답 도착 등)
-    // 다시 깐다 — 개수만 보면 활성 미션이 교체됐을 때 옛 제목이 남는다.
-    string m_builtSignature;
+    // 행 목록은 최대 사용량만큼 보관한다. 빈 안내에는 현재 활성 행 수를 쓴다.
+    int m_dailyRowCount;
+    int m_weeklyRowCount;
+    Action<string> m_claimHandler;
+    Action<string> m_navigateHandler;
+    MissionDefinition m_completionDefinition;
 
     // 탭 모드에서 지금 주간 탭인가. 열 때마다 일일로 돌아간다 — 미션의 주 무대가 일일이다.
     bool m_weeklyTab;
@@ -163,21 +170,33 @@ public class MissionPanel : PooledUIBase
         this.RefreshResetLabels();
     }
 
-    // 조회 응답이 정의를 갈아끼웠을 수 있으므로 서명을 보고 필요할 때만 다시 깐다.
-    void HandleMissionsChanged()
-    {
-        if (BuildSignature() != this.m_builtSignature) this.Rebuild();
-        else this.RefreshRows();
-    }
+    void HandleMissionsChanged() => this.Rebuild();
 
     void Rebuild()
     {
-        BuildSection(this.dailyContent, this.rowPrefab, this.m_dailyRows, PERIOD_DAILY, this.dailyEmptyNotice);
-        BuildSection(this.weeklyContent, this.rowPrefab, this.m_weeklyRows, PERIOD_WEEKLY, this.weeklyEmptyNotice);
-        this.m_builtSignature = BuildSignature();
+        this.RefreshCompletionRow();
+        this.m_dailyRowCount = BuildSection(this.dailyContent, this.rowPrefab, this.m_dailyRows, PERIOD_DAILY, this.dailyEmptyNotice);
+        this.m_weeklyRowCount = BuildSection(this.weeklyContent, this.rowPrefab, this.m_weeklyRows, PERIOD_WEEKLY, this.weeklyEmptyNotice);
         this.ApplyTab();
         this.RefreshClaimAllButton();
         this.RefreshResetLabels();
+    }
+
+    void RefreshCompletionRow()
+    {
+        this.m_completionDefinition = null;
+        if (this.completionRow == null) return;
+
+        string t_period = this.m_weeklyTab ? PERIOD_WEEKLY : PERIOD_DAILY;
+        string t_event = this.m_weeklyTab ? "CompleteWeeklyMissions" : "CompleteDailyMissions";
+        foreach (MissionDefinition t_definition in MissionManager.Definitions)
+        {
+            if (t_definition.Period != t_period || t_definition.Event != t_event) continue;
+            this.m_completionDefinition = t_definition;
+            this.m_claimHandler ??= this.HandleClaim;
+            this.completionRow.Bind(t_definition, this.m_claimHandler);
+            break;
+        }
     }
 
     void SelectDailyTab() => this.SelectTab(false);
@@ -189,14 +208,15 @@ public class MissionPanel : PooledUIBase
         if (this.m_weeklyTab == _weekly) return;
 
         this.m_weeklyTab = _weekly;
-        this.ApplyTab();
-        this.RefreshResetLabels();
+        this.Rebuild();
     }
 
     /// <summary>탭 모드면 목록을 하나만 남긴다. 빈 안내는 BuildSection 이 개수로 켠 것을
     /// 탭 가시성으로 한 번 더 거른다 — 안내가 목록 밖 형제라 탭 전환이 스스로 끄지 못한다.</summary>
     void ApplyTab()
     {
+        if (this.completionRow != null)
+            this.completionRow.gameObject.SetActive(this.m_completionDefinition != null);
         if (this.dailyTabButton == null || this.weeklyTabButton == null) return;
 
         GameObject t_daily = this.dailyListRoot != null ? this.dailyListRoot : this.dailyContent != null ? this.dailyContent.gameObject : null;
@@ -204,51 +224,46 @@ public class MissionPanel : PooledUIBase
         if (t_daily != null) t_daily.SetActive(!this.m_weeklyTab);
         if (t_weekly != null) t_weekly.SetActive(this.m_weeklyTab);
 
-        if (this.dailyEmptyNotice != null) this.dailyEmptyNotice.SetActive(!this.m_weeklyTab && this.m_dailyRows.Count == 0);
-        if (this.weeklyEmptyNotice != null) this.weeklyEmptyNotice.SetActive(this.m_weeklyTab && this.m_weeklyRows.Count == 0);
+        if (this.dailyEmptyNotice != null) this.dailyEmptyNotice.SetActive(!this.m_weeklyTab && this.m_dailyRowCount == 0);
+        if (this.weeklyEmptyNotice != null) this.weeklyEmptyNotice.SetActive(this.m_weeklyTab && this.m_weeklyRowCount == 0);
 
         // 선택 표시는 그림 틴트 하나다. Button 의 ColorTint 전이는 canvasRenderer 색을 곱하므로 여기와 충돌하지 않는다.
         if (this.dailyTabButton.targetGraphic != null) this.dailyTabButton.targetGraphic.color = this.m_weeklyTab ? this.tabDimColor : Color.white;
         if (this.weeklyTabButton.targetGraphic != null) this.weeklyTabButton.targetGraphic.color = this.m_weeklyTab ? Color.white : this.tabDimColor;
     }
 
-    void BuildSection(Transform _content, MissionRowView _rowPrefab, List<MissionRowView> _rows,
+    int BuildSection(Transform _content, MissionRowView _rowPrefab, List<MissionRowView> _rows,
                       string _period, GameObject _emptyNotice)
     {
-        _rows.Clear();
-        if (_content == null || _rowPrefab == null) return;
+        if (_content == null || _rowPrefab == null) return 0;
 
-        // Destroy 는 프레임 끝에 처리되므로 먼저 비활성화한다 — 레이아웃 계산에서 빠져야 이번 프레임 배치가 맞는다.
-        for (int i = _content.childCount - 1; i >= 0; i--)
-        {
-            GameObject t_child = _content.GetChild(i).gameObject;
-            t_child.SetActive(false);
-            Destroy(t_child);
-        }
+        // 씬 안의 템플릿도 원본으로 보존한다. 다른 저작 자식은 건드리지 않는다.
+        if (_rowPrefab.transform.parent == _content) _rowPrefab.gameObject.SetActive(false);
 
+        int t_count = 0;
+        this.m_claimHandler ??= this.HandleClaim;
+        this.m_navigateHandler ??= this.HandleNavigate;
         IReadOnlyList<MissionDefinition> t_definitions = MissionManager.Definitions;
         for (int i = 0; i < t_definitions.Count; i++)
         {
             MissionDefinition t_definition = t_definitions[i];
             // 가이드 미션은 전용 화면(GuideMissionPanel)이 그린다 — 여기서는 정확히 해당 주기만.
             if (!string.Equals(t_definition.Period, _period, StringComparison.Ordinal)) continue;
+            if (ReferenceEquals(t_definition, this.m_completionDefinition)) continue;
 
-            MissionRowView t_row = Instantiate(_rowPrefab, _content);
-            t_row.gameObject.SetActive(true);
-            t_row.Bind(t_definition, this.HandleClaim);
-            _rows.Add(t_row);
+            if (t_count == _rows.Count) _rows.Add(null);
+            MissionRowView t_row = _rows[t_count];
+            if (t_row == null) _rows[t_count] = t_row = Instantiate(_rowPrefab, _content);
+            t_row.Bind(t_definition, this.m_claimHandler,
+                MissionContentNavigation.HasDestination(t_definition) ? this.m_navigateHandler : null);
+            if (!t_row.gameObject.activeSelf) t_row.gameObject.SetActive(true);
+            t_count++;
         }
 
-        if (_emptyNotice != null) _emptyNotice.SetActive(_rows.Count == 0);
-    }
-
-    void RefreshRows()
-    {
-        for (int i = 0; i < this.m_dailyRows.Count; i++)
-            if (this.m_dailyRows[i] != null) this.m_dailyRows[i].Refresh();
-        for (int i = 0; i < this.m_weeklyRows.Count; i++)
-            if (this.m_weeklyRows[i] != null) this.m_weeklyRows[i].Refresh();
-        this.RefreshClaimAllButton();
+        for (int i = t_count; i < _rows.Count; i++)
+            if (_rows[i] != null && _rows[i].gameObject.activeSelf) _rows[i].gameObject.SetActive(false);
+        if (_emptyNotice != null) _emptyNotice.SetActive(t_count == 0);
+        return t_count;
     }
 
     /// <summary>받을 수 있는 미션이 하나라도 있을 때만 모두 받기를 살린다.
@@ -261,6 +276,12 @@ public class MissionPanel : PooledUIBase
     }
 
     void HandleClaimAll() => this.ClaimAllAsync().Forget();
+
+    void HandleNavigate(string _missionId)
+    {
+        if (this.m_claimingAll || !this.isShow) return;
+        MissionContentNavigation.TryNavigate(MissionManager.Find(_missionId), this.Close);
+    }
 
     async UniTaskVoid ClaimAllAsync()
     {
@@ -296,17 +317,6 @@ public class MissionPanel : PooledUIBase
         }
         if (t_results.Exists(t_result => (t_result.Cards?.Count ?? 0) > 0)) this.Close();
         ShowClaimedRewards(t_results);
-    }
-
-    // 정의 목록의 신원. id 와 순서가 그대로면 다시 깔 이유가 없다.
-    static string BuildSignature()
-    {
-        IReadOnlyList<MissionDefinition> t_definitions = MissionManager.Definitions;
-        if (t_definitions.Count == 0) return string.Empty;
-
-        var t_builder = new System.Text.StringBuilder(t_definitions.Count * 24);
-        for (int i = 0; i < t_definitions.Count; i++) t_builder.Append(t_definitions[i].Id).Append(MissionManager.IsClaimed(t_definitions[i].Id)).Append('|');
-        return t_builder.ToString();
     }
 
     void HandleClaim(string _missionId)

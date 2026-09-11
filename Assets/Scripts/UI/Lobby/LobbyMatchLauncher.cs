@@ -560,7 +560,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (_preset && _matched.HasValue)
         {
             MatchOpponentHandoff.Set(_matched.Value);
-            DeckConfig.SetEnemyDeck(_matched.Value.Deck, _matched.Value.CardLevel);
+            DeckConfig.SetEnemyDeck(_matched.Value.Deck, _matched.Value.CardLevel, _matched.Value.Growth);
             return true;
         }
 
@@ -577,7 +577,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         // 덱 없이 프로필만 온 상대(실제 매칭)는 덱만 폴백을 탄다 — 표시는 매칭한 상대를 그대로 유지한다.
         if (_matched.HasValue && _matched.Value.IsValid)
         {
-            DeckConfig.SetEnemyDeck(_matched.Value.Deck, _matched.Value.CardLevel);
+            DeckConfig.SetEnemyDeck(_matched.Value.Deck, _matched.Value.CardLevel, _matched.Value.Growth);
             return true;
         }
 
@@ -611,6 +611,14 @@ public class LobbyMatchLauncher : MonoBehaviour
     {
         adventurePanel?.Close();   // 맵이 떠 있는 채로 덱 탭에 가면 오버레이가 덱 화면을 가린다
         if (deckPanel != null) lobbyTabController?.Select(deckPanel);
+    }
+
+    /// <summary>미션에서 모험 선택 화면을 연다. 정점 선택과 전투 시작은 사용자가 한다.</summary>
+    public bool TryOpenAdventureMap(System.Action _beforeOpen = null)
+    {
+        if (!isActiveAndEnabled || m_running || adventurePanel == null || matchPanel == null
+            || lobbyTabController == null || !OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure)) return false;
+        return lobbyTabController.TrySelectFeature(EOutgameFeature.LobbyMatchTab, _beforeOpen, OpenAdventureMap);
     }
 
     void OpenAdventureMap()

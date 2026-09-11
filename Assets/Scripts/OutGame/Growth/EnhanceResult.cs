@@ -6,10 +6,13 @@ public readonly struct EnhanceResult
     // 시도 후 강화 레벨(실패·차단이면 기존 레벨 그대로)
     public readonly int Level;
 
-    public EnhanceResult(EEnhanceOutcome _outcome, int _level)
+    public readonly int AppliedShards;
+
+    public EnhanceResult(EEnhanceOutcome _outcome, int _level, int _appliedShards = 0)
     {
         Outcome = _outcome;
         Level   = _level;
+        AppliedShards = _appliedShards;
     }
 }
 

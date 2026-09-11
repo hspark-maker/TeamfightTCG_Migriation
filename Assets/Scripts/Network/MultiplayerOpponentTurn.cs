@@ -20,6 +20,7 @@ public class MultiplayerOpponentTurn : TurnBase
 
     public override async UniTask Execute()
     {
+        if (TurnState.BattleEnded) return;
         await UniTask.Delay((int)(GameTiming.Battle.OpponentTurnStartDelay * 1000));
         CardInstance t_takeoverAttacker = null;
         CardInstance t_takeoverTarget = null;
@@ -32,6 +33,7 @@ public class MultiplayerOpponentTurn : TurnBase
 
         while (true)
         {
+            if (TurnState.BattleEnded) return;
             bool t_locallyDecided = false;
             // 이번 바퀴에만 유효하다 — 꺼진 채로 다음 바퀴에 새는 일이 없게 읽자마자 되돌린다.
             bool t_ruleBackstopOff = t_executionFollowUp;
@@ -70,6 +72,7 @@ public class MultiplayerOpponentTurn : TurnBase
                 (t_received, t_attackerSlot, t_defenderSlot, t_cunningSwap) = t_attack;
             }
 
+            if (TurnState.BattleEnded) return;
             if (!t_received)
             {
                 if (DeckConfig.AiTakeover)
@@ -117,6 +120,7 @@ public class MultiplayerOpponentTurn : TurnBase
                 t_atk, t_def, this.ctx.enemyField, this.ctx.playerField,
                 this.ctx.enemyFieldView, this.ctx.playerFieldView,
                 t_cunningSwap, t_ruleBackstopOff));
+            if (TurnState.BattleEnded) return;
             AttackResult t_result = t_outcome.Result;
             CardView t_attackerView = t_outcome.AttackerView;
             CardView t_defenderView = t_outcome.DefenderView;
@@ -130,6 +134,7 @@ public class MultiplayerOpponentTurn : TurnBase
             this.ctx.playerFieldView.Refresh();
             this.ctx.playerDeckUI?.Refresh();
             await this.ctx.playerFieldView.PlayFillAnim(t_playerPlaced);
+            if (TurnState.BattleEnded) return;
 
             // PlayDeathAnim이 alpha/scale을 1로 리셋하므로, 죽은 슬롯만 즉시 숨김
             // 전체 Refresh는 RPC로 미리 배치된 신규 카드까지 노출시키므로 사용 금지
@@ -144,6 +149,7 @@ public class MultiplayerOpponentTurn : TurnBase
             else if (NetworkGameController.Instance != null)
             {
                 bool t_ready = await NetworkGameController.Instance.WaitForOpponentReady();
+                if (TurnState.BattleEnded) return;
                 if (!t_ready)
                 {
                     if (DeckConfig.AiTakeover)
@@ -167,6 +173,7 @@ public class MultiplayerOpponentTurn : TurnBase
             this.ctx.enemyFieldView.Refresh();
             this.ctx.enemyDeckUI?.Refresh();
             await this.ctx.enemyFieldView.PlayFillAnim(t_enemyPlaced);
+            if (TurnState.BattleEnded) return;
 
             // divergence 카나리아 스냅샷. MultiplayerPlayerTurn과 **정확히 같은 지점**이어야 한다
             // (배리어 통과 + 양쪽 보충 완료 직후). 인자 순서는 무관하다 — BattleStateHash가 OwnerIndex로 정렬한다.
@@ -217,6 +224,7 @@ public class MultiplayerOpponentTurn : TurnBase
 
     async UniTask ExecuteAiTakeoverTurn()
     {
+        if (TurnState.BattleEnded) return;
         var t_aiTurn = new EnemyTurn(this.ctx);
         t_aiTurn.OnEnter();
         await t_aiTurn.Execute();

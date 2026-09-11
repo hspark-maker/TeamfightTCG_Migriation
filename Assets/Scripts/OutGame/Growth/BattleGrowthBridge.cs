@@ -20,16 +20,25 @@ public static class BattleGrowthBridge
         CardVisualRules.UnlockedKeywordProvider = _card => CardGrowthManager.GrowthOf(_card).UnlockedKeywords;
         CardVisualRules.EvolutionStageProvider = _card => CardGrowthManager.GrowthOf(_card).EvolutionStage;
 
-        // 싱글 AI 레벨. 모험 정점 저작값만 남았고(랭크 티어로 적을 강화하던 축은 제거) 같은 성장 곡선에 태운다 —
-        // 체력뿐 아니라 키워드·시너지 해금까지 플레이어와 동일한 규칙으로 결정된다.
-        // 레벨은 전투 시작 시점에 읽어야 한다(초기화에서 굳히면 진행 중 바뀐 정점 값이 안 따라온다).
-        GameInitializer.EnemyGrowthProvider = _card => CardGrowthManager.GrowthAtLevel(_card, EnemyCardLevel());
+        // 매칭이 고정한 카드별 스냅샷을 표시와 실제 필드가 함께 읽는다.
+        GameInitializer.EnemyGrowthProvider = EnemyGrowthOf;
         GameInitializer.EnemyTierProvider = () => RankManager.TierIndex;
 
         // 튜토리얼 전투용 미강화 기준값. 레벨은 바닥 고정이라 체력은 안 오르고 해금 게이트만 산다 —
         // 진행도(GrowthProvider)를 태우면 저작된 킬 수·턴 수가 깨지고, 아예 안 태우면 키워드가 전부 열린다.
         GameInitializer.BaseGrowthProvider = _card => CardGrowthManager.GrowthAtLevel(_card, CardGrowth.BaseLevel);
         GameInitializer.GrowthAtLevelProvider = CardGrowthManager.GrowthAtLevel;
+    }
+
+    public static CardGrowth EnemyGrowthOf(int _card)
+    {
+        if (DeckConfig.IsMultiplayer)
+            return CardGrowthManager.GrowthAtLevel(_card, CardGrowth.BaseLevel);
+        if (TutorialConfig.IsActive)
+            return CardGrowthManager.GrowthAtLevel(_card, TutorialConfig.EnemyCardLevel);
+        if (!AdventureRun.IsActive && DeckConfig.EnemyGrowth != null)
+            return DeckConfig.EnemyGrowth[_card];
+        return CardGrowthManager.GrowthAtLevel(_card, EnemyCardLevel());
     }
 
     // 이번 전투에서 적 카드가 쓸 레벨. 우선순위는 모험 정점 저작값 > AI 덱 저작 레벨 > 바닥이다

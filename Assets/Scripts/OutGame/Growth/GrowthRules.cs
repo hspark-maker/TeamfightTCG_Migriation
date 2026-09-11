@@ -56,6 +56,24 @@ public static class GrowthRules
         return t_sum;
     }
 
+    /// <summary>현재 레벨에서 다음 별까지 필요한 샤드 총량. 마지막 별은 0이다.</summary>
+    public static int ShardRequiredAt(int _level)
+    {
+        if (!GrowthSpec.TryGetCardEnhanceCost(_level + 1, out EnhanceCost t_cost)) return 0;
+        return (int)System.Math.Min(int.MaxValue, System.Math.Max(1L, t_cost.Cost));
+    }
+
+    public static int ClampShardProgress(int _level, int _progress)
+        => System.Math.Max(0, System.Math.Min(_progress, ShardRequiredAt(_level) - 1));
+
+    /// <summary>별 사이에 투자한 비율만큼 체력을 가산한다. 서버와 동일하게 정수 미만은 버린다.</summary>
+    public static int ShardHpBonusAt(int _cardId, int _level, int _progress)
+    {
+        int t_required = ShardRequiredAt(_level);
+        if (t_required <= 0) return 0;
+        return (int)((long)HpGainAt(_cardId, _level + 1) * ClampShardProgress(_level, _progress) / t_required);
+    }
+
     /// <summary>한계돌파 _stage까지의 누적 체력 가산분.</summary>
     public static int LimitBreakHpBonusAt(int _stage)
         => _stage < 0 ? 0 : GrowthSpec.LimitBreakHpBonusAt(_stage);

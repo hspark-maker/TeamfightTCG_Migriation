@@ -5,7 +5,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>서버가 확정한 미션 진행을 로비 오른쪽에서 한 건씩 알린다. 입력과 보상 수령에는 관여하지 않는다.</summary>
-public sealed class MissionCutInView : SingletonOverlayBase
+public sealed class MissionCutInView : PooledUIBase
 {
     static MissionCutInView s_instance;
 
@@ -22,7 +22,7 @@ public sealed class MissionCutInView : SingletonOverlayBase
     [SerializeField] Color progressColor = new Color(0.35f, 0.78f, 1f);
     [SerializeField] Color completeColor = new Color(1f, 0.82f, 0.3f);
     [SerializeField, Min(0.1f)] float enterSeconds = 0.3f;
-    [SerializeField, Min(0.1f)] float holdSeconds = 2.2f;
+    [SerializeField, Min(0.1f)] float holdSeconds = 1.5f;
     [SerializeField, Min(0.1f)] float exitSeconds = 0.22f;
 
     Vector2 m_home;
@@ -38,17 +38,30 @@ public sealed class MissionCutInView : SingletonOverlayBase
     {
         MissionProgressNotifications.Install();
         if (s_instance != null) return;
-        GameObject t_prefab = RuntimeOverlayPrefabs.Get<MissionCutInView>();
-        if (t_prefab == null) return;
-        GameObject t_object = Instantiate(t_prefab);
-        s_instance = t_object.GetComponent<MissionCutInView>();
-        DontDestroyOnLoad(t_object);
+        UIPoolManager.Instance?.AddOrUpdateUI<MissionCutInView>();
     }
 
-    void Awake()
+    public override void Initialization(UIData _data) => data = _data;
+
+    public override void Show()
     {
+        isShow = true;
+        if (contents != null) contents.SetActive(true);
+    }
+
+    public override void Hide()
+    {
+        isShow = false;
+        Finish();
+        if (contents != null) contents.SetActive(false);
+    }
+
+    protected override void Awake()
+    {
+        base.Awake();
+        s_instance = this;
         m_home = panel.anchoredPosition;
-        UiSortingOrder.Stamp(overlayCanvas, UiSortingOrder.MissionCutIn);
+        UiSortingOrder.LiftNested(overlayCanvas.gameObject, UiSortingOrder.MissionCutIn);
         canvasGroup.blocksRaycasts = false;
         canvasGroup.interactable = false;
         canvasGroup.alpha = 0f;
@@ -69,14 +82,15 @@ public sealed class MissionCutInView : SingletonOverlayBase
     bool CanShow => GameInitialization.IsReady
         && SceneManager.GetActiveScene().name == "LobbyScene"
         && !CurtainView.IsBusy
-        && (m_matchLauncher == null || !m_matchLauncher.IsRunning)
-        && !OutgameTutorialRunner.IsRunning && !TriggeredTutorialRunner.IsRunning;
+        // 튜토리얼 완료 여부는 진행 알림을 막지 않는다. 컷인은 입력을 가로채지 않는다.
+        && (m_matchLauncher == null || !m_matchLauncher.IsRunning);
 
     void Update()
     {
 #if UNITY_EDITOR
         if (m_preview) return;
 #endif
+        if (!isShow) return;
         if (m_hasCurrent && !MissionProgressNotifications.IsCurrent(m_current)) Finish();
         if (!CanShow)
         {
@@ -149,14 +163,28 @@ public sealed class MissionCutInView : SingletonOverlayBase
 #endif
     }
 
-    void OnDestroy()
+    protected override void OnDestroy()
     {
         m_sequence?.Kill();
         if (s_instance == this) s_instance = null;
+        base.OnDestroy();
     }
 
 #if UNITY_EDITOR
     bool m_preview;
+
+    [ContextMenu("진단/미션 알림 상태")]
+    public void LogNotificationState()
+    {
+        Debug.Log($"[MissionCutIn] show={isShow}, active={gameObject.activeInHierarchy}, " +
+            $"canShow={CanShow}, preview={m_preview}, current={m_hasCurrent}, alpha={canvasGroup.alpha}, " +
+            $"ready={MissionManager.IsReady}, definitions={MissionManager.Definitions.Count}");
+        foreach (MissionDefinition t_definition in MissionManager.Definitions)
+            if (t_definition.Event == "OpenPack")
+                Debug.Log($"[MissionCutIn] {t_definition.Id}: {MissionManager.ProgressOf(t_definition)}/{t_definition.Target}, " +
+                    $"claimed={MissionManager.IsClaimed(t_definition.Id)}");
+        MissionProgressNotifications.LogState();
+    }
 
     [ContextMenu("미리보기/미션 진행")]
     public void PreviewProgress()

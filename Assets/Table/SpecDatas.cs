@@ -314,14 +314,14 @@ public partial class CardEnhanceRule
 [GeneratorSpecData]
 public partial class CardLimitBreak
 {
-    /// 행 고유 번호(부여 후 변경 금지)
+    /// id
     [GeneratorId(nameof(id), typeof(int))]
     public int id;
-    /// 한계돌파 단계(1부터). CardEnhanceRule.maxLimitBreak 를 넘는 단계는 무시된다
+    /// stage
     public int stage;
-    /// 이 단계에서 더해지는 최대 체력. 누적이라 3단계 카드는 1~3단계 합을 받는다
+    /// hpGain
     public int hpGain;
-    /// 이 단계에 드는 간식 수(카드마다 따로 쌓이는 중복 카드 간식). 1 미만은 1로 올라간다
+    /// snackCost
     public int snackCost;
 }
 
@@ -441,4 +441,18 @@ public partial class AccountLevel
     public long winExp;
     /// 패배·무승부 1회 획득 경험치(전 행 동일)
     public long loseExp;
+}
+
+[GeneratorSpecData]
+public partial class AIDeckCard
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// AIDeck.deckId 참조
+    public string deckId;
+    /// 덱 안 카드 순서(0~5)
+    public int slot;
+    /// Card.id 참조
+    public int cardId;
 }

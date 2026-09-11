@@ -17,9 +17,10 @@ import {
   readPass,
 } from "../pass/passStore";
 import {parseRewardRows, resolveRewards} from "../rewardTable";
+import {passRepeatDefinition, passRepeatResponse} from "../pass/passRepeat";
 import {isKnownEnv, requireUid} from "../save/saveDocument";
 
-/** Returns the active free battle-pass season, curve, rewards, and player progress. */
+/** Returns the active battle-pass season, both reward tracks, and player progress. */
 export const getPass = onCall(async (request) => {
   const uid = requireUid(request.auth);
   const env = String(request.data?.env ?? "");
@@ -35,12 +36,13 @@ export const getPass = onCall(async (request) => {
     ]);
     const season = currentPassSeason(parsePassSeasons(seasonRows), nowMs);
     if (season === null) {
-      return {season: null, progress: null, currentLevel: 0, nextRequiredExp: null, levels: []};
+      return {season: null, progress: null, currentLevel: 0, nextRequiredExp: null, levels: [], repeat: null};
     }
 
     const levels = parsePassLevels(levelRows, season);
     const state = applyPassSeason(readPass(snapshot), season.seasonId);
     const rewardSpec = parseRewardRows(rewardRows);
+    const repeat = passRepeatDefinition(season.seasonId, levels, rewardSpec);
     const choiceItems = rewardSpec.filter((row) => row.ownerType === "Pass" && row.rewardType === "PackChoice")
       .map((row) => ({rewardType: "PackChoice" as const, rewardId: row.rewardId, amount: row.amount}));
     const choices = choiceItems.length ? await loadItemGrantContext(env, choiceItems) : null;
@@ -51,6 +53,7 @@ export const getPass = onCall(async (request) => {
     return {
       season,
       progress: passProgressResponse(state),
+      repeat: repeat === null ? null : passRepeatResponse(state, repeat),
       currentLevel,
       nextRequiredExp: next?.requiredExp ?? null,
       packChoices: choices === null ? [] : unlockedRewardPacks(choices, Number(rankSnapshot?.data()?.points ?? 0)),
@@ -60,6 +63,10 @@ export const getPass = onCall(async (request) => {
         items: resolveRewards(rewardSpec, "Pass", passRewardOwnerId(season.seasonId, entry.level)).items,
         reward: resolveRewards(
           rewardSpec, "Pass", passRewardOwnerId(season.seasonId, entry.level)).gains,
+        premiumItems: resolveRewards(
+          rewardSpec, "Pass", passRewardOwnerId(season.seasonId, entry.level, "premium")).items,
+        premiumReward: resolveRewards(
+          rewardSpec, "Pass", passRewardOwnerId(season.seasonId, entry.level, "premium")).gains,
       })),
     };
   } catch (error) {

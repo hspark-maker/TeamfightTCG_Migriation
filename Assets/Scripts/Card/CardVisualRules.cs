@@ -149,6 +149,9 @@ public static class CardVisualRules
     public static CardKeyword TraitKeywords(int _cardId)
         => _cardId <= 0 ? CardKeyword.None : OwnedKeywords(_cardId) & ~AlwaysStatus;
 
+    public static CardKeyword TraitKeywords(CardGrowth _growth)
+        => _growth.UnlockedKeywords & ~AlwaysStatus;
+
 
     /// <summary>이 카드가 가졌지만 **아직 해금 레벨에 닿지 않은** 키워드. 정보창이 잠김 룩으로 띄우는 대상이며,
     /// 아이콘 줄·프레임 장식은 이걸 띄우지 않는다(카드 위 표시는 지금 쓸 수 있는 것만).
@@ -187,6 +190,8 @@ public static class CardVisualRules
 
     /// <summary>아웃게임(도감/로비) 아이콘 줄용. 인게임과 같은 제외 규칙.</summary>
     public static CardKeyword IconKeywords(int _cardId) => TraitKeywords(_cardId) & ~IconRowExcluded;
+
+    public static CardKeyword IconKeywords(CardGrowth _growth) => TraitKeywords(_growth) & ~IconRowExcluded;
 
 
     /// <summary>비트마스크에서 표시할 키워드 아이콘 목록을 뽑는다(표시 순서 = 리스트 순서).

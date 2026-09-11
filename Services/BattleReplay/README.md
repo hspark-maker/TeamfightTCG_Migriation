@@ -94,10 +94,4 @@ gcloud run services update battle-replay --project bm-cardbattle --region asia-n
 
 토글이 켜진 상태에서 `BATTLE_REPLAY_URL` 이 비어 있으면 ruleset 2 이상 매치는 **정산되지 않는다**. Functions에는 이 값을 Cloud Run 서비스 기본 URL로 반드시 설정한다. 커스텀 audience를 쓸 때만 `BATTLE_REPLAY_AUDIENCE`를 추가한다. `BATTLE_REPLAY_BEARER_TOKEN`은 Firebase emulator에서만 읽히며 배포 환경에서는 무시된다.
 
-## 규칙 회귀
-
-전투 규칙 사본은 이제 하나뿐이라(`Assets/Scripts/BattleCore`) 사본 간 대조 테스트는 없다. 대신 Unity 가 캡처한 골든 코퍼스로 회귀를 막는다.
-
-```powershell
-cd functions; npm run test:battle-golden
-```
+전투 규칙 구현은 `Assets/Scripts/BattleCore`를 공유한다. 골든 코퍼스 테스트 러너와 Cloud Build의 테스트 단계는 제거되어 있다.

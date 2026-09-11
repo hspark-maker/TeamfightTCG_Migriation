@@ -20,7 +20,15 @@ public class EnemyTurn : TurnBase
 
     public override async UniTask Execute()
     {
+        try { await ExecuteCore(); }
+        catch (OperationCanceledException) when (TurnState.BattleEnded) { }
+    }
+
+    async UniTask ExecuteCore()
+    {
+        if (TurnState.BattleEnded) return;
         // 생각 시간은 연출 전용 난수로 정해 전투 판정의 MatchRandom 시퀀스를 보존한다.
+        // 타이머 표시는 플레이어와 같은 TurnThinkTime 총량으로 — 행동만 1~3초에 한다(AI 위장).
         if (TutorialConfig.IsActive)
         {
             await UniTask.Delay((int)(GameTiming.Battle.EnemyTurnStartDelay * 1000),
@@ -28,7 +36,8 @@ public class EnemyTurn : TurnBase
         }
         else
         {
-            await TurnThinkTimer.WaitForEnemy(UnityEngine.Random.Range(1f, 3f), GetCt());
+            await TurnThinkTimer.WaitForEnemy(UnityEngine.Random.Range(1f, 3f),
+                GameTiming.Battle.TurnThinkTime, GetCt());
         }
 
         CardInstance t_forcedAttacker = null;
@@ -36,6 +45,7 @@ public class EnemyTurn : TurnBase
 
         while (true)
         {
+            if (TurnState.BattleEnded) return;
             List<CardInstance> t_attackers = this.ctx.enemyField.GetActiveCards();
             List<CardInstance> t_targets   = this.ctx.playerField.GetValidTargets();
             if (t_attackers.Count == 0 || t_targets.Count == 0) return;
@@ -117,7 +127,7 @@ public class EnemyTurn : TurnBase
             {
                 TutorialOverlayUI.Instance.ShowAttack(t_tutorialMsg, t_attackerView, t_defenderView, false,
                                                       t_bannerAnchor);
-                await UniTask.Delay((int)(GameTiming.Battle.EnemyTurnStartDelay * 1000));
+                await UniTask.Delay((int)(GameTiming.Battle.EnemyTurnStartDelay * 1000), cancellationToken: GetCt());
 
                 // 안내 읽기 딜레이 후, 실제 공격 연출 동안 힌트(배너·하이라이트) 전부 숨김. 다음 스텝에서 재표시.
                 TutorialOverlayUI.Instance.Clear();
@@ -129,7 +139,9 @@ public class EnemyTurn : TurnBase
                 this.ctx.enemyFieldView, this.ctx.playerFieldView,
                 _forceCunningSwap: null, _derivedCommand: t_forcedAttacker != null))).Result;
 
+            if (TurnState.BattleEnded) return;
             await this.ctx.FillAndAnimate();
+            if (TurnState.BattleEnded) return;
 
             // 튜토리얼: 슬롯 지정 스텝대로 끝난 공격의 결과 보드를 기준선으로 재동기(PlayerTurn과 대칭).
             if (TutorialConfig.IsActive && t_scriptedSlots)
@@ -142,14 +154,14 @@ public class EnemyTurn : TurnBase
             {
                 t_forcedAttacker = t_atk;
                 t_forcedTarget = t_nextTarget;
-                await UniTask.Delay((int)(GameTiming.Battle.EnemyExtraAttackDelay * 1000));
+                await UniTask.Delay((int)(GameTiming.Battle.EnemyExtraAttackDelay * 1000), cancellationToken: GetCt());
             }
             else if ((TutorialConfig.IsActive || !BattleUxFlags.ExecutionRandomTarget) &&
                      t_result.canAttackAgain && t_atk.IsAlive)
             {
                 t_forcedAttacker = t_atk;
                 t_forcedTarget = null;
-                await UniTask.Delay((int)(GameTiming.Battle.EnemyExtraAttackDelay * 1000));
+                await UniTask.Delay((int)(GameTiming.Battle.EnemyExtraAttackDelay * 1000), cancellationToken: GetCt());
             }
             else
             {
@@ -203,5 +215,7 @@ public class EnemyTurn : TurnBase
         return TutorialConfig.TryPeekEnemyStep(out _);   // 남은 공격 스텝 존재?
     }
 
-    CancellationToken GetCt() => this.ctx.playerFieldView.GetCancellationTokenOnDestroy();
+    CancellationToken GetCt() => TurnRunner.Instance != null
+        ? TurnRunner.Instance.BattleEndToken
+        : this.ctx.playerFieldView.GetCancellationTokenOnDestroy();
 }

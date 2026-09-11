@@ -1,7 +1,7 @@
 import {measuredCallable} from "../observability/requestMetrics";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
-import {randomInt, randomUUID} from "node:crypto";
+import {randomUUID} from "node:crypto";
 import {FieldValue} from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
 import {EVENTS} from "../analytics/eventNames";
@@ -27,16 +27,16 @@ import {readSpecRows} from "../packs/packSpecReader";
 import {canAfford, spend} from "../currency/wallet";
 import {nextWallet} from "../currency/walletStore";
 import {
-  applyEnhanceLevel,
+  feedShard,
   growthSlot,
   levelOfCard,
   readGrowthEntries,
+  shardRequirement,
 } from "../growth/cardGrowth";
 import {
   cardEnhanceStep,
   parseCardEnhanceOverrides,
   parseCardEnhanceRule,
-  rollSucceeded,
 } from "../growth/enhanceRules";
 import {
   grantsRef,
@@ -64,24 +64,22 @@ function reject(reason: EnhanceReject, message: string, context: Record<string, 
   rejectDomain(reason, message, context);
 }
 
-/**
- * 카드 강화 1회. 비용 곡선·차감·성공 판정을 서버가 소유한다.
- *
- * 실패해도 비용은 나가고 레벨은 내려가지 않는다(클라 CardGrowthManager.TryEnhance 와 같은 규칙).
- * 무료 한 방은 **비용만 0으로** 만들고 성공률은 건드리지 않으며, 성공했을 때만 소진으로 찍는다
- * — 실패로 닫으면 온보딩이 시킨 성장을 유저가 제 돈으로 다시 해야 한다.
- */
+/** Feed up to the next evolution. The tutorial grant fills the remaining amount. */
 export const enhanceCard = onCall(measuredCallable("enhanceCard", async (request) => {
   const uid = requireUid(request.auth);
   const env = String(request.data?.env ?? "");
   const cardId = Number(request.data?.cardId ?? 0);
   const freeShotRequested = request.data?.freeShot === true;
+  const amount = request.data?.amount === undefined ? 1 : request.data.amount;
 
   if (!isKnownEnv(env)) {
     throw new HttpsError("invalid-argument", `Unknown env: ${env}`);
   }
   if (!Number.isInteger(cardId) || cardId <= 0) {
     throw new HttpsError("invalid-argument", "cardId must be a positive integer.");
+  }
+  if (!Number.isInteger(amount) || amount < 1 || amount > 150) {
+    throw new HttpsError("invalid-argument", "amount must be an integer from 1 to 150.");
   }
 
   // 스펙 읽기는 트랜잭션 밖이다 — 유저 문서와 무관하고, 재실행마다 다시 읽으면 비용만 는다.
@@ -102,6 +100,10 @@ export const enhanceCard = onCall(measuredCallable("enhanceCard", async (request
 
   let outcome: "Success" | "Failed" = "Failed";
   let level = 0;
+  let shardProgress = 0;
+  let shardRequired = 0;
+  let evolved = false;
+  let appliedShards = 0;
   let currency = "";
   let cost = 0;
   let freeShotUsed = false;
@@ -122,7 +124,7 @@ export const enhanceCard = onCall(measuredCallable("enhanceCard", async (request
       // 미션 **쓰기**는 그 grants 읽기보다 뒤여야 해서 콜백 맨 끝으로 갈라 두었다.
       const missions = await beginMissionBump(transaction, db, env, uid, period);
 
-      // 트랜잭션이 재실행되면 이전 판정을 버리고 다시 굴린다 — 잔액·레벨과 정합해야 한다.
+      // Retry from the committed growth and wallet state.
       const entries = readGrowthEntries(current.cardGrowth);
       const currentLevel = levelOfCard(entries, cardId);
 
@@ -141,34 +143,41 @@ export const enhanceCard = onCall(measuredCallable("enhanceCard", async (request
         if (hasFreeShot(grants, FREE_SHOT_AXIS)) freeShot = grants;
       }
 
-      const charged = freeShot === null ? step.cost : 0;
+      const paid = freeShot === null && step.cost > 0;
       const balances = wallet.balances;
-      if (!canAfford(balances, step.currency, charged)) {
+      if (paid && !canAfford(balances, step.currency, 1)) {
         reject("NotAffordable", `Not enough ${step.currency} to enhance card ${cardId}.`,
-          {uid, env, cardId, level: currentLevel, currency: step.currency, cost: charged,
+          {uid, env, cardId, level: currentLevel, currency: step.currency, cost: 1,
             balance: balances[step.currency]});
       }
 
-      const succeeded = rollSucceeded(step.successPermille, randomInt);
-      if (succeeded && grantsReference !== null && freeShot !== null) {
+      const availableAmount = paid ? Math.min(amount, balances[step.currency] ?? 0) : amount;
+      const fed = feedShard(entries, cardId, step.cost, freeShot !== null, availableAmount);
+      const charged = paid ? fed.appliedShards : 0;
+      if (grantsReference !== null && freeShot !== null) {
         writeGrantUsed(transaction, grantsReference, FREE_SHOT_AXIS, FieldValue.serverTimestamp());
       }
 
-      outcome = succeeded ? "Success" : "Failed";
-      level = succeeded ? step.level : currentLevel;
+      outcome = "Success";
+      level = fed.level;
+      shardProgress = fed.shardProgress;
+      const nextStep = cardEnhanceStep(rule, overrides, level + 1);
+      shardRequired = nextStep === null ? 0 : shardRequirement(nextStep.cost);
+      evolved = fed.evolved;
+      appliedShards = fed.appliedShards;
       currency = step.currency;
       cost = charged;
-      freeShotUsed = succeeded && freeShot !== null;
+      freeShotUsed = freeShot !== null;
 
       const slots = {
-        cardGrowth: growthSlot(succeeded ? applyEnhanceLevel(entries, cardId, step.level) : entries),
+        cardGrowth: growthSlot(fed.entries),
       };
       applyGuideProgress(missions, current, slots, guideCards, catalog);
 
-      // 실패한 강화도 센다 — 재화는 이미 나갔고, 미션이 확률에 좌우되면 같은 횟수를 굴린 두 유저가
-      // 서로 다른 진행도를 갖는다. 진행도는 "시도"의 축이다.
-      // 이 쓰기는 위 grants 읽기보다 뒤여야 한다(Firestore 트랜잭션 규칙).
-      commitMissionBump(transaction, missions, EVENTS.cardEnhanceResolved.missionKey, 1, FieldValue.serverTimestamp());
+      // Count each accepted shard feed, including feeds below the evolution threshold.
+      // All mission writes follow the optional tutorial-grant read.
+      commitMissionBump(transaction, missions, EVENTS.cardEnhanceResolved.missionKey,
+        freeShotUsed ? 1 : appliedShards, FieldValue.serverTimestamp());
       missionState = missionResponse(missions.state, period, catalog);
 
       return {
@@ -178,7 +187,8 @@ export const enhanceCard = onCall(measuredCallable("enhanceCard", async (request
     },
     (adopted) => {
       replayed = false;
-      return {...adopted, outcome, level, currency, cost, freeShotUsed, missions: missionState};
+      return {...adopted, outcome, level, shardProgress, shardRequired, evolved, appliedShards,
+        currency, cost, freeShotUsed, missions: missionState};
     });
 
   if (replayed) {
@@ -186,7 +196,7 @@ export const enhanceCard = onCall(measuredCallable("enhanceCard", async (request
   } else {
     recordEvent(EVENTS.cardEnhanceResolved.name, {
       uid, env, eventId: txId, sourceCommand: "enhanceCard", result: outcome,
-      cardId, outcome, level, currency, cost,
+      cardId, outcome, level, shardProgress, shardRequired, evolved, appliedShards, currency, cost,
       freeShotRequested, freeShotUsed,
       revision: result.revision,
       txIdSource: isClientReceiptId(request.data?.txId) ? "client" : "server",

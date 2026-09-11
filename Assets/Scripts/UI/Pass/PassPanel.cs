@@ -15,7 +15,7 @@ using UnityEngine.UI;
 /// <para>게임 시작 때 미리 받은 캐시로 즉시 그리고
 /// <see cref="PassManager.OnChanged"/> 가 오면 다시 그린다.</para>
 /// </summary>
-public class PassPanel : PooledUIBase
+public partial class PassPanel : PooledUIBase
 {
     // 풀 계약. 표시 데이터는 PassManager 에서 스스로 당기므로 UIData 가 필요 없다.
     public override void Initialization(UIData _data) { }
@@ -70,14 +70,20 @@ public class PassPanel : PooledUIBase
     [Range(0f, 1f)] [SerializeField] float dimAlpha = 0.72f;
 
     readonly List<PassLevelRowView> m_rows = new List<PassLevelRowView>();
+    Action<int> m_claimHandler;
+    Action<int> m_premiumClaimHandler;
 
-    // 지금 깔린 행이 어느 시즌·곡선으로 만들어졌는지. 시즌이 바뀌면 다시 깐다.
-    string m_builtSignature;
     bool m_claiming;
+    bool m_scrollOnOpen;
+    bool m_waitForOpeningRefresh;
+    int m_openGeneration;
 
     // 씬 버튼 UnityEvent 가 인자 없는 이 시그니처에 바인딩된다 — 매개변수를 붙이면 배선이 끊긴다.
     public void Open()
     {
+        this.m_scrollOnOpen = true;
+        this.m_openGeneration++;
+        this.m_waitForOpeningRefresh = false;
         this.SetVisible(true);
         this.Rebuild();
 
@@ -85,10 +91,33 @@ public class PassPanel : PooledUIBase
         if (PassCommands.NeedsRefresh || !PassManager.HasSeason ||
             (PassManager.Season.EndAtMs > 0L &&
              PassManager.Season.EndAtMs <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()))
-            PassCommands.RefreshAsync().Forget();
+        {
+            this.m_waitForOpeningRefresh = true;
+            this.RefreshOpeningAsync(this.m_openGeneration).Forget();
+        }
     }
 
-    public void Close() => this.SetVisible(false);
+    async UniTaskVoid RefreshOpeningAsync(int _generation)
+    {
+        try
+        {
+            await UniTask.WaitUntil(() => (!PassCommands.IsRefreshing && !PassCommands.IsRepeatInFlight) || this == null || !this.isShow,
+                cancellationToken: this.GetCancellationTokenOnDestroy());
+            if (this == null || !this.isShow || _generation != this.m_openGeneration) return;
+            await PassCommands.RefreshAsync();
+        }
+        finally
+        {
+            if (this != null && _generation == this.m_openGeneration) this.m_waitForOpeningRefresh = false;
+        }
+    }
+
+    public void Close()
+    {
+        this.m_scrollOnOpen = false;
+        this.m_openGeneration++;
+        this.SetVisible(false);
+    }
 
     void OnEnable()
     {
@@ -110,10 +139,12 @@ public class PassPanel : PooledUIBase
         }
 
         PassManager.OnChanged += this.HandlePassChanged;
+        this.BindExtraButtons();
     }
 
     void OnDisable()
     {
+        this.m_scrollOnOpen = false;
         PassManager.OnChanged -= this.HandlePassChanged;
 
         // 안전망 — Close 를 거치지 않고 꺼지면 공용 딤이 남는다.
@@ -126,63 +157,94 @@ public class PassPanel : PooledUIBase
         // 남은 기간만 매 프레임 갱신한다. 행 다시 그리기는 OnChanged 가 유발한다.
         if (!this.isShow) return;
         this.RefreshRemainLabel(PassManager.Season);
+        if (Time.unscaledTime >= this.m_nextExtrasRefresh)
+        {
+            this.m_nextExtrasRefresh = Time.unscaledTime + 1f;
+            this.RefreshHeader();
+        }
     }
 
-    void HandlePassChanged()
+    void HandlePassChanged() => this.Rebuild();
+
+    void LateUpdate()
     {
-        if (BuildSignature() != this.m_builtSignature) this.Rebuild();
-        else this.RefreshRows();
+        if (!this.m_scrollOnOpen || this.m_waitForOpeningRefresh || !this.isShow || !PassManager.HasSeason || this.levelContent == null) return;
+        int t_index = FindOpeningRowIndex();
+        if (t_index < 0 || t_index >= this.m_rows.Count || this.m_rows[t_index] == null) return;
+        Transform t_targetTransform = this.m_rows[t_index].transform;
+        if (this.repeatRoot != null && this.repeatRoot.activeSelf && PassManager.Exp >= PassManager.MaxRequiredExp
+            && !HasUnclaimedLevel()) t_targetTransform = this.repeatRoot.transform;
+        ScrollRect t_scroll = this.levelContent.GetComponentInParent<ScrollRect>();
+        if (t_scroll == null || t_scroll.content == null)
+        {
+            this.m_scrollOnOpen = false;
+            return;
+        }
+
+        // 비동기 첫 조회로 생긴 행도 레이아웃 크기가 확정된 뒤 한 번만 맞춘다.
+        Canvas.ForceUpdateCanvases();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(t_scroll.content);
+        RectTransform t_viewport = t_scroll.viewport != null ? t_scroll.viewport : (RectTransform)t_scroll.transform;
+        float t_viewHeight = t_viewport.rect.height;
+        if (t_viewHeight <= 0f) return;
+        Bounds t_target = RectTransformUtility.CalculateRelativeRectTransformBounds(
+            t_scroll.content, t_targetTransform);
+        float t_scrollHeight = t_scroll.content.rect.height - t_viewHeight;
+        t_scroll.StopMovement();
+        t_scroll.verticalNormalizedPosition = t_scrollHeight > 0f
+            ? Mathf.Clamp01((t_target.center.y - t_scroll.content.rect.yMin - t_viewHeight * 0.5f) / t_scrollHeight)
+            : 1f;
+        this.m_scrollOnOpen = false;
+    }
+
+    static int FindOpeningRowIndex()
+    {
+        int t_index = 0;
+        int t_next = -1;
+        foreach (PassLevelDefinition t_level in PassManager.Levels)
+        {
+            if (t_level == null) continue;
+            if (PassManager.CanClaim(t_level) || PassManager.CanClaimPremium(t_level)) return t_index;
+            if (t_next < 0 && t_level.RequiredExp > PassManager.Exp) t_next = t_index;
+            t_index++;
+        }
+        return t_next >= 0 ? t_next : t_index - 1;
     }
 
     void Rebuild()
     {
         this.BuildRows();
-        this.m_builtSignature = BuildSignature();
         this.RefreshHeader();
     }
 
     void BuildRows()
     {
-        this.m_rows.Clear();
         if (this.levelContent == null || this.rowPrefab == null) return;
 
-        // Destroy 는 프레임 끝에 처리되므로 먼저 비활성화한다 — 레이아웃 계산에서 빠져야 이번 프레임 배치가 맞는다.
-        for (int i = this.levelContent.childCount - 1; i >= 0; i--)
-        {
-            GameObject t_child = this.levelContent.GetChild(i).gameObject;
-            t_child.SetActive(false);
-            Destroy(t_child);
-        }
+        if (this.rowPrefab.transform.parent == this.levelContent) this.rowPrefab.gameObject.SetActive(false);
 
+        int t_count = 0;
+        this.m_claimHandler ??= this.HandleClaim;
+        this.m_premiumClaimHandler ??= this.HandlePremiumClaim;
         IReadOnlyList<PassLevelDefinition> t_levels = PassManager.Levels;
         for (int i = 0; i < t_levels.Count; i++)
         {
             PassLevelDefinition t_level = t_levels[i];
             if (t_level == null) continue;
 
-            PassLevelRowView t_row = Instantiate(this.rowPrefab, this.levelContent);
-            t_row.gameObject.SetActive(true);
+            if (t_count == this.m_rows.Count) this.m_rows.Add(null);
+            PassLevelRowView t_row = this.m_rows[t_count];
+            if (t_row == null) this.m_rows[t_count] = t_row = Instantiate(this.rowPrefab, this.levelContent);
             long? t_next = i + 1 < t_levels.Count ? t_levels[i + 1]?.RequiredExp : null;
-            t_row.Bind(t_level, t_next, this.HandleClaim);
-            this.m_rows.Add(t_row);
+            t_row.Bind(t_level, t_next, this.m_claimHandler, this.m_premiumClaimHandler);
+            if (!t_row.gameObject.activeSelf) t_row.gameObject.SetActive(true);
+            t_count++;
         }
 
-        if (this.emptyNotice != null) this.emptyNotice.SetActive(this.m_rows.Count == 0);
-    }
-
-    void RefreshRows()
-    {
-        for (int i = 0; i < this.m_rows.Count; i++)
-            if (this.m_rows[i] != null) this.m_rows[i].Refresh();
-
-        this.RefreshHeader();
-    }
-
-    // 곡선의 신원. 시즌과 레벨 수가 그대로면 다시 깔 이유가 없다.
-    static string BuildSignature()
-    {
-        IReadOnlyList<PassLevelDefinition> t_levels = PassManager.Levels;
-        return $"{PassManager.Season?.SeasonId ?? string.Empty}:{t_levels.Count}";
+        for (int i = t_count; i < this.m_rows.Count; i++)
+            if (this.m_rows[i] != null && this.m_rows[i].gameObject.activeSelf) this.m_rows[i].gameObject.SetActive(false);
+        if (this.emptyNotice != null) this.emptyNotice.SetActive(t_count == 0);
+        if (this.repeatRoot != null) this.repeatRoot.transform.SetAsLastSibling();
     }
 
     void RefreshHeader()
@@ -203,11 +265,14 @@ public class PassPanel : PooledUIBase
         long t_floor = FloorOf(t_exp);
         if (this.expText != null)
             this.expText.text = t_season == null ? string.Empty
-                : t_next.HasValue ? $"{t_exp - t_floor:N0} / {t_next.Value - t_floor:N0}" : "MAX";
+                : t_next.HasValue ? $"{t_exp - t_floor:N0} / {t_next.Value - t_floor:N0}"
+                : PassManager.HasRepeatReward ? $"{PassManager.RepeatProgressExp:N0} / {PassManager.Repeat.RequiredExp:N0}" : "MAX";
 
         if (this.expFill != null)
         {
             float t_fill = t_season == null ? 0f : FillOf(t_exp, t_next);
+            if (t_season != null && !t_next.HasValue && PassManager.HasRepeatReward)
+                t_fill = (float)PassManager.RepeatProgressExp / PassManager.Repeat.RequiredExp;
             this.expFill.rectTransform.anchorMax = new Vector2(t_fill, 1f);
             this.expFill.gameObject.SetActive(t_fill > 0f);
         }
@@ -216,6 +281,7 @@ public class PassPanel : PooledUIBase
         if (this.claimAllAlertDot != null) this.claimAllAlertDot.SetActive(t_claimable);
 
         this.RefreshRemainLabel(t_season);
+        this.RefreshExtras();
     }
 
     // 게이지는 현재 레벨 문턱과 다음 문턱 사이 비율이다 — 0 부터 재면 뒷레벨에서 거의 안 움직인다.
@@ -263,47 +329,70 @@ public class PassPanel : PooledUIBase
             : $"{(int)t_span.TotalHours}시간 {t_span.Minutes}분 남음";
     }
 
-    void HandleClaim(int _level) => this.ClaimAsync(new List<int> { _level }).Forget();
+    readonly struct ClaimTarget
+    {
+        internal readonly int Level;
+        internal readonly bool Premium;
+        internal ClaimTarget(int _level, bool _premium = false) { Level = _level; Premium = _premium; }
+    }
+
+    void HandleClaim(int _level) => this.ClaimAsync(new List<ClaimTarget> { new ClaimTarget(_level) }).Forget();
+    void HandlePremiumClaim(int _level) => this.ClaimAsync(new List<ClaimTarget> { new ClaimTarget(_level, true) }).Forget();
 
     void HandleClaimAll()
     {
-        var t_levels = new List<int>();
+        var t_levels = new List<ClaimTarget>();
         foreach (PassLevelDefinition t_level in PassManager.Levels)
-            if (PassManager.CanClaim(t_level)) t_levels.Add(t_level.Level);
-        this.ClaimAsync(t_levels).Forget();
+        {
+            if (PassManager.CanClaim(t_level)) t_levels.Add(new ClaimTarget(t_level.Level));
+            if (PassManager.CanClaimPremium(t_level)) t_levels.Add(new ClaimTarget(t_level.Level, true));
+        }
+        this.ClaimAsync(t_levels, true).Forget();
     }
 
-    async UniTaskVoid ClaimAsync(List<int> _levels)
+    async UniTaskVoid ClaimAsync(List<ClaimTarget> _levels, bool _includeRepeat = false)
     {
-        if (this.m_claiming || _levels.Count == 0) return;
+        if (this.m_claiming || (_levels.Count == 0 && (!_includeRepeat || !PassManager.CanClaimRepeat))) return;
         this.m_claiming = true;
         this.RefreshHeader();
         string t_season = PassManager.Season?.SeasonId;
         var t_rewards = new List<ClaimMissionResult>();
+        bool t_continue = true;
         try
         {
-            foreach (int t_levelNumber in _levels)
+            foreach (ClaimTarget t_target in _levels)
             {
                 if (PassManager.Season?.SeasonId != t_season) break;
                 PassLevelDefinition t_definition = null;
                 foreach (PassLevelDefinition t_level in PassManager.Levels)
-                    if (t_level != null && t_level.Level == t_levelNumber) { t_definition = t_level; break; }
-                if (!PassManager.CanClaim(t_definition)) continue;
+                    if (t_level != null && t_level.Level == t_target.Level) { t_definition = t_level; break; }
+                if (!(t_target.Premium ? PassManager.CanClaimPremium(t_definition) : PassManager.CanClaim(t_definition))) continue;
 
                 string t_selected = null;
-                if (t_definition.Items != null && t_definition.Items.Exists(t_item => t_item != null && t_item.RewardType == "PackChoice"))
+                List<ClaimRewardItem> t_items = t_target.Premium ? t_definition.PremiumItems : t_definition.Items;
+                if (t_items != null && t_items.Exists(t_item => t_item != null && t_item.RewardType == "PackChoice"))
                 {
                     t_selected = await RewardPackChoice.ChooseAsync(PassManager.PackChoices);
-                    if (string.IsNullOrEmpty(t_selected)) break;
+                    if (string.IsNullOrEmpty(t_selected)) { t_continue = false; break; }
                 }
 
                 ClaimPassRewardResult t_result;
                 ServerWaitOverlay.Hold(this);
-                try { t_result = await PassCommands.ClaimAsync(t_levelNumber, t_selected); }
+                try { t_result = await PassCommands.ClaimAsync(t_target.Level, t_selected, t_target.Premium); }
                 finally { ServerWaitOverlay.Release(this); }
                 // 실패 이후 요청을 계속 보내지 않는다. 앞서 성공한 보상은 아래에서 표시한다.
-                if (t_result == null) break;
+                if (t_result == null) { t_continue = false; break; }
                 t_rewards.Add(new ClaimMissionResult { Granted = t_result.Granted, Cards = t_result.Cards, Packs = t_result.Packs });
+            }
+            if (_includeRepeat && t_continue && PassManager.Season?.SeasonId == t_season && PassManager.CanClaimRepeat)
+            {
+                ServerWaitOverlay.Hold(this);
+                try
+                {
+                    ClaimPassRepeatRewardResult t_result = await PassCommands.ClaimRepeatAsync();
+                    if (t_result != null) t_rewards.Add(new ClaimMissionResult { Granted = t_result.Granted });
+                }
+                finally { ServerWaitOverlay.Release(this); }
             }
         }
         finally

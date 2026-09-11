@@ -10,12 +10,24 @@ internal static class MissionProgressNotifications
     static string s_userId;
     static bool s_installed;
 
+#if UNITY_EDITOR
+    internal static void LogState()
+    {
+        Debug.Log($"[MissionNotifications] installed={s_installed}, observed={s_observed.Count}, pending={s_pending.Count}");
+        foreach (var t_pair in s_observed)
+            if (t_pair.Value.Event == "OpenPack")
+                Debug.Log($"[MissionNotifications] {t_pair.Key}: observed={t_pair.Value.Progress}/{t_pair.Value.Target}");
+    }
+#endif
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     internal static void Install()
     {
         // 계정 재시작은 도메인 리로드 없이 이벤트 구독을 비우기도 한다.
         MissionManager.OnChanged -= HandleChanged;
         MissionManager.OnChanged += HandleChanged;
+        MissionManager.OnPeriodReset -= HandlePeriodReset;
+        MissionManager.OnPeriodReset += HandlePeriodReset;
         FirebaseAuthService.Instance.OnStateChanged -= SynchronizeAccount;
         FirebaseAuthService.Instance.OnStateChanged += SynchronizeAccount;
         SynchronizeAccount();
@@ -48,7 +60,17 @@ internal static class MissionProgressNotifications
             _notification.UserId != FirebaseAuthService.Instance.UserId) return false;
         MissionDefinition t_definition = MissionManager.Find(_notification.MissionId);
         return t_definition != null && _notification.Matches(t_definition, PeriodKey(t_definition.Period)) &&
+               MissionManager.ProgressOf(t_definition) >= _notification.Progress &&
                MissionManager.IsGuideUnlocked(t_definition);
+    }
+
+    static void HandlePeriodReset(string _period)
+    {
+        var t_ids = new List<string>();
+        foreach (var t_pair in s_observed)
+            if (t_pair.Value.Period == _period) t_ids.Add(t_pair.Key);
+        foreach (string t_id in t_ids) s_observed.Remove(t_id);
+        s_pending.RemoveAll(t_item => t_item.Period == _period);
     }
 
     static void HandleChanged()
@@ -122,6 +144,7 @@ internal static class MissionProgressNotifications
     static void ResetRuntimeState()
     {
         MissionManager.OnChanged -= HandleChanged;
+        MissionManager.OnPeriodReset -= HandlePeriodReset;
         FirebaseAuthService.Instance.OnStateChanged -= SynchronizeAccount;
         s_observed.Clear();
         s_pending.Clear();

@@ -143,6 +143,8 @@ public static partial class SpecFirestoreUploader
         foreach (KeyValuePair<string, IEnumerable> t_pair in EnumerateTables(t_manager))
             t_names.Add(t_pair.Key);
 
+        if (!t_names.Contains(SpecLocalTables.CsvOnlyTableName)) t_names.Add(SpecLocalTables.CsvOnlyTableName);
+
         t_names.Sort(StringComparer.Ordinal);
         return t_names;
     }
@@ -547,6 +549,11 @@ public static partial class SpecFirestoreUploader
     {
         _snapshot = null;
         _error = null;
+        if (_table == SpecLocalTables.CsvOnlyTableName)
+        {
+            if (!SpecLocalTables.TryLoadRankAiEncounter(out List<RankAiEncounterRow> t_rows, out _error)) return false;
+            return TryBuildSnapshotFrom(t_rows, _table, out _snapshot, out _error);
+        }
         IEnumerable t_source = null;
 
         foreach (KeyValuePair<string, IEnumerable> t_pair in EnumerateTables(_manager))

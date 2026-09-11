@@ -48,11 +48,15 @@ public class TurnRunner : MonoBehaviour
 
     // 파괴 후 처음 읽으면 Unity가 MissingReferenceException을 던진다 — 씬 전환 중 재개하는 연출이 있으므로 살아 있을 때 잡아 둔다.
     CancellationToken destroyCt;
+    CancellationTokenSource battleEndCts;
+    public CancellationToken BattleEndToken => this.battleEndCts.Token;
+    int presentationCount;
 
     void Awake()
     {
         Instance = this;
         this.destroyCt = this.GetCancellationTokenOnDestroy();
+        this.battleEndCts = CancellationTokenSource.CreateLinkedTokenSource(this.destroyCt);
     }
 
     void OnDestroy()
@@ -60,6 +64,8 @@ public class TurnRunner : MonoBehaviour
         if (Instance == this) Instance = null;
         if (NetworkSession.Instance != null)
             NetworkSession.Instance.OnPlayerLeftRoom -= HandlePlayerLeft;
+        this.battleEndCts?.Cancel();
+        this.battleEndCts?.Dispose();
     }
 
     /// <summary>항복 = 즉시 패배 확정. 보상·랭크는 정상 패배와 같은 경로(CaptureResult)를 탄다.
@@ -124,7 +130,7 @@ public class TurnRunner : MonoBehaviour
         if (this.resultFinalized) return;   // 이미 승패 확정 — 보상 재지급·팝업 덮어쓰기 방지
 
         this.forcedEnd = true;
-        // 강제 종료에는 여운을 붙이지 않는다 — 항복·디버그 승리는 화면에 강조할 "결정타"가 없다.
+        // 항복은 전용 연출을 거친다. 결정타 여운은 정상 종료에만 붙인다.
         FinalizeResult(_won, _reason);
 
         if (!_won && DeckConfig.IsMultiplayer && _reason != EMatchEndReason.Surrender)
@@ -140,7 +146,10 @@ public class TurnRunner : MonoBehaviour
         if (this.resultFinalized) return;
         this.resultFinalized = true;
 
+        TurnState.BattleEnded = true;
         TurnState.InputAllowed = false;    // 결과 팝업 뒤에서 공격이 계속 나가지 않게
+        this.battleEndCts.Cancel();
+        if (_reason == EMatchEndReason.Surrender) ReleaseNetworkWaits();
         if (_reason.IsVoid())
         {
             // 무효 경기는 씬 전환이 커버 연출을 태우느라 1초 넘게 걸린다. 그동안 전투 씬은 살아 있으므로
@@ -155,7 +164,7 @@ public class TurnRunner : MonoBehaviour
         if (_reason.GrantsReward())
             CaptureResult(_won, _reason);
         BattleGoldenRecorder.Finish(_won, _reason == EMatchEndReason.Draw);
-        ShowResult(_won, _reason.PlaysBeat()).Forget();
+        ShowResult(_won, _reason.PlaysBeat(), _reason == EMatchEndReason.Surrender).Forget();
     }
 
     async UniTaskVoid LoadVoidResultNextFrame()
@@ -212,11 +221,35 @@ public class TurnRunner : MonoBehaviour
     }
 
     // 여운은 표시 전용이라 결과·보상 확정 뒤에 돈다 — 도중에 씬이 내려가면 취소되고 팝업도 뜨지 않는다.
-    async UniTaskVoid ShowResult(bool _won, bool _withBeat)
+    async UniTaskVoid ShowResult(bool _won, bool _withBeat, bool _surrender = false)
     {
+        if (_surrender)
+        {
+            // 공격·보충·인트로가 같은 슬롯 뷰를 쓰므로 모두 내려온 뒤 연출한다.
+            await UniTask.WaitUntil(() => this.presentationCount == 0, cancellationToken: this.destroyCt);
+            BattleResultBeat.AbortFinish();
+            DeckPileUI.CloseAny();
+            CardView.RestoreAllFades();
+            this.playerFieldView?.ClearAllHighlights();
+            this.enemyFieldView?.ClearAllHighlights();
+            this.mulliganOverlay?.Hide();
+            TutorialOverlayUI.Instance?.Clear();
+            if (this.turnCountLabel != null) this.turnCountLabel.gameObject.SetActive(false);
+            if (this.turnBanner != null) this.turnBanner.ShowSurrender(_won);
+            else if (this.turnLabel != null)
+                this.turnLabel.text = _won ? "상대가 항복했습니다" : "항복했습니다";
+
+            // 설정창 퇴장과 배너 등장을 먼저 보여 준다.
+            await UniTask.Delay(300, cancellationToken: this.destroyCt);
+            BattleFieldView t_loser = _won ? this.enemyFieldView : this.playerFieldView;
+            if (t_loser != null) await t_loser.PlaySurrender(this.destroyCt);
+            await UniTask.Delay(700, cancellationToken: this.destroyCt);
+            HideTurnInfo();
+        }
         if (_withBeat)
             await BattleResultBeat.Play(_won, this.destroyCt);
 
+        if (this.destroyCt.IsCancellationRequested) return;
         GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
         t_popup?.Show(this.lastReward, this.lastRankDelta, _won,
             this.lastSurvivorCards, this.lastFallenCards);
@@ -310,6 +343,15 @@ public class TurnRunner : MonoBehaviour
     /// → (4) 턴 루프(선공 배너는 이미 재생했으므로 첫 턴 배너 스킵). 코인은 싱글 AI전 전용(멀티 스킵).</summary>
     public async UniTask PlayIntroAndStart(System.Func<UniTask> _dealCards)
     {
+        if (this.resultFinalized) return;
+        this.presentationCount++;
+        try { await PlayIntroAndStartCore(_dealCards); }
+        catch (OperationCanceledException) when (this.destroyCt.IsCancellationRequested || TurnState.BattleEnded) { }
+        finally { this.presentationCount--; }
+    }
+
+    async UniTask PlayIntroAndStartCore(System.Func<UniTask> _dealCards)
+    {
         BattleCommandLog.Reset();
         BattleGoldenRecorder.Reset();
         TurnCount = 1;
@@ -358,7 +400,11 @@ public class TurnRunner : MonoBehaviour
             await this.coinFlip.Play(IsMyTurn(t_first));
             await UniTask.Delay(500);                   // 결과 잠깐 유지
             // 연출 대기 중 씬이 내려갔으면 아래는 전부 파괴된 오브젝트를 만진다.
-            if (this.destroyCt.IsCancellationRequested) return;
+            if (this.destroyCt.IsCancellationRequested || this.resultFinalized)
+            {
+                if (this.coinFlip != null) this.coinFlip.gameObject.SetActive(false);
+                return;
+            }
             this.coinFlip.gameObject.SetActive(false);
         }
 
@@ -373,11 +419,12 @@ public class TurnRunner : MonoBehaviour
         }
 
         // (3) 카드 배치.
+        if (this.resultFinalized) return;
         if (_dealCards != null) await _dealCards();
 
         // (3.5) 후공 어드밴티지 멀리건 — 첫 턴 시작 전, 보드가 채워진 뒤.
-        if (this.destroyCt.IsCancellationRequested) return;   // 딜 도중 씬 전환 — 멀리건·턴 루프를 시작하지 않는다
-        await MulliganPhase.Run(this.ctx, t_first, this.destroyCt);
+        if (this.destroyCt.IsCancellationRequested || this.resultFinalized) return;
+        await MulliganPhase.Run(this.ctx, t_first, this.BattleEndToken);
 
         // 멀리건 RPC 상한이 무효 경기를 확정했거나 씬이 내려간 경우 턴 루프를 새로 시작하지 않는다.
         if (this.destroyCt.IsCancellationRequested || this.resultFinalized || this.forcedEnd) return;
@@ -392,12 +439,21 @@ public class TurnRunner : MonoBehaviour
 
     async UniTask RunBattleLoop(int _startCurrent, bool _skipFirstBanner)
     {
+        this.presentationCount++;
+        try { await RunBattleLoopCore(_startCurrent, _skipFirstBanner); }
+        catch (OperationCanceledException) when (this.destroyCt.IsCancellationRequested || TurnState.BattleEnded) { }
+        finally { this.presentationCount--; }
+    }
+
+    async UniTask RunBattleLoopCore(int _startCurrent, bool _skipFirstBanner)
+    {
         bool t_skipBanner = _skipFirstBanner;
         this.battleLoop = new BattleLoop(this.ruleCtx, _startCurrent);
 
         EBattleLoopEnd t_end = await this.battleLoop.Run(
             async t_current =>
             {
+                if (this.resultFinalized) return;
                 this.viewCtx.RefreshViews();
 
                 bool t_isMyTurn = IsMyTurn(t_current);
@@ -407,6 +463,7 @@ public class TurnRunner : MonoBehaviour
                     await this.viewCtx.turnBanner.Play(t_isMyTurn);
                 }
                 t_skipBanner = false;
+                if (this.resultFinalized) return;
 
                 if (this.aiTakeoverFillPending)
                 {
@@ -414,6 +471,7 @@ public class TurnRunner : MonoBehaviour
                     TurnFillResult t_filled = this.ruleCtx.FillSlots();
                     await this.viewCtx.AnimateFilled(t_filled);
                 }
+                if (this.resultFinalized) return;
 
                 TurnBase t_turn;
                 if (DeckConfig.IsMultiplayer && !DeckConfig.AiTakeover)
@@ -431,9 +489,12 @@ public class TurnRunner : MonoBehaviour
 
                 this.battleLoop.ActiveTurn = t_turn as IAiTakeoverContinuable;
                 t_turn.OnEnter();
-                await t_turn.Execute();
-                t_turn.OnExit();
-                this.battleLoop.ActiveTurn = null;
+                try { await t_turn.Execute(); }
+                finally
+                {
+                    t_turn.OnExit();
+                    this.battleLoop.ActiveTurn = null;
+                }
             },
             () => this.forcedEnd,
             t_owner =>

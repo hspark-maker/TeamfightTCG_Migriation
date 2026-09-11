@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getReplayDivergence = exports.claimPassReward = exports.getPass = exports.syncRankProfile = exports.syncGuideProgress = exports.claimMission = exports.getMissions = exports.spinRoulette = exports.limitBreakCard = exports.reportAdventureWin = exports.grantTutorialCards = exports.claimBattleReward = exports.enhanceKeyword = exports.enhanceCard = exports.claimPayout = exports.aggregateReplayDaily = exports.submitMatchResult = exports.verifyMatchTicket = exports.findAiMatch = exports.getRankLeaderboard = exports.getRankSnapshot = exports.lockDeck = exports.createMatch = exports.claimReward = exports.openPack = exports.repairSaveSlots = exports.ensureWallet = exports.ensureAccount = exports.devResetDailyMissions = exports.devCompleteMissions = exports.devResetSave = exports.devBumpRevision = exports.ping = void 0;
+exports.getReplayDivergence = exports.claimPassRepeatReward = exports.claimPassReward = exports.getPass = exports.syncRankProfile = exports.syncGuideProgress = exports.claimMission = exports.getMissions = exports.spinRoulette = exports.limitBreakCard = exports.reportAdventureWin = exports.grantTutorialCards = exports.claimBattleReward = exports.enhanceKeyword = exports.enhanceCard = exports.claimPayout = exports.aggregateReplayDaily = exports.submitMatchResult = exports.verifyMatchTicket = exports.findAiMatch = exports.getRankLeaderboard = exports.getRankSnapshot = exports.lockDeck = exports.createMatch = exports.claimReward = exports.openPack = exports.repairSaveSlots = exports.ensureWallet = exports.ensureAccount = exports.devResetDailyMissions = exports.devCompleteMissions = exports.devResetSave = exports.devBumpRevision = exports.ping = void 0;
 var ping_1 = require("./commands/ping");
 Object.defineProperty(exports, "ping", { enumerable: true, get: function () { return ping_1.ping; } });
 var devBumpRevision_1 = require("./commands/devBumpRevision");
@@ -65,6 +65,8 @@ var getPass_1 = require("./commands/getPass");
 Object.defineProperty(exports, "getPass", { enumerable: true, get: function () { return getPass_1.getPass; } });
 var claimPassReward_1 = require("./commands/claimPassReward");
 Object.defineProperty(exports, "claimPassReward", { enumerable: true, get: function () { return claimPassReward_1.claimPassReward; } });
+var claimPassRepeatReward_1 = require("./commands/claimPassRepeatReward");
+Object.defineProperty(exports, "claimPassRepeatReward", { enumerable: true, get: function () { return claimPassRepeatReward_1.claimPassRepeatReward; } });
 var getReplayDivergence_1 = require("./commands/getReplayDivergence");
 Object.defineProperty(exports, "getReplayDivergence", { enumerable: true, get: function () { return getReplayDivergence_1.getReplayDivergence; } });
 //# sourceMappingURL=index.js.map

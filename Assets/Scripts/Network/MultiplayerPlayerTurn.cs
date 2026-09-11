@@ -15,7 +15,7 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
 {
     CardInstance forcedAttacker;
     bool turnDone;
-    bool attackRunning;
+    int runningAttacks;
 
     public MultiplayerPlayerTurn(TurnContext _ctx) : base(_ctx) { }
 
@@ -29,11 +29,13 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
 
     public override async UniTask Execute()
     {
+        if (TurnState.BattleEnded) return;
         this.turnDone = false;
         // 생각시간 감시 기동. ct는 턴 수명(씬 파괴)에 묶고, turnDone 세팅 시 자연 종료.
         var t_ct = this.ctx.playerFieldView.GetCancellationTokenOnDestroy();
-        TurnThinkTimer.Watch(GameTiming.Battle.TurnThinkTime, () => this.turnDone, ForceTimeoutAttack, t_ct).Forget();
-        await UniTask.WaitUntil(() => this.turnDone);
+        TurnThinkTimer.Watch(GameTiming.Battle.TurnThinkTime, () => this.turnDone || TurnState.BattleEnded, ForceTimeoutAttack, t_ct).Forget();
+        await UniTask.WaitUntil(() => (this.turnDone || TurnState.BattleEnded) && this.runningAttacks == 0,
+            cancellationToken: t_ct);
     }
 
     public override void OnExit()
@@ -47,13 +49,12 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
         CardView.OnAttack      -= HandleCardViewAttack;
         this.ctx.ClearAllHighlights();
         this.forcedAttacker = null;
-        this.attackRunning = false;
     }
 
     /// <summary>내 입력을 기다리던 중 상대가 이탈했다면 현재 턴은 그대로 플레이하게 한다.</summary>
     public void ContinueAfterAiTakeover()
     {
-        if (this.turnDone || this.attackRunning) return;
+        if (this.turnDone || this.runningAttacks > 0 || TurnState.BattleEnded) return;
         TurnState.InputAllowed = true;
     }
 
@@ -114,7 +115,14 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
 
     async UniTask ExecuteAttackAsync(CardInstance _attacker, CardInstance _defender)
     {
-        this.attackRunning = true;
+        if (TurnState.BattleEnded) return;
+        this.runningAttacks++;
+        try { await ExecuteAttackCore(_attacker, _defender); }
+        finally { this.runningAttacks--; }
+    }
+
+    async UniTask ExecuteAttackCore(CardInstance _attacker, CardInstance _defender)
+    {
         TurnState.InputAllowed = false;
 
         bool t_cunningSwap = _attacker.HasKeyword(CardKeyword.Cunning)
@@ -130,6 +138,7 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
             _attacker, _defender, this.ctx.playerField, this.ctx.enemyField,
             this.ctx.playerFieldView, this.ctx.enemyFieldView,
             t_cunningSwap, t_derivedCommand));
+        if (TurnState.BattleEnded) return;
         AttackResult t_result = t_attack.Result;
         CardView t_attackerView = t_attack.AttackerView;
         CardView t_defenderView = t_attack.DefenderView;
@@ -143,6 +152,7 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
         this.ctx.playerFieldView.Refresh();
         this.ctx.playerDeckUI?.Refresh();
         await this.ctx.playerFieldView.PlayFillAnim(t_playerPlaced);
+        if (TurnState.BattleEnded) return;
 
         // PlayDeathAnim이 alpha/scale을 1로 리셋하므로, 죽은 슬롯만 즉시 숨김
         // 전체 Refresh는 RPC로 미리 배치된 신규 카드까지 노출시키므로 사용 금지
@@ -158,6 +168,7 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
         else if (NetworkGameController.Instance != null)
         {
             bool t_ready = await NetworkGameController.Instance.WaitForOpponentReady();
+            if (TurnState.BattleEnded) return;
             if (!t_ready)
             {
                 if (DeckConfig.AiTakeover)
@@ -182,6 +193,7 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
         this.ctx.enemyFieldView.Refresh();
         this.ctx.enemyDeckUI?.Refresh();
         await this.ctx.enemyFieldView.PlayFillAnim(t_enemyPlaced);
+        if (TurnState.BattleEnded) return;
 
         // divergence 카나리아 스냅샷. **공격 해결 직후가 아니라 여기다.**
         // 상대 CardSpawn은 수신 즉시 enemyField에 반영되므로(PlaceCardDirectly), 보충 전에 뜨면
@@ -227,7 +239,6 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
             }
 
             TurnState.InputAllowed = true;
-            this.attackRunning = false;
             return;
         }
 

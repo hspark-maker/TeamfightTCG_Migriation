@@ -200,6 +200,15 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     bool m_readOnly;
 
+    ShardEnhanceHoldInput m_holdInput;
+    ShardAbsorbEffect m_shardAbsorb;
+    bool m_enhanceRequestPending;
+    bool m_holdActive;
+    int m_holdCard;
+    int m_holdLevel;
+    int m_viewVersion;
+    float m_nextHoldFeed;
+
     // 창이 열려 있는 동안만 순서를 덮어쓰고 닫히면 되돌린다 — 상시 최상단이면 로비 레이어와의 순서까지 뒤집힌다.
     Canvas m_sortingCanvas;
 
@@ -328,6 +337,14 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         // 룩만 얹는 부착이다 — 차단은 RefreshGrowthActions의 계산식이 진다.
         if (this.enhanceButton != null) FeatureLockView.Attach(this.enhanceButton.gameObject, EOutgameFeature.CardEnhance);
+        if (this.enhanceButton != null)
+        {
+            this.m_holdInput = this.enhanceButton.GetComponent<ShardEnhanceHoldInput>();
+            if (this.m_holdInput == null) this.m_holdInput = this.enhanceButton.gameObject.AddComponent<ShardEnhanceHoldInput>();
+            this.m_holdInput.OnHoldTick = OnEnhanceHold;
+            this.m_holdInput.OnHoldEnded = EndEnhanceHold;
+            this.m_shardAbsorb = gameObject.AddComponent<ShardAbsorbEffect>();
+        }
 
         // 카드 그림 위 탭은 루트의 OnPointerClick으로 오지 않는다(LongPressDetector가 pointerPress를 가져간다).
         if (this.cardView != null)
@@ -374,6 +391,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     void OnDisable()
     {
+        this.m_viewVersion++;
+        StopEnhanceHold();
         LobbyShellBars.Show(this);
 
         ScreenDim.Hide(this, EDimLayer.Content);
@@ -451,6 +470,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     void Hide()
     {
+        this.m_viewVersion++;
+        StopEnhanceHold();
         // 퇴장 중 입력부터 죽인다 — 닫히는 도중 전환이 시작되면 close 시퀀스와 같은 노드를 두고 싸운다.
         if (this.swipeDetector != null) this.swipeDetector.Interactable = false;
 
@@ -528,12 +549,12 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         this.m_activeRitual = null;
     }
 
-    /// <summary>이 카드의 다음 한 방을 맡을 연출. 진화 관문은 담금질과 다른 얼굴을 쓴다.</summary>
+    /// <summary>다음 샤드가 별을 올릴 때만 진화 연출을 고른다.</summary>
     CardGrowthRitualView RitualFor(int _card)
     {
         if (this.evolveRitual != null
-         && CardGrowthManager.TryGetNextStep(_card, out GrowthStep t_step)
-         && CardGrowthManager.IsEvolutionLevel(t_step.Level)) return this.evolveRitual;
+         && CardGrowthManager.PreviewGrowthAfterEnhance(_card).Level > CardGrowthManager.LevelOf(_card))
+            return this.evolveRitual;
 
         return this.ritual;
     }
@@ -694,7 +715,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     void OnGrowthChanged()
     {
         // 연출 중이면 흘려보낸다 — 결과는 공개 순간에 한 번에 반영된다.
-        if (this.m_ritualPlaying) return;
+        if (this.m_ritualPlaying || this.m_enhanceRequestPending) return;
 
         int t_card = CardAt(this.m_index);
         if (t_card > 0) RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
@@ -712,7 +733,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // 재화 종류에 따라 버튼 활성만 바뀐다 — 어느 종류든 다시 판정하면 되므로 걸러내지 않는다.
     void HandleCurrencyChanged(ECurrencyType _type, long _balance)
     {
-        if (this.m_ritualPlaying) return;
+        if (this.m_ritualPlaying || this.m_enhanceRequestPending) return;
 
         int t_card = CardAt(this.m_index);
         if (t_card > 0) RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
@@ -743,6 +764,8 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     // 카드가 바뀔 때의 전량 갱신. 조건 없는 칩 재생성은 여기뿐이다.
     void Apply(int _card)
     {
+        this.m_viewVersion++;
+        StopEnhanceHold();
         bool t_owned = OwnershipManager.IsOwned(_card);
 
         // 다른 카드를 그리는 참이다 — 앞 카드의 해금 대기를 안 버리면 이 카드의 판이 이유 없이 터진다.
@@ -991,14 +1014,12 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         GrowthStep t_step = default;
         bool t_hasStep = _owned && CardGrowthManager.TryGetNextStep(_card, out t_step);
 
-        // 다음 한 방이 진화 관문이면 같은 버튼이 진화 얼굴로 갈아입는다 — 어느 쪽이든 버튼이 자리를 옮기지 않는다.
-        bool t_evolve = t_hasStep && CardGrowthManager.IsEvolutionLevel(t_step.Level);
-
         // 열람 전용도 같은 길로 내린다 — 알파만 0인 채 살아 있는 버튼은 탭을 먹는다.
         bool t_actions = _owned && !this.m_readOnly;
         if (this.enhanceButton != null) this.enhanceButton.gameObject.SetActive(t_actions);
 
-        ApplyGrowthFace(t_evolve);
+        // 샤드는 항상 강화로 투입하며, 필요량을 채운 결과에서 자동으로 진화한다.
+        ApplyGrowthFace(false);
 
         // 안내 타깃은 지금 서 있는 성장 버튼을 따라간다 — 열릴 때마다 새로 서서 프리팹 표식으로는 잡을 수 없다.
         ApplyGrowthAnchor(t_actions ? this.enhanceButton : null);
@@ -1007,14 +1028,23 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         bool t_unlocked = OutgameFeatureLock.IsUnlocked(EOutgameFeature.CardEnhance);
 
         bool t_canPayEnhance = t_hasStep && CurrencyManager.CanAfford(t_step.Currency, t_step.Cost);
-        SetActionsEnabled(t_canPayEnhance && !this.m_ritualPlaying && t_unlocked);
+        bool t_holding = this.m_holdActive && this.m_holdInput != null && this.m_holdInput.IsPressed;
+        SetActionsEnabled(t_actions && !this.m_ritualPlaying && t_unlocked
+            && (this.m_enhanceRequestPending ? t_holding : t_canPayEnhance));
 
         ApplyCost(t_hasStep, t_step);
 
         // 결과판이 걷힌 뒤(또는 평상시)엔 다시 각자의 글자다 — 값 갱신이 지나는 이 길이 곧 글자의 복귀 지점이다.
         SetActionLabel(false);
         if (this.successRateText != null)
-            this.successRateText.text = t_hasStep ? $"{Mathf.RoundToInt(t_step.SuccessRate * 100f)}%" : NoValue;
+            this.successRateText.text = ShardProgressLabel(_card, t_hasStep);
+    }
+
+    static string ShardProgressLabel(int _card, bool _hasStep)
+    {
+        return _hasStep
+            ? $"{CardGrowthManager.ShardProgressOf(_card):N0}/{CardGrowthManager.ShardRequiredOf(_card):N0}"
+            : NoValue;
     }
 
     /// <summary>이번 강화(_from → _to)로 새로 열린 것을 한 문장으로. 아무것도 안 열렸으면 null.</summary>
@@ -1057,6 +1087,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     static bool UnlockedSynergy(int _card, int _from, int _to)
     {
         if (_card <= 0 || _to <= _from) return false;
+        if (CardCatalog.RequireSynergies(_card).Count == 0) return false;
 
         return !CardGrowthManager.GrowthAtLevel(_card, _from).SynergyUnlocked
             &&  CardGrowthManager.GrowthAtLevel(_card, _to).SynergyUnlocked;
@@ -1131,6 +1162,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     void OnEnhancePressed()
     {
+        if (this.m_holdInput != null && this.m_holdInput.ConsumeClick()) return;
         // 결과를 읽는 중이면 이 버튼이 곧 "한 번 더"다 — 손이 이미 가 있는 하단 바 버튼을 그대로 쓴다.
         if (this.resultPanel != null && this.resultPanel.IsOpen)
         {
@@ -1138,7 +1170,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             return;
         }
 
-        if (this.m_ritualPlaying) return;
+        if (this.m_ritualPlaying || this.m_enhanceRequestPending) return;
 
         int t_card = CardAt(this.m_index);
         if (t_card <= 0)
@@ -1147,14 +1179,64 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             return;
         }
 
-        // 유예를 먼저 세운다 — 판정이 서버로 나가 있는 동안 버튼이 살아 있으면 같은 결제가 여러 번 나간다.
-        this.m_ritualPlaying = true;
-
-        EnhanceAsync(t_card).Forget();
+        BeginEnhance(t_card, 1);
     }
 
-    // 서버 왕복 강화. 잡아 둘 값도 고를 연출도 전부 왕복 "전"이다 — 레벨이 오르고 나면 다른 답이 된다.
-    async UniTaskVoid EnhanceAsync(int _card)
+    void OnEnhanceHold(float _seconds)
+    {
+        if (this.m_enhanceRequestPending || this.m_ritualPlaying || Time.unscaledTime < this.m_nextHoldFeed) return;
+        int t_card = CardAt(this.m_index);
+        if (!CanFeedShard(t_card) || (this.resultPanel != null && this.resultPanel.IsOpen))
+        { StopEnhanceHold(); return; }
+        if (!this.m_holdActive)
+        {
+            this.m_holdActive = true;
+            this.m_holdCard = t_card;
+            this.m_holdLevel = CardGrowthManager.LevelOf(t_card);
+        }
+        if (this.m_holdCard != t_card || this.m_holdLevel != CardGrowthManager.LevelOf(t_card))
+        { StopEnhanceHold(); return; }
+        int t_amount = _seconds < 1f ? 1 : _seconds < 2f ? 5 : 20;
+        this.m_nextHoldFeed = Time.unscaledTime + 0.45f;
+        BeginEnhance(t_card, t_amount);
+    }
+
+    bool CanFeedShard(int _card)
+        => isActiveAndEnabled && !this.m_readOnly && _card > 0 && OwnershipManager.IsOwned(_card)
+            && OutgameFeatureLock.IsUnlocked(EOutgameFeature.CardEnhance)
+            && CardGrowthManager.Precheck(_card) == EEnhanceOutcome.Success;
+
+    void BeginEnhance(int _card, int _amount)
+    {
+        if (!CanFeedShard(_card)) { StopEnhanceHold(); return; }
+        int t_count = Mathf.Min(_amount, CardGrowthManager.ShardRequiredOf(_card) - CardGrowthManager.ShardProgressOf(_card));
+        if (CardGrowthManager.TryGetNextStep(_card, out GrowthStep t_step) && t_step.Cost > 0)
+            t_count = (int)Math.Min(t_count, CurrencyManager.GetBalance(t_step.Currency));
+        if (t_count <= 0) { StopEnhanceHold(); return; }
+        this.m_enhanceRequestPending = true;
+        // 홀드 중에는 Button의 Pressed 상태를 유지한다. 중복 요청은 pending 가드가 막는다.
+        SetActionsEnabled(this.m_holdActive && this.m_holdInput != null && this.m_holdInput.IsPressed);
+        this.m_shardAbsorb?.Play(this.enhanceButton.transform as RectTransform,
+            this.cardView != null ? this.cardView.transform as RectTransform : null, t_count);
+        EnhanceAsync(_card, t_count, this.m_viewVersion).Forget();
+    }
+
+    void StopEnhanceHold()
+    {
+        this.m_holdInput?.Cancel();
+        EndEnhanceHold();
+    }
+
+    void EndEnhanceHold()
+    {
+        this.m_holdActive = false;
+        this.m_nextHoldFeed = 0f;
+        this.m_shardAbsorb?.Stop();
+        if (this.m_enhanceRequestPending) SetActionsEnabled(false);
+    }
+
+    // 이전 수치는 왕복 전에 잡고, 진화 연출은 서버가 확정한 실제 레벨 변화로 고른다.
+    async UniTaskVoid EnhanceAsync(int _card, int _amount, int _viewVersion)
     {
         int t_card = _card;
 
@@ -1162,43 +1244,58 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         int t_fromLevel = CardGrowthManager.GrowthOf(t_card).Level;
         int t_fromHp    = DeckPower.MaxHpOf(t_card);
 
-        CardGrowthRitualView t_ritual = RitualFor(t_card);
-        bool                 t_evolve = t_ritual == this.evolveRitual && this.evolveRitual != null;
-
         // 왕복 전의 문지기. 진실원은 여전히 서버라 이 검사는 낙관일 뿐이고, 통과한 뒤 거절이 오는 갈래는 정상 동작이다.
         if (CardGrowthManager.Precheck(t_card) != EEnhanceOutcome.Success)
         {
+            this.m_enhanceRequestPending = false;
+            StopEnhanceHold();
             AbortEnhance(t_card);
             return;
         }
 
         EnhanceResult t_result;
 
-        // Release는 반드시 finally에서 — 예외나 조기 반환으로 한 번이라도 새면 전역 오버레이가 화면을 영영 잠근다.
-        ServerWaitOverlay.Hold(this);
+        // 명령은 백그라운드에서 직렬 처리한다. 닫기·카드 이동은 응답을 기다리지 않는다.
         try
         {
-            t_result = await CardGrowthManager.TryEnhanceAsync(t_card);
+            t_result = await CardGrowthManager.TryEnhanceAsync(t_card, _amount);
+        }
+        catch (Exception t_exception)
+        {
+            Debug.LogException(t_exception);
+            t_result = new EnhanceResult(EEnhanceOutcome.NotReady, CardGrowthManager.LevelOf(t_card));
         }
         finally
         {
-            ServerWaitOverlay.Release(this);
+            this.m_enhanceRequestPending = false;
         }
 
         // 왕복 중 이 창이 사라졌다면 되돌릴 화면도 태울 연출도 없다(레벨·잔액은 서버가 이미 확정했다).
-        if (this == null) return;
+        if (this == null) { NotifyEnhanceSettled(t_result); return; }
 
         // 저작 실수(초기화 누락)는 조용히 넘기지 않는다 — 재화는 소모되지 않았고 원인이 화면 밖에 있다.
         if (t_result.Outcome == EEnhanceOutcome.NotReady && !CardGrowthManager.IsReady)
             Debug.LogError("[CardDetailOverlayView] Growth data is not initialized — CardGrowthManager.Init() was not called during initialization.");
 
         bool t_played = t_result.Outcome == EEnhanceOutcome.Success || t_result.Outcome == EEnhanceOutcome.Failed;
+        bool t_evolve = t_result.Outcome == EEnhanceOutcome.Success && t_result.Level > t_fromLevel;
+        CardGrowthRitualView t_ritual = t_evolve && this.evolveRitual != null ? this.evolveRitual : this.ritual;
 
         // 왕복 중 창이 닫혔어도 성립한 강화는 알린다 — 기다리던 안내가 영영 깨어나지 못하면 진행이 막힌다.
-        if (!this.isActiveAndEnabled)
+        if (!this.isActiveAndEnabled || this.m_viewVersion != _viewVersion || CardAt(this.m_index) != t_card)
         {
-            this.m_ritualPlaying = false;
+            int t_visible = CardAt(this.m_index);
+            if (this.isActiveAndEnabled && t_visible > 0) RefreshGrowth(t_visible, OwnershipManager.IsOwned(t_visible));
             if (t_played) NotifyEnhanceSettled(t_result);
+            return;
+        }
+
+        if (t_evolve || t_result.Outcome != EEnhanceOutcome.Success) StopEnhanceHold();
+
+        // 매 샤드마다 결과창으로 흐름을 끊지 않는다. 정수 능력치가 그대로여도 누적 수치는 즉시 오른다.
+        if (t_result.Outcome == EEnhanceOutcome.Success && !t_evolve)
+        {
+            CompleteShardEnhance(t_card, t_result);
             return;
         }
 
@@ -1213,9 +1310,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         }
 
         this.m_activeRitual = t_ritual;
+        this.m_ritualPlaying = true;
 
         // 레벨은 이미 올랐고 화면은 아직 옛 상태라, "곧 켜질 것"이 정확히 나오는 유일한 시점이다.
-        if (t_evolve && this.cardView != null)
+        if (t_evolve && this.evolveRitual != null && this.cardView != null)
         {
             this.cardView.CollectPendingKeywordFrames(t_card, OwnershipManager.IsOwned(t_card), this.m_emblemBuffer);
             this.evolveRitual.SetEmblems(this.m_emblemBuffer);
@@ -1275,6 +1373,15 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                 this.m_retryQueued = false;
                 OnEnhancePressed();
             });
+    }
+
+    void CompleteShardEnhance(int _card, EnhanceResult _result)
+    {
+        OnAnyEnhanceStarted?.Invoke();
+        AbortEnhance(_card);
+        if (CardAt(this.m_index) == _card && this.cardView != null) this.cardView.FlashGrowth();
+        OnAnyEnhanceResultReady?.Invoke(_result);
+        NotifyEnhanceSettled(_result);
     }
 
     // 강화·진화가 같은 키인 이유: 안내가 시키는 일은 "한 단계 키워라" 하나이고 관문에서는 버튼의 얼굴만 갈린다.
@@ -1366,14 +1473,15 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         bool t_hasNext = CardGrowthManager.TryGetNextStep(_card, out GrowthStep t_next);
 
         // 다음 한 방이 진화 관문이면 잇지 않는다 — 무대가 갈려 연타의 이득이 사라지고, 진화는 관람 대상이다.
-        bool t_nextIsEvolve = t_hasNext && CardGrowthManager.IsEvolutionLevel(t_next.Level);
+        bool t_nextIsEvolve = t_hasNext
+            && CardGrowthManager.PreviewGrowthAfterEnhance(_card).Level > CardGrowthManager.LevelOf(_card);
 
         // 이번 한 방으로 키워드·시너지가 열렸으면 같은 이유로 잇지 않는다 — 연타로 넘어가면 무엇을 열었는지 못 본다.
         bool t_unlocked = NewKeywords(_card, _fromLevel, _result.Level) != CardKeyword.None
                        || UnlockedSynergy(_card, _fromLevel, _result.Level);
 
         // 탭을 기다리지 않고 스스로 걷혀 상세로 돌아가는 판(= 이을 것이 없는 자리).
-        bool t_selfReturn = t_nextIsEvolve || t_unlocked;
+        bool t_selfReturn = _evolve || t_nextIsEvolve || t_unlocked;
 
         // 안내가 시킨 한 방은 이 화면이 종착지다 — "한 번 더"를 되살리면 유저가 그걸 눌러 안내 밖으로 샌다.
         bool t_guided = OutgameTutorialGuide.IsCurrentAction(EOutgameTutorialAction.WaitEnhance);

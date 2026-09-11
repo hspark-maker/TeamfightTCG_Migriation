@@ -41,6 +41,10 @@ const logger = __importStar(require("firebase-functions/logger"));
 const node_crypto_1 = require("node:crypto");
 const firebaseApp_1 = require("../firebaseApp");
 const aiDeckDraw_1 = require("../matchmaking/aiDeckDraw");
+const rankAiEncounter_1 = require("../matchmaking/rankAiEncounter");
+const deckValidation_1 = require("../deckValidation");
+const enhanceRules_1 = require("../growth/enhanceRules");
+const limitBreakTable_1 = require("../growth/limitBreakTable");
 const matchPairing_1 = require("../matchPairing");
 const countedTransaction_1 = require("../observability/countedTransaction");
 const payout_1 = require("../payout");
@@ -59,9 +63,12 @@ function parseData(raw) {
     }
     const fingerprint = data?.contentFingerprint;
     const rawPlayerDeck = data?.playerDeck;
+    if (data?.aiGrowthVersion != null && data.aiGrowthVersion !== 1) {
+        throw new https_1.HttpsError("invalid-argument", "unsupported AI growth version");
+    }
     // 서버 선배포 창. 구 클라는 env만 보내고 덱 선택만 받는다. 새 필드 중 하나만 보낸 반쪽
     // 페이로드는 구 버전으로 접지 않는다 — 매치가 봉인됐다고 믿는 클라를 만들 수 있다.
-    if (fingerprint == null && rawPlayerDeck == null)
+    if (fingerprint == null && rawPlayerDeck == null && data?.aiGrowthVersion == null)
         return { env, legacy: true };
     if (typeof fingerprint !== "string" || !payloadGuards_1.HEX_64.test(fingerprint) ||
         !Array.isArray(rawPlayerDeck) || rawPlayerDeck.length !== DECK_SIZE) {
@@ -81,6 +88,7 @@ function parseData(raw) {
         // txId가 없는 수동 호출용일 뿐이며 clientReceiptId는 유효한 원본을 그대로 반환한다.
         txId: (0, receiptId_1.clientReceiptId)(data?.txId, (0, node_crypto_1.randomUUID)()),
         resultProtocol: 1,
+        aiGrowthVersion: data?.aiGrowthVersion === 1 ? 1 : 0,
     };
 }
 function shuffle(cards) {
@@ -115,6 +123,12 @@ function storedResponse(raw, data) {
         deck.length !== DECK_SIZE || playerBoardOrder.length !== DECK_SIZE ||
         enemyBoardOrder.length !== DECK_SIZE || !Number.isInteger(aiDeck?.cardLevel))
         return null;
+    if ((raw.aiGrowthVersion ?? 0) !== data.aiGrowthVersion)
+        return null;
+    const snapshots = data.aiGrowthVersion === 1 ?
+        (0, deckValidation_1.readAiDeckSnapshots)(deck, aiDeck.cardGrowth, aiDeck.snapshots) : null;
+    if (data.aiGrowthVersion === 1 && snapshots == null)
+        return null;
     return {
         revision: 0,
         matchId: raw.matchId,
@@ -122,10 +136,16 @@ function storedResponse(raw, data) {
         rulesetVersion: raw.rulesetVersion,
         deck,
         cardLevel: aiDeck.cardLevel,
+        ...(snapshots == null ? {} : growthResponse(aiDeck.cardGrowth, snapshots)),
         playerBoardOrder,
         enemyBoardOrder,
         resultProtocol: 1,
     };
+}
+function growthResponse(growth, snapshots) {
+    return { aiGrowthVersion: 1, cardGrowth: snapshots.map((snapshot) => ({
+            ...snapshot, limitBreak: growth.find((entry) => entry.cardId === snapshot.cardId).limitBreak,
+        })) };
 }
 /**
  * 실시간 상대가 없을 때 AI 덱과 재시뮬 입력을 한 매치 문서에 봉인한다.
@@ -134,9 +154,23 @@ function storedResponse(raw, data) {
 exports.findAiMatch = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)("findAiMatch", async (request) => {
     const uid = (0, saveDocument_1.requireUid)(request.auth);
     const data = parseData(request.data);
+    // 이미 발급한 매치는 현재 표·시즌을 다시 읽기 전에 반환한다. 재발행 뒤 재시도도 같은 계약이다.
+    const matchId = data.legacy ? null : (0, node_crypto_1.createHash)("sha256").update(`${uid}:${data.txId}`, "utf8")
+        .digest("hex").slice(0, 32);
+    const matchRef = matchId == null ? null : firebaseApp_1.db.doc(`envs/${data.env}/matches/${matchId}`);
+    if (!data.legacy && matchRef != null) {
+        const prior = await matchRef.get();
+        if (prior.exists) {
+            const stored = storedResponse(prior.data() ?? {}, data);
+            if (stored == null)
+                throw new https_1.HttpsError("already-exists", "AI match receipt was reused");
+            if (prior.data()?.resultProtocol === 1)
+                return stored;
+        }
+    }
     const [rankRows, deckRows, seasonRows] = await Promise.all([
         (0, specBlobReader_1.readSpecRows)(data.env, "RankGrade"),
-        (0, specBlobReader_1.readSpecRows)(data.env, "AIDeck"),
+        !data.legacy && data.aiGrowthVersion === 1 ? Promise.resolve([]) : (0, specBlobReader_1.readSpecRows)(data.env, "AIDeck"),
         (0, specBlobReader_1.readSpecRows)(data.env, "PassSeason"),
     ]);
     const grades = (0, payout_1.parseRankGradeRows)(rankRows);
@@ -155,23 +189,64 @@ exports.findAiMatch = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
             logger.warn("AIDeck rows skipped", { env: data.env, skipped: parsed.skipped });
         }
         const tierIndex = (0, payout_1.resolveTierIndex)(points, grades);
-        const draw = (0, aiDeckDraw_1.drawAiDeck)(parsed.rows, tierIndex, node_crypto_1.randomInt);
-        if (draw === null)
-            throw new Error("AIDeck spec has no usable row");
         if (data.legacy) {
+            const draw = (0, aiDeckDraw_1.drawAiDeck)(parsed.rows, tierIndex, node_crypto_1.randomInt);
+            if (draw === null)
+                throw new Error("AIDeck spec has no usable row");
             logger.info("legacy AI deck selected", { uid, env: data.env, tierIndex, deckId: draw.deckId });
             return { revision: 0, deck: draw.deck, cardLevel: draw.cardLevel };
         }
         const authoredData = data;
-        const specPins = await (0, specBlobReader_1.readSpecPins)(authoredData.env, specBlobReader_1.BATTLE_REPLAY_SPEC_TABLES);
+        if (matchRef == null || matchId == null)
+            throw new Error("AI match identity missing");
+        const specPins = await (0, specBlobReader_1.readSpecPins)(authoredData.env, authoredData.aiGrowthVersion === 1 ?
+            [...specBlobReader_1.BATTLE_REPLAY_SPEC_TABLES, "CardLimitBreak", "CardEnhanceRule", "AIDeck", "RankAiEncounter"] :
+            specBlobReader_1.BATTLE_REPLAY_SPEC_TABLES);
         if ((0, specBlobReader_1.fingerprintOfSpecPins)(authoredData.env, specPins, ["Card"]) !== authoredData.contentFingerprint) {
             throw new https_1.HttpsError("failed-precondition", "content_fingerprint_mismatch");
         }
         // 같은 txId 재시도는 같은 문서를 읽는다. callable 응답 유실 뒤 클라가 재시도해도
         // AI 덱·시드·보드 순서가 바뀐 유령 매치를 하나 더 만들지 않는다.
-        const matchId = (0, node_crypto_1.createHash)("sha256").update(`${uid}:${authoredData.txId}`, "utf8")
-            .digest("hex").slice(0, 32);
-        const matchRef = firebaseApp_1.db.doc(`envs/${authoredData.env}/matches/${matchId}`);
+        let cardGrowth = [];
+        let snapshots = [];
+        let encounter = null;
+        let draw = null;
+        if (authoredData.aiGrowthVersion === 1) {
+            const [cardRows, limitBreakRows, ruleRows, pinnedDeckRows, encounterRows] = await Promise.all([
+                (0, specBlobReader_1.readPinnedSpecRows)(data.env, "Card", specPins.Card),
+                (0, specBlobReader_1.readPinnedSpecRows)(data.env, "CardLimitBreak", specPins.CardLimitBreak),
+                (0, specBlobReader_1.readPinnedSpecRows)(data.env, "CardEnhanceRule", specPins.CardEnhanceRule),
+                (0, specBlobReader_1.readPinnedSpecRows)(data.env, "AIDeck", specPins.AIDeck),
+                (0, specBlobReader_1.readPinnedSpecRows)(data.env, "RankAiEncounter", specPins.RankAiEncounter),
+            ]);
+            const pinnedDecks = (0, aiDeckDraw_1.parseAiDeckRows)(pinnedDeckRows);
+            const profiles = (0, rankAiEncounter_1.parseRankAiEncounters)(encounterRows, pinnedDecks.rows);
+            // 마지막전 판정은 별도 기능이다. 현재는 일반전 저작 프로필만 사용한다.
+            const selected = (0, rankAiEncounter_1.drawRankAiEncounter)(profiles, pinnedDecks.rows, tierIndex, "Normal", node_crypto_1.randomInt);
+            encounter = selected.profile;
+            draw = { deckId: selected.deck.deckId, deck: [...selected.deck.cardIds], cardLevel: 0 };
+            const rule = (0, enhanceRules_1.parseCardEnhanceRule)(ruleRows);
+            if (rule == null)
+                throw new Error("CardEnhanceRule spec is invalid");
+            const curve = (0, limitBreakTable_1.parseLimitBreakCurve)(limitBreakRows, rule.maxLimitBreak);
+            const specs = new Map(cardRows.map((row) => {
+                const spec = (0, deckValidation_1.parseCardSpecRow)(row);
+                if (spec == null)
+                    throw new Error(`invalid Card spec:${row.id}`);
+                return [spec.id, spec];
+            }));
+            cardGrowth = encounter.cardGrowth;
+            const built = (0, deckValidation_1.buildAiDeckSnapshots)(draw.deck, cardGrowth, specs, curve);
+            if (built == null)
+                throw new Error("AI card growth is invalid");
+            snapshots = built;
+        }
+        else {
+            draw = (0, aiDeckDraw_1.drawAiDeck)(parsed.rows, tierIndex, node_crypto_1.randomInt);
+        }
+        if (draw === null)
+            throw new Error("AIDeck spec has no usable row");
+        const selectedDraw = draw;
         const seedHex = (0, node_crypto_1.randomBytes)(8).toString("hex");
         const playerBoardOrder = shuffle(authoredData.playerDeck);
         const enemyBoardOrder = shuffle(draw.deck);
@@ -202,12 +277,16 @@ exports.findAiMatch = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
                 expectedParticipants: 1,
                 mode: "solo",
                 resultProtocol: authoredData.resultProtocol,
+                ...(authoredData.aiGrowthVersion === 1 ? { aiGrowthVersion: 1 } : {}),
                 ownerIndexByUid: { [uid]: 0 },
                 playerDeckCardIds: [...authoredData.playerDeck].sort((a, b) => a - b),
                 aiDeck: {
-                    deckId: draw.deckId,
-                    cardIds: draw.deck,
-                    cardLevel: draw.cardLevel,
+                    deckId: selectedDraw.deckId,
+                    cardIds: selectedDraw.deck,
+                    cardLevel: selectedDraw.cardLevel,
+                    ...(authoredData.aiGrowthVersion === 1 ? { cardGrowth, snapshots } : {}),
+                    ...(encounter == null ? {} : { encounterId: encounter.id, tierIndex: encounter.tierIndex,
+                        battleKind: encounter.battleKind, highlightCardId: encounter.highlightCardId }),
                 },
                 serverBoardOrders: {
                     owner0: playerBoardOrder,
@@ -223,8 +302,9 @@ exports.findAiMatch = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
                 matchId,
                 seedHex,
                 rulesetVersion: matchPairing_1.SERVER_RULESET_VERSION,
-                deck: draw.deck,
-                cardLevel: draw.cardLevel,
+                deck: selectedDraw.deck,
+                cardLevel: selectedDraw.cardLevel,
+                ...(authoredData.aiGrowthVersion === 1 ? growthResponse(cardGrowth, snapshots) : {}),
                 playerBoardOrder,
                 enemyBoardOrder,
                 resultProtocol: authoredData.resultProtocol,

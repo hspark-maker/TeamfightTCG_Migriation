@@ -104,13 +104,13 @@ public static class SpecAdminAuth
     {
         _error = null;
 
-        if (!GoogleOAuthSignIn.TryAcquireGoogleIdToken(out string t_googleIdToken, out _error)) return false;
         if (!SpecFirestoreUploader.TryReadFirebaseConfig(out _, out string t_apiKey, out _error)) return false;
+        if (!GoogleOAuthSignIn.TryAcquireGoogleIdToken(out string t_googleIdToken, out _error)) return false;
 
         string t_body = JsonUtility.ToJson(new IdpRequest
         {
             // postBody는 폼 인코딩 문자열을 JSON 안에 넣는 Identity Toolkit 특유의 형식이다.
-            postBody = "id_token=" + t_googleIdToken + "&providerId=google.com",
+            postBody = "id_token=" + Uri.EscapeDataString(t_googleIdToken) + "&providerId=google.com",
             // 루프백 포트가 매번 바뀌므로 고정값을 쓴다. 구글 로그인 검증에는 쓰이지 않는다.
             requestUri = "http://localhost",
             returnSecureToken = true,
@@ -128,14 +128,22 @@ public static class SpecAdminAuth
             return false;
         }
 
-        if (t_parsed == null || string.IsNullOrEmpty(t_parsed.idToken))
+        if (t_parsed != null && t_parsed.needConfirmation)
         {
-            _error = "구글 로그인 응답에 idToken이 없다.";
+            _error = "같은 이메일의 다른 로그인 계정이 있어 Google 로그인을 완료하지 못했다. " +
+                     "기존 로그인 방식으로 인증한 뒤 계정 연결을 확인할 것.";
+            return false;
+        }
+
+        if (t_parsed == null || string.IsNullOrEmpty(t_parsed.idToken) || string.IsNullOrEmpty(t_parsed.refreshToken))
+        {
+            _error = "구글 로그인 응답에 ID 토큰 또는 갱신 토큰이 없어 로그인 세션을 만들 수 없다.";
             return false;
         }
 
         Store(t_parsed.idToken, t_parsed.refreshToken, t_parsed.expiresIn);
         SessionState.SetString(SIGNED_EMAIL_KEY, t_parsed.email ?? "(구글 계정)");
+        if (!string.IsNullOrEmpty(t_parsed.email)) LastEmail = t_parsed.email;
         return true;
     }
 
@@ -288,7 +296,7 @@ public static class SpecAdminAuth
     };
 
     [Serializable] sealed class IdpRequest      { public string postBody; public string requestUri; public bool returnSecureToken; }
-    [Serializable] sealed class IdpResponse     { public string idToken; public string refreshToken; public string expiresIn; public string email; }
+    [Serializable] sealed class IdpResponse     { public string idToken; public string refreshToken; public string expiresIn; public string email; public bool needConfirmation; }
     [Serializable] sealed class SignInRequest   { public string email; public string password; public bool returnSecureToken; }
     [Serializable] sealed class SignInResponse  { public string idToken; public string refreshToken; public string expiresIn; public string localId; }
     [Serializable] sealed class RefreshResponse { public string id_token; public string refresh_token; public string expires_in; }

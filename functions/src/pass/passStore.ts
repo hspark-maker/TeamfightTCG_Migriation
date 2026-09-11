@@ -12,12 +12,18 @@ export interface PassState {
   seasonId: string;
   exp: number;
   claimed: Record<string, boolean>;
+  repeatClaimed: number;
+  premiumUnlocked: boolean;
+  premiumClaimed: Record<string, boolean>;
 }
 
 export interface PassProgressResponse {
   seasonId: string;
   exp: number;
   claimed: Record<string, boolean>;
+  repeatClaimed: number;
+  premiumUnlocked: boolean;
+  premiumClaimed: Record<string, boolean>;
 }
 
 export interface PassMutation {
@@ -53,10 +59,15 @@ function claimedMap(value: unknown): Record<string, boolean> {
 export function readPass(snapshot: DocumentSnapshot): PassState {
   const data = snapshot.exists ? snapshot.data() : undefined;
   const rawExp = Number(data?.exp ?? 0);
+  const rawRepeatClaimed = Number(data?.repeatClaimed ?? 0);
   return {
     seasonId: typeof data?.seasonId === "string" ? data.seasonId : "",
     exp: Number.isSafeInteger(rawExp) && rawExp > 0 ? Math.min(rawExp, PASS_EXP_MAX) : 0,
     claimed: claimedMap(data?.claimed),
+    premiumUnlocked: data?.premiumUnlocked === true,
+    premiumClaimed: claimedMap(data?.premiumClaimed),
+    repeatClaimed: Number.isSafeInteger(rawRepeatClaimed) && rawRepeatClaimed > 0 ?
+      Math.min(rawRepeatClaimed, PASS_EXP_MAX) : 0,
   };
 }
 
@@ -68,7 +79,7 @@ export function readPass(snapshot: DocumentSnapshot): PassState {
  */
 export function applyPassSeason(state: PassState, seasonId: string): PassState {
   if (state.seasonId === seasonId) return state;
-  return {seasonId, exp: 0, claimed: {}};
+  return {seasonId, exp: 0, claimed: {}, repeatClaimed: 0, premiumUnlocked: false, premiumClaimed: {}};
 }
 
 /**
@@ -98,6 +109,9 @@ function write(transaction: Transaction, pass: PassMutation, now: unknown): void
     seasonId: pass.state.seasonId,
     exp: pass.state.exp,
     claimed: pass.state.claimed,
+    repeatClaimed: pass.state.repeatClaimed,
+    premiumUnlocked: pass.state.premiumUnlocked,
+    premiumClaimed: pass.state.premiumClaimed,
     updatedAt: now,
   });
 }
@@ -118,16 +132,17 @@ export function commitPassExp(
 }
 
 /**
- * Marks one free-track level claimed and persists the pass state.
+ * Marks one track's level claimed and persists the pass state.
  * @param {Transaction} transaction Active transaction.
  * @param {PassMutation} pass Mutable pass snapshot.
  * @param {number} level Claimed level.
  * @param {unknown} now Server timestamp value.
+ * @param {string} track Validated reward track, default free for older callers.
  */
 export function commitPassClaim(
-  transaction: Transaction, pass: PassMutation, level: number, now: unknown,
+  transaction: Transaction, pass: PassMutation, level: number, now: unknown, track: "free" | "premium" = "free",
 ): void {
-  pass.state.claimed[String(level)] = true;
+  (track === "premium" ? pass.state.premiumClaimed : pass.state.claimed)[String(level)] = true;
   write(transaction, pass, now);
 }
 
@@ -137,5 +152,20 @@ export function commitPassClaim(
  * @return {PassProgressResponse} Wire-safe snapshot.
  */
 export function passProgressResponse(state: PassState): PassProgressResponse {
-  return {seasonId: state.seasonId, exp: state.exp, claimed: {...state.claimed}};
+  return {seasonId: state.seasonId, exp: state.exp, claimed: {...state.claimed}, repeatClaimed: state.repeatClaimed,
+    premiumUnlocked: state.premiumUnlocked, premiumClaimed: {...state.premiumClaimed}};
+}
+
+/**
+ * Persists the cumulative repeat reward claim count in the wallet transaction.
+ * @param {Transaction} transaction Active wallet transaction.
+ * @param {PassMutation} pass Active season state.
+ * @param {number} toClaimCount Validated cumulative claim count.
+ * @param {unknown} now Server timestamp.
+ */
+export function commitPassRepeatClaim(
+  transaction: Transaction, pass: PassMutation, toClaimCount: number, now: unknown,
+): void {
+  pass.state.repeatClaimed = toClaimCount;
+  write(transaction, pass, now);
 }

@@ -323,8 +323,12 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
         const aiDeck = solo ? (0, payloadGuards_1.objectRecord)(match?.aiDeck) : null;
         const aiCardIds = aiDeck?.cardIds;
         const aiCardLevel = (0, payloadGuards_1.safeInteger)(aiDeck?.cardLevel);
-        const soloAiSnapshots = solo && Array.isArray(aiCardIds) && aiCardLevel != null ?
-            (0, deckValidation_1.buildAiDeckSnapshots)(aiCardIds, aiCardLevel, cardSpecs) : null;
+        // 새 계약은 발급 당시 스냅샷이 진실원이다. 누락·손상 시 구 공통 레벨로 우회하지 않는다.
+        const soloAiSnapshots = solo && Array.isArray(aiCardIds) ?
+            match?.aiGrowthVersion === 1 ?
+                (0, deckValidation_1.readAiDeckSnapshots)(aiCardIds, aiDeck?.cardGrowth, aiDeck?.snapshots) :
+                match?.aiGrowthVersion == null && aiCardLevel != null ?
+                    (0, deckValidation_1.buildAiDeckSnapshots)(aiCardIds, aiCardLevel, cardSpecs) : null : null;
         let soloContractReason = null;
         if (solo) {
             const serverOrders = (0, payloadGuards_1.objectRecord)(match?.serverBoardOrders);

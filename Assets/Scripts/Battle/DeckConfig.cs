@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 
 public static class DeckConfig
@@ -23,10 +24,28 @@ public static class DeckConfig
     /// 모험·튜토리얼은 각자 저작값이 우선이라 이 값을 보지 않는다(BattleGrowthBridgeStep 참고).</summary>
     public static int EnemyCardLevel { get; private set; }
 
-    public static void SetEnemyDeck(IEnumerable<int> _deck, int _cardLevel = 0)
+    public static IReadOnlyDictionary<int, CardGrowth> EnemyGrowth { get; private set; }
+
+    public static void SetEnemyDeck(IEnumerable<int> _deck, int _cardLevel = 0,
+                                   IReadOnlyDictionary<int, CardGrowth> _growth = null)
     {
-        EnemyDeck = new List<int>(_deck.Where(CardCatalog.Contains));
+        var t_deck = new List<int>(_deck.Where(CardCatalog.Contains));
+        Dictionary<int, CardGrowth> t_growth = null;
+        if (_growth != null)
+        {
+            t_growth = new Dictionary<int, CardGrowth>();
+            foreach (int t_id in t_deck)
+            {
+                if (!_growth.TryGetValue(t_id, out CardGrowth t_value) || !t_value.Applied)
+                    throw new System.ArgumentException("AI deck growth is incomplete.", nameof(_growth));
+                t_growth.Add(t_id, t_value);
+            }
+            if (t_growth.Count != _growth.Count)
+                throw new System.ArgumentException("AI deck growth contains an unexpected card.", nameof(_growth));
+        }
+        EnemyDeck = t_deck;
         EnemyCardLevel = _cardLevel > 0 ? _cardLevel : 0;
+        EnemyGrowth = t_growth == null ? null : new ReadOnlyDictionary<int, CardGrowth>(t_growth);
     }
 
 
@@ -37,6 +56,7 @@ public static class DeckConfig
     {
         EnemyDeck = null;
         EnemyCardLevel = 0;
+        EnemyGrowth = null;
     }
 
     public static bool IsMultiplayer { get; private set; }

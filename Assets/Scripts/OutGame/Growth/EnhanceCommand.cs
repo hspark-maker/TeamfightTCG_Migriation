@@ -18,16 +18,17 @@ internal static class EnhanceCommand
 
     /// <summary>카드 강화 1회를 서버에 요청한다. 성공·확률실패는 결제가 끝난 것이고, 그 밖의 결말은 재화 소모가 없다.</summary>
     internal static async UniTask<EnhanceCommandResult> EnhanceCardAsync(
-        int _cardId, bool _freeShot, CurrencyPendingTicket _pending = null)
+        int _cardId, bool _freeShot, CurrencyPendingTicket _pending = null, int _amount = 1)
     {
         try
         {
             var t_result = await ServerSaveCommands.InvokeAsync<EnhanceCardResult>(
                 CARD_COMMAND,
-                new { env = ContentProfileConfig.Active.CloudEnvId, cardId = _cardId, freeShot = _freeShot },
+                new { env = ContentProfileConfig.Active.CloudEnvId, cardId = _cardId, freeShot = _freeShot, amount = _amount },
                 _pending);
 
-            return new EnhanceCommandResult(t_result.ResolveOutcome(), t_result.Level, t_result.FreeShotUsed);
+            return new EnhanceCommandResult(t_result.ResolveOutcome(), t_result.Level, t_result.FreeShotUsed,
+                _appliedShards: t_result.AppliedShards);
         }
         catch (ServerCommandRejectedException t_rejected)
         {
@@ -108,18 +109,22 @@ internal readonly struct EnhanceCommandResult
     /// <summary>서버가 확정한 시도 후 레벨.</summary>
     internal readonly int Level;
 
+    internal readonly int AppliedShards;
+
     /// <summary>안내가 대준 무료 한 방을 서버가 실제로 먹였는가.</summary>
     internal readonly bool FreeShotUsed;
 
     /// <summary>서버가 붙인 거절 사유 코드. 서버 거절이 아닌 결말(성립·통신 실패)에서는 빈 문자열이다.</summary>
     internal readonly string RejectReason;
 
-    internal EnhanceCommandResult(EEnhanceOutcome _outcome, int _level, bool _freeShotUsed, string _rejectReason = null)
+    internal EnhanceCommandResult(EEnhanceOutcome _outcome, int _level, bool _freeShotUsed, string _rejectReason = null,
+        int _appliedShards = 0)
     {
         Outcome      = _outcome;
         Level        = _level;
         FreeShotUsed = _freeShotUsed;
         RejectReason = _rejectReason ?? string.Empty;
+        AppliedShards = _appliedShards;
     }
 
     /// <summary>결제 전에 막힌 결말(레벨 변화도 재화 소모도 없다).</summary>

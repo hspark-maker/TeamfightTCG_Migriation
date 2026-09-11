@@ -13,7 +13,7 @@ import {
   validateDeckShape,
   validateDeckSnapshots,
 } from "../deckValidation";
-import {authoredMaxLimitBreak, parseCardEnhanceRule} from "../growth/enhanceRules";
+import {authoredMaxLimitBreak, cardEnhanceStep, parseCardEnhanceOverrides, parseCardEnhanceRule} from "../growth/enhanceRules";
 import {LimitBreakCurve, parseLimitBreakCurve} from "../growth/limitBreakTable";
 import {expectedMatchId} from "../matchResult";
 import {HEX_16, HEX_32, HEX_64, objectRecord, safeInteger} from "../match/payloadGuards";
@@ -131,7 +131,8 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
   //
   // 한계돌파 곡선의 진실원도 표다 — 검증기가 순수 모듈이라 여기서 읽어 주입한다.
   // 두 표를 나란히 읽는다: 직렬로 두면 캐시 미스마다 왕복이 하나씩 더 붙는다.
-  const [specRows, limitBreakCurve] = await Promise.all([
+  const enhanceRuleRows = shapeError != null ? Promise.resolve([]) : readSpecRows(data.env, "CardEnhanceRule");
+  const [specRows, limitBreakCurve, enhanceSteps] = await Promise.all([
     (async (): Promise<Record<string, unknown>[]> => {
       if (shapeError != null) return [];
       try {
@@ -148,7 +149,7 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
       if (shapeError != null) return null;
       try {
         const [ruleRows, curveRows] = await Promise.all([
-          readSpecRows(data.env, "CardEnhanceRule"),
+          enhanceRuleRows,
           readSpecRows(data.env, "CardLimitBreak"),
         ]);
         const rule = parseCardEnhanceRule(ruleRows);
@@ -178,6 +179,18 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
         logger.error("lockDeck limit break spec read failed", {env: data.env, error});
         throw new HttpsError("unavailable", "limit break spec read failed");
       }
+    })(),
+    (async () => {
+      if (shapeError != null) return new Map();
+      const [ruleRows, rows] = await Promise.all([
+        enhanceRuleRows, readSpecRows(data.env, "CardEnhance"),
+      ]);
+      const rule = parseCardEnhanceRule(ruleRows);
+      if (rule == null) throw new HttpsError("unavailable", "card enhance rule is unavailable");
+      const overrides = parseCardEnhanceOverrides(rows);
+      const steps = new Map();
+      for (let level = 2; level <= rule.maxLevel; level++) steps.set(level, cardEnhanceStep(rule, overrides, level));
+      return steps;
     })(),
   ]);
   const specs = new Map();
@@ -324,7 +337,7 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
       return rejectLock("deck_hash_mismatch");
     }
 
-    const validation = validateDeckSnapshots(data.cardSnapshots, specs, saveSnapshot.data(), limitBreakCurve);
+    const validation = validateDeckSnapshots(data.cardSnapshots, specs, saveSnapshot.data(), limitBreakCurve, enhanceSteps);
     if (!validation.ok) {
       // 표 사고 갈래. 서버가 이미 지급한 단계를 곡선 축소가 부정한 것이라 유저 잘못이 아니다 —
       // rejectLock 으로 접으면 매치 문서에 rejected 가 박혀 아무 잘못 없는 상대 몫까지 탄다.

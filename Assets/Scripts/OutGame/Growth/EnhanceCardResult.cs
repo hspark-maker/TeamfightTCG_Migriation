@@ -9,6 +9,12 @@ internal sealed class EnhanceCardResult : ServerCommandResult
 
     [JsonProperty("level")] public int Level { get; set; }
 
+    [JsonProperty("shardProgress")] public int ShardProgress { get; set; }
+    [JsonProperty("shardRequired")] public int ShardRequired { get; set; }
+    [JsonProperty("evolved")] public bool Evolved { get; set; }
+    // 이전 서버는 필드를 보내지 않고 샤드를 한 개씩 처리한다.
+    [JsonProperty("appliedShards")] public int AppliedShards { get; set; } = 1;
+
     // ECurrencyType 이름 문자열. 차감은 서버가 이미 했고 이 값은 로그·대조용이다.
     [JsonProperty("currency")] public string Currency { get; set; }
 

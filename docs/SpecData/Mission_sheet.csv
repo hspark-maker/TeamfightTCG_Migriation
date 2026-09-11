@@ -6,18 +6,18 @@ int,string,int,string,string,int,string,string,long,int,string
 3,weekly.openPack10,1,weekly,OpenPack,10,카드 팩 10회 개봉,카드 팩을 10회 개봉하세요,30,3,서버 catalog 동기화 및 보상 팩 지급 구현 대기
 4,weekly.enhanceCard5,0,weekly,EnhanceCard,5,카드 5회 강화,카드를 5회 강화하세요,0,2,퇴역; weekly.enhanceCard10으로 교체; 서버 catalog 동기화 대기
 5,weekly.limitBreakCard1,0,weekly,LimitBreakCard,1,카드 1회 한계 돌파,카드를 1회 한계 돌파하세요,0,3,퇴역; 한계돌파를 주간 필수 조건에서 제외; 서버 catalog 동기화 대기
-6,daily.completeBattle3,1,daily,CompleteBattle,3,모험·일반 전투 합산 3회 완료,모험과 일반 전투를 합쳐 3회 완료하세요,20,1,하루 누적; 패배 포함; 모험 집계 연결 및 서버 catalog 동기화 대기
+6,daily.completeBattle3,1,daily,CompleteBattle,3,전투 3회 완료,전투를 3회 완료하세요,20,1,하루 누적; 패배 포함; 모험 집계 연결 및 서버 catalog 동기화 대기
 7,weekly.winRankedBattle5,0,weekly,WinRankedBattle,5,랭크 전투 5회 승리,랭크 전투에서 5회 승리하세요,0,4,퇴역; weekly.winBattle10으로 교체; 서버 catalog 동기화 대기
 8,daily.claimReward1,0,daily,ClaimReward,1,보상 1회 수령,보상을 1회 수령하세요,0,4,퇴역; 보상 수령을 일일 필수 조건에서 제외; 서버 catalog 동기화 대기
-9,daily.destroyCards3,1,daily,DestroyCards,3,모험·일반 전투에서 상대 카드 3장 파괴,모험과 일반 전투에서 상대 카드를 3장 파괴하세요,15,3,모험 집계 연결 및 서버 catalog 동기화 대기
-10,daily.triggerSynergy2,1,daily,TriggerSynergy,2,모험·일반 전투에서 시너지 2회 발동,모험과 일반 전투에서 시너지를 2회 발동하세요,15,5,모험 집계 연결 및 서버 catalog 동기화 대기
-11,daily.triggerKeyword2,1,daily,TriggerKeyword,2,모험·일반 전투에서 키워드 2회 발동,모험과 일반 전투에서 키워드를 2회 발동하세요,15,4,모험 집계 연결 및 서버 catalog 동기화 대기
+9,daily.destroyCards3,1,daily,DestroyCards,3,전투에서 상대 카드 3장 파괴,전투에서 상대 카드를 3장 파괴하세요,15,3,모험 집계 연결 및 서버 catalog 동기화 대기
+10,daily.triggerSynergy2,1,daily,TriggerSynergy,2,전투에서 시너지 2회 발동,전투에서 시너지를 2회 발동하세요,15,5,모험 집계 연결 및 서버 catalog 동기화 대기
+11,daily.triggerKeyword2,1,daily,TriggerKeyword,2,전투에서 키워드 2회 발동,전투에서 키워드를 2회 발동하세요,15,4,모험 집계 연결 및 서버 catalog 동기화 대기
 12,weekly.attackTimes50,0,weekly,AttackTimes,50,공격 50회 수행,공격을 50회 수행하세요,0,5,퇴역; 전투 완료 미션으로 통합; 서버 catalog 동기화 대기
-13,daily.completeBattle5,1,daily,CompleteBattle,5,모험·일반 전투 합산 5회 완료,모험과 일반 전투를 합쳐 5회 완료하세요,20,2,하루 누적; 전투 3회와 진행도 공유; 모험 집계 및 서버 catalog 등록 대기
-14,weekly.completeBattle20,1,weekly,CompleteBattle,20,모험·일반 전투 합산 20회 완료,모험과 일반 전투를 합쳐 20회 완료하세요,30,1,주간 누적; 패배 포함; 모험 집계 및 서버 catalog 등록 대기
-15,weekly.completeBattle35,1,weekly,CompleteBattle,35,모험·일반 전투 합산 35회 완료,모험과 일반 전투를 합쳐 35회 완료하세요,40,2,주간 누적; 전투 20회와 진행도 공유; 모험 집계 및 서버 catalog 등록 대기
+13,daily.completeBattle5,1,daily,EnhanceCard,1,카드 강화 1회 시도,카드 강화를 1회 시도하세요,20,2,전투 5회 항목을 강화로 교체; 무료 강화와 실패한 시도 포함; 보상 참조와 수령 기록 보존을 위해 미션 고유키 유지
+14,weekly.completeBattle20,1,weekly,CompleteBattle,20,전투 20회 완료,전투를 20회 완료하세요,30,1,주간 누적; 패배 포함; 모험 집계 및 서버 catalog 등록 대기
+15,weekly.completeBattle35,1,weekly,TriggerKeyword,20,전투에서 키워드 20회 발동,전투에서 키워드를 20회 발동하세요,40,2,전투 35회 항목을 키워드 발동으로 교체; 보상 참조와 수령 기록 보존을 위해 미션 고유키 유지
 16,weekly.enhanceCard10,1,weekly,EnhanceCard,10,카드 강화 10회 시도,카드 강화를 10회 시도하세요,20,4,무료 강화와 실패한 시도 포함; 서버 catalog 등록 대기
-17,weekly.winBattle10,1,weekly,WinBattle,10,모험·일반 전투 합산 10회 승리,모험과 일반 전투를 합쳐 10회 승리하세요,40,5,예약 이벤트 WinBattle; 모험 포함 승리 집계 및 서버 catalog 등록 대기
+17,weekly.winBattle10,1,weekly,WinBattle,10,전투 10회 승리,전투에서 10회 승리하세요,40,5,예약 이벤트 WinBattle; 모험 포함 승리 집계 및 서버 catalog 등록 대기
 18,guide.01,1,guide,Guide.DeckSaved6,1,6장 덱 저장,유효한 6장 덱을 저장하세요. 기존 튜토리얼에서 저장했다면 자동 인정합니다,0,1,가이드 실행 대기; 계정당 1회; 만료 없음; 순차 수령; 미리 달성한 상태도 인정
 19,guide.02,1,guide,Guide.AdventureNode01,1,모험 1번 정점 클리어,모험 1번 정점을 클리어하세요. 이미 클리어했다면 자동 인정합니다,0,2,가이드 실행 대기; 서버 클리어 상태 소급 인정; 계정당 1회 순차 수령
 20,guide.03,1,guide,Guide.CaretakerCardsAtStar1,3,서로 다른 1성 이상 돌보미 카드 3장 보유,서로 다른 돌보미 카드 3장을 1성 이상으로 성장시키세요. 이미 성장했다면 인정합니다,0,3,가이드 실행 대기; 강화 횟수 아님; 잠긴 단계 달성도 기록; 계정당 1회 순차 수령
