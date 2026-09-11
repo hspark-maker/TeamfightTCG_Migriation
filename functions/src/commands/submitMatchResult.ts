@@ -55,7 +55,7 @@ import {isBattleReplayEnabled} from "../battleReplayConfig";
 import {enqueueReplayDaily, ReplayDailyDelta} from "../battleReplayTelemetry";
 import {currentRankSeason, RankSeasonDef} from "../rank/rankSeason";
 import {
-  adoptLegacyEntry,
+  applyTutorialRankEntry,
   applyRankSeason,
   legacyClaimedTiers,
   legacyRankPoints,
@@ -601,7 +601,7 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
         rankSeason.seasonId,
         rankRows,
       );
-      rankState = adoptLegacyEntry(rankState, fallbackPoints, rankRows);
+      rankState = applyTutorialRankEntry(rankState, saveSnapshots[i].data(), rankRows);
       const rankBefore = rankState.points;
       const rankSequence = Number.isSafeInteger(storedSequence) ? (storedSequence as number) + 1 : 1;
       const owner = ownerIndexByUid?.[entry.uid] ?? -1;

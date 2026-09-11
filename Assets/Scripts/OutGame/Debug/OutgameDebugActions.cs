@@ -40,7 +40,7 @@ public static class OutgameDebugActions
             Debug.LogWarning($"[OutgameDebug] Unsupported grade for the rarity test pack: {_grade}");
             return;
         }
-        if (OutgameTutorialRunner.IsRunning || TriggeredTutorialRunner.IsRunning)
+        if (OutgameTutorialRunner.IsRunning || OutgameTutorialRunner.IsGuidedRunning)
         {
             Debug.LogWarning("[OutgameDebug] The rarity test pack cannot be opened during the tutorial, in order to protect the progress events.");
             return;
@@ -311,7 +311,7 @@ public static class OutgameDebugActions
     public static void SkipTutorial()
     {
         OutgameTutorialRunner.CompleteSequence();   // 스킵도 졸업 — 첫 랭크 진입을 동일하게 받는다
-        TriggeredTutorialRunner.Abort();
+        OutgameTutorialRunner.AbortGuided();
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.ClearForce();
 
         Debug.Log("[OutgameDebug] Tutorial marked complete — gate released");
@@ -321,19 +321,19 @@ public static class OutgameDebugActions
     public static void ResetTutorial()
     {
         OutgameTutorialProgress.ResetForDebug();
-        TriggeredTutorialRunner.Abort();
+        OutgameTutorialRunner.AbortGuided();
         Debug.Log($"[OutgameDebug] Tutorial progress reset — {OutgameTutorialProgress.ChapterIndex}-{OutgameTutorialProgress.StepIndex} / completed {OutgameTutorialProgress.IsCompleted}");
     }
 
-    // 트리거 튜토리얼(탭 첫 진입 등) 낙인만 재설정
+    // 자율 안내(탭 첫 진입·패널 첫 열기 등) 완주 낙인만 재설정
     public static void ResetTriggeredTutorials()
     {
         // 낙인을 먼저 걷는다 — Abort가 변경을 통지하므로, 순서를 뒤집으면 알림 점이 아직 완주 상태를 보고 안 뜬다.
         OutgameTutorialProgress.ClearTriggersForDebug();
-        TriggeredTutorialRunner.Abort();
+        OutgameTutorialRunner.AbortGuided();
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.ClearForce();
 
-        Debug.Log("[OutgameDebug] Triggered tutorial marks reset — they play again when you re-enter the tab");
+        Debug.Log("[OutgameDebug] Guided tutorial marks reset — they play again on the next trigger");
     }
 
     // 튜토리얼 N편 처음으로 되감기 — 되돌리는 것은 좌표와 완료 낙인뿐이다(씬 재진입 시 적용).
@@ -342,14 +342,14 @@ public static class OutgameDebugActions
     // 첫실행 상태 그대로 보려면 에디터의 [Tools > Card Battle > 튜토리얼 저작 도구]에서 [여기부터]로 예약하고 재생한다.
     public static void RestartTutorialFromChapter(int _chapterIndex)
     {
-        int t_last    = OutgameTutorialRunner.ChapterCount - 1;
+        int t_last    = OutgameTutorialRunner.ForcedChapterCount - 1;
         int t_chapter = t_last < 0 ? 0 : Mathf.Clamp(_chapterIndex, 0, t_last);
 
         OutgameTutorialProgress.JumpForDebug(t_chapter, 0);
-        TriggeredTutorialRunner.Abort();
+        OutgameTutorialRunner.AbortGuided();
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.ClearForce();
 
-        Debug.Log($"[OutgameDebug] Tutorial chapter {t_chapter + 1} back to the start — only the position is rewound (ownership and currency are kept). Applied on scene re-entry ({OutgameTutorialRunner.ChapterCount} chapter(s) authored in total)");
+        Debug.Log($"[OutgameDebug] Tutorial chapter {t_chapter + 1} back to the start — only the position is rewound (ownership and currency are kept). Applied on scene re-entry ({OutgameTutorialRunner.ForcedChapterCount} forced chapter(s) authored)");
     }
 
     // 계정 경험치 더하기. 만렙 구간은 전승 1,000판대라 이 문 없이는 확인할 수 없다.

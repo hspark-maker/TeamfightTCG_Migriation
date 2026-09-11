@@ -93,7 +93,7 @@ public static class ProfileManager
         Nickname = RestoreNickname(t_slot.Nickname);
         AvatarId = IsKnownAvatar(t_slot.AvatarId) ? t_slot.AvatarId : DefaultAvatarId;
         FrameId  = IsKnownFrame(t_slot.FrameId)   ? t_slot.FrameId  : DefaultFrameId;
-        s_emoteIds = BuildLoadout(t_slot.EmoteIds);
+        s_emoteIds = t_slot.EmoteIds == null ? BuildDefaultLoadout() : BuildLoadout(t_slot.EmoteIds);
 
         // 로비는 세이브 의존 설치보다 먼저 그려진다 — 통지가 없으면 프로필 버튼이 기본값으로 굳는다.
         // 초기화 한복판이라 구독자 예외를 여기서 흘리면 나머지 설치가 통째로 중단된다.
@@ -173,19 +173,39 @@ public static class ProfileManager
 
     static bool IsKnownFrame(string _id) => Config != null && Config.TryGetFrame(_id, out _);
 
-    // 길이를 SLOT_COUNT로 고정한다 — 못 알아볼 칸을 걸러내며 압축하면 뒤 칸이 당겨져 슬롯이 밀리고,
-    // 짧아진 목록은 편집 화면이 뒤쪽 칸을 아예 못 고르게 만든다. 못 알아볼 칸은 같은 자리 기본값 → 0.
+    // 0은 사용자가 비운 칸이다. 유효한 첫 등장과 위치만 보존하고 자동으로 채우지 않는다.
     static List<int> BuildLoadout(IReadOnlyList<int> _source)
     {
-        List<int> t_defaults = EmoteCatalog != null ? EmoteCatalog.DefaultLoadout() : new List<int>();
         var t_result = new List<int>(global::EmoteCatalog.SLOT_COUNT);
+        var t_used = new HashSet<int>();
 
         for (int t_i = 0; t_i < global::EmoteCatalog.SLOT_COUNT; t_i++)
         {
             int t_id = _source != null && t_i < _source.Count ? _source[t_i] : 0;
-            if (EmoteCatalog == null || !EmoteCatalog.TryGet(t_id, out _))
-                t_id = t_i < t_defaults.Count ? t_defaults[t_i] : 0;
+            if (EmoteCatalog == null || !EmoteCatalog.TryGet(t_id, out _) || !t_used.Add(t_id))
+                t_id = 0;
             t_result.Add(t_id);
+        }
+
+        return t_result;
+    }
+
+    // 장착 기록이 없는 계정에만 기본 구성을 준다. 명시적으로 저장한 빈 배열과 구분한다.
+    static List<int> BuildDefaultLoadout()
+    {
+        List<int> t_result = BuildLoadout(null);
+        var t_used = new HashSet<int>();
+        int t_poolIndex = 0;
+        for (int t_i = 0; t_i < t_result.Count; t_i++)
+        {
+            if (t_result[t_i] != 0) continue;
+            while (EmoteCatalog != null && t_poolIndex < EmoteCatalog.Count)
+            {
+                EmoteEntry t_entry = EmoteCatalog.PoolAt(t_poolIndex++);
+                if (t_entry == null || t_entry.id <= 0 || !t_used.Add(t_entry.id)) continue;
+                t_result[t_i] = t_entry.id;
+                break;
+            }
         }
         return t_result;
     }

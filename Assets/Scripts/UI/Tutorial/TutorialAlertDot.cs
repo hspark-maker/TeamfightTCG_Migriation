@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // "이 탭에 아직 볼 튜토리얼이 남았다"를 가리키는 알림 점.
-// 판정 근거는 TriggeredTutorialRunner.HasPending 하나뿐 — 발화 조건과 표시 조건이 갈리지 않는다.
+// 판정 근거는 OutgameTutorialRunner.HasPending 하나뿐 — 발화 조건과 표시 조건이 갈리지 않는다.
 // 잠긴 대상에는 띄우지 않는다 — 못 들어가는 곳으로 부르는 유인이 된다.
 public class TutorialAlertDot : AlertDotView
 {
@@ -20,19 +20,19 @@ public class TutorialAlertDot : AlertDotView
              "아이콘 얼굴을 덮지 않으려면 안쪽으로 밀지 않는 편이 낫다. 배선된 점 노드를 쓸 때는 무시된다")]
     [SerializeField] Vector2 dotOffset = Vector2.zero;
 
-    protected override bool ShouldShow => TriggeredTutorialRunner.HasPending(this.trigger)
+    protected override bool ShouldShow => OutgameTutorialRunner.HasPending(this.trigger)
                                        && OutgameFeatureLock.IsUnlocked(this.unlockFeature);
 
     // 해금이 풀리는 순간에도 떠야 하므로 잠금 통지까지 함께 듣는다.
     protected override void Subscribe(Action _handler)
     {
-        TriggeredTutorialRunner.OnChanged += _handler;
+        OutgameTutorialRunner.OnGuidedChanged += _handler;
         OutgameFeatureLock.OnChanged      += _handler;
     }
 
     protected override void Unsubscribe(Action _handler)
     {
-        TriggeredTutorialRunner.OnChanged -= _handler;
+        OutgameTutorialRunner.OnGuidedChanged -= _handler;
         OutgameFeatureLock.OnChanged      -= _handler;
     }
 

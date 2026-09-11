@@ -5,6 +5,14 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "OutgameTutorial", menuName = "Card Battle/Outgame Tutorial")]
 public class OutgameTutorialData : ScriptableObject
 {
+    [Header("콘텐츠 해금 조건")]
+    [Tooltip("조건은 모두 AND로 평가한다. 스텝 실행과 독립적이며, 한번 해금한 콘텐츠는 조건을 올려도 다시 잠기지 않는다.")]
+    public List<ContentUnlockDef> contentUnlocks = new List<ContentUnlockDef>();
+
+    [Header("콘텐츠 해금 소개")]
+    [Tooltip("소개 화면의 이름·설명·아이콘. 실제 이용 자격과 해금 조건은 위 목록에서 정한다.")]
+    public List<ContentUnlockIntroDef> contentIntros = new List<ContentUnlockIntroDef>();
+
     [Header("챕터 시퀀스 (순서 = 진행 순서, 세이브가 붙잡는 것은 스텝의 stepId)")]
     [Tooltip("챕터 하나 = 기획의 '튜토리얼 N편'.\n"
            + "행을 복제하면 stepId까지 복제되므로, 복제한 뒤에는 우클릭 메뉴 [스텝 ID 부여]를 다시 돌려라 "
@@ -16,6 +24,20 @@ public class OutgameTutorialData : ScriptableObject
     // 이 줄을 지우거나 머지에서 떨어뜨리지 마라: 값을 잃으면 남은 최댓값에서 다시 세는데,
     // 하필 가장 큰 번호의 스텝을 지운 뒤였다면 그 번호가 재발급된다(위의 조용한 이동이 그때 난다).
     [SerializeField, HideInInspector] int nextStepId = 1;
+
+    /// <summary>소개 스텝이 참조하는 콘텐츠 표현을 찾는다.</summary>
+    public bool TryGetContentIntro(EContentUnlockIntro _content, out ContentUnlockIntroDef _intro)
+    {
+        if (contentIntros != null)
+            foreach (ContentUnlockIntroDef t_intro in contentIntros)
+                if (t_intro != null && t_intro.content == _content)
+                {
+                    _intro = t_intro;
+                    return true;
+                }
+        _intro = null;
+        return false;
+    }
 
 #if UNITY_EDITOR
     /// <summary>저작 도구 전용 — 런타임은 읽기만 한다. 다음 번호를 한 개 떼어 준다(떼면 카운터가 올라간다).

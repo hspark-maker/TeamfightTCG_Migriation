@@ -24,6 +24,7 @@ public static class TutorialStepExecutor
         {
             case EOutgameTutorialAction.WaitClick:
             case EOutgameTutorialAction.Message:
+            case EOutgameTutorialAction.ContentUnlockIntro:
             case EOutgameTutorialAction.WaitPurchase:
             case EOutgameTutorialAction.WaitPackOpen:
             case EOutgameTutorialAction.DeckAutoEquip:
@@ -35,12 +36,12 @@ public static class TutorialStepExecutor
             case EOutgameTutorialAction.WaitCardDetailReturn:
             case EOutgameTutorialAction.WaitDeckEquip:
             case EOutgameTutorialAction.WaitDeckSave:
+            case EOutgameTutorialAction.EnterFirstRank:
                 return EOutgameTutorialStepResult.Gated;
 
             case EOutgameTutorialAction.CloseCardDetail: return EnterCloseCardDetail(_context);
             case EOutgameTutorialAction.CloseAlbumPage: return EnterCloseAlbumPage(_context);
             case EOutgameTutorialAction.CloseDeckEdit: return EnterCloseDeckEdit(_context);
-            case EOutgameTutorialAction.EnterFirstRank: return EnterFirstRank(_context);
             case EOutgameTutorialAction.BattleEntry:  return EnterBattleEntry(_step, _context);
             case EOutgameTutorialAction.AutoBattle:   return EnterAutoBattle(_step, _context);
             case EOutgameTutorialAction.AutoPurchase: return EnterAutoPurchase(_step, _context);
@@ -77,33 +78,6 @@ public static class TutorialStepExecutor
         _context.CommitAdvance();
         _context.CompleteIfLast();
         return EOutgameTutorialStepResult.Advanced;
-    }
-
-    // 첫 랭크 티어 진입. 온보딩 전투가 다 끝난 자리(= 마지막 전투에서 로비로 돌아온 직후)에 두어야
-    // 랭크 연출 디렉터가 자기 Start에서 캐리어를 소비한다 — 브리지의 스텝 진입이 그 소비(다음 프레임)보다 앞선다.
-    // 뒤로 밀면 캐리어가 남아 다음 로비 진입 때 그때의 전투 결과에 병합돼 뒤늦게 터진다.
-    //
-    // 진입에 성공하면 완료를 넘기지 않는다 — 뒤이을 안내가 승급 연출 위에 겹쳐 뜨지 않도록
-    // 그 연출이 끝나는 신호를 기다린다(Completion.RankEffect).
-    static EOutgameTutorialStepResult EnterFirstRank(OutgameTutorialStepContext _context)
-    {
-        // 이미 랭크에 오른 세이브(디버그 승급·재진입)엔 보여줄 연출이 없다 — 기다리지 않고 지나간다.
-        // 실패가 아니라 정상 통과라 실패 정책을 묻지 않는다.
-        if (!RankManager.TryEnterFirstTier(out var t_entry))
-        {
-            // 볼 연출이 없으니 "연출이 끝난 뒤"가 곧 지금이다 — 트리거 문도 여기서 연다.
-            TriggeredTutorialRunner.NotifyRankPromotionFinished();
-
-            _context.CommitAdvance();
-            _context.CompleteIfLast();
-            return EOutgameTutorialStepResult.Advanced;
-        }
-
-        RankResultHandoff.Set(t_entry);
-
-        // 문은 여기서 열지 않는다 — 연출을 다 본 뒤(Completion.RankEffect)가 여는 자리이고,
-        // 그 신호를 받는 브리지가 연다.
-        return EOutgameTutorialStepResult.Gated;
     }
 
     // 카드 상세는 전면 오버레이라 열려 있는 동안 로비 위젯을 전부 덮는다 —

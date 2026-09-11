@@ -79,6 +79,14 @@ public class UIPoolManager : MonoBehaviour
         return null;
     }
 
+    /// <summary>알림이 기존 팝업을 덮지 않도록 조회한다. 자신의 표시만 제외할 수 있다.</summary>
+    public bool HasVisibleUIExcept(PooledUIBase except = null)
+    {
+        foreach (var ui in activeUIs.Values)
+            if (ui != null && ui != except && ui.isShow && ui.gameObject.activeInHierarchy) return true;
+        return false;
+    }
+
     public T HideUI<T>() where T : PooledUIBase
     {
         if (this.activeUIs.TryGetValue(typeof(T), out var t_ui))

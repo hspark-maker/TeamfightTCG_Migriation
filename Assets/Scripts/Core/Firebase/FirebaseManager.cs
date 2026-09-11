@@ -207,7 +207,8 @@ public static class FirebaseManager
         // 다음 플레이에서는 FirebaseApp.DefaultInstance가 다시 만들어진다(정적 상태는 리로드가 비운다).
         try
         {
-            FirebaseApp.DefaultInstance?.Dispose();
+            // DefaultInstance creates an app when absent; teardown must only dispose an existing app.
+            FirebaseApp.GetInstance(FirebaseApp.DefaultName)?.Dispose();
         }
         catch (Exception t_exception)
         {

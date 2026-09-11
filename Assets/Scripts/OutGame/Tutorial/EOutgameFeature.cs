@@ -19,4 +19,6 @@ public enum EOutgameFeature
     CardEnhance        = 14,   // 카드 상세의 성장 한 방(강화 버튼 한 칸이 진화 관문에서 얼굴만 갈아입는다)
     KeywordGrowth      = 15,   // 로비 매치 탭의 키워드 강화 패널
     Adventure         = 16,   // 로비 매치 탭의 모험 진입 버튼 — 온보딩 마지막 스텝이 연다
+    Mission           = 17,
+    Roulette          = 18,
 }

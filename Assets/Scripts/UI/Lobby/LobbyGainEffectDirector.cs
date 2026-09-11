@@ -77,6 +77,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
     /// <summary>이 씬에서 획득 연출을 재생할 수 있는가. 꺼져 있으면 코루틴이 돌지 못해
     /// 통지가 영영 오지 않으므로, 있기만 한 것으로는 부족하다.</summary>
     public static bool Exists => s_instance != null && s_instance.isActiveAndEnabled;
+    public static bool Playing => Exists && s_instance.m_runId != s_instance.m_finishedRunId;
 
     /// <summary>씬을 다시 열지 않고 지금 실린 캐리어를 재생한다. 로비에 머문 채 지급하는 쪽이 쓴다
     /// (Start·오버레이 닫힘은 이미 지나갔으므로 그 둘로는 닿지 않는다).
@@ -174,7 +175,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         if (CardPackRewardHandoff.HasPending) return;
 
         // 안내 중에도 비켜선다 — 늦게 오는 보상이 안내가 짠 순서에 끼어든다.
-        if (OutgameTutorialRunner.IsRunning || TriggeredTutorialRunner.IsRunning) return;
+        if (OutgameTutorialRunner.IsRunning || OutgameTutorialRunner.IsGuidedRunning) return;
 
         // 이 경로의 종료는 아무도 기다리지 않는다 — OnAnyFinished를 내면 그 신호를 기다리던 다른 스텝
         // (튜토리얼 CardGain · 모험 선물 등장)이 자기 차례로 오인해 조기 통과한다.
@@ -298,7 +299,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         // 안내 중에는 유저가 직접 도감 탭을 누르는 것 자체가 스텝이다 — 여기서 켜면 그 스텝을 대신 해 버린다.
         // 도감에 이미 들어와 있었다면 이 호출이 곧바로 세우고, 아니면 탭이 켜지는 순간 스스로 선다.
         // 전체 해금(첫 랭크 승급) 뒤는 예외다 — 그 뒤 획득은 안내가 짠 순서가 아니므로 일반 경로대로 탭을 대신 켠다.
-        if (OutgameTutorialRunner.IsRunning && !OutgameFeatureLock.AllUnlocked)
+        if (OutgameTutorialRunner.IsRunning && !OutgameFeatureLock.IsFtueFreeNavigation)
         {
             t_album.TryBeginInsert();
             return;

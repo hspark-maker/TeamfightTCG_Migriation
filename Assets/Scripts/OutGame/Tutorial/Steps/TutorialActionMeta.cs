@@ -27,6 +27,7 @@ public enum EStepField
     Card             = 1 << 14,
     Cards            = 1 << 15,
     Spotlight        = 1 << 16,
+    ContentIntros    = 1 << 17,
 }
 
 /// <summary>스텝 한 행이 비트(유저가 겪는 사건 하나) 안에서 맡는 자리.
@@ -112,6 +113,7 @@ public readonly struct TutorialActionMeta
         // 저장 버튼은 바꾼 게 없으면 잠긴다 — 누른 순간이 아니라 저장이 확정된 순간이 완료다(WaitEnhance와 같은 규약).
         new(A.WaitDeckSave,         C.DeckSave,         F.Anchor | F.GuideMessage | F.Dim | F.Spotlight),
         new(A.CloseDeckEdit,        C.Auto,             F.None, _beatSlot: EBeatSlot.Post),
+        new(A.ContentUnlockIntro,  C.ContentUnlockIntro, F.ContentIntros),
     };
 
     // 이 구조의 조용한 실패 두 가지를 초기화 때 한 번 소리내어 잡는다.

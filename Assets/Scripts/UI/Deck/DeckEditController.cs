@@ -263,7 +263,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
 
     // _synergy가 null이면 강조 해제. 대상 카드는 살짝 커지고 나머지는 흐려진다.
     // 강조 중에는 컬렉션 목록을 세운다 — 설명창을 띄운 채 화면이 스와이프되면 보라고 강조한 카드가 흘러간다.
-    void ApplySynergyFocus(SynergyData _synergy)
+    public void ApplySynergyFocus(SynergyData _synergy)
     {
         bool t_focusing = _synergy != null;
 
@@ -276,7 +276,8 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
             for (int t_i = 0; t_i < slots.Length; t_i++)
             {
                 if (slots[t_i] == null) continue;
-                slots[t_i].SetFocus(t_focusing, SynergyPreview.Has(slots[t_i].Card, _synergy));
+                slots[t_i].SetFocus(t_focusing, DeckSynergyEligibility.IsEligible(slots[t_i].Card, DeckConfig.IsMultiplayer)
+                    && SynergyPreview.Has(slots[t_i].Card, _synergy));
             }
         }
 
@@ -290,6 +291,9 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         // (멀티터치로 시너지 강조 중에 모드로 들어간 경우) 컬렉션 딤만 지워진 반쪽 화면이 남는다.
         if (!t_focusing) ApplySlotPickVisual();
     }
+
+    public RectTransform FindSynergyAnchor(SynergyData _synergy)
+        => synergyStrip != null ? synergyStrip.FindSynergyAnchor(_synergy) : null;
 
     /// <summary>풀이 넘긴 진입 요청을 받아둔다. 실제 열기는 <see cref="Show"/>다 —
     /// 재사용 인스턴스는 이 시점에 아직 비활성이고, BeginEdit이 세우는 컬렉션 그리드는 활성이라야 레이아웃이 선다.</summary>

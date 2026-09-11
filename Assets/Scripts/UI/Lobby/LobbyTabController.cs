@@ -48,8 +48,8 @@ public class LobbyTabController : MonoBehaviour
         && m_pendingStart == null && m_startSlides == null
         && m_pendingArrive == null && m_leaving == null
         // 미완주 상태라도 전체 해금된 로비는 자유 조작을 허용한다.
-        && (!OutgameTutorialRunner.IsRunning || OutgameFeatureLock.AllUnlocked)
-        && !TriggeredTutorialRunner.IsRunning;
+        && (!OutgameTutorialRunner.IsRunning || OutgameFeatureLock.IsFtueFreeNavigation)
+        && !OutgameTutorialRunner.IsGuidedRunning;
 
     /// <summary>Moves one adjacent tab through the same policy as a tab button.</summary>
     public void TrySwipe(int _direction)
@@ -102,6 +102,7 @@ public class LobbyTabController : MonoBehaviour
 
     void Awake()
     {
+        GuidanceCoordinator.Install(gameObject);
         if (tabBar != null) tabBar.Selected += HandleTabSelected;
 
         // 로비 버튼 전체에 공통 클릭음을 한 번에 건다. 꺼져 있는 탭 패널까지 훑으므로 여기 한 번으로 끝난다.
@@ -264,7 +265,7 @@ public class LobbyTabController : MonoBehaviour
         m_pendingArrive = () =>
         {
             t_next?.OnSettled();
-            if (_fireTrigger) TriggeredTutorialRunner.Fire(tabs[_index].tutorialTrigger);
+            if (_fireTrigger) GuidanceCoordinator.TryFire(tabs[_index].tutorialTrigger);
         };
 
         // 알약과 콘텐츠는 반드시 같은 프레임에 떠난다(LobbyTabBarView.focusSlideSeconds와 한 박자 계약).

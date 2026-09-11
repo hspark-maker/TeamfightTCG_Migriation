@@ -34,9 +34,11 @@ public class LobbyEntryAlertDot : AlertDotView
                            && OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure);
 
                 case EAlertDotTarget.Mission:
-                    return MissionManager.HasAnyRegularClaimable;
+                    return OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission)
+                           && MissionManager.HasAnyRegularClaimable;
                 case EAlertDotTarget.GuideMission:
-                    return MissionManager.HasAnyClaimable("guide");
+                    return OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission)
+                           && MissionManager.HasAnyClaimable("guide");
                 case EAlertDotTarget.Pass:
                     return PassManager.HasAnyClaimable;
 
@@ -56,6 +58,7 @@ public class LobbyEntryAlertDot : AlertDotView
             case EAlertDotTarget.Mission:
             case EAlertDotTarget.GuideMission:
                 MissionManager.OnChanged += _handler;
+                OutgameFeatureLock.OnChanged += _handler;
                 break;
             case EAlertDotTarget.Pass:
                 PassManager.OnChanged += _handler;
@@ -89,6 +92,7 @@ public class LobbyEntryAlertDot : AlertDotView
             case EAlertDotTarget.Mission:
             case EAlertDotTarget.GuideMission:
                 MissionManager.OnChanged -= _handler;
+                OutgameFeatureLock.OnChanged -= _handler;
                 break;
             case EAlertDotTarget.Pass:
                 PassManager.OnChanged -= _handler;

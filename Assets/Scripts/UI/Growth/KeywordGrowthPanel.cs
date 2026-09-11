@@ -95,7 +95,7 @@ public class KeywordGrowthPanel : PooledUIBase
         else this.Build();
 
         // 화면이 다 선 뒤에 깨운다 — 안내가 가리킬 칸·버튼이 그때야 등록돼 있다.
-        TriggeredTutorialRunner.Fire(EOutgameTutorialTrigger.KeywordGrowthFirstOpen);
+        GuidanceCoordinator.TryFire(EOutgameTutorialTrigger.KeywordGrowthFirstOpen);
     }
 
     public void Close()

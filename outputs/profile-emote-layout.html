@@ -1,0 +1,66 @@
+<div id="profile-emote-proposal" aria-label="프로필 편집 배치 제안">
+<style>
+#profile-emote-proposal { --pe-bg:light-dark(#f2e6d3,#342d27); --pe-panel:light-dark(#fff8eb,#463c32); --pe-ink:light-dark(#35281d,#fff0d7); --pe-line:light-dark(#b5a28a,#8e7b62); --pe-active:light-dark(#f0c76b,#906927); color:var(--pe-ink); font-family:system-ui,sans-serif; }
+#profile-emote-proposal * { box-sizing:border-box; }
+#profile-emote-proposal .pe-window { width:100%; max-width:450px; margin:auto; background:var(--pe-bg); border:2px solid var(--pe-line); border-radius:18px; padding:16px; }
+#profile-emote-proposal .pe-title { display:flex; align-items:center; justify-content:space-between; padding:4px 0 16px; }
+#profile-emote-proposal button { font:inherit; color:inherit; background:var(--pe-panel); border:1px solid var(--pe-line); border-radius:8px; cursor:pointer; min-height:44px; }
+#profile-emote-proposal .pe-tabs { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; }
+#profile-emote-proposal button[aria-pressed="true"] { background:var(--pe-active); border:2px solid var(--pe-ink); }
+#profile-emote-proposal .pe-body { min-height:510px; padding:18px 0; }
+#profile-emote-proposal .pe-label { display:flex; justify-content:space-between; gap:8px; margin-bottom:16px; }
+#profile-emote-proposal .pe-equipped { display:grid; grid-template-columns:repeat(2,35.714%); justify-content:center; gap:10px; }
+#profile-emote-proposal .pe-slot { aspect-ratio:1; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:12px; }
+#profile-emote-proposal .pe-slot span { font-size:32px; }
+#profile-emote-proposal .pe-profile { display:flex; align-items:center; justify-content:center; gap:24px; height:120px; background:var(--pe-panel); border-radius:10px; margin-bottom:18px; }
+#profile-emote-proposal .pe-portrait { width:84px; aspect-ratio:1; border:4px solid var(--pe-line); border-radius:18px; display:grid; place-items:center; font-size:32px; }
+#profile-emote-proposal .pe-catalog { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+#profile-emote-proposal .pe-catalog button { aspect-ratio:1; font-size:28px; }
+#profile-emote-proposal .pe-footer { display:flex; justify-content:center; padding-top:8px; }
+#profile-emote-proposal .pe-footer button { width:56%; background:var(--pe-active); }
+#profile-emote-proposal .pe-back { margin-bottom:14px; padding:4px 12px; }
+@media(max-width:380px) { #profile-emote-proposal .pe-window { padding:12px; } #profile-emote-proposal .pe-body { min-height:420px; } }
+</style>
+<div class="pe-window">
+ <div class="pe-title"><strong>프로필 편집</strong><span>배치 제안</span></div>
+ <div class="pe-tabs" aria-label="편집 종류">
+  <button type="button" data-tab="profile" aria-pressed="false">프로필</button>
+  <button type="button" data-tab="frame" aria-pressed="false">프레임</button>
+  <button type="button" data-tab="emote" aria-pressed="true">이모티콘</button>
+ </div>
+ <div class="pe-body" aria-live="polite"></div>
+ <div class="pe-footer"><button type="button" class="pe-save">저장</button></div>
+</div>
+<script>
+(() => {
+ const root = document.getElementById('profile-emote-proposal');
+ const body = root.querySelector('.pe-body');
+ const state = { tab:'emote', slot:null, size:300 };
+ const symbols = ['😄','😎','😭','😡','😍','😴','🤔','🥳','😱','😇','🤩','😤'];
+ const equipped = symbols.slice(0,6);
+ function render() {
+  root.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-pressed',String(b.dataset.tab===state.tab)));
+  root.querySelector('.pe-save').textContent='저장';
+  if(state.tab==='emote' && state.slot===null) {
+   body.innerHTML='<div class="pe-label"><span>장착 이모티콘 · 6개</span><span>'+state.size+' × '+state.size+'</span></div><div class="pe-equipped">'+equipped.map((s,i)=>'<button type="button" class="pe-slot" data-slot="'+i+'" aria-label="'+(i+1)+'번 슬롯 교체"><small>슬롯 '+(i+1)+'</small><span>'+s+'</span></button>').join('')+'</div>';
+   body.querySelector('.pe-equipped').style.gridTemplateColumns='repeat(2,'+(state.size/840*100)+'%)';
+   body.querySelectorAll('[data-slot]').forEach(b => b.onclick=()=>{state.slot=Number(b.dataset.slot);render();});
+  } else if(state.tab==='emote') {
+   body.innerHTML='<button type="button" class="pe-back">← 장착 화면</button><div class="pe-label"><span>슬롯 '+(state.slot+1)+' 교체</span><span>현재 '+equipped[state.slot]+'</span></div><div class="pe-catalog">'+symbols.map((s,i)=>'<button type="button" data-choice="'+i+'" aria-label="이모티콘 '+(i+1)+' 선택">'+s+'</button>').join('')+'</div>';
+   body.querySelector('.pe-back').onclick=()=>{state.slot=null;render();};
+   body.querySelectorAll('[data-choice]').forEach(b=>b.onclick=()=>{const next=symbols[Number(b.dataset.choice)];const other=equipped.indexOf(next);if(other>=0)equipped[other]=equipped[state.slot];equipped[state.slot]=next;state.slot=null;render();});
+  } else {
+   body.innerHTML='<div class="pe-profile"><div class="pe-portrait">🐱</div><span>플레이어<br><small>닉네임 편집</small></span></div><div class="pe-label"><span>'+(state.tab==='profile'?'프로필 선택':'프레임 선택')+'</span></div><div class="pe-catalog">'+['🐱','🐻','🐰','🦊','🐼','🐯','🐸','🐵','🐶'].map((s,i)=>'<button type="button" data-profile="'+i+'" aria-label="'+(i+1)+'번 선택">'+(state.tab==='profile'?s:'▣')+'</button>').join('')+'</div>';
+   body.querySelectorAll('[data-profile]').forEach(b=>b.onclick=()=>{body.querySelectorAll('[data-profile]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));if(state.tab==='profile')body.querySelector('.pe-portrait').textContent=b.textContent;});
+  }
+ }
+ root.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;state.slot=null;render();});
+ root.querySelector('.pe-save').onclick=()=>{root.querySelector('.pe-save').textContent='미리보기 저장됨';};
+ render();
+ if(globalThis.Tweak) {
+  const tweak=new Tweak({container:root,onChange:render});
+  tweak.addSlider(state,'size',{label:'장착 셀 크기',min:300,max:320,step:10,unit:'px'});
+ }
+})();
+</script>
+</div>

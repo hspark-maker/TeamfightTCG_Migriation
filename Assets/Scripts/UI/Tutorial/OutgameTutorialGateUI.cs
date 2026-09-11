@@ -15,10 +15,10 @@ using UnityEngine.UI;
 //      — 그 스텝의 차단은 기능 잠금(OutgameFeatureLock)이 대신 맡는다.
 //  (2) 딤이 걸린 채 누를 수 있는 것이 하나도 없는 상태를 만들지 않는다.
 //  (3) 무대는 하나뿐이고 주인은 마지막에 건 쪽이다. 남의 무대는 걷지 않는다(m_owner·OwnedBy).
-//      온보딩(OutgameTutorialBridge)과 트리거(TriggeredTutorialBridge)가 이 인스턴스를 공유하므로,
+//      튜토리얼 브리지(OutgameTutorialBridge)와 시너지 소개(SynergyIntroduction)가 이 인스턴스를 공유하므로,
 //      소유권 없이 걷으면 그 런은 완료 신호를 받을 주체를 잃고 영영 멈춘다.
-//      가져가는 것은 막지 않는다 — 트리거가 발화하면 무대를 넘겨받는 것이 맞고, 온보딩은
-//      트리거가 끝났다는 통지를 받아 자기 안내를 다시 세운다.
+//      가져가는 것은 막지 않는다 — 두 주인은 조정기(GuidanceCoordinator)가 동시에 세우지 않으므로,
+//      소유권 검사는 그 보장이 깨졌을 때의 방어선이다.
 //
 // 강조는 "딤 위로 올라온 대상" 그 자체다 — 테두리를 덧그리지 않는다. 봐야 할 것만 밝게 남는 것이 안내다.
 // 클릭 스텝은 누를 타깃 외에 "읽을 영역"(spotlight)을 하나 더 올릴 수 있다 — 보고 나서 눌러야 성립하는 자리용이다.
@@ -40,6 +40,8 @@ using UnityEngine.UI;
 public class OutgameTutorialGateUI : MonoBehaviour
 {
     public static OutgameTutorialGateUI Instance { get; private set; }
+    public static bool IsShowing => Instance != null && Instance.m_gateRoot != null
+        && Instance.m_gateRoot.activeInHierarchy;
 
     // 정렬 불변식: TutorialOverlay(200) < 딤(350) < 타깃(351) < 안내 요소(352) < UIPoolManager 팝업(400) < Mulligan(999) < LoadingCover(1000).
     // 400을 넘기면 안 된다 — 플레이 스텝의 "유효한 덱이 없습니다"(LobbyMatchLauncher)와 구매 실패 팝업

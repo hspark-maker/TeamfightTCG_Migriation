@@ -93,6 +93,11 @@ public class RoulettePanel : PooledUIBase
     /// <summary>씬 버튼 UnityEvent가 인자 없는 이 시그니처에 바인딩된다 — 매개변수를 붙이면 배선이 끊긴다.</summary>
     public void Open()
     {
+        if (!RouletteManager.IsAvailable || !OutgameFeatureLock.IsUnlocked(EOutgameFeature.Roulette))
+        {
+            this.Close();
+            return;
+        }
         this.SetVisible(true);
 
         // 이 판은 상단바를 덮는다 — 회전 비용과 보상이 곧 재화라 잔액이 보이는 채로 돌아야 한다.

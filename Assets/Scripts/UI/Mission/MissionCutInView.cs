@@ -31,6 +31,9 @@ public sealed class MissionCutInView : PooledUIBase
     LobbyMatchLauncher m_matchLauncher;
     bool m_hasCurrent;
 
+    public static bool IsPlaying => s_instance != null && s_instance.isActiveAndEnabled
+        && s_instance.m_hasCurrent && s_instance.canvasGroup != null && s_instance.canvasGroup.alpha > 0f;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetRuntimeState() => s_instance = null;
 
@@ -80,9 +83,11 @@ public sealed class MissionCutInView : PooledUIBase
     void FindLobby() => m_matchLauncher = FindFirstObjectByType<LobbyMatchLauncher>(FindObjectsInactive.Include);
 
     bool CanShow => GameInitialization.IsReady
+        && !ContentUnlockPresentation.IsPlaying
         && SceneManager.GetActiveScene().name == "LobbyScene"
         && !CurtainView.IsBusy
-        // 튜토리얼 완료 여부는 진행 알림을 막지 않는다. 컷인은 입력을 가로채지 않는다.
+        && !SynergyIntroduction.IsActive
+        // 튜토리얼 완료 여부나 풀 UI는 진행 알림을 막지 않는다. 현재 재생 중인 소개만 기다린다.
         && (m_matchLauncher == null || !m_matchLauncher.IsRunning);
 
     void Update()

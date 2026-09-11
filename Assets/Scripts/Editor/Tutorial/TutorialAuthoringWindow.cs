@@ -26,8 +26,6 @@ using UnityEngine;
 /// </summary>
 public class TutorialAuthoringWindow : EditorWindow
 {
-    enum EMode { Onboarding, Triggered }
-
     const float MinListWidth   = 200f;
     const float MinDetailWidth = 280f;
     const float SplitterWidth  = 5f;
@@ -35,17 +33,14 @@ public class TutorialAuthoringWindow : EditorWindow
 
     // 도메인 리로드를 건너뛰고 살아남아야 한다 — 되살아날 때마다 FindAsset이 첫 GUID로 되돌리면
     // 같은 타입 SO가 둘 이상일 때 초기화가 쓰는 것과 다른 에셋을 검증하게 된다.
-    [SerializeField] OutgameTutorialData   data;
-    [SerializeField] TriggeredTutorialData triggeredData;
+    [SerializeField] OutgameTutorialData data;
 
-    [SerializeField] EMode mode;
     [SerializeField] bool  structureEdit;
     [SerializeField] bool  issuesOnly;
     [SerializeField] bool  showSettings;
     [SerializeField] float listWidth = 300f;
 
     int dataAssetCount;
-    int triggeredAssetCount;
 
     int selectedOuter = -1;
     int selectedStep  = -1;
@@ -60,7 +55,6 @@ public class TutorialAuthoringWindow : EditorWindow
     System.Action pendingEdit;
 
     SerializedObject serialized;
-    SerializedObject triggeredSerialized;
 
     // 캐시 — 매 OnGUI마다 33스텝을 다시 훑을 이유가 없다. 무효화는 아래 Invalidate 계열이 맡는다.
     TutorialSequenceState state;
@@ -69,10 +63,8 @@ public class TutorialAuthoringWindow : EditorWindow
     Dictionary<int, List<TutorialBeat>> beats;
 
     List<TutorialIssue> issues;
-    List<TutorialIssue> triggeredIssues;
 
     Dictionary<long, List<TutorialIssue>> issueByStep;
-    Dictionary<long, List<TutorialIssue>> triggeredIssueByStep;
 
     int errorCount;
     int warningCount;
@@ -85,8 +77,7 @@ public class TutorialAuthoringWindow : EditorWindow
 
     void OnEnable()
     {
-        if (this.data == null)          this.data          = FindAsset<OutgameTutorialData>();
-        if (this.triggeredData == null) this.triggeredData = FindAsset<TriggeredTutorialData>();
+        if (this.data == null) this.data = FindAsset<OutgameTutorialData>();
 
         CountAssets();
         Invalidate();
@@ -122,22 +113,18 @@ public class TutorialAuthoringWindow : EditorWindow
 
     void CountAssets()
     {
-        this.dataAssetCount      = AssetDatabase.FindAssets("t:" + nameof(OutgameTutorialData)).Length;
-        this.triggeredAssetCount = AssetDatabase.FindAssets("t:" + nameof(TriggeredTutorialData)).Length;
+        this.dataAssetCount = AssetDatabase.FindAssets("t:" + nameof(OutgameTutorialData)).Length;
     }
 
     void Invalidate()
     {
-        this.state                = null;
-        this.beats                = null;
-        this.issues               = null;
-        this.triggeredIssues      = null;
-        this.issueByStep          = null;
-        this.triggeredIssueByStep = null;
+        this.state       = null;
+        this.beats       = null;
+        this.issues      = null;
+        this.issueByStep = null;
 
         // 구조가 바뀌면 잡고 있던 SerializedProperty가 옛 배열을 가리킨다 — 통째로 다시 뜬다.
-        this.serialized          = null;
-        this.triggeredSerialized = null;
+        this.serialized = null;
 
         ClampSelection();
         Repaint();
@@ -170,27 +157,22 @@ public class TutorialAuthoringWindow : EditorWindow
 
     void EnsureSerialized()
     {
-        if (this.serialized == null && this.data != null)                   this.serialized          = new SerializedObject(this.data);
-        if (this.triggeredSerialized == null && this.triggeredData != null) this.triggeredSerialized = new SerializedObject(this.triggeredData);
+        if (this.serialized == null && this.data != null) this.serialized = new SerializedObject(this.data);
     }
 
     void EnsureAnalysis()
     {
         if (this.issues != null) return;
 
-        this.state           = TutorialSequenceState.Build(this.data);
-        this.issues          = TutorialValidator.Validate(this.data);
-        this.triggeredIssues = TutorialValidator.ValidateTriggered(this.triggeredData);
-
-        this.issueByStep          = GroupByStep(this.issues);
-        this.triggeredIssueByStep = GroupByStep(this.triggeredIssues);
+        this.state       = TutorialSequenceState.Build(this.data);
+        this.issues      = TutorialValidator.Validate(this.data);
+        this.issueByStep = GroupByStep(this.issues);
 
         this.errorCount   = 0;
         this.warningCount = 0;
         this.infoCount    = 0;
 
         CountLevels(this.issues);
-        CountLevels(this.triggeredIssues);
     }
 
     void CountLevels(List<TutorialIssue> _list)
@@ -236,7 +218,6 @@ public class TutorialAuthoringWindow : EditorWindow
         EnsureSerialized();
 
         this.serialized?.Update();
-        this.triggeredSerialized?.Update();
 
         DrawToolbar();
         DrawSettings();
@@ -248,8 +229,7 @@ public class TutorialAuthoringWindow : EditorWindow
         EditorGUILayout.EndHorizontal();
 
         // 값 편집(드로어가 그린 필드)을 먼저 굳힌 뒤에 구조 편집을 돌린다 — 순서가 뒤집히면 방금 친 값이 날아간다.
-        if (this.serialized != null && this.serialized.ApplyModifiedProperties())                   Invalidate();
-        if (this.triggeredSerialized != null && this.triggeredSerialized.ApplyModifiedProperties()) Invalidate();
+        if (this.serialized != null && this.serialized.ApplyModifiedProperties()) Invalidate();
 
         if (this.pendingEdit == null) return;
 
@@ -262,19 +242,6 @@ public class TutorialAuthoringWindow : EditorWindow
     void DrawToolbar()
     {
         EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
-
-        var t_mode = (EMode)GUILayout.Toolbar((int)this.mode, s_modeLabels, EditorStyles.toolbarButton, GUILayout.Width(120));
-        if (t_mode != this.mode)
-        {
-            this.mode = t_mode;
-            this.selectedOuter = -1;
-            this.selectedStep  = -1;
-
-            // 비트 캐시는 편 번호로만 키가 잡혀 있다 — 버리지 않으면 트리거 묶음에 온보딩 접기가 씌워진다.
-            Invalidate();
-        }
-
-        GUILayout.Space(8);
 
         this.structureEdit = GUILayout.Toggle(this.structureEdit, "구조 편집", EditorStyles.toolbarButton, GUILayout.Width(66));
         this.issuesOnly    = GUILayout.Toggle(this.issuesOnly,    "문제만",   EditorStyles.toolbarButton, GUILayout.Width(52));
@@ -295,11 +262,9 @@ public class TutorialAuthoringWindow : EditorWindow
         EditorGUILayout.EndHorizontal();
     }
 
-    static readonly string[] s_modeLabels = { "온보딩", "트리거" };
-
     string VerdictLabel()
     {
-        if (this.data == null) return "온보딩 SO 미지정";
+        if (this.data == null) return "튜토리얼 SO 미지정";
 
         if (this.errorCount == 0 && this.warningCount == 0)
             return this.infoCount == 0 ? "이상 없음" : $"안내 {this.infoCount}";
@@ -315,17 +280,22 @@ public class TutorialAuthoringWindow : EditorWindow
         EditorGUI.BeginChangeCheck();
 
         this.data = (OutgameTutorialData)EditorGUILayout.ObjectField(
-            "온보딩 SO", this.data, typeof(OutgameTutorialData), false);
-
-        this.triggeredData = (TriggeredTutorialData)EditorGUILayout.ObjectField(
-            "트리거 SO", this.triggeredData, typeof(TriggeredTutorialData), false);
+            "튜토리얼 SO", this.data, typeof(OutgameTutorialData), false);
 
         if (EditorGUI.EndChangeCheck()) Invalidate();
 
         // 초기화는 자기가 찾은 한 벌을 재생한다 — 여러 벌이면 여기서 검증한 것과 다를 수 있다.
-        if (this.dataAssetCount > 1 || this.triggeredAssetCount > 1)
-            EditorGUILayout.HelpBox($"같은 타입의 SO가 여러 벌이다(온보딩 {this.dataAssetCount} · 트리거 {this.triggeredAssetCount}) — "
-                                  + "초기화가 실제로 재생하는 에셋을 직접 지정할 것.", MessageType.Warning);
+        if (this.dataAssetCount > 1)
+            EditorGUILayout.HelpBox($"같은 타입의 SO가 여러 벌이다({this.dataAssetCount}) — 초기화가 실제로 재생하는 에셋을 직접 지정할 것.",
+                                    MessageType.Warning);
+
+        if (this.serialized != null)
+        {
+            EditorGUILayout.PropertyField(this.serialized.FindProperty("contentUnlocks"),
+                new GUIContent("콘텐츠 해금 조건"), true);
+            EditorGUILayout.PropertyField(this.serialized.FindProperty("contentIntros"),
+                new GUIContent("콘텐츠 해금 소개"), true);
+        }
 
         EditorGUILayout.Space(2);
     }
@@ -339,15 +309,14 @@ public class TutorialAuthoringWindow : EditorWindow
         int t_outers = OuterCount();
         if (t_outers == 0)
         {
-            EditorGUILayout.LabelField(this.mode == EMode.Onboarding ? "저작된 편이 없다" : "저작된 묶음이 없다",
-                                       EditorStyles.miniLabel);
+            EditorGUILayout.LabelField("저작된 편이 없다", EditorStyles.miniLabel);
         }
 
         this.listScroll = EditorGUILayout.BeginScrollView(this.listScroll, GUILayout.Width(this.listWidth));
 
         for (int t_o = 0; t_o < t_outers; t_o++) DrawOuterGroup(t_o);
 
-        if (this.structureEdit && this.mode == EMode.Onboarding && GUILayout.Button("+ 편 추가", EditorStyles.miniButton))
+        if (this.structureEdit && GUILayout.Button("+ 편 추가", EditorStyles.miniButton))
             Defer(() => TutorialSequenceEditOps.AddChapter(this.data, t_outers));
 
         EditorGUILayout.EndScrollView();
@@ -404,7 +373,7 @@ public class TutorialAuthoringWindow : EditorWindow
 
         // ▶ = 지금 서 있는 칸(플레이 중), ◆ = 다음 플레이에 시작할 칸
         string t_mark = t_isScheduled ? "◆" : t_isHere ? "▶" : " ";
-        string t_id   = this.mode == EMode.Onboarding ? (t_found && t_def.StepId > 0 ? $"#{t_def.StepId}" : "#-") : string.Empty;
+        string t_id   = t_found && t_def.StepId > 0 ? $"#{t_def.StepId}" : "#-";
         string t_name = t_found ? t_def.Action.ToString() : "(빈 칸)";
 
         var t_worst = WorstLevel(t_issues);
@@ -447,7 +416,8 @@ public class TutorialAuthoringWindow : EditorWindow
         _isHere      = false;
         _isScheduled = false;
 
-        if (this.mode != EMode.Onboarding) return;
+        // 자율 챕터는 세이브 좌표도 되감기 예약도 없다 — 표시할 것이 없다
+        if (IsGuidedChapter(_outer)) return;
 
         for (int t_s = _beat.First; t_s <= _beat.Last; t_s++)
         {
@@ -550,20 +520,42 @@ public class TutorialAuthoringWindow : EditorWindow
         EditorGUILayout.LabelField(OuterHeadLabel(_outer, StepCountOf(_outer)), EditorStyles.boldLabel);
         EditorGUILayout.Space(4);
 
-        if (this.mode == EMode.Onboarding) DrawChapterFields(_outer);
-        else                               DrawEntryFields(_outer);
+        DrawChapterFields(_outer);
 
         DrawIssueCards(IssuesAt(_outer, 0));
     }
 
+    // 편 이름·성격·발화 키·선행 기능. 성격은 강제 경계를 움직이고 발화 키는 완주 낙인의 식별자라 구조 편집 토글 아래에 둔다.
     void DrawChapterFields(int _chapter)
     {
+        if (!TryGetChapter(_chapter, out var t_chapter)) return;
+
         using (new EditorGUI.DisabledScope(!this.structureEdit))
         {
             string t_label  = LabelOf(_chapter);
             string t_edited = EditorGUILayout.DelayedTextField("편 이름", t_label);
             if (t_edited != t_label) Defer(() => TutorialSequenceEditOps.SetChapterLabel(this.data, _chapter, t_edited));
+
+            var t_kind = (EOutgameTutorialChapterKind)EditorGUILayout.EnumPopup("성격", t_chapter.Kind);
+            if (t_kind != t_chapter.Kind) Defer(() => TutorialSequenceEditOps.SetChapterKind(this.data, _chapter, t_kind));
+
+            if (t_chapter.IsGuided)
+            {
+                var t_trigger = (EOutgameTutorialTrigger)EditorGUILayout.EnumPopup("발화 키", t_chapter.Trigger);
+                if (t_trigger != t_chapter.Trigger)
+                {
+                    Defer(() => TutorialSequenceEditOps.SetChapterTrigger(this.data, _chapter, t_trigger));
+                    Debug.LogWarning("[TutorialAuthoring] The trigger key is the identifier of the completion mark — changing it makes accounts that already finished see this chapter again.");
+                }
+
+                var t_feature = (EOutgameFeature)EditorGUILayout.EnumPopup("선행 기능", t_chapter.Prerequisite);
+                if (t_feature != t_chapter.Prerequisite) Defer(() => TutorialSequenceEditOps.SetChapterPrerequisite(this.data, _chapter, t_feature));
+            }
         }
+
+        if (t_chapter.IsGuided)
+            EditorGUILayout.HelpBox("자율 챕터 — 졸업 뒤 발화 키가 깨운다. 진행은 메모리에만 남고(화면을 떠나면 다음에 처음부터), 완주해야 낙인이 찍힌다. "
+                                  + "locks/unlocks는 읽히지 않는다.", MessageType.None);
 
         if (!this.structureEdit) return;
 
@@ -585,26 +577,6 @@ public class TutorialAuthoringWindow : EditorWindow
             Defer(() => TutorialSequenceEditOps.DeleteChapter(this.data, _chapter));
 
         EditorGUILayout.EndHorizontal();
-    }
-
-    // 묶음의 이름과 발화 키. 키는 완주 낙인의 식별자이기도 해서 바꾸면 이미 찍힌 낙인과 갈린다.
-    void DrawEntryFields(int _entry)
-    {
-        if (!TryGetEntry(_entry, out var t_entry)) return;
-
-        using (new EditorGUI.DisabledScope(!this.structureEdit))
-        {
-            string t_label  = t_entry.Label ?? string.Empty;
-            string t_edited = EditorGUILayout.DelayedTextField("묶음 이름", t_label);
-            if (t_edited != t_label) Defer(() => TutorialSequenceEditOps.SetTriggeredLabel(this.triggeredData, _entry, t_edited));
-
-            var t_trigger = (EOutgameTutorialTrigger)EditorGUILayout.EnumPopup("발화 키", t_entry.Trigger);
-            if (t_trigger != t_entry.Trigger)
-            {
-                Defer(() => TutorialSequenceEditOps.SetTriggeredKey(this.triggeredData, _entry, t_trigger));
-                Debug.LogWarning("[TutorialAuthoring] The trigger key is the identifier of the completion mark — changing it makes accounts that already finished see this bundle again.");
-            }
-        }
     }
 
     /// <summary>고른 것 하나 = 비트 하나. 사건 행만이 아니라 그 사건에 매달린 무대 준비·뒤처리까지
@@ -673,11 +645,11 @@ public class TutorialAuthoringWindow : EditorWindow
 
         EditorGUILayout.BeginHorizontal();
 
-        string t_id = this.mode == EMode.Onboarding && t_found && t_def.StepId > 0 ? $"  #{t_def.StepId}" : string.Empty;
+        string t_id = t_found && t_def.StepId > 0 ? $"  #{t_def.StepId}" : string.Empty;
         EditorGUILayout.LabelField($"{_outer}-{_step}{t_id}   {(t_found ? t_def.Action.ToString() : "(빈 칸)")}",
                                    EditorStyles.miniBoldLabel);
 
-        if (this.mode == EMode.Onboarding)
+        if (!IsGuidedChapter(_outer))
         {
             bool t_scheduled = IsScheduled(_outer, _step);
 
@@ -717,11 +689,14 @@ public class TutorialAuthoringWindow : EditorWindow
         EditorGUILayout.BeginHorizontal();
 
         string t_coord = _beat.Count == 1 ? $"{_outer}-{_beat.First}" : $"{_outer}-{_beat.First}~{_beat.Last}";
-        string t_id    = this.mode == EMode.Onboarding && _found && _def.StepId > 0 ? $"  #{_def.StepId}" : string.Empty;
+        string t_id    = _found && _def.StepId > 0 ? $"  #{_def.StepId}" : string.Empty;
 
         EditorGUILayout.LabelField($"{t_coord}{t_id}   {(_found ? _def.Action.ToString() : "(빈 칸)")}", EditorStyles.boldLabel);
 
-        if (this.mode == EMode.Onboarding)
+        // 되감기는 세이브 좌표를 미는 일이라 강제 챕터에만 있다
+        bool t_forced = !IsGuidedChapter(_outer);
+
+        if (t_forced)
         {
             bool t_scheduled = IsScheduled(_outer, _beat.First);
 
@@ -731,7 +706,7 @@ public class TutorialAuthoringWindow : EditorWindow
 
         EditorGUILayout.EndHorizontal();
 
-        if (this.mode == EMode.Onboarding) DrawScheduleLine();
+        if (t_forced) DrawScheduleLine();
     }
 
     // 되감기는 진행 중인 세이브를 지운다 — 목록에 상시 경고를 세우는 대신 누르는 순간에 묻는다.
@@ -764,7 +739,7 @@ public class TutorialAuthoringWindow : EditorWindow
     // 이 스텝에 서 있을 때 게임의 문이 어디까지 열려 있는가 — 저작만 봐서는 알 수 없는 유일한 값이다.
     void DrawStateBox(int _outer, int _step, TutorialStepDef _def)
     {
-        if (this.mode != EMode.Onboarding) return;
+        if (IsGuidedChapter(_outer)) return;   // 자율은 졸업 뒤라 "전부 열림" 하나뿐이다 — 보여 줄 상태가 없다
         if (this.state == null || !this.state.TryGet(_outer, _step, out var t_state)) return;
 
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
@@ -806,11 +781,8 @@ public class TutorialAuthoringWindow : EditorWindow
         if (GUILayout.Button("아래 추가", EditorStyles.miniButtonMid)) Defer(() => AddStepAt(_outer, _step + 1));
         if (GUILayout.Button("삭제", EditorStyles.miniButtonRight))    Defer(() => DeleteStepAt(_outer, _step));
 
-        if (this.mode == EMode.Onboarding)
-        {
-            GUILayout.Space(8);
-            if (GUILayout.Button("편 이동 ▾", EditorStyles.miniButton, GUILayout.Width(70))) ShowChapterMoveMenu(_outer, _step);
-        }
+        GUILayout.Space(8);
+        if (GUILayout.Button("편 이동 ▾", EditorStyles.miniButton, GUILayout.Width(70))) ShowChapterMoveMenu(_outer, _step);
 
         EditorGUILayout.EndHorizontal();
     }
@@ -855,27 +827,12 @@ public class TutorialAuthoringWindow : EditorWindow
         }
     }
 
-    // ── 편집 배선 (모드에 따라 온보딩·트리거 연산을 가른다) ──────────────────
+    // ── 편집 배선 ──────────────────────────────────────────────────────────
 
-    bool AddStepAt(int _outer, int _index)
-        => this.mode == EMode.Onboarding
-            ? TutorialSequenceEditOps.AddStep(this.data, _outer, _index)
-            : TutorialSequenceEditOps.AddTriggeredStep(this.triggeredData, _outer, _index);
-
-    bool DuplicateStepAt(int _outer, int _step)
-        => this.mode == EMode.Onboarding
-            ? TutorialSequenceEditOps.DuplicateStep(this.data, _outer, _step)
-            : TutorialSequenceEditOps.DuplicateTriggeredStep(this.triggeredData, _outer, _step);
-
-    bool DeleteStepAt(int _outer, int _step)
-        => this.mode == EMode.Onboarding
-            ? TutorialSequenceEditOps.DeleteStep(this.data, _outer, _step)
-            : TutorialSequenceEditOps.DeleteTriggeredStep(this.triggeredData, _outer, _step);
-
-    bool MoveStepBy(int _outer, int _step, int _delta)
-        => this.mode == EMode.Onboarding
-            ? TutorialSequenceEditOps.MoveStep(this.data, _outer, _step, _delta)
-            : TutorialSequenceEditOps.MoveTriggeredStep(this.triggeredData, _outer, _step, _delta);
+    bool AddStepAt(int _outer, int _index)          => TutorialSequenceEditOps.AddStep(this.data, _outer, _index);
+    bool DuplicateStepAt(int _outer, int _step)     => TutorialSequenceEditOps.DuplicateStep(this.data, _outer, _step);
+    bool DeleteStepAt(int _outer, int _step)        => TutorialSequenceEditOps.DeleteStep(this.data, _outer, _step);
+    bool MoveStepBy(int _outer, int _step, int _delta) => TutorialSequenceEditOps.MoveStep(this.data, _outer, _step, _delta);
 
     // 편집이 실제로 일어났을 때만 캐시를 버린다(삭제 대화상자를 취소하면 아무것도 안 바뀐다).
     // Repaint는 여기서 반드시 걸어야 한다 — GenericMenu 콜백은 GUI 패스 밖에서 도는 탓에
@@ -890,58 +847,43 @@ public class TutorialAuthoringWindow : EditorWindow
         Repaint();
     }
 
-    // ── 모드에 무관한 조회 (왼쪽 목록이 온보딩·트리거를 한 코드로 그리는 근거) ──
+    // ── 조회 ────────────────────────────────────────────────────────────────
 
-    int OuterCount()
-    {
-        if (this.mode == EMode.Onboarding) return this.data != null && this.data.chapters != null ? this.data.chapters.Count : 0;
+    int OuterCount() => this.data != null && this.data.chapters != null ? this.data.chapters.Count : 0;
 
-        return this.triggeredData != null && this.triggeredData.entries != null ? this.triggeredData.entries.Count : 0;
-    }
+    int StepCountOf(int _outer) => TryGetChapter(_outer, out var t_chapter) ? t_chapter.StepCount : 0;
 
-    int StepCountOf(int _outer)
-    {
-        if (this.mode == EMode.Onboarding) return TryGetChapter(_outer, out var t_chapter) ? t_chapter.StepCount : 0;
+    bool IsGuidedChapter(int _outer) => TryGetChapter(_outer, out var t_chapter) && t_chapter.IsGuided;
 
-        return TryGetEntry(_outer, out var t_entry) ? t_entry.StepCount : 0;
-    }
-
+    // 편 헤더. 자율 챕터는 성격과 발화 키를 함께 보여 준다 — 목록만 훑어도 강제 경계가 어디인지 보이게.
     string OuterHeadLabel(int _outer, int _steps)
     {
-        if (this.mode == EMode.Onboarding)
-        {
-            string t_label = LabelOf(_outer);
-            return string.IsNullOrEmpty(t_label) ? $"{_outer + 1}편  ({_steps})" : $"{_outer + 1}편 — {t_label}  ({_steps})";
-        }
+        string t_label = LabelOf(_outer);
+        string t_head  = string.IsNullOrEmpty(t_label) ? $"{_outer + 1}편" : $"{_outer + 1}편 — {t_label}";
 
-        if (!TryGetEntry(_outer, out var t_entry)) return $"{_outer}  ({_steps})";
+        if (TryGetChapter(_outer, out var t_chapter) && t_chapter.IsGuided)
+            t_head += $"  [자율 · {t_chapter.Trigger}]";
 
-        return string.IsNullOrEmpty(t_entry.Label) ? $"{t_entry.Trigger}  ({_steps})" : $"{t_entry.Trigger} — {t_entry.Label}  ({_steps})";
+        return $"{t_head}  ({_steps})";
     }
 
     bool TryGetStepAt(int _outer, int _step, out TutorialStepDef _def)
     {
         _def = null;
 
-        if (this.mode == EMode.Onboarding) return TryGetChapter(_outer, out var t_chapter) && t_chapter.TryGetStep(_step, out _def);
-
-        return TryGetEntry(_outer, out var t_entry) && t_entry.TryGetStep(_step, out _def);
+        return TryGetChapter(_outer, out var t_chapter) && t_chapter.TryGetStep(_step, out _def);
     }
 
     List<TutorialIssue> IssuesAt(int _outer, int _step)
-    {
-        var t_map = this.mode == EMode.Onboarding ? this.issueByStep : this.triggeredIssueByStep;
+        => this.issueByStep != null && this.issueByStep.TryGetValue(StepKey(_outer, _step), out var t_bucket) ? t_bucket : null;
 
-        return t_map != null && t_map.TryGetValue(StepKey(_outer, _step), out var t_bucket) ? t_bucket : null;
-    }
-
-    // 편 헤더의 배지. 스텝 줄이 없는 이슈(빈 편·빈 묶음)는 여기서만 드러날 수 있어 경고도 함께 센다.
+    // 편 헤더의 배지. 스텝 줄이 없는 이슈(빈 편·챕터 성격)는 여기서만 드러날 수 있어 경고도 함께 센다.
     void OuterBadge(int _outer, out ETutorialIssueLevel _worst, out int _count)
     {
         _worst = ETutorialIssueLevel.Info;
         _count = 0;
 
-        var t_list = this.mode == EMode.Onboarding ? this.issues : this.triggeredIssues;
+        var t_list = this.issues;
         if (t_list == null) return;
 
         for (int t_i = 0; t_i < t_list.Count; t_i++)
@@ -956,10 +898,9 @@ public class TutorialAuthoringWindow : EditorWindow
 
     SerializedProperty StepProperty(int _outer, int _step)
     {
-        var t_object = this.mode == EMode.Onboarding ? this.serialized : this.triggeredSerialized;
-        if (t_object == null) return null;
+        if (this.serialized == null) return null;
 
-        var t_outerList = t_object.FindProperty(this.mode == EMode.Onboarding ? "chapters" : "entries");
+        var t_outerList = this.serialized.FindProperty("chapters");
         if (t_outerList == null || _outer < 0 || _outer >= t_outerList.arraySize) return null;
 
         var t_steps = t_outerList.GetArrayElementAtIndex(_outer).FindPropertyRelative("stepDefs");
@@ -978,16 +919,6 @@ public class TutorialAuthoringWindow : EditorWindow
         if (_chapter < 0 || _chapter >= this.data.chapters.Count) return false;
 
         _result = this.data.chapters[_chapter];
-        return _result != null;
-    }
-
-    bool TryGetEntry(int _entry, out TriggeredTutorialEntry _result)
-    {
-        _result = null;
-        if (this.triggeredData == null || this.triggeredData.entries == null) return false;
-        if (_entry < 0 || _entry >= this.triggeredData.entries.Count)         return false;
-
-        _result = this.triggeredData.entries[_entry];
         return _result != null;
     }
 

@@ -62,7 +62,7 @@ import {grant} from "../currency/wallet";
 import {nextWallet} from "../currency/walletStore";
 import {currentRankSeason, RankSeasonDef} from "../rank/rankSeason";
 import {
-  adoptLegacyEntry,
+  applyTutorialRankEntry,
   applyRankSeason,
   legacyClaimedTiers,
   legacyRankPoints,
@@ -464,7 +464,7 @@ export const claimReward = onCall(measuredCallable("claimReward", async (request
           (rankSeason as RankSeasonDef).seasonId,
           rankGrades,
         );
-        rankState = adoptLegacyEntry(rankState, fallbackPoints, rankGrades);
+        rankState = applyTutorialRankEntry(rankState, current, rankGrades);
       }
       // 지급은 자격 판정보다 먼저 계산해도 안전하다 — 거절은 아래 낙인 함수들이 던지고, 던지면 트랜잭션 전체가 없던 일이 된다.
       // 줄 것이 없으면 지갑을 아예 쓰지 않는다(claimBattleReward·claimPayout 과 같은 정책) — 보상 미저작 정점의
