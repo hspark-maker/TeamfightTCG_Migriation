@@ -70,13 +70,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     [SerializeField] GameObject enhanceIcon;
     [SerializeField] string     evolveLabel = "진화";
 
-    [Header("한계돌파 조작 (선택 — 미배선이면 만렙 카드에 강화 버튼이 그대로 선다)")]
-    [Tooltip("3성 만렙 뒤에 강화 버튼 대신 서는 버튼. 무는 것은 재화가 아니라 그 카드 전용 간식이다.")]
-    [SerializeField] Button   limitBreakButton;
-    [SerializeField] TMP_Text limitBreakLabelText;
-    [SerializeField] TMP_Text limitBreakCostText;
-    [SerializeField] string   limitBreakLabel = "간식 먹이기";
-
     [Header("일러스트만 보기 (선택 — 미배선이면 기능만 빠진다)")]
     [Tooltip("누를 때마다 카드 위 정보(이름·이름판·체력·레벨·키워드 아이콘·프레임 장식·시너지)를 가렸다 되돌린다.")]
     [SerializeField] Button artOnlyButton;
@@ -228,7 +221,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
     // 각 버튼 밑판의 흑백 효과. 자식은 UIEffectReplica로 따라오므로 코드가 쥐는 것은 버튼당 이 하나뿐이다.
     UIEffect m_enhanceTone;
-    UIEffect m_limitBreakTone;
 
     // 잠김 판정은 "열린 것이 하나도 없는가"라 마스크가 그대로여도 상태가 바뀔 수 있다.
     bool m_shownKeywordLocked;
@@ -333,11 +325,9 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         s_instance = this;
 
         if (this.enhanceButton != null) this.m_enhanceTone = this.enhanceButton.GetComponent<UIEffect>();
-        if (this.limitBreakButton != null) this.m_limitBreakTone = this.limitBreakButton.GetComponent<UIEffect>();
 
         // 룩만 얹는 부착이다 — 차단은 RefreshGrowthActions의 계산식이 진다.
         if (this.enhanceButton != null) FeatureLockView.Attach(this.enhanceButton.gameObject, EOutgameFeature.CardEnhance);
-        if (this.limitBreakButton != null) FeatureLockView.Attach(this.limitBreakButton.gameObject, EOutgameFeature.CardEnhance);
 
         // 카드 그림 위 탭은 루트의 OnPointerClick으로 오지 않는다(LongPressDetector가 pointerPress를 가져간다).
         if (this.cardView != null)
@@ -360,13 +350,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         {
             this.enhanceButton.onClick.RemoveListener(OnEnhancePressed);
             this.enhanceButton.onClick.AddListener(OnEnhancePressed);
-        }
-
-        // 한계돌파는 핸들러가 따로다 — 연출도 결과판도 무는 것도 강화와 다르다.
-        if (this.limitBreakButton != null)
-        {
-            this.limitBreakButton.onClick.RemoveListener(OnLimitBreakPressed);
-            this.limitBreakButton.onClick.AddListener(OnLimitBreakPressed);
         }
 
         if (this.artOnlyButton != null)
@@ -398,7 +381,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (this.swipeDetector != null) this.swipeDetector.OnSwipe = null;
 
         if (this.enhanceButton != null) this.enhanceButton.onClick.RemoveListener(OnEnhancePressed);
-        if (this.limitBreakButton != null) this.limitBreakButton.onClick.RemoveListener(OnLimitBreakPressed);
 
         if (this.artOnlyButton != null) this.artOnlyButton.onClick.RemoveListener(ToggleArtOnly);
 
@@ -1009,30 +991,17 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         GrowthStep t_step = default;
         bool t_hasStep = _owned && CardGrowthManager.TryGetNextStep(_card, out t_step);
 
-        // 한계돌파는 강화 레벨과 무관한 별개 축이라 0성부터 선다 — 강화 버튼과 나란히 놓인다.
-        LimitBreakStep t_lbStep = default;
-        bool t_hasLimitBreak = _owned
-                            && CardGrowthManager.TryGetNextLimitBreakStep(_card, out t_lbStep);
-        int t_snack = _owned ? CardGrowthManager.SnackOf(_card) : 0;
-
         // 다음 한 방이 진화 관문이면 같은 버튼이 진화 얼굴로 갈아입는다 — 어느 쪽이든 버튼이 자리를 옮기지 않는다.
         bool t_evolve = t_hasStep && CardGrowthManager.IsEvolutionLevel(t_step.Level);
 
         // 열람 전용도 같은 길로 내린다 — 알파만 0인 채 살아 있는 버튼은 탭을 먹는다.
-        bool t_limit = this.limitBreakButton != null && t_hasLimitBreak;
-
-        // 강화·진화는 한 버튼이 얼굴만 갈아입고, 한계돌파는 그 옆에 따로 선다(ActionRow가 가로로 정렬).
         bool t_actions = _owned && !this.m_readOnly;
         if (this.enhanceButton != null) this.enhanceButton.gameObject.SetActive(t_actions);
-        if (this.limitBreakButton != null) this.limitBreakButton.gameObject.SetActive(t_actions && t_limit);
 
         ApplyGrowthFace(t_evolve);
 
         // 안내 타깃은 지금 서 있는 성장 버튼을 따라간다 — 열릴 때마다 새로 서서 프리팹 표식으로는 잡을 수 없다.
-        ApplyGrowthAnchor(!t_actions ? null
-                        : t_hasStep ? this.enhanceButton
-                        : t_limit  ? this.limitBreakButton
-                        : this.enhanceButton);
+        ApplyGrowthAnchor(t_actions ? this.enhanceButton : null);
 
         // 연출 중에는 공개 시점의 갱신이 버튼을 되살리지 않게 눌러둔다(복귀에서 다시 판정된다).
         bool t_unlocked = OutgameFeatureLock.IsUnlocked(EOutgameFeature.CardEnhance);
@@ -1040,13 +1009,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         bool t_canPayEnhance = t_hasStep && CurrencyManager.CanAfford(t_step.Currency, t_step.Cost);
         SetActionsEnabled(t_canPayEnhance && !this.m_ritualPlaying && t_unlocked);
 
-        // 한계돌파는 무는 것이 재화가 아니라 그 카드 간식이라 활성 판정을 따로 낸다.
-        bool t_canPayLimit = t_hasLimitBreak && t_snack >= t_lbStep.SnackCost;
-        SetActionEnabled(this.limitBreakButton, this.m_limitBreakTone,
-                         t_canPayLimit && !this.m_ritualPlaying && t_unlocked);
-
         ApplyCost(t_hasStep, t_step);
-        ApplyLimitBreakCost(t_hasLimitBreak, t_lbStep, t_snack);
 
         // 결과판이 걷힌 뒤(또는 평상시)엔 다시 각자의 글자다 — 값 갱신이 지나는 이 길이 곧 글자의 복귀 지점이다.
         SetActionLabel(false);
@@ -1120,15 +1083,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         ApplyCostIcon(this.enhanceCostIcon, t_charged, _step.Currency);
     }
 
-    // 아이콘 칸을 두지 않는다 — 간식은 재화 enum이 아니라 CurrencyLook에 그림을 물어볼 창구가 없다.
-    void ApplyLimitBreakCost(bool _hasStep, LimitBreakStep _step, int _snack)
-    {
-        if (this.limitBreakLabelText != null) this.limitBreakLabelText.text = this.limitBreakLabel;
-        if (this.limitBreakCostText  == null) return;
-
-        this.limitBreakCostText.text = _hasStep ? $"간식 {_snack:N0}/{_step.SnackCost:N0}" : NoValue;
-    }
-
     void ApplyCostIcon(Image _target, bool _charged, ECurrencyType _currency)
     {
         if (_target == null) return;
@@ -1145,7 +1099,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         SetActionEnabled(this.enhanceButton, this.m_enhanceTone, _interactable);
     }
 
-    // 한 버튼이 두 얼굴을 갈아입는다 — 진화를 옆자리로 두면 같은 한 방이 버튼 둘로 읽히고, 그 자리는 한계돌파가 쓴다.
+    // 다음 성장 단계에 맞춰 같은 버튼을 강화 또는 진화로 표시한다.
     void ApplyGrowthFace(bool _evolve)
     {
         if (this.enhanceLabelText != null) this.enhanceLabelText.gameObject.SetActive(!_evolve);
@@ -1173,56 +1127,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         string t_name = CurrencyLook.NameOf(_currency);
         return string.Format(NotAffordableFormat, t_name, KoreanText.Subject(t_name));
-    }
-
-    /// <summary>간식을 먹여 한계돌파 1단계. 강화 연출·결과판·튜토리얼 통지를 타지 않는다.</summary>
-    void OnLimitBreakPressed()
-    {
-        if (this.m_ritualPlaying) return;
-
-        int t_card = CardAt(this.m_index);
-        if (t_card <= 0) return;
-
-        // 유예를 먼저 세운다 — 판정이 서버로 나가 있는 동안 버튼이 살아 있으면 같은 차감이 여러 번 나간다.
-        this.m_ritualPlaying = true;
-
-        // 이 유예에는 무대가 없다 — 앞선 강화의 연출 참조를 두면 SkipPlayingFx가 왕복 내내 탭을 삼킨다.
-        this.m_activeRitual = null;
-
-        LimitBreakAsync(t_card).Forget();
-    }
-
-    // 서버 왕복 한계돌파. 오른 단계는 응답이 도착한 프레임에 처음 드러난다 — 강화와 같은 규율이다.
-    async UniTaskVoid LimitBreakAsync(int _card)
-    {
-        ELimitBreakOutcome t_outcome;
-
-        // Release는 반드시 finally에서 — 예외나 조기 반환으로 한 번이라도 새면 전역 오버레이가 화면을 영영 잠근다.
-        ServerWaitOverlay.Hold(this);
-        try
-        {
-            t_outcome = await CardGrowthManager.TryLimitBreakAsync(_card);
-        }
-        finally
-        {
-            this.m_ritualPlaying = false;
-            ServerWaitOverlay.Release(this);
-        }
-
-        // 왕복 중 이 창이 사라졌다면 그릴 화면이 없다(단계·간식은 서버가 이미 확정했다).
-        if (this == null) return;
-
-        // 창이 닫혔으면 그릴 것도 깨울 안내도 없다 — 한계돌파는 튜토리얼 통지를 타지 않는다.
-        if (!this.isActiveAndEnabled) return;
-
-        // 거절 사유는 그리지 않는다 — 버튼이 간식 잔량으로 잠겨 있어 거절은 곧 화면이 낡았다는 뜻이고 답은 갱신이다.
-        int t_now = CardAt(this.m_index);
-        if (t_now > 0) RefreshGrowth(t_now, OwnershipManager.IsOwned(t_now));
-
-        // 새 단계가 드러나는 그 한 박을 강조한다. 갱신 뒤라 섬광이 물러날 때 이미 오른 체력이 서 있다.
-        if (t_outcome == ELimitBreakOutcome.Success && this.cardView != null) this.cardView.FlashGrowth();
-
-        RefreshArrows();
     }
 
     void OnEnhancePressed()
@@ -1602,14 +1506,13 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
                 if (t_syn == null || !t_seen.Add(t_syn)) continue;   // 중복 나열 방어
 
                 // 요구치는 이름 뒤에 붙인다 — 칩 한 줄에서 "무엇이 몇 장에 켜지는가"가 끝난다.
-                // 아이콘 배율은 시너지 PNG 투명 여백 보정 — 없으면 키워드 칩 옆에서 혼자 작아 보인다.
+                // 현재 상세 아이콘은 키워드와 같은 크기의 아트다. 예전 투명 여백 확대 보정을 적용하지 않는다.
                 string t_req  = SynergyText.Requirement(t_syn);
                 string t_name = string.IsNullOrEmpty(t_req) ? SynergyText.Name(t_syn)
                                                             : $"{SynergyText.Name(t_syn)} {t_req}";
 
                 if (TryShowChip(this.synergyChipRoot, t_used, "시너지",
-                                t_syn.activeIcon, t_name,
-                                SynergyIconStrip.IconPadCompensation, t_open))
+                                t_syn.activeIcon, t_name, 1f, t_open))
                     t_used++;
 
                 // 아래 줄에는 효과 설명만 남긴다 — 비어 있으면 요구치라도 적어 그 자리가 "없음"이 되지 않게 한다.

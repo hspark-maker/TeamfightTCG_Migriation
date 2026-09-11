@@ -30,7 +30,7 @@ public class GuideMissionPanel : PooledUIBase
     [Tooltip("가이드 미션 행이 쌓일 Content(VerticalLayoutGroup).")]
     [SerializeField] Transform listContent;
 
-    [Tooltip("가이드 미션 행 프리팹 에셋.")]
+    [Tooltip("가이드·일일·주간이 공유하는 미션 행 프리팹 에셋.")]
     [SerializeField] MissionRowView rowPrefab;
 
     [Tooltip("가이드 미션이 하나도 없을 때 켤 안내(서버 정의 미도착 포함).")]
@@ -60,11 +60,12 @@ public class GuideMissionPanel : PooledUIBase
     // 씬 버튼 UnityEvent 가 인자 없는 이 시그니처에 바인딩된다 — 매개변수를 붙이면 배선이 끊긴다.
     public void Open()
     {
+        if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission)) return;
+
         this.SetVisible(true);
         this.Rebuild();
 
-        // 정상 경로의 조회는 초기화(MissionPreloadStep)가 이미 했다 — 여기 조회는 캐시가 빈 경우의
-        // 안전망뿐이다. 던져만 두고 응답이 오면 OnChanged 가 다시 그린다(MissionPanel 과 같은 계약).
+        // 초기화 요청을 공유하고, 상태·기간·저장 버전이 유효하면 최근 조회를 재사용한다.
         MissionCommands.RefreshAsync().Forget();
     }
 
@@ -171,7 +172,11 @@ public class GuideMissionPanel : PooledUIBase
             // **팝업보다 먼저 걷는다.** 순서를 뒤집으면 안내가 대기 딤에 묻힌다.
             ServerWaitOverlay.Release(this);
         }
-        if (t_result != null) MissionPanel.ShowClaimedRewards(new[] { t_result });
+        if (t_result != null)
+        {
+            if ((t_result.Cards?.Count ?? 0) > 0) this.Close();
+            MissionPanel.ShowClaimedRewards(new[] { t_result });
+        }
     }
 
     // 여는 순간 오버레이 자신을 켠다 — 저작본은 루트가 꺼진 채로 들어오므로, 켜 주지 않으면

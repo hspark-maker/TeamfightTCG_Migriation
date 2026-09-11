@@ -112,6 +112,8 @@ public class MatchDeckShell : MonoBehaviour
         // 안내가 시킨 순서를 거치지 않고 이 화면을 떠나는 길이 있다(편집 화면의 전투 버튼) —
         // 좌표를 두고 가면 앵커가 사라진 화면으로 돌아와 영영 대기한다. 전투 스텝에 이미 서 있으면 무시된다.
         OutgameTutorialRunner.NotifyDeckGateBattleLaunched();
+        // 안내 밖 경로로 정점 전투에 나가도 모험 소개는 목적을 이룬 것이다 — 낙인을 찍어 다음에 다시 부르지 않는다.
+        if (AdventureRun.IsActive) OutgameTutorialRunner.FinishGuided(AdventureUnlock.GuideTrigger);
 
         // 뷰가 없으면 태울 안무도 없다 — 연출 때문에 전투가 시작되지 않는 길을 만들지 않는다.
         // 편집 화면만 쓰는 진입도 같다: 안무의 주인인 VS 패널이 꺼져 있어 콜백이 돌지 않는다(게이트가 영영 안 열린다).
@@ -128,6 +130,7 @@ public class MatchDeckShell : MonoBehaviour
     // 전투 포기. 실제로 어디로 돌아갈지는 호스트가 정한다(셸은 씬을 모른다).
     public void Cancel()
     {
+        OutgameTutorialRunner.AbortGuided(AdventureUnlock.GuideTrigger);   // 화면 이탈 = 이번 세션 미루기
         m_gate = EGate.Cancelled;
     }
 

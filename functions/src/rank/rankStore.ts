@@ -1,4 +1,6 @@
 import {isDeepStrictEqual} from "node:util";
+import {withCountedTransaction} from "../observability/countedTransaction";
+import {publicRankProfile, RankPublicProfile} from "./publicProfile";
 import {
   DocumentReference,
   DocumentSnapshot,
@@ -84,7 +86,8 @@ export function readRank(
   const data = snapshot.exists ? snapshot.data() : undefined;
   const tierCount = rankTierCount(grades);
   const rawPoints = Number(data?.points);
-  const points = Number.isSafeInteger(rawPoints) && rawPoints >= 0 ? rawPoints : fallbackPoints;
+  const points = Number.isSafeInteger(rawPoints) && rawPoints >= 0 ?
+    rawPoints : snapshot.exists ? 0 : fallbackPoints;
   const fallbackMap = Object.fromEntries(
     normalizeTierIndexes(fallbackClaimed, tierCount).map((tier) => [String(tier), true]),
   );
@@ -116,24 +119,34 @@ export function applyRankSeason(
   return {seasonId, points: resetPoints, bestTierIndex: resetTier, claimed: {}};
 }
 
-/**
- * Adopts a completed tutorial's legacy Bronze entry before the first ranked settlement.
- * @param {RankState} state Current rank state.
- * @param {number} fallbackPoints Legacy points from save/payoutState.
- * @param {RankGradeRow[]} grades Rank grade spec rows.
- * @return {RankState} State with the legacy entry adopted, or the input untouched.
- */
-export function adoptLegacyEntry(
-  state: RankState, fallbackPoints: number, grades: RankGradeRow[],
+// Contract with OutgameTutorial.asset: chapter 3 starts with EnterFirstRank (stepId 23).
+// Coordinates are committed before executing a step; step IDs are not ordered numbers.
+export const FIRST_RANK_CHAPTER_INDEX = 3;
+
+export function canEnterFirstRank(save: unknown): boolean {
+  const tutorial = (save as {tutorial?: {
+    outgameCompleted?: unknown; chapterIndex?: unknown; chapterStepIndex?: unknown;
+  }} | null)?.tutorial;
+  if (!tutorial) return false;
+  if (tutorial.outgameCompleted === true) return true;
+  const {chapterIndex, chapterStepIndex} = tutorial;
+  return typeof chapterIndex === "number" && Number.isSafeInteger(chapterIndex) &&
+    chapterIndex >= FIRST_RANK_CHAPTER_INDEX &&
+    typeof chapterStepIndex === "number" && Number.isSafeInteger(chapterStepIndex) &&
+    chapterStepIndex >= 0;
+}
+
+// Server decides tutorial entry from saved progress, never from client rank points.
+export function applyTutorialRankEntry(
+  state: RankState, save: unknown, grades: RankGradeRow[],
 ): RankState {
   if (grades.length === 0 || state.points >= grades[0].entryPoints ||
-      fallbackPoints < grades[0].entryPoints) return state;
-  const points = fallbackPoints;
-  return {...state, points, bestTierIndex: Math.max(state.bestTierIndex, resolveTierIndex(points, grades))};
+      !canEnterFirstRank(save)) return state;
+  return {...state, points: grades[0].entryPoints, bestTierIndex: Math.max(state.bestTierIndex, 0)};
 }
 
 export function writeRank(
-  transaction: Transaction, ref: DocumentReference, state: RankState, now: unknown,
+  transaction: Transaction, ref: DocumentReference, state: RankState, now: unknown, profile: unknown,
 ): void {
   transaction.set(ref, {
     schemaVersion: RANK_SCHEMA_VERSION,
@@ -148,6 +161,7 @@ export function writeRank(
   transaction.set(user.parent.parent!.collection("rankings").doc(user.id), {
     seasonId: state.seasonId,
     points: state.points,
+    profile: publicRankProfile(profile),
     updatedAt: now,
   });
 }
@@ -168,7 +182,15 @@ export async function ensureRankState(
   seasonId: string,
   grades: RankGradeRow[],
 ): Promise<RankState | null> {
-  return db.runTransaction(async (transaction) => {
+  const snapshot = await ensureRankSnapshot(db, env, uid, seasonId, grades);
+  return snapshot?.state ?? null;
+}
+
+// 이미 읽는 세이브에서 내 공개 프로필도 반환해 랭킹 조회의 추가 읽기를 없앤다.
+export async function ensureRankSnapshot(
+  db: Firestore, env: string, uid: string, seasonId: string, grades: RankGradeRow[],
+): Promise<{state: RankState; profile: RankPublicProfile} | null> {
+  return withCountedTransaction("ensureRankSnapshot", async (transaction) => {
     const currentRankRef = rankRef(db, env, uid);
     const payoutRef = db.doc(`envs/${env}/users/${uid}/payoutState/current`);
     const saveRef = db.doc(`envs/${env}/users/${uid}/save/current`);
@@ -184,7 +206,8 @@ export async function ensureRankState(
       seasonId,
       grades,
     );
-    state = adoptLegacyEntry(state, fallbackPoints, grades);
+    state = applyTutorialRankEntry(state, saveSnapshot.data(), grades);
+    const profile = publicRankProfile(saveSnapshot.data()?.profile);
 
     // 원본과 두 사본이 모두 맞으면 timestamp만 갱신하는 3회 쓰기를 생략한다.
     // 정규화 전 저장값과 비교해야 손상된 값도 복구된다. 색인도 같은 트랜잭션에서
@@ -196,13 +219,16 @@ export async function ensureRankState(
         stored.bestTierIndex === state.bestTierIndex && isDeepStrictEqual(stored.claimed, state.claimed) &&
         board?.seasonId === state.seasonId && board.points === state.points &&
         payoutSnapshot.data()?.currentPoints === state.points) {
-      return state;
+      if (!isDeepStrictEqual(board.profile, profile)) {
+        transaction.set(boardRef, {profile}, {mergeFields: ["profile"]});
+      }
+      return {state, profile};
     }
 
     const now = FieldValue.serverTimestamp();
-    writeRank(transaction, currentRankRef, state, now);
+    writeRank(transaction, currentRankRef, state, now, profile);
     // Keep rollback compatibility while payoutState remains deployed.
     transaction.set(payoutRef, {currentPoints: state.points, updatedAt: now}, {merge: true});
-    return state;
-  });
+    return {state, profile};
+  }, {}, db);
 }

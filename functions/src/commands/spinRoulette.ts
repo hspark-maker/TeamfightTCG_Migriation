@@ -1,4 +1,5 @@
 import {HttpsError, onCall} from "firebase-functions/v2/https";
+import {FieldValue} from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import {randomInt, randomUUID} from "node:crypto";
 import {isKnownEnv, requireUid, mutateSave} from "../save/saveDocument";
@@ -10,6 +11,11 @@ import {db} from "../firebaseApp";
 import {rankRef} from "../rank/rankStore";
 import {RewardGain, RewardItem, parseRewardRows} from "../rewardTable";
 import {grantRewardItems, loadItemGrantContext, GrantedItems} from "../rewards/itemGrant";
+import {beginMissionBump, commitMissionProgress, missionResponse, MissionResponse} from "../missions/missionStore";
+import {missionPeriod} from "../missions/period";
+import {readMissionCatalog} from "../missions/missionSpec";
+import {applyGuideProgress} from "../missions/guideMutation";
+import {applySnackGrowthProgress} from "../missions/snackGrowthProgress";
 import {readSpecRows} from "../specs/specBlobReader";
 import {EVENTS} from "../analytics/eventNames";
 import {recordEvent} from "../observability/analyticsEvent";
@@ -81,6 +87,9 @@ export const spinRoulette = onCall(async (request) => {
     .map((slot) => ({rewardType: "Pack", rewardId: slot.rewardId, amount: slot.amount}));
   const itemContext = items.length ? await loadItemGrantContext(env, items) : null;
   const rewardRows = items.length ? parseRewardRows(await readSpecRows(env, "Reward")) : [];
+  const catalog = itemContext ? await readMissionCatalog(env) : [];
+  const period = missionPeriod(Date.now());
+  let missionState: MissionResponse | undefined;
 
   // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
   const txId = clientReceiptId(request.data?.txId, randomUUID());
@@ -93,6 +102,7 @@ export const spinRoulette = onCall(async (request) => {
 
   const result = await mutateSave(env, uid, "spinRoulette", {kind: "client", txId},
     async (current, transaction, wallet) => {
+      missionState = undefined;
       const rank = itemContext ? await transaction.get(rankRef(db, env, uid)) : null;
       const balances = wallet.balances;
       if (!canAfford(balances, board.priceType, board.price)) {
@@ -113,6 +123,13 @@ export const spinRoulette = onCall(async (request) => {
         {slots: {}, cards: [], currencies: []};
       granted = slot.currency === null ? itemGrant.currencies :
         [{currency: slot.currency, amount: slot.amount}];
+      if (itemContext && itemGrant.cards.length > 0) {
+        const missions = await beginMissionBump(transaction, db, env, uid, period);
+        applyGuideProgress(missions, current, itemGrant.slots, itemContext.cards, catalog);
+        applySnackGrowthProgress(missions, itemGrant.cards);
+        commitMissionProgress(transaction, missions, FieldValue.serverTimestamp());
+        missionState = missionResponse(missions.state, period, catalog);
+      }
 
       // 차감과 지급을 한 nextWallet 으로 묶는다 — 영수증 changes 가 순증감 한 줄로 남아야 한다.
       const paid = spend(balances, board.priceType, board.price);
@@ -132,6 +149,8 @@ export const spinRoulette = onCall(async (request) => {
         gain: drawn.currency === null ? null : {currency: drawn.currency, amount: drawn.amount},
         granted,
         cards: itemGrant.cards,
+        packs: itemGrant.packs ?? [],
+        ...(missionState ? {missions: missionState} : {}),
       };
     }, isLegacyRouletteReceipt);
 

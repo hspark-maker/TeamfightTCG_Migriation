@@ -1,3 +1,4 @@
+import {measuredCallable} from "../observability/requestMetrics";
 import {FieldValue} from "firebase-admin/firestore";
 import {randomUUID} from "node:crypto";
 import {db} from "../firebaseApp";
@@ -11,6 +12,7 @@ import {
 } from "../missions/missionStore";
 import {missionPeriod} from "../missions/period";
 import {readMissionCatalog} from "../missions/missionSpec";
+import {applyGuideProgress, readGuideCards} from "../missions/guideMutation";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {
@@ -56,7 +58,7 @@ function reject(reason: LimitBreakReject, message: string, context: Record<strin
  * 지갑을 건드리지 않는다 — 간식은 전역 재화가 아니라 cardGrowth 슬롯 안 카드별 값이다.
  * 확률 실패가 없어(클라 TryLimitBreak 에 판정이 없다) 통과하면 항상 단계가 오른다.
  */
-export const limitBreakCard = onCall(async (request) => {
+export const limitBreakCard = onCall(measuredCallable("limitBreakCard", async (request) => {
   const uid = requireUid(request.auth);
   const env = String(request.data?.env ?? "");
   const cardId = Number(request.data?.cardId ?? 0);
@@ -69,10 +71,11 @@ export const limitBreakCard = onCall(async (request) => {
   }
 
   // 스펙 읽기는 트랜잭션 밖이다 — 유저 문서와 무관하고, 재실행마다 다시 읽으면 비용만 는다.
-  const [ruleRows, curveRows, catalog] = await Promise.all([
+  const [ruleRows, curveRows, catalog, guideCards] = await Promise.all([
     readSpecRows(env, "CardEnhanceRule"),
     readSpecRows(env, "CardLimitBreak"),
     readMissionCatalog(env),
+    readGuideCards(env),
   ]);
 
   const rule = parseCardEnhanceRule(ruleRows);
@@ -150,17 +153,18 @@ export const limitBreakCard = onCall(async (request) => {
       snackCost = step.snackCost;
       snackLeft = currentSnack - step.snackCost;
 
+      const slots = {
+        cardGrowth: growthSlot(applyLimitBreak(entries, cardId, next, step.snackCost)),
+      };
+      applyGuideProgress(missions, current, slots, guideCards, catalog);
+
       // 진행도는 콜백 안에서 올린다 — 영수증 히트는 이 콜백을 건너뛰므로 재시도가 두 번 올리지 않는다.
       commitMissionBump(
         transaction, missions, EVENTS.cardLimitBreakCompleted.missionKey, 1, FieldValue.serverTimestamp());
       missionState = missionResponse(missions.state, period, catalog);
 
       // 지갑 키를 싣지 않는다 — 간식은 지갑 재화가 아니라 cardGrowth 슬롯 안 값이다.
-      return {
-        slots: {
-          cardGrowth: growthSlot(applyLimitBreak(entries, cardId, next, step.snackCost)),
-        },
-      };
+      return {slots};
     },
     (adopted) => {
       replayed = false;
@@ -179,4 +183,4 @@ export const limitBreakCard = onCall(async (request) => {
   }
 
   return result;
-});
+}));

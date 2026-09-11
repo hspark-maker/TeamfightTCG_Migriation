@@ -1,6 +1,7 @@
+import {measuredCallable} from "../observability/requestMetrics";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
-import {createHash} from "node:crypto";
+import {createHash, randomUUID} from "node:crypto";
 import {
   FieldValue,
   Timestamp,
@@ -10,7 +11,7 @@ import {db} from "../firebaseApp";
 import {withCountedTransaction} from "../observability/countedTransaction";
 import {EVENTS} from "../analytics/eventNames";
 import {recordEvent} from "../observability/analyticsEvent";
-import {beginMissionBump, commitMissionBumps, MissionBump} from "../missions/missionStore";
+import {commitMissionBumps, missionBumpFromSnapshot, missionsRef} from "../missions/missionStore";
 import {missionPeriod} from "../missions/period";
 import {
   decideMatch,
@@ -50,10 +51,10 @@ import {
   ReplayVerdict,
 } from "../battleReplayService";
 import {isBattleReplayEnabled} from "../battleReplayConfig";
-import {recordReplayDaily, ReplayDailyDelta} from "../battleReplayTelemetry";
+import {enqueueReplayDaily, ReplayDailyDelta} from "../battleReplayTelemetry";
 import {currentRankSeason, RankSeasonDef} from "../rank/rankSeason";
 import {
-  adoptLegacyEntry,
+  applyTutorialRankEntry,
   applyRankSeason,
   legacyClaimedTiers,
   legacyRankPoints,
@@ -274,7 +275,7 @@ function parseSubmitData(raw: unknown): SubmitData {
 
 
 // 기본 60초로는 재생 왕복(최악 40초) + 트랜잭션 2회를 못 견딘다.
-export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds: 120}, async (request) => {
+export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds: 120}, measuredCallable("submitMatchResult", async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "authentication required");
   const data = parseSubmitData(request.data);
@@ -567,16 +568,17 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
       db.doc(`envs/${data.env}/users/${entry.uid}/payoutState/current`));
     const saveRefs = entries.map((entry) =>
       db.doc(`envs/${data.env}/users/${entry.uid}/save/current`));
-    const rankSnapshots = await tx.getAll(...rankRefs);
-    const rankStateSnapshots = await tx.getAll(...rankStateRefs);
-    const saveSnapshots = await tx.getAll(...saveRefs);
+    const missionRefs = entries.map((entry) => missionsRef(db, data.env, entry.uid));
+    const snapshots = await tx.getAll(...rankRefs, ...rankStateRefs, ...saveRefs, ...missionRefs);
+    const count = entries.length;
+    const rankSnapshots = snapshots.slice(0, count);
+    const rankStateSnapshots = snapshots.slice(count, count * 2);
+    const saveSnapshots = snapshots.slice(count * 2, count * 3);
 
     // 미션 문서는 payout 쓰기보다 먼저 전부 읽는다. 정산 트랜잭션의 pending -> confirmed 전이가
     // matchId 멱등 게이트라 같은 제출을 다시 보내도 이 경로에는 재진입하지 않는다.
-    const missionBumps: MissionBump[] = [];
-    for (const entry of entries) {
-      missionBumps.push(await beginMissionBump(tx, db, data.env, entry.uid, period));
-    }
+    const missionBumps = missionRefs.map((ref, i) =>
+      missionBumpFromSnapshot(ref, snapshots[count * 3 + i], period));
 
     const settledAt = Timestamp.now();
     const payoutExpiresAt = Timestamp.fromMillis(settledAt.toMillis() + 180 * 24 * 60 * 60 * 1000);
@@ -594,7 +596,7 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
         rankSeason.seasonId,
         rankRows,
       );
-      rankState = adoptLegacyEntry(rankState, fallbackPoints, rankRows);
+      rankState = applyTutorialRankEntry(rankState, saveSnapshots[i].data(), rankRows);
       const rankBefore = rankState.points;
       const rankSequence = Number.isSafeInteger(storedSequence) ? (storedSequence as number) + 1 : 1;
       const owner = ownerIndexByUid?.[entry.uid] ?? -1;
@@ -636,7 +638,7 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
         expiresAt: payoutExpiresAt,
       };
       tx.set(db.doc(`envs/${data.env}/users/${entry.uid}/payouts/${data.matchId}`), payout);
-      writeRank(tx, rankRefs[i], rankState, settledAt);
+      writeRank(tx, rankRefs[i], rankState, settledAt, saveSnapshots[i].data()?.profile);
       tx.set(rankStateRefs[i], {
         currentPoints: rank.after,
         sequence: rankSequence,
@@ -743,13 +745,17 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
   // 재생은 HTTP 호출이라 Firestore 트랜잭션 안에서 돌릴 수 없다. 트랜잭션이 "이 입력의 재생이
   // 필요하다"고 지문과 함께 물러나면, 여기서 받아 와 같은 입력으로 다시 들어간다.
   let replay: CachedReplay | null = null;
+  const telemetryEventId = randomUUID();
   for (let attempt = 0; attempt < SETTLE_ATTEMPTS; attempt++) {
     const outcome = await withCountedTransaction("submitMatchResult",
-      (tx: Transaction) => settle(tx, replay));
+      async (tx: Transaction) => {
+        const result = await settle(tx, replay);
+        if (result.kind === "done" && result.telemetry != null) {
+          enqueueReplayDaily(tx, data.env, telemetryEventId, result.telemetry);
+        }
+        return result;
+      });
     if (outcome.kind === "done") {
-      if (outcome.telemetry != null) {
-        await recordReplayDaily(data.env, outcome.telemetry);
-      }
       // 계측 델타가 있다고 정산된 것이 아니다 — 재생 불가로 pending 에 머문 갈래도 델타를 낸다
       // (settled:0). 그 갈래에 이벤트를 내면 매치 하나가 완료로 잡히고, matchId 중복 제거가
       // 나중에 오는 진짜 정산 행을 덮을 수 있다. 실제로 정산이 커밋된 경우에만 낸다.
@@ -794,4 +800,4 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
   // 제출은 그대로 다시 보낼 수 있다.
   logger.error("battle_replay_fingerprint_unstable", {matchId: data.matchId, env: data.env});
   throw new HttpsError("unavailable", "battle replay could not be resolved");
-});
+}));

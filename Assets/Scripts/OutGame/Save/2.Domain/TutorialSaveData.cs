@@ -26,4 +26,11 @@ public class TutorialSaveData
 
     // 완주한 트리거 튜토리얼 키(EOutgameTutorialTrigger 이름)
     [FirestoreProperty("completedTriggers")] public List<string> CompletedTriggers { get; set; } = new List<string>();
+    // 모험 흐름의 세이브 버전(AdventureUnlock.MigrateLegacyProgress가 올린다). 2 = 도입 진행이 CompletedTriggers 낙인으로 통합된 판.
+    [FirestoreProperty("adventureFlowVersion")] public int AdventureFlowVersion { get; set; }
+    [FirestoreProperty("adventureUnlocked")] public bool AdventureUnlocked { get; set; }
+    // 폐기 — v1 세이브의 도입 완주를 v2 낙인으로 옮길 때 읽기만 한다(AdventureUnlock.MigrateLegacyProgress). 런타임은 쓰지 않는다.
+    // 같은 판의 adventureIntroStarted/Deferred/StepId는 지웠다 — 문서에 남아 있어도 UnknownPropertyHandling.Ignore가 버린다.
+    [FirestoreProperty("adventureIntroCompleted")] public bool AdventureIntroCompleted { get; set; }
+    [FirestoreProperty("synergyIntroduction")] public SynergyIntroductionSaveData SynergyIntroduction { get; set; } = new SynergyIntroductionSaveData();
 }

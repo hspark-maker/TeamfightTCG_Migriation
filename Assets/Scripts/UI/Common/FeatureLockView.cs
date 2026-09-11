@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
@@ -26,12 +27,17 @@ public class FeatureLockView : MonoBehaviour
     Vector3    m_badgeScale0;    // 연출이 잘려도 저작 배율로 돌아갈 자리
 
     Sequence m_unlockFx;
+    Tween m_unlockPunch;
+    bool m_explicitPresentation;
     bool     m_wasLocked;        // 직전 적용 결과. 잠김→활성 뒤집힘을 이 컴포넌트가 스스로 잡는다
     bool     m_synced;           // 첫 적용은 상태 맞추기일 뿐이라 연출을 태우지 않는다
 
     List<UiGrayscale.Toned> m_toned;
 
     public EOutgameFeature Feature => feature;
+
+    /// <summary>명시적으로 시작한 해금 연출이 살아 있는가.</summary>
+    public bool IsPresenting => m_explicitPresentation && m_unlockFx != null && m_unlockFx.IsActive();
 
     /// <summary>지금 이 UI가 잠겨 있는가. 튜토리얼 게이트가 "왜 타깃이 안 눌리는지"를 진단할 때 읽는다.</summary>
     public bool IsLocked => feature != EOutgameFeature.None && !OutgameFeatureLock.IsUnlocked(feature);
@@ -89,7 +95,8 @@ public class FeatureLockView : MonoBehaviour
         // 각자 자기 직전 상태를 알고 있어 그것만으로 "방금 내가 열렸다"가 성립한다.
         // 판정을 IsUnlocked 뒤에 두는 것이 재진입 방어이기도 하다 — 중첩 호출이 이미 상태를 갱신했으면
         // 바깥은 여기서 false를 받아 같은 해제로 두 번 터지지 않는다.
-        bool t_justUnlocked = !_silent && this.m_synced && this.m_wasLocked && t_unlocked;
+        bool t_justUnlocked = !_silent && this.m_synced && this.m_wasLocked && t_unlocked
+            && !ContentUnlockManager.TryGetKey(this.feature, out _);
 
         this.m_wasLocked = !t_unlocked;
         this.m_synced    = true;
@@ -99,6 +106,7 @@ public class FeatureLockView : MonoBehaviour
 
         if (t_unlocked)
         {
+            if (this.m_explicitPresentation) return;
             if (t_justUnlocked) PlayUnlockFx();
             else              { KillUnlockFx(); HideBadge(); }
             return;
@@ -121,13 +129,14 @@ public class FeatureLockView : MonoBehaviour
     /// <summary>잠김이 걷히는 한 박 — 자물쇠가 부풀며 사라지고 같은 박자에 대상이 한 번 튄다.
     /// 색은 이 메서드에 오기 전에 이미 돌아와 있다. 원색이 자물쇠와 함께 걷혀서는 안 되고
     /// 자물쇠가 터지는 프레임에 이미 들어와 있어야 "열렸다"가 사건으로 읽힌다.</summary>
-    void PlayUnlockFx()
+    void PlayUnlockFx(Action _onComplete = null)
     {
         KillUnlockFx();
 
         if (this.m_badge == null || this.unlockFxDuration <= 0f)
         {
             HideBadge();
+            _onComplete?.Invoke();
             return;
         }
 
@@ -144,13 +153,40 @@ public class FeatureLockView : MonoBehaviour
         this.m_unlockFx = DOTween.Sequence().SetLink(gameObject)
                                  .Append(t_tr.DOScale(this.m_badgeScale0 * 1.6f, t_len).SetEase(Ease.OutQuad))
                                  .Join(t_cg.DOFade(0f, t_len).SetEase(Ease.InQuad))
-                                 .OnComplete(HideBadge);
+                                 .OnComplete(() =>
+                                 {
+                                     this.m_unlockFx = null;
+                                     this.m_explicitPresentation = false;
+                                     HideBadge();
+                                     _onComplete?.Invoke();
+                                 });
 
-        UiPunch.Play(transform);
+        this.m_unlockPunch = UiPunch.Play(transform, _duration: t_len);
+    }
+
+    /// <summary>보관된 콘텐츠 해금 사건을 명시적으로 재생한다.</summary>
+    public bool PresentUnlock(Action _onComplete)
+    {
+        if (!isActiveAndEnabled || IsLocked) return false;
+        EnsureBadge();
+        UiGrayscale.Restore(this.m_toned);
+        PlayUnlockFx(_onComplete);
+        this.m_explicitPresentation = this.m_unlockFx != null;
+        return true;
+    }
+
+    /// <summary>중단된 연출을 걷고 현재 잠금 상태로 돌아간다.</summary>
+    public void CancelPresentation()
+    {
+        KillUnlockFx();
+        Apply(_silent: true);
     }
 
     void KillUnlockFx()
     {
+        this.m_explicitPresentation = false;
+        this.m_unlockPunch?.Complete();
+        this.m_unlockPunch = null;
         if (this.m_unlockFx == null) return;
 
         // 먼저 비우고 죽인다 — Kill이 부르는 콜백이 다시 이 메서드로 들어와도 한 번만 돈다.

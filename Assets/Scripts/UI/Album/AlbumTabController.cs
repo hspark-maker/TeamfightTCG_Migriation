@@ -52,7 +52,7 @@ public class AlbumTabController : LobbyTabPanel
         // 여기서 막지 않으면 테마를 누르라는 스텝을 세션이 대신 해 버린다.
         // 단 전체 해금(첫 랭크 승급) 뒤로는 예외를 걷는다 — 그 구간의 획득은 안내가 짠 것이 아니라 유저가 스스로 산 것이라
         // 일반 경로와 같은 길(획득 → 도감 → 삽입)을 타야 한다.
-        if (OutgameTutorialRunner.IsRunning && !OutgameFeatureLock.AllUnlocked
+        if (OutgameTutorialRunner.IsRunning && !OutgameFeatureLock.IsFtueFreeNavigation
             && (pageOverlay == null || !pageOverlay.gameObject.activeSelf)) return;
 
         var t_session = ResolveInsertSession();

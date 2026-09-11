@@ -20,6 +20,7 @@
     <type fullname="TournamentSaveData" preserve="all"/>
     <type fullname="TutorialSaveData" preserve="all"/>
     <type fullname="ProfileSaveData" preserve="all"/>
+    <type fullname="ContentUnlockSaveData" preserve="all"/>
     <type fullname="ServerSlotPatch" preserve="all"/>
     <type fullname="ServerCommandResult" preserve="all"/>
     <type fullname="WalletPatch" preserve="all"/>

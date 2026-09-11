@@ -13,6 +13,7 @@
  */
 
 import {parsePoolGrade} from "./rankGrade";
+import type {SnackGrowth} from "../growth/cardGrowth";
 
 /** 중복 1장이 주는 간식 수. 클라 CardPackOpener.SnackPerDuplicate 와 같아야 한다. */
 export const SNACK_PER_DUPLICATE = 1;
@@ -37,6 +38,8 @@ export interface DrawnCard {
   cardId: number;
   isNew: boolean;
   snack: number;
+  /** 존재하면 클라는 이 카드의 간식 성장 연출을 생략하지 않는다. */
+  snackGrowth?: SnackGrowth;
 }
 
 /** 난수원. 0 이상 max 미만의 정수를 낸다(crypto.randomInt 형태). */

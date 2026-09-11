@@ -77,6 +77,14 @@ public class LobbyRankEffectDirector : MonoBehaviour
         this.StartCoroutine(this.PlayWhenReady());
     }
 
+    // 같은 로비에서 비동기 첫 진입이 늦게 준비돼도 캐리어가 다음 복귀까지 남지 않게 한다.
+    internal static void ResumePending()
+    {
+        if (s_instance == null || !s_finished) return;
+        s_finished = false;
+        s_instance.StartCoroutine(s_instance.PlayWhenReady());
+    }
+
     void OnDisable()
     {
         // 재생에 닿지 못한 채 꺼지면 정지한 시퀀스가 RankHud.Render의 연출 가드를 영영 막아 표시가 과거에 고착된다.
@@ -94,6 +102,7 @@ public class LobbyRankEffectDirector : MonoBehaviour
         {
             // 탭 선택(LobbyTabController.Start)과 레이아웃이 끝나야 배지 좌표가 확정된다(LobbyGainEffectDirector와 같은 이유).
             yield return null;
+            yield return new WaitWhile(() => OutgameTutorialBridge.IsRankEntryPending);
             Canvas.ForceUpdateCanvases();
 
             // 연출할 자리가 없어도 소비한다 — 남기면 다음 전투 결과에 옛 소식이 병합돼 두 배로 계산된다.
@@ -116,11 +125,11 @@ public class LobbyRankEffectDirector : MonoBehaviour
             s_finished = true;
             OnAnyFinished?.Invoke();
 
-            // 트리거 안내는 이 통지 "뒤"에 깨운다 — 트리거 문을 여는 것(NotifyRankPromotionFinished)이
+            // 자율 안내는 이 통지 "뒤"에 깨운다 — 미룬 졸업을 확정하는 것이
             // 이 신호를 받은 온보딩 브리지라, 앞서 발화하면 문이 닫힌 채라 Fire가 조용히 거절된다.
             var t_trigger = this.m_promoteTrigger;
             this.m_promoteTrigger = EOutgameTutorialTrigger.None;
-            TriggeredTutorialRunner.Fire(t_trigger);
+            GuidanceCoordinator.TryFire(t_trigger);
         }
     }
 

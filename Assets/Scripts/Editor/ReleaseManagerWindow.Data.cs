@@ -10,6 +10,7 @@ public partial class ReleaseManagerWindow
     const string DATA_SELECTION_PREF_KEY = "SpecFirestore.Selected";
     const string DATA_SELECTION_INITIALIZED_PREF_KEY = "SpecFirestore.Selected.Initialized";
     const string DATA_PUBLISH_PREF_KEY = "SpecFirestore.PublishIndex";
+    const string DATA_GENERATION_REPORT_KEY = "SpecFirestore.GenerationReport";
     const int CONTENT_NOTICE_BODY_MAX_LENGTH = 200;
 
     EContentRunMode dataUploadMode;
@@ -19,6 +20,7 @@ public partial class ReleaseManagerWindow
     string dataReport;
     // 업로드가 끝나면 새 콘텐츠 버전을 공개할지. 끄면 표 문서만 올라가고 _index 포인터는 그대로다.
     bool dataPublishIndex = true;
+    bool dataAdvanceGeneration;
     string dataPublishNoticeTitle = string.Empty;
     string dataPublishNoticeBody = string.Empty;
     Vector2 dataScroll;
@@ -30,6 +32,12 @@ public partial class ReleaseManagerWindow
     {
         this.dataUploadMode = ContentRunModeEditor.Current;
         ReloadDataTables();
+        string t_generationReport = SessionState.GetString(DATA_GENERATION_REPORT_KEY, string.Empty);
+        if (!string.IsNullOrEmpty(t_generationReport))
+        {
+            this.dataReport = t_generationReport;
+            SessionState.EraseString(DATA_GENERATION_REPORT_KEY);
+        }
         RefreshRulesState();
     }
 
@@ -76,8 +84,9 @@ public partial class ReleaseManagerWindow
         DrawDataTableSelection();
 
         EditorGUILayout.Space(6);
+        DrawDataGenerationControl();
         bool t_publish = EditorGUILayout.ToggleLeft(
-            "업로드 후 테이블 버전을 올린다 (_index 공개)", this.dataPublishIndex);
+            "업로드 후 공개 시리얼 올리기 (_index 공개 · 테이블 세대 유지)", this.dataPublishIndex);
         if (t_publish != this.dataPublishIndex)
         {
             this.dataPublishIndex = t_publish;
@@ -131,6 +140,43 @@ public partial class ReleaseManagerWindow
         }
 
         EditorGUILayout.EndScrollView();
+    }
+
+    void DrawDataGenerationControl()
+    {
+        this.dataAdvanceGeneration = EditorGUILayout.ToggleLeft(
+            $"테이블 버전 올리기 (컬럼 계약 변경 · 세대 {ContentVersion.Major} → {(long)ContentVersion.Major + 1})",
+            this.dataAdvanceGeneration);
+        if (!this.dataAdvanceGeneration) return;
+
+        EditorGUILayout.HelpBox(
+            "적용하면 클라이언트·서버·content-version.json의 세대와 최소 요구 세대를 함께 올립니다. " +
+            "지원 목록은 새 세대만 남깁니다.\n" +
+            "컴파일 후 새 앱 빌드와 Functions 배포를 준비하고 전체 표를 업로드하세요. " +
+            "세대 적용은 업로드·공개·SpecData 산출물 생성을 실행하지 않습니다.", MessageType.Info);
+        ContentVersionConsistency.TryValidate(out string t_error);
+        using (new EditorGUI.DisabledScope(EditorApplication.isCompiling ||
+                   ContentVersion.Major == int.MaxValue || t_error != null))
+        {
+            if (!GUILayout.Button("테이블 세대 변경 적용", GUILayout.Height(28))) return;
+            if (!ContentVersionConsistency.TryAdvanceGeneration(out int t_next, out string t_advanceError))
+            {
+                this.dataReport = t_advanceError;
+                return;
+            }
+
+            this.dataAdvanceGeneration = false;
+            // 공개 인덱스는 모든 표의 세대가 같아야 한다. 재컴파일 뒤에도 전체 선택을 유지한다.
+            this.dataSelected = new HashSet<string>(this.dataTables);
+            EditorPrefs.SetString(DATA_SELECTION_PREF_KEY, string.Join("|", this.dataSelected));
+            EditorPrefs.SetBool(DATA_SELECTION_INITIALIZED_PREF_KEY, true);
+            this.dataReport = $"테이블 세대 {ContentVersion.Major} → {t_next} 적용 완료.\n" +
+                              "컴파일 후 새 앱 빌드·Functions 배포를 준비하고 전체 표를 업로드하세요.\n" +
+                              "아직 업로드하거나 공개하지 않았습니다.";
+            SessionState.SetString(DATA_GENERATION_REPORT_KEY, this.dataReport);
+            AssetDatabase.Refresh();
+            GUIUtility.ExitGUI();
+        }
     }
 
     void DrawRulesState()
@@ -292,6 +338,8 @@ public partial class ReleaseManagerWindow
 
     string DataUploadBlocker(bool _hasEnv, string _envError)
     {
+        if (EditorApplication.isCompiling) return "스크립트 컴파일 완료 후 업로드할 수 있다.";
+        if (this.dataAdvanceGeneration) return "테이블 세대 변경을 먼저 적용하거나 체크를 해제해야 한다.";
         if (!_hasEnv) return _envError;
         if (!ContentVersionConsistency.TryValidate(out string t_versionError)) return t_versionError;
         if (!SpecAdminAuth.IsSignedIn) return "관리자 로그인이 필요하다.";

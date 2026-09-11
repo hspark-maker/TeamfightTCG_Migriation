@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.claimReward = void 0;
+const requestMetrics_1 = require("../observability/requestMetrics");
 const firestore_1 = require("firebase-admin/firestore");
 const node_crypto_1 = require("node:crypto");
 const firebaseApp_1 = require("../firebaseApp");
@@ -42,6 +43,8 @@ const analyticsEvent_1 = require("../observability/analyticsEvent");
 const missionStore_1 = require("../missions/missionStore");
 const period_1 = require("../missions/period");
 const missionSpec_1 = require("../missions/missionSpec");
+const guideMutation_1 = require("../missions/guideMutation");
+const snackGrowthProgress_1 = require("../missions/snackGrowthProgress");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
 const saveDocument_1 = require("../save/saveDocument");
@@ -265,7 +268,7 @@ function claimAlbumReward(current, entryRows, themeRows, context) {
  * 판정 근거는 전부 스펙 표에 있고(RankGrade · AdventureChapter · AlbumEntry · AlbumThemeInfo) 표가 비면
  * fail-closed 로 거절한다. 지급은 지갑 문서로 나가고 세이브에는 낙인 슬롯만 남는다.
  */
-exports.claimReward = (0, https_1.onCall)(async (request) => {
+exports.claimReward = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)("claimReward", async (request) => {
     const uid = (0, saveDocument_1.requireUid)(request.auth);
     const env = String(request.data?.env ?? "");
     const ownerType = String(request.data?.ownerType ?? "");
@@ -326,7 +329,9 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
     }
     // 랭크는 티어 인덱스를 정규 표기로 되돌려 조회한다 — 클라 RankConfig.FillRewards 가 쓰는 키와 같아야 한다.
     const specOwnerId = ownerType === "Rank" ? String(tierIndex) : ownerId;
-    const [rawRewardRows, catalog] = await Promise.all([(0, packSpecReader_1.readSpecRows)(env, "Reward"), (0, missionSpec_1.readMissionCatalog)(env)]);
+    const [rawRewardRows, catalog, guideCards] = await Promise.all([
+        (0, packSpecReader_1.readSpecRows)(env, "Reward"), (0, missionSpec_1.readMissionCatalog)(env), (0, guideMutation_1.readGuideCards)(env),
+    ]);
     const rewardRows = (0, rewardTable_1.parseRewardRows)(rawRewardRows);
     const judgement = (0, rewardTable_1.judgeRewardClaim)(rewardRows, ownerType, specOwnerId);
     const { gains, items, dropped } = judgement;
@@ -376,7 +381,7 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
             const fallbackPoints = (0, rankStore_1.legacyRankPoints)(payoutSnapshot.data(), current);
             const fallbackClaimed = (0, rankStore_1.legacyClaimedTiers)(current, tierCount);
             rankState = (0, rankStore_1.applyRankSeason)((0, rankStore_1.readRank)(rankSnapshot, fallbackPoints, fallbackClaimed, rankGrades), rankSeason.seasonId, rankGrades);
-            rankState = (0, rankStore_1.adoptLegacyEntry)(rankState, fallbackPoints, rankGrades);
+            rankState = (0, rankStore_1.applyTutorialRankEntry)(rankState, current, rankGrades);
         }
         // 지급은 자격 판정보다 먼저 계산해도 안전하다 — 거절은 아래 낙인 함수들이 던지고, 던지면 트랜잭션 전체가 없던 일이 된다.
         // 줄 것이 없으면 지갑을 아예 쓰지 않는다(claimBattleReward·claimPayout 과 같은 정책) — 보상 미저작 정점의
@@ -393,28 +398,31 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
         //
         // 진행도를 올리는 것은 이 명령뿐이다 — claimMission 은 ClaimReward 를 올리지 않는다.
         // 올리면 미션 수령이 미션을 낳는 자기참조가 된다.
-        (0, missionStore_1.commitMissionBump)(transaction, missions, eventNames_1.EVENTS.rewardClaimed.missionKey, 1, firestore_1.FieldValue.serverTimestamp());
-        missionState = (0, missionStore_1.missionResponse)(missions.state, period, catalog);
+        const finish = (slots) => {
+            (0, guideMutation_1.applyGuideProgress)(missions, current, slots, guideCards, catalog);
+            (0, snackGrowthProgress_1.applySnackGrowthProgress)(missions, itemGrant.cards);
+            (0, missionStore_1.commitMissionBump)(transaction, missions, eventNames_1.EVENTS.rewardClaimed.missionKey, 1, firestore_1.FieldValue.serverTimestamp());
+            missionState = (0, missionStore_1.missionResponse)(missions.state, period, catalog);
+            return { slots, wallet: paid };
+        };
         if (ownerType === "Rank") {
             claimRankTier(rankState, tierIndex, context);
             rankProgress = (0, rankStore_1.rankProgressResponse)(rankState);
-            (0, rankStore_1.writeRank)(transaction, currentRankRef, rankState, firestore_1.FieldValue.serverTimestamp());
+            (0, rankStore_1.writeRank)(transaction, currentRankRef, rankState, firestore_1.FieldValue.serverTimestamp(), current.profile);
             transaction.set(payoutStateRef, { currentPoints: rankState.points, updatedAt: firestore_1.FieldValue.serverTimestamp() }, { merge: true });
-            return { slots: itemGrant.slots, wallet: paid };
+            return finish(itemGrant.slots);
         }
         if (ownerType === "Album") {
-            return {
-                slots: { ...itemGrant.slots, albumReward: claimAlbumReward(current, albumEntries, albumThemes, context) },
-                wallet: paid,
-            };
+            return finish({ ...itemGrant.slots, albumReward: claimAlbumReward(current, albumEntries, albumThemes, context) });
         }
         if (isChapter) {
-            return { slots: { ...itemGrant.slots, adventure: claimAdventureChapter(current, chapterNodes, context) }, wallet: paid };
+            return finish({ ...itemGrant.slots, adventure: claimAdventureChapter(current, chapterNodes, context) });
         }
-        return { slots: { ...itemGrant.slots, adventure: claimAdventureNode(current, chapterNodes, context) }, wallet: paid };
+        return finish({ ...itemGrant.slots, adventure: claimAdventureNode(current, chapterNodes, context) });
     }, (adopted) => {
         replayed = false;
-        return { ...adopted, granted, cards: itemGrant.cards, missions: missionState, rankProgress };
+        return { ...adopted, granted, cards: itemGrant.cards, packs: itemGrant.packs ?? [],
+            missions: missionState, rankProgress };
     });
     if (replayed) {
         logger.info("receipt replay", { uid, env, source: "claimReward", txId, revision: result.revision });
@@ -430,5 +438,5 @@ exports.claimReward = (0, https_1.onCall)(async (request) => {
         });
     }
     return result;
-});
+}));
 //# sourceMappingURL=claimReward.js.map

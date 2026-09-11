@@ -129,8 +129,8 @@ public partial class ReleaseManagerWindow
     {
         string t_action = _enabled ? "켜기" : "끄기";
         string t_warning = _enabled
-            ? "Cloud Run min instance를 먼저 1로 올렸는지 확인하십시오. 설정 전파에는 Functions 인스턴스별 최대 60초가 걸립니다."
-            : "최대 60초 뒤 Cloud Run 호출이 멈추고 클라이언트 합의 정산으로 후퇴합니다. 호출이 멎은 뒤 min instance를 0으로 내리십시오.";
+            ? "최소 인스턴스 0에서도 검증 요청이 오면 자동 기동합니다. 설정 전파에는 Functions 인스턴스별 최대 60초가 걸립니다."
+            : "최대 60초 뒤 Cloud Run 호출이 멈추고 클라이언트 합의 정산으로 후퇴합니다. 비용 절약만 필요하면 검증을 유지하고 최소 인스턴스를 0으로 설정하십시오.";
         if (!EditorUtility.DisplayDialog($"서버 전투 검증 {t_action}",
                 $"{ContentRunModeEditor.Label(this.replayEnvMode)} 환경의 검증을 {t_action}합니다.\n\n{t_warning}", t_action, "취소"))
             return;
@@ -211,7 +211,8 @@ public partial class ReleaseManagerWindow
             EditorGUILayout.HelpBox(this.replayCloudError, this.replayCloudNeedsLogin ? MessageType.Warning : MessageType.Error);
 
         EditorGUILayout.HelpBox(
-            "켜기: min 1 적용 후 검증 켜기. 끄기: 검증 끄기 → 60초 대기 후 min 0 적용.", MessageType.None);
+            "기본은 min 0: 검증 요청 시 자동 기동하고, 유휴 상태는 최대 약 15분 유지 후 자동 축소합니다. " +
+            "유휴 유지 시간은 보장되지 않습니다. 검증 토글은 켜둬도 됩니다. min 1은 상시 대기하며 유휴 과금이 발생합니다.", MessageType.None);
 
         using (new EditorGUI.DisabledScope(CloudRunControl.IsBusy))
         using (new EditorGUILayout.HorizontalScope())
@@ -223,12 +224,10 @@ public partial class ReleaseManagerWindow
 
         using (new EditorGUILayout.HorizontalScope())
         {
-            if (this.replayCloudNeedsLogin && GUILayout.Button("gcloud 로그인"))
+            using (new EditorGUI.DisabledScope(CloudRunControl.IsBusy))
             {
-                if (!CloudRunControl.TryOpenLogin(out string t_loginError))
-                    this.replayCloudError = t_loginError;
-                else
-                    this.replayReport = "새 콘솔 창에서 gcloud auth login 을 마친 뒤 '상태 조회' 를 다시 누르십시오.";
+                if (this.replayCloudNeedsLogin && GUILayout.Button("gcloud 로그인"))
+                    RunCloudRunLogin();
             }
             if (GUILayout.Button("min 1 명령 복사"))
                 CopyCommand(MinInstancesCommand(1));
@@ -239,7 +238,31 @@ public partial class ReleaseManagerWindow
 
     string MinInstancesCommand(int _min) =>
         $"gcloud run services update {CloudRunControl.SERVICE} --project {this.replayProjectId} " +
-        $"--region {CloudRunControl.REGION} --min {_min}";
+        $"--region {CloudRunControl.REGION} --scaling auto --min {_min} --min-instances 0 --cpu-throttling";
+
+    void RunCloudRunLogin()
+    {
+        this.replayCloudBusy = "브라우저에서 gcloud 로그인을 완료하십시오. 완료 후 상태를 자동 조회합니다.";
+        this.replayCloudError = null;
+        CloudRunControl.Login(t_result =>
+        {
+            if (this == null) return;
+            this.replayCloudBusy = null;
+            if (t_result.Ok)
+            {
+                this.replayCloudNeedsLogin = false;
+                this.replayReport = "gcloud 로그인 완료. Cloud Run 접근 권한과 상태를 확인합니다.";
+                this.RunCloudRunDescribe();
+            }
+            else
+            {
+                this.replayCloudNeedsLogin = true;
+                this.replayCloudError = t_result.Error;
+                this.Repaint();
+            }
+        });
+        this.Repaint();
+    }
 
     void RunCloudRunDescribe()
     {
@@ -258,9 +281,11 @@ public partial class ReleaseManagerWindow
         this.replayCloudNeedsLogin = _result.NeedsLogin;
         if (_result.Ok)
         {
-            // describe 는 "minScale<TAB>url" 한 줄을 준다. minScale 이 미설정이면 앞칸이 빈 문자열이다.
-            string[] t_parts = (_result.StdOut ?? string.Empty).Trim().Split('\t');
-            this.replayMinScale = t_parts.Length > 0 ? t_parts[0].Trim() : string.Empty;
+            // 서비스 최소값·URL·이미지·리비전 최소값. 미설정인 첫 칸의 탭은 보존한다.
+            string[] t_parts = (_result.StdOut ?? string.Empty).TrimEnd('\r', '\n').Split('\t');
+            int.TryParse(t_parts.Length > 0 ? t_parts[0].Trim() : null, out int t_serviceMin);
+            int.TryParse(t_parts.Length > 3 ? t_parts[3].Trim() : null, out int t_revisionMin);
+            this.replayMinScale = System.Math.Max(t_serviceMin, t_revisionMin).ToString();
             this.replayServiceUrl = t_parts.Length > 1 ? t_parts[1].Trim() : null;
             this.replayDeployedImage = t_parts.Length > 2 ? t_parts[2].Trim() : null;
         }
@@ -270,7 +295,7 @@ public partial class ReleaseManagerWindow
     void RunCloudRunSetMin(int _min)
     {
         string t_warning = _min == 0
-            ? "유휴 과금이 멈추는 대신 다음 요청이 콜드 스타트를 겪습니다. 검증 토글을 먼저 끄고 60초를 기다렸는지 확인하십시오."
+            ? "요청 기반 과금으로 설정하며 유휴 과금이 멈춥니다. 검증은 계속 사용할 수 있고, 인스턴스가 종료된 뒤 첫 요청에는 기동 지연이 생깁니다."
             : "인스턴스가 상시 대기하며 유휴 과금이 발생합니다.";
         if (!EditorUtility.DisplayDialog($"Cloud Run 최소 인스턴스 {_min}",
                 $"{CloudRunControl.SERVICE} ({CloudRunControl.REGION}) 의 최소 인스턴스를 {_min} 로 바꿉니다.\n" +

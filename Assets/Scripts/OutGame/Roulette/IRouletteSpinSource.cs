@@ -37,6 +37,7 @@ public readonly struct RouletteSpinOutcome
     public readonly string PackId;
     public readonly IReadOnlyList<DrawnCard> Cards;
     public readonly IReadOnlyList<CurrencyGain> Granted;
+    public readonly IReadOnlyList<GrantedRewardPack> Packs;
     public bool IsPack => !string.IsNullOrEmpty(PackId);
 
     public bool Success => Result == ERouletteSpinResult.Success;
@@ -48,11 +49,13 @@ public readonly struct RouletteSpinOutcome
         => new RouletteSpinOutcome(_result, INVALID_SLOT, ECurrencyType.Gold, 0L);
 
     public static RouletteSpinOutcome CreatePack(int _slotIndex, string _packId, long _amount,
-        IReadOnlyList<DrawnCard> _cards, IReadOnlyList<CurrencyGain> _granted)
-        => new RouletteSpinOutcome(ERouletteSpinResult.Success, _slotIndex, default, _amount, _packId, _cards, _granted);
+        IReadOnlyList<DrawnCard> _cards, IReadOnlyList<CurrencyGain> _granted,
+        IReadOnlyList<GrantedRewardPack> _packs = null)
+        => new RouletteSpinOutcome(ERouletteSpinResult.Success, _slotIndex, default, _amount, _packId, _cards, _granted, _packs);
 
     RouletteSpinOutcome(ERouletteSpinResult _result, int _slotIndex, ECurrencyType _currency, long _amount,
-        string _packId = null, IReadOnlyList<DrawnCard> _cards = null, IReadOnlyList<CurrencyGain> _granted = null)
+        string _packId = null, IReadOnlyList<DrawnCard> _cards = null, IReadOnlyList<CurrencyGain> _granted = null,
+        IReadOnlyList<GrantedRewardPack> _packs = null)
     {
         Result = _result;
         SlotIndex = _slotIndex;
@@ -61,6 +64,7 @@ public readonly struct RouletteSpinOutcome
         PackId = _packId;
         Cards = _cards;
         Granted = _granted;
+        Packs = _packs;
     }
 }
 

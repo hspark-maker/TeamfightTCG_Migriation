@@ -7,6 +7,11 @@ import {CurrencyGain, grant} from "../currency/wallet";
 import {nextWallet} from "../currency/walletStore";
 import {GrantedItems, grantRewardItems, loadItemGrantContext} from "../rewards/itemGrant";
 import {rankRef} from "../rank/rankStore";
+import {beginMissionBump, commitMissionProgress, missionResponse, MissionResponse} from "../missions/missionStore";
+import {missionPeriod} from "../missions/period";
+import {readMissionCatalog} from "../missions/missionSpec";
+import {applyGuideProgress} from "../missions/guideMutation";
+import {applySnackGrowthProgress} from "../missions/snackGrowthProgress";
 import {db} from "../firebaseApp";
 import {recordEvent} from "../observability/analyticsEvent";
 import {readSpecRows} from "../packs/packSpecReader";
@@ -81,6 +86,9 @@ export const claimPassReward = onCall(async (request) => {
 
   const txId = clientReceiptId(request.data?.txId, randomUUID());
   const itemContext = items.length ? await loadItemGrantContext(env, items) : null;
+  const catalog = itemContext ? await readMissionCatalog(env) : [];
+  const period = missionPeriod(nowMs);
+  let missionState: MissionResponse | undefined;
   let itemGrant: GrantedItems = {slots: {}, cards: [], currencies: []};
   let replayed = true;
   let progress: PassProgressResponse | undefined;
@@ -90,6 +98,7 @@ export const claimPassReward = onCall(async (request) => {
     async (current, transaction, wallet): Promise<SaveMutation> => {
       const pass = await beginPassMutation(transaction, db, env, uid, season.seasonId);
       const rankSnapshot = itemContext === null ? null : await transaction.get(rankRef(db, env, uid));
+      const missions = itemContext ? await beginMissionBump(transaction, db, env, uid, period) : null;
       if (pass.state.claimed[String(level)] === true) {
         throw new HttpsError("already-exists", `PASS_ALREADY_CLAIMED level=${level}`);
       }
@@ -104,6 +113,12 @@ export const claimPassReward = onCall(async (request) => {
         grantRewardItems(current, items, itemContext, rewardRows, String(request.data?.selectedPackId ?? ""),
           Number(rankSnapshot?.data()?.points ?? (current.rank as {points?: number})?.points ?? 0));
       granted = [...authoredRewards, ...itemGrant.currencies];
+      if (missions && itemContext) {
+        applyGuideProgress(missions, current, itemGrant.slots, itemContext.cards, catalog);
+        applySnackGrowthProgress(missions, itemGrant.cards);
+        commitMissionProgress(transaction, missions, FieldValue.serverTimestamp());
+        missionState = missionResponse(missions.state, period, catalog);
+      }
       commitPassClaim(transaction, pass, level, FieldValue.serverTimestamp());
       progress = passProgressResponse(pass.state);
       return {
@@ -113,7 +128,9 @@ export const claimPassReward = onCall(async (request) => {
     },
     (adopted) => {
       replayed = false;
-      return {...adopted, seasonId: season.seasonId, level, granted, cards: itemGrant.cards, progress};
+      return {...adopted, seasonId: season.seasonId, level, granted,
+        cards: itemGrant.cards, packs: itemGrant.packs ?? [], progress,
+        ...(missionState ? {missions: missionState} : {})};
     });
 
   if (replayed) {

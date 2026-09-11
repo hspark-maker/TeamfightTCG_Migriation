@@ -14,17 +14,25 @@ public sealed class TutorialSequenceState
     {
         static readonly HashSet<EOutgameFeature> s_empty = new HashSet<EOutgameFeature>();
 
-        public readonly bool AllUnlocked;
+        public readonly bool IsFtueFreeNavigation;
 
         readonly HashSet<EOutgameFeature> m_unlocked;
         readonly HashSet<EOutgameFeature> m_locked;
+        readonly bool m_ftueCompleted;
+        readonly EOutgameFeature m_prerequisite;
+        readonly IReadOnlyList<ContentUnlockDef> m_contentUnlocks;
 
         // 좌표는 싣지 않는다 — 이 값을 얻는 유일한 길이 TryGet(chapter, step, ...)이라 호출자가 이미 알고 있다
-        public StepState(bool _allUnlocked, HashSet<EOutgameFeature> _unlocked, HashSet<EOutgameFeature> _locked)
+        public StepState(bool _allUnlocked, HashSet<EOutgameFeature> _unlocked, HashSet<EOutgameFeature> _locked,
+                         bool _ftueCompleted = false, EOutgameFeature _prerequisite = EOutgameFeature.None,
+                         IReadOnlyList<ContentUnlockDef> _contentUnlocks = null)
         {
-            AllUnlocked = _allUnlocked;
+            IsFtueFreeNavigation = _allUnlocked;
             m_unlocked  = _unlocked;
             m_locked    = _locked;
+            m_ftueCompleted = _ftueCompleted;
+            m_prerequisite = _prerequisite;
+            m_contentUnlocks = _contentUnlocks;
         }
 
         // 이 스텝까지의 누적 해금 — 자기 스텝의 unlocks가 이미 반영돼 있다(EnumerateUpTo가 자기 칸을 포함한다)
@@ -37,11 +45,17 @@ public sealed class TutorialSequenceState
         public bool IsUnlocked(EOutgameFeature _feature)
         {
             if (_feature == EOutgameFeature.None) return true;
+            if (ContentUnlockManager.TryGetKey(_feature, out string t_key))
+            {
+                if (m_ftueCompleted && m_prerequisite == _feature) return true;
+                if (!ContentUnlockConfig.TryGet(m_contentUnlocks, t_key, out ContentUnlockRule t_rule)) return false;
+                return ContentUnlockRules.Evaluate(t_rule, m_ftueCompleted, true, false, -1, 0, true, 1).IsUnlocked;
+            }
 
             // 일시 잠금이 해금보다 우선한다 — 이미 열린 기능도, 전체 해금 상태에서도 그 스텝 동안은 닫힌다
             if (m_locked != null && m_locked.Contains(_feature)) return false;
 
-            return AllUnlocked || (m_unlocked != null && m_unlocked.Contains(_feature));
+            return IsFtueFreeNavigation || (m_unlocked != null && m_unlocked.Contains(_feature));
         }
 
         /// <summary>목록 한 줄 표시용 요약</summary>
@@ -49,7 +63,7 @@ public sealed class TutorialSequenceState
         {
             get
             {
-                string t_head = AllUnlocked           ? "전체 해금"
+                string t_head = IsFtueFreeNavigation  ? "FTUE 자유 이동"
                               : Unlocked.Count > 0    ? $"해금 {Unlocked.Count}"
                                                       : "해금 없음";
 
@@ -72,14 +86,27 @@ public sealed class TutorialSequenceState
         var  t_unlocked = new HashSet<EOutgameFeature>();
         bool t_all      = false;
 
+        // 선두의 연속 강제 챕터까지만 누적한다(OutgameTutorialRunner.ForcedChapterCount의 거울).
+        // 그 뒤의 자율 챕터는 졸업 뒤에만 서므로 "전부 열림·잠금 없음" 스냅샷 하나로 본다 — 런타임의 s_all = !running과 같다.
+        bool t_guidedZone = false;
+
         for (int t_c = 0; t_c < _data.chapters.Count; t_c++)
         {
             var t_chapter = _data.chapters[t_c];
             if (t_chapter == null) continue;
 
+            if (t_chapter.IsGuided) t_guidedZone = true;
+
             for (int t_s = 0; t_s < t_chapter.StepCount; t_s++)
             {
                 if (!t_chapter.TryGetStep(t_s, out var t_step)) continue;
+
+                if (t_guidedZone)
+                {
+                    t_result.m_states[(t_c, t_s)] = new StepState(true, new HashSet<EOutgameFeature>(t_unlocked), null,
+                                                               true, t_chapter.Prerequisite, _data.contentUnlocks);
+                    continue;
+                }
 
                 // 자기 칸의 저작이 자기 자신에게 이미 적용된다 — 이 순서를 뒤집으면 앵커 잠김 규칙이 오탐을 낸다
                 if (t_step.UnlocksAll) t_all = true;
@@ -92,7 +119,8 @@ public sealed class TutorialSequenceState
                 bool t_allHere = t_all || (t_unlocked.Count == 0 && !t_hasAuthored);
 
                 t_result.m_states[(t_c, t_s)] =
-                    new StepState(t_allHere, new HashSet<EOutgameFeature>(t_unlocked), t_locked);
+                    new StepState(t_allHere, new HashSet<EOutgameFeature>(t_unlocked), t_locked, false,
+                                  EOutgameFeature.None, _data.contentUnlocks);
             }
         }
 
@@ -111,12 +139,14 @@ public sealed class TutorialSequenceState
             if (_features[t_i] != EOutgameFeature.None) _set.Add(_features[t_i]);
     }
 
+    // 강제 챕터만 본다 — 런타임 EnumerateUpTo도 강제 경계 안에서만 돈다
     static bool HasAnyAuthoredUnlock(OutgameTutorialData _data)
     {
         for (int t_c = 0; t_c < _data.chapters.Count; t_c++)
         {
             var t_chapter = _data.chapters[t_c];
             if (t_chapter == null) continue;
+            if (t_chapter.IsGuided) break;
 
             for (int t_s = 0; t_s < t_chapter.StepCount; t_s++)
             {

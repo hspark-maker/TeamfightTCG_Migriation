@@ -13,4 +13,5 @@ public class ProfileSaveData
 
     // 계정 레벨은 이 누적치의 파생이라 레벨 자체는 저장하지 않는다(AccountLevelManager).
     [FirestoreProperty("accountExp")] public long AccountExp { get; set; }
+    [FirestoreProperty("contentUnlocks")] public ContentUnlockSaveData ContentUnlocks { get; set; } = new ContentUnlockSaveData();
 }

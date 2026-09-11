@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-// 튜토리얼 진행 좌표에서 파생되는 기능 해금의 단일 창구(저장하지 않음)
+// FTUE 입력 해금 창구. 콘텐츠 이용 자격은 ContentUnlockManager에 위임한다.
 // 불변식: 스텝이 지목하는 앵커의 기능은 그 스텝까지의 누적 unlocks에 포함되어야 한다(어기면 게이트가 무한 대기)
 public static class OutgameFeatureLock
 {
@@ -46,6 +46,8 @@ public static class OutgameFeatureLock
     public static bool IsUnlocked(EOutgameFeature _feature)
     {
         if (_feature == EOutgameFeature.None) return true;
+        if (ContentUnlockManager.TryGetKey(_feature, out string t_content))
+            return s_forceUnlockAll || ContentUnlockManager.IsUnlocked(t_content);
 
         Refresh();
 
@@ -55,10 +57,8 @@ public static class OutgameFeatureLock
         return s_all || s_unlocked.Contains(_feature);
     }
 
-    // 남은 기능이 전부 열렸는가(저작의 UnlocksAll·정지 판정·디버그 전체 해금 중 하나라도 섰으면 참).
-    // 안내는 아직 돌고 있어도 게임의 문은 이미 다 열린 구간이라는 뜻이다 —
-    // "안내 중이라 막는다"는 예외를 그 구간에서 걷어야 할 때 이걸 본다(일시 잠금은 여기에 섞지 않는다).
-    public static bool AllUnlocked
+    // FTUE의 자유 이동 구간인지 판정한다. 콘텐츠 조건과 스텝의 일시 잠금은 별도로 확인한다.
+    public static bool IsFtueFreeNavigation
     {
         get
         {
@@ -74,6 +74,9 @@ public static class OutgameFeatureLock
 
         OnChanged?.Invoke();
     }
+
+    /// <summary>콘텐츠 해금 변화도 기존 버튼과 안내 구독자에게 전달한다.</summary>
+    public static void NotifyContentChanged() => OnChanged?.Invoke();
 
     /// <summary>튜토리얼이 더 나아갈 수 없다고 판정됐다 — 남은 기능을 전부 연다(멱등).
     ///

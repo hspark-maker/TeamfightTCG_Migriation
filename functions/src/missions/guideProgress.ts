@@ -19,16 +19,19 @@ export function evaluateGuideProgress(
   const growth = readGrowthEntries(current.cardGrowth);
   const star = (id: number) => Math.max(0, levelOfCard(growth, id) - 1);
   const deck = current.deck as {slots?: {cardIds?: number[]}[]; selectedSlot?: number} | undefined;
-  const validDecks = (deck?.slots ?? []).map((slot) => slot.cardIds ?? []).filter((ids) =>
-    ids.length === 6 && new Set(ids).size === 6 && ids.every((id) => owned.has(id)));
-  const selectedIds = deck?.slots?.[deck.selectedSlot ?? 0]?.cardIds ?? [];
+  // 직접 저장되는 슬롯 내부까지 보안 규칙이 검증하지는 않는다. 잘못된 덱 때문에
+  // 가이드를 함께 계산하는 팩·강화 명령 전체가 실패하지 않도록 유효한 배열만 해석한다.
+  const slots = Array.isArray(deck?.slots) ? deck.slots : [];
+  const validDecks = slots.map((slot) => Array.isArray(slot?.cardIds) ? slot.cardIds : []).filter((ids) =>
+    ids.length === 6 && new Set(ids).size === 6 && ids.every((id) => Number.isInteger(id) && owned.has(id)));
+  const selectedIds = slots[deck?.selectedSlot ?? 0]?.cardIds ?? [];
   const selected = validDecks.includes(selectedIds) ? selectedIds : [];
   const caretaker = new Set(cards.filter((row) => String(row.synergies).split("/").includes("Data_Synergy_Caretaker"))
     .map((row) => Number(row.id)));
   const tracePair = cards.filter((row) => ["Data_Card_Nightchestnut", "Data_Card_MushroomCat"].includes(String(row.name)))
     .map((row) => Number(row.id));
   const adventure = current.adventure as {clearedNodeIds?: string[]} | undefined;
-  const cleared = new Set(adventure?.clearedNodeIds ?? []);
+  const cleared = new Set(Array.isArray(adventure?.clearedNodeIds) ? adventure.clearedNodeIds : []);
   for (const mission of catalog.filter((entry) => entry.period === "guide")) {
     let progress = 0;
     const event = mission.event;

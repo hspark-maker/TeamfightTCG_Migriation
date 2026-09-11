@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.parseSpecPins = parseSpecPins;
 exports.callBattleReplay = callBattleReplay;
 const logger = __importStar(require("firebase-functions/logger"));
+const requestMetrics_1 = require("./observability/requestMetrics");
 const payloadGuards_1 = require("./match/payloadGuards");
 const specBlobReader_1 = require("./specs/specBlobReader");
 // Cloud Run 콜드 스타트 + specPins 4표 Firestore 로드가 이 안에 들어가야 한다.
@@ -63,15 +64,20 @@ function parseSpecPins(env, raw) {
     return result;
 }
 async function callBattleReplay(request) {
+    return (0, requestMetrics_1.measurePhase)("replayTotal", () => callBattleReplayWithRetries(request));
+}
+async function callBattleReplayWithRetries(request) {
     const serviceUrl = (process.env.BATTLE_REPLAY_URL ?? "").replace(/\/+$/, "");
     if (serviceUrl === "")
         return { kind: "unavailable", reason: "replay_url_missing" };
     let lastTransportReason = "replay_transport";
     for (let attempt = 0; attempt < REPLAY_TRANSPORT_ATTEMPTS; attempt++) {
         try {
-            return await postReplay(serviceUrl, request);
+            (0, requestMetrics_1.recordMetric)("replayAttempts");
+            return await (0, requestMetrics_1.measurePhase)("replayAttempt", () => postReplay(serviceUrl, request));
         }
         catch (error) {
+            (0, requestMetrics_1.recordMetric)("replayTransportFailures");
             lastTransportReason = transportReason(error);
             logger.warn("battle_replay_transport_failed", {
                 attempt, reason: lastTransportReason, error,
@@ -85,19 +91,24 @@ async function callBattleReplay(request) {
 }
 async function postReplay(serviceUrl, request) {
     const audience = process.env.BATTLE_REPLAY_AUDIENCE ?? serviceUrl;
-    const token = await identityToken(audience);
+    const token = await (0, requestMetrics_1.measurePhase)("replayIdentity", () => identityToken(audience));
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REPLAY_TIMEOUT_MS);
     let response;
     let data;
     try {
-        response = await fetch(`${serviceUrl}/v1/battle/replay`, {
-            method: "POST",
-            headers: { "content-type": "application/json", "authorization": `Bearer ${token}` },
-            body: JSON.stringify(request),
-            signal: controller.signal,
+        (0, requestMetrics_1.recordMetric)("replayHttpCalls");
+        const received = await (0, requestMetrics_1.measurePhase)("replayHttp", async () => {
+            const response = await fetch(`${serviceUrl}/v1/battle/replay`, {
+                method: "POST",
+                headers: { "content-type": "application/json", "authorization": `Bearer ${token}` },
+                body: JSON.stringify(request),
+                signal: controller.signal,
+            });
+            const data = (await response.json().catch(() => ({})));
+            return { response, data };
         });
-        data = (await response.json().catch(() => ({})));
+        ({ response, data } = received);
     }
     finally {
         clearTimeout(timeout);

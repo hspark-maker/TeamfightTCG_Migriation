@@ -151,6 +151,15 @@ public static class SpecSheetsUploader
             throw new InvalidOperationException($"{_title}: 행마다 열 수가 다릅니다.");
         if (t_rows.Count <= t_typeRow + 1)
             throw new InvalidOperationException($"{_title}: 데이터가 없는 CSV는 업로드하지 않습니다.");
+        // ExcelUtil은 일반 표의 1행=설명, 2행=필드명, 3행=타입을 고정으로 읽는다.
+        // 로컬 CSV는 설명 없는 2행 헤더도 허용하므로 업로드용 행만 보완한다.
+        // 빈 첫 행은 XLSX 내보내기에서 누락될 수 있어 필드명을 설명으로 사용한다.
+        // enum은 생성기 자체가 2행 헤더를 쓰므로 옮기지 않는다.
+        if (!t_enum && t_typeRow == 1)
+        {
+            t_rows.Insert(0, new List<string>(t_rows[0]));
+            t_typeRow = 2;
+        }
         List<string> t_types = t_enum
             ? t_rows[1].Select(t => t.StartsWith("value:", StringComparison.Ordinal) || t.StartsWith("flag_value:", StringComparison.Ordinal) ? "long" : "string").ToList()
             : t_rows[t_typeRow];
@@ -188,6 +197,7 @@ public static class SpecSheetsUploader
         int t_changes = 0, t_conflicts = 0, t_cleared = 0, t_samples = 0;
         t_report.AppendLine("대상: " + (string)_remote["properties"]?["title"]);
         t_report.AppendLine("CSV 셀 값으로 선택한 탭을 갱신합니다. CSV 범위 밖의 기존 값은 비웁니다. 서식·메모·다른 탭은 유지합니다.");
+        t_report.AppendLine("설명 행이 없는 일반 CSV는 필드명으로 설명 행을 보완합니다(설명·필드명·타입 순서).");
         foreach (SpecSheetsCsv t_file in _files)
         {
             JObject t_sheet = t_sheets.OfType<JObject>().FirstOrDefault(t => (string)t["properties"]?["title"] == t_file.Title);

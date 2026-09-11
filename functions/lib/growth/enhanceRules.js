@@ -54,16 +54,6 @@ function costCurrency(value, fallback) {
     return currencyKeys_1.CURRENCY_KEYS.find((key) => key.toLowerCase() === lowered) ?? fallback;
 }
 /**
- * 1000분율을 0~1000 으로 조인다(표 툴팁의 규약).
- * @param {number} permille 저작 성공률
- * @return {number} 조인 성공률
- */
-function clampPermille(permille) {
-    if (permille < 0)
-        return 0;
-    return permille > exports.PERMILLE ? exports.PERMILLE : permille;
-}
-/**
  * 카드 강화 전역 규칙. 표를 못 읽으면 null — 곡선 없이 차감하면 안 되므로 호출부가 거절한다.
  * @param {Record<string, unknown>[]} rows CardEnhanceRule 표(id 오름차순)
  * @return {CardEnhanceRule | null} 전역 규칙
@@ -83,8 +73,6 @@ function parseCardEnhanceRule(rows) {
         maxLimitBreak: maxLimitBreak > exports.LIMIT_BREAK_STAGE_CEILING ? exports.LIMIT_BREAK_STAGE_CEILING : maxLimitBreak,
         baseEnhanceCost: (0, saveValues_1.intOf)(row.baseEnhanceCost),
         costGrowthPerLevel: (0, saveValues_1.intOf)(row.costGrowthPerLevel),
-        baseSuccessPermille: clampPermille((0, saveValues_1.intOf)(row.baseSuccessPermille)),
-        rateDropPerLevelPermille: (0, saveValues_1.intOf)(row.rateDropPerLevelPermille),
     };
 }
 /**
@@ -116,7 +104,7 @@ function parseCardEnhanceOverrides(rows) {
             level,
             currency: costCurrency(row.costCurrency, CARD_DEFAULT_CURRENCY),
             cost: cost > 0 ? cost : 0,
-            successPermille: clampPermille((0, saveValues_1.intOf)(row.successPermille)),
+            successPermille: exports.PERMILLE,
         });
     }
     return overrides;
@@ -132,15 +120,16 @@ function cardEnhanceStep(rule, overrides, level) {
     if (level <= cardGrowth_1.BASE_LEVEL || level > rule.maxLevel)
         return null;
     const override = overrides.get(level);
+    // 카드 강화는 항상 성공한다. 표의 구 확률 열은 사용하지 않는다.
     if (override !== undefined)
-        return { ...override };
+        return { ...override, successPermille: exports.PERMILLE };
     const steps = level - cardGrowth_1.BASE_LEVEL - 1;
     const cost = rule.baseEnhanceCost + steps * rule.costGrowthPerLevel;
     return {
         level,
         currency: CARD_DEFAULT_CURRENCY,
         cost: cost > 0 ? cost : 0,
-        successPermille: clampPermille(rule.baseSuccessPermille - steps * rule.rateDropPerLevelPermille),
+        successPermille: exports.PERMILLE,
     };
 }
 /**

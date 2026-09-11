@@ -131,7 +131,7 @@ public static class OutgameTutorialRewind
         int t_decks = 0;
         int t_cards = 0;
 
-        for (int t_c = 0; t_c <= t_chapter && t_c < OutgameTutorialRunner.ChapterCount; t_c++)
+        for (int t_c = 0; t_c <= t_chapter && t_c < OutgameTutorialRunner.ForcedChapterCount; t_c++)
         {
             int t_count = OutgameTutorialRunner.StepCountOf(t_c);
             int t_end   = t_c < t_chapter ? t_count : Mathf.Min(t_step, t_count);

@@ -49,6 +49,7 @@ public class EmoteDirector : MonoBehaviour
         if (_slot < 0 || _slot >= ProfileManager.EmoteIds.Count) return;
 
         int t_id = ProfileManager.EmoteIds[_slot];
+        if (this.catalog == null || !this.catalog.TryGet(t_id, out _)) return;
         PlayId(t_id, _isEnemy: false);
         if (IsMultiplayer())
             NetworkGameController.Instance?.SendEmote(t_id);

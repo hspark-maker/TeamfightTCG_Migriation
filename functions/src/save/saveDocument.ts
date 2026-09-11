@@ -194,7 +194,9 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
   const walletReference = walletRef(db, env, uid);
 
   return withCountedTransaction(source, async (transaction) => {
-    const snapshot = await transaction.get(reference);
+    // 독립 문서를 한 번에 읽되, 검증은 기존 save → wallet → receipt 순서를 지킨다.
+    const [snapshot, walletSnapshot, receiptSnapshot] = await transaction.getAll(
+      reference, walletReference, receiptRef(walletReference, receipt.txId));
     if (!snapshot.exists) {
       throw new HttpsError(
         "failed-precondition",
@@ -205,9 +207,6 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
     const current = snapshot.data() ?? {};
     assertWritableSchema(current.schemaVersion, env, uid);
 
-    // 지갑 읽기는 콜백 진입 **전에** 끝낸다 — Firestore 트랜잭션은 모든 읽기가 모든 쓰기보다
-    // 앞서야 하는데, openPack 처럼 재실행되는 명령 안에서 읽으면 그 순서가 깨진다.
-    const walletSnapshot = await transaction.get(walletReference);
     const wallet = readWallet(walletSnapshot);
 
     // 여기서 승급하지 않는다 — 위 판정을 통과한 문서는 이미 v8 이고, v7 이관은
@@ -218,10 +217,8 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
     // 잃는 것이 없다. 안 세우면 지갑을 쓰는 명령이 전부 실패해 계정이 굳는다.
     const creatingWallet = !walletSnapshot.exists;
 
-    // 영수증 조회가 **마지막 무조건 읽기**다 — 콜백이 자기 문서를 더 읽을 수 있으므로
-    // (enhanceCard 의 grants) 여기보다 뒤로 밀 수 없고, 쓰기는 아직 하나도 없다.
-    const lookup = readReceipt(
-      await transaction.get(receiptRef(walletReference, receipt.txId)));
+    // 영수증 재생은 콜백 전에 판정한다. 콜백의 추가 읽기·쓰기는 히트 시 실행하지 않는다.
+    const lookup = readReceipt(receiptSnapshot);
     if (lookup.hit) {
       if (lookup.source !== source) {
         // 같은 txId 를 다른 명령이 재사용했다. 첫 명령의 응답을 다른 명령에 돌려주면

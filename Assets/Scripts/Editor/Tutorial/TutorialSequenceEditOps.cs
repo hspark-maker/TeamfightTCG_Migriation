@@ -217,118 +217,51 @@ public static class TutorialSequenceEditOps
         return true;
     }
 
-    /// <summary>트리거 묶음의 표시 이름을 바꾼다(표시·로그용일 뿐이다)</summary>
-    public static bool SetTriggeredLabel(TriggeredTutorialData _data, int _entry, string _label)
+    /// <summary>챕터 성격(강제/자율)을 바꾼다. 강제 경계가 움직이면 세이브 좌표가 가리키는 스텝이 갈리므로 구조 변경으로 본다.</summary>
+    public static bool SetChapterKind(OutgameTutorialData _data, int _index, EOutgameTutorialChapterKind _kind)
     {
-        if (!TryGetEntry(_data, _entry, out var t_entry)) return false;
+        if (!TryGetChapters(_data, out var t_chapters)) return false;
+        if (_index < 0 || _index >= t_chapters.Count)   return false;
 
-        string t_next = _label ?? string.Empty;
-        if (string.Equals(t_entry.EditorLabel ?? string.Empty, t_next)) return false;
+        var t_chapter = t_chapters[_index];
+        if (t_chapter == null || t_chapter.EditorKind == _kind) return false;
 
-        Undo.RecordObject(_data, "트리거 묶음 이름 변경");
-        t_entry.EditorLabel = t_next;
+        Undo.RecordObject(_data, "튜토리얼 챕터 성격 변경");
+        t_chapter.EditorKind = _kind;
+
+        CancelRewindForStructureChange($"챕터 성격 변경({_index} → {_kind})");
+        MarkDirty(_data);
+        return true;
+    }
+
+    /// <summary>자율 챕터의 발화 키를 바꾼다.
+    /// 이 값은 완주 낙인의 식별자이기도 하다 — 바꾸면 이미 완주한 계정의 낙인과 갈려 그 챕터가 다시 뜬다.</summary>
+    public static bool SetChapterTrigger(OutgameTutorialData _data, int _index, EOutgameTutorialTrigger _trigger)
+    {
+        if (!TryGetChapters(_data, out var t_chapters)) return false;
+        if (_index < 0 || _index >= t_chapters.Count)   return false;
+
+        var t_chapter = t_chapters[_index];
+        if (t_chapter == null || t_chapter.EditorTrigger == _trigger) return false;
+
+        Undo.RecordObject(_data, "튜토리얼 챕터 발화 키 변경");
+        t_chapter.EditorTrigger = _trigger;
 
         MarkDirty(_data);
         return true;
     }
 
-    /// <summary>트리거 묶음의 발화 키를 바꾼다.
-    /// 이 값은 완주 낙인의 식별자이기도 하다 — 바꾸면 이미 완주한 계정의 낙인과 갈려 그 묶음이 다시 뜬다.</summary>
-    public static bool SetTriggeredKey(TriggeredTutorialData _data, int _entry, EOutgameTutorialTrigger _trigger)
+    /// <summary>자율 챕터의 선행 기능을 바꾼다(발화·알림 점 가시성 조건일 뿐 구조 변경이 아니다)</summary>
+    public static bool SetChapterPrerequisite(OutgameTutorialData _data, int _index, EOutgameFeature _feature)
     {
-        if (!TryGetEntry(_data, _entry, out var t_entry)) return false;
-        if (t_entry.EditorTrigger == _trigger)            return false;
+        if (!TryGetChapters(_data, out var t_chapters)) return false;
+        if (_index < 0 || _index >= t_chapters.Count)   return false;
 
-        Undo.RecordObject(_data, "트리거 발화 키 변경");
-        t_entry.EditorTrigger = _trigger;
+        var t_chapter = t_chapters[_index];
+        if (t_chapter == null || t_chapter.EditorPrerequisite == _feature) return false;
 
-        MarkDirty(_data);
-        return true;
-    }
-
-    static bool TryGetEntry(TriggeredTutorialData _data, int _entry, out TriggeredTutorialEntry _result)
-    {
-        _result = null;
-        if (_data == null || _data.entries == null)      return false;
-        if (_entry < 0 || _entry >= _data.entries.Count) return false;
-
-        _result = _data.entries[_entry];
-        return _result != null;
-    }
-
-    // ───────── 트리거 스텝 ─────────
-    // 트리거는 진행 좌표가 메모리에만 남아(앱을 끄면 처음부터) 번호가 의미를 갖지 않는다.
-    // 그래서 아래 넷은 stepId를 부여하지도 지우지도 않는다 — 검증기가 "stepId가 부여돼 있음"을 경고로 잡는다.
-    // 되감기 예약도 온보딩 좌표라 여기서는 걷지 않는다(트리거 저작은 그 좌표를 밀지 못한다).
-
-    /// <summary>빈 트리거 스텝을 그 자리에 끼운다</summary>
-    public static bool AddTriggeredStep(TriggeredTutorialData _data, int _entry, int _index)
-    {
-        if (!TryGetEntrySteps(_data, _entry, out var t_steps)) return false;
-        if (_index < 0 || _index > t_steps.Count)              return false;
-
-        Undo.RegisterCompleteObjectUndo(_data, "트리거 스텝 추가");
-        t_steps.Insert(_index, new TutorialStepDef());
-
-        MarkDirty(_data);
-        return true;
-    }
-
-    /// <summary>트리거 스텝을 바로 뒤에 복제한다</summary>
-    public static bool DuplicateTriggeredStep(TriggeredTutorialData _data, int _entry, int _index)
-    {
-        if (!TryGetEntrySteps(_data, _entry, out var t_steps)) return false;
-        if (_index < 0 || _index >= t_steps.Count)             return false;
-
-        Undo.RegisterCompleteObjectUndo(_data, "트리거 스텝 복제");
-
-        // 온보딩과 같은 이유로 손복제를 하지 않는다(필드가 늘어날 때 조용히 누락된다)
-        var t_so   = new SerializedObject(_data);
-        var t_list = t_so.FindProperty("entries").GetArrayElementAtIndex(_entry).FindPropertyRelative("stepDefs");
-        t_list.InsertArrayElementAtIndex(_index);
-        t_so.ApplyModifiedPropertiesWithoutUndo();
-
-        MarkDirty(_data);
-        return true;
-    }
-
-    /// <summary>트리거 스텝을 지운다(확인을 받는다)</summary>
-    public static bool DeleteTriggeredStep(TriggeredTutorialData _data, int _entry, int _index)
-    {
-        if (!TryGetEntrySteps(_data, _entry, out var t_steps)) return false;
-        if (_index < 0 || _index >= t_steps.Count)             return false;
-
-        var    t_step   = t_steps[_index];
-        string t_action = t_step != null ? t_step.Action.ToString() : "(빈 칸)";
-
-        if (!EditorUtility.DisplayDialog(
-                "트리거 스텝 삭제",
-                $"{_entry}-{_index}  {t_action}\n\n이 스텝을 지웁니다.",
-                "삭제", "취소"))
-            return false;
-
-        Undo.RegisterCompleteObjectUndo(_data, "트리거 스텝 삭제");
-        t_steps.RemoveAt(_index);
-
-        MarkDirty(_data);
-        return true;
-    }
-
-    /// <summary>같은 묶음 안에서 트리거 스텝을 위아래로 옮긴다</summary>
-    public static bool MoveTriggeredStep(TriggeredTutorialData _data, int _entry, int _index, int _delta)
-    {
-        if (!TryGetEntrySteps(_data, _entry, out var t_steps)) return false;
-        if (_index < 0 || _index >= t_steps.Count)             return false;
-        if (_delta == 0)                                       return false;
-
-        int t_target = _index + _delta;
-        if (t_target < 0 || t_target >= t_steps.Count) return false;
-
-        Undo.RegisterCompleteObjectUndo(_data, "트리거 스텝 순서 변경");
-
-        var t_step = t_steps[_index];
-        t_steps.RemoveAt(_index);
-        t_steps.Insert(t_target, t_step);
+        Undo.RecordObject(_data, "튜토리얼 챕터 선행 기능 변경");
+        t_chapter.EditorPrerequisite = _feature;
 
         MarkDirty(_data);
         return true;
@@ -352,19 +285,6 @@ public static class TutorialSequenceEditOps
         if (t_chapter == null) return false;
 
         _steps = t_chapter.EditorSteps;
-        return _steps != null;
-    }
-
-    static bool TryGetEntrySteps(TriggeredTutorialData _data, int _entry, out List<TutorialStepDef> _steps)
-    {
-        _steps = null;
-        if (_data == null || _data.entries == null)      return false;
-        if (_entry < 0 || _entry >= _data.entries.Count) return false;
-
-        var t_entry = _data.entries[_entry];
-        if (t_entry == null) return false;
-
-        _steps = t_entry.EditorSteps;
         return _steps != null;
     }
 

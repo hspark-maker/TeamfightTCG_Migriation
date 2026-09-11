@@ -261,7 +261,7 @@ MonoBehaviour:
   isShow: 0
   root: {fileID: 3375942486813688512}
   listContent: {fileID: 9100000000000000002}
-  rowPrefab: {fileID: 9100000000000000024, guid: bdeddef46b0f4b7db9358a1deccc3a95, type: 3}
+  rowPrefab: {fileID: 9100000000000000024, guid: 5b2074d3365f43eea16ffa8324468415, type: 3}
   emptyNotice: {fileID: 9100000000000000031}
   closeButton: {fileID: 0}
   dimButton: {fileID: 7547680357580154284}
@@ -562,7 +562,7 @@ RectTransform:
   m_Father: {fileID: 4171121905590021432}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 0.96282893}
+  m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -617,7 +617,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 200}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!114 &9100000000000000003
 MonoBehaviour:

@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 // 서버 claimReward 응답. 무엇이 지급됐는지의 진실원이다(잔액 자체는 updatedSlots 의 currency 슬롯이 갈아끼운다).
 internal sealed class ClaimRewardResult : ServerCommandResult
 {
+    [JsonProperty("packs")] public List<ClaimRewardPack> Packs { get; set; }
     [JsonProperty("cards")] public List<OpenPackCard> Cards { get; set; }
     [JsonProperty("granted")] public List<ClaimRewardGain> Granted { get; set; }
     [JsonProperty("rankProgress")] public RankProgressResult RankProgress { get; set; }

@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const {major: CONTENT_MAJOR} = require("../../content-version.json");
 const Module = require("node:module");
 const {parseMissionCatalog} = require("../lib/missions/catalog");
 const {missionPeriod} = require("../lib/missions/period");
@@ -58,10 +59,10 @@ function publish(env, table, version, rows, fields = Object.keys(rows[0])) {
   const payload = JSON.stringify([fields, ...rows.map(r => fields.map(key => String(r[key])))]);
   const payloadHash = specPayloadHash(payload);
   const blobPath = `envs/${env}/specs/${table}/releases/${version}`;
-  documents.set(blobPath, {major: 4, payload, payloadHash, rowCount: rows.length});
+  documents.set(blobPath, {major: CONTENT_MAJOR, payload, payloadHash, rowCount: rows.length});
   const indexPath = `envs/${env}/specs/_index`;
   const previous = documents.get(indexPath);
-  documents.set(indexPath, {major: 4, minor: version,
+  documents.set(indexPath, {major: CONTENT_MAJOR, minor: version,
     tables: {...previous?.tables, [table]: {blobPath, payloadHash}}});
 }
 function seed(env) {

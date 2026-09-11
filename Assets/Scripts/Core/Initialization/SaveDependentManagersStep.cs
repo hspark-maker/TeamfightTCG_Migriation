@@ -20,6 +20,7 @@ public sealed class SaveDependentManagersStep : MainInitializer
 
     internal static void ResetForAccountChange()
     {
+        ContentUnlockManager.ResetSession();
         s_installed = false;
     }
 
@@ -32,6 +33,11 @@ public sealed class SaveDependentManagersStep : MainInitializer
 
     public override async UniTask Initialize(InitializationContext _context)
     {
+        if (!ContentUnlockConfig.TryValidateProgression(out string t_error))
+        {
+            FailToRecovery(_context, new System.InvalidOperationException(t_error));
+            return;
+        }
         GameInitialization.SetState(EGameInitState.InstallingManagers);
 
         // MarkReady()는 조기 return 바깥이다 — 재시도로 다시 들어오면 설치는 이미 끝나 있어 여기서 걷어차이는데,
@@ -76,13 +82,13 @@ public sealed class SaveDependentManagersStep : MainInitializer
             ProfileManager.Init();
             OwnershipManager.Init();
             // 정지 예외와 트리거의 메모리 진행은 이전 계정의 값이다. 새 세이브로 정지를 판정하기 전에 걷는다.
-            TriggeredTutorialRunner.Abort();
+            OutgameTutorialRunner.AbortGuided();
             OutgameFeatureLock.ClearStall();
             OutgameTutorialProgress.Init();
-            if (OutgameTutorialProgress.IsCompleted) RankManager.TryEnterFirstTier(out _);
             KeywordGrowthManager.Init();
             CardGrowthManager.Init();
             DeckSaveManager.LoadFromSave();
+            SynergyIntroduction.ResetSession();
             StarterDeck.GrantIfNoDeck(starterDeckPackId);
             OutgameTutorialRunner.ResolveProgressAnchor();
             OutgameTutorialRunner.RewindToPendingBattleEntry();
@@ -95,6 +101,7 @@ public sealed class SaveDependentManagersStep : MainInitializer
             // 지급의 멱등은 그 callable이 진다(문서가 있으면 쓰지 않는다).
             DataSaveManager.SaveImmediate();
             await RankManager.RefreshServerProgressAsync();
+            ContentUnlockManager.Initialize(() => !ServerSaveCommands.IsInFlight);
         }
         finally
         {

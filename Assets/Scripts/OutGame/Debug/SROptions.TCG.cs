@@ -15,7 +15,7 @@ public partial class SROptions
     [Category("카드"), DisplayName("모든 카드 최대 성장")]
     public void MaxCardGrowth() => OutgameDebugActions.MaxCardGrowth();
 
-    [Category("카드"), DisplayName("카드 성장 초기화")]
+    [Category("카드"), DisplayName("카드 강화·한계돌파 초기화")]
     public void ResetCardGrowth() => OutgameDebugActions.ResetCardGrowth();
 
     [Category("카드"), DisplayName("소유 카드 로그")]
@@ -68,6 +68,9 @@ public partial class SROptions
 
     [Category("미션"), DisplayName("미션 모두 완료 (서버)")]
     public void CompleteMissions() => OutgameDebugActions.CompleteMissions();
+
+    [Category("미션"), DisplayName("일일 미션 초기화 (서버·테스트 전용)")]
+    public void ResetDailyMissions() => OutgameDebugActions.ResetDailyMissions();
 
     [Category("카드"), DisplayName("소유 카드")]
     public string OwnedCards => $"{OwnershipManager.OwnedCount} / {CardCatalog.Count}";

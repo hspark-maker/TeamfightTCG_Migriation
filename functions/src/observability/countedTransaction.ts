@@ -1,6 +1,7 @@
 import * as logger from "firebase-functions/logger";
-import {Transaction} from "firebase-admin/firestore";
+import {Firestore, Transaction} from "firebase-admin/firestore";
 import {db} from "../firebaseApp";
+import {measurePhase, recordMetric} from "./requestMetrics";
 
 type AttemptMetrics = {
   reads: number;
@@ -19,7 +20,8 @@ function createCountedTransaction(
       if (property === "get") {
         return async (...args: unknown[]) => {
           const method = target.get as unknown as AnyMethod;
-          const result = await method.apply(target, args);
+          recordMetric("txReadCalls");
+          const result = await measurePhase("txRead", () => method.apply(target, args));
           const querySize = (result as {size?: unknown})?.size;
           const count = typeof querySize === "number" ? Math.max(1, querySize) : 1;
           attempt.reads += count;
@@ -31,7 +33,8 @@ function createCountedTransaction(
       if (property === "getAll") {
         return async (...args: unknown[]) => {
           const method = target.getAll as unknown as AnyMethod;
-          const result = await method.apply(target, args) as unknown[];
+          recordMetric("txReadCalls");
+          const result = await measurePhase("txRead", () => method.apply(target, args)) as unknown[];
           attempt.reads += result.length;
           onRead(result.length);
           return result;
@@ -43,6 +46,7 @@ function createCountedTransaction(
           attempt.writes++;
           const method = Reflect.get(target, property, target) as unknown as AnyMethod;
           method.apply(target, args);
+          recordMetric("txQueuedWrites");
           return proxy;
         };
       }
@@ -69,6 +73,7 @@ export async function withCountedTransaction<T>(
   command: string,
   run: (transaction: Transaction) => Promise<T>,
   extra: Record<string, unknown> = {},
+  firestore: Firestore = db,
 ): Promise<T> {
   const startedAtMs = Date.now();
   let attempts = 0;
@@ -76,8 +81,9 @@ export async function withCountedTransaction<T>(
   let totalObservedReads = 0;
 
   try {
-    const result = await db.runTransaction(async (raw) => {
+    const result = await measurePhase("transaction", () => firestore.runTransaction(async (raw) => {
       attempts++;
+      recordMetric("txAttempts");
       const attempt: AttemptMetrics = {reads: 0, writes: 0};
       lastAttempt = attempt;
       const transaction = createCountedTransaction(
@@ -85,11 +91,13 @@ export async function withCountedTransaction<T>(
         attempt,
         (count) => {
           totalObservedReads += count;
+          recordMetric("txReadDocuments", count);
         },
       );
       const value = await run(transaction);
       return value;
-    });
+    }));
+    recordMetric("txCommittedWrites", lastAttempt.writes);
 
     logger.info("tx_cost", {
       ...extra,

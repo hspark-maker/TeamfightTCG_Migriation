@@ -59,6 +59,7 @@ public class PackAcquireController : MonoBehaviour
     // 캐리어에서 받은 목적지 컨텍스트(Start에서 캡처, 이후 재판정 안 함).
     string m_nextScene;
     bool m_startTutorial;
+    bool m_isReward;
 
     // 방금 연 팩. 캐리어는 BeginSession에서 Consume돼 비므로, 되사려면 여기 쥐고 있어야 한다.
     string m_pack;
@@ -117,6 +118,7 @@ public class PackAcquireController : MonoBehaviour
         // 목적지·팩 컨텍스트를 먼저 캡처한 뒤 Consume(캐리어를 통째로 비움 → 다음 개봉 세션 격리).
         m_nextScene = PackHandoff.NextScene;
         m_startTutorial = PackHandoff.StartTutorial;
+        m_isReward = PackHandoff.IsReward;
         m_pack = PackHandoff.PackId;
         var t_opened = PackHandoff.Consume();
 
@@ -266,6 +268,7 @@ public class PackAcquireController : MonoBehaviour
         if (retryButton == null) return;
 
         bool t_allowed = !string.IsNullOrEmpty(m_pack)
+                      && !m_isReward
                       && !m_left
                       && !OutgameTutorialRunner.IsRunning
                       && PackUnlockRules.IsUnlocked(m_pack)
@@ -338,7 +341,7 @@ public class PackAcquireController : MonoBehaviour
     //   튜토리얼 중엔 이 버튼이 잠겨 있다. 신호를 늘리면 "구매 1회 : 스텝 1칸"이 도리어 어긋난다.
     void OnRetryPressed()
     {
-        if (m_left || m_retrying || string.IsNullOrEmpty(m_pack) || view == null) return;
+        if (m_isReward || m_left || m_retrying || string.IsNullOrEmpty(m_pack) || view == null) return;
 
         RetryAsync().Forget();
     }
@@ -438,7 +441,8 @@ public class PackAcquireController : MonoBehaviour
 
         // 환급·카드가 같은 개봉 세션 결과라 로비 복귀 직전 한 지점에서 함께 싣는다(지급·저장은 이미 끝났다 — 표시량뿐).
         // 카드는 신규만 — 중복분은 환급 재화로 이미 표현된다. 튜토리얼 경로로 전투에 먼저 가면 이후 로비 진입 시 재생된다.
-        CardPackRewardHandoff.Set(PendingRefund(), m_newCards);
+        if (!m_isReward || !RewardPackPresentation.TryDeferLobbyReward(PendingRefund(), m_newCards))
+            CardPackRewardHandoff.Set(PendingRefund(), m_newCards);
 
         // 튜토리얼 세팅은 목적지(전투) 진입 직전 1회. scenario null이면 Begin이 End로 안전 처리.
         if (m_startTutorial) TutorialConfig.Begin(scenario);

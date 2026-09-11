@@ -2,12 +2,9 @@ using System;
 using Cysharp.Threading.Tasks;
 
 // "지금 안내가 시키고 있는 일"을 묻는 단일 창구.
-// 두 러너(온보딩·트리거)를 합쳐서 보는 이유: 같은 안내가 챕터에서 트리거로 옮겨 다니는데,
-// 묻는 쪽(성장 비용·도감 화면·결과 화면)은 그것이 어느 러너의 것인지 알 필요가 없다.
-// 둘은 겹칠 수 있다 — 트리거 문이 졸업 낙인 **전에**(첫 랭크 승급 연출 종료) 열리는데
-// 온보딩은 그 뒤로도 카드 강화 편이 남아 있기 때문이다.
-// 겹칠 땐 트리거가 답이다: 그쪽은 로비 안에서 시작해 로비 안에서 끝나므로 지금 화면을 쥔 것이 언제나 트리거다.
-// 순서를 뒤집으면 온보딩 스텝이 트리거 스텝을 가려 freeOfCharge·anchorCard가 조용히 무시된다.
+// 강제 커서와 자율 커서를 합쳐서 보는 이유: 같은 안내가 강제 챕터에서 자율 챕터로 옮겨 다니는데,
+// 묻는 쪽(성장 비용·도감 화면·결과 화면)은 그것이 어느 커서의 것인지 알 필요가 없다.
+// 자율 안내는 졸업 뒤에만 열리므로 두 커서가 동시에 서는 일은 없다 — 자율을 먼저 묻는 것은 순서 규약일 뿐이다.
 public static class OutgameTutorialGuide
 {
     // 안내가 대준 무료 한 방을 이미 쓴 스텝(세이브하지 않는다 — 재시작하면 다시 한 방).
@@ -24,7 +21,7 @@ public static class OutgameTutorialGuide
     }
 
     public static bool IsCurrentAction(EOutgameTutorialAction _action)
-        => TriggeredTutorialRunner.IsCurrentAction(_action)
+        => OutgameTutorialRunner.IsGuidedAction(_action)
         || OutgameTutorialRunner.IsCurrentAction(_action);
 
     /// <summary>지금 안내가 지목한 카드. 도감처럼 같은 종류의 자리가 여럿인 화면이 "어느 칸인가"를 여기서 받는다.
@@ -87,6 +84,6 @@ public static class OutgameTutorialGuide
     /// <summary>지금 서 있는 스텝. 둘 다 돌고 있으면 트리거 쪽이다(클래스 주석 참고).
     /// 무료 한 방의 소진 표식처럼 "그 스텝 하나"를 식별해야 하는 쪽도 이 참조를 그대로 쓴다.</summary>
     public static bool TryGetCurrentStep(out TutorialStepDef _step)
-        => TriggeredTutorialRunner.TryGetCurrentStep(out _step)
+        => OutgameTutorialRunner.TryGetGuidedStep(out _step)
         || OutgameTutorialRunner.TryGetCurrentStep(out _step);
 }

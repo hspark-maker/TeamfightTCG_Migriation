@@ -54,6 +54,7 @@ internal sealed class PassGetResponse
 /// <summary>claimPassReward 응답. 지갑·세이브 채택은 공통 배관이 하고 여기 값은 표시용이다.</summary>
 internal sealed class ClaimPassRewardResult : ServerCommandResult
 {
+    [JsonProperty("packs")] public List<ClaimRewardPack> Packs { get; set; }
     [JsonProperty("cards")] public List<OpenPackCard> Cards { get; set; }
     [JsonProperty("seasonId")] public string SeasonId { get; set; }
 

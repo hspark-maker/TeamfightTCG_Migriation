@@ -1,43 +1,10 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MAX_REPLAY_DAYS = void 0;
 exports.utcDay = utcDay;
 exports.replayDayRef = replayDayRef;
-exports.recordReplayDaily = recordReplayDaily;
-const logger = __importStar(require("firebase-functions/logger"));
+exports.enqueueReplayDaily = enqueueReplayDaily;
+exports.consumeReplayDaily = consumeReplayDaily;
 const firestore_1 = require("firebase-admin/firestore");
 const firebaseApp_1 = require("./firebaseApp");
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -62,25 +29,43 @@ function replayDayRef(env, day) {
     return firebaseApp_1.db.doc(`envs/${env}/telemetry/replayDaily/days/${day}`);
 }
 /**
- * 정산 트랜잭션과 분리된 best-effort 집계다. 실패해도 보상 정산은 되돌리지 않는다.
+ * 정산과 같은 커밋에 집계 이벤트를 남긴다. 일별 카운터의 경합은 응답 경로에서 분리한다.
+ * @param {Transaction} transaction 정산 트랜잭션
  * @param {string} env 환경 id
+ * @param {string} eventId 호출마다 발급하고 트랜잭션 재시도 동안 유지하는 고유 ID
  * @param {ReplayDailyDelta} delta 이번 제출이 더할 카운터
- * @return {Promise<void>} 실패는 로그로만 남는다
+ * @return {void}
  */
-async function recordReplayDaily(env, delta) {
-    try {
+function enqueueReplayDaily(transaction, env, eventId, delta) {
+    const createdAt = firestore_1.Timestamp.now();
+    transaction.create(firebaseApp_1.db.doc(`envs/${env}/replayTelemetryEvents/${eventId}`), {
+        day: new Date(createdAt.toMillis()).toISOString().slice(0, 10), delta, createdAt,
+    });
+}
+/**
+ * 카운터 증가와 이벤트 삭제를 원자적으로 처리한다. 중복 배달은 삭제된 이벤트를 보고 끝난다.
+ * 실패는 트리거에 전파해 재시도하며, 미처리 이벤트는 삭제하지 않는다.
+ * @param {string} env 환경 id
+ * @param {DocumentReference} eventRef 집계 이벤트 문서 참조
+ * @return {Promise<void>} 집계 커밋 완료
+ */
+async function consumeReplayDaily(env, eventRef) {
+    await firebaseApp_1.db.runTransaction(async (transaction) => {
+        // 생성 이벤트의 사본이 아니라 현재 문서를 읽어 중복·동시 배달을 걸러 낸다.
+        const snapshot = await transaction.get(eventRef);
+        if (!snapshot.exists)
+            return;
+        const { day, delta } = snapshot.data();
         const increments = {
-            day: utcDay(),
+            day, // 배달이 자정을 넘겨도 정산 당시 UTC 날짜로 집계한다.
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
         };
         for (const [key, value] of Object.entries(delta)) {
             if (value !== 0)
                 increments[key] = firestore_1.FieldValue.increment(value);
         }
-        await replayDayRef(env, increments.day).set(increments, { merge: true });
-    }
-    catch (error) {
-        logger.error("battle_replay_telemetry_write_failed", { env, delta, error });
-    }
+        transaction.set(replayDayRef(env, day), increments, { merge: true });
+        transaction.delete(eventRef);
+    });
 }
 //# sourceMappingURL=battleReplayTelemetry.js.map

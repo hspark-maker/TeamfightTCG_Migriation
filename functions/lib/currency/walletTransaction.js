@@ -62,7 +62,8 @@ async function mutateWallet(env, uid, source, receipt, mutate, finalize, guard) 
     }
     const reference = (0, walletStore_1.walletRef)(firebaseApp_1.db, env, uid);
     return (0, countedTransaction_1.withCountedTransaction)(source, async (transaction) => {
-        const snapshot = await transaction.get(reference);
+        // 독립 문서 2개를 한 왕복에 읽되, 지갑 존재 검증은 영수증 해석보다 먼저 유지한다.
+        const [snapshot, receiptSnapshot] = await transaction.getAll(reference, (0, walletStore_1.receiptRef)(reference, receipt.txId));
         if (!snapshot.exists) {
             // 도메인 거절(permission-denied)이 아니라 세션 문제다 — 초기화의 ensureWallet 이
             // 돌지 않았다는 뜻이라 클라가 다시 초기화하는 것이 옳은 조치다. rejectDomain 으로
@@ -70,7 +71,7 @@ async function mutateWallet(env, uid, source, receipt, mutate, finalize, guard) 
             throw new https_1.HttpsError("failed-precondition", "Wallet document does not exist. Boot must call ensureWallet first.");
         }
         // 영수증 조회. 히트면 쓰기를 하나도 하지 않고 첫 응답을 그대로 돌려준다(자격 검사도 건너뛴다).
-        const lookup = (0, walletStore_1.readReceipt)(await transaction.get((0, walletStore_1.receiptRef)(reference, receipt.txId)));
+        const lookup = (0, walletStore_1.readReceipt)(receiptSnapshot);
         if (lookup.hit) {
             if (lookup.source !== source) {
                 // 같은 txId 를 다른 명령이 재사용했다. 첫 명령의 응답을 돌려주면 클라가 엉뚱한

@@ -282,38 +282,32 @@ public partial class RouletteSlot
 [GeneratorSpecData]
 public partial class CardEnhance
 {
-    /// 행 고유 번호(부여 후 변경 금지)
+    /// id
     [GeneratorId(nameof(id), typeof(int))]
     public int id;
-    /// 대상 레벨(2 = 첫 강화). 1 이하는 강화로 도달하는 레벨이 아니라 무시된다
+    /// level
     public int level;
-    /// 소모 재화(Gold/Diamond/Energy/Shard)
+    /// costCurrency
     public string costCurrency;
-    /// 이 레벨업 비용. 0 이하면 무료
+    /// cost
     public long cost;
-    /// 성공률 1000분율(1000 = 100%). 범위 밖은 0~1000으로 조인다
-    public int successPermille;
 }
 
 [GeneratorSpecData]
 public partial class CardEnhanceRule
 {
-    /// 행 고유 번호(부여 후 변경 금지). 이 표는 한 줄만 쓴다 — id 1 행이 전역 설정이다
+    /// id
     [GeneratorId(nameof(id), typeof(int))]
     public int id;
-    /// 강화 상한 레벨. 미강화가 Lv1이라 강화 횟수는 이 값 - 1이다
+    /// maxLevel
     public int maxLevel;
-    /// 레벨업 1회 기본 체력 증가. Card 표의 hp2~hp4 가 있으면 그 값이 이긴다
+    /// hpPerLevel
     public int hpPerLevel;
-    /// 첫 강화(Lv2) 기본 비용. CardEnhance 표에 그 레벨 행이 있으면 그 값이 이긴다
+    /// baseEnhanceCost
     public long baseEnhanceCost;
-    /// 레벨마다 늘어나는 기본 비용. 레벨 N 비용 = baseEnhanceCost + (N-2) * 이 값
+    /// costGrowthPerLevel
     public long costGrowthPerLevel;
-    /// 첫 강화 기본 성공률 1000분율(1000 = 100%)
-    public int baseSuccessPermille;
-    /// 레벨마다 떨어지는 성공률 1000분율. 레벨 N 성공률 = baseSuccessPermille - (N-2) * 이 값
-    public int rateDropPerLevelPermille;
-    /// 한계돌파 최대 단계. CardLimitBreak 표는 이 단계까지만 읽힌다
+    /// maxLimitBreak
     public int maxLimitBreak;
 }
 

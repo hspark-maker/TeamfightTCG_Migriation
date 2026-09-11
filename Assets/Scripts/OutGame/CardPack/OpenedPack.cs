@@ -27,6 +27,7 @@ public readonly struct DrawnCard
 
     // 중복이라 적립된 간식 수(신규면 0). 팩 합계는 두지 않는다 — 카드별 재화라 총합이 답이 될 질문이 없다.
     public readonly int Snack;
+    public readonly SnackGrowthResult SnackGrowth;
 
     // 환급도 간식도 없는 지급(보상 오버레이 등). 표식 자체가 뜨지 않아 재화를 물을 일이 없다.
     public DrawnCard(int _cardId, bool _isNew)
@@ -36,16 +37,18 @@ public readonly struct DrawnCard
         Refund = 0L;
         RefundType = ECurrencyType.Gold;
         Snack = 0;
+        SnackGrowth = null;
     }
 
     // 중복 보상이 간식인 지급(카드팩). 재화 환급이 없으므로 재화 종류를 묻지 않는다.
-    public DrawnCard(int _cardId, bool _isNew, int _snack)
+    public DrawnCard(int _cardId, bool _isNew, int _snack, SnackGrowthResult _snackGrowth = null)
     {
         CardId = _cardId;
         IsNew = _isNew;
         Refund = 0L;
         RefundType = ECurrencyType.Gold;
         Snack = _snack;
+        SnackGrowth = _snackGrowth;
     }
 
     // 환급이 있으면 재화 종류가 필수다 — 기본값을 열어두면 조각 환급이 골드 코인으로 조용히 표시된다.
@@ -56,7 +59,19 @@ public readonly struct DrawnCard
         Refund = _refund;
         RefundType = _refundType;
         Snack = 0;
+        SnackGrowth = null;
     }
+}
+
+// 서버가 간식 적립과 함께 확정한 성장. 연출은 이 전후 값을 쓰고 재지급하지 않는다.
+public sealed class SnackGrowthResult
+{
+    [Newtonsoft.Json.JsonProperty("fromStage")] public int FromStage { get; private set; }
+    [Newtonsoft.Json.JsonProperty("toStage")] public int ToStage { get; private set; }
+    [Newtonsoft.Json.JsonProperty("hpGain")] public int HpGain { get; private set; }
+    [Newtonsoft.Json.JsonProperty("snackCost")] public int SnackCost { get; private set; }
+    [Newtonsoft.Json.JsonProperty("snackLeft")] public int SnackLeft { get; private set; }
+    [Newtonsoft.Json.JsonIgnore] public bool HasGrowth => ToStage > FromStage;
 }
 
 // 팩 개봉 결과 스냅샷 (성공: 뽑힌 카드·총 환급 / 실패: 사유 코드)

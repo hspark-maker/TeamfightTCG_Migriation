@@ -135,6 +135,7 @@ public class PackCardView : MonoBehaviour
     [SerializeField] GameObject refundBadge;
     [Tooltip("환급 숫자. 환급이 0이면 비워지고 \"중복\"만 남는다.")]
     [SerializeField] TMP_Text refundText;
+    [SerializeField] TMP_Text dupeText;
     [Tooltip("환급 재화 아이콘. 환급이 0이면 숫자와 함께 내려간다 — 액수 없이 코인만 남으면 뜻이 없다.")]
     [SerializeField] GameObject refundCoin;
     [Tooltip("카드가 드러난 뒤 중복 칩이 등장하기까지의 뜸. 0이 기본 — NEW 워드마크가 뜸 없이 곧장 꽂히므로 " +
@@ -158,9 +159,69 @@ public class PackCardView : MonoBehaviour
     [Tooltip("결과 격자에서 간식 문구가 뜨는 동안 카드 그림이 내려가는 알파. 0이면 무슨 카드였는지를 잃는다.")]
     [Range(0f, 1f)] [SerializeField] float snackLoopCardAlpha = 0.15f;
 
+    [Header("간식 성장 — 강화 표면 연출")]
+    [SerializeField] CardEnhanceShading snackGrowthShading = new CardEnhanceShading();
+
     public bool IsNew { get; private set; }
     public long Refund { get; private set; }
     public int Snack { get; private set; }
+
+    int m_cardId;
+    SnackGrowthResult m_snackGrowth;
+    bool m_snackGrowthComplete;
+    bool m_snackGrowthAwaitingConfirm;
+    bool m_snackGrowthSkipping;
+    bool m_resultContrast;
+    Sequence m_snackGrowthSeq;
+    System.Action m_snackGrowthCompleted;
+    bool m_growthGleamWasEnabled;
+    Tween m_punchTween;
+    Sequence m_flashSeq;
+    Vector3 m_growthRestScale;
+    Vector2 m_growthTextPosition;
+    Vector2 m_growthTextSize;
+    TextAlignmentOptions m_growthTextAlignment;
+    float m_growthTextMinSize;
+    bool m_growthTextAutoSize;
+    bool m_growthChipPrepared;
+    Vector3 m_dupeTextHome;
+    bool m_dupeTextHomeCaptured;
+    readonly System.Collections.Generic.List<GameObject> m_growthHiddenLabels = new System.Collections.Generic.List<GameObject>();
+
+    /// <summary>간식 성장 연출 또는 결과 확인이 남았는가.</summary>
+    public bool HasPendingSnackGrowth => m_snackGrowth != null && m_snackGrowth.HasGrowth && !m_snackGrowthComplete;
+
+    public void HidePackText()
+    {
+        KillRefundSeq();
+        HideRefundBadge();
+    }
+
+    public bool IsSnackGrowthPlaying => isActiveAndEnabled && m_snackGrowthSeq != null
+        && m_snackGrowthSeq.IsActive() && m_snackGrowthSeq.IsPlaying() && !m_snackGrowthSeq.IsComplete();
+
+    /// <summary>남은 고조를 건너뛰고 짧은 반짝임 뒤 결과를 표시한다. 다음 진행은 별도 탭으로 확인한다.</summary>
+    public bool SkipSnackGrowth()
+    {
+        if (!IsSnackGrowthPlaying) return false;
+        if (m_snackGrowthSkipping) return true;
+        m_snackGrowthSkipping = true;
+        m_snackGrowthSeq.Complete(true);
+        return true;
+    }
+
+    public bool ConfirmSnackGrowthResult()
+    {
+        if (!isActiveAndEnabled || !m_snackGrowthAwaitingConfirm) return false;
+        m_snackGrowthAwaitingConfirm = false;
+        m_snackGrowthComplete = true;
+        HideRefundBadge();
+        var t_callback = m_snackGrowthCompleted;
+        m_snackGrowthCompleted = null;
+        if (m_resultContrast) ApplyResultContrast();
+        t_callback?.Invoke();
+        return true;
+    }
 
     // 환급 재화 종류. 코인 그림이 갈리는 유일한 근거라 Bind에서 받아 둔다.
     ECurrencyType m_refundType;
@@ -210,8 +271,13 @@ public class PackCardView : MonoBehaviour
     bool m_newBadgeRestCaptured;
 
     /// <summary>카드 데이터·신규여부·환급액을 태운다. 강조는 아직 재생하지 않는다(완전히 드러난 뒤가 발화 시점).</summary>
-    public void Bind(DrawnCard _drawn)
+    public void Bind(DrawnCard _drawn, bool _showFinalGrowth = false)
     {
+        CancelSnackGrowth();
+        m_cardId = _drawn.CardId;
+        m_snackGrowth = _drawn.SnackGrowth;
+        m_snackGrowthComplete = _showFinalGrowth;
+        m_resultContrast = false;
         IsNew = _drawn.IsNew;
         Refund = _drawn.Refund;
         Snack = _drawn.Snack;
@@ -220,6 +286,7 @@ public class PackCardView : MonoBehaviour
 
         // 개봉 카드는 항상 소유(위 헤더 주석) → _owned는 true 고정.
         if (cardVisual != null) cardVisual.Bind(_drawn.CardId, true);
+        if (HasPendingSnackGrowth) BindSnackGrowthBefore();
 
         ResetAccent();
     }
@@ -257,7 +324,227 @@ public class PackCardView : MonoBehaviour
             return;
         }
 
-        PlayDupeChip(_instant);
+        if (!HasPendingSnackGrowth || _instant) PlayDupeChip(_instant);
+    }
+
+    /// <summary>서버 확정 간식 성장만 표시한다. 결과 확인 탭/성장 없음은 콜백, 비활성·재바인드 취소는 콜백 없이 끝낸다.
+    /// 격자 등장 트윈이 끝난 뒤 호출한다. 호출 당시 배율을 보존하며 저장값·재화를 변경하지 않는다.</summary>
+    public void PlaySnackGrowth(System.Action _onComplete)
+    {
+        if (!isActiveAndEnabled) return;
+        if (!HasPendingSnackGrowth) { _onComplete?.Invoke(); return; }
+        if (m_snackGrowthSeq != null || m_snackGrowthAwaitingConfirm)
+        {
+            m_snackGrowthCompleted += _onComplete;
+            return;
+        }
+
+        KillRefundSeq();
+        HideRefundBadge();
+        // 등장 펀치가 아직 회수 중이면 원래 배율부터 회복한다. 격자의 0.42배를 1로 덮지 않는다.
+        if (m_punchTween != null && m_punchTween.IsActive())
+        {
+            m_punchTween.Kill();
+            SnapPunchToRest();
+        }
+        m_growthRestScale = transform.localScale;
+        m_snackGrowthCompleted = _onComplete;
+        // UIEffect가 강화 재질을 자기 셰이더로 바꾸지 않도록 잠시 내린다.
+        // 이 타깃을 따르는 Replica도 context가 null이 되어 원래 재질을 그대로 통과시킨다.
+        m_growthGleamWasEnabled = cardGleam != null && cardGleam.enabled;
+        if (cardGleam != null)
+        {
+            DOTween.Kill(cardGleam);
+            cardGleam.transitionRate = 1f;
+            cardGleam.toneIntensity = 0f;
+            cardGleam.enabled = false;
+        }
+
+        CardInstance t_card = BindSnackGrowthBefore();
+        int t_afterHp = t_card != null ? t_card.hp + m_snackGrowth.HpGain : 0;
+        snackGrowthShading.Attach();
+        snackGrowthShading.Neutralize();
+
+        float t_accrualHold = Mathf.Max(0.65f, dupeRevealDelay + refundRiseDuration);
+        float t_growthHold = Mathf.Max(1.1f, Mathf.Max(punchDuration, flashRiseDuration + flashFallDuration));
+        const float t_charge = 0.65f;
+        const float t_flood = 0.12f;
+        float t_revealAt = t_accrualHold + t_charge + t_flood;
+        m_snackGrowthSeq = DOTween.Sequence().SetUpdate(true).SetLink(gameObject)
+            .AppendInterval(t_revealAt)
+            .AppendCallback(() =>
+            {
+                if (t_card != null && cardVisual != null)
+                {
+                    t_card.hp = t_card.maxHp = t_afterHp;
+                    cardVisual.RefreshHp(m_cardId, true);
+                    cardVisual.FlashGrowth();
+                }
+                PlayPunch();
+                PlayFlash();
+            })
+            .AppendInterval(t_growthHold)
+            .OnComplete(() =>
+            {
+                // Complete(true)가 같은 프레임에 섬광까지 지우지 않도록 스킵의 마지막 빛은 따로 재생한다.
+                if (m_snackGrowthSkipping) PlaySnackGrowthSkipFlash();
+                else ShowSnackGrowthResult();
+            });
+
+        // 고조→백열 덮개→공개→빛줄기를 같은 시퀀스에 넣어 Complete(true)도 전부 통과한다.
+        var t_seq = m_snackGrowthSeq;
+        snackGrowthShading.BlindColor = snackGrowthShading.Ember;
+        t_seq.Insert(t_accrualHold, snackGrowthShading.TweenHeat(1f, t_charge).SetEase(Ease.InQuad));
+        t_seq.Insert(t_accrualHold, snackGrowthShading.TweenShake(1f, t_charge).SetEase(Ease.InQuad));
+        float t_overheatAt = t_accrualHold + t_charge * 0.5f;
+        float t_overheatDuration = t_revealAt - t_overheatAt;
+        t_seq.Insert(t_overheatAt, snackGrowthShading.TweenBlind(1f, t_overheatDuration).SetEase(Ease.InQuad));
+        t_seq.Insert(t_overheatAt, snackGrowthShading.TweenBlindColor(snackGrowthShading.WhiteHot, t_overheatDuration));
+        t_seq.Insert(t_accrualHold + t_charge, snackGrowthShading.TweenCover(1f, t_flood).SetEase(Ease.InQuad));
+        t_seq.Insert(t_revealAt, snackGrowthShading.TweenShake(0f, 0.1f));
+        t_seq.Insert(t_revealAt, snackGrowthShading.TweenBlind(0f, 0.35f).SetEase(Ease.InQuad));
+        t_seq.Insert(t_revealAt, snackGrowthShading.TweenCover(0f, 0.25f).SetEase(Ease.InQuad));
+        t_seq.Insert(t_revealAt, snackGrowthShading.TweenHeat(0f, t_growthHold).SetEase(Ease.OutQuad));
+        if (snackGrowthShading.HasGleam)
+        {
+            float t_gleamAt = t_revealAt + 0.3f;
+            t_seq.InsertCallback(t_gleamAt, snackGrowthShading.BeginGleam);
+            t_seq.Insert(t_gleamAt, snackGrowthShading.TweenGleam(1f, 0.55f).SetEase(Ease.InOutSine));
+            t_seq.InsertCallback(t_gleamAt + 0.55f, snackGrowthShading.EndGleam);
+        }
+    }
+
+    void PlaySnackGrowthSkipFlash()
+    {
+        m_flashSeq?.Kill();
+        m_flashSeq = null;
+        if (revealFlash != null) revealFlash.gameObject.SetActive(false);
+        snackGrowthShading.Neutralize();
+        snackGrowthShading.BlindColor = snackGrowthShading.WhiteHot;
+        snackGrowthShading.Heat = 1f;
+        snackGrowthShading.Blind = 1f;
+        snackGrowthShading.Cover = 1f;
+
+        // 연타해도 이 한 번의 반짝임은 끝까지 보여주고 결과 확인을 기다린다.
+        const float t_hold = 0.04f;
+        const float t_fall = 0.22f;
+        m_snackGrowthSeq = DOTween.Sequence().SetUpdate(true).SetLink(gameObject)
+            .AppendInterval(t_hold + t_fall)
+            .OnComplete(ShowSnackGrowthResult);
+        m_snackGrowthSeq.Insert(t_hold, snackGrowthShading.TweenBlind(0f, t_fall).SetEase(Ease.InQuad));
+        m_snackGrowthSeq.Insert(t_hold, snackGrowthShading.TweenCover(0f, t_fall).SetEase(Ease.InQuad));
+        m_snackGrowthSeq.Insert(t_hold, snackGrowthShading.TweenHeat(0f, t_fall).SetEase(Ease.OutQuad));
+    }
+
+    void ShowSnackGrowthResult()
+    {
+        m_snackGrowthSeq = null;
+        m_snackGrowthSkipping = false;
+        m_snackGrowthAwaitingConfirm = true;
+        RestoreGrowthPresentation(false);
+        PrepareGrowthChip();
+        SetGrowthText($"간식 성장 {m_snackGrowth.FromStage} → {m_snackGrowth.ToStage}단계\n체력 +{m_snackGrowth.HpGain:N0}");
+    }
+
+    // 캐시는 이미 팩 최종 단계다. 같은 카드의 앞선 draw에도 미래 HP가 비치지 않게 Bind부터 행별 값을 쓴다.
+    CardInstance BindSnackGrowthBefore()
+    {
+        if (cardVisual == null) return null;
+        CardGrowth t_current = CardGrowthManager.GrowthOf(m_cardId);
+        int t_bonus = t_current.HpBonus
+            - GrowthRules.LimitBreakHpBonusAt(CardGrowthManager.LimitBreakOf(m_cardId))
+            + GrowthRules.LimitBreakHpBonusAt(m_snackGrowth.ToStage);
+        var t_before = new CardGrowth(t_current.Level, t_bonus - m_snackGrowth.HpGain,
+            t_current.EvolutionStage, t_current.UnlockedKeywords, t_current.SynergyUnlocked);
+        var t_card = new CardInstance(m_cardId, 0, t_before);
+        cardVisual.Bind(t_card);
+        cardVisual.RefreshHp(m_cardId, true);
+        return t_card;
+    }
+
+    // 기존 칩의 숫자 영역을 잠시 넓힌다. 새 UI·프리팹 없이 폰트·색·배지 저작을 그대로 쓴다.
+    void PrepareGrowthChip()
+    {
+        if (refundBadge == null || refundText == null || m_growthChipPrepared) return;
+        m_growthChipPrepared = true;
+        var t_text = refundText.rectTransform;
+        m_growthTextPosition = t_text.anchoredPosition;
+        m_growthTextSize = t_text.sizeDelta;
+        m_growthTextAlignment = refundText.alignment;
+        m_growthTextMinSize = refundText.fontSizeMin;
+        m_growthTextAutoSize = refundText.enableAutoSizing;
+        foreach (var t_label in refundBadge.GetComponentsInChildren<TMP_Text>(true))
+        {
+            if (t_label == refundText || !t_label.gameObject.activeSelf) continue;
+            m_growthHiddenLabels.Add(t_label.gameObject);
+            t_label.gameObject.SetActive(false);
+        }
+        var t_badge = (RectTransform)refundBadge.transform;
+        // 앵커는 프리팹 값을 유지하고 부모 rect의 중앙으로만 옮긴다.
+        t_text.localPosition = new Vector3(t_badge.rect.center.x, t_badge.rect.center.y, t_text.localPosition.z);
+        t_text.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, t_badge.rect.width);
+        t_text.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, t_badge.rect.height);
+        refundText.alignment = TextAlignmentOptions.Center;
+        refundText.enableAutoSizing = true;
+        refundText.fontSizeMin = Mathf.Min(refundText.fontSizeMin, 32f);
+        refundText.gameObject.SetActive(true);
+        if (refundCoin != null) refundCoin.SetActive(false);
+        refundBadge.SetActive(true);
+        ResolveRefundGroup().alpha = 1f;
+    }
+
+    void SetGrowthText(string _text)
+    {
+        if (refundText != null) refundText.text = _text;
+    }
+
+    void RestoreGrowthPresentation(bool _restoreCurrentStats)
+    {
+        snackGrowthShading.Neutralize();
+        snackGrowthShading.Release(); // 원래 재질을 먼저 복원한 뒤, 이번 연출의 사본 셋을 Destroy한다.
+        if (cardGleam != null) cardGleam.enabled = m_growthGleamWasEnabled;
+        if (cardVisual != null) cardVisual.RestoreGrowthFlash();
+        m_punchTween?.Kill();
+        m_punchTween = null;
+        transform.localScale = m_growthRestScale;
+        m_punchRestScale = m_growthRestScale;
+        m_flashSeq?.Kill();
+        m_flashSeq = null;
+        if (revealFlash != null) revealFlash.gameObject.SetActive(false);
+        if (_restoreCurrentStats && cardVisual != null) cardVisual.Bind(m_cardId, true);
+        HideRefundBadge();
+    }
+
+    void RestoreGrowthChip()
+    {
+        if (!m_growthChipPrepared) return;
+        m_growthChipPrepared = false;
+        if (refundText != null)
+        {
+            refundText.rectTransform.anchoredPosition = m_growthTextPosition;
+            refundText.rectTransform.sizeDelta = m_growthTextSize;
+            refundText.alignment = m_growthTextAlignment;
+            refundText.fontSizeMin = m_growthTextMinSize;
+            refundText.enableAutoSizing = m_growthTextAutoSize;
+        }
+        foreach (var t_label in m_growthHiddenLabels)
+            if (t_label != null) t_label.SetActive(true);
+        m_growthHiddenLabels.Clear();
+    }
+
+    void CancelSnackGrowth()
+    {
+        m_snackGrowthCompleted = null;
+        m_snackGrowthSkipping = false;
+        if (m_snackGrowthAwaitingConfirm)
+        {
+            m_snackGrowthAwaitingConfirm = false;
+            HideRefundBadge();
+        }
+        if (m_snackGrowthSeq == null) return;
+        m_snackGrowthSeq.Kill();
+        m_snackGrowthSeq = null;
+        RestoreGrowthPresentation(true);
     }
 
     /// <summary>
@@ -269,6 +556,8 @@ public class PackCardView : MonoBehaviour
     /// </summary>
     public void ApplyResultContrast()
     {
+        m_resultContrast = true;
+        if (m_snackGrowthSeq != null || m_snackGrowthAwaitingConfirm) return;
         if (IsNew)
         {
             // 림라이트는 셰이더가 스스로 돌린다(autoPlaySpeed) — 카드가 여러 장이라 장당 트윈을 굴리지 않는다.
@@ -425,7 +714,8 @@ public class PackCardView : MonoBehaviour
 
         // OutQuint — 첫 프레임이 가장 빠르고 끝에서 단단히 선다.
         // OutBack·OutElastic은 제자리를 지나쳐 흔들려 다시 말랑해지므로 쓰지 않는다.
-        transform.DOScale(m_punchRestScale, punchDuration)
+        m_punchTween = transform.DOScale(m_punchRestScale, punchDuration)
+                 .SetUpdate(true)
                  .SetEase(Ease.OutQuint)
                  .SetLink(gameObject);
     }
@@ -440,11 +730,13 @@ public class PackCardView : MonoBehaviour
     {
         if (revealFlash == null) return;
 
+        m_flashSeq?.Kill();
         revealFlash.DOKill();
         revealFlash.gameObject.SetActive(true);
         SetAlpha(revealFlash, 0f);
 
-        DOTween.Sequence()
+        m_flashSeq = DOTween.Sequence()
+            .SetUpdate(true)
             .SetLink(revealFlash.gameObject)
             .Append(revealFlash.DOFade(flashPeakAlpha, flashRiseDuration))
             .Append(revealFlash.DOFade(0f, flashFallDuration))
@@ -521,6 +813,19 @@ public class PackCardView : MonoBehaviour
         // 환급이 0이어도 칩은 뜬다 — 중복을 말하는 유일한 신호라, 액수 하나로 표식까지 사라지면 안 된다.
         // 대신 숫자와 코인만 내려가 "중복"만 남는다.
         bool t_hasRefund = Refund > 0;
+        if (dupeText != null)
+        {
+            var t_label = dupeText.rectTransform;
+            if (!m_dupeTextHomeCaptured)
+            {
+                m_dupeTextHome = t_label.localPosition;
+                m_dupeTextHomeCaptured = true;
+            }
+            // 숫자·아이콘이 없을 때는 왼쪽 칸을 비우고 '중복' 문구만 배지 중앙에 놓는다.
+            var t_badgeRect = (RectTransform)refundBadge.transform;
+            t_label.localPosition = t_hasRefund ? m_dupeTextHome
+                : new Vector3(t_badgeRect.rect.center.x, t_badgeRect.rect.center.y, m_dupeTextHome.z);
+        }
         if (refundText != null) refundText.text = t_hasRefund ? $"+{Refund:N0}" : string.Empty;
         if (refundCoin != null)
         {
@@ -571,9 +876,14 @@ public class PackCardView : MonoBehaviour
     void PlayResultSnackLoop()
     {
         if (refundBadge == null || cardVisual == null) return;
-        if (Snack <= 0) return;
+        bool t_grew = m_snackGrowth != null && m_snackGrowth.HasGrowth;
+        if (Snack <= 0 && !t_grew) return;
 
-        if (refundText != null) refundText.text = $"간식 {Snack:N0}개 획득";
+        if (t_grew) PrepareGrowthChip();
+        if (refundText != null)
+            refundText.text = t_grew
+                ? $"간식 +{Snack:N0}개 · 성장 {m_snackGrowth.FromStage}→{m_snackGrowth.ToStage}단계\n체력 +{m_snackGrowth.HpGain:N0} · 간식 {m_snackGrowth.SnackCost:N0}개 사용\n성장 후 {m_snackGrowth.SnackLeft:N0}개 남음"
+                : $"간식 {Snack:N0}개 획득";
         if (refundCoin != null) refundCoin.SetActive(false);
 
         var t_tr = refundBadge.transform;
@@ -620,6 +930,7 @@ public class PackCardView : MonoBehaviour
     //   자기를 재생 중인 트윈을 콜백 안에서 걷어내는 꼴이 된다. 걷어내기는 부르는 쪽(KillRefundSeq)의 몫이다.
     void HideRefundBadge()
     {
+        RestoreGrowthChip();
         if (refundBadge == null) return;
 
         m_refundSeq = null;
@@ -629,7 +940,10 @@ public class PackCardView : MonoBehaviour
         {
             t_tr.localPosition = m_refundHome;
             t_tr.localScale = m_refundRestScale;
-            t_tr.SetSiblingIndex(m_refundSiblingIndex);
+            // OnDisable에서는 부모가 활성 상태를 바꾸는 중이라 형제 순서를 변경할 수 없다.
+            // 다음 Bind/표시 정리 때 활성 상태에서 저작 순서를 복원한다.
+            if (isActiveAndEnabled && t_tr.GetSiblingIndex() != m_refundSiblingIndex)
+                t_tr.SetSiblingIndex(m_refundSiblingIndex);
         }
 
         // 알파는 1로 되돌린다 — 0으로 남으면 다음 카드의 칩이 켜져도 보이지 않는다.
@@ -650,6 +964,11 @@ public class PackCardView : MonoBehaviour
 
     void OnDisable()
     {
+        CancelSnackGrowth();
+        m_punchTween?.Kill();
+        m_punchTween = null;
+        m_flashSeq?.Kill();
+        m_flashSeq = null;
         KillRefundSeq();
         HideRefundBadge();
     }

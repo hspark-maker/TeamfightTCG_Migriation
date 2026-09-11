@@ -33,6 +33,15 @@ public class LobbyEntryAlertDot : AlertDotView
                     return AdventureProgress.HasAnyWaiting
                            && OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure);
 
+                case EAlertDotTarget.Mission:
+                    return OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission)
+                           && MissionManager.HasAnyRegularClaimable;
+                case EAlertDotTarget.GuideMission:
+                    return OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission)
+                           && MissionManager.HasAnyClaimable("guide");
+                case EAlertDotTarget.Pass:
+                    return PassManager.HasAnyClaimable;
+
                 default:
                     return false;
             }
@@ -46,6 +55,14 @@ public class LobbyEntryAlertDot : AlertDotView
 
         switch (this.m_boundTarget)
         {
+            case EAlertDotTarget.Mission:
+            case EAlertDotTarget.GuideMission:
+                MissionManager.OnChanged += _handler;
+                OutgameFeatureLock.OnChanged += _handler;
+                break;
+            case EAlertDotTarget.Pass:
+                PassManager.OnChanged += _handler;
+                break;
             // 수령 자격은 랭크 티어를 즉시 읽어 판정한다 — 티어가 오른 순간을 랭크 통지로만 잡을 수 있다.
             case EAlertDotTarget.RankReward:
                 RankRewardManager.OnChanged += _handler;
@@ -72,6 +89,14 @@ public class LobbyEntryAlertDot : AlertDotView
     {
         switch (this.m_boundTarget)
         {
+            case EAlertDotTarget.Mission:
+            case EAlertDotTarget.GuideMission:
+                MissionManager.OnChanged -= _handler;
+                OutgameFeatureLock.OnChanged -= _handler;
+                break;
+            case EAlertDotTarget.Pass:
+                PassManager.OnChanged -= _handler;
+                break;
             case EAlertDotTarget.RankReward:
                 RankRewardManager.OnChanged -= _handler;
                 RankManager.OnChanged -= _handler;
@@ -104,4 +129,7 @@ public enum EAlertDotTarget
     RankReward = 0,
     KeywordGrowth,
     Adventure,
+    Mission = 3,
+    GuideMission = 4,
+    Pass = 5,
 }

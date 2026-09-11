@@ -53,7 +53,7 @@ public sealed class PackGradeFxPalette
 // 흐름: 입장 → 스와이프 대기 → 자리잡기(팩이 화면 아래로) → 씰 찢기 → 뽑기(뭉치째 솟아오름)
 //       → 한 장씩 밀어내기 → 결과 격자 → OnRevealComplete.
 //
-// 유저가 손을 대는 지점은 둘뿐이다 — 개봉을 여는 스와이프 한 번과, 그 뒤 카드를 넘기는 스와이프.
+// 개봉은 스와이프, 카드 한 장 넘기기는 탭·스와이프, 전체 넘기기는 스킵 버튼으로 조작한다.
 // 그 사이(자리잡기 → 씰 찢기 → 뽑기)는 손을 떼는 순간 끊기지 않고 자동으로 이어진다.
 //
 // 이 연출의 전제는 단 하나 — 카드는 처음부터 팩 속에 들어 있다.
@@ -213,6 +213,8 @@ public class PackRevealView : MonoBehaviour
 
     // 이번 세션에서 개봉 신호를 이미 쐈는지. 뜯김과 스킵 어느 쪽으로 열려도 정확히 1회여야 한다.
     bool m_announced;
+    bool m_cardsMaterialized;
+    bool m_skipSummaryInstant;
 
     /// <summary>개봉 세션 시작: 카드를 팩 속에 넣은 채 팩이 등장하고 찢기 대기로 이어진다.
     /// _pack은 이 결과를 낳은 팩 정의 — 껍데기 그림이 그 팩의 것으로 갈린다(미지정이면 프리팹 기본 그림).</summary>
@@ -231,6 +233,8 @@ public class PackRevealView : MonoBehaviour
         m_topGrade = TopGrade(_opened.Cards);
         m_skips = 0;
         m_announced = false;
+        m_cardsMaterialized = false;
+        m_skipSummaryInstant = false;
 
         GateInput(false);
         SetTearHint(false, true);
@@ -292,6 +296,7 @@ public class PackRevealView : MonoBehaviour
 
         // 카드는 여기서 단 한 번 세워 팩 속에 넣는다. 이후 어느 단계도 카드를 "등장"시키지 않는다.
         cardStack.Build(m_pending.Cards);
+        m_cardsMaterialized = true;
         cardStack.PlaceInsidePack(cardInPackCenter, cardInPackScale);
     }
 
@@ -309,6 +314,9 @@ public class PackRevealView : MonoBehaviour
     /// OnDisable은 요약 도달분을 일부러 남기므로(중복 발화 방지), 오버레이가 닫힐 때는 이쪽이 필요하다.</summary>
     public void ResetSession()
     {
+        // 트윈 완료 콜백보다 먼저 이전 더미의 수명을 끝낸다.
+        m_stage = EStage.Idle;
+        if (cardStack != null) cardStack.Clear();
         KillStageSeq();
         KillTotalRefundTween();
 
@@ -327,6 +335,8 @@ public class PackRevealView : MonoBehaviour
         m_topGrade = ECardGrade.Unknown;
         m_announced = false;
         m_skips = 0;
+        m_cardsMaterialized = false;
+        m_skipSummaryInstant = false;
     }
 
     void OnEnable()
@@ -337,7 +347,6 @@ public class PackRevealView : MonoBehaviour
         {
             cardStack.OnCardRevealed  += HandleCardRevealed;
             cardStack.OnEmptied       += HandleStackEmptied;
-            cardStack.OnSkipRequested += RequestSkip;
         }
 
         if (skipButton != null) skipButton.onClick.AddListener(RequestSkip);
@@ -355,7 +364,6 @@ public class PackRevealView : MonoBehaviour
         {
             cardStack.OnCardRevealed  -= HandleCardRevealed;
             cardStack.OnEmptied       -= HandleStackEmptied;
-            cardStack.OnSkipRequested -= RequestSkip;
         }
 
         if (skipButton != null) skipButton.onClick.RemoveListener(RequestSkip);
@@ -371,9 +379,12 @@ public class PackRevealView : MonoBehaviour
 
         // 진행 중이던 세션은 여기서 끊긴다 — 결과까지 함께 비워 다음 BeginOpen이 온전히 새 세션이 되게 한다.
         m_stage = EStage.Idle;
+        if (cardStack != null) cardStack.Clear();
         m_pending = null;
         m_topGrade = ECardGrade.Unknown;
         m_announced = false;
+        m_cardsMaterialized = false;
+        m_skipSummaryInstant = false;
     }
 
     // ── 스테이지 ────────────────────────────────────────────────
@@ -564,7 +575,7 @@ public class PackRevealView : MonoBehaviour
     void HandleStackEmptied()
     {
         if (m_stage != EStage.Flicking) return;
-        EnterSummary();
+        EnterSummary(m_skipSummaryInstant);
     }
 
     // 요약: 뽑은 카드 전부를 3열 격자로 되짚어 주고 총 환급과 함께 획득을 넘긴다.
@@ -729,6 +740,15 @@ public class PackRevealView : MonoBehaviour
     // 어느 단계든 요약으로 직행.
     void SkipToSummary()
     {
+        m_skipSummaryInstant = true;
+        // 성장 중 연타는 위치·배율·연출을 다시 건드리지 않고 남은 카드 스킵 요청만 유지한다.
+        if (m_stage == EStage.Flicking)
+        {
+            if (cardStack != null) cardStack.FlickAllImmediate();
+            else EnterSummary(true);
+            return;
+        }
+
         KillStageSeq();
 
         if (tearHandle != null) tearHandle.Disarm();
@@ -742,10 +762,20 @@ public class PackRevealView : MonoBehaviour
         if (shellRig != null) shellRig.HideShells();
         if (tearSkin != null) tearSkin.HideLid();
 
-        // 더미는 걷어내기만 한다 — 카드는 요약 격자가 전부 다시 보여주므로 넘기는 시늉이 필요 없다.
-        if (cardStack != null) cardStack.Clear();
+        // 입장 중 direct skip이면 아직 카드가 생성되지 않았다. 결과 순서 그대로 한 번만 세운다.
+        if (!m_cardsMaterialized) MaterializePending();
+        if (cardStack == null) { EnterSummary(true); return; }
 
-        EnterSummary(true);
+        if (shellRig != null) shellRig.SetIdle(false);
+        var t_offset = shellRig != null ? shellRig.StageOffset : Vector2.zero;
+        float t_scale = shellRig != null ? shellRig.StageScale : 1f;
+        if (t_scale <= 0f) t_scale = 1f;
+        cardStack.SettleForSkip((cardEmergeCenter - t_offset) / t_scale, 1f / t_scale);
+        m_stage = EStage.Flicking;
+        GateInput(true);
+        if (skipButton != null) skipButton.gameObject.SetActive(true);
+        // 일반 카드는 즉시 제거하고 성장 카드만 전부 완주한 뒤 HandleStackEmptied로 요약에 도달한다.
+        cardStack.FlickAllImmediate();
     }
 
     // ── 카드 단계 콜백 ──────────────────────────────────────────

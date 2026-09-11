@@ -3,34 +3,26 @@ id,ownerType,ownerId,order,rewardType,rewardId,amount,#memo
 int,string,string,int,string,string,long,string
 1,Album,t:Theme_Nature,1,Currency,Diamond,20,자연 테마 완성
 2,Album,t:Theme_Nature,2,Currency,Shard,150,자연 테마 완성
-3,Album,p:Theme_Nature/P1,1,Currency,Energy,50,자연 P1 완성
-4,Album,p:Theme_Nature/P2,1,Currency,Energy,50,자연 P2 완성
-5,Album,p:Theme_Nature/P3,1,Currency,Energy,50,자연 P3 완성
-6,Album,p:Theme_Nature/P4,1,Currency,Energy,50,자연 P4 완성
 7,Album,b,1,Currency,Gold,1500,앨범 전체 완성
 8,Album,b,2,Currency,Diamond,30,앨범 전체 완성
 9,Album,b,3,Currency,Shard,300,앨범 전체 완성
 10,Adventure,node_01,1,Currency,Gold,110,
 11,Adventure,node_02,1,Currency,Shard,30,
-12,Adventure,node_03,1,Currency,Energy,20,
 13,Adventure,node_04,1,Currency,Gold,110,
 14,Adventure,node_05,1,Currency,Shard,60,
 16,Adventure,chapter_01,1,Currency,Gold,110,
 18,Adventure,node_07,1,Currency,Gold,140,
 19,Adventure,node_08,1,Currency,Shard,40,
-20,Adventure,node_09,1,Currency,Energy,30,
 21,Adventure,node_10,1,Currency,Gold,150,
 22,Adventure,node_11,1,Currency,Shard,70,
 24,Adventure,chapter_02,1,Currency,Gold,150,
 26,Adventure,node_13,1,Currency,Gold,180,
 27,Adventure,node_14,1,Currency,Shard,50,
-28,Adventure,node_15,1,Currency,Energy,40,
 29,Adventure,node_16,1,Currency,Gold,180,
 30,Adventure,node_17,1,Currency,Shard,80,
 32,Adventure,chapter_03,1,Currency,Gold,190,
 34,Adventure,node_19,1,Currency,Gold,220,
 35,Adventure,node_20,1,Currency,Shard,60,
-36,Adventure,node_21,1,Currency,Energy,50,
 37,Adventure,node_22,1,Currency,Gold,220,
 38,Adventure,node_23,1,Currency,Shard,90,
 40,Adventure,chapter_04,1,Currency,Gold,220,
@@ -100,26 +92,23 @@ int,string,string,int,string,string,long,string
 140,Mission,daily.completeBattle3,1,Currency,Shard,40,미션 catalog/모험 집계 동기화 대기
 141,Mission,daily.completeBattle5,1,Currency,Gold,100,미션 catalog/모험 집계 동기화 대기
 142,Mission,daily.completeBattle3,2,Currency,RouletteTicket,1,일일 첫 회전은 전투 3회 완료로 지급; 승패 무관
-143,Mission,daily.triggerKeyword2,1,Currency,Energy,10,미션 catalog/모험 집계 동기화 대기
+143,Mission,daily.triggerKeyword2,1,Currency,Gold,10,에너지 보상을 골드로 대체
 144,Mission,daily.triggerSynergy2,1,Currency,Shard,20,미션 catalog/모험 집계 동기화 대기
 145,Mission,weekly.completeBattle20,1,Currency,Shard,120,미션 catalog/모험 집계 동기화 대기
 146,Mission,weekly.completeBattle35,1,Currency,Shard,60,미션 catalog/모험 집계 동기화 대기
 147,Mission,weekly.completeBattle35,2,Currency,Gold,300,미션 catalog/모험 집계 동기화 대기
 148,Mission,weekly.openPack10,1,Pack,NormalPack_TEST,1,미션 catalog/모험 집계 동기화 대기; 팩 지급 구현 대기
-149,Mission,weekly.enhanceCard10,1,Currency,Gold,200,미션 catalog/모험 집계 동기화 대기
-150,Mission,weekly.enhanceCard10,2,Currency,Energy,30,미션 catalog/모험 집계 동기화 대기
+149,Mission,weekly.enhanceCard10,1,Currency,Gold,230,기존 골드 200 + 에너지 대체 골드 30
 151,Mission,weekly.winBattle10,1,Currency,Diamond,20,미션 catalog/모험 집계 동기화 대기
 152,Mission,weekly.completeBattle20,2,Currency,RouletteTicket,3,주간 회전 보충은 전투 20회 완료로 지급; 승패 무관
 153,Pass,S1:2,1,Currency,Shard,60,시즌 1 무료 트랙 레벨 2
 154,Pass,S1:3,1,Pack,NormalPack_TEST,1,시즌 1 무료 트랙 레벨 3; 팩 지급 구현 대기
 155,Pass,S1:3,2,Currency,RouletteTicket,2,시즌 1 무료 트랙 레벨 3
 156,Pass,S1:4,1,Currency,Diamond,10,시즌 1 무료 트랙 레벨 4
-157,Pass,S1:4,2,Currency,Energy,20,시즌 1 무료 트랙 레벨 4
 158,Pass,S1:5,1,Currency,Shard,80,시즌 1 무료 트랙 레벨 5
 159,Pass,S1:5,2,Pack,SpecialPack,1,시즌 1 무료 트랙 레벨 5; 팩 지급 구현 대기
 160,Pass,S1:6,2,Currency,RouletteTicket,2,시즌 1 무료 트랙 레벨 6
 161,Pass,S1:8,1,Currency,Diamond,20,시즌 1 무료 트랙 레벨 8
-162,Pass,S1:8,2,Currency,Energy,30,시즌 1 무료 트랙 레벨 8
 163,Pass,S1:9,1,Currency,Shard,120,시즌 1 무료 트랙 레벨 9
 164,Pass,S1:9,2,Pack,NormalPack_TEST,2,시즌 1 무료 트랙 레벨 9; 팩 지급 구현 대기
 165,Pass,S1:10,2,PackChoice,UnlockedThemePack,1,시즌 1 무료 트랙 레벨 10; 팩 지급 구현 대기
