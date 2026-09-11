@@ -623,6 +623,18 @@ public class LobbyMatchLauncher : MonoBehaviour
         return lobbyTabController.TrySelectFeature(EOutgameFeature.LobbyMatchTab, _beforeOpen, OpenAdventureMap);
     }
 
+    /// <summary>모험 맵을 열고 정점 하나를 가운데에 둔다. 가이드 미션 "이동"이 부른다. 잠겨 있으면 false.</summary>
+    public bool TryOpenAdventureMapAt(int _nodeIndex)
+    {
+        if (adventurePanel == null || !OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure)) return false;
+
+        // 목록 오버레이는 다른 탭에서도 눌린다 — 맵은 배틀 탭 위에 서야 한다(복귀 경로와 같은 순서).
+        if (matchPanel != null) lobbyTabController?.Select(matchPanel, false);
+        OpenAdventureMap();
+        if (_nodeIndex >= 0) adventurePanel.FocusNode(_nodeIndex);
+        return adventurePanel.IsOpen;
+    }
+
     void OpenAdventureMap()
     {
         // 버튼을 죽여 두는 것만으로는 부족하다 — 잠김 표시는 표현 레이어 몫이고, 진입을 실제로 막는 주체는 여기다.

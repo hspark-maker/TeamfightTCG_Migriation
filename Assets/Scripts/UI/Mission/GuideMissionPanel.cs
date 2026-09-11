@@ -36,6 +36,9 @@ public class GuideMissionPanel : PooledUIBase
     [Tooltip("가이드 미션이 하나도 없을 때 켤 안내(서버 정의 미도착 포함).")]
     [SerializeField] GameObject emptyNotice;
 
+    [Tooltip("막 헤더 행 프리팹. 비워 두면 종전처럼 헤더 없이 행만 깐다.")]
+    [SerializeField] MissionActHeaderView headerPrefab;
+
     [Header("버튼")]
     [SerializeField] Button closeButton;
 
@@ -50,8 +53,24 @@ public class GuideMissionPanel : PooledUIBase
     [Range(0f, 1f)] [SerializeField] float dimAlpha = 0.72f;
 
     readonly List<MissionRowView> m_rows = new List<MissionRowView>();
-    Action<string> m_claimHandler;
-    Action<string> m_navigateHandler;
+
+    // 막별 (헤더, 행들). 접기는 행 활성만 토글하고 서명에 넣지 않는다.
+    readonly List<ActGroup> m_groups = new List<ActGroup>();
+
+    // 접힘 상태는 세션 메모리다 — 기본은 "전부 받은 막만 접힘". 유저가 건드린 막만 기억한다.
+    static readonly Dictionary<int, bool> s_collapsedOverride = new Dictionary<int, bool>();
+
+    sealed class ActGroup
+    {
+        internal GuideMissionTrack.GuideAct Act;
+        internal MissionActHeaderView Header;
+        internal readonly List<MissionRowView> Rows = new List<MissionRowView>();
+        internal bool Collapsed;
+    }
+
+    // 지금 화면에 깔린 행이 어느 정의·수령 상태로 만들어졌는지. 바뀌면 다시 깐다 —
+    // 수령이 서명에 들어가는 이유는 앞 미션 수령이 다음 줄의 잠금 표시를 바꾸기 때문이다.
+    string m_builtSignature;
 
     const string PERIOD_GUIDE = "guide";
 
@@ -95,46 +114,114 @@ public class GuideMissionPanel : PooledUIBase
         this.transition.HandleDisabled(this.ResolveTarget());
     }
 
-    void HandleMissionsChanged() => this.Rebuild();
+    void HandleMissionsChanged()
+    {
+        if (BuildSignature() != this.m_builtSignature) this.Rebuild();
+        else this.RefreshRows();
+    }
 
     void Rebuild()
     {
+        this.m_rows.Clear();
+        this.m_builtSignature = BuildSignature();
         if (this.listContent == null || this.rowPrefab == null) return;
 
-        if (this.rowPrefab.transform.parent == this.listContent) this.rowPrefab.gameObject.SetActive(false);
+        // Destroy 는 프레임 끝에 처리되므로 먼저 비활성화한다 — 레이아웃 계산에서 빠져야 이번 프레임 배치가 맞는다.
+        for (int i = this.listContent.childCount - 1; i >= 0; i--)
+        {
+            GameObject t_child = this.listContent.GetChild(i).gameObject;
+            t_child.SetActive(false);
+            Destroy(t_child);
+        }
 
-        int t_count = 0;
-        this.m_claimHandler ??= this.HandleClaim;
-        this.m_navigateHandler ??= this.HandleNavigate;
+        this.m_groups.Clear();
+        MissionDefinition t_current = GuideMissionTrack.Current;
+        ActGroup t_group = null;
+
         IReadOnlyList<MissionDefinition> t_definitions = MissionManager.Definitions;
         for (int i = 0; i < t_definitions.Count; i++)
         {
             MissionDefinition t_definition = t_definitions[i];
             if (!string.Equals(t_definition.Period, PERIOD_GUIDE, StringComparison.Ordinal)) continue;
 
-            if (t_count == this.m_rows.Count) this.m_rows.Add(null);
-            MissionRowView t_row = this.m_rows[t_count];
-            if (t_row == null) this.m_rows[t_count] = t_row = Instantiate(this.rowPrefab, this.listContent);
-            t_row.Bind(t_definition, this.m_claimHandler,
-                MissionContentNavigation.HasDestination(t_definition) ? this.m_navigateHandler : null);
-            if (!t_row.gameObject.activeSelf) t_row.gameObject.SetActive(true);
-            t_count++;
+            if (this.headerPrefab != null && GuideMissionTrack.TryGetAct(t_definition, out GuideMissionTrack.GuideAct t_act)
+                && (t_group == null || t_group.Act.Number != t_act.Number))
+                t_group = this.BuildHeader(t_act);
+
+            MissionRowView t_row = Instantiate(this.rowPrefab, this.listContent);
+            t_row.gameObject.SetActive(true);
+            t_row.Bind(t_definition, this.HandleClaim);
+            bool t_isCurrent = t_current != null && string.Equals(t_current.Id, t_definition.Id, StringComparison.Ordinal);
+            EMissionRowEmphasis t_emphasis = t_isCurrent ? EMissionRowEmphasis.Current
+                : MissionManager.IsGuideUnlocked(t_definition) ? EMissionRowEmphasis.Normal : EMissionRowEmphasis.Locked;
+            t_row.SetEmphasis(t_emphasis, t_isCurrent && GuideMissionNavigator.CanGo(t_definition) ? () => this.HandleGo(t_definition) : null);
+            this.m_rows.Add(t_row);
+            if (t_group != null)
+            {
+                t_group.Rows.Add(t_row);
+                t_row.gameObject.SetActive(!t_group.Collapsed);
+            }
         }
 
-        for (int i = t_count; i < this.m_rows.Count; i++)
-            if (this.m_rows[i] != null && this.m_rows[i].gameObject.activeSelf) this.m_rows[i].gameObject.SetActive(false);
-        if (this.emptyNotice != null) this.emptyNotice.SetActive(t_count == 0);
+        if (this.emptyNotice != null) this.emptyNotice.SetActive(this.m_rows.Count == 0);
+    }
+
+    ActGroup BuildHeader(GuideMissionTrack.GuideAct _act)
+    {
+        (int t_claimed, int t_total) = GuideMissionTrack.CountOf(_act);
+        var t_group = new ActGroup { Act = _act };
+        t_group.Collapsed = s_collapsedOverride.TryGetValue(_act.Number, out bool t_override)
+            ? t_override
+            : t_total > 0 && t_claimed >= t_total;
+
+        MissionActHeaderView t_header = Instantiate(this.headerPrefab, this.listContent);
+        t_header.gameObject.SetActive(true);
+        t_header.Bind(_act.Label, t_claimed, t_total, t_group.Collapsed, () => this.ToggleGroup(t_group));
+        t_group.Header = t_header;
+        this.m_groups.Add(t_group);
+        return t_group;
+    }
+
+    void ToggleGroup(ActGroup _group)
+    {
+        _group.Collapsed = !_group.Collapsed;
+        s_collapsedOverride[_group.Act.Number] = _group.Collapsed;
+        if (_group.Header != null) _group.Header.SetCollapsed(_group.Collapsed);
+        for (int i = 0; i < _group.Rows.Count; i++)
+            if (_group.Rows[i] != null) _group.Rows[i].gameObject.SetActive(!_group.Collapsed);
+    }
+
+    // 목록은 오버레이라 목적지 화면을 가린다 — 먼저 걷고 간다.
+    void HandleGo(MissionDefinition _definition)
+    {
+        this.Close();
+        GuideMissionNavigator.Go(_definition);
+    }
+
+    void RefreshRows()
+    {
+        for (int i = 0; i < this.m_rows.Count; i++)
+            if (this.m_rows[i] != null) this.m_rows[i].Refresh();
+    }
+
+    // 정의 목록의 신원 + 수령 낙인. MissionPanel 과 같은 모양이되 guide 줄만 본다.
+    static string BuildSignature()
+    {
+        IReadOnlyList<MissionDefinition> t_definitions = MissionManager.Definitions;
+        if (t_definitions.Count == 0) return string.Empty;
+
+        var t_builder = new System.Text.StringBuilder(t_definitions.Count * 24);
+        for (int i = 0; i < t_definitions.Count; i++)
+        {
+            if (t_definitions[i].Period != PERIOD_GUIDE) continue;
+            t_builder.Append(t_definitions[i].Id).Append(MissionManager.IsClaimed(t_definitions[i].Id)).Append('|');
+        }
+        return t_builder.ToString();
     }
 
     void HandleClaim(string _missionId)
     {
         this.ClaimAsync(_missionId).Forget();
-    }
-
-    void HandleNavigate(string _missionId)
-    {
-        if (!this.isShow) return;
-        MissionContentNavigation.TryNavigate(MissionManager.Find(_missionId), this.Close);
     }
 
     async UniTaskVoid ClaimAsync(string _missionId)

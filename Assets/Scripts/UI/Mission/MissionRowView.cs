@@ -70,11 +70,26 @@ public class MissionRowView : MonoBehaviour
 
     [SerializeField] CanvasGroup claimGroup;
 
+    [Header("가이드 전용(선택 배선)")]
+    [Tooltip("현재 가이드 미션 행에만 보이는 이동 버튼. 일일·주간 행은 Bind 가 항상 끈다.")]
+    [SerializeField] Button goButton;
+
+    [Tooltip("행 전체 알파. 잠긴 가이드 행을 흐리게 하는 데 쓴다(수령 버튼 전용 claimGroup 과 별개). 비워 두면 흐리지 않는다.")]
+    [SerializeField] CanvasGroup rowGroup;
+
+    [Tooltip("현재 가이드 미션 행에 켜는 강조 틀. 비워 두면 그리지 않는다.")]
+    [SerializeField] GameObject currentMark;
+
+    [Tooltip("잠긴 가이드 행에 씌울 알파.")]
+    [Range(0f, 1f)] [SerializeField] float lockedAlpha = 0.55f;
+
     MissionDefinition m_definition;
     System.Action<string> m_onClaim;
     System.Action<string> m_onNavigate;
     Sprite m_authoredRewardIcon;
     bool m_hasBound;
+    EMissionRowEmphasis m_emphasis;
+    System.Action m_onGo;
 
     readonly Vector3[] m_fillCorners = new Vector3[4];
     readonly Vector3[] m_textCorners = new Vector3[4];
@@ -88,6 +103,9 @@ public class MissionRowView : MonoBehaviour
     {
         this.m_onClaim = _onClaim;
         this.m_onNavigate = _onNavigate;
+        // 강조는 가이드 패널만 SetEmphasis 로 올린다 — 공용 프리팹이라 일일·주간 행은 여기서 항상 기본으로 돌아간다.
+        this.m_emphasis = EMissionRowEmphasis.Normal;
+        this.m_onGo = null;
         // 상태만 채택한 응답은 같은 정의 객체를 유지한다. 새 조회의 같은 ID도 다시 바인딩한다.
         if (this.m_hasBound && ReferenceEquals(this.m_definition, _definition))
         {
@@ -109,6 +127,11 @@ public class MissionRowView : MonoBehaviour
             this.navigateButton.onClick.RemoveAllListeners();
             this.navigateButton.onClick.AddListener(this.HandleNavigate);
         }
+        if (this.goButton != null)
+        {
+            this.goButton.onClick.RemoveAllListeners();
+            this.goButton.onClick.AddListener(this.HandleGo);
+        }
 
         if (this.titleText != null) this.titleText.text = (_definition?.Period == "guide" ? "가이드 · " : "") + (_definition?.Title ?? string.Empty);
         if (this.descriptionText != null) this.descriptionText.text = _definition?.Description ?? string.Empty;
@@ -118,10 +141,19 @@ public class MissionRowView : MonoBehaviour
         this.Refresh();
     }
 
+    /// <summary>가이드 목록에서 현재·잠김 행을 구분한다. 이동 콜백은 현재 행이 미완료일 때만 버튼으로 노출된다.</summary>
+    internal void SetEmphasis(EMissionRowEmphasis _emphasis, System.Action _onGo = null)
+    {
+        this.m_emphasis = _emphasis;
+        this.m_onGo = _onGo;
+        this.Refresh();
+    }
+
     /// <summary>진행도·수령 상태만 다시 그린다. 정의가 그대로면 Bind 를 다시 부르지 않는다.</summary>
     internal void Refresh()
     {
         if (this.m_definition == null) return;
+        this.ApplyEmphasis(MissionManager.IsComplete(this.m_definition));
 
         long t_progress = MissionManager.ProgressOf(this.m_definition);
         long t_target = this.m_definition.Target;
@@ -203,6 +235,20 @@ public class MissionRowView : MonoBehaviour
         t_filledText.SetPositionAndRotation(t_source.position, t_source.rotation);
     }
 
+    void ApplyEmphasis(bool _complete)
+    {
+        bool t_current = this.m_emphasis == EMissionRowEmphasis.Current;
+        // 진행도만 바뀌어 달성되면(서명 불변) 이동 버튼이 숨고 수령 버튼이 살아나야 한다.
+        bool t_showGo = t_current && !_complete && this.m_onGo != null && this.goButton != null;
+        if (this.goButton != null) this.goButton.gameObject.SetActive(t_showGo);
+        // 이동 버튼은 수령 버튼 자리에 선다 — "진행 중" 표지와 겹치지 않게 그동안만 수령 버튼을 내린다.
+        if (this.claimButton != null) this.claimButton.gameObject.SetActive(!t_showGo);
+        if (this.currentMark != null) this.currentMark.SetActive(t_current);
+        if (this.rowGroup != null) this.rowGroup.alpha = this.m_emphasis == EMissionRowEmphasis.Locked ? this.lockedAlpha : 1f;
+    }
+
+    void HandleGo() => this.m_onGo?.Invoke();
+
     void HandleClaim()
     {
         if (this.m_definition == null) return;
@@ -272,7 +318,7 @@ public class MissionRowView : MonoBehaviour
         if (_countText != null) _countText.text = "x" + _gain.Amount;
     }
 
-    static ClaimRewardGain CurrencyAt(MissionDefinition _definition, int _index)
+    internal static ClaimRewardGain CurrencyAt(MissionDefinition _definition, int _index)
     {
         List<ClaimRewardGain> t_gains = _definition?.Reward?.Currencies;
         if (t_gains == null) return null;
@@ -281,7 +327,7 @@ public class MissionRowView : MonoBehaviour
         return null;
     }
 
-    static ClaimRewardItem FirstItem(MissionDefinition _definition)
+    internal static ClaimRewardItem FirstItem(MissionDefinition _definition)
     {
         List<ClaimRewardItem> t_items = _definition?.Reward?.Items;
         if (t_items == null) return null;
@@ -317,3 +363,6 @@ public class MissionRowView : MonoBehaviour
     static string CurrencyLabel(string _currency)
         => System.Enum.TryParse(_currency, out ECurrencyType t_type) ? CurrencyLook.NameOf(t_type) : _currency;
 }
+
+/// <summary>가이드 목록 안에서 행이 서 있는 자리. 일일·주간은 항상 Normal 이다.</summary>
+public enum EMissionRowEmphasis { Normal, Current, Locked }

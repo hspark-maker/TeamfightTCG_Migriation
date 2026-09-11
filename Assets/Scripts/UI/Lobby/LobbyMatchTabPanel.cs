@@ -1,4 +1,5 @@
 ﻿using System;
+using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -124,6 +125,22 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         RefreshPlayLabel();
         ApplyFeatureLocks();
         RefreshGuideMissionButton();
+        if (OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission)) RefreshGuideMissionsAsync().Forget();
+    }
+
+    /// <summary>덱 저장·전투 뒤 로비로 돌아온 시점에 가이드 진행도를 다시 읽는다.
+    /// 디바운스 안의 업로드를 먼저 확정해야 서버가 최신 덱으로 판정한다. 캐시가 유효하면 왕복은 생략된다.</summary>
+    static async UniTaskVoid RefreshGuideMissionsAsync()
+    {
+        try
+        {
+            if (PlayerSaveCloud.HasPendingUpload) await PlayerSaveCloud.FlushAsync();
+            await MissionCommands.RefreshAsync();
+        }
+        catch (Exception t_exception)
+        {
+            Debug.LogWarning($"[LobbyMatchTabPanel] Guide mission refresh on lobby entry failed — {t_exception.GetBaseException().Message}");
+        }
     }
 
     public override void OnSettled() => m_unlockPresentation?.SetVisible(true);

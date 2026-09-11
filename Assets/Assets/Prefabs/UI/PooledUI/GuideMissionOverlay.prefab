@@ -263,6 +263,7 @@ MonoBehaviour:
   listContent: {fileID: 9100000000000000002}
   rowPrefab: {fileID: 9100000000000000024, guid: 5b2074d3365f43eea16ffa8324468415, type: 3}
   emptyNotice: {fileID: 9100000000000000031}
+  headerPrefab: {fileID: 2280463491794117847, guid: fa740ce6918c6a94480e408e53d01964, type: 3}
   closeButton: {fileID: 0}
   dimButton: {fileID: 7547680357580154284}
   transition:
