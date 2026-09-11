@@ -19,8 +19,13 @@ public sealed class SynergyIntroduction : MonoBehaviour
 
     static SynergyIntroductionSaveData State => DataSaveManager.Data?.Tutorial?.SynergyIntroduction;
     public static bool IsActive => s_instance != null && s_instance.m_active;
-    public static bool HasPending => State != null && !State.Completed && State.DeckSlot >= 0
+    public static bool HasPending => State != null && State.DeckSlot >= 0
+        && !string.IsNullOrEmpty(State.SynergyId) && !State.IsDone(State.SynergyId)
         && (s_instance == null || !s_instance.m_deferred);
+
+    // 가이드 미션 축에 고정된 소개 대상. 미션 4(돌보미 3장 2성 편성) 달성 → 돌보미, 미션 6(추적 조합) 달성 → 추적.
+    const string CARETAKER_ID = "Caretaker";
+    const string TRACE_ID = "Trace";
 
     /// <summary>새 서버 세이브 채택 후 세션 UI와 미루기 상태를 초기화한다. 저장 진행도는 보존한다.</summary>
     public static void ResetSession()
@@ -48,7 +53,12 @@ public sealed class SynergyIntroduction : MonoBehaviour
         DeckSaveManager.OnSelectedSlotChanged += OnStateChanged;
         CardGrowthManager.OnGrowthChanged += OnStateChanged;
         OwnershipManager.OnOwnershipChanged += OnStateChanged;
+        // "달성 직후"는 강화 응답 채택이나 로비 복귀 재조회가 미션 봉투를 갈아끼우는 순간이다.
+        // 미션 봉투는 조회·수령마다 바뀌므로 "나중에" 미루기는 되돌리지 않는다(덱·성장 변화만 되돌린다).
+        MissionManager.OnChanged += OnMissionsChanged;
     }
+
+    void OnMissionsChanged() => Reevaluate();
 
     void OnDestroy()
     {
@@ -56,6 +66,7 @@ public sealed class SynergyIntroduction : MonoBehaviour
         DeckSaveManager.OnSelectedSlotChanged -= OnStateChanged;
         CardGrowthManager.OnGrowthChanged -= OnStateChanged;
         OwnershipManager.OnOwnershipChanged -= OnStateChanged;
+        MissionManager.OnChanged -= OnMissionsChanged;
         ClearPresentation();
         if (s_instance == this) s_instance = null;
     }
@@ -74,27 +85,48 @@ public sealed class SynergyIntroduction : MonoBehaviour
 
     public static void Reevaluate()
     {
-        if (!CardCatalog.IsReady || !CardGrowthManager.IsReady || State == null || State.Completed) return;
+        if (!CardCatalog.IsReady || !CardGrowthManager.IsReady || State == null) return;
         Ensure();
         if (IsActive) return;
+        string t_id = PendingSynergyId();
         int t_slot = -1;
         SynergyProgress t_target = null;
-        // 저장한 후보가 여전히 유효하면 유지한다. 없거나 무효일 때만 우선순위로 새로 고른다.
-        if (TryResolve(State.DeckSlot, State.SynergyId, out t_target)) t_slot = State.DeckSlot;
-        else
+        if (!string.IsNullOrEmpty(t_id))
         {
-            int t_selected = DeckSaveManager.SelectedSlot;
-            if (TryResolve(t_selected, null, out t_target)) t_slot = t_selected;
+            // 저장한 슬롯이 여전히 그 시너지를 켜고 있으면 유지한다. 아니면 선택 슬롯 → 나머지 순서로 다시 고른다.
+            if (State.SynergyId == t_id && TryResolve(State.DeckSlot, t_id, out t_target)) t_slot = State.DeckSlot;
             else
-                for (int t_i = 0; t_i < DeckSaveManager.SLOT_COUNT; t_i++)
-                    if (t_i != t_selected && TryResolve(t_i, null, out t_target)) { t_slot = t_i; break; }
+            {
+                int t_selected = DeckSaveManager.SelectedSlot;
+                if (TryResolve(t_selected, t_id, out t_target)) t_slot = t_selected;
+                else
+                    for (int t_i = 0; t_i < DeckSaveManager.SLOT_COUNT; t_i++)
+                        if (t_i != t_selected && TryResolve(t_i, t_id, out t_target)) { t_slot = t_i; break; }
+            }
+            if (t_slot < 0) t_id = "";
         }
-        string t_id = t_target?.Synergy.SynergyId ?? "";
         if (State.DeckSlot == t_slot && State.SynergyId == t_id) return;
         State.DeckSlot = t_slot;
         State.SynergyId = t_id;
         DataSaveManager.SaveCoalesced();
         Debug.Log($"[SynergyIntroduction] Candidate slot={t_slot}, synergy={t_id}");
+    }
+
+    // 지금 소개할 시너지. 미션 달성은 서버 판정(IsComplete)이라 수령 전·소급 모두 같은 답이 나온다.
+    static string PendingSynergyId()
+    {
+        if (!MissionManager.IsReady) return "";
+        if (!State.IsDone(CARETAKER_ID))
+            return IsGuideComplete(GuideMissionTrack.EVENT_CARETAKER_DECK_STAR2) ? CARETAKER_ID : "";
+        if (!State.IsDone(TRACE_ID))
+            return IsGuideComplete(GuideMissionTrack.EVENT_CARETAKER_TRACE_DECK) ? TRACE_ID : "";
+        return "";
+    }
+
+    static bool IsGuideComplete(string _event)
+    {
+        MissionDefinition t_definition = GuideMissionTrack.FindByEvent(_event);
+        return t_definition != null && MissionManager.IsComplete(t_definition);
     }
 
     static bool TryResolve(int _slot, string _id, out SynergyProgress _target)
@@ -188,16 +220,20 @@ public sealed class SynergyIntroduction : MonoBehaviour
         { ClearPresentation(); return; }
         ExplainPopupData t_data = ExplainPopupData.ForSynergy(m_target.Synergy, m_target.Count);
         if (t_data == null) { ClearPresentation(); return; }
+        string t_lead = m_target.Synergy.SynergyId == TRACE_ID ? "돌보미와 추적, 두 시너지가 함께 켜졌어요.\n" : "";
         OutgameTutorialGateUI.Ensure().ShowMessageGate(this, m_editor.FindSynergyAnchor(m_target.Synergy),
-            t_data.displayName + "\n" + t_data.explain, Complete, _atBottom: true, _dim: false);
+            t_lead + t_data.displayName + "\n" + t_data.explain, Complete, _atBottom: true, _dim: false);
     }
 
     void Complete()
     {
-        State.Completed = true;
+        string t_id = State.SynergyId;
+        State.MarkDone(t_id);
         DataSaveManager.SaveCoalesced();
-        Debug.Log("[SynergyIntroduction] Completed " + State.SynergyId);
+        Debug.Log("[SynergyIntroduction] Completed " + t_id);
         ClearPresentation();
+        // 다음 소개(추적)가 이미 달성돼 있으면 후보를 바로 세운다 — 조정기가 다음 빈 무대에서 집어 간다.
+        Reevaluate();
     }
 
     public static void CancelPresentation()
