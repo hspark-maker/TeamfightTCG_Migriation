@@ -1,0 +1,9 @@
+{
+    "name": "Teamfight.UIEffectInspector.Editor",
+    "references": [
+        "Coffee.UIEffect",
+        "Coffee.UIEffect.Editor"
+    ],
+    "includePlatforms": ["Editor"],
+    "autoReferenced": false
+}

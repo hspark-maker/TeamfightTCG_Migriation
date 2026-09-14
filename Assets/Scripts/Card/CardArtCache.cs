@@ -6,18 +6,66 @@ using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine.ResourceManagement.ResourceLocations;
 
-/// <summary>Cards 라벨의 Addressables 카탈로그를 조회하고 카드 아트를 앱 수명 동안 캐시한다.</summary>
+/// <summary>Cards 주소를 색인하고, 화면에서 쓰는 아트와 최근 사용한 24장만 유지한다.</summary>
 public static class CardArtCache
 {
     const string CardsLabel = "Cards";
     const string CardAssetPrefix = "Data_Card_";
 
     static readonly HashSet<string> s_addresses = new HashSet<string>(StringComparer.Ordinal);
-    static readonly Dictionary<string, Sprite> s_loaded = new Dictionary<string, Sprite>(StringComparer.Ordinal);
-    static readonly Dictionary<string, AsyncOperationHandle<Sprite>> s_handles =
-        new Dictionary<string, AsyncOperationHandle<Sprite>>(StringComparer.Ordinal);
-    static readonly HashSet<string> s_pending = new HashSet<string>(StringComparer.Ordinal);
-    static readonly HashSet<string> s_reportedMisses = new HashSet<string>(StringComparer.Ordinal);
+    public const int IdleCapacity = 24;
+    static readonly Dictionary<string, Entry> s_entries = new(StringComparer.Ordinal);
+    static long s_access;
+
+    internal sealed class Entry
+    {
+        public string Address;
+        public AsyncOperationHandle<Sprite> Handle;
+        public Sprite Sprite;
+        public int References;
+        public long LastUse;
+        public bool Complete;
+        public event Action<Sprite> Changed;
+        public void Subscribe(Action<Sprite> callback) => Changed += callback;
+        public void Unsubscribe(Action<Sprite> callback) => Changed -= callback;
+        public void Notify()
+        {
+            if (Changed == null) return;
+            foreach (Action<Sprite> callback in Changed.GetInvocationList())
+                try { callback(Sprite); }
+                catch (Exception exception) { Debug.LogException(exception); }
+        }
+    }
+
+    /// <summary>표시 중 참조를 유지하고 숨김/재바인딩 시 반환한다.</summary>
+    public sealed class Lease : IDisposable
+    {
+        Entry m_entry;
+        readonly Action<Sprite> m_changed;
+        readonly int m_generation;
+        internal Lease(Entry entry, Action<Sprite> changed)
+        {
+            m_entry = entry;
+            m_changed = changed;
+            m_generation = s_generation;
+            entry.References++;
+            entry.Subscribe(OnChanged);
+        }
+        public Sprite Sprite => m_entry?.Sprite;
+        void OnChanged(Sprite sprite)
+        {
+            if (m_entry != null && m_generation == s_generation) m_changed?.Invoke(sprite);
+        }
+        public void Dispose()
+        {
+            if (m_entry == null) return;
+            m_entry.Unsubscribe(OnChanged);
+            m_entry.References--;
+            m_entry.LastUse = ++s_access;
+            m_entry = null;
+            if (m_generation == s_generation) TrimIdle();
+        }
+    }
 
     static AsyncOperationHandle<IList<IResourceLocation>> s_catalogHandle;
     static bool s_catalogRequested;
@@ -27,8 +75,6 @@ public static class CardArtCache
     static bool s_preloadComplete;
     static bool s_loadFailed;
     static bool s_reportedCatalogNotReady;
-    static int s_wantedCount;
-    static int s_finishedCount;
     static int s_generation;
 
     public static event Action OnArtLoaded;
@@ -37,8 +83,15 @@ public static class CardArtCache
     public static bool IsComplete => s_preloadComplete;
     public static bool HasFailed => s_catalogFailed || s_loadFailed;
     public static bool IsReady => s_preloadComplete && !HasFailed;
-    public static bool IsBusy => (s_catalogRequested && !s_catalogReady && !s_catalogFailed) || s_pending.Count > 0;
-    public static int LoadedCount => s_loaded.Count;
+    public static bool IsBusy => (s_catalogRequested && !s_catalogReady && !s_catalogFailed) || PendingCount > 0;
+    public static int LoadedCount
+    {
+        get { int count = 0; foreach (var entry in s_entries.Values) if (entry.Sprite != null) count++; return count; }
+    }
+    public static int PendingCount
+    {
+        get { int count = 0; foreach (var entry in s_entries.Values) if (!entry.Complete) count++; return count; }
+    }
 
     public static float LoadProgress
     {
@@ -48,8 +101,7 @@ public static class CardArtCache
             if (!s_catalogReady) return s_catalogRequested && s_catalogHandle.IsValid()
                 ? Mathf.Clamp01(s_catalogHandle.PercentComplete) * 0.1f
                 : 0f;
-            if (!s_preloadStarted || s_wantedCount == 0) return 0.1f;
-            return 0.1f + 0.9f * Mathf.Clamp01((float)s_finishedCount / s_wantedCount);
+            return 0.9f;
         }
     }
 
@@ -120,15 +172,57 @@ public static class CardArtCache
         return !string.IsNullOrEmpty(_address) && s_addresses.Contains(_address);
     }
 
-    public static Sprite Get(string _address)
+    public static Lease Acquire(string _address, Action<Sprite> _changed)
     {
-        if (string.IsNullOrEmpty(_address)) return null;
-        if (s_loaded.TryGetValue(_address, out Sprite t_sprite)) return t_sprite;
-        if (s_reportedMisses.Add(_address))
-            Debug.LogError($"[CardArtCache] Card art was not preloaded or failed to load: {_address}");
-        return null;
+        if (!Exists(_address)) return null;
+        bool t_new = !s_entries.TryGetValue(_address, out Entry t_entry);
+        if (t_new)
+        {
+            t_entry = new Entry { Address = _address };
+            s_entries.Add(_address, t_entry);
+        }
+        t_entry.LastUse = ++s_access;
+        var t_lease = new Lease(t_entry, _changed);
+        if (t_new)
+        {
+            int t_generation = s_generation;
+            t_entry.Handle = Addressables.LoadAssetAsync<Sprite>(_address);
+            t_entry.Handle.Completed += operation =>
+            {
+                if (t_generation != s_generation) return;
+                t_entry.Complete = true;
+                if (operation.Status == AsyncOperationStatus.Succeeded)
+                    t_entry.Sprite = operation.Result;
+                else
+                    Debug.LogError($"[CardArtCache] Card art load failed: {_address}");
+                t_entry.Notify();
+                TrimIdle();
+            };
+        }
+        return t_lease;
     }
 
+    static void TrimIdle()
+    {
+        while (true)
+        {
+            int t_idle = 0;
+            Entry t_oldest = null;
+            foreach (Entry t_entry in s_entries.Values)
+            {
+                if (t_entry.References != 0 || !t_entry.Complete) continue;
+                t_idle++;
+                if (t_oldest == null || (t_entry.Sprite == null && t_oldest.Sprite != null) ||
+                    ((t_entry.Sprite == null) == (t_oldest.Sprite == null) && t_entry.LastUse < t_oldest.LastUse))
+                    t_oldest = t_entry;
+            }
+            if (t_oldest == null || (t_idle <= IdleCapacity && t_oldest.Sprite != null)) return;
+            s_entries.Remove(t_oldest.Address);
+            if (t_oldest.Handle.IsValid()) Addressables.Release(t_oldest.Handle);
+        }
+    }
+
+    // 초기화는 주소 배선만 검증한다. Sprite/Texture는 화면에서 Acquire할 때 읽는다.
     public static IEnumerator Preload(IEnumerable<CardSpec> _specs)
     {
         if (s_preloadComplete) yield break;
@@ -149,68 +243,18 @@ public static class CardArtCache
             yield break;
         }
 
-        var t_wanted = new HashSet<string>(StringComparer.Ordinal);
         if (_specs != null)
-        {
             foreach (CardSpec t_spec in _specs)
             {
                 if (t_spec == null) continue;
-                string t_baseAddress = AddressOf(t_spec, 0);
-                if (!s_addresses.Contains(t_baseAddress))
-                {
-                    s_loadFailed = true;
-                    Debug.LogError($"[CardArtCache] Missing default card art address: {t_baseAddress}");
-                }
-
-                for (int t_stage = 0; t_stage <= CardSpec.MaxEvolutionStage; t_stage++)
-                {
-                    string t_address = AddressOf(t_spec, t_stage);
-                    if (s_addresses.Contains(t_address)) t_wanted.Add(t_address);
-                }
-
-                string t_silhouetteAddress = SilhouetteAddressOf(t_spec);
-                if (s_addresses.Contains(t_silhouetteAddress)) t_wanted.Add(t_silhouetteAddress);
+                string t_address = AddressOf(t_spec, 0);
+                if (s_addresses.Contains(t_address)) continue;
+                s_loadFailed = true;
+                Debug.LogError($"[CardArtCache] Missing default card art address: {t_address}");
             }
-        }
-
-        s_wantedCount = t_wanted.Count;
-        s_finishedCount = 0;
-
-        foreach (string t_address in t_wanted)
-        {
-            if (s_loaded.ContainsKey(t_address))
-            {
-                s_finishedCount++;
-                continue;
-            }
-            if (!s_pending.Add(t_address)) continue;
-            LoadOne(t_address, t_generation);
-        }
-
-        while (s_pending.Count > 0 && t_generation == s_generation) yield return null;
-        if (t_generation != s_generation) yield break;
 
         s_preloadComplete = true;
         OnArtLoaded?.Invoke();
-    }
-
-    static void LoadOne(string _address, int _generation)
-    {
-        AsyncOperationHandle<Sprite> t_handle = Addressables.LoadAssetAsync<Sprite>(_address);
-        s_handles[_address] = t_handle;
-        t_handle.Completed += _operation =>
-        {
-            if (_generation != s_generation) return;
-            s_pending.Remove(_address);
-            s_finishedCount++;
-            if (_operation.Status == AsyncOperationStatus.Succeeded && _operation.Result != null)
-                s_loaded[_address] = _operation.Result;
-            else
-            {
-                s_loadFailed = true;
-                Debug.LogError($"[CardArtCache] Card art load failed: {_address}");
-            }
-        };
     }
 
     /// <summary>실패한 적재만 처음 상태로 되돌린다(초기화 재시도용).</summary>
@@ -225,15 +269,13 @@ public static class CardArtCache
     {
         s_generation++;
         if (s_catalogHandle.IsValid()) Addressables.Release(s_catalogHandle);
-        foreach (KeyValuePair<string, AsyncOperationHandle<Sprite>> t_pair in s_handles)
-            if (t_pair.Value.IsValid()) Addressables.Release(t_pair.Value);
+        foreach (Entry t_entry in s_entries.Values)
+            if (t_entry.Handle.IsValid()) Addressables.Release(t_entry.Handle);
 
         s_catalogHandle = default;
         s_addresses.Clear();
-        s_loaded.Clear();
-        s_handles.Clear();
-        s_pending.Clear();
-        s_reportedMisses.Clear();
+        s_entries.Clear();
+        s_access = 0;
         s_catalogRequested = false;
         s_catalogReady = false;
         s_catalogFailed = false;
@@ -241,8 +283,6 @@ public static class CardArtCache
         s_preloadComplete = false;
         s_loadFailed = false;
         s_reportedCatalogNotReady = false;
-        s_wantedCount = 0;
-        s_finishedCount = 0;
         OnArtLoaded = null;
     }
 }

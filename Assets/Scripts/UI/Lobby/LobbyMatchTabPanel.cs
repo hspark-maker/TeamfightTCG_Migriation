@@ -244,7 +244,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     /// 화면이 그 사실을 그린다(빈 목록으로 두지 않는다).</summary>
     public void OpenPass() => OpenPooled<PassPanel>();
 
-    static void OpenPooled<T>() where T : PooledUIBase
+    void OpenPooled<T>() where T : PooledUIBase
     {
         if (UIPoolManager.Instance == null)
         {
@@ -252,7 +252,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
             return;
         }
 
-        UIPoolManager.Instance.AddOrUpdateUI<T>();
+        UIPoolManager.Instance.RequestUI<T>(this);
     }
 
     public void SetPlayInteractable(bool _interactable)

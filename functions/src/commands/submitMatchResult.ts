@@ -108,7 +108,7 @@ type SettleAnalytics = {
 type SettleOutcome =
   | {
       kind: "done";
-      value: {status: string; reason?: unknown};
+      value: {status: string; reason?: unknown; adventureNodeId?: string; won?: boolean; draw?: boolean};
       telemetry?: ReplayDailyDelta;
       analytics?: SettleAnalytics;
     }
@@ -284,29 +284,31 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
   if (data.seedSource !== "server") {
     throw new HttpsError("failed-precondition", "legacy match results are not authoritative");
   }
-  // 토글은 트랜잭션 밖에서 제출당 한 번만 읽는다. off면 Cloud Run 호출 자체를 생략해
-  // 대역폭·인스턴스 사용을 멈추고 기존 두 클라이언트 합의 경로로 되돌아간다.
+  // 랭크 재생 토글은 트랜잭션 밖에서 제출당 한 번만 읽는다.
+  // 모험 매치는 승리 낙인과 미션이 검증 결과를 요구하므로 토글과 무관하게 재생한다.
   const replayEnabled = await isBattleReplayEnabled(data.env);
   const matchRef = db.doc(`envs/${data.env}/matches/${data.matchId}`);
+  const initialMatch = (await matchRef.get()).data();
+  const adventureMatch = typeof initialMatch?.adventureNodeId === "string";
   const cardTable = "Card";
   // 표 3개를 블롭으로 읽는다 — 행 문서를 훑으면 제출 1건마다 행 수만큼(Reward 85 · Card 41 …) 과금된다.
   // readSpecRows 가 (env, table) 단위로 5분 캐시를 이미 갖고 있다(specs/specBlobReader.ts).
   // 여기서 다시 캐시하지 마라 — TTL 이 두 벌이 되고 clearSpecCache 로 비워도 이쪽이 옛 값을 계속 준다.
   let rewardRows;
   let rankRows;
-  let rankSeason: RankSeasonDef;
+  let rankSeason: RankSeasonDef | null;
   const cardSpecs = new Map<number, CardSpecForValidation>();
   try {
     const [rewardSpecRows, rankSpecRows, cardSpecRows, seasonSpecRows] = await Promise.all([
-      readSpecRows(data.env, "Reward"),
-      readSpecRows(data.env, "RankGrade"),
+      adventureMatch ? Promise.resolve([]) : readSpecRows(data.env, "Reward"),
+      adventureMatch ? Promise.resolve([]) : readSpecRows(data.env, "RankGrade"),
       readSpecRows(data.env, cardTable),
-      readSpecRows(data.env, "PassSeason"),
+      adventureMatch ? Promise.resolve([]) : readSpecRows(data.env, "PassSeason"),
     ]);
     rewardRows = parseRewardRows(rewardSpecRows as Record<string, unknown>[]);
     rankRows = parseRankGradeRows(rankSpecRows as Record<string, unknown>[]);
     const activeSeason = currentRankSeason(seasonSpecRows, Date.now());
-    if (activeSeason === null) throw new Error("no active rank season");
+    if (!adventureMatch && activeSeason === null) throw new Error("no active rank season");
     rankSeason = activeSeason;
     for (const row of cardSpecRows) {
       const spec = parseCardSpecRow(row);
@@ -327,6 +329,10 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
   const settle = async (tx: Transaction, replay: CachedReplay | null): Promise<SettleOutcome> => {
     const matchSnapshot = await tx.get(matchRef);
     const match = matchSnapshot.data() as Record<string, unknown> | undefined;
+    const adventureNodeId = typeof match?.adventureNodeId === "string" ? match.adventureNodeId : null;
+    if ((adventureNodeId != null) !== adventureMatch) {
+      throw new HttpsError("unavailable", "match type changed");
+    }
     if (data.seedSource === "server") {
       const participantUids = match?.participantUids;
       if (match?.seedSource !== "server" ||
@@ -336,7 +342,11 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
     }
     const status = typeof match?.status === "string" ? match.status : "pending";
     if (status !== "pending") {
-      return {kind: "done", value: {status, reason: match?.reason ?? null}};
+      const simulation = objectRecord(match?.serverSimulation);
+      return {kind: "done", value: {status, reason: match?.reason ?? null,
+        ...(adventureNodeId == null ? {} : {adventureNodeId,
+          won: simulation?.ok === true && simulation.draw !== true && simulation.winnerOwner === 0,
+          draw: simulation?.draw === true})}};
     }
 
     const submissions = {...(match?.submissions as Record<string, Submission> | undefined)};
@@ -362,11 +372,14 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
     const aiCardLevel = safeInteger(aiDeck?.cardLevel);
     // 새 계약은 발급 당시 스냅샷이 진실원이다. 누락·손상 시 구 공통 레벨로 우회하지 않는다.
     const soloAiSnapshots = solo && Array.isArray(aiCardIds) ?
-      match?.aiGrowthVersion === 1 ?
+      match?.aiGrowthVersion === 1 || adventureNodeId != null ?
         readAiDeckSnapshots(aiCardIds as number[], aiDeck?.cardGrowth, aiDeck?.snapshots) :
         match?.aiGrowthVersion == null && aiCardLevel != null ?
           buildAiDeckSnapshots(aiCardIds as number[], aiCardLevel, cardSpecs) : null : null;
     let soloContractReason: string | null = null;
+    if (adventureNodeId != null && !solo) {
+      throw new HttpsError("failed-precondition", "adventure match must be solo");
+    }
     if (solo) {
       const serverOrders = objectRecord(match?.serverBoardOrders);
       if (!Array.isArray(participantUids) || participantUids.length !== 1 || participantUids[0] !== uid ||
@@ -397,8 +410,13 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
     //   SERVER_SIMULATION_AUTHORITATIVE = 배포로만 되돌리는 코드 킬스위치
     // **토글이 꺼진 동안은 승패 진실원이 클라 합의다** — 치트 방어가 낮아진 상태이므로
     // 릴리즈 관리 창의 경고를 무시하고 오래 꺼 두지 마라.
-    const simulateRules = replayEnabled && rulesetVersion >= SERVER_AUTHORITATIVE_RULESET_VERSION;
-    const authoritativeRules = SERVER_SIMULATION_AUTHORITATIVE && simulateRules;
+    // 모험 신규 계약은 reportAdventureWin이 서버 승리를 요구하므로 항상 권위 재생한다.
+    const simulateRules = (replayEnabled || adventureNodeId != null) &&
+      rulesetVersion >= SERVER_AUTHORITATIVE_RULESET_VERSION;
+    const authoritativeRules = (SERVER_SIMULATION_AUTHORITATIVE || adventureNodeId != null) && simulateRules;
+    if (adventureNodeId != null && !simulateRules) {
+      throw new HttpsError("failed-precondition", "adventure replay ruleset is unsupported");
+    }
     const nowMs = Timestamp.now().toMillis();
     const decision = solo ?
       entries.length > 1 ? {status: "flagged" as const, reason: "too_many_submissions"} :
@@ -569,22 +587,23 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
       }
     }
 
-    const rankRefs = entries.map((entry) => rankRef(db, data.env, entry.uid));
-    const rankStateRefs = entries.map((entry) =>
+    const rankRefs = adventureNodeId != null ? [] : entries.map((entry) => rankRef(db, data.env, entry.uid));
+    const rankStateRefs = adventureNodeId != null ? [] : entries.map((entry) =>
       db.doc(`envs/${data.env}/users/${entry.uid}/payoutState/current`));
     const saveRefs = entries.map((entry) =>
       db.doc(`envs/${data.env}/users/${entry.uid}/save/current`));
     const missionRefs = entries.map((entry) => missionsRef(db, data.env, entry.uid));
     const snapshots = await tx.getAll(...rankRefs, ...rankStateRefs, ...saveRefs, ...missionRefs);
     const count = entries.length;
-    const rankSnapshots = snapshots.slice(0, count);
-    const rankStateSnapshots = snapshots.slice(count, count * 2);
-    const saveSnapshots = snapshots.slice(count * 2, count * 3);
+    const rankSnapshots = snapshots.slice(0, rankRefs.length);
+    const rankStateSnapshots = snapshots.slice(rankRefs.length, rankRefs.length + rankStateRefs.length);
+    const saveOffset = rankRefs.length + rankStateRefs.length;
+    const saveSnapshots = snapshots.slice(saveOffset, saveOffset + count);
 
     // 미션 문서는 payout 쓰기보다 먼저 전부 읽는다. 정산 트랜잭션의 pending -> confirmed 전이가
     // matchId 멱등 게이트라 같은 제출을 다시 보내도 이 경로에는 재진입하지 않는다.
     const missionBumps = missionRefs.map((ref, i) =>
-      missionBumpFromSnapshot(ref, snapshots[count * 3 + i], period));
+      missionBumpFromSnapshot(ref, snapshots[saveOffset + count + i], period, saveSnapshots[i].data()));
 
     const settledAt = Timestamp.now();
     const payoutExpiresAt = Timestamp.fromMillis(settledAt.toMillis() + 180 * 24 * 60 * 60 * 1000);
@@ -594,12 +613,20 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
     const settleOutcomes: SettleAnalytics["outcomes"] = [];
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i];
+      if (adventureNodeId != null) {
+        if (serverReplay?.ok !== true) throw new HttpsError("unavailable", "adventure replay is unavailable");
+        const outcome = serverReplay.outcome;
+        const points = safeInteger(objectRecord(saveSnapshots[i].data()?.rank)?.points) ?? 0;
+        settleOutcomes.push({uid: entry.uid, won: !outcome.draw && outcome.winnerOwner === 0,
+          draw: outcome.draw, rankBefore: points, rankAfter: points});
+        continue;
+      }
       const storedSequence = rankStateSnapshots[i].data()?.sequence;
       const fallbackPoints = legacyRankPoints(rankStateSnapshots[i].data(), saveSnapshots[i].data());
       const fallbackClaimed = legacyClaimedTiers(saveSnapshots[i].data(), rankTierCount(rankRows));
       let rankState = applyRankSeason(
         readRank(rankSnapshots[i], fallbackPoints, fallbackClaimed, rankRows),
-        rankSeason.seasonId,
+        rankSeason!.seasonId,
         rankRows,
       );
       rankState = applyTutorialRankEntry(rankState, saveSnapshots[i].data(), rankRows);
@@ -735,7 +762,9 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
       serverSimulation: persistableReplay(serverReplay), clientDivergence,
       replayUnavailable: FieldValue.delete(),
       settledAt: FieldValue.serverTimestamp(), expiresAt}, {merge: true});
-    return {kind: "done", value: {status: "confirmed"}, analytics: {
+    return {kind: "done", value: {status: "confirmed",
+      ...(adventureNodeId == null ? {} : {adventureNodeId,
+        won: settleOutcomes[0].won, draw: settleOutcomes[0].draw})}, analytics: {
       outcomes: settleOutcomes,
       stats: replayStats,
       destroyedByOwner,

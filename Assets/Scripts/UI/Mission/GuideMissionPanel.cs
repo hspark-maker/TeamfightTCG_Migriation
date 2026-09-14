@@ -33,6 +33,9 @@ public class GuideMissionPanel : PooledUIBase
     [Tooltip("가이드·일일·주간이 공유하는 미션 행 프리팹 에셋.")]
     [SerializeField] MissionRowView rowPrefab;
 
+    [Tooltip("가이드 전체 진행도와 마지막 단계의 달성 보상을 표시하는 고정 행.")]
+    [SerializeField] MissionRowView completionRow;
+
     [Tooltip("가이드 미션이 하나도 없을 때 켤 안내(서버 정의 미도착 포함).")]
     [SerializeField] GameObject emptyNotice;
 
@@ -72,6 +75,9 @@ public class GuideMissionPanel : PooledUIBase
     // 수령이 서명에 들어가는 이유는 앞 미션 수령이 다음 줄의 잠금 표시를 바꾸기 때문이다.
     string m_builtSignature;
     long m_builtDefinitionsVersion;
+    Action<string> m_claimHandler;
+    Action<string> m_navigateHandler;
+    MissionDefinition m_completionDefinition;
 
     const string PERIOD_GUIDE = "guide";
 
@@ -127,6 +133,9 @@ public class GuideMissionPanel : PooledUIBase
         this.m_rows.Clear();
         this.m_builtSignature = BuildSignature();
         this.m_builtDefinitionsVersion = MissionManager.DefinitionsVersion;
+        this.m_claimHandler ??= this.HandleClaim;
+        this.m_navigateHandler ??= this.HandleNavigate;
+        this.RefreshCompletionRow();
         if (this.listContent == null || this.rowPrefab == null) return;
 
         // Destroy 는 프레임 끝에 처리되므로 먼저 비활성화한다 — 레이아웃 계산에서 빠져야 이번 프레임 배치가 맞는다.
@@ -146,6 +155,7 @@ public class GuideMissionPanel : PooledUIBase
         {
             MissionDefinition t_definition = t_definitions[i];
             if (!string.Equals(t_definition.Period, PERIOD_GUIDE, StringComparison.Ordinal)) continue;
+            if (ReferenceEquals(t_definition, this.m_completionDefinition)) continue;
 
             if (this.headerPrefab != null && GuideMissionTrack.TryGetAct(t_definition, out GuideMissionTrack.GuideAct t_act)
                 && (t_group == null || t_group.Act.Number != t_act.Number))
@@ -153,7 +163,8 @@ public class GuideMissionPanel : PooledUIBase
 
             MissionRowView t_row = Instantiate(this.rowPrefab, this.listContent);
             t_row.gameObject.SetActive(true);
-            t_row.Bind(t_definition, this.HandleClaim);
+            t_row.Bind(t_definition, this.m_claimHandler,
+                MissionContentNavigation.HasDestination(t_definition) ? this.m_navigateHandler : null);
             bool t_isCurrent = t_current != null && string.Equals(t_current.Id, t_definition.Id, StringComparison.Ordinal);
             EMissionRowEmphasis t_emphasis = t_isCurrent ? EMissionRowEmphasis.Current
                 : MissionManager.IsGuideUnlocked(t_definition) ? EMissionRowEmphasis.Normal : EMissionRowEmphasis.Locked;
@@ -166,7 +177,7 @@ public class GuideMissionPanel : PooledUIBase
             }
         }
 
-        if (this.emptyNotice != null) this.emptyNotice.SetActive(this.m_rows.Count == 0);
+        if (this.emptyNotice != null) this.emptyNotice.SetActive(this.m_rows.Count == 0 && this.m_completionDefinition == null);
     }
 
     ActGroup BuildHeader(GuideMissionTrack.GuideAct _act)
@@ -203,6 +214,7 @@ public class GuideMissionPanel : PooledUIBase
 
     void RefreshRows()
     {
+        this.RefreshCompletionRow();
         for (int i = 0; i < this.m_rows.Count; i++)
             if (this.m_rows[i] != null) this.m_rows[i].Refresh();
     }
@@ -222,9 +234,39 @@ public class GuideMissionPanel : PooledUIBase
         return t_builder.ToString();
     }
 
+    void RefreshCompletionRow()
+    {
+        this.m_completionDefinition = null;
+        if (this.completionRow == null) return;
+
+        int t_total = 0;
+        int t_completed = 0;
+        foreach (MissionDefinition t_definition in MissionManager.Definitions)
+        {
+            if (t_definition.Period != PERIOD_GUIDE) continue;
+            t_total++;
+            if (MissionManager.IsComplete(t_definition)) t_completed++;
+            if (this.m_completionDefinition == null || t_definition.SortOrder > this.m_completionDefinition.SortOrder)
+                this.m_completionDefinition = t_definition;
+        }
+
+        this.completionRow.gameObject.SetActive(this.m_completionDefinition != null);
+        if (this.m_completionDefinition == null) return;
+
+        // 표시는 전체 진행도, 수령·순차 해금은 서버의 마지막 미션 정의를 그대로 따른다.
+        this.completionRow.BindCompletion(this.m_completionDefinition, t_completed, t_total, this.m_claimHandler,
+            MissionContentNavigation.HasDestination(this.m_completionDefinition) ? this.m_navigateHandler : null);
+    }
+
     void HandleClaim(string _missionId)
     {
         this.ClaimAsync(_missionId).Forget();
+    }
+
+    void HandleNavigate(string _missionId)
+    {
+        if (!this.isShow) return;
+        MissionContentNavigation.TryNavigate(MissionManager.Find(_missionId), this.Close);
     }
 
     async UniTaskVoid ClaimAsync(string _missionId)

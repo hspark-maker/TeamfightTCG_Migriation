@@ -2,7 +2,7 @@ using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>강화 버튼의 샤드가 카드로 흡수되는 짧은 연출. 서버 처리와 별도로 재생한다.</summary>
+/// <summary>상단 샤드가 강화 버튼의 터치 위치로 흡수되는 연출. 서버 처리와 별도로 재생한다.</summary>
 public sealed class ShardAbsorbEffect : MonoBehaviour
 {
     const int MaxIcons = 8;
@@ -21,16 +21,28 @@ public sealed class ShardAbsorbEffect : MonoBehaviour
         }
     }
 
-    public void Play(RectTransform source, RectTransform target)
+    public void Play(RectTransform target, ShardEnhanceHoldInput input)
     {
-        if (!isActiveAndEnabled || source == null || target == null) return;
+        if (!isActiveAndEnabled || target == null || !CurrencyHud.TryGet(ECurrencyType.Shard, out CurrencyHud t_hud)
+            || t_hud.TextRect == null) return;
 
         Sprite t_sprite = CurrencyLook.IconOf(ECurrencyType.Shard);
         Canvas t_canvas = GetComponentInParent<Canvas>();
         if (t_sprite == null || t_canvas == null) return;
 
         EnsureLayer(t_canvas);
-        if (!TryGetCenter(source, out Vector2 t_from) || !TryGetCenter(target, out Vector2 t_to)) return;
+        if (!TryGetCenter(t_hud.TextRect, out Vector2 t_from) || !TryGetCenter(target, out Vector2 t_to)) return;
+        int t_pressVersion = input != null ? input.PressVersion : 0;
+        if (input != null && input.PointerPosition.HasValue && TryGetPointer(input, out Vector2 t_pointer))
+            t_to = t_pointer;
+
+        Vector2 FollowTarget()
+        {
+            // 손을 떼거나 새 터치를 시작하면 날아가던 샤드는 마지막 목적지로 마무리한다.
+            if (input != null && input.PressVersion == t_pressVersion
+                && TryGetPointer(input, out Vector2 t_current)) t_to = t_current;
+            return t_to;
+        }
 
         int t_slot = m_nextIcon;
         m_nextIcon = (m_nextIcon + 1) % MaxIcons;
@@ -41,7 +53,8 @@ public sealed class ShardAbsorbEffect : MonoBehaviour
         m_layer.SetAsLastSibling();
         Sequence t_sequence = UiGainBurst.Build(m_layer, t_from, t_to, t_settings,
             _spawn: _index => GetIcon(t_slot, t_sprite),
-            _despawn: _icon => _icon.gameObject.SetActive(false));
+            _despawn: _icon => _icon.gameObject.SetActive(false),
+            _followTarget: FollowTarget);
         m_sequences[t_slot] = t_sequence;
         t_sequence.SetUpdate(true).SetLink(gameObject).OnComplete(() =>
         {
@@ -87,6 +100,13 @@ public sealed class ShardAbsorbEffect : MonoBehaviour
         Vector2 t_screen = RectTransformUtility.WorldToScreenPoint(CameraOf(rect), t_world);
         return RectTransformUtility.ScreenPointToLocalPointInRectangle(
             m_layer, t_screen, CameraOf(m_layer), out position);
+    }
+
+    bool TryGetPointer(ShardEnhanceHoldInput input, out Vector2 position)
+    {
+        position = default;
+        return input.PointerPosition.HasValue && RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            m_layer, input.PointerPosition.Value, CameraOf(m_layer), out position);
     }
 
     static Camera CameraOf(RectTransform rect)

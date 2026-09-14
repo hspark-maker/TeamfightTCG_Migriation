@@ -140,6 +140,7 @@ Material:
     - _DepthFadeMin: 0
     - _DetailNormalMapScale: 1
     - _DstBlend: 1
+    - _DstBlendAlpha: 1
     - _EDGEFADE: 1
     - _EdgeFade: 0.652
     - _EdgeFadeMax: 1
@@ -168,6 +169,7 @@ Material:
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 5
+    - _SrcBlendAlpha: 1
     - _Surface: 1
     - _USEMASK: 0
     - _USEMASK2: 0
@@ -178,6 +180,7 @@ Material:
     - _WARP: 0
     - _WarpIntensity: 0
     - _WarpScale: 1
+    - _XRMotionVectorsPass: 1
     - _ZTest: 4
     - _ZWrite: 0
     - _ZWriteControl: 0

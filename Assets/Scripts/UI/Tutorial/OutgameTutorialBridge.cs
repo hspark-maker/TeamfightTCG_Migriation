@@ -17,6 +17,8 @@ public class OutgameTutorialBridge : MonoBehaviour
     [Tooltip("안내 UI 프리팹(OutgameTutorialGate). 미배선이면 딤+문구만 그리는 코드 폴백으로 떨어진다.")]
     [SerializeField] OutgameTutorialGateUI gatePrefab;
 
+    internal OutgameTutorialGateUI GatePrefabForDebug => gatePrefab;
+
     [Tooltip("이 씬에서는 딤·배너를 띄우지 않는다. 스텝 완료 감지와 진행도 커밋은 그대로 — 화면 자체 안내(개봉 스와이프 문구 등)가 역할을 대신한다. 개봉 오버레이가 떠 있는 동안은 이 값과 무관하게 자동 억제된다.")]
     [SerializeField] bool suppressGuideUI;
 
@@ -329,7 +331,8 @@ public class OutgameTutorialBridge : MonoBehaviour
         }
 
         OutgameTutorialGateUI.Ensure(this.gatePrefab)
-            .ShowGate(this, t_rect, t_button, m_step.GuideMessage, t_onSatisfied, m_step.UseDim, SpotlightRect());
+            .ShowGate(this, t_rect, t_button, m_step.GuideMessage, t_onSatisfied, m_step.UseDim, SpotlightRect(),
+                _holdPointer: m_step.Action == EOutgameTutorialAction.WaitEnhance);
     }
 
     // 타깃과 함께 밝힐 영역. 아직 등록되지 않았으면 강조 없이 진행한다 — 이 축이 진행을 막을 이유가 없다.

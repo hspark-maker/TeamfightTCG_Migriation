@@ -49,22 +49,7 @@ public sealed class ServerMatchmaker : IMatchmaker
             // 끝날 때까지 매칭 화면이 남고, 그 다음 상대를 정상 확정해 취소한 전투가 시작된다.
             FindAiMatchResult t_result = await t_request.AttachExternalCancellation(_ct);
             if (_ct.IsCancellationRequested || !Application.isPlaying) return null;
-            if (t_result?.Deck == null || t_result.Deck.Count != DeckSaveManager.DECK_SIZE)
-                throw new InvalidOperationException("Server returned an invalid AI deck.");
-            if (string.IsNullOrEmpty(t_result.MatchId) ||
-                !ulong.TryParse(t_result.SeedHex, NumberStyles.HexNumber,
-                    CultureInfo.InvariantCulture, out ulong t_seed) ||
-                t_result.RulesetVersion <= 0 ||
-                !SameCards(t_result.PlayerBoardOrder, DeckConfig.PlayerDeck) ||
-                !SameCards(t_result.EnemyBoardOrder, t_result.Deck))
-                throw new InvalidOperationException("Server returned an invalid solo match identity.");
-
-            IReadOnlyDictionary<int, CardGrowth> t_growth = AiMatchGrowth.Read(
-                t_result.AiGrowthVersion, t_result.Deck, t_result.CardGrowth);
-            SoloMatchHandoff.Set(
-                t_result.MatchId, t_result.SeedHex, t_seed, t_result.RulesetVersion,
-                t_result.PlayerBoardOrder, t_result.EnemyBoardOrder,
-                t_result.ResultProtocol, ComputeEnemyDeckHash(t_result.Deck, t_result.CardLevel, t_growth));
+            IReadOnlyDictionary<int, CardGrowth> t_growth = AdoptMatch(t_result);
 
             MatchProfile t_profile = MatchProfile.OfOpponent(
                 this.m_pool != null ? this.m_pool.PickName() : OpponentProfilePool.FALLBACK_NAME,
@@ -80,13 +65,65 @@ public sealed class ServerMatchmaker : IMatchmaker
         }
     }
 
-    static async UniTask<FindAiMatchResult> RequestAsync()
+    internal static async UniTask<bool> PrepareAdventureAsync(string _nodeId, CancellationToken _ct)
+    {
+        if (string.IsNullOrEmpty(_nodeId) || _ct.IsCancellationRequested) return false;
+        try
+        {
+            FindAiMatchResult t_result = await RequestAsync(_nodeId).AttachExternalCancellation(_ct);
+            if (_ct.IsCancellationRequested || !Application.isPlaying) return false;
+            // 구 서버가 랭크 AI를 반환하거나 정점 표가 어긋났으면 다른 적으로 시작하지 않는다.
+            if (t_result?.AdventureNodeId != _nodeId ||
+                t_result.AiGrowthVersion.HasValue || t_result.CardGrowth != null ||
+                !SameCards(t_result.Deck, DeckConfig.EnemyDeck) ||
+                CardGrowthManager.ClampLevel(t_result.CardLevel) != CardGrowthManager.ClampLevel(AdventureRun.AiCardLevel))
+                throw new InvalidOperationException("Server returned a different adventure encounter.");
+            AdoptMatch(t_result);
+            return true;
+        }
+        catch (Exception t_exception)
+        {
+            if (!_ct.IsCancellationRequested)
+                Debug.LogWarning($"[ServerMatchmaker] Adventure validation failed: {t_exception.GetBaseException().Message}");
+            return false;
+        }
+    }
+
+    static IReadOnlyDictionary<int, CardGrowth> AdoptMatch(FindAiMatchResult _result)
+    {
+        if (_result?.Deck == null || _result.Deck.Count != DeckSaveManager.DECK_SIZE)
+            throw new InvalidOperationException("Server returned an invalid AI deck.");
+        if (string.IsNullOrEmpty(_result.MatchId) ||
+            !ulong.TryParse(_result.SeedHex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong t_seed) ||
+            _result.RulesetVersion <= 0 || _result.ResultProtocol != 1 ||
+            !SameCards(_result.PlayerBoardOrder, DeckConfig.PlayerDeck) ||
+            !SameCards(_result.EnemyBoardOrder, _result.Deck))
+            throw new InvalidOperationException("Server returned an invalid solo match identity.");
+        IReadOnlyDictionary<int, CardGrowth> t_growth = AiMatchGrowth.Read(
+            _result.AiGrowthVersion, _result.Deck, _result.CardGrowth);
+        SoloMatchHandoff.Set(_result.MatchId, _result.SeedHex, t_seed, _result.RulesetVersion,
+            _result.PlayerBoardOrder, _result.EnemyBoardOrder, _result.ResultProtocol,
+            ComputeEnemyDeckHash(_result.Deck, _result.CardLevel, t_growth));
+        return t_growth;
+    }
+
+    static async UniTask<FindAiMatchResult> RequestAsync(string _adventureNodeId = null)
     {
         string t_env = ContentProfileConfig.Active != null
             ? ContentProfileConfig.Active.CloudEnvId
             : null;
         if (string.IsNullOrEmpty(t_env))
             throw new InvalidOperationException("Content profile has no cloud environment.");
+
+        if (!string.IsNullOrEmpty(_adventureNodeId))
+            return await ServerSaveCommands.InvokeAsync<FindAiMatchResult>(CommandName, new
+            {
+                env = t_env,
+                contentFingerprint = SpecSource.BattleFingerprint.ToLowerInvariant(),
+                playerDeck = DeckConfig.PlayerDeck,
+                resultProtocol = 1,
+                adventureNodeId = _adventureNodeId,
+            });
 
         return await ServerSaveCommands.InvokeAsync<FindAiMatchResult>(CommandName, new
         {
@@ -150,6 +187,7 @@ public sealed class ServerMatchmaker : IMatchmaker
 
 internal sealed class FindAiMatchResult : ServerCommandResult
 {
+    [JsonProperty("adventureNodeId")] public string AdventureNodeId { get; set; }
     [JsonProperty("matchId")] public string MatchId { get; set; }
     [JsonProperty("seedHex")] public string SeedHex { get; set; }
     [JsonProperty("rulesetVersion")] public int RulesetVersion { get; set; }

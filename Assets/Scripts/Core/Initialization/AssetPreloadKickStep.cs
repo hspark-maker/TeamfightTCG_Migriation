@@ -6,10 +6,8 @@ public sealed class AssetPreloadKickStep : MainInitializer
 {
     public override UniTask Initialize(InitializationContext _context)
     {
-        // 카드 아트는 CardData가 직접 물지 않고 Addressables로 따로 온다(CardArtCache).
-        // 그리는 코드는 여전히 동기라 화면에 나가기 전에 여기서 채워 둔다.
-        // 지금은 전 카드를 받는다 — 범위를 덱·도감 단위로 좁히는 건 그 다음 단계다.
-        StartCoroutine(CardArtCache.Preload(CardCatalog.AllSpecs));
+        // 로컬 UI·팩 아트만 먼저 적재한다. 카드 아트는 WaitAssetPreloadStep이
+        // 원격 번들 다운로드를 마친 뒤 적재해 진행률과 재시도를 한곳에서 관리한다.
         StartCoroutine(PackArtCache.Preload());
 
         UiPrefabCache.Preload().Forget();

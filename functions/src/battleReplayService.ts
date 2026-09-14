@@ -16,7 +16,7 @@ export type BattleReplayOutcome = {
   destroyedByOwner: number[];
   finalStateHash: string;
   drawCount: number;
-  stats?: BattleReplayStats;
+  stats: BattleReplayStats;
 };
 
 export type BattleReplayStats = {
@@ -138,8 +138,10 @@ async function postReplay(serviceUrl: string, request: ReplayRequestPayload): Pr
     // 200 인데 본문이 어긋나면 **기본값으로 접으면 안 된다** — winnerOwner 가 없어 -1 로 떨어지면
     // 권위 모드에서 양쪽 다 패배로 지급된다. 판정을 못 읽은 것은 판정이 아니다.
     if (outcome == null) {
-      logger.error("battle_replay_response_malformed", {body: data});
-      return {kind: "unavailable", reason: "replay_response_malformed"};
+      const reason = parseReplayStats(data.stats) == null ?
+        "replay_stats_missing_or_malformed" : "replay_response_malformed";
+      logger.error("battle_replay_response_malformed", {reason, body: data});
+      return {kind: "unavailable", reason};
     }
     return {kind: "ok", outcome};
   }
@@ -178,8 +180,10 @@ function parseOutcome(data: Record<string, unknown>): BattleReplayOutcome | null
     return null;
   }
   const stats = parseReplayStats(data.stats);
+  // 통계 없이 확정하면 미션 카운터가 영구 누락된다. 구버전·불완전 응답은 pending 재시도로 남긴다.
+  if (stats == null) return null;
   return {firstOwner, winnerOwner: winnerOwner as number, draw, remaining, destroyedByOwner,
-    finalStateHash, drawCount, ...(stats == null ? {} : {stats})};
+    finalStateHash, drawCount, stats};
 }
 
 function parseReplayStats(raw: unknown): BattleReplayStats | null {

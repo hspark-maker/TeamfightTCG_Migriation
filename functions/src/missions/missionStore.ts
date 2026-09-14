@@ -73,6 +73,8 @@ export interface MissionResponse {
 /** 콜백 맨 앞에서 읽어 둔 상태. 쓰기는 이 손잡이로만 한다. */
 export interface MissionBump {
   ref: DocumentReference;
+  /** 같은 트랜잭션에서 읽은 세이브의 미션 콘텐츠 해금 여부. */
+  unlocked: boolean;
   /** 기간 리셋까지 반영한 상태. */
   state: MissionState;
   period: MissionPeriod;
@@ -232,6 +234,7 @@ export function applyPeriodReset(state: MissionState, period: MissionPeriod): Mi
  * @param {string} env 환경 id
  * @param {string} uid 사용자 id
  * @param {MissionPeriod} period 이번 호출의 기간(callable 본문이 한 번만 잰 값)
+ * @param {unknown} save 같은 트랜잭션에서 읽은 세이브
  * @return {Promise<MissionBump>} 쓰기에 쓸 손잡이
  */
 export async function beginMissionBump(
@@ -240,9 +243,10 @@ export async function beginMissionBump(
   env: string,
   uid: string,
   period: MissionPeriod,
+  save: unknown,
 ): Promise<MissionBump> {
   const ref = missionsRef(db, env, uid);
-  return missionBumpFromSnapshot(ref, await transaction.get(ref), period);
+  return missionBumpFromSnapshot(ref, await transaction.get(ref), period, save);
 }
 
 /**
@@ -250,14 +254,21 @@ export async function beginMissionBump(
  * @param {DocumentReference} ref 조회한 미션 문서 참조
  * @param {DocumentSnapshot} snapshot 같은 트랜잭션에서 읽은 스냅샷
  * @param {MissionPeriod} period 이번 호출의 기간
+ * @param {unknown} save 같은 트랜잭션에서 읽은 세이브
  * @return {MissionBump} 쓰기에 쓸 손잡이
  */
 export function missionBumpFromSnapshot(
   ref: DocumentReference,
   snapshot: DocumentSnapshot,
   period: MissionPeriod,
+  save: unknown,
 ): MissionBump {
-  return {ref, state: applyPeriodReset(readMissions(snapshot), period), period};
+  const unlocked = (save as {profile?: {contentUnlocks?: {unlocked?: unknown}}} | null)
+    ?.profile?.contentUnlocks?.unlocked;
+  return {
+    ref, state: applyPeriodReset(readMissions(snapshot), period), period,
+    unlocked: Array.isArray(unlocked) && unlocked.includes("Mission"),
+  };
 }
 
 /**
@@ -343,6 +354,7 @@ export function commitMissionBumps(
  * @param {number} amount 증가량
  */
 export function applyMissionIncrement(bump: MissionBump, event: string, amount: number): void {
+  if (!bump.unlocked) return;
   const step = Number.isInteger(amount) && amount > 0 ? amount : 1;
   for (const kind of ["daily", "weekly"] as const) {
     const key = progressKey(kind, event);

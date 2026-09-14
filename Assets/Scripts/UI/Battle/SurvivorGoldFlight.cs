@@ -381,13 +381,17 @@ public class SurvivorGoldFlight
         var t_rt = (RectTransform)t_go.transform;
         t_rt.sizeDelta = this.tileSize;
 
-        Sprite t_art = CardVisualRules.PickCardArt(_card);
-        if (t_art != null) AddImage(t_go, t_art, this.tileSize);
+        string t_address = CardVisualRules.CardArtAddress(_card);
+        if (t_address != null)
+        {
+            AddImage(t_go, null, this.tileSize);
+            CardArtBinding.Bind(t_go.GetComponent<Image>(), t_address);
+        }
 
         if (this.tileFrame != null)
         {
             // 테두리는 아트 위에 얹힌다(카드 프리팹과 같은 순서) — 뒤에 깔면 아트에 가려 안 보인다.
-            GameObject t_frameHost = t_art != null ? NewChild(t_rt) : t_go;
+            GameObject t_frameHost = t_address != null ? NewChild(t_rt) : t_go;
             AddImage(t_frameHost, this.tileFrame, this.tileSize);
         }
 

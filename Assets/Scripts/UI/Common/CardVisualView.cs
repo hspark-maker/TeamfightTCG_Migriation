@@ -219,13 +219,15 @@ public class CardVisualView : MonoBehaviour
         if (_card <= 0 || this.portrait == null) return;
 
         // 인스턴스가 있으면 진화 단계도 그 인스턴스의 값이다 — 적 카드에 내 진화 단계를 얹지 않는다.
-        Sprite t_art = !_owned
-            ? CardVisualRules.PickCardSilhouette(_card)
+        string t_address = !_owned
+            ? CardVisualRules.SilhouetteAddress(_card)
             : this.m_instance != null
-            ? CardVisualRules.PickBattleArt(this.m_instance)
-            : CardVisualRules.PickCardArt(_card, DeckPower.EvolutionStageOf(_card, _mine));
-        this.portrait.sprite  = t_art;
-        this.portrait.enabled = t_art != null;
+            ? CardVisualRules.BattleArtAddress(this.m_instance)
+            : CardVisualRules.CardArtAddress(_card, DeckPower.EvolutionStageOf(_card, _mine));
+        CardArtBinding.Bind(this.portrait, t_address, sprite =>
+        {
+            if (this.lockOverlay != null) this.lockOverlay.SetActive(!_owned && sprite == null);
+        });
     }
 
     /// <summary>강화로 키워드가 해금된 프레임에 카드 위 아이콘 줄·프레임 장식·시너지 배지를 다시 그린다.</summary>

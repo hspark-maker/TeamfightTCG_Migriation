@@ -446,7 +446,7 @@ export const claimReward = onCall(measuredCallable("claimReward", async (request
   const result = await mutateSave(env, uid, "claimReward", {kind: "client", txId},
     async (current, transaction, wallet): Promise<SaveMutation> => {
       // 미션 읽기가 콜백의 첫 줄이다 — 아래 쓰기보다 반드시 앞이어야 한다(Firestore 트랜잭션 규칙).
-      const missions = await beginMissionBump(transaction, db, env, uid, period);
+      const missions = await beginMissionBump(transaction, db, env, uid, period, current);
       const itemRankSnapshot = itemContext !== null && ownerType !== "Rank" ?
         await transaction.get(rankRef(db, env, uid)) : null;
       let rankState: RankState | undefined;

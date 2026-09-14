@@ -7,8 +7,7 @@ using UnityEngine;
 // 낙인 반영은 여기서 하지 않는다: 응답의 updatedSlots 를 ServerSaveCommands 가 채택하면
 // ServerSlotRehydrator 가 모험 화면 갱신까지 통지한다.
 //
-// 승패를 보내지 않는다 — 서버가 전투를 검증할 방법이 없어 "항상 true 인 인자"가 되고,
-// 그런 인자는 읽는 사람에게 검증되는 것처럼 보인다. 패배는 아예 부르지 않는 것이 계약이다.
+// 신규 전투는 matchId로 서버 재생의 승리 판정을 확인한다. 패배는 신고하지 않는다.
 internal static class AdventureWinCommand
 {
     const string REPORT_COMMAND = "reportAdventureWin";
@@ -22,7 +21,7 @@ internal static class AdventureWinCommand
         new Dictionary<string, UniTaskCompletionSource<bool>>();
 
     /// <summary>정점 격파를 서버에 신고한다. 낙인이 섰으면 true — 이미 서 있던 경우도 포함한다.</summary>
-    internal static UniTask<bool> ReportWinAsync(string _nodeId)
+    internal static UniTask<bool> ReportWinAsync(string _nodeId, string _matchId = null)
     {
         if (string.IsNullOrEmpty(_nodeId))
         {
@@ -38,11 +37,11 @@ internal static class AdventureWinCommand
         var t_source = new UniTaskCompletionSource<bool>();
         s_inFlight[_nodeId] = t_source;
 
-        SendAsync(_nodeId, t_source).Forget();
+        SendAsync(_nodeId, _matchId, t_source).Forget();
         return t_source.Task;
     }
 
-    static async UniTaskVoid SendAsync(string _nodeId, UniTaskCompletionSource<bool> _source)
+    static async UniTaskVoid SendAsync(string _nodeId, string _matchId, UniTaskCompletionSource<bool> _source)
     {
         bool t_reported = false;
 
@@ -50,11 +49,11 @@ internal static class AdventureWinCommand
         {
             var t_result = await ServerSaveCommands.InvokeAsync<ReportAdventureWinResult>(
                 REPORT_COMMAND,
-                new { env = ContentProfileConfig.Active.CloudEnvId, nodeId = _nodeId });
+                new { env = ContentProfileConfig.Active.CloudEnvId, nodeId = _nodeId, matchId = _matchId });
 
-            // 서버가 다른 정점을 낙인했다면 우리가 아는 상태가 아니다 — 성공으로 접으면
-            // 없는 선물을 그리게 된다(응답에 nodeId 가 없는 구 서버는 그대로 믿는다).
-            t_reported = string.IsNullOrEmpty(t_result.NodeId) || t_result.NodeId == _nodeId;
+            // 검증된 새 경로는 같은 정점의 승인 응답까지 확인한다. 구 호출만 빈 nodeId를 허용한다.
+            t_reported = t_result.NodeId == _nodeId ||
+                (string.IsNullOrEmpty(_matchId) && string.IsNullOrEmpty(t_result.NodeId));
             if (t_reported)
                 Debug.Log($"[AdventureWinCommand] Defeat reported (node={_nodeId}, rev={t_result.Revision}).");
             else

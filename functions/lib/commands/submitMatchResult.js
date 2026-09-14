@@ -249,10 +249,12 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
     if (data.seedSource !== "server") {
         throw new https_1.HttpsError("failed-precondition", "legacy match results are not authoritative");
     }
-    // 토글은 트랜잭션 밖에서 제출당 한 번만 읽는다. off면 Cloud Run 호출 자체를 생략해
-    // 대역폭·인스턴스 사용을 멈추고 기존 두 클라이언트 합의 경로로 되돌아간다.
+    // 랭크 재생 토글은 트랜잭션 밖에서 제출당 한 번만 읽는다.
+    // 모험 매치는 승리 낙인과 미션이 검증 결과를 요구하므로 토글과 무관하게 재생한다.
     const replayEnabled = await (0, battleReplayConfig_1.isBattleReplayEnabled)(data.env);
     const matchRef = firebaseApp_1.db.doc(`envs/${data.env}/matches/${data.matchId}`);
+    const initialMatch = (await matchRef.get()).data();
+    const adventureMatch = typeof initialMatch?.adventureNodeId === "string";
     const cardTable = "Card";
     // 표 3개를 블롭으로 읽는다 — 행 문서를 훑으면 제출 1건마다 행 수만큼(Reward 85 · Card 41 …) 과금된다.
     // readSpecRows 가 (env, table) 단위로 5분 캐시를 이미 갖고 있다(specs/specBlobReader.ts).
@@ -263,15 +265,15 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
     const cardSpecs = new Map();
     try {
         const [rewardSpecRows, rankSpecRows, cardSpecRows, seasonSpecRows] = await Promise.all([
-            (0, specBlobReader_1.readSpecRows)(data.env, "Reward"),
-            (0, specBlobReader_1.readSpecRows)(data.env, "RankGrade"),
+            adventureMatch ? Promise.resolve([]) : (0, specBlobReader_1.readSpecRows)(data.env, "Reward"),
+            adventureMatch ? Promise.resolve([]) : (0, specBlobReader_1.readSpecRows)(data.env, "RankGrade"),
             (0, specBlobReader_1.readSpecRows)(data.env, cardTable),
-            (0, specBlobReader_1.readSpecRows)(data.env, "PassSeason"),
+            adventureMatch ? Promise.resolve([]) : (0, specBlobReader_1.readSpecRows)(data.env, "PassSeason"),
         ]);
         rewardRows = (0, rewardTable_1.parseRewardRows)(rewardSpecRows);
         rankRows = (0, payout_1.parseRankGradeRows)(rankSpecRows);
         const activeSeason = (0, rankSeason_1.currentRankSeason)(seasonSpecRows, Date.now());
-        if (activeSeason === null)
+        if (!adventureMatch && activeSeason === null)
             throw new Error("no active rank season");
         rankSeason = activeSeason;
         for (const row of cardSpecRows) {
@@ -293,6 +295,10 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
     const settle = async (tx, replay) => {
         const matchSnapshot = await tx.get(matchRef);
         const match = matchSnapshot.data();
+        const adventureNodeId = typeof match?.adventureNodeId === "string" ? match.adventureNodeId : null;
+        if ((adventureNodeId != null) !== adventureMatch) {
+            throw new https_1.HttpsError("unavailable", "match type changed");
+        }
         if (data.seedSource === "server") {
             const participantUids = match?.participantUids;
             if (match?.seedSource !== "server" ||
@@ -302,7 +308,11 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
         }
         const status = typeof match?.status === "string" ? match.status : "pending";
         if (status !== "pending") {
-            return { kind: "done", value: { status, reason: match?.reason ?? null } };
+            const simulation = (0, payloadGuards_1.objectRecord)(match?.serverSimulation);
+            return { kind: "done", value: { status, reason: match?.reason ?? null,
+                    ...(adventureNodeId == null ? {} : { adventureNodeId,
+                        won: simulation?.ok === true && simulation.draw !== true && simulation.winnerOwner === 0,
+                        draw: simulation?.draw === true }) } };
         }
         const submissions = { ...match?.submissions };
         const incoming = { ...data, uid, submittedAt: firestore_1.Timestamp.now() };
@@ -326,11 +336,14 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
         const aiCardLevel = (0, payloadGuards_1.safeInteger)(aiDeck?.cardLevel);
         // 새 계약은 발급 당시 스냅샷이 진실원이다. 누락·손상 시 구 공통 레벨로 우회하지 않는다.
         const soloAiSnapshots = solo && Array.isArray(aiCardIds) ?
-            match?.aiGrowthVersion === 1 ?
+            match?.aiGrowthVersion === 1 || adventureNodeId != null ?
                 (0, deckValidation_1.readAiDeckSnapshots)(aiCardIds, aiDeck?.cardGrowth, aiDeck?.snapshots) :
                 match?.aiGrowthVersion == null && aiCardLevel != null ?
                     (0, deckValidation_1.buildAiDeckSnapshots)(aiCardIds, aiCardLevel, cardSpecs) : null : null;
         let soloContractReason = null;
+        if (adventureNodeId != null && !solo) {
+            throw new https_1.HttpsError("failed-precondition", "adventure match must be solo");
+        }
         if (solo) {
             const serverOrders = (0, payloadGuards_1.objectRecord)(match?.serverBoardOrders);
             if (!Array.isArray(participantUids) || participantUids.length !== 1 || participantUids[0] !== uid ||
@@ -365,8 +378,13 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
         //   SERVER_SIMULATION_AUTHORITATIVE = 배포로만 되돌리는 코드 킬스위치
         // **토글이 꺼진 동안은 승패 진실원이 클라 합의다** — 치트 방어가 낮아진 상태이므로
         // 릴리즈 관리 창의 경고를 무시하고 오래 꺼 두지 마라.
-        const simulateRules = replayEnabled && rulesetVersion >= matchPairing_1.SERVER_AUTHORITATIVE_RULESET_VERSION;
-        const authoritativeRules = SERVER_SIMULATION_AUTHORITATIVE && simulateRules;
+        // 모험 신규 계약은 reportAdventureWin이 서버 승리를 요구하므로 항상 권위 재생한다.
+        const simulateRules = (replayEnabled || adventureNodeId != null) &&
+            rulesetVersion >= matchPairing_1.SERVER_AUTHORITATIVE_RULESET_VERSION;
+        const authoritativeRules = (SERVER_SIMULATION_AUTHORITATIVE || adventureNodeId != null) && simulateRules;
+        if (adventureNodeId != null && !simulateRules) {
+            throw new https_1.HttpsError("failed-precondition", "adventure replay ruleset is unsupported");
+        }
         const nowMs = firestore_1.Timestamp.now().toMillis();
         const decision = solo ?
             entries.length > 1 ? { status: "flagged", reason: "too_many_submissions" } :
@@ -540,18 +558,19 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
                 }
             }
         }
-        const rankRefs = entries.map((entry) => (0, rankStore_1.rankRef)(firebaseApp_1.db, data.env, entry.uid));
-        const rankStateRefs = entries.map((entry) => firebaseApp_1.db.doc(`envs/${data.env}/users/${entry.uid}/payoutState/current`));
+        const rankRefs = adventureNodeId != null ? [] : entries.map((entry) => (0, rankStore_1.rankRef)(firebaseApp_1.db, data.env, entry.uid));
+        const rankStateRefs = adventureNodeId != null ? [] : entries.map((entry) => firebaseApp_1.db.doc(`envs/${data.env}/users/${entry.uid}/payoutState/current`));
         const saveRefs = entries.map((entry) => firebaseApp_1.db.doc(`envs/${data.env}/users/${entry.uid}/save/current`));
         const missionRefs = entries.map((entry) => (0, missionStore_1.missionsRef)(firebaseApp_1.db, data.env, entry.uid));
         const snapshots = await tx.getAll(...rankRefs, ...rankStateRefs, ...saveRefs, ...missionRefs);
         const count = entries.length;
-        const rankSnapshots = snapshots.slice(0, count);
-        const rankStateSnapshots = snapshots.slice(count, count * 2);
-        const saveSnapshots = snapshots.slice(count * 2, count * 3);
+        const rankSnapshots = snapshots.slice(0, rankRefs.length);
+        const rankStateSnapshots = snapshots.slice(rankRefs.length, rankRefs.length + rankStateRefs.length);
+        const saveOffset = rankRefs.length + rankStateRefs.length;
+        const saveSnapshots = snapshots.slice(saveOffset, saveOffset + count);
         // 미션 문서는 payout 쓰기보다 먼저 전부 읽는다. 정산 트랜잭션의 pending -> confirmed 전이가
         // matchId 멱등 게이트라 같은 제출을 다시 보내도 이 경로에는 재진입하지 않는다.
-        const missionBumps = missionRefs.map((ref, i) => (0, missionStore_1.missionBumpFromSnapshot)(ref, snapshots[count * 3 + i], period));
+        const missionBumps = missionRefs.map((ref, i) => (0, missionStore_1.missionBumpFromSnapshot)(ref, snapshots[saveOffset + count + i], period, saveSnapshots[i].data()));
         const settledAt = firestore_1.Timestamp.now();
         const payoutExpiresAt = firestore_1.Timestamp.fromMillis(settledAt.toMillis() + 180 * 24 * 60 * 60 * 1000);
         const payoutSummary = {};
@@ -560,6 +579,15 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
         const settleOutcomes = [];
         for (let i = 0; i < entries.length; i++) {
             const entry = entries[i];
+            if (adventureNodeId != null) {
+                if (serverReplay?.ok !== true)
+                    throw new https_1.HttpsError("unavailable", "adventure replay is unavailable");
+                const outcome = serverReplay.outcome;
+                const points = (0, payloadGuards_1.safeInteger)((0, payloadGuards_1.objectRecord)(saveSnapshots[i].data()?.rank)?.points) ?? 0;
+                settleOutcomes.push({ uid: entry.uid, won: !outcome.draw && outcome.winnerOwner === 0,
+                    draw: outcome.draw, rankBefore: points, rankAfter: points });
+                continue;
+            }
             const storedSequence = rankStateSnapshots[i].data()?.sequence;
             const fallbackPoints = (0, rankStore_1.legacyRankPoints)(rankStateSnapshots[i].data(), saveSnapshots[i].data());
             const fallbackClaimed = (0, rankStore_1.legacyClaimedTiers)(saveSnapshots[i].data(), (0, payout_1.rankTierCount)(rankRows));
@@ -696,7 +724,9 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
             serverSimulation: persistableReplay(serverReplay), clientDivergence,
             replayUnavailable: firestore_1.FieldValue.delete(),
             settledAt: firestore_1.FieldValue.serverTimestamp(), expiresAt }, { merge: true });
-        return { kind: "done", value: { status: "confirmed" }, analytics: {
+        return { kind: "done", value: { status: "confirmed",
+                ...(adventureNodeId == null ? {} : { adventureNodeId,
+                    won: settleOutcomes[0].won, draw: settleOutcomes[0].draw }) }, analytics: {
                 outcomes: settleOutcomes,
                 stats: replayStats,
                 destroyedByOwner,

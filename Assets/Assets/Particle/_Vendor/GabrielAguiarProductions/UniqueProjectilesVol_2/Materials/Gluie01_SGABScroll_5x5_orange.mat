@@ -72,7 +72,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _DistortionMask:
-        m_Texture: {fileID: 2800000, guid: 6ed6cf384cca402d818090e14cbba63d, type: 3}
+        m_Texture: {fileID: 2800000, guid: 663540ab948415c4bac0ba0ab5ccc1da, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _DistortionTexture:

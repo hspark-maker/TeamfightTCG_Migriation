@@ -258,6 +258,9 @@ public class MatchmakingShell : MonoBehaviour
 
         ApplyRankedTuning();
 
+        PhotonRankedMatchmaker t_rankedMatchmaker = _matchmaker as PhotonRankedMatchmaker;
+        if (t_rankedMatchmaker != null) t_rankedMatchmaker.OnOpponentPaired += DisableCancelAfterPairing;
+
         MatchOpponent? t_result = null;
         try
         {
@@ -267,6 +270,7 @@ public class MatchmakingShell : MonoBehaviour
         }
         finally
         {
+            if (t_rankedMatchmaker != null) t_rankedMatchmaker.OnOpponentPaired -= DisableCancelAfterPairing;
             StopDots();
 
             // 내리는 것은 물러날 때뿐이다. 상대가 확정되면 이 화면의 부품들이 그대로 덱 화면으로 옮겨 앉으므로
@@ -699,6 +703,8 @@ public class MatchmakingShell : MonoBehaviour
     RectTransform[] ActiveRiders => m_versusMode ? VersusRiders : Riders;
 
     // 취소 버튼. 실제로 어디로 돌아갈지는 호스트가 정한다(셸은 씬을 모른다).
+    void DisableCancelAfterPairing() => SetCancelInteractable(false);
+
     public void Cancel()
     {
         m_cts?.Cancel();

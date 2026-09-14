@@ -123,7 +123,7 @@ export const limitBreakCard = onCall(measuredCallable("limitBreakCard", async (r
   const result = await mutateSave(env, uid, "limitBreakCard", {kind: "client", txId},
     async (current, transaction): Promise<SaveMutation> => {
       // 미션 읽기가 콜백의 첫 줄이다 — 아래 쓰기보다 반드시 앞이어야 한다(Firestore 트랜잭션 규칙).
-      const missions = await beginMissionBump(transaction, db, env, uid, period);
+      const missions = await beginMissionBump(transaction, db, env, uid, period, current);
       // 트랜잭션이 재실행되면 이전 판정을 버리고 다시 잰다 — 간식·단계와 정합해야 한다.
       // 소유 게이트는 클라 TryGetNextLimitBreakStep 과 같은 자리다. 빼면 세이브에 진행도만
       // 남은 미소유 카드에 체력이 붙는다.

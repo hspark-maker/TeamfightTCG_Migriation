@@ -89,11 +89,28 @@ public partial class SROptions
     }
 
     [Category("튜토리얼"), DisplayName("챕터 (1부터)"), NumberRange(1, 999), Increment(1)]
-    [SRDebugger.SRParamOf(nameof(RestartTutorialChapter))]
+    [SRDebugger.SRParamOf(nameof(RestartTutorialChapter), nameof(PreviewTutorialStep))]
     public int TutorialChapter { get; set; } = 1;
 
     [Category("튜토리얼"), DisplayName("챕터 처음으로 (씬 재진입 시 적용)")]
     public void RestartTutorialChapter() => OutgameDebugActions.RestartTutorialFromChapter(TutorialChapter - 1);
+
+    [Category("튜토리얼"), DisplayName("단계 (1부터)"), NumberRange(1, 999), Increment(1)]
+    [SRDebugger.SRParamOf(nameof(PreviewTutorialStep))]
+    public int TutorialStep { get; set; } = 1;
+
+    [Category("튜토리얼"), DisplayName("선택 단계 안내")]
+    public string SelectedTutorialStep => OutgameDebugActions.DescribeTutorialStep(TutorialChapter - 1, TutorialStep - 1);
+
+    [Category("튜토리얼"), DisplayName("선택 단계 미리보기 (현재 화면)")]
+    public void PreviewTutorialStep()
+    {
+        if (OutgameDebugActions.PreviewTutorialStep(TutorialChapter - 1, TutorialStep - 1))
+            SRDebug.Instance.HideDebugPanel();
+    }
+
+    [Category("튜토리얼"), DisplayName("단계 미리보기 닫기")]
+    public void CloseTutorialPreview() => OutgameDebugActions.CloseTutorialPreview();
 
     [Category("계정"), DisplayName("추가 경험치"), NumberRange(1, 1000000), Increment(500)]
     [SRDebugger.SRParamOf(nameof(AddAccountExperience))]

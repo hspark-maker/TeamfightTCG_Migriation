@@ -352,6 +352,86 @@ public static class OutgameDebugActions
         Debug.Log($"[OutgameDebug] Tutorial chapter {t_chapter + 1} back to the start — only the position is rewound (ownership and currency are kept). Applied on scene re-entry ({OutgameTutorialRunner.ForcedChapterCount} forced chapter(s) authored)");
     }
 
+    public static string DescribeTutorialStep(int _chapter, int _step)
+    {
+        if (!OutgameTutorialRunner.TryGetStepForDebug(_chapter, _step, out var t_step))
+            return $"단계 없음 (전체 {OutgameTutorialRunner.ChapterCount}챕터)";
+
+        return $"#{t_step.StepId} {t_step.Action} / {t_step.Anchor}\n{t_step.GuideMessage}";
+    }
+
+    // Enter/완료 콜백을 실행하지 않고 저작된 안내만 표시한다. 실제 튜토리얼의 게이트를 빼앗지 않는다.
+    public static bool PreviewTutorialStep(int _chapter, int _step)
+    {
+        if (!Application.isPlaying ||
+            !OutgameTutorialRunner.TryGetStepForDebug(_chapter, _step, out var t_step))
+        {
+            Debug.LogWarning("[OutgameDebug] 플레이 중 유효한 튜토리얼 챕터·단계를 선택하세요.");
+            return false;
+        }
+
+        if (OutgameTutorialRunner.IsRunning || OutgameTutorialRunner.IsGuidedRunning)
+        {
+            Debug.LogWarning("[OutgameDebug] 진행 중인 튜토리얼이 끝난 뒤 미리보기를 실행하세요.");
+            return false;
+        }
+
+        RectTransform t_target = null;
+        UnityEngine.UI.Button t_button = null;
+        if (t_step.Anchor != EOutgameTutorialAnchor.None &&
+            (!TutorialAnchorRegistry.TryGet(t_step.Anchor, out t_target, out t_button) ||
+             t_target == null || !t_target.gameObject.activeInHierarchy))
+        {
+            Debug.LogWarning($"[OutgameDebug] {t_step.Anchor} 대상이 없습니다. 해당 화면을 먼저 열어 주세요.");
+            return false;
+        }
+
+        if (t_step.Completion != EOutgameTutorialCompletion.Confirm && t_button != null && !t_button.IsInteractable())
+        {
+            Debug.LogWarning($"[OutgameDebug] {t_step.Anchor} 버튼이 비활성 상태입니다. 누를 수 있는 상태에서 실행하세요.");
+            return false;
+        }
+
+        var t_bridge = Object.FindFirstObjectByType<OutgameTutorialBridge>();
+        var t_gate = OutgameTutorialGateUI.Instance;
+        if (t_gate == null && t_bridge != null && t_bridge.GatePrefabForDebug != null)
+            t_gate = OutgameTutorialGateUI.Ensure(t_bridge.GatePrefabForDebug);
+        if (t_gate == null)
+        {
+            Debug.LogWarning("[OutgameDebug] 튜토리얼 안내 프리팹이 연결된 화면에서 실행하세요.");
+            return false;
+        }
+
+        RectTransform t_spotlight = null;
+        if (t_step.Spotlight != EOutgameTutorialAnchor.None)
+            TutorialAnchorRegistry.TryGet(t_step.Spotlight, out t_spotlight, out _);
+        if (t_spotlight != null && !t_spotlight.gameObject.activeInHierarchy) t_spotlight = null;
+
+        // 게이트 자신을 소유자로 써서 종료 버튼이 실제 튜토리얼 안내를 닫지 못하게 한다.
+        if (t_step.Completion == EOutgameTutorialCompletion.Confirm)
+            t_gate.ShowMessageGate(t_gate, t_target, t_step.GuideMessage, CloseTutorialPreview,
+                t_step.MessageAtBottom, t_step.UseDim, t_spotlight);
+        else if (t_target != null)
+            t_gate.ShowGate(t_gate, t_target, t_button, t_step.GuideMessage, null,
+                t_step.UseDim, t_spotlight, _holdPointer: t_step.Action == EOutgameTutorialAction.WaitEnhance);
+        else if (!string.IsNullOrEmpty(t_step.GuideMessage))
+            t_gate.ShowBanner(t_gate, t_step.GuideMessage);
+        else
+        {
+            Debug.LogWarning($"[OutgameDebug] {t_step.Action} 단계에는 미리 볼 안내 문구나 대상이 없습니다.");
+            return false;
+        }
+
+        Debug.Log($"[OutgameDebug] 튜토리얼 {_chapter + 1}챕터 {_step + 1}단계 미리보기: {t_step.Action}");
+        return true;
+    }
+
+    public static void CloseTutorialPreview()
+    {
+        var t_gate = OutgameTutorialGateUI.Instance;
+        if (t_gate != null) t_gate.Clear(t_gate);
+    }
+
     // 계정 경험치 더하기. 만렙 구간은 전승 1,000판대라 이 문 없이는 확인할 수 없다.
     public static void AddAccountExp(long _amount)
     {

@@ -19,6 +19,13 @@ static class PayoutInbox
         public List<string> matchIds = new List<string>();
     }
 
+    sealed class PendingAck
+    {
+        public readonly string receiptId = $"claimPayout:{Guid.NewGuid():N}";
+        public List<string> matchIds;
+        public Dictionary<string, CurrencyGain> gains;
+    }
+
     static readonly HashSet<string> s_applied = new HashSet<string>();
     static string s_envId;
     static UniTaskCompletionSource s_inFlight;
@@ -26,11 +33,13 @@ static class PayoutInbox
     static double s_nextPassiveRefreshAt;
     static int s_retryVersion;
     static int s_generation;
+    static PendingAck s_pendingAck;
 
     internal static void Initialize(string _envId)
     {
         s_generation++;
         s_inFlight = null;
+        s_pendingAck = null;
         s_refreshRequested = false;
         s_nextPassiveRefreshAt = 0;
         s_retryVersion++;
@@ -43,6 +52,7 @@ static class PayoutInbox
     {
         s_generation++;
         s_inFlight = null;
+        s_pendingAck = null;
         s_refreshRequested = false;
         s_nextPassiveRefreshAt = 0;
         s_retryVersion++;
@@ -121,6 +131,13 @@ static class PayoutInbox
         if (_generation != s_generation) return;
         if (!t_signedIn) throw new InvalidOperationException("Payout collection requires sign-in.");
 
+        // ack 응답을 잃었으면 ready 목록에서 이미 빠졌을 수 있다. 목록보다 먼저 같은 영수증을 재생한다.
+        if (s_pendingAck != null)
+        {
+            await AckPendingAsync(_generation);
+            if (_generation != s_generation) return;
+        }
+
         // list 는 아무 문서도 쓰지 않는다 — 업로드 봉인도 응답 채택도 걸지 않는다.
         PayoutListResult t_list = await ServerSaveCommands.InvokeReadOnlyAsync<PayoutListResult>(
             CommandName,
@@ -165,11 +182,24 @@ static class PayoutInbox
 
         if (t_ackIds.Count == 0) return;
 
+        s_pendingAck = new PendingAck { matchIds = t_ackIds, gains = t_gains };
+        int t_acked = await AckPendingAsync(_generation);
+        if (_generation != s_generation) return;
+        // 실제 ack를 확인한 페이지부터 다음 페이지를 회수한다.
+        if (t_payouts.Count >= PayoutPageSize && t_acked > 0) s_refreshRequested = true;
+    }
+
+    static async UniTask<int> AckPendingAsync(int _generation)
+    {
+        PendingAck t_pending = s_pendingAck;
+        if (t_pending == null) return 0;
+
         // ack 는 지갑을 쓴다 — 채택 창구를 타야 응답의 wallet 이 잔액에 반영된다(세이브는 쓰지 않아 revision 이 없다).
         PayoutAckResult t_ack = await ServerSaveCommands.InvokeAsync<PayoutAckResult>(
             CommandName,
-            new { env = s_envId, action = "ack", matchIds = t_ackIds });
-        if (_generation != s_generation) return;
+            new { env = s_envId, action = "ack", matchIds = t_pending.matchIds },
+            _receiptId: t_pending.receiptId);
+        if (_generation != s_generation) return 0;
         if (t_ack?.Acked == null) throw new InvalidOperationException("Payout ack response is missing.");
 
         foreach (string t_matchId in t_ack.Acked)
@@ -178,15 +208,15 @@ static class PayoutInbox
 
             // 표시량은 크레딧이 확정된 뒤에 싣는다 — ack 전에 실으면 결과 화면이 "+N" 을 띄우는 동안 지갑은 그대로다.
             // 여러 건이 한 번에 acked 되면 그만큼 누적된다(핸드오프가 합산 홀더다).
-            if (t_gains.TryGetValue(t_matchId, out CurrencyGain t_credited)) BattleRewardHandoff.Set(t_credited);
+            if (t_pending.gains.TryGetValue(t_matchId, out CurrencyGain t_credited)) BattleRewardHandoff.Set(t_credited);
+            MatchResultSubmission.NotifyPayoutCollected(t_matchId);
         }
+        s_pendingAck = null;
         SaveApplied();
         // 전투 정산은 미션 카운터도 갱신하지만 지급 응답에는 그 상태가 없다.
         // 미션 화면을 열기 전에도 변경 알림·컷인이 도착하도록 정산 후 한 번 조회한다.
         MissionCommands.RefreshAsync().Forget();
-        // 종료·입장마다 다시 조회하지 않으므로 쌓인 지급은 이번 회수에서 비운다.
-        // 실제 ack가 없으면 재조회하지 않아 손상된 항목만 있는 페이지를 무한 반복하지 않는다.
-        if (t_payouts.Count >= PayoutPageSize && t_ack.Acked.Count > 0) s_refreshRequested = true;
+        return t_ack.Acked.Count;
     }
 
     static async UniTaskVoid RetryAfterDelay(int _generation, int _retryVersion)

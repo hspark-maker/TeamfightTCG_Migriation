@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
-using Fusion;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -285,7 +284,7 @@ public class LobbyMatchLauncher : MonoBehaviour
             // 대인전은 매칭 단계(PreBattleMatchSync)가 이미 서버 검증을 끝냈다 — 여기서 또 태우지 않는다.
             if (DeckConfig.IsMultiplayer)
             {
-                LoadBattleSceneOverNetwork();
+                await LoadBattleSceneOverNetworkAsync();
                 return;
             }
 
@@ -324,15 +323,9 @@ public class LobbyMatchLauncher : MonoBehaviour
     {
         if (TutorialConfig.IsActive) return true;
 
-        // 모험(모험) 정점도 제외한다. 상대·덱·AI 레벨이 저작 고정이라 이 경로는 findAiMatch를 태우지 않고
-        // (RunEntryChainAsync가 매칭 블록을 건너뛴다), 그래서 서버 매치 신원 자체가 없다 —
-        // SoloMatchSync는 그것을 "findAiMatch가 발급한 매치 신원이 없다"로 거절하므로 정점이 영영 시작되지 않는다.
-        //
-        // 여기서 통과시켜도 보상 자격은 클라가 못 만든다: 정점 격파는 reportAdventureWin이,
-        // 지급은 claimReward가 서버에서 선행 사슬·랭크 잠금을 다시 재고 결정한다(matchId를 쓰지 않는 경로).
-        // 남는 구멍은 정점 전투에 한해 출전 덱 소유·성장 대조가 빠진다는 것 — 그건 findAiMatch에
-        // 모험 모드를 여는 서버 작업이 필요하다.
-        if (AdventureRun.IsActive) return true;
+        // 모험도 고정 상대와 서버 시드를 먼저 봉인한 뒤 같은 덱 검증·결과 재생을 거친다.
+        if (AdventureRun.IsActive && !await ServerMatchmaker.PrepareAdventureAsync(
+                AdventureRun.NodeId, this.GetCancellationTokenOnDestroy())) return false;
 
         ESoloMatchSyncResult t_result = await SoloMatchSync.RunAsync(this.GetCancellationTokenOnDestroy());
 
@@ -381,18 +374,12 @@ public class LobbyMatchLauncher : MonoBehaviour
         });
     }
 
-    // 멀티는 두 클라가 같은 씬으로 함께 넘어가야 한다 — 마스터가 러너로 태우고 나머지는 따라 들어간다.
-    // 커튼(CurtainView)을 쓰지 않는 이유: 그건 이쪽 화면만 덮는 로컬 전환이라, 러너가 씬을 바꾸는
-    // 시점과 어긋나면 한쪽만 로비에 남는다.
-    void LoadBattleSceneOverNetwork()
+    // 각 클라가 씬을 열기 직전, 대치 연출·콘텐츠 확인 중 매칭이 취소되지 않았는지 확인한다.
+    async UniTask LoadBattleSceneOverNetworkAsync()
     {
-        NetworkRunner t_runner = NetworkSession.Instance?.Runner;
-        if (t_runner == null)
+        if (!PreBattleMatchHandoff.CanEnterBattle)
         {
-            // 여기까지 왔는데 러너가 없으면 매칭이 세운 멀티 플래그가 거짓이다 — 싱글로 되돌려 전투는 살린다.
-            Debug.LogError("[LobbyMatchLauncher] Multiplayer entry without a network runner — falling back to the single-player path.");
-            DeckConfig.ResetMode();
-            LoadBattleScene();
+            await AbortMultiplayerEntryAsync();
             return;
         }
 
@@ -406,6 +393,19 @@ public class LobbyMatchLauncher : MonoBehaviour
         // 두 클라가 각자 연다. 마스터만 열고 Fusion 이 상대를 끌어오던 구조는 늦은 쪽의 로비 절차를
         // 강제 종료시켰고, 마스터가 끊기면 상대가 영영 못 들어왔다 — BattleSceneEntry 설명 참조.
         BattleSceneEntry.Load(BATTLE_SCENE);
+    }
+
+    async UniTask AbortMultiplayerEntryAsync()
+    {
+        NetworkGameController.Instance?.SendMatchAbort(EMatchEndReason.OpponentLeftDuringInit);
+        PreBattleMatchHandoff.Clear();
+        MatchOpponentHandoff.Clear();
+        DeckConfig.ResetMode();
+        m_matchShell?.Close();
+        NetworkSession t_session = NetworkSession.Instance;
+        if (t_session != null) await t_session.Disconnect();
+        if (this == null) return;
+        ShowEntryBlocked("상대가 매칭을 취소했거나 연결이 끊겼습니다.\n다시 매칭해 주세요.");
     }
 
     // 진입 체인이 "전투 시작"으로 닫히면 그때 씬을 로드한다. 포기면 각 화면이 스스로 닫고 로비가 그대로 남는다.
@@ -481,6 +481,11 @@ public class LobbyMatchLauncher : MonoBehaviour
             // 아래 고정 상대 경로의 t_opponent와 이름을 나눈다 — 같은 이름은 메서드 선언 공간이 겹쳐 컴파일되지 않는다.
             MatchOpponent? t_matched = await t_matchShell.RunMatchAsync(Matchmaker, _ct);
             if (t_matched == null) return false;   // 취소 = 로비로 되돌아간다
+            if (DeckConfig.IsMultiplayer && !PreBattleMatchHandoff.CanEnterBattle)
+            {
+                await AbortMultiplayerEntryAsync();
+                return false;
+            }
 
             if (!ConfirmOpponent(t_matched))
             {
@@ -652,7 +657,8 @@ public class LobbyMatchLauncher : MonoBehaviour
         adventurePanel?.Open();
         // 복귀 재오픈(HandleAdventureReturn)은 이 자리를 거치지 않는다 — 안내가 전투 복귀 연출 위에 겹치지 않는 이유다.
         if (AdventureUnlock.GuideTrigger == EOutgameTutorialTrigger.AdventureMapFirstOpen)
-            GuidanceCoordinator.TryFire(EOutgameTutorialTrigger.AdventureMapFirstOpen);
+            GuidanceCoordinator.TryFire(EOutgameTutorialTrigger.AdventureMapFirstOpen,
+                () => this != null && this.IsAdventureMapOpen);
     }
 
     // 정점 전투 복귀 — 떠났던 화면(배틀 탭 + 맵)을 되돌린다. 승패 무관하게 맵으로 온다.

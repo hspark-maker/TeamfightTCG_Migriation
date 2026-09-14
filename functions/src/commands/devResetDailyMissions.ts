@@ -18,7 +18,7 @@ export const devResetDailyMissions = onCall(async (request) => {
   const catalog = await readMissionCatalog(env);
   const period = missionPeriod(Date.now());
   const missions = await db.runTransaction(async (transaction) => {
-    const bump = await beginMissionBump(transaction, db, env, uid, period);
+    const bump = await beginMissionBump(transaction, db, env, uid, period, undefined);
     commitDailyMissionReset(transaction, bump, FieldValue.serverTimestamp());
     return missionResponse(bump.state, period, catalog);
   });

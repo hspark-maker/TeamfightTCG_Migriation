@@ -8,6 +8,10 @@ public sealed class WaitAssetPreloadStep : MainInitializer
     {
         GameInitialization.SetState(EGameInitState.LoadingAssets);
 
+        await RemoteCardArtDownload.PrepareAsync(this.GetCancellationTokenOnDestroy());
+        if (GameInitialization.IsTerminated) return;
+        StartCoroutine(CardArtCache.Preload(CardCatalog.AllSpecs));
+
         await UniTask.WaitUntil(() =>
             (CardArtCache.IsComplete && PackArtCache.IsComplete &&
              (UiPrefabCache.IsComplete || UiPrefabCache.HasFailed)) ||
