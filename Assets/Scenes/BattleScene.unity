@@ -6409,7 +6409,7 @@ MonoBehaviour:
   cardListRoot: {fileID: 682367204}
   contentRoot: {fileID: 605270989}
   backgroundCloseButton: {fileID: 1091019055}
-  cardElementPrefab: {fileID: 935035159887010702, guid: 4295846c5a704d949aeca3544cc3d8b5, type: 3}
+  cardElementPrefab: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
   faceDownEntryPrefab: {fileID: 8213931047195785937, guid: a6b82b503f3c72b4b9429c1572e39a15, type: 3}
   panelGroup: {fileID: 1091019058}
   drawOutTime: 0.18
@@ -6498,7 +6498,7 @@ MonoBehaviour:
   cardListRoot: {fileID: 735438644}
   contentRoot: {fileID: 1969753786}
   backgroundCloseButton: {fileID: 245661005}
-  cardElementPrefab: {fileID: 935035159887010702, guid: 4295846c5a704d949aeca3544cc3d8b5, type: 3}
+  cardElementPrefab: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
   faceDownEntryPrefab: {fileID: 8213931047195785937, guid: a6b82b503f3c72b4b9429c1572e39a15, type: 3}
   panelGroup: {fileID: 245661006}
   drawOutTime: 0.18

@@ -321,5 +321,5 @@ MonoBehaviour:
   deckButton: {fileID: 2956389357996447050}
   panel: {fileID: 0}
   cardListRoot: {fileID: 8381650083676123024}
-  cardElementPrefab: {fileID: 935035159887010702, guid: 4295846c5a704d949aeca3544cc3d8b5, type: 3}
+  cardElementPrefab: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
   faceDownEntryPrefab: {fileID: 0}

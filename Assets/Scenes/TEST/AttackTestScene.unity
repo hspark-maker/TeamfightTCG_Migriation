@@ -1546,7 +1546,7 @@ PrefabInstance:
     - target: {fileID: 8381650083676123027, guid: 93785a3a5186d5046bf2fe80c7b270b5, type: 3}
       propertyPath: cardElementPrefab
       value: 
-      objectReference: {fileID: 935035159887010702, guid: 4295846c5a704d949aeca3544cc3d8b5, type: 3}
+      objectReference: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
     - target: {fileID: 8381650083676123027, guid: 93785a3a5186d5046bf2fe80c7b270b5, type: 3}
       propertyPath: faceDownEntryPrefab
       value: 
@@ -2074,7 +2074,7 @@ PrefabInstance:
     - target: {fileID: 8381650083676123027, guid: 93785a3a5186d5046bf2fe80c7b270b5, type: 3}
       propertyPath: cardElementPrefab
       value: 
-      objectReference: {fileID: 935035159887010702, guid: 4295846c5a704d949aeca3544cc3d8b5, type: 3}
+      objectReference: {fileID: 3692091235067170845, guid: e114849808e011c4ea757d3c052285ca, type: 3}
     - target: {fileID: 8381650083676123027, guid: 93785a3a5186d5046bf2fe80c7b270b5, type: 3}
       propertyPath: faceDownEntryPrefab
       value: 

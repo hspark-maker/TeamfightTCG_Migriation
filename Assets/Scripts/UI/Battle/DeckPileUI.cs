@@ -376,6 +376,10 @@ public class DeckPileUI : MonoBehaviour
                 else
                 {
                     t_entry = Instantiate(this.cardElementPrefab, this.cardListRoot);
+                    // 공용 CardUIView에 덱 목록 전용 누름 입력을 붙인다.
+                    if (t_entry.GetComponent<CardPressRelay>() == null)
+                        t_entry.gameObject.AddComponent<CardPressRelay>();
+                    t_entry.GetComponent<Graphic>().raycastTarget = true;
                     this.cardElementPool.Add(t_entry);
                 }
                 // 대기 중인 **그 인스턴스**를 그린다 — 현재 체력·그 카드가 실제로 가진 키워드가 정답이다.

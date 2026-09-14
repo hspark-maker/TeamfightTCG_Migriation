@@ -1,0 +1,30 @@
+<!-- SpecPayloadCodec는 행의 public 필드와 매니저/컨테이너 속성을 리플렉션으로 읽는다.
+     직접 소비되지 않는 열도 열 개수·순서·해시 계약에 포함되므로 스트리핑하면 안 된다.
+     TableNames에 클라이언트 동기화 표를 추가하면 여기에도 행 타입을 추가한다. -->
+<linker>
+  <assembly fullname="Assembly-CSharp">
+    <type fullname="SpecDataManager" preserve="all"/>
+    <type fullname="SpecDataManager/InnerData*" preserve="all"/>
+    <type fullname="Card" preserve="fields"/>
+    <type fullname="CardPack" preserve="fields"/>
+    <type fullname="CardPackDrop" preserve="fields"/>
+    <type fullname="AIDeck" preserve="fields"/>
+    <type fullname="Reward" preserve="fields"/>
+    <type fullname="RankGrade" preserve="fields"/>
+    <type fullname="KeywordEnhance" preserve="fields"/>
+    <type fullname="CardEnhance" preserve="fields"/>
+    <type fullname="CardEnhanceRule" preserve="fields"/>
+    <type fullname="CardLimitBreak" preserve="fields"/>
+    <type fullname="AlbumEntry" preserve="fields"/>
+    <type fullname="AlbumThemeInfo" preserve="fields"/>
+    <type fullname="SynergyDef" preserve="fields"/>
+    <type fullname="SynergyTierDef" preserve="fields"/>
+    <type fullname="SynergyEffectDef" preserve="fields"/>
+    <type fullname="AccountLevel" preserve="fields"/>
+    <type fullname="Roulette" preserve="fields"/>
+    <type fullname="RouletteSlot" preserve="fields"/>
+    <type fullname="AdventureChapter" preserve="fields"/>
+    <type fullname="PassSeason" preserve="fields"/>
+    <type fullname="PassLevel" preserve="fields"/>
+  </assembly>
+</linker>

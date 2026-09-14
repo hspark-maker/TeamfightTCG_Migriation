@@ -8,6 +8,40 @@
 -->
 <linker>
   <assembly fullname="Assembly-CSharp">
+    <!-- Callable 요청은 익명 타입의 getter를 Newtonsoft가 리플렉션으로 읽는다.
+         Medium stripping에서 getter가 제거되면 env 등을 포함한 요청 전체가 빈 맵이 된다.
+         컴파일마다 타입 번호가 달라지므로 컴파일러가 생성하는 접두사로 보존한다. -->
+    <type fullname="&lt;&gt;f__AnonymousType*" preserve="all"/>
+    <!-- 응답·중첩 모델의 setter도 직접 호출되지 않으므로 각 타입을 보존한다. -->
+    <type fullname="ReportAdventureWinResult" preserve="all"/>
+    <type fullname="SnackGrowthResult" preserve="all"/>
+    <type fullname="OutgameDebugActions/DebugRankResult" preserve="all"/>
+    <type fullname="AiMatchCardGrowth" preserve="all"/>
+    <type fullname="MatchTicketVerifyResult" preserve="all"/>
+    <type fullname="RankProgressResult" preserve="all"/>
+    <type fullname="RankSnapshotResult" preserve="all"/>
+    <type fullname="FindAiMatchResult" preserve="all"/>
+    <type fullname="MissionSnapshot" preserve="all"/>
+    <type fullname="MissionDefinition" preserve="all"/>
+    <type fullname="MissionReward" preserve="all"/>
+    <type fullname="MissionGetResponse" preserve="all"/>
+    <type fullname="ClaimMissionResult" preserve="all"/>
+    <type fullname="PassSeasonDefinition" preserve="all"/>
+    <type fullname="PassLevelDefinition" preserve="all"/>
+    <type fullname="PassProgress" preserve="all"/>
+    <type fullname="PassGetResponse" preserve="all"/>
+    <type fullname="PassRepeatDefinition" preserve="all"/>
+    <type fullname="ClaimPassRepeatRewardResult" preserve="all"/>
+    <type fullname="ClaimPassRewardResult" preserve="all"/>
+    <type fullname="RankLeaderboardResult" preserve="all"/>
+    <type fullname="RankLeaderboardSeason" preserve="all"/>
+    <type fullname="RankLeaderboardEntry" preserve="all"/>
+    <type fullname="ClaimRewardItem" preserve="all"/>
+    <type fullname="ClaimRewardPack" preserve="all"/>
+    <type fullname="SpinRouletteResult" preserve="all"/>
+    <type fullname="AdventureSaveData" preserve="all"/>
+    <type fullname="RepairSaveSlotsResult" preserve="all"/>
+    <type fullname="SynergyIntroductionSaveData" preserve="all"/>
     <type fullname="UserSaveData" preserve="all"/>
     <type fullname="OwnershipSaveData" preserve="all"/>
     <type fullname="DeckSaveData" preserve="all"/>
