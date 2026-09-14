@@ -1,1 +1,2 @@
-PASS: catalog only; 32 actual sprites; shared load; active lease protected; idle cap 24; stale rebind; disable/re-enable lifecycle.
+FAIL: System.Exception: Timeout at catalog; pending=0
+  at Unity.AI.Assistant.Agent.Dynamic.Extension.Editor.CommandScript.Tick () [0x00035] in <0b05556858e34caeac3c43428d5a1ef1>:0

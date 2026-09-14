@@ -49,13 +49,17 @@ public static class CardArtCache
             m_changed = changed;
             m_generation = s_generation;
             entry.References++;
-            entry.Subscribe(changed);
+            entry.Subscribe(OnChanged);
         }
         public Sprite Sprite => m_entry?.Sprite;
+        void OnChanged(Sprite sprite)
+        {
+            if (m_entry != null && m_generation == s_generation) m_changed?.Invoke(sprite);
+        }
         public void Dispose()
         {
             if (m_entry == null) return;
-            m_entry.Unsubscribe(m_changed);
+            m_entry.Unsubscribe(OnChanged);
             m_entry.References--;
             m_entry.LastUse = ++s_access;
             m_entry = null;
