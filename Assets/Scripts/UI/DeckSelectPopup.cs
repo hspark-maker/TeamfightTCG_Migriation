@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.SceneManagement;
 using TMPro;
 
 [RequireComponent(typeof(Canvas))]
@@ -107,7 +106,7 @@ public class DeckSelectPopup : MonoBehaviour
     {
         if (!DeckSaveManager.IsSlotValid(_index)) return;
         DeckConfig.Set(DeckSaveManager.GetSlot(_index));
-        SceneManager.LoadScene(this.battleSceneName);
+        LoadingCoverView.LoadScene(this.battleSceneName);
     }
 
     // ── UI helpers ────────────────────────────────────────────────────────

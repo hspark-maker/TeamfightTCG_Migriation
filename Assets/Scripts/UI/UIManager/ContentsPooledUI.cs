@@ -7,7 +7,7 @@ using UnityEngine;
 /// 풀 등록은 UIPoolManager가 소유한다.
 /// </summary>
 [DisallowMultipleComponent]
-public abstract class ContentsPooledUI : PooledUIBase, IUIInitializable
+public abstract class ContentsPooledUI : PooledUIBase, IUIInitializationRoot
 {
     [Header("연출")]
     [Tooltip("Contents 안의 패널 본체. 전체 Contents가 아닌 팝 연출 대상을 지정한다.")]
@@ -78,6 +78,11 @@ public abstract class ContentsPooledUI : PooledUIBase, IUIInitializable
             this.OnViewHidden();
             ScreenDim.Hide(this);
         }
+        this.ApplyContentsVisibility(_visible);
+    }
+
+    protected virtual void ApplyContentsVisibility(bool _visible)
+    {
         if (this.UsePopupTransition) this.transition.SetVisible(this.contents, _visible);
         else this.contents.SetActive(_visible);
     }

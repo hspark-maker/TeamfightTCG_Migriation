@@ -1,0 +1,98 @@
+{
+  "sourceBytes": 68398148,
+  "rawDataBytes": 178338441,
+  "originalCompressedBlocks": 68392580,
+  "lz4hc12CompressedBlocks": 60028891,
+  "estimatedSavingBytes": 8363689,
+  "blockTypes": {
+    "2": 1329,
+    "0": 32
+  },
+  "files": [
+    {
+      "name": "globalgamemanagers",
+      "rawBytes": 509844,
+      "lz4StandaloneEstimate": 221493
+    },
+    {
+      "name": "Resources/unity_builtin_extra",
+      "rawBytes": 699956,
+      "lz4StandaloneEstimate": 419301
+    },
+    {
+      "name": "globalgamemanagers.assets",
+      "rawBytes": 2306760,
+      "lz4StandaloneEstimate": 1358274
+    },
+    {
+      "name": "sharedassets0.assets",
+      "rawBytes": 25984968,
+      "lz4StandaloneEstimate": 5749081
+    },
+    {
+      "name": "globalgamemanagers.assets.resS",
+      "rawBytes": 4169408,
+      "lz4StandaloneEstimate": 2431721
+    },
+    {
+      "name": "sharedassets0.assets.resS",
+      "rawBytes": 97658784,
+      "lz4StandaloneEstimate": 34874412
+    },
+    {
+      "name": "level0",
+      "rawBytes": 40728,
+      "lz4StandaloneEstimate": 12641
+    },
+    {
+      "name": "sharedassets1.assets",
+      "rawBytes": 6819896,
+      "lz4StandaloneEstimate": 1384812
+    },
+    {
+      "name": "sharedassets1.assets.resS",
+      "rawBytes": 17267264,
+      "lz4StandaloneEstimate": 8374700
+    },
+    {
+      "name": "level1",
+      "rawBytes": 1252840,
+      "lz4StandaloneEstimate": 275050
+    },
+    {
+      "name": "sharedassets2.assets",
+      "rawBytes": 191464,
+      "lz4StandaloneEstimate": 75433
+    },
+    {
+      "name": "sharedassets2.assets.resS",
+      "rawBytes": 4140576,
+      "lz4StandaloneEstimate": 2205125
+    },
+    {
+      "name": "level2",
+      "rawBytes": 275732,
+      "lz4StandaloneEstimate": 58811
+    },
+    {
+      "name": "sharedassets3.assets",
+      "rawBytes": 26121,
+      "lz4StandaloneEstimate": 8997
+    },
+    {
+      "name": "level3",
+      "rawBytes": 28720,
+      "lz4StandaloneEstimate": 9515
+    },
+    {
+      "name": "resources.assets",
+      "rawBytes": 15917492,
+      "lz4StandaloneEstimate": 10761803
+    },
+    {
+      "name": "resources.assets.resS",
+      "rawBytes": 1047888,
+      "lz4StandaloneEstimate": 188240
+    }
+  ]
+}

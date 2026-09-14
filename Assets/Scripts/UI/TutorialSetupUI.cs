@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.SceneManagement;
 using TMPro;
 using ScriptedAttack = TutorialScenarioData.ScriptedAttack;
 
@@ -36,7 +35,7 @@ public class TutorialSetupUI : MonoBehaviour
         else
             TutorialConfig.Begin(this.playerDeckIds, this.enemyDeckIds, this.playerScript, this.enemyScript);
 
-        SceneManager.LoadScene(this.battleSceneName);
+        LoadingCoverView.LoadScene(this.battleSceneName);
     }
 
     // ── 최소 캔버스 + 시작 버튼(코드 빌드) ──────────────────────────────────

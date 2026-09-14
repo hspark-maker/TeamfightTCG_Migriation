@@ -4,7 +4,6 @@ using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 // 씬 전환을 덮는 전체화면 로딩 커버. 두 가지 방식으로 산다.
@@ -90,6 +89,9 @@ public class LoadingCoverView : MonoBehaviour
     // 씬 교체 직전에 돌려줄 정리 훅(전환 모드 전용). LoadScene의 _onBeforeLoad 참고.
     Action m_beforeLoad;
     bool m_waitForBattleResult;
+    bool m_choosingInitialScene;
+    bool m_sceneLoadFailed;
+    GameSceneLoadOperation m_sceneOperation;
 
     // 커버가 최소 1초는 도니 커튼(0.25초)보다 넉넉하게 뺀다.
     const float BgmFadeOutSeconds = 0.5f;
@@ -101,6 +103,14 @@ public class LoadingCoverView : MonoBehaviour
     /// 그 시간만큼 더 살아 돌며 진행 중이던 연출 체인이 깨어나 그걸 만진다(MissingReferenceException).</param>
     public static void LoadScene(string _scene, Action _onBeforeLoad = null, bool _fromBattle = false)
     {
+        // 최초 AutoBattle은 이미 있는 시작 커버에 목적지만 넘긴다. 튜토리얼 커밋은 한 번만 실행한다.
+        if (s_active != null && s_active.m_choosingInitialScene)
+        {
+            s_active.m_targetScene = _scene;
+            s_active.m_beforeLoad = _onBeforeLoad;
+            return;
+        }
+
         // 씬을 벗어나는 모든 호출부가 이 창구를 지나므로 BGM 퇴장은 여기 한 곳에서 책임진다.
         SoundManager.Instance?.FadeOutBGM(BgmFadeOutSeconds);
 
@@ -131,8 +141,14 @@ public class LoadingCoverView : MonoBehaviour
     static async UniTaskVoid LoadWithoutCoverAsync(string _scene, Action _onBeforeLoad, bool _waitForBattleResult)
     {
         if (_waitForBattleResult) await MatchResultSubmission.WaitForBattleResultAsync();
-        _onBeforeLoad?.Invoke();
-        SceneManager.LoadScene(_scene);
+        await new GameSceneLoadOperation(_scene).CommitAsync(_onBeforeLoad);
+    }
+
+    public static void ShowSceneLoadFailure(string _scene, Action _onBeforeLoad)
+    {
+        LoadScene(_scene, _onBeforeLoad);
+        if (s_active != null && s_active.m_targetScene == _scene)
+            s_active.m_sceneLoadFailed = true;
     }
 
     void Awake()
@@ -150,13 +166,25 @@ public class LoadingCoverView : MonoBehaviour
     }
 
     // 파괴 = 페이드아웃 완료(Reveal) 시점이다 — 여기가 "이제 화면이 보인다"의 유일한 신호다.
+    void OnDisable()
+    {
+        m_sceneOperation?.FinishWithoutCover(m_beforeLoad);
+    }
+
     void OnDestroy()
     {
+        m_sceneOperation?.FinishWithoutCover(m_beforeLoad);
         if (s_active == this) s_active = null;
     }
 
     void Start()
     {
+        if (m_sceneLoadFailed)
+        {
+            if (m_group != null) m_group.alpha = 1f;
+            ShowRecovery();
+            return;
+        }
         StartCoroutine(m_targetScene == null ? CoRunInitialize() : CoRunSceneLoad());
     }
 
@@ -283,7 +311,7 @@ public class LoadingCoverView : MonoBehaviour
     void ShowRecovery()
     {
         bool t_updateRequired = GameInitialization.State == EGameInitState.UpdateRequired;
-        bool t_assetFailed   = RemoteCardArtDownload.HasFailed || CardArtCache.HasFailed || PackArtCache.HasFailed || UiPrefabCache.HasFailed;
+        bool t_assetFailed   = m_sceneLoadFailed || RemoteCardArtDownload.HasFailed || CardArtCache.HasFailed || PackArtCache.HasFailed || UiPrefabCache.HasFailed;
 
         SetRecoveryVisible(true);
 
@@ -298,7 +326,7 @@ public class LoadingCoverView : MonoBehaviour
 
         ApplyStoreButton(t_updateRequired);
 
-        bool t_canRetry = GameInitialization.CanRetry;
+        bool t_canRetry = m_sceneLoadFailed || GameInitialization.CanRetry;
 
         if (retryButton != null)
         {
@@ -348,6 +376,13 @@ public class LoadingCoverView : MonoBehaviour
 
         SetRecoveryVisible(false);
 
+        if (m_sceneLoadFailed)
+        {
+            m_sceneLoadFailed = false;
+            StartCoroutine(CoRunSceneLoad());
+            return;
+        }
+
         // TODO(초기화 재시작): 실패한 캐시·클라우드 상태를 되돌리는 체인이 아직 없다
         // — 지금은 게이트만 다시 걸어 같은 실패를 그대로 다시 볼 수 있다.
         InitializationRunner.RestartGate();
@@ -385,29 +420,16 @@ public class LoadingCoverView : MonoBehaviour
         // 로드보다 반드시 먼저 — 이 뒤로 누가 씬을 걸든 커버가 살아남아 전환 순간을 덮는다.
         DontDestroyOnLoad(gameObject);
 
-        // 여기부터는 어떻게 빠져나가든 커버를 걷어야 한다. 남기면 DDOL + sortingOrder 1000 + blocksRaycasts가
-        // 이후 모든 씬을 영구 입력 불가로 잠가 재시작 말고는 탈출로가 없다 — 그래서 finally에 건다.
+        // AutoBattle은 목적지를 이 커버에 전달한다. 실패 시 목적지만 재시도해 스텝을 두 번 커밋하지 않는다.
+        m_choosingInitialScene = true;
         try
         {
-            bool t_needLobby = true;
-
             if (OutgameTutorialRunner.TryGetCurrentStep(out var t_step) && t_step.Action == EOutgameTutorialAction.AutoBattle)
-            {
-                // 러너가 전투 씬을 걸었으면 Gated가 아니다(커밋·시나리오 주입 포함). AutoBattle 진입은 실제로 항상 씬을 걸므로
-                // 로비가 필요해지는 건 스텝 판정이 어긋난 예외뿐이다. 조기 return은 두지 않는다 — 커버를 걷어야 하니까.
-                t_needLobby = OutgameTutorialRunner.EnterCurrentStep() == EOutgameTutorialStepResult.Gated;
-            }
-
-            if (t_needLobby) yield return SceneManager.LoadSceneAsync(LobbyScene);
-
-            // 새 씬이 최소 한 번 그려지도록 한 프레임만 양보한다. "준비 완료"를 뜻하지는 않는다 —
-            // 전투 보드 생성(GameInitializer)은 비동기고, 로비는 곧장 다음 씬으로 넘어가기도 한다.
-            yield return null;
+                OutgameTutorialRunner.EnterCurrentStep();
         }
-        finally
-        {
-            Reveal();
-        }
+        finally { m_choosingInitialScene = false; }
+        if (string.IsNullOrEmpty(m_targetScene)) m_targetScene = LobbyScene;
+        yield return CoLoadTarget(false);
     }
 
     // ── 전환 모드 ─────────────────────────────────────────────────────────────
@@ -425,16 +447,17 @@ public class LoadingCoverView : MonoBehaviour
         // 로드보다 반드시 먼저 — 씬이 갈려도 커버가 살아남아 전환 순간을 덮는다.
         DontDestroyOnLoad(gameObject);
 
-        // 여기서 걸리는 씬은 초기화가 이미 데워둔 상태라 로드가 한두 프레임에 끝난다. 활성화를 붙잡지 않으면
-        // 바가 차기도 전에 씬이 갈려 커버가 한 프레임만 번쩍인다 — 노출 길이를 정하는 건 로드 시간이 아니라 minDuration이다.
-        var t_op = SceneManager.LoadSceneAsync(m_targetScene);
-        t_op.allowSceneActivation = false;
+        yield return CoLoadTarget(true);
+    }
 
-        // 초기화 경로와 같은 이유로 finally에 건다 — 커버를 남기면 이후 모든 씬이 입력 불가가 된다.
+    IEnumerator CoLoadTarget(bool _animateProgress)
+    {
+        var t_op = new GameSceneLoadOperation(m_targetScene);
+        m_sceneOperation = t_op;
+
         try
         {
-            // 활성화를 막아둔 동안 progress는 0.9에서 멈춘다 — 그 구간을 0~1로 편다.
-            yield return CoFillBar(() => t_op.progress / 0.9f);
+            if (_animateProgress) yield return CoFillBar(() => t_op.Progress);
 
             // 연출 시간 상한으로 서버 검증을 건너뛰지 않는다. 씬 활성화·전투 정리보다 먼저 기다린다.
             if (m_waitForBattleResult)
@@ -445,20 +468,23 @@ public class LoadingCoverView : MonoBehaviour
 
             if (holdBeforeLoad > 0f) yield return new WaitForSecondsRealtime(holdBeforeLoad);
 
-            // 정리는 여기 — 씬 교체와 붙어 있어야 파괴된 오브젝트를 붙잡은 연출 체인이 깨어날 틈이 없다.
-            // 커버 자신은 이 시점에 도는 트윈이 없어(페이드인은 끝났고 Reveal은 뒤에 만들어진다)
-            // 훅이 DOTween.KillAll류를 돌려도 커버가 같이 죽지 않는다.
-            m_beforeLoad?.Invoke();
+            // 성공적으로 준비된 뒤에만 정리하고 활성화한다. 실패 시 이전 씬은 그대로 재시도를 기다린다.
+            yield return t_op.Commit(m_beforeLoad);
+            if (!t_op.Succeeded)
+            {
+                m_sceneLoadFailed = true;
+                ShowRecovery();
+                yield break;
+            }
             m_beforeLoad = null;
-
-            t_op.allowSceneActivation = true;
-            yield return t_op;
 
             yield return null;   // 새 씬이 최소 한 번 그려지도록 한 프레임 양보.
         }
         finally
         {
-            Reveal();
+            t_op.FinishWithoutCover(m_beforeLoad);
+            m_sceneOperation = null;
+            if (!m_sceneLoadFailed) Reveal();
         }
     }
 

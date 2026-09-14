@@ -5,7 +5,7 @@ using DG.Tweening;
 using UnityEngine;
 
 /// <summary>Coordinates tab policy; panels own lifecycle and the tab bar owns visuals.</summary>
-public class LobbyTabController : MonoBehaviour
+public class LobbyTabController : MonoBehaviour, IUIInitializable
 {
     [Serializable]
     public class Tab
@@ -100,8 +100,14 @@ public class LobbyTabController : MonoBehaviour
             ? tabs[m_currentIndex].panel
             : null;
 
-    void Awake()
+    bool m_initialized;
+
+    void Awake() => InitializeUI();
+
+    public void InitializeUI()
     {
+        if (m_initialized) return;
+        m_initialized = true;
         GuidanceCoordinator.Install(gameObject);
         if (tabBar != null) tabBar.Selected += HandleTabSelected;
 
@@ -118,7 +124,9 @@ public class LobbyTabController : MonoBehaviour
         for (int i = 0; i < tabs.Count; i++)
         {
             Tab t_tab = tabs[i];
+            t_tab.panel?.InitializeUI();
             t_tab.panel?.Initialize(t_services);
+            if (t_tab.panel != null) t_tab.panel.gameObject.SetActive(true);
 
             RectTransform t_root = t_tab.panel != null ? t_tab.panel.Root : null;
             m_homeX[i] = t_root != null ? t_root.anchoredPosition.x : 0f;
@@ -136,6 +144,14 @@ public class LobbyTabController : MonoBehaviour
     // 컨트롤러가 꺼지면 출발을 기다리던 코루틴이 조용히 죽는다 —
     // 그대로 두면 새 탭이 화면 밖에 주차된 채로 남는다.
     // (로비를 떠나는 정규 경로는 씬 전환이라 여기는 방어에 가깝다.)
+    void OnEnable()
+    {
+        if (!m_initialized || CurrentPanel == null) return;
+        CurrentPanel.SetViewVisible(true);
+        CurrentPanel.OnEnter();
+        CurrentPanel.OnSettled();
+    }
+
     void OnDisable()
     {
         m_swipeVersion++;
@@ -187,6 +203,7 @@ public class LobbyTabController : MonoBehaviour
 
     void SelectInternal(int _index, bool _fireTrigger, Action _beforeSelect, Action _afterSelect)
     {
+        InitializeUI();
         if (_index < 0 || _index >= tabs.Count) return;
         if (_fireTrigger &&
             !OutgameFeatureLock.IsUnlocked(tabs[_index].unlockFeature))
@@ -240,7 +257,7 @@ public class LobbyTabController : MonoBehaviour
             t_previous.OnLeave();
             // 슬라이드가 있으면 아직 끄지 않는다 — 출발할 때까지 이 탭이 화면을 지키고 있어야
             // 준비하는 프레임 동안 빈 화면이 비치지 않는다.
-            if (!t_slide) t_previous.gameObject.SetActive(false);
+            if (!t_slide) t_previous.SetViewVisible(false);
         }
 
         for (int i = 0; i < tabs.Count; i++)
@@ -248,14 +265,14 @@ public class LobbyTabController : MonoBehaviour
             LobbyTabPanel t_panel = tabs[i].panel;
             // 떠나는 패널은 아직 화면 밖으로 미끄러지는 중이라 여기서 끄지 않는다 — 끄는 시점은 트윈이 끝날 때다.
             if (t_panel != null && i != _index && t_panel != t_previous)
-                t_panel.gameObject.SetActive(false);
+                t_panel.SetViewVisible(false);
         }
 
         m_currentIndex = _index;
         LobbyTabPanel t_next = CurrentPanel;
         if (t_next != null)
         {
-            t_next.gameObject.SetActive(true);
+            t_next.SetViewVisible(true);
             // 켜자마자 화면 밖으로 보낸다. 출발을 미루는 동안 제자리에 서 있으면 그 모습이 그대로 비친다.
             if (t_slide) PlaceOffscreen(t_next, _index, t_direction);
             t_next.OnEnter();
@@ -347,7 +364,7 @@ public class LobbyTabController : MonoBehaviour
         RectTransform t_root = _panel.Root;
         if (t_root == null)
         {
-            _panel.gameObject.SetActive(false);
+            _panel.SetViewVisible(false);
             return;
         }
 
@@ -362,7 +379,7 @@ public class LobbyTabController : MonoBehaviour
               .OnComplete(() =>
               {
                   t_root.anchoredPosition = new Vector2(t_home, t_root.anchoredPosition.y);
-                  _panel.gameObject.SetActive(false);
+                  _panel.SetViewVisible(false);
                   if (m_leaving == _panel) m_leaving = null;
               });
     }

@@ -32,9 +32,6 @@ public enum EPromoteKind
 // 씬에 저작하지 않고 Addressables 타입 색인에서 독립 Canvas로 세운다(UnlockIntroOverlay와 같은 규약).
 public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
 {
-    [Tooltip("켜고 끌 대상. 미배선이면 자기 gameObject를 토글한다.")]
-    [SerializeField] GameObject root;
-
     [Tooltip("화면 어디를 눌러도 받는 투명 버튼. 안무 도중에 눌리면 건너뛰고 곧바로 닫힌다.")]
     [SerializeField] Button tapButton;
 
@@ -273,6 +270,7 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
     public void Show(RankTier _from, RankTier _to, EPromoteKind _kind, Action _onCovered, Action _onClose,
                      bool _browse = false)
     {
+        InitializeUI();
         // 직전 표시의 안무를 걷는다 — 시퀀스에 중첩된 트윈은 대상의 DOKill이 잡지 못해 새 안무와 같은 노드를 함께 민다.
         KillChoreo();
         Capture();
@@ -327,13 +325,13 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
     }
 
     // Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서도 문이 잠기지 않게 열어 둔다.
-    void OnEnable()
+    protected override void OnViewShown()
     {
         SetInputEnabled(true);
     }
 
     // 오버레이는 자기 자신이 토글 대상이라 OnDisable이 정상 동작한다 — 잘린 퇴장 마무리를 여기서 위임한다.
-    void OnDisable()
+    protected override void OnViewHidden()
     {
         this.transition.HandleDisabled(ResolveTarget());
         KillChoreo();
@@ -1028,10 +1026,10 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
 
     void SetVisible(bool _visible)
     {
-        this.transition.SetVisible(ResolveTarget(), _visible);
+        SetContentsVisible(_visible, this.transition);
     }
 
-    GameObject ResolveTarget() => this.root != null ? this.root : gameObject;
+    GameObject ResolveTarget() => viewContents;
 
     RectTransform ResolveKickRoot()
         => this.kickRoot != null

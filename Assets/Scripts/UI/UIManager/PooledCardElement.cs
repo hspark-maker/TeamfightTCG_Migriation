@@ -7,7 +7,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 
-public class PooledCardElement : PooledUIBase
+public class PooledCardElement : ContentsPooledUI
 {
     PooledCardElementData cardElementData;
     int cardId;
@@ -44,11 +44,13 @@ public class PooledCardElement : PooledUIBase
     Canvas cachedCanvas;
     RectTransform rectTransform;
 
-    protected override void Awake()
+    protected override bool UsePopupTransition => false;
+    protected override bool UseScreenDim => false;
+
+    protected override void OnInitializeUI()
     {
-        base.Awake();
         this.rectTransform = (RectTransform)transform;
-        this.cachedCanvas = GetComponentInParent<Canvas>();
+        this.cachedCanvas = GetComponentInParent<Canvas>(true);
     }
 
     /// <summary>지금 켜져 있는 카드 콘텐츠 rect. 루트가 아니라 **이쪽**을 옮겨야 한다 —
@@ -202,6 +204,7 @@ public class PooledCardElement : PooledUIBase
 
     public override void Initialization(UIData _data)
     {
+        this.InitializeUI();
         this.cardElementData = _data as PooledCardElementData;
         if (this.cardElementData == null) return;
         this.cardId = this.cardElementData.instance?.cardId ?? this.cardElementData.cardId;
@@ -297,10 +300,10 @@ public class PooledCardElement : PooledUIBase
 
     public override void Show()
     {
+        this.SetContentsVisible(true);
         bool t_dimOnly = this.cardElementData != null && this.cardElementData.dimOnly;
 
         this.fullCardContents.SetActive(!t_dimOnly);
-        this.isShow = true;
 
         if (!t_dimOnly) PlaceAtCursor();
     }
@@ -310,20 +313,47 @@ public class PooledCardElement : PooledUIBase
     ///
     /// 카드는 즉시 사라지고 배경만 남아 옅어진다 — 손을 뗀 순간 정보는 끝난 것이고,
     /// 배경까지 같이 끊으면 화면이 툭 끊긴다.</summary>
-    public override void Hide()
+    public override void Hide() => this.SetContentsVisible(false);
+
+    protected override void ApplyContentsVisibility(bool _visible)
     {
+        this.dimBg?.DOKill();
+        if (_visible)
+        {
+            this.contents.SetActive(true);
+            return;
+        }
+
         this.fullCardContents.SetActive(false);
-        this.isShow = false;
+        if (this.dimBg == null || this.dimFadeOut <= 0f || this.dimBg.color.a <= 0.001f)
+        {
+            SetDim(0f);
+            this.contents.SetActive(false);
+            return;
+        }
 
-        if (this.dimBg == null) return;
-
-        this.dimBg.DOKill();
-        if (this.dimFadeOut <= 0f || this.dimBg.color.a <= 0.001f) { SetDim(0f); return; }
-
-        this.dimBg.DOFade(0f, this.dimFadeOut)
-            .SetLink(gameObject)                              // 파괴된 뒤 접근 방지(트윈 수명 규약)
-            .OnComplete(() => this.dimBg.enabled = false);    // 다 옅어지면 그리기까지 끈다
+        int t_version = this.VisibilityVersion;
+        this.dimBg.DOFade(0f, this.dimFadeOut).SetLink(gameObject)
+            .OnComplete(() =>
+            {
+                if (this.isShow || t_version != this.VisibilityVersion) return;
+                this.dimBg.enabled = false;
+                this.contents.SetActive(false);
+            });
     }
+
+    protected override void OnDisable()
+    {
+        SetDim(0f);
+        base.OnDisable();
+    }
+
+    protected override void OnDestroy()
+    {
+        SetDim(0f);
+        base.OnDestroy();
+    }
+
 }
 
 public class PooledCardElementData : UIData

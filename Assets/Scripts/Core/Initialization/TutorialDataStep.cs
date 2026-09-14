@@ -6,7 +6,7 @@ using UnityEngine;
 public sealed class TutorialDataStep : MainInitializer
 {
     // 튜토리얼 스텝 시퀀스 SO.
-    [SerializeField] OutgameTutorialData tutorialData;
+    OutgameTutorialData tutorialData => RuntimeContentCache.Config.tutorialData;
 
     public override UniTask Initialize(InitializationContext _context)
     {

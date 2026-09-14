@@ -20,7 +20,7 @@ using UnityEngine.UI;
 //
 // 부품은 한 벌뿐이고 두 모드가 갈리는 것은 튜닝 묶음 셋(ClashTuning·EntranceTuning·SeamTuning)이다.
 // 진입할 때마다 그 판의 값을 통째로 갈아끼워, 한 인스턴스가 두 모드를 번갈아 타도 항상 결정적이다.
-public class MatchmakingShell : MonoBehaviour
+public class MatchmakingShell : ContentsUIBehaviour
 {
     [SerializeField] MatchProfileView myProfile;
     [SerializeField] MatchProfileView opponentProfile;
@@ -137,8 +137,9 @@ public class MatchmakingShell : MonoBehaviour
 
     // 지금 화면에 떠 있는 안무. 화면이 내려갈 때 함께 걷지 않으면 파괴된 대상 위에서 계속 돈다.
     Sequence m_stage;
+    bool m_closingForHandoff;
 
-    void Awake()
+    protected override void OnInitializeUI()
     {
         // 층의 주인은 표다 — 이 호출이 매번 UiSortingOrder.Matchmaking을 다시 찍으므로 프리팹 저작값은 읽기용 사본이고,
         // 사본이 표와 갈리면 OnValidate가 잡는다. 승격 문은 하나여야 한다는 규약대로 여기서 걸고,
@@ -151,7 +152,7 @@ public class MatchmakingShell : MonoBehaviour
         if (myProfile       != null) m_myHome       = myProfile.Rect.anchoredPosition;
         if (opponentProfile != null) m_opponentHome = opponentProfile.Rect.anchoredPosition;
 
-        m_rootHome = ((RectTransform)transform).anchoredPosition;
+        m_rootHome = ((RectTransform)viewContents.transform).anchoredPosition;
 
         CaptureRiderHomes();
 
@@ -205,8 +206,9 @@ public class MatchmakingShell : MonoBehaviour
         t_rect.offsetMax  = Vector2.zero;
     }
 
-    void OnDestroy()
+    protected override void OnDestroy()
     {
+        base.OnDestroy();
         // 셸만 먼저 파괴되는 경우(호스트는 살아 있다) 매치메이커가 계속 돌다 파괴된 화면을 그린다.
         m_cts?.Cancel();
         StopDots();
@@ -238,6 +240,7 @@ public class MatchmakingShell : MonoBehaviour
     // null = 유저가 물러났거나 매칭이 실패했다(또는 씬이 내려갔다) → 호스트가 복귀를 처리한다.
     public async UniTask<MatchOpponent?> RunMatchAsync(IMatchmaker _matchmaker, CancellationToken _ct)
     {
+        InitializeUI();
         if (_matchmaker == null)
         {
             Debug.LogError("[MatchmakingShell] There is no matchmaker — skipping matchmaking.");
@@ -292,7 +295,7 @@ public class MatchmakingShell : MonoBehaviour
     {
         KillStage();
 
-        var t_root = (RectTransform)transform;
+        var t_root = (RectTransform)viewContents.transform;
 
         m_stage = handoffFx.Build(myProfile, opponentProfile, VersusRect, fx.Dim.Target,
                                   t_root, ActiveRiders, fx.RaySprite, in _targets);
@@ -305,7 +308,7 @@ public class MatchmakingShell : MonoBehaviour
         // 배너가 다 나가고 배경 판까지 다 열린 프레임에 내려간다. 한 프레임이라도 일찍 내리면
         // 아직 화면에 남아 있던 판이 통째로 사라져 전환 한복판이 끊긴다 — 걷어내는 도중에 끄는 것이 곧 하드컷이다.
         // 뒤의 덱 등장까지 켜 두지 않는 이유는 알파 0짜리 딤이 그동안 터치를 먹기 때문이다.
-        m_stage.InsertCallback(Mathf.Max(handoffFx.CloseAt, bgFx.PartDuration), Close);
+        m_stage.InsertCallback(Mathf.Max(handoffFx.CloseAt, bgFx.PartDuration), CloseForHandoff);
 
         await m_stage.ToUniTask(cancellationToken: _ct).SuppressCancellationThrow();
 
@@ -321,6 +324,7 @@ public class MatchmakingShell : MonoBehaviour
     /// </summary>
     public async UniTask PlayVersusAsync(MatchOpponent _opponent, CancellationToken _ct)
     {
+        InitializeUI();
         // 이미 진행 중인데 다시 부르면 두 await가 같은 화면을 두고 경쟁한다.
         if (m_running)
         {
@@ -398,7 +402,7 @@ public class MatchmakingShell : MonoBehaviour
     //     ④ 낙하     — ③의 DOKill 뒤에 지어야 살아남는다
     void OpenVersus(in MatchOpponent _opponent)
     {
-        gameObject.SetActive(true);
+        SetContentsVisible(true);
 
         // 직전 전환이 프로필을 화면 밖으로 밀어내고 화면을 줄여 놓은 채 끝났다 — 저작 상태로 되돌린 뒤에 연다.
         KillStage();
@@ -407,8 +411,8 @@ public class MatchmakingShell : MonoBehaviour
         // 덱 색으로 옮겨 놓았다. 기준을 저작값으로 돌린 뒤라야 이어지는 fx.Reset이 옳은 색으로 칠한다.
         bgFx.Reset(fx.Dim);
 
-        fx.Reset(myProfile, opponentProfile, (RectTransform)transform, VersusRect);
-        handoffFx.Reset((RectTransform)transform, VersusRect);
+        fx.Reset(myProfile, opponentProfile, (RectTransform)viewContents.transform, VersusRect);
+        handoffFx.Reset((RectTransform)viewContents.transform, VersusRect);
 
         RestoreHome(myProfile,       m_myHome);
         RestoreHome(opponentProfile, m_opponentHome);
@@ -421,7 +425,7 @@ public class MatchmakingShell : MonoBehaviour
         if (myProfile       != null) myProfile.Render(MatchProfile.OfLocalPlayer());
         if (opponentProfile != null) opponentProfile.Render(_opponent.Profile);
 
-        var t_root = (RectTransform)transform;
+        var t_root = (RectTransform)viewContents.transform;
 
         // 낙하 거리는 판이 푼다. 실린 것이 판과 같은 거리를 써야 이음매 위에 얹혀 있는 것으로 읽힌다.
         bgFx.SolveTravel(t_root, out float t_up, out float t_down);
@@ -504,7 +508,7 @@ public class MatchmakingShell : MonoBehaviour
     // 그것이 안무가 다 끝난 뒤에야 돈다 — 부딪힌 자리에서 셸이 직접 되돌린다.
     void RestoreRootHome()
     {
-        ((RectTransform)transform).anchoredPosition = m_rootHome;
+        ((RectTransform)viewContents.transform).anchoredPosition = m_rootHome;
     }
 
     // 탐색중 → 발견 → 대치 → 진입. 어느 단계에서 끊겨도 null로 빠져나온다.
@@ -545,7 +549,7 @@ public class MatchmakingShell : MonoBehaviour
 
     void OpenSearching()
     {
-        gameObject.SetActive(true);
+        SetContentsVisible(true);
         EnsureWired();
 
         // 직전 전환이 배너를 화면 밖으로 밀어내고 화면을 줄여 놓은 채 끝났다 — 저작 상태로 되돌린 뒤에 연다.
@@ -555,8 +559,8 @@ public class MatchmakingShell : MonoBehaviour
         // (순서를 뒤집으면 fx.Reset이 덱 색을 칠하고 다음 매칭이 그 색으로 열린다).
         bgFx.Reset(fx.Dim);
 
-        fx.Reset(myProfile, opponentProfile, (RectTransform)transform, VersusRect);
-        handoffFx.Reset((RectTransform)transform, VersusRect);
+        fx.Reset(myProfile, opponentProfile, (RectTransform)viewContents.transform, VersusRect);
+        handoffFx.Reset((RectTransform)viewContents.transform, VersusRect);
 
         RestoreHome(myProfile,       m_myHome);
         RestoreHome(opponentProfile, m_opponentHome);
@@ -577,7 +581,7 @@ public class MatchmakingShell : MonoBehaviour
         //
         // 여는 순서가 곧 전제다: 바로 위에서 fx.Reset·RestoreHome이 저작 상태로 되돌린 뒤라야
         // 안무가 지금 자리를 홈으로, 지금 딤 알파를 목표로 삼을 수 있다.
-        var t_root = (RectTransform)transform;
+        var t_root = (RectTransform)viewContents.transform;
 
         var t_enter = entryFx.Build(myProfile, opponentProfile, VersusRect, fx.Dim.Target,
                                     t_root, ActiveRiders, bgFx.EnterNormal);
@@ -623,7 +627,7 @@ public class MatchmakingShell : MonoBehaviour
 
         opponentProfile.Render(_opponent.Profile);
 
-        var t_root = (RectTransform)transform;
+        var t_root = (RectTransform)viewContents.transform;
         var t_seq  = fx.BuildFound(opponentProfile, t_root);
 
         // 카드가 꽂히는 그 프레임부터 배경 두 판이 덱 화면의 섹션 색으로 옮겨 앉는다 —
@@ -656,7 +660,7 @@ public class MatchmakingShell : MonoBehaviour
 
         PlayStage(fx.BuildVersus(myProfile != null ? myProfile.Rect : null,       m_myHome,
                                  opponentProfile != null ? opponentProfile.Rect : null, m_opponentHome,
-                                 VersusStep, t_vs, (RectTransform)transform));
+                                 VersusStep, t_vs, (RectTransform)viewContents.transform));
     }
 
     // 미는 방향은 두 카드의 실제 배치에서 구한다 — 어느 쪽이 위인지 프리팹을 몰라도 된다.
@@ -702,7 +706,24 @@ public class MatchmakingShell : MonoBehaviour
 
     public void Close()
     {
-        gameObject.SetActive(false);
+        SetContentsVisible(false);
+    }
+
+    void CloseForHandoff()
+    {
+        // 같은 시퀀스에 새 덱 화면의 등장도 실려 있다. 매칭 화면이 내려가도 그 부분은 끝까지 둔다.
+        m_closingForHandoff = true;
+        try { Close(); }
+        finally { m_closingForHandoff = false; }
+    }
+
+    protected override void OnViewHidden()
+    {
+        m_cts?.Cancel();
+        StopDots();
+        if (!m_closingForHandoff) KillStage();
+        fx.StopScan();
+        fx.ClearCharge();
     }
 
     /// <summary>이 화면을 그대로 다음 씬으로 데려갈 수 있는가. 배경 두 판이 맞물려 화면을 덮고 있어야 한다 —
@@ -713,7 +734,7 @@ public class MatchmakingShell : MonoBehaviour
     ///
     /// <para>activeSelf가 아니라 activeInHierarchy인 이유: 이 화면은 로비 캔버스의 자식이라
     /// 부모가 꺼지면 아무것도 안 보이는데도 activeSelf는 참을 답한다.</para></summary>
-    public bool CanCarryToScene => gameObject.activeInHierarchy && bgFx.IsClosed;
+    public bool CanCarryToScene => IsViewVisible && bgFx.IsClosed;
 
     /// <summary>씬을 넘어가기 직전 정리. <b>도는 안무만</b> 걷고 판·프로필·배너는 그 자리에 그대로 둔다 —
     /// 지금 화면이 그대로 실려 가는 것이 이 전환의 전부라, 무엇 하나라도 되돌리면 그 자리가 하드컷이 된다.</summary>
@@ -737,7 +758,7 @@ public class MatchmakingShell : MonoBehaviour
     /// 화면이 파괴되는 프레임에 통째로 증발한다.</para></summary>
     public Sequence PlayCarryPart()
     {
-        var t_root = (RectTransform)transform;
+        var t_root = (RectTransform)viewContents.transform;
 
         Sequence t_seq = handoffFx.BuildCarry(myProfile, opponentProfile, VersusRect, fx.Dim.Target,
                                               t_root, ActiveRiders, fx.RaySprite);
@@ -745,7 +766,7 @@ public class MatchmakingShell : MonoBehaviour
         t_seq.Insert(0f, bgFx.BuildPart(t_root));
 
         // 화면 전환을 덮는 물건이라 timeScale을 신뢰하지 않는다 — 배속이 걸리면 판이 영영 안 걷힌다.
-        return t_seq.SetLink(gameObject).SetUpdate(true).Play();
+        return t_seq.SetLink(viewContents, LinkBehaviour.KillOnDisable).SetUpdate(true).Play();
     }
 
     RectTransform VersusRect => versusRoot != null ? (RectTransform)versusRoot.transform : null;
@@ -757,7 +778,7 @@ public class MatchmakingShell : MonoBehaviour
 
         if (_seq == null) return;
 
-        m_stage = _seq.SetLink(gameObject);
+        m_stage = _seq.SetLink(viewContents, LinkBehaviour.KillOnDisable);
         m_stage.Play();
     }
 
@@ -785,7 +806,7 @@ public class MatchmakingShell : MonoBehaviour
 
         var t_seq = fx.BuildCancelDismiss((RectTransform)cancelButton.transform);
 
-        t_seq.SetLink(gameObject);
+        t_seq.SetLink(viewContents, LinkBehaviour.KillOnDisable);
 
         // 발견 안무(m_stage)와 나란히 돈다 — 같은 사건의 두 축이라 한쪽이 다른 쪽을 기다리면 박자가 어긋난다.
         t_seq.OnComplete(() => { if (cancelButton != null) cancelButton.gameObject.SetActive(false); });

@@ -149,7 +149,6 @@ GameObject:
   - component: {fileID: 1118912883624455154}
   - component: {fileID: 7882763554261788583}
   - component: {fileID: 3093995937381416702}
-  - component: {fileID: 5094890747121428149}
   - component: {fileID: 7339965254467976638}
   m_Layer: 0
   m_Name: CardSetRewardOverlay
@@ -170,8 +169,7 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 6638248930087243987}
-  - {fileID: 4162789631156138521}
+  - {fileID: 8909000000000000002}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -248,7 +246,7 @@ CanvasGroup:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1600789160134675030}
+  m_GameObject: {fileID: 8909000000000000001}
   m_Enabled: 1
   m_Alpha: 1
   m_Interactable: 1
@@ -266,7 +264,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3ef045785f507c949b02789682eba8c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CardSetRewardOverlay
-  root: {fileID: 0}
   titleText: {fileID: 7863546268192744097}
   claimButton: {fileID: 7856946437835751216}
   grid: {fileID: 1041424122099593929}
@@ -278,6 +275,7 @@ MonoBehaviour:
     closeToScale: 0.94
   claimDelay: 0.8
   claimFadeDuration: 0.16
+  viewContents: {fileID: 8909000000000000001}
 --- !u!1 &1618820920085967210
 GameObject:
   m_ObjectHideFlags: 0
@@ -308,7 +306,7 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 7147919034864819992}
-  m_Father: {fileID: 7284149686138063173}
+  m_Father: {fileID: 8909000000000000002}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
@@ -666,7 +664,7 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 7284149686138063173}
+  m_Father: {fileID: 8909000000000000002}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
@@ -783,3 +781,41 @@ MonoBehaviour:
   cardStagger: 0.06
   cardPopDuration: 0.25
   cardPopFromScale: 0.7
+--- !u!1 &8909000000000000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8909000000000000002}
+  - component: {fileID: 5094890747121428149}
+  m_Layer: 0
+  m_Name: Contents
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &8909000000000000002
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8909000000000000001}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 6638248930087243987}
+  - {fileID: 4162789631156138521}
+  m_Father: {fileID: 7284149686138063173}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}

@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 // 스텝 행 하나를 실행하는 단일 창구
 public static class TutorialStepExecutor
@@ -134,7 +133,7 @@ public static class TutorialStepExecutor
             Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} AutoBattle has no scenario wired — entering a normal battle.");
 
         TutorialConfig.Begin(_step.Scenario, _step.ShowDeckGate);
-        SceneManager.LoadScene(BattleScene);
+        LoadingCoverView.LoadScene(BattleScene);
         return EOutgameTutorialStepResult.Advanced;
     }
 

@@ -3,7 +3,7 @@ using System;
 using UnityEngine.UI;
 using TMPro;
 
-public class SimpleYNPopup : PooledUIBase
+public class SimpleYNPopup : ContentsPooledUI
 {
     [SerializeField] Button yesButton;
     [SerializeField] Button noButton;
@@ -11,8 +11,30 @@ public class SimpleYNPopup : PooledUIBase
     [SerializeField] TextMeshProUGUI noText;
     [SerializeField] TextMeshProUGUI titleText;
 
+    protected override bool UsePopupTransition => false;
+    protected override bool UseScreenDim => false;
+
+    protected override void OnInitializeUI()
+    {
+        this.yesButton.onClick.AddListener(OnYes);
+        this.noButton.onClick.AddListener(OnNo);
+    }
+
+    void OnYes()
+    {
+        (this.data as SimpleYNPopupData)?.yesAction?.Invoke();
+        Hide();
+    }
+
+    void OnNo()
+    {
+        (this.data as SimpleYNPopupData)?.noAction?.Invoke();
+        Hide();
+    }
+
     public override void Initialization(UIData _data)
     {
+        this.InitializeUI();
         this.data = _data;
         var t_d = _data as SimpleYNPopupData;
 
@@ -20,26 +42,18 @@ public class SimpleYNPopup : PooledUIBase
 
         this.yesText.text = t_d.yesText;
         this.noText.text = t_d.noText;
-
-        this.yesButton.onClick.RemoveAllListeners();
-        this.noButton.onClick.RemoveAllListeners();
-
-        this.yesButton.onClick.AddListener(() => { t_d.yesAction?.Invoke(); Hide(); });
-        this.noButton.onClick.AddListener(() => { t_d.noAction?.Invoke(); Hide(); });
     }
 
     public override void Show()
     {
-        this.contents.SetActive(true);
-        this.isShow = true;
-        this.data.showCustomMethod?.Invoke();
+        this.SetContentsVisible(true);
+        this.data?.showCustomMethod?.Invoke();
     }
 
     public override void Hide()
     {
-        this.contents.SetActive(false);
-        this.isShow = false;
-        this.data.onHide?.Invoke();
+        this.SetContentsVisible(false);
+        this.data?.onHide?.Invoke();
     }
 }
 

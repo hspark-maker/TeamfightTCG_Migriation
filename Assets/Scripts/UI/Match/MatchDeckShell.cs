@@ -9,7 +9,7 @@ using UnityEngine;
 //
 // 아는 것은 "어느 저장 슬롯이 선택됐는가"와 "두 패널 중 무엇을 보이는가"뿐 — 편성·저장은 전부 DeckEditController에 위임한다.
 // 선택을 DeckConfig가 아니라 슬롯 인덱스로 드는 이유: DeckConfig는 직렬화 없는 씬 캐리어라 "어느 슬롯"을 표현하지 못한다.
-public class MatchDeckShell : MonoBehaviour
+public class MatchDeckShell : ContentsUIBehaviour
 {
     [SerializeField] GameObject matchPanel;   // MatchDeckPanel 인스턴스
 
@@ -150,13 +150,14 @@ public class MatchDeckShell : MonoBehaviour
     // _slotIndex가 음수면 이전 선택 → 첫 유효 슬롯 순으로 알아서 고른다.
     public void Open(int _slotIndex = -1, bool _forHandoff = false)
     {
+        InitializeUI();
         // 전환을 타고 들어오는 길은 상대가 곧 실린다 — 이 순간의 캐리어는 아직 비어 있으니 믿지 않는다.
         m_forHandoff = _forHandoff;
 
         // 루트를 켜기 전에 편집 패널을 내린다 — 비활성 부모 아래에선 OnEnable이 돌지 않으므로,
         // 편집 패널의 튜토리얼 앵커(로비 덱 편집과 키를 공유한다)가 켜졌다 꺼지며 로비 쪽 등록을 지우는 일이 없다.
         HideEditorIfOpen();
-        gameObject.SetActive(true);
+        SetContentsVisible(true);
 
         // 전투로 닫히지 않은 화면이 다시 열린다 — 지난번 응답 한 박의 가드를 물려받으면 전투 시작이 영영 안 눌린다.
         m_launching = false;
@@ -173,7 +174,7 @@ public class MatchDeckShell : MonoBehaviour
         // 편집 중 닫히는 경로는 없지만(편집은 뒤로가기로만 나간다), 패널이 켜진 채 루트가 꺼지면
         // DeckEditController.OnDisable이 편집 상태를 무저장 폐기한다 — 그게 이 화면의 사양이다.
         HideEditorIfOpen();
-        gameObject.SetActive(false);
+        SetContentsVisible(false);
     }
 
     // 매치 패널 EditButton. 편집 대상은 지금 선택된 덱이다.
@@ -225,7 +226,7 @@ public class MatchDeckShell : MonoBehaviour
         DeckEditController.HidePooled();
     }
 
-    void OnDisable()
+    protected override void OnViewHidden()
     {
         HideEditorIfOpen();
     }

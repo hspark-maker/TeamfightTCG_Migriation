@@ -5,6 +5,7 @@ using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEditor.AddressableAssets;
 using UnityEditor.AddressableAssets.Settings;
+using UnityEditor.AddressableAssets.Settings.GroupSchemas;
 using UnityEngine;
 
 public sealed class ContentProfileValidator : IPreprocessBuildWithReport
@@ -316,14 +317,32 @@ public sealed class ContentProfileValidator : IPreprocessBuildWithReport
     static IEnumerable<T> LoadBuildDependencies<T>() where T : UnityEngine.Object
     {
         var t_seen = new HashSet<T>();
+        var t_roots = new HashSet<string>();
         foreach (EditorBuildSettingsScene t_scene in EditorBuildSettings.scenes)
         {
-            if (!t_scene.enabled) continue;
-            foreach (string t_path in AssetDatabase.GetDependencies(t_scene.path, true))
+            if (t_scene.enabled) t_roots.Add(t_scene.path);
+        }
+        // 게임 씬·튜토리얼 설정을 원격으로 옮겨도 Live 카드 검증 대상에서 빠지면 안 된다.
+        var t_settings = AddressableAssetSettingsDefaultObject.Settings;
+        if (t_settings != null)
+        {
+            foreach (var t_group in t_settings.groups)
             {
-                T t_asset = AssetDatabase.LoadAssetAtPath<T>(t_path);
-                if (t_asset != null && t_seen.Add(t_asset)) yield return t_asset;
+                if (t_group == null) continue;
+                var t_schema = t_group.GetSchema<BundledAssetGroupSchema>();
+                if (t_schema == null || !t_schema.IncludeInBuild) continue;
+                foreach (var t_entry in t_group.entries)
+                    if (!string.IsNullOrEmpty(t_entry.AssetPath)) t_roots.Add(t_entry.AssetPath);
             }
+        }
+        var t_paths = new HashSet<string>();
+        foreach (string t_root in t_roots)
+            foreach (string t_path in AssetDatabase.GetDependencies(t_root, true))
+                t_paths.Add(t_path);
+        foreach (string t_path in t_paths)
+        {
+            T t_asset = AssetDatabase.LoadAssetAtPath<T>(t_path);
+            if (t_asset != null && t_seen.Add(t_asset)) yield return t_asset;
         }
     }
 

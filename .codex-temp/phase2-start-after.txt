@@ -1,0 +1,88 @@
+Packages/com.unity.ugui/Runtime/UGUI/UI/Core/Slider.cs
+Assets/Assets/Images/_Vendor/LayerLab/GUI Pro-SimpleCasual/ResourcesData/Sprites/Components/Slider/Slider_Demo_Common/Slider19_Fill.png
+Assets/Scripts/Core/Initialization/BattleConfigStep.cs
+Assets/TextMesh Pro/Shaders/TMP_SDF.shader
+Assets/Scripts/Core/Initialization/TutorialDataStep.cs
+Assets/Assets/Images/UI/Button_Bar_06.png
+Assets/Assets/Images/_Vendor/LayerLab/GUI Pro-SuperCasual/ResourcesData/Sprites/Components/Popup/Popup02~09_Topber_White_BgTop.png
+Assets/Scripts/Core/Initialization/WaitAssetPreloadStep.cs
+Assets/Fonts/uK4mTd9JFejCoAXNZyXHV6glsI/Jalnan2/Jalnan2TTF.ttf
+Packages/com.unity.ugui/Editor Resources/Gizmos/TMP - Input Field Icon.psd
+Packages/com.unity.ugui/Runtime/TMP/TextMeshProUGUI.cs
+Assets/TextMesh Pro/Shaders/TMP_SDF-Mobile.shader
+Packages/com.unity.ugui/Editor Resources/Gizmos/TMP - Text Component Icon.psd
+Assets/Scripts/Core/Initialization/PassPreloadStep.cs
+Assets/Scripts/Core/Initialization/AssetPreloadKickStep.cs
+Packages/com.unity.ugui/Runtime/UGUI/UI/Core/VertexModifiers/Shadow.cs
+Packages/com.unity.ugui/Runtime/UGUI/UI/Core/Image.cs
+Assets/Assets/Images/UI/Cancel_Button.png
+Assets/Assets/Images/_Vendor/LayerLab/GUI Pro-SimpleCasual/ResourcesData/Sprites/Components/Slider/Slider_Demo_Common/Slider19_Frame.png
+Assets/PurchasedAssets/Layer Lab/GUI Pro-SuperCasual/ResourcesData/Fonts/Sen_Line_s_Black SDF.asset
+Assets/Scripts/Core/Initialization/CardCatalogStep.cs
+Assets/Assets/Audio/UI/Use/TurnChange.ogg
+Assets/Assets/Prefabs/UI/Popup_LoginEmail.prefab
+Assets/PurchasedAssets/Layer Lab/GUI Pro-SuperCasual/ResourcesData/Sprites/Components/Icon_PictoIcons/128/PictoIcon_Mail_2.Png
+Assets/Assets/Images/_Vendor/LayerLab/GUI Pro-SuperCasual/ResourcesData/Sprites/Components/Button/Button01_l_Mint.png
+Assets/Assets/Images/UI/bar_02.psd
+Assets/Scripts/Core/Initialization/RuntimeContentPreloadStep.cs
+Assets/Scripts/UI/LoginEmailPanel.cs
+Assets/Scripts/UI/Common/LoadingCoverView.cs
+Assets/Scripts/UI/UIManager/UIPoolManager.cs
+Packages/com.unity.ugui/Runtime/UGUI/UI/Core/Mask.cs
+Packages/com.unity.ugui/Runtime/UGUI/UI/Core/Layout/CanvasScaler.cs
+Assets/Assets/Images/UI/Button_Bar_02.png
+Packages/com.unity.ugui/Editor Resources/Gizmos/TMP - Font Asset Icon.psd
+Packages/com.unity.ugui/Runtime/UGUI/UI/Core/RawImage.cs
+Assets/Assets/Audio/UI/Use/10796125.ogg
+Packages/com.unity.ugui/Runtime/TMP/TMP_InputField.cs
+Assets/Scripts/Core/Initialization/ContentProfileStep.cs
+Assets/Scripts/Audio/SoundBank.cs
+Assets/Scripts/Core/Initialization/OutgameConfigStep.cs
+Assets/Scripts/Audio/SoundManager.cs
+Packages/com.unity.ugui/Runtime/UGUI/UI/Core/Button.cs
+Packages/com.unity.ugui/Runtime/UGUI/UI/Core/RectMask2D.cs
+Packages/com.unity.ugui/Runtime/TMP/TMP_FontAsset.cs
+Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset
+Assets/PurchasedAssets/Layer Lab/GUI Pro-SuperCasual/ResourcesData/Sprites/Components/UI_Etc/InputField01_Bg_Single.png
+Assets/Scripts/Core/Initialization/SpecSheetPreloadStep.cs
+Assets/Scripts/Core/Initialization/MissionPreloadStep.cs
+Assets/Fonts/uK4mTd9JFejCoAXNZyXHV6glsI/Jalnan2/Jalnan2TTF SDF_outline.asset
+Packages/com.unity.inputsystem/InputSystem/Actions/InputActionAsset.cs
+Assets/Assets/Prefabs/UI/Common/LoadingCover.prefab
+Assets/Fonts/Jalnan2 SDF 1.asset
+Packages/com.unity.inputsystem/InputSystem/Editor/Icons/InputSystemUIInputModule@64.png
+Assets/Scripts/Utils/DataLibrary.cs
+Assets/Scripts/UI/SafeAreaFitter.cs
+Assets/Fonts/uK4mTd9JFejCoAXNZyXHV6glsI/Jalnan2/Jalnan2.otf
+Assets/PurchasedAssets/Layer Lab/GUI Pro-SuperCasual/ResourcesData/Sprites/Components/Popup/Popup02~09_Topber_White_BgTopLight.png
+Assets/SO/OutgameSoundBank.asset
+Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset
+Assets/Assets/Prefabs/Initialize.prefab
+Packages/com.unity.inputsystem/InputSystem/Actions/InputActionReference.cs
+Assets/Scripts/Core/Initialization/SaveDependentManagersStep.cs
+Packages/com.unity.ugui/Runtime/UGUI/UI/Core/Layout/LayoutElement.cs
+Assets/Assets/Images/_Vendor/LayerLab/GUI Pro-SuperCasual/ResourcesData/Sprites/Demo/Demo_Background/Panal_Dim_Black.png
+Packages/com.unity.render-pipelines.universal/Runtime/UniversalAdditionalCameraData.cs
+Assets/Scripts/UI/MainMenu/SceneTransitionVideo.cs
+Assets/PurchasedAssets/Layer Lab/GUI Pro-SuperCasual/ResourcesData/Fonts/Sen SDF.asset
+Assets/Scripts/Core/Initialization/BattleGrowthBridgeStep.cs
+Assets/Assets/Images/UI/background/SplashBG.png
+Assets/Scripts/Audio/SoundConfig.cs
+Assets/Scripts/UI/UIManager/ScenePooledUIRegistrar.cs
+Packages/com.unity.inputsystem/InputSystem/Editor/AssetImporter/InputActionImporter.cs
+Assets/Scripts/Core/Initialization/SpecSyncStep.cs
+Assets/Scripts/Core/Initialization/InitializationRunner.cs
+Assets/Assets/Images/UI/Button_Bar_08.png
+Assets/Scripts/Core/Initialization/WaitCloudSaveGateStep.cs
+Assets/Assets/Audio/UI/Use/CardTurn.ogg
+Assets/Scripts/Core/Initialization/RootLifecycleStep.cs
+Assets/Scripts/UI/UIManager/SimpleYNPopup.cs
+Packages/com.unity.ugui/Runtime/UGUI/UI/Core/GraphicRaycaster.cs
+Packages/com.unity.ugui/Runtime/UGUI/EventSystem/EventSystem.cs
+Assets/SO/SoundConfig.asset
+Packages/com.unity.inputsystem/InputSystem/Plugins/PlayerInput/DefaultInputActions.inputactions
+Assets/Fonts/Jalnan2 SDF.asset
+Packages/com.unity.inputsystem/InputSystem/Plugins/UI/InputSystemUIInputModule.cs
+Assets/PurchasedAssets/Layer Lab/GUI Pro-SuperCasual/ResourcesData/Sprites/Components/Icon_PictoIcons/128/PictoIcon_Lock_1.Png
+Assets/Scenes/StartScene.unity
+Assets/TextMesh Pro/Fonts/LiberationSans.ttf

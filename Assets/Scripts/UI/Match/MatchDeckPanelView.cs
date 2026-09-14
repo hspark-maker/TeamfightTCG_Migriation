@@ -12,7 +12,7 @@ using UnityEngine.UI;
 // 이 뷰는 매 Render마다 거기서 다시 읽는다(사본을 캐시하지 않는다).
 // 상대 덱을 "무엇으로 확정할지"는 여기서 정하지 않는다. 고정 상대·튜토리얼은 호스트가 미리 싣고,
 // 일반전은 매칭 전이라 비어 있다. 확정 뒤에는 전투가 같은 캐리어를 소비한다.
-public class MatchDeckPanelView : MonoBehaviour
+public class MatchDeckPanelView : MonoBehaviour, IUIInitializable
 {
     [SerializeField] MatchDeckShell   shell;
     [SerializeField] CardVisualView[] mySlots;      // 6칸. MySlot_N 자신이 아니라 자식 MySlot_N/CardUIView를 물린다
@@ -52,8 +52,14 @@ public class MatchDeckPanelView : MonoBehaviour
     bool    m_homeCaptured;
     string  m_homeLabelText;
 
-    void Awake()
+    bool m_uiInitialized;
+
+    void Awake() => InitializeUI();
+
+    public void InitializeUI()
     {
+        if (m_uiInitialized) return;
+        m_uiInitialized = true;
         // 셸은 부모 프리팹(MatchDeckRoot)에 있어 이 프리팹 안에서는 저작으로 물릴 수 없다 —
         // 인스턴스 오버라이드로만 배선되는데 그게 비어 있으면 세 버튼이 전부 무동작으로 조용히 죽는다.
         // 패널은 언제나 셸 아래에 서므로 부모에서 찾아 메운다.
@@ -85,6 +91,7 @@ public class MatchDeckPanelView : MonoBehaviour
     // 패널이 켜질 때마다 뷰가 스스로 그리면 슬롯을 모른 채 0번이나 직전 값으로 그리게 된다 → 셸이 명시적으로 부른다.
     public void Render(int _slotIndex)
     {
+        InitializeUI();
         // 한쪽이 미배선이어도 다른 쪽은 그려야 한다 → 여기서 조기 반환하지 않고 각 렌더러가 알아서 건너뛴다.
         RenderMySlots(_slotIndex);
         RenderEnemySlots();

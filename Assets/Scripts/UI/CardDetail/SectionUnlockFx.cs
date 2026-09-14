@@ -5,7 +5,7 @@ using UnityEngine.UI;
 // 잠김 판이 걷히는 순간의 연출 — 빛이 자물쇠로 모였다가, 자물쇠가 터지며 판이 사라진다.
 // 잠김 판 노드에 붙인다(키워드 섹션·시너지 섹션 각각 한 장).
 [RequireComponent(typeof(RectTransform))]
-public class SectionUnlockFx : MonoBehaviour
+public class SectionUnlockFx : MonoBehaviour, IUIInitializable
 {
     [Tooltip("빛이 모이는 목적지(자물쇠 아이콘). 미배선이면 판 한가운데로 모인다.")]
     [SerializeField] RectTransform lockMark;
@@ -64,6 +64,7 @@ public class SectionUnlockFx : MonoBehaviour
     /// <summary>판을 연출로 걷고 노드를 비활성으로 남긴다. 꺼져 있으면 아무것도 하지 않는다.</summary>
     public Tween Play()
     {
+        InitializeUI();
         if (!gameObject.activeInHierarchy) return null;
 
         KillRunning();
@@ -111,8 +112,13 @@ public class SectionUnlockFx : MonoBehaviour
         return true;
     }
 
-    void Awake()
+    bool m_uiInitialized;
+    void Awake() => InitializeUI();
+
+    public void InitializeUI()
     {
+        if (m_uiInitialized) return;
+        m_uiInitialized = true;
         Graphic t_plate = this.Plate;
         if (t_plate != null) this.m_plateAlpha0 = t_plate.color.a;
 

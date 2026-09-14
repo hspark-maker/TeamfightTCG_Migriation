@@ -4,7 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class SettingsPanel : PooledUIBase
+public class SettingsPanel : ContentsPooledUI
 {
     // 등장/퇴장 floating 연출 값. 배경 dim은 제자리에 두고 패널만 뜬다 —
     // dim까지 움직이면 화면 끝에 안 덮인 띠가 드러난다.
@@ -32,6 +32,8 @@ public class SettingsPanel : PooledUIBase
     [Tooltip("contents에 붙은 CanvasGroup. 창 등장/퇴장 페이드용 — 프리팹에 저작돼 있어야 한다")]
     [SerializeField] CanvasGroup contentsGroup;
     Vector2 panelHomePos;
+    int visibilityRequest;
+    Tween hideTween;
     bool    hiding;   // 퇴장 연출 진행 중. 중복 Hide로 시퀀스가 겹치지 않게 잠근다.
 
     [Header("Pages")]
@@ -55,9 +57,11 @@ public class SettingsPanel : PooledUIBase
     // 디버그 강제 승리. 에디터 전용 — 빌드에서는 리스너도 안 걸고 오브젝트도 항상 꺼둔다.
     [SerializeField] Button winDebugButton;
 
-    protected override void Awake()
+    protected override bool UsePopupTransition => false;
+    protected override bool UseScreenDim => false;
+
+    protected override void OnInitializeUI()
     {
-        base.Awake();
         // 정렬 승격은 코드가 확정한다 — overrideSorting은 부모 캔버스가 있어야 의미가 있어
         // 프리팹(단독 루트) 상태로는 저장되지 않는다. 캔버스 컴포넌트 자체는 프리팹에 저작돼 있다.
         Canvas t_canvas = GetComponent<Canvas>();
@@ -82,12 +86,15 @@ public class SettingsPanel : PooledUIBase
         // 버튼의 창 닫기(Hide)는 프리팹 onClick 영속 호출에 이미 배선돼 있다 — 여기서 또 걸지 않는다.
     }
 
-    public override void Initialization(UIData _data) { }
+    public override void Initialization(UIData _data) => this.InitializeUI();
 
     public override void Show()
     {
-        this.contents.SetActive(true);
-        this.isShow = true;
+        this.InitializeUI();
+        this.visibilityRequest++;
+        this.hideTween?.Kill();
+        this.hideTween = null;
+        this.SetContentsVisible(true);
         this.hiding = false;   // 퇴장 연출 도중 다시 열렸으면 잠금 해제 — 안 풀면 다음 Hide가 통째로 무시된다.
 
         // 퇴장이 껐던 입력을 되돌린다(퇴장 중 재오픈 경로).
@@ -267,6 +274,7 @@ public class SettingsPanel : PooledUIBase
     async UniTaskVoid HideRoutine()
     {
         this.hiding = true;
+        int t_request = this.visibilityRequest;
 
         // 연출이 도는 동안 창 자체 입력을 끊는다 — 사라지는 중인 버튼이 눌리면 안 된다.
         // 레이캐스트는 여전히 막으므로 뒤쪽 필드로 터치가 새지도 않는다.
@@ -274,11 +282,9 @@ public class SettingsPanel : PooledUIBase
         if (t_cg != null) t_cg.blocksRaycasts = false;
 
         bool t_canceled = await PlayFloatOut(t_cg);
-        if (t_canceled) return;   // 파괴됨 — 아래 정리는 의미 없다(플래그는 OnDestroy가 푼다).
+        if (t_canceled || this == null || t_request != this.visibilityRequest) return;
 
-        this.contents.SetActive(false);
-        this.isShow = false;
-        this.hiding = false;
+        this.SetContentsVisible(false);
 
         // 카드 조작 차단 해제는 창이 완전히 사라진 뒤. 연출 도중에 풀면
         // 창을 끈 그 터치가 그대로 필드 카드 선택으로 이어진다.
@@ -309,8 +315,8 @@ public class SettingsPanel : PooledUIBase
         if (this.panelRoot == null)
         {
             if (_cg == null) return false;
-            return await _cg.DOFade(0f, FloatExitTime).SetLink(gameObject)
-                .ToUniTask(cancellationToken: this.GetCancellationTokenOnDestroy())
+            this.hideTween = _cg.DOFade(0f, FloatExitTime).SetLink(gameObject);
+            return await this.hideTween.ToUniTask(cancellationToken: this.GetCancellationTokenOnDestroy())
                 .SuppressCancellationThrow();
         }
 
@@ -318,6 +324,7 @@ public class SettingsPanel : PooledUIBase
         if (_cg != null) _cg.DOKill();
 
         Sequence t_seq = DOTween.Sequence().SetLink(this.panelRoot.gameObject);
+        this.hideTween = t_seq;
         t_seq.Join(this.panelRoot.DOAnchorPos(this.panelHomePos + new Vector2(0f, FloatExitOffsetY), FloatExitTime)
                        .SetEase(Ease.InBack, 1.2f));
         t_seq.Join(this.panelRoot.DOScale(FloatExitScale, FloatExitTime).SetEase(Ease.InCubic));
@@ -327,12 +334,23 @@ public class SettingsPanel : PooledUIBase
                           .SuppressCancellationThrow();
     }
 
-    protected override void OnDestroy()
+    protected override void OnViewHidden()
     {
-        // 창이 떠 있는 채로 파괴되면(씬 전환 등) 차단 플래그가 켜진 채 남아 카드 입력이 영영 죽는다.
-        if (this.isShow) TurnState.UiBlocking = false;
+        this.visibilityRequest++;
+        this.hiding = false;
+        this.hideTween?.Kill();
+        this.hideTween = null;
         this.panelRoot?.DOKill();
-        base.OnDestroy();
+        this.contentsGroup?.DOKill();
+        ResetPage(this.menuPage, this.menuHomePos);
+        ResetPage(this.optionsPage, this.optionsHomePos);
+        if (this.titleText != null)
+        {
+            this.titleText.transform.DOKill();
+            this.titleText.transform.localScale = Vector3.one;
+        }
+        // 외부 비활성화·씬 파괴도 필드 입력 잠금을 남기지 않는다.
+        TurnState.UiBlocking = false;
     }
 
     public void OnBGMChanged(float _val) => this.settingsOptions?.OnBGMChanged(_val);

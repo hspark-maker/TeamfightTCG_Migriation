@@ -15,7 +15,6 @@ using TMPro;
 public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
 {
     [Tooltip("켜고 끌 대상. 미배선이면 자기 gameObject를 토글한다.")]
-    [SerializeField] GameObject root;
 
     [SerializeField] TMP_Text titleText;  // 티어 표시명(선택)
     [SerializeField] Button claimButton;  // [획득]
@@ -101,6 +100,7 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
                      bool _claimOnDim = false, Action _onClosed = null,
                      IReadOnlyList<CurrencyRewardSlotView> _gainSlotsAfterClose = null)
     {
+        InitializeUI();
         this.m_showVersion++;
         this.m_onConfirm = _onConfirm;
         this.m_onClosed = _onClosed;
@@ -174,14 +174,14 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
 
     // 잠금은 등장 안무가 푼다. Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서는 그 안무가 없어
     // [획득]도 딤도 잠긴 모달로 남으므로, 켜질 때 일단 열어 둔다(Show는 이 뒤에 다시 잠근다).
-    void OnEnable()
+    protected override void OnViewShown()
     {
         this.SetInputEnabled(true);
     }
 
     // 팝업은 자기 자신이 토글 대상이라 OnDisable이 정상 동작한다 — 잘린 퇴장 마무리와 표시 원복을 여기서 위임한다.
     // 분출 시퀀스는 죽이지 않는다(팝업 밖 노드에서 도는 연출이라 끊으면 코인이 허공에 굳는다).
-    void OnDisable()
+    protected override void OnViewHidden()
     {
         ClearOpen();
         this.transition.HandleDisabled(this.ResolveTarget());
@@ -419,8 +419,8 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
 
     void SetVisible(bool _visible)
     {
-        this.transition.SetVisible(this.ResolveTarget(), _visible);
+        SetContentsVisible(_visible, this.transition);
     }
 
-    GameObject ResolveTarget() => this.root != null ? this.root : this.gameObject;
+    GameObject ResolveTarget() => viewContents;
 }

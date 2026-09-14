@@ -45,7 +45,7 @@ public class AlbumTabController : LobbyTabPanel
     // 큐가 채워지는 순간(획득 연출 끝)과 탭이 켜지는 순간(유저 진입) 양쪽에서 이 하나를 부르면 된다
     public void TryBeginInsert()
     {
-        if (!isActiveAndEnabled || m_insertPending) return;
+        if (!IsViewVisible || m_insertPending) return;
         if (!AlbumInsertQueue.HasPending || AlbumInsertSession.IsRunning) return;
 
         // 안내 중에는 유저가 직접 테마를 열어야 한다 — 세션은 시작하면서 오버레이를 스스로 열기 때문에,
@@ -53,7 +53,7 @@ public class AlbumTabController : LobbyTabPanel
         // 단 전체 해금(첫 랭크 승급) 뒤로는 예외를 걷는다 — 그 구간의 획득은 안내가 짠 것이 아니라 유저가 스스로 산 것이라
         // 일반 경로와 같은 길(획득 → 도감 → 삽입)을 타야 한다.
         if (OutgameTutorialRunner.IsRunning && !OutgameFeatureLock.IsFtueFreeNavigation
-            && (pageOverlay == null || !pageOverlay.gameObject.activeSelf)) return;
+            && (pageOverlay == null || !AlbumPageOverlayView.IsOpen)) return;
 
         var t_session = ResolveInsertSession();
         if (t_session == null)
@@ -69,8 +69,9 @@ public class AlbumTabController : LobbyTabPanel
         StartCoroutine(BeginInsertNextFrame(t_session));
     }
 
-    void OnEnable()
+    protected override void OnViewShown()
     {
+        base.OnViewShown();
         if (!m_built) Build();
 
         OwnershipManager.OnOwnershipChanged += Refresh;
@@ -83,13 +84,15 @@ public class AlbumTabController : LobbyTabPanel
         TryBeginInsert();
     }
 
-    void OnDisable()
+    protected override void OnViewHidden()
     {
+        base.OnViewHidden();
+        StopAllCoroutines();
         OwnershipManager.OnOwnershipChanged -= Refresh;
         AlbumRewardManager.OnChanged -= Refresh;
         AlbumInsertMask.OnChanged -= Refresh;
 
-        // 비활성화가 시작 코루틴을 끊는다 — 플래그가 남으면 다음 진입에서 영영 시작하지 못한다
+        // 제어 루트는 살아 있으므로 시작 코루틴과 플래그를 직접 정리한다.
         m_insertPending = false;
         m_settled = false;
     }

@@ -9,7 +9,7 @@ using UnityEngine.ResourceManagement.AsyncOperations;
 // 카드·팩·UI 번들을 디스크 캐시에 먼저 받는다. 실제 적재는 각 캐시가 이어받는다.
 public static class RemoteCardArtDownload
 {
-    static readonly string[] DownloadLabels = { "Cards", "Packs", "RemoteUI" };
+    static readonly string[] DownloadLabels = { "Cards", "Packs", "RemoteUI", "RemoteScenes" };
     public static bool IsDownloading { get; private set; }
     public static bool IsComplete { get; private set; }
     public static bool HasFailed { get; private set; }

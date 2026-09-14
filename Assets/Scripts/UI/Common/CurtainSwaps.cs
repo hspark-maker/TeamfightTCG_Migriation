@@ -1,7 +1,5 @@
 using System;
 using System.Collections;
-using UnityEngine;
-using UnityEngine.SceneManagement;
 
 // 커튼이 덮은 동안 벌어지는 교체 한 건. CurtainView는 판을 여닫을 뿐 무엇이 갈리는지 모른다 —
 // 씬 로드도 화면 교체도 여기 구현 하나로 표현된다.
@@ -33,8 +31,8 @@ public class SceneLoadSwap : ICurtainSwap
     readonly string m_scene;
     readonly Action m_beforeLoad;
 
-    AsyncOperation m_op;
-    bool           m_committed;
+    GameSceneLoadOperation m_op;
+    bool m_handedToRecovery;
 
     /// <param name="_onBeforeLoad">씬 교체 **직전** 1회 호출. 화면을 망가뜨리는 정리는 반드시 여기로 넘긴다
     /// — 씬 교체와 붙어 있어야 파괴된 오브젝트를 붙잡은 연출 체인이 깨어날 틈이 없다(LoadingCoverView와 같은 계약).</param>
@@ -46,50 +44,27 @@ public class SceneLoadSwap : ICurtainSwap
 
     public void Prepare()
     {
-        m_op = SceneManager.LoadSceneAsync(m_scene);
-
-        // 로드를 못 걸었으면 Commit이 동기 로드로 되돌아간다 — 연출 때문에 화면이 갇히는 일은 없어야 한다.
-        if (m_op == null)
-        {
-            Debug.LogError($"[SceneLoadSwap] Cannot load '{m_scene}' asynchronously — handing it to a synchronous load once covered.");
-
-            return;
-        }
-
-        // 닫히는 동안 뒤에서 로드하고, 활성화는 다 닫힐 때까지 붙잡는다.
-        m_op.allowSceneActivation = false;
+        m_op = new GameSceneLoadOperation(m_scene);
     }
 
-    // 활성화를 막아둔 동안 progress는 0.9에서 멈춘다 — 그게 이 경로의 "다 됐다"이다.
-    public bool IsReady => m_op == null || m_op.progress >= 0.9f;
+    public bool IsReady => m_op == null || m_op.IsReady;
 
     public IEnumerator Commit()
     {
-        m_committed = true;
-
-        m_beforeLoad?.Invoke();
-
-        if (m_op == null)
+        if (m_op == null) Prepare();
+        yield return m_op.Commit(m_beforeLoad);
+        if (!m_op.Succeeded)
         {
-            SceneManager.LoadScene(m_scene);
-            yield break;
+            m_handedToRecovery = true;
+            LoadingCoverView.ShowSceneLoadFailure(m_scene, m_beforeLoad);
         }
-
-        m_op.allowSceneActivation = true;
-        yield return m_op;
-        m_op = null;
 
         yield return null;   // 새 씬이 최소 한 번 그려지도록 한 프레임 양보
     }
 
     public void Abort()
     {
-        if (m_op == null) return;
-
-        // Commit도 못 간 채 잘렸다면 정리 훅조차 돌지 않았다 — 씬은 어차피 갈리므로 계약대로 돌려준다.
-        if (!m_committed) m_beforeLoad?.Invoke();
-
-        m_op.allowSceneActivation = true;
-        m_op = null;
+        if (m_op == null || m_handedToRecovery) return;
+        m_op.FinishWithoutCover(m_beforeLoad);
     }
 }

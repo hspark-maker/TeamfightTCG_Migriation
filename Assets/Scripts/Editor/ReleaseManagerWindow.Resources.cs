@@ -25,7 +25,7 @@ public partial class ReleaseManagerWindow
         EditorGUILayout.LabelField("다운로드 주소");
         EditorGUILayout.SelectableLabel(t_url, EditorStyles.textField, GUILayout.Height(20));
         EditorGUILayout.HelpBox(
-            "카드·UI 리소스를 빌드한 뒤 검사 → 배포 순서로 진행합니다. 앱 버전·플랫폼은 Player Settings / Build Profiles에서 선택합니다.\n" +
+            "카드·UI·게임 씬 리소스를 빌드한 뒤 검사 → 배포 → 앱 빌드 순서로 진행합니다. 앱 버전·플랫폼은 Player Settings / Build Profiles에서 선택합니다.\n" +
             "배포는 Firebase CLI 로그인(firebase login)을 사용하며, 이 창의 관리자 로그인과 별개입니다.", MessageType.Info);
 
         using (new EditorGUI.DisabledScope(resourceCommandBusy || EditorApplication.isCompiling))

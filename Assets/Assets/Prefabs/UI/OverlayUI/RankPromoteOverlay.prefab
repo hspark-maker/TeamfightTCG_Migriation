@@ -9803,12 +9803,12 @@ GameObject:
   - component: {fileID: 4701247435359491720}
   - component: {fileID: 1526116490415059566}
   m_Layer: 0
-  m_Name: Root
+  m_Name: Contents
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &4701247435359491720
 RectTransform:
   m_ObjectHideFlags: 0
@@ -15077,7 +15077,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3aa8aa7d181972449864282a5b02752d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RankPromoteOverlay
-  root: {fileID: 705023458171116954}
   tapButton: {fileID: 8331625347682083499}
   contentGroup: {fileID: 7703932003665624274}
   kickRoot: {fileID: 1681872392437260348}
@@ -15165,6 +15164,7 @@ MonoBehaviour:
   gradeNameFade: 0.25
   gradeNameRise: 40
   firstEntrySlamAt: 0.45
+  viewContents: {fileID: 705023458171116954}
 --- !u!1 &1634384363982361638
 GameObject:
   m_ObjectHideFlags: 0

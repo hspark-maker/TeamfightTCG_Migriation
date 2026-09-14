@@ -57,7 +57,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     string m_defaultPlayText;
     ContentUnlockPresentation m_unlockPresentation;
 
-    void Awake()
+    protected override void OnInitializeUI()
     {
         if (playButton != null) playButton.onClick.AddListener(HandlePlayRequested);
         if (rankRewardButton != null) rankRewardButton.onClick.AddListener(OpenRankRewards);
@@ -101,8 +101,9 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         RefreshGuideMissionButton();
     }
 
-    void OnDestroy()
+    protected override void OnDestroy()
     {
+        base.OnDestroy();
         if (playButton != null) playButton.onClick.RemoveListener(HandlePlayRequested);
         if (rankRewardButton != null) rankRewardButton.onClick.RemoveListener(OpenRankRewards);
         if (rankingButton != null) rankingButton.onClick.RemoveListener(OpenRanking);

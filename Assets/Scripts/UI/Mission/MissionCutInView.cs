@@ -5,7 +5,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>서버가 확정한 미션 진행을 로비 오른쪽에서 한 건씩 알린다. 입력과 보상 수령에는 관여하지 않는다.</summary>
-public sealed class MissionCutInView : PooledUIBase
+public sealed class MissionCutInView : ContentsPooledUI
 {
     static MissionCutInView s_instance;
 
@@ -43,24 +43,29 @@ public sealed class MissionCutInView : PooledUIBase
         UIPoolManager.Instance?.AddOrUpdateUI<MissionCutInView>();
     }
 
-    public override void Initialization(UIData _data) => data = _data;
+    protected override bool UsePopupTransition => false;
+    protected override bool UseScreenDim => false;
+
+    public override void Initialization(UIData _data)
+    {
+        InitializeUI();
+        data = _data;
+    }
 
     public override void Show()
     {
-        isShow = true;
-        if (contents != null) contents.SetActive(true);
+        SetContentsVisible(true);
     }
 
     public override void Hide()
     {
-        isShow = false;
+        InitializeUI();
         Finish();
-        if (contents != null) contents.SetActive(false);
+        SetContentsVisible(false);
     }
 
-    protected override void Awake()
+    protected override void OnInitializeUI()
     {
-        base.Awake();
         s_instance = this;
         m_home = panel.anchoredPosition;
         UiSortingOrder.LiftNested(gameObject, UiSortingOrder.MissionCutIn);
@@ -70,8 +75,13 @@ public sealed class MissionCutInView : PooledUIBase
         FindLobby();
     }
 
-    void OnEnable() => SceneManager.sceneLoaded += OnSceneLoaded;
-    void OnDisable()
+    protected override void OnViewShown()
+    {
+        FindLobby();
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    protected override void OnViewHidden()
     {
         SceneManager.sceneLoaded -= OnSceneLoaded;
         m_sequence?.Pause();
@@ -193,7 +203,7 @@ public sealed class MissionCutInView : PooledUIBase
     [ContextMenu("미리보기/미션 진행")]
     public void PreviewProgress()
     {
-        if (!Application.isPlaying) m_home = panel.anchoredPosition;
+        PreparePreview();
         m_preview = true;
         ShowVisual("전투 3회 완료", "daily", 1, 2, 3, false);
     }
@@ -201,9 +211,19 @@ public sealed class MissionCutInView : PooledUIBase
     [ContextMenu("미리보기/미션 달성")]
     public void PreviewComplete()
     {
-        if (!Application.isPlaying) m_home = panel.anchoredPosition;
+        PreparePreview();
         m_preview = true;
         ShowVisual("전투 3회 완료", "daily", 2, 3, 3, true);
+    }
+
+    void PreparePreview()
+    {
+        if (Application.isPlaying) Show();
+        else
+        {
+            m_home = panel.anchoredPosition;
+            if (contents != null) contents.SetActive(true);
+        }
     }
 #endif
 }

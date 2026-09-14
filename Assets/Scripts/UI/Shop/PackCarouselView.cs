@@ -27,7 +27,7 @@ using UnityEngine.UI;
 //
 // ⚠ 배선 전제: 이 컴포넌트는 raycastTarget인 Graphic(투명 Image)이 붙은 Viewport에 있어야 하고,
 //   track은 그 자식이어야 한다(마스크 안에서 잘리도록).
-public class PackCarouselView : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+public class PackCarouselView : MonoBehaviour, IUIInitializable, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
     /// <summary>중앙 페이지가 실제로 바뀌었다(스냅 확정 시점 — 연출 종료가 아니다).
     /// 표시·구매 잠금이 슬라이드보다 늦게 따라오면 "보이는 것과 살 것"이 어긋난다.</summary>
@@ -104,11 +104,15 @@ public class PackCarouselView : MonoBehaviour, IBeginDragHandler, IDragHandler, 
     // 한 페이지가 좌우에 동시에 놓여야 하는 2장 이하에서는 순환이 성립하지 않는다.
     bool CanLoop => loop && m_pages.Count >= 3;
 
-    void Awake() => EnsureInit();
+    bool m_buttonsBound;
 
-    void OnEnable()
+    void Awake() => InitializeUI();
+
+    public void InitializeUI()
     {
         EnsureInit();
+        if (m_buttonsBound) return;
+        m_buttonsBound = true;
 
         if (prevButton != null)
         {
@@ -122,10 +126,14 @@ public class PackCarouselView : MonoBehaviour, IBeginDragHandler, IDragHandler, 
         }
     }
 
-    void OnDisable()
+    void OnDestroy()
     {
         if (prevButton != null) prevButton.onClick.RemoveListener(OnPrevPressed);
         if (nextButton != null) nextButton.onClick.RemoveListener(OnNextPressed);
+    }
+
+    void OnDisable()
+    {
 
         // 탭 전환 중 드래그 상태로 굳으면 재진입 시 유령 오프셋이 남는다.
         if (track != null) track.DOKill();

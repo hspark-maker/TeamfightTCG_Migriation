@@ -264,7 +264,7 @@ public class MultiplayerTestInitializer : MonoBehaviour
             }
 
             FirebaseManager.Initialize(ContentProfileConfig.Active.CloudEnvId, ContentProfileConfig.Active.FirebaseEmulators);
-            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            LoadingCoverView.LoadScene(SceneManager.GetActiveScene().name);
         }
         catch (System.Exception _exception)
         {

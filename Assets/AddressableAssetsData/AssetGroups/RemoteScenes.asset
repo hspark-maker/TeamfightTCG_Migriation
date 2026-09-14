@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: RemoteScenes
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: RemoteScenes
+  m_GUID: 1d68d1fd23057b14c98a4881217173fe
+  m_SerializeEntries:
+  - m_GUID: 6dc20db39a4144949b24ce6719fda265
+    m_Address: LobbyScene
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteScenes
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9fc0d4010bbf28b4594072e72b8655ab
+    m_Address: BattleScene
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteScenes
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c7c0121e7c3b43c0833d5754a3d4c895
+    m_Address: MultiplayerTestScene
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteScenes
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 886280ed4ce95ea4fa7b0c1bf828dbdc, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 94676bc3b60325e40a13636bfb384424, type: 2}
+    - {fileID: 11400000, guid: 20334159a0b04e743aea4c98fb85c329, type: 2}

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>Owns every visual and input detail inside the lobby bottom tab bar.</summary>
-public sealed class LobbyTabBarView : MonoBehaviour
+public sealed class LobbyTabBarView : MonoBehaviour, IUIInitializable
 {
     [SerializeField] RectTransform focus;
     [SerializeField] Image focusIcon;
@@ -28,7 +28,9 @@ public sealed class LobbyTabBarView : MonoBehaviour
     public event Action<int> Selected;
     public int Count { get { EnsureViews(); return m_views.Length; } }
 
-    void Awake() => EnsureViews();
+    void Awake() => InitializeUI();
+
+    public void InitializeUI() => EnsureViews();
 
     /// <summary>탭 목록은 인스펙터 배선이 아니라 자식 계층의 TabButtonView를 훑어 만든다 —
     /// 클릭 이벤트는 각 탭이 스스로 소유하고(BindClick), 여기는 계층 순서로 인덱스만 정한다.

@@ -25,6 +25,7 @@ GameObject:
   - component: {fileID: 1581884920793774153}
   - component: {fileID: 1581884920793774160}
   - component: {fileID: 1581884920793774161}
+  - component: {fileID: 1581884920793774162}
   m_Layer: 0
   m_Name: Initialize
   m_TagString: Untagged
@@ -66,10 +67,11 @@ MonoBehaviour:
   initializeOnAwake: 1
   initializers:
   - {fileID: 1581884920793774142}
-  - {fileID: 1581884920793774143}
   - {fileID: 1581884920793774144}
   - {fileID: 1581884920793774151}
   - {fileID: 1581884920793774154}
+  - {fileID: 1581884920793774162}
+  - {fileID: 1581884920793774143}
   - {fileID: 1581884920793774145}
   - {fileID: 1581884920793774147}
   - {fileID: 1581884920793774146}
@@ -110,11 +112,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BattleConfigStep
   initializerId: BattleConfig
   required: 1
-  requiredIds: []
+  requiredIds:
+  - RuntimeContentPreload
   retryEntry: 0
-  battleTimingConfig: {fileID: 11400000, guid: fa77fd9889cfb5d4e853ff6a2b266f22, type: 2}
-  rankConfig: {fileID: 11400000, guid: 408410dc0be34c648afdaf57203b958c, type: 2}
-  battleVfxLibrary: {fileID: 11400000, guid: 8b4aacde1cb67a54b8706abfa2954826, type: 2}
 --- !u!114 &1581884920793774144
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -147,8 +147,8 @@ MonoBehaviour:
   required: 1
   requiredIds:
   - SpecSync
+  - BattleConfig
   retryEntry: 0
-  synergyRegistry: {fileID: 11400000, guid: 0f17069139424ae7956455108c7f08a2, type: 2}
 --- !u!114 &1581884920793774146
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -167,13 +167,6 @@ MonoBehaviour:
   - CardCatalog
   - SpecSheetPreload
   retryEntry: 0
-  albumConfig: {fileID: 11400000, guid: 5c04cd167e805484b92609d72e119abd, type: 2}
-  currencyLook: {fileID: 11400000, guid: b9d217f7eca0f6345ae5bd3b654b4a37, type: 2}
-  adventureConfig: {fileID: 11400000, guid: ff32166a7a94716469f68bae386a7555, type: 2}
-  profileConfig: {fileID: 11400000, guid: 098146b7940589948afb63e709ac5357, type: 2}
-  emoteCatalog: {fileID: 11400000, guid: 0c1e5b7a94d3f2149a86c5d0e7b31f68, type: 2}
-  deckImageCatalog: {fileID: 11400000, guid: 20a3ae6097a4cb440ad35c4621cec66e, type: 2}
-  rouletteConfig: {fileID: 11400000, guid: c79a047159501ef46a7e47fcabb63abf, type: 2}
 --- !u!114 &1581884920793774147
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -239,9 +232,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TutorialDataStep
   initializerId: TutorialData
   required: 1
-  requiredIds: []
+  requiredIds:
+  - RuntimeContentPreload
   retryEntry: 0
-  tutorialData: {fileID: 11400000, guid: f8c1956156735bb4e8266fa5abf76d0c, type: 2}
 --- !u!114 &1581884920793774151
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -550,8 +543,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6bfb12adb2884dc4bb6767de8391bb6c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  keywordIconConfig: {fileID: 11400000, guid: 2e0475eb8d64d1449916d99de758135a, type: 2}
-  cardFrameConfig: {fileID: 11400000, guid: ed4cd9df9407f0a4e97ba1a9c52f5890, type: 2}
 --- !u!1 &8415867346927682444
 GameObject:
   m_ObjectHideFlags: 0
@@ -849,3 +840,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   canvas: {fileID: 4730033491931504418}
   uiRoot: {fileID: 8380210619043447819}
+--- !u!114 &1581884920793774162
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2449901017464239670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f74f69d1f76febc48a643bae14282c3c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RuntimeContentPreloadStep
+  initializerId: RuntimeContentPreload
+  required: 1
+  requiredIds:
+  - SpecSync
+  retryEntry: 0

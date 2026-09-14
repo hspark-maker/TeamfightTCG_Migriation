@@ -63,7 +63,7 @@ public readonly struct EnhanceResultLine
 //
 // ⚠ 카드를 가리지 않는다 — 무대(CardSlot)에 선 카드가 결과의 주인공이므로 배경은 투명하고,
 //   글자는 걷힌 DetailPanel·BottomBar가 비운 자리에 얹힌다.
-public class EnhanceResultPanelView : MonoBehaviour
+public class EnhanceResultPanelView : ContentsUIBehaviour
 {
     // 오른 것이 없을 때의 자리표시. 행을 지우지 않는 이유는 상세 패널과 같다 — 결과마다 높이가 흔들린다.
     const string NoGain = "—";
@@ -159,7 +159,7 @@ public class EnhanceResultPanelView : MonoBehaviour
             return;
         }
 
-        gameObject.SetActive(true);
+        SetContentsVisible(true);
         EnsureBase();
         KillSeq();
         KillAutoReturn();   // 앞 판의 예약이 살아 있으면 이제 막 뜬 이 판을 닫는다
@@ -200,7 +200,7 @@ public class EnhanceResultPanelView : MonoBehaviour
         this.group.alpha          = 0f;
         this.group.blocksRaycasts = true;
 
-        Sequence t_seq = DOTween.Sequence().SetLink(gameObject).SetId(this);
+        Sequence t_seq = DOTween.Sequence().SetLink(viewContents).SetId(this);
         t_seq.Insert(0f, this.group.DOFade(1f, Mathf.Max(0.01f, this.fadeInDuration)));
 
         if (this.titleText != null)
@@ -259,12 +259,12 @@ public class EnhanceResultPanelView : MonoBehaviour
             this.group.blocksRaycasts = true;
         }
 
-        gameObject.SetActive(false);
+        SetContentsVisible(false);
     }
 
     // 버튼은 여기서 배선한다 — 패널은 열 때마다 꺼졌다 켜지므로 Awake 한 번으로는 부족하고,
     // Remove 후 Add라 중복 등록도 남지 않는다(CardDetailOverlayView와 같은 관용구).
-    void OnEnable()
+    protected override void OnInitializeUI()
     {
         if (this.tapCatcher != null)
         {
@@ -279,11 +279,8 @@ public class EnhanceResultPanelView : MonoBehaviour
         }
     }
 
-    void OnDisable()
+    protected override void OnViewHidden()
     {
-        if (this.tapCatcher  != null) this.tapCatcher.onClick.RemoveListener(OnTapped);
-        if (this.retryButton != null) this.retryButton.onClick.RemoveListener(OnRetryPressed);
-
         KillSeq();
         KillAutoReturn();
 
@@ -386,7 +383,7 @@ public class EnhanceResultPanelView : MonoBehaviour
         if (!this.m_autoReturnOn || this.m_closing) return;
 
         this.m_autoReturn = DOVirtual.DelayedCall(Mathf.Max(0f, this.autoReturnHold), RequestClose)
-                                     .SetLink(gameObject);
+                                     .SetLink(viewContents);
     }
 
     void OnRetryPressed()
@@ -409,7 +406,7 @@ public class EnhanceResultPanelView : MonoBehaviour
         // 걷히는 동안 입력을 죽인다 — 두 번째 탭이 복귀를 두 번 시작하면 무대가 두 번 되돌아간다.
         this.group.blocksRaycasts = false;
 
-        Sequence t_seq = DOTween.Sequence().SetLink(gameObject).SetId(this);
+        Sequence t_seq = DOTween.Sequence().SetLink(viewContents).SetId(this);
         t_seq.Append(this.group.DOFade(0f, Mathf.Max(0.01f, this.fadeOutDuration)));
 
         // OnKill이 아니라 OnComplete다 — 중단 경로(HideImmediate)에서 잘릴 때 무대 복귀가 딸려 나가면 안 된다.
@@ -429,8 +426,8 @@ public class EnhanceResultPanelView : MonoBehaviour
     {
         if (this.group == null)
         {
-            this.group = GetComponent<CanvasGroup>();
-            if (this.group == null) this.group = gameObject.AddComponent<CanvasGroup>();
+            this.group = viewContents.GetComponent<CanvasGroup>();
+            if (this.group == null) this.group = viewContents.AddComponent<CanvasGroup>();
         }
 
         if (this.m_rowBase != null || this.rows == null) return;

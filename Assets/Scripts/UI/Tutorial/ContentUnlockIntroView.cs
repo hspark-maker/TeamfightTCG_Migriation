@@ -8,7 +8,6 @@ using UnityEngine.UI;
 /// <summary>온보딩 보상 무대와 같은 순서로 콘텐츠 해금을 소개한다.</summary>
 public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntroView>
 {
-    [SerializeField] GameObject root;
     [SerializeField] TMP_Text _headingText;
     [SerializeField] TMP_Text _messageText;
     [SerializeField] TMP_Text _bodyText;
@@ -64,6 +63,7 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
     public void Show(string title, string body, IReadOnlyList<Sprite> icons,
         Action onConfirmed, Action onCancelled)
     {
+        InitializeUI();
         Close();
         CaptureHome();
         _onConfirmed = onConfirmed;
@@ -81,7 +81,7 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
         _confirmButton.onClick.RemoveListener(Confirm);
         _confirmButton.onClick.AddListener(Confirm);
         MarkOpen();
-        transition.SetVisible(ResolveTarget(), true);
+        SetContentsVisible(true, transition);
         _confirmButton.interactable = false;
         BuildIntro();
     }
@@ -155,7 +155,7 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
         _closing = true;
         _confirmButton.interactable = false;
         KillChoreography();
-        transition.SetVisible(ResolveTarget(), false);
+        SetContentsVisible(false, transition);
         ResolveTarget().GetComponent<CanvasGroup>().blocksRaycasts = true;
         // 후속 스텝이 자체 PopupDim 아래에 먼저 서지 않게 퇴장을 마친 뒤 넘긴다.
         _exit = DOTween.Sequence().SetTarget(this)
@@ -174,12 +174,12 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
         KillChoreography();
         transition.HandleDisabled(ResolveTarget());
         ResetChoreography();
-        ResolveTarget().SetActive(false);
+        SetContentsVisible(false);
         NotifyClosed(wasOpen);
         if (wasOpen) callback?.Invoke();
     }
 
-    void OnDisable()
+    protected override void OnViewHidden()
     {
         transition.HandleDisabled(ResolveTarget());
         Finish(_closing);
@@ -211,7 +211,7 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
         }
     }
 
-    GameObject ResolveTarget() => root != null ? root : gameObject;
+    GameObject ResolveTarget() => viewContents;
 
     static CanvasGroup GroupOf(GameObject target)
     {

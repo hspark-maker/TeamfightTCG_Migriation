@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 테마 한 개의 페이지 열람 오버레이(Panel_PageOverlay 부착) — 페이지 스테퍼 통합
-public class AlbumPageOverlayView : MonoBehaviour
+public class AlbumPageOverlayView : ContentsUIBehaviour
 {
     [Header("닫기")]
     [Tooltip("바깥을 눌러 닫는 딤판")]
@@ -109,7 +109,7 @@ public class AlbumPageOverlayView : MonoBehaviour
     public static event System.Action OnAnyClosed;
 
     /// <summary>지금 이 오버레이가 도감 화면을 덮고 있는가.</summary>
-    public static bool IsOpen => s_instance != null && s_instance.gameObject.activeInHierarchy;
+    public static bool IsOpen => s_instance != null && s_instance.IsViewVisible;
 
     /// <summary>밖(튜토리얼 자동 복귀)에서 이 오버레이를 걷어 그 아래 앨범 테마 화면을 드러낸다.
     /// 열려 있지 않으면 아무 일도 없다.</summary>
@@ -146,12 +146,13 @@ public class AlbumPageOverlayView : MonoBehaviour
 
         CancelFlip();   // 잘린 넘김 자세를 안고 열리지 않게
 
-        bool t_wasActive = gameObject.activeSelf;
+        InitializeUI();
+        bool t_wasActive = IsViewVisible;
         m_theme = _theme;
         m_pageIndex = Mathf.Clamp(_pageIndex, 0, _theme.Pages.Count - 1);
 
         // 활성화가 OnEnable→RefreshPage를 태우므로 상태 세팅이 먼저다
-        transition.SetVisible(gameObject, true);
+        SetContentsVisible(true, transition);
         if (t_wasActive) RefreshPage();   // 이미 열려 있으면 OnEnable이 안 돈다
     }
 
@@ -159,7 +160,7 @@ public class AlbumPageOverlayView : MonoBehaviour
     {
         // 퇴장 연출과 나란히 돌려준다 — OnDisable을 기다리면 오버레이가 완전히 사라진 뒤에야 바가 돌아온다.
         LobbyShellBars.Show(this);
-        transition.SetVisible(gameObject, false);
+        SetContentsVisible(false, transition);
     }
 
     // 삽입 카드를 꽂을 칸 — 슬롯은 RefreshPage가 만든 뒤에야 존재하고 레이아웃도 그 프레임 이후에 확정된다.
@@ -269,7 +270,7 @@ public class AlbumPageOverlayView : MonoBehaviour
         Step(_dir);
     }
 
-    void Awake()
+    protected override void OnInitializeUI()
     {
         s_instance = this;
 
@@ -294,7 +295,7 @@ public class AlbumPageOverlayView : MonoBehaviour
             underSlotRoot as RectTransform);
     }
 
-    void OnEnable()
+    protected override void OnViewShown()
     {
         // 페이지를 펼치는 동안은 로비 셸을 걷는다 — 이 오버레이가 화면을 통째로 쓴다.
         LobbyShellBars.Hide(this, transform);
@@ -316,7 +317,7 @@ public class AlbumPageOverlayView : MonoBehaviour
         if (m_theme != null) RefreshPage();
     }
 
-    void OnDisable()
+    protected override void OnViewHidden()
     {
         // 안전망 — 탭 전환·씬 이탈처럼 Close를 거치지 않는 경로로 꺼져도 셸은 돌아와야 한다.
         LobbyShellBars.Show(this);
@@ -342,14 +343,15 @@ public class AlbumPageOverlayView : MonoBehaviour
         // 탭 전환 등으로 넘김 도중에 꺼지면 종이가 세워진 채 굳는다
         CancelFlip();
 
-        transition.HandleDisabled(gameObject);
+        transition.HandleDisabled(viewContents);
 
         // 정리가 다 끝난 뒤에 알린다 — 구독자가 이 오버레이의 상태를 다시 물어볼 수 있어야 한다.
         OnAnyClosed?.Invoke();
     }
 
-    void OnDestroy()
+    protected override void OnDestroy()
     {
+        base.OnDestroy();
         pageFlip.Dispose();
 
         if (s_instance == this) s_instance = null;
@@ -662,7 +664,7 @@ public class AlbumPageOverlayView : MonoBehaviour
         // 마무리는 OnKill 하나로 모은다 — autoKill이라 정상 완료도 여기를 지나고,
         // CancelFlip의 Kill(complete:true)로 잘려도 같은 길로 끝난다(두 번 걸면 그대로 두 번 돈다).
         DOTween.To(() => t_from, _v => { t_from = _v; pageFlip.SetFlipProgress(_v); }, 0f, t_dur)
-               .SetEase(Ease.OutQuad).SetLink(gameObject).SetId(this)
+               .SetEase(Ease.OutQuad).SetLink(viewContents).SetId(this)
                .OnKill(ResetDrag);
     }
 
@@ -721,7 +723,7 @@ public class AlbumPageOverlayView : MonoBehaviour
         if (_theme == null || _theme.Pages == null || _theme.Pages.Count == 0) return;
 
         // 닫혀 있으면 넘길 옛 페이지가 없다 — 팝업 등장에 맡기고 그게 끝날 때까지 기다린다
-        if (!gameObject.activeSelf || m_theme == null || m_flipping || pageFlip.Duration <= 0f)
+        if (!IsViewVisible || m_theme == null || m_flipping || pageFlip.Duration <= 0f)
         {
             Open(_theme, _pageIndex);
             await UniTask.Delay((int)(transition.OpenDuration * 1000f), ignoreTimeScale: true);
@@ -824,7 +826,7 @@ public class AlbumPageOverlayView : MonoBehaviour
         float t_dur = Mathf.Min(0.12f, Mathf.Max(0.02f, this.dragReturnDuration) * (t_p / 0.5f));
 
         await DOTween.To(() => t_p, _v => { t_p = _v; pageFlip.SetFlipProgress(_v); }, 0f, t_dur)
-            .SetEase(Ease.OutQuad).SetLink(gameObject).SetId(this).ToUniTask();
+            .SetEase(Ease.OutQuad).SetLink(viewContents).SetId(this).ToUniTask();
 
         pageFlip.Cancel();
         HideUnderPage();
@@ -855,7 +857,7 @@ public class AlbumPageOverlayView : MonoBehaviour
             pageFlip.SetFlipProgress(t_p);
             if (t_first > 0.001f)
                 await DOTween.To(() => t_p, _v => { t_p = _v; pageFlip.SetFlipProgress(_v); }, 0.5f, t_first)
-                    .SetEase(Ease.InQuad).SetLink(gameObject).SetId(this).ToUniTask();
+                    .SetEase(Ease.InQuad).SetLink(viewContents).SetId(this).ToUniTask();
 
             if (t_gen != m_flipGen) return;   // 도중에 잘렸다 — 새 페이지를 덮어쓰면 안 된다
 
@@ -880,7 +882,7 @@ public class AlbumPageOverlayView : MonoBehaviour
             float t_side = 0f;
             pageFlip.SetSideAlpha(0f);
             await DOTween.To(() => t_side, _v => { t_side = _v; pageFlip.SetSideAlpha(_v); }, 1f, pageFlip.Crossfade)
-                .SetEase(Ease.OutQuad).SetLink(gameObject).SetId(this).ToUniTask();
+                .SetEase(Ease.OutQuad).SetLink(viewContents).SetId(this).ToUniTask();
         }
         finally
         {

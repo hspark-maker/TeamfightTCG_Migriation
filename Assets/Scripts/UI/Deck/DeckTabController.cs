@@ -5,8 +5,7 @@ using UnityEngine;
 // 덱 탭 루트(Tab_Deck에 부착). 이 탭에는 내용이 없다 — 탭에 들어오면 풀 UI 덱 편집 화면(DeckEditController)을 열 뿐이다.
 // 덱을 갈아타는 일은 편집 화면 하단의 덱 선택 바(DeckStripView)가 맡는다.
 //
-// 탭 셸(LobbyTabController)이 단순 SetActive 토글이라 라이프사이클 훅이 없으므로,
-// "탭이 켜지면 항상 편집 화면"을 OnEnable로 보장한다.
+// 탭의 Contents 표시 훅에서 편집기를 열고 퇴장 슬라이드가 끝나면 정리한다.
 //
 // 편집 화면을 얻는 길은 둘이다: 이 탭 안에 놓인 인스턴스(editor 배선)를 직접 쓰거나,
 // 미배선이면 매치 셸과 한 인스턴스를 나눠 쓰는 풀(DeckEditController.OpenPooled)에서 세운다.
@@ -53,8 +52,9 @@ public class DeckTabController : LobbyTabPanel
     }
 
     // 덱 탭을 단독 배치한 테스트 씬에서는 셸이 없을 수 있다 → 호출측은 항상 null을 감안한다.
-    void OnEnable()
+    protected override void OnViewShown()
     {
+        base.OnViewShown();
         // 편집 중 탭이 꺼졌다 켜지면 이전 편집분은 무저장 폐기된다.
         // 편집은 DeckEditController의 메모리 사본에서만 일어나고 세이브는 손대지 않으므로
         // 손실은 "이번 편집분"뿐이고 기존 덱은 온전하다 — 그래서 확인 팝업 없이 다시 열어도 안전하다.
@@ -73,8 +73,9 @@ public class DeckTabController : LobbyTabPanel
 
     // 탭 전환이 아닌 경로(로비 캔버스 비활성·씬 전환)로 덱 탭이 꺼지면 CloseEditor를 거치지 않는다 →
     // 가드가 셸에 남아 이후 모든 탭 전환이 죽은 편집기에게 넘어가고, 풀 캔버스의 편집 화면이 다른 탭 위에 남는다.
-    void OnDisable()
+    protected override void OnViewHidden()
     {
+        base.OnViewHidden();
         HideEditor();
 
         // 편집기는 탭이 실제로 꺼진 지금 비운다 — 더 일찍 비우면 빈 판이 미끄러져 나간다.
@@ -345,7 +346,7 @@ public class DeckTabController : LobbyTabPanel
             DeckSaveManager.TrySelectSlot(m_lastSlot);
         }
 
-        // 탭 안에 놓인 인스턴스는 아직 미끄러져 나가는 중이다 — 비우는 자리는 OnDisable이다.
+        // 탭 안의 인스턴스는 아직 미끄러져 나가는 중이다. OnViewHidden에서 비운다.
         if (this.editor == null) t_editor.Hide();
     }
 }

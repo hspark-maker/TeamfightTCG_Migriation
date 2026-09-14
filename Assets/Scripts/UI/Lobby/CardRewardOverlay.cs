@@ -17,7 +17,6 @@ using TMPro;
 public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
 {
     [Tooltip("켜고 끌 대상. 미배선이면 자기 gameObject를 토글한다.")]
-    [SerializeField] GameObject root;
 
     [SerializeField] TMP_Text titleText;
     [SerializeField] Button acquireButton;
@@ -136,6 +135,7 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
     /// 그때 지급하고, 이어지는 획득 연출도 그쪽이 튼다(화면은 그 연출과 겹쳐 걷힌다).</summary>
     public void Show(string _title, int _cardId, Action _onAcquire)
     {
+        InitializeUI();
         this.m_onAcquire = _onAcquire;
 
         // 직전 표시의 안무를 걷는다 — 시퀀스에 중첩된 트윈은 대상의 DOKill이 잡지 못해 새 안무와 같은 노드를 함께 민다.
@@ -166,13 +166,13 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
 
     // 잠금은 등장 안무가 푼다. Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서는 그 안무가 없어
     // [획득]이 잠긴 모달로 남으므로, 켜질 때 일단 열어 둔다(Show는 이 뒤에 다시 잠근다).
-    void OnEnable()
+    protected override void OnViewShown()
     {
         this.SetInputEnabled(true);
     }
 
     // 오버레이는 자기 자신이 토글 대상이라 OnDisable이 정상 동작한다 — 잘린 퇴장 마무리를 여기서 위임한다.
-    void OnDisable()
+    protected override void OnViewHidden()
     {
         this.transition.HandleDisabled(this.ResolveTarget());
         this.KillChoreo();
@@ -495,10 +495,10 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
 
     void SetVisible(bool _visible)
     {
-        this.transition.SetVisible(this.ResolveTarget(), _visible);
+        SetContentsVisible(_visible, this.transition);
     }
 
-    GameObject ResolveTarget() => this.root != null ? this.root : this.gameObject;
+    GameObject ResolveTarget() => viewContents;
 
     static CanvasGroup GroupOf(GameObject _go)
     {

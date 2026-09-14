@@ -68,7 +68,7 @@ public sealed class PackGradeFxPalette
 //
 // 진입은 컨트롤러가 넘기는 OpenedPack(BeginOpen)뿐 — 구매·소유·덱은 이 뷰 밖의 책임이다.
 // 연출은 이미 끝난 서버 거래(openPack 트랜잭션 1회)를 보여줄 뿐, 경제를 건드리지 않는다.
-public class PackRevealView : MonoBehaviour
+public class PackRevealView : MonoBehaviour, IUIInitializable
 {
     // 요약 도달 시 1회 발화(스킵으로 건너뛰어도 반드시 발화 — 획득 버튼 데드락 방지).
     public event Action OnRevealComplete;
@@ -220,6 +220,7 @@ public class PackRevealView : MonoBehaviour
     /// _pack은 이 결과를 낳은 팩 정의 — 껍데기 그림이 그 팩의 것으로 갈린다(미지정이면 프리팹 기본 그림).</summary>
     public void BeginOpen(OpenedPack _opened, string _packId)
     {
+        InitializeUI();
         if (m_stage != EStage.Idle) return;   // 재진입 = 중복 개봉 방지
         if (_opened == null || !_opened.Success)
         {
@@ -339,8 +340,20 @@ public class PackRevealView : MonoBehaviour
         m_skipSummaryInstant = false;
     }
 
+    bool m_uiInitialized;
+
+    void Awake() => InitializeUI();
+
+    public void InitializeUI()
+    {
+        if (m_uiInitialized) return;
+        m_uiInitialized = true;
+        if (skipButton != null) skipButton.onClick.AddListener(RequestSkip);
+    }
+
     void OnEnable()
     {
+        InitializeUI();
         if (tearHandle != null) tearHandle.OnTorn += HandleTorn;
 
         if (cardStack != null)
@@ -348,8 +361,6 @@ public class PackRevealView : MonoBehaviour
             cardStack.OnCardRevealed  += HandleCardRevealed;
             cardStack.OnEmptied       += HandleStackEmptied;
         }
-
-        if (skipButton != null) skipButton.onClick.AddListener(RequestSkip);
     }
 
     void OnDisable()
@@ -365,9 +376,6 @@ public class PackRevealView : MonoBehaviour
             cardStack.OnCardRevealed  -= HandleCardRevealed;
             cardStack.OnEmptied       -= HandleStackEmptied;
         }
-
-        if (skipButton != null) skipButton.onClick.RemoveListener(RequestSkip);
-
         // 연출 중 비활성 시 좀비 트윈 정리 + 상태 리셋(재활성 후 "중간 단계에 갇힘" 방지).
         KillStageSeq();
         if (shellRig != null) shellRig.ResetPose();

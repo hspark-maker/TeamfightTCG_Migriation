@@ -28,6 +28,12 @@ MonoBehaviour:
     - RemoteUI
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 098146b7940589948afb63e709ac5357
+    m_Address: Config/profileConfig
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0a52b3ddd93b99847afa605113552c84
     m_Address: RouletteOverlay
     m_ReadOnly: 0
@@ -37,6 +43,18 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0a80f89b64b393f41853432f24fdd505
     m_Address: Atlases/UIMatch
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0c1e5b7a94d3f2149a86c5d0e7b31f68
+    m_Address: Config/emoteCatalog
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0f17069139424ae7956455108c7f08a2
+    m_Address: Config/synergyRegistry
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteUI
@@ -67,6 +85,12 @@ MonoBehaviour:
     - RemoteUI
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 20a3ae6097a4cb440ad35c4621cec66e
+    m_Address: Config/deckImageCatalog
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 20a600274526bcf4f8ec46ea6bd8d07f
     m_Address: SimpleYNPopup
     m_ReadOnly: 0
@@ -81,8 +105,20 @@ MonoBehaviour:
     - RemoteUI
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2e0475eb8d64d1449916d99de758135a
+    m_Address: Config/keywordIconConfig
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 397e58311ca372c4abd78f896f53a9f2
     m_Address: Atlases/UILobby
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 408410dc0be34c648afdaf57203b958c
+    m_Address: Config/rankConfig
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteUI
@@ -108,6 +144,12 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 443948c77e9cab24494f8e3a8664f486
     m_Address: Atlases/UIAdventure
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5c04cd167e805484b92609d72e119abd
+    m_Address: Config/albumConfig
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteUI
@@ -179,6 +221,12 @@ MonoBehaviour:
     - RemoteUI
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8b4aacde1cb67a54b8706abfa2954826
+    m_Address: Config/battleVfxLibrary
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 8c92fb32c19ee614ebe69e688fea51eb
     m_Address: Atlases/UIRoulette
     m_ReadOnly: 0
@@ -229,6 +277,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - RemoteUI
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b9d217f7eca0f6345ae5bd3b654b4a37
+    m_Address: Config/currencyLook
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: bab0c173e1415bd49a7b0ffd3bb1567c
     m_Address: UnlockIntroOverlay
     m_ReadOnly: 0
@@ -242,12 +296,24 @@ MonoBehaviour:
     m_SerializedLabels:
     - RemoteUI
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c79a047159501ef46a7e47fcabb63abf
+    m_Address: Config/rouletteConfig
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ce8e0425d90f4b843a806f6d4ab5f045
     m_Address: CardRewardOverlay
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteUI
     - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d37d99e23546412baf9b3e76ad7573f2
+    m_Address: RuntimeContentCatalog
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d39777ec9f35af14b9b4397582338e12
     m_Address: ProfileEditPanel
@@ -297,6 +363,12 @@ MonoBehaviour:
     - RemoteUI
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ed4cd9df9407f0a4e97ba1a9c52f5890
+    m_Address: Config/cardFrameConfig
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f541ddb0494e8c94f96c26596bdc750c
     m_Address: Atlases/CardIcons
     m_ReadOnly: 0
@@ -310,12 +382,24 @@ MonoBehaviour:
     - RemoteUI
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f8c1956156735bb4e8266fa5abf76d0c
+    m_Address: Config/tutorialData
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f95d3da55cfb6f44f84adfc2fbdc308d
     m_Address: TouchEffectOverlay
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteUI
     - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fa77fd9889cfb5d4e853ff6a2b266f22
+    m_Address: Config/battleTimingConfig
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: fa7b83a15c5ed524abfc6e6a4e87a418
     m_Address: LobbySettingPanel
@@ -330,6 +414,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - RemoteUI
     - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ff32166a7a94716469f68bae386a7555
+    m_Address: Config/adventureConfig
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
     FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 886280ed4ce95ea4fa7b0c1bf828dbdc, type: 2}

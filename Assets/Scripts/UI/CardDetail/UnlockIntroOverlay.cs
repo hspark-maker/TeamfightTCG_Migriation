@@ -9,7 +9,6 @@ using UnityEngine.UI;
 public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 {
     [Tooltip("켜고 끌 대상. 미배선이면 자기 gameObject를 토글한다.")]
-    [SerializeField] GameObject root;
 
     [SerializeField] Button confirmButton;
 
@@ -57,6 +56,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
     /// <summary>_intros를 세우고 [확인]을 기다린다(_onClose는 걷힌 뒤 한 번, 빈 목록이면 곧바로 온다).</summary>
     public void Show(IReadOnlyList<UnlockIntro> _intros, int _card, Action _onClose)
     {
+        InitializeUI();
         // 시퀀스에 중첩된 트윈은 대상의 DOKill이 잡지 못해 새 안무와 같은 노드를 함께 민다.
         KillIntro();
         EndDemo();
@@ -97,12 +97,12 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
     }
 
     // 잠금을 푸는 곳이 등장 안무뿐이라, Show를 거치지 않고 뜨면 [확인]이 잠긴 모달로 남는다.
-    void OnEnable()
+    protected override void OnViewShown()
     {
         SetInputEnabled(true);
     }
 
-    void OnDisable()
+    protected override void OnViewHidden()
     {
         this.transition.HandleDisabled(ResolveTarget());
         KillIntro();
@@ -305,10 +305,10 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 
     void SetVisible(bool _visible)
     {
-        this.transition.SetVisible(ResolveTarget(), _visible);
+        SetContentsVisible(_visible, this.transition);
     }
 
-    GameObject ResolveTarget() => this.root != null ? this.root : gameObject;
+    GameObject ResolveTarget() => viewContents;
 
     static CanvasGroup GroupOf(GameObject _go)
     {

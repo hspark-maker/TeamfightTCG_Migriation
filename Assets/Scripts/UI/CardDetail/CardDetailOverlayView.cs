@@ -31,7 +31,7 @@ public readonly struct CardDetailOpenOptions
     }
 }
 
-public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
+public class CardDetailOverlayView : ContentsUIBehaviour, IPointerClickHandler
 {
     const string LockedName  = "???";
     const string LockedValue = "?";
@@ -164,7 +164,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     }
 
     /// <summary>지금 이 창이 화면을 덮고 있는가.</summary>
-    public static bool IsOpen => s_instance != null && s_instance.gameObject.activeInHierarchy;
+    public static bool IsOpen => s_instance != null && s_instance.IsViewVisible;
 
     /// <summary>지금 해금 연출이 도는 중인가.</summary>
     public static bool IsUnlockFxPlaying => s_instance != null && s_instance.m_unlockFxPlaying;
@@ -264,6 +264,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         if (t_view == null) return;
 
         // 세 축 모두 창을 닫을 때 내려가므로(OnDisable) 여기서 매번 다시 세우면 그만이다.
+        t_view.InitializeUI();
         t_view.m_readOnly = _options.ReadOnly;
         t_view.LiftAbove(_options.LiftAboveAll);
         t_view.SetFullScreen(_options.CoverFullScreen);
@@ -335,9 +336,20 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         t_rect.offsetMax = _on ? Vector2.zero : this.m_baseOffsetMax;
     }
 
-    void Awake()
+    protected override void OnInitializeUI()
     {
         s_instance = this;
+
+        if (this.enhanceButton != null)
+        {
+            this.enhanceButton.onClick.AddListener(OnEnhancePressed);
+        }
+
+        if (this.artOnlyButton != null)
+        {
+            this.artOnlyButton.onClick.AddListener(ToggleArtOnly);
+        }
+
 
         if (this.enhanceButton != null) this.m_enhanceTone = this.enhanceButton.GetComponent<UIEffect>();
 
@@ -349,7 +361,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             if (this.m_holdInput == null) this.m_holdInput = this.enhanceButton.gameObject.AddComponent<ShardEnhanceHoldInput>();
             this.m_holdInput.OnHoldTick = OnEnhanceHold;
             this.m_holdInput.OnHoldEnded = EndEnhanceHold;
-            this.m_shardAbsorb = gameObject.AddComponent<ShardAbsorbEffect>();
+            this.m_shardAbsorb = viewContents.AddComponent<ShardAbsorbEffect>();
         }
 
         // 카드 그림 위 탭은 루트의 OnPointerClick으로 오지 않는다(LongPressDetector가 pointerPress를 가져간다).
@@ -361,25 +373,13 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     }
 
     // 화살표·스와이프는 열 때마다 꺼졌다 켜지므로 Awake가 아니라 여기서 배선한다.
-    void OnEnable()
+    protected override void OnViewShown()
     {
         // 상단 재화 바는 강화 비용을 보는 자리라 하단 탭바만 걷는다.
         LobbyShellBars.Hide(this, transform, EShellBars.Bottom);
 
         // 배경판이 상단바 아래에서 시작해 바의 둥근 모서리 틈으로 로비가 비친다 — 그 뒤를 Content 딤이 메운다.
         ScreenDim.Show(this, CONTENT_DIM_ALPHA, true, 0f, EDimLayer.Content);
-
-        if (this.enhanceButton != null)
-        {
-            this.enhanceButton.onClick.RemoveListener(OnEnhancePressed);
-            this.enhanceButton.onClick.AddListener(OnEnhancePressed);
-        }
-
-        if (this.artOnlyButton != null)
-        {
-            this.artOnlyButton.onClick.RemoveListener(ToggleArtOnly);
-            this.artOnlyButton.onClick.AddListener(ToggleArtOnly);
-        }
 
         // 대입 — 구독자는 언제나 이 오버레이 하나뿐이다.
         if (this.swipeDetector != null) this.swipeDetector.OnSwipe = Step;
@@ -395,7 +395,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         RefreshArrows();
     }
 
-    void OnDisable()
+    protected override void OnViewHidden()
     {
         this.m_viewVersion++;
         StopEnhanceHold();
@@ -404,10 +404,6 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         ScreenDim.Hide(this, EDimLayer.Content);
 
         if (this.swipeDetector != null) this.swipeDetector.OnSwipe = null;
-
-        if (this.enhanceButton != null) this.enhanceButton.onClick.RemoveListener(OnEnhancePressed);
-
-        if (this.artOnlyButton != null) this.artOnlyButton.onClick.RemoveListener(ToggleArtOnly);
 
         // 열람 모드는 창을 닫으면 푼다 — cardView는 이 오버레이 전용 인스턴스라 남겨두면 다음 열기에 따라온다.
         this.m_artOnly = false;
@@ -430,7 +426,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         this.m_retryQueued = false;
 
         // 퇴장 트윈이 완료 전에 잘렸으면(부모가 먼저 꺼짐) 여기서 마무리해야 다음 열기에 유령 프레임이 안 뜬다.
-        this.transition.HandleDisabled(gameObject);
+        this.transition.HandleDisabled(viewContents);
 
         // 빌린 순서와 크기를 돌려준다 — 남겨두면 다음 창이 상단 바를 덮은 채 조작도 없는 화면이 된다.
         LiftAbove(false);
@@ -444,14 +440,16 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         DropPendingUnlockFx();
     }
 
-    void OnDestroy()
+    protected override void OnDestroy()
     {
+        base.OnDestroy();
         if (s_instance == this) s_instance = null;
     }
 
     // 목록·인덱스는 SetVisible보다 먼저 확정한다 — 그것이 유발하는 OnEnable의 RefreshArrows가 최신을 보게.
     void Show(IReadOnlyList<int> _cards, int _index)
     {
+        InitializeUI();
         // 유효 인덱스를 확정한 뒤에 목록을 갈아끼운다 — 중도 return하면 목록과 인덱스가 서로 다른 기준으로 남는다.
         int t_index = Mathf.Clamp(_index, 0, _cards.Count - 1);
         if (_cards[t_index] <= 0)
@@ -469,7 +467,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         this.resultPanel?.HideImmediate();
         this.m_retryQueued = false;
         ShowBottomBar();   // 연출 도중에 닫았다 다시 연 경우 걷힌 상태가 남아 있을 수 있다
-        this.transition.SetVisible(gameObject, true);
+        SetContentsVisible(true, this.transition);
         Apply(CardAt(this.m_index));
         RefreshArrows();
     }
@@ -484,7 +482,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 퇴장은 트윈이라 OnDisable이 곧바로 오지 않는다 — 예약이 살아 있으면 사라지는 창 위에서 다음 담금질이 시작된다.
         this.m_retryQueued = false;
 
-        this.transition.SetVisible(gameObject, false);
+        SetContentsVisible(false, this.transition);
     }
 
     /// <summary>닫기는 배경(딤) 탭만이다 — 카드·상세 패널·조작 바 위의 탭은 닫지 않는다.</summary>
@@ -498,7 +496,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 연출 중의 탭은 어디를 눌렀든 스킵이다 — 해금 구간을 탭으로 지우면 그 사건은 이 카드에 두 번 오지 않는다.
         if (SkipPlayingFx()) return;
 
-        if (_e.pointerPressRaycast.gameObject != gameObject) return;
+        if (_e.pointerPressRaycast.gameObject != viewContents) return;
 
         Hide();
     }
@@ -591,7 +589,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     {
         if (_card <= 0) return;
 
-        if (this.slideTarget == null || !isActiveAndEnabled)
+        if (this.slideTarget == null || !IsViewVisible)
         {
             Apply(_card);
             return;
@@ -606,7 +604,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         float t_half = Mathf.Max(0.02f, this.slideDuration) * 0.5f;
 
         // id는 이 인스턴스 자체 — CancelSlide가 같은 노드의 남의 트윈을 건드리지 않게 하는 표식이다.
-        Sequence t_seq = DOTween.Sequence().SetLink(gameObject).SetId(this);
+        Sequence t_seq = DOTween.Sequence().SetLink(viewContents).SetId(this);
 
         t_seq.Append(this.slideTarget.DOAnchorPosX(this.m_slideBaseX + t_out, t_half).SetEase(Ease.InQuad));
         if (this.m_slideGroup != null) t_seq.Join(this.m_slideGroup.DOFade(0f, t_half));
@@ -956,7 +954,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
 
         t_content.DOAnchorPosY(t_to, this.unlockScrollDuration)
                  .SetEase(Ease.OutCubic)
-                 .SetLink(gameObject);
+                 .SetLink(viewContents);
     }
 
     // 걷을 판이 없거나 연출이 미배선이면 null — 부른 쪽은 "기다릴 것이 없다"로 읽는다.
@@ -1215,7 +1213,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
     }
 
     bool CanFeedShard(int _card)
-        => isActiveAndEnabled && !this.m_readOnly && _card > 0 && OwnershipManager.IsOwned(_card)
+        => IsViewVisible && !this.m_readOnly && _card > 0 && OwnershipManager.IsOwned(_card)
             && OutgameFeatureLock.IsUnlocked(EOutgameFeature.CardEnhance)
             && CardGrowthManager.Precheck(_card) == EEnhanceOutcome.Success;
 
@@ -1289,7 +1287,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             ReleaseQueuedShardTickets();
             this.m_queuedShards = this.m_inFlightShards = 0;
             this.m_enhanceRequestPending = false;
-            if (this != null && this.isActiveAndEnabled && !this.m_ritualPlaying)
+            if (this != null && this.IsViewVisible && !this.m_ritualPlaying)
             {
                 int t_card = CardAt(this.m_index);
                 if (t_card > 0) RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
@@ -1352,7 +1350,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 마지막으로 투입한 샤드까지 도착한 뒤 진화한다. 닫기·카드 이동은 기다리지 않는다.
         if (t_result.Outcome == EEnhanceOutcome.Success && t_result.Level > t_fromLevel)
         {
-            while (this != null && this.isActiveAndEnabled && this.m_viewVersion == _viewVersion
+            while (this != null && this.IsViewVisible && this.m_viewVersion == _viewVersion
                 && this.m_shardAbsorb != null && this.m_shardAbsorb.IsPlaying)
                 await UniTask.Yield();
         }
@@ -1369,10 +1367,10 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         CardGrowthRitualView t_ritual = t_evolve && this.evolveRitual != null ? this.evolveRitual : this.ritual;
 
         // 왕복 중 창이 닫혔어도 성립한 강화는 알린다 — 기다리던 안내가 영영 깨어나지 못하면 진행이 막힌다.
-        if (!this.isActiveAndEnabled || this.m_viewVersion != _viewVersion || CardAt(this.m_index) != t_card)
+        if (!this.IsViewVisible || this.m_viewVersion != _viewVersion || CardAt(this.m_index) != t_card)
         {
             int t_visible = CardAt(this.m_index);
-            if (this.isActiveAndEnabled && t_visible > 0) RefreshGrowth(t_visible, OwnershipManager.IsOwned(t_visible));
+            if (this.IsViewVisible && t_visible > 0) RefreshGrowth(t_visible, OwnershipManager.IsOwned(t_visible));
             if (t_played) NotifyEnhanceSettled(t_result);
             return t_result;
         }

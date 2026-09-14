@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 // 튜토리얼 구매 스텝 중에는 저작된 팩이 진열 "목록 자체"를 대체한다(ResolveDisplay).
 //   우선순위 규칙으로 두면 캐러셀은 팩 A를, 가격·결제는 팩 B를 가리키는 상태가 생긴다 —
 //   목록으로 흡수하면 그림·이름·가격·결제가 전부 한 곳에서 나오므로 갈릴 여지가 구조적으로 없다.
-public class PackShowcaseController : MonoBehaviour
+public class PackShowcaseController : MonoBehaviour, IUIInitializable
 {
     // 구매가 실제로 성립한 순간 발화(클릭이 아니라 서버 응답). 구독자는 모른다 — "일어난 일"만 알린다.
     public static event Action OnAnyPurchased;
@@ -62,12 +62,18 @@ public class PackShowcaseController : MonoBehaviour
     // 구매는 끝났고 개봉 화면만 아직 열지 않은 상태. 임팩트가 화면을 덮는 사이의 짧은 구간이다.
     bool m_openPending;
 
-    void OnEnable()
-    {
-        // 굳은 잠금을 푸는 복구 장치다 — 다만 결제 왕복이 도는 중이라면 그 잠금은 굳은 것이 아니라 일하는 중이다.
-        // 지우면 대기 오버레이가 서지 못한 상태(UIPrefab 항목 누락)에서 탭을 여닫는 것만으로 같은 결제가 두 번 나간다.
-        if (!PackPurchaseFlow.IsPurchasing) s_transitioning = false;
+    bool m_initialized;
+    bool m_visible;
+    LobbyTabPanel m_tab;
 
+    void Awake() => InitializeUI();
+
+    public void InitializeUI()
+    {
+        if (m_initialized) return;
+        m_initialized = true;
+        m_tab = GetComponent<LobbyTabPanel>();
+        if (m_tab != null) m_tab.ViewVisibilityChanged += SetViewVisible;
         if (buyButton != null)
         {
             buyButton.onClick.RemoveListener(OnBuyPressed);
@@ -88,6 +94,25 @@ public class PackShowcaseController : MonoBehaviour
             carousel.OnIndexChanged += OnPageChanged;
         }
 
+    }
+
+    void OnEnable()
+    {
+        InitializeUI();
+        if (m_tab == null || m_tab.IsViewVisible) SetViewVisible(true);
+    }
+
+    void SetViewVisible(bool _visible)
+    {
+        if (m_visible == _visible) return;
+        m_visible = _visible;
+        if (_visible) OnViewShown();
+        else OnViewHidden();
+    }
+
+    void OnViewShown()
+    {
+        if (!PackPurchaseFlow.IsPurchasing) s_transitioning = false;
         CurrencyManager.OnCurrencyChanged    += OnCurrencyChanged;
         RankManager.OnChanged                += Refresh;
         OutgameTutorialRunner.OnStepChanged  += Refresh;
@@ -96,11 +121,19 @@ public class PackShowcaseController : MonoBehaviour
         Refresh();
     }
 
-    void OnDisable()
+    void OnDisable() => SetViewVisible(false);
+
+    void OnDestroy()
     {
+        SetViewVisible(false);
+        if (m_tab != null) m_tab.ViewVisibilityChanged -= SetViewVisible;
         if (buyButton != null) buyButton.onClick.RemoveListener(OnBuyPressed);
         if (oddsButton != null) oddsButton.onClick.RemoveListener(OnOddsPressed);
         if (carousel != null) carousel.OnIndexChanged -= OnPageChanged;
+    }
+
+    void OnViewHidden()
+    {
 
         CurrencyManager.OnCurrencyChanged    -= OnCurrencyChanged;
         RankManager.OnChanged                -= Refresh;

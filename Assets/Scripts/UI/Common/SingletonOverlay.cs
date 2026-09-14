@@ -5,8 +5,10 @@ using UnityEngine;
 
 /// <summary>Marker base used by DataLibrary to index non-pooled runtime prefabs resolved by
 /// component type — 전면 오버레이뿐 아니라 화면 밖 무대처럼 타입으로 찾는 단일 인스턴스 프리팹도 포함한다.</summary>
-public abstract class SingletonOverlayBase : MonoBehaviour
+public abstract class SingletonOverlayBase : ContentsUIBehaviour
 {
+    // 타입 색인만 사용하는 비표시 무대·상시 효과는 개폐 Contents를 요구하지 않는다.
+    protected override bool RequiresContents => false;
 }
 
 /// <summary>단일 인스턴스 회수와 개폐 계약을 함께 쥔다 — 여는 표식·닫는 표식·닫힘 통지·닫힘 대기·정렬 층이
@@ -15,6 +17,7 @@ public abstract class SingletonOverlay<T> : SingletonOverlayBase
     where T : SingletonOverlay<T>
 {
     static T s_instance;
+    protected override bool RequiresContents => true;
 
     /// <summary>이 타입의 화면이 떠 있는가. 제네릭 타입 인자마다 갈라진 static이라 타입별로 독립이다.</summary>
     public static bool IsOpen { get; private set; }
@@ -98,8 +101,9 @@ public abstract class SingletonOverlay<T> : SingletonOverlayBase
     public static UniTask WaitUntilClosedAsync(CancellationToken _token = default)
         => UniTask.WaitUntil(() => !IsOpen, cancellationToken: _token);
 
-    protected virtual void OnDestroy()
+    protected override void OnDestroy()
     {
+        base.OnDestroy();
         if (s_instance == this) s_instance = null;
         ClearOpen();
     }
@@ -111,6 +115,7 @@ public abstract class SingletonOverlay<T> : SingletonOverlayBase
         s_instance = _overlay;
         if (_overlay == null) return;
 
+        _overlay.InitializeUI();
         UiSortingOrder.Stamp(_overlay.GetComponent<Canvas>(), _overlay.SortingOrder);
     }
 }

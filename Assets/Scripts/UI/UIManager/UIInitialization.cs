@@ -6,6 +6,9 @@ public interface IUIInitializable
     void InitializeUI();
 }
 
+/// <summary>하위 초기화를 직접 소유하는 프리팹 경계.</summary>
+public interface IUIInitializationRoot : IUIInitializable { }
+
 public static class UIInitialization
 {
     /// <summary>프리팹 소유자가 비활성 자식까지 준비한다. 각 구현은 중복 호출에 안전해야 한다.</summary>
@@ -18,11 +21,12 @@ public static class UIInitialization
     static void InitializeBranch(Transform _branch)
     {
         // 중첩 화면의 하위 초기화는 해당 화면이 맡는다. 부모가 다시 순회하지 않는다.
-        if (_branch.TryGetComponent<ContentsPooledUI>(out var t_panel))
-        {
-            t_panel.InitializeUI();
-            return;
-        }
+        foreach (var t_component in _branch.GetComponents<MonoBehaviour>())
+            if (t_component is IUIInitializationRoot t_root)
+            {
+                t_root.InitializeUI();
+                return;
+            }
 
         foreach (var t_component in _branch.GetComponents<MonoBehaviour>())
             if (t_component is IUIInitializable t_initializable) t_initializable.InitializeUI();

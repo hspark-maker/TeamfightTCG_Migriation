@@ -87,9 +87,9 @@ public static class ContentUnlockIntroValidation
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
                 "Assets/Assets/Prefabs/UI/OverlayUI/ContentUnlockIntroView.prefab");
             Require(prefab != null, "Intro prefab missing.");
-            Require(prefab.GetComponent<Canvas>() != null && prefab.transform.Find("SafeArea/Stage") != null,
+            Require(prefab.GetComponent<Canvas>() != null && prefab.transform.Find("Contents/SafeArea/Stage") != null,
                 "Onboarding overlay requires its own canvas and SafeArea/Stage.");
-            var dim = prefab.transform.Find("PopupDim");
+            var dim = prefab.transform.Find("Contents/PopupDim");
             Require(dim != null && dim.GetComponent<Image>().color.a == 1f
                 && dim.GetComponent<Image>().raycastTarget && dim.GetComponent<Button>() == null,
                 "Reward-style PopupDim must cover input without confirming the step.");
@@ -122,7 +122,7 @@ public static class ContentUnlockIntroValidation
             button.onClick.Invoke();
             button.onClick.Invoke();
             Require(confirmations == 0, "Confirmation must wait for the overlay exit.");
-            Require(instance.GetComponent<CanvasGroup>().blocksRaycasts,
+            Require(instance.transform.Find("Contents").GetComponent<CanvasGroup>().blocksRaycasts,
                 "Exit must keep the underlying lobby blocked until completion.");
             DOTween.Complete(view, true);
             Require(confirmations == 1 && cancellations == 0 && !ContentUnlockIntroView.IsOpen,
@@ -130,8 +130,18 @@ public static class ContentUnlockIntroValidation
             view.Show("모험 오픈 !", "스테이지를 클리어하고 보상을 받으세요.",
                 new[] { mission.icon }, () => confirmations++, () => cancellations++);
             Require(!button.interactable, "Reopening must reset entrance input.");
-            var secondIcon = (Image)serialized.FindProperty("_icons").GetArrayElementAtIndex(1).objectReferenceValue;
-            Require(!secondIcon.gameObject.activeSelf, "Single intro retained second grouped icon.");
+            bool OnlyFirstIconVisible()
+            {
+                var slots = serialized.FindProperty("_icons");
+                if (slots.arraySize == 0) return false;
+                for (int i = 0; i < slots.arraySize; i++)
+                {
+                    var icon = (Image)slots.GetArrayElementAtIndex(i).objectReferenceValue;
+                    if (icon == null || icon.gameObject.activeSelf != (i == 0)) return false;
+                }
+                return true;
+            }
+            Require(OnlyFirstIconVisible(), "Single intro must show only its first icon.");
             view.Close();
             view.Close();
             Require(confirmations == 1 && cancellations == 1 && !ContentUnlockIntroView.IsOpen,
@@ -156,7 +166,7 @@ public static class ContentUnlockIntroValidation
                 ShowNext();
             }
             Prepare();
-            Require(message.text == "미션 오픈 !" && !secondIcon.gameObject.activeSelf,
+            Require(message.text == "미션 오픈 !" && OnlyFirstIconVisible(),
                 "First queued content must have its own panel and one icon.");
             DOTween.Complete(view, true);
             button.onClick.Invoke();
@@ -165,7 +175,7 @@ public static class ContentUnlockIntroValidation
                 && (bool)ownerType.GetField("m_pendingIntro", flags).GetValue(owner),
                 "First confirmation must queue the next panel without completing the step.");
             ShowNext();
-            Require(message.text == "룰렛 오픈 !" && !secondIcon.gameObject.activeSelf && !button.interactable,
+            Require(message.text == "룰렛 오픈 !" && OnlyFirstIconVisible() && !button.interactable,
                 "Next content must reopen with its own title and entrance gate.");
             var firstIcon = (Image)serialized.FindProperty("_icons").GetArrayElementAtIndex(0).objectReferenceValue;
             Require(firstIcon.sprite == roulette.icon, "Next content retained the previous icon.");

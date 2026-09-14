@@ -15,7 +15,7 @@ using UnityEngine.SceneManagement;
 // 경계: 목적지 분기는 캐리어 값(NextScene/StartTutorial)으로만 한다 — 첫시작 판정을 여기서 재계산하지 않는다.
 //   이것이 구 FirstStartBattleRedirect 같은 별도 리다이렉트 레이어를 없앤 이유(구매한 쪽이 목적지를 이미 결정).
 //   Battle 참조는 TutorialConfig.Begin 한 줄뿐(TutorialSetupUI 선례와 동일 방향, 전투 지식 격리).
-public class PackAcquireController : MonoBehaviour
+public class PackAcquireController : MonoBehaviour, IUIInitializable
 {
     [Header("참조")]
     [Tooltip("카드팩 개봉 뷰. BeginOpen으로 세션을 태우고 OnRevealComplete를 수신.")]
@@ -98,6 +98,7 @@ public class PackAcquireController : MonoBehaviour
     /// — Start에 두면 오버레이는 한 번만 열리는 화면이 된다(재개봉 불가).</summary>
     public bool BeginSession()
     {
+        InitializeUI();
         // 카드 배치 전까지 아래 버튼들 숨김 — OnRevealComplete에서 함께 노출.
         if (acquireButton != null) acquireButton.gameObject.SetActive(false);
         if (retryButton != null) retryButton.gameObject.SetActive(false);
@@ -141,18 +142,27 @@ public class PackAcquireController : MonoBehaviour
         return true;
     }
 
-    void OnEnable()
+    bool m_uiInitialized;
+
+    void Awake() => InitializeUI();
+
+    public void InitializeUI()
     {
-        if (view != null) view.OnRevealComplete += OnRevealComplete;
+        if (m_uiInitialized) return;
+        m_uiInitialized = true;
         if (acquireButton != null) acquireButton.onClick.AddListener(OnAcquirePressed);
         if (retryButton != null) retryButton.onClick.AddListener(OnRetryPressed);
+    }
+
+    void OnEnable()
+    {
+        InitializeUI();
+        if (view != null) view.OnRevealComplete += OnRevealComplete;
     }
 
     void OnDisable()
     {
         if (view != null) view.OnRevealComplete -= OnRevealComplete;
-        if (acquireButton != null) acquireButton.onClick.RemoveListener(OnAcquirePressed);
-        if (retryButton != null) retryButton.onClick.RemoveListener(OnRetryPressed);
 
         // 화면이 꺼진 뒤 도착하는 임팩트 콜백은 세션을 되살릴 자리가 없다 — 여기서 미리 무효화한다.
         // 남겨 두면 다음에 열렸을 때 이 플래그가 그대로 남아 재구매가 영영 막힌다.
@@ -469,7 +479,7 @@ public class PackAcquireController : MonoBehaviour
             return;
         }
 
-        SceneManager.LoadScene(m_nextScene);
+        LoadingCoverView.LoadScene(m_nextScene);
     }
 
 }

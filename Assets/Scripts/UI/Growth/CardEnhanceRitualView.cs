@@ -5,7 +5,7 @@ using UnityEngine;
 // 담금질이다 — 카드가 움츠러들며 달아오르고(고조), 그 빛이 카드를 통째로 삼킨 뒤(정적), 백열이 걷히며 터진다(공개).
 //
 // 호출부와의 콜백 계약은 CardGrowthRitualView가 진다 — 여기는 무대에 무엇을 그릴지만 정한다.
-public class CardEnhanceRitualView : CardGrowthRitualView
+public class CardEnhanceRitualView : CardGrowthRitualView, IUIInitializable
 {
     [Header("무대 (미배선이면 연출 없이 콜백만 즉시 흘린다)")]
     [Tooltip("⚠ LayoutGroup에 구동되지 않는 노드여야 한다 — 매 프레임 좌표가 되돌려지면 진동이 보이지 않는다.")]
@@ -148,8 +148,13 @@ public class CardEnhanceRitualView : CardGrowthRitualView
     // 재질 **사본**은 여기서 미리 만든다(강화 순간의 생성 렉 제거). 카드에 얹는 것은 연출이 시작할 때다 —
     // 평상시까지 얹어두면 카드가 연출 셰이더로 그려져, 상세창 좌우 전환의 알파 페이드에서 색이 틀어졌다.
     // 불티(embers)는 카드가 아니라 별도 판이고 평상시 알파 0이라 미리 얹어둬도 된다.
-    void Awake()
+    bool m_uiInitialized;
+    void Awake() => InitializeUI();
+
+    public void InitializeUI()
     {
+        if (m_uiInitialized) return;
+        m_uiInitialized = true;
         this.shading.Warm();
         this.embers.Attach();
     }

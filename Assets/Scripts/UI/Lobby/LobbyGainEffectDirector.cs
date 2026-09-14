@@ -309,7 +309,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
         if (this.lobbyTabController != null) this.lobbyTabController.Select(t_album, false);
 
         // 탭을 못 켰으면 세션이 설 자리가 없다 — 위장을 남기면 그 카드가 도감에서 영영 빈 칸이다.
-        if (!t_album.isActiveAndEnabled)
+        if (!t_album.IsViewVisible)
         {
             Debug.LogWarning("[LobbyGainEffectDirector] Could not turn on the album tab, so the insert presentation is skipped — the cards are still inserted.");
             CancelInsertSession();

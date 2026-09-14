@@ -14,6 +14,7 @@ public sealed class WaitAssetPreloadStep : MainInitializer
         StartCoroutine(PackArtCache.Preload());
         UiPrefabCache.ResetIfFailed();
         UiPrefabCache.Preload().Forget();
+        CardArtCache.ResetIfFailed();
         StartCoroutine(CardArtCache.Preload(CardCatalog.AllSpecs));
 
         await UniTask.WaitUntil(() =>

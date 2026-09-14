@@ -39,7 +39,7 @@ MissionOverlay             활성 유지: ContentsPooledUI 파생 제어 스크�
 - 배틀패스: `PassPanel` / `PassOverlay.prefab`
 - 비활성 준비 지원: `MissionRowView`, `PassLevelRowView`, `SafeAreaFitter`
 
-기존 `PooledUIBase` 파생 화면은 기존 Awake 등록을 유지한다. 씬에 배치된 `SimpleYNPopup`, `hostEmbedded` 덱 편집은 등록 예외를 확인한 뒤 별도 이관한다. 나머지 팝업, 로비 탭, 단일 오버레이, 전투 UI도 후속 이관 대상이다.
+1차 시점에는 기존 `PooledUIBase` 화면의 Awake 등록을 유지했다. 씬에 배치된 `SimpleYNPopup`, `hostEmbedded` 덱 편집과 로비의 나머지 화면은 아래 6차에서 이관했다. 전투 전용 HUD 전체를 이관한 것은 아니다.
 
 ## 2차 적용 범위
 
@@ -85,6 +85,21 @@ MissionOverlay             활성 유지: ContentsPooledUI 파생 제어 스크�
 두 화면은 공용 딤·전환을 사용하지 않고 기존 즉시 개폐를 유지한다. 로비 설정은 기존 Contents를 최초 비활성화하고, 대기 프리팹은 이미 같은 구조라 저작값을 바꾸지 않는다. 계정 상태 구독은 로비 설정이 표시된 동안만 유지한다. 프로필 편집 후 복귀와 로그아웃 실패 시 복귀 경로는 유지한다. 설정 초기화는 입력을 연결하며 설정값을 저장하거나 인증을 시작하지 않는다.
 
 대기 화면은 초기화 후 owner를 더하고 Show에서 목록을 유지한다. 입력은 즉시 차단하고 딤·스피너는 기존 임계 뒤에 표시한다. 마지막 owner가 Release될 때만 닫힌다. Hide·외부 비활성화·파괴에서 owner·지연 세대·페이드·스피너를 명시적으로 정리하며, 기존 Show/Hide 콜백은 유지한다.
+
+## 6차 적용 범위
+
+- 로비 탭 공통 및 전투·덱·도감·팩·상점 탭: `LobbyTabPanel`, `LobbyTabController`와 파생 탭. 슬라이드 위치는 제어 루트가 유지하고 Contents만 개폐한다. `PackShowcaseController`는 탭의 표시 이벤트로 구독을 관리한다.
+- 덱 편집: `DeckEditController`를 ContentsPooledUI로 이관한다. 로비 내장 `hostEmbedded`는 풀에 등록하지 않으며, 숨김에서 편집 사본·드래그·구독을 정리한다.
+- 카드 상세·강화 결과·도감 페이지·모험 맵: `CardDetailOverlayView`, `EnhanceResultPanelView`, `AlbumPageOverlayView`, `AdventureMapOverlayView`. 강화·진화 연출과 섹션 해금 효과도 비활성 상태에서 참조를 준비한다.
+- 보상·승급·해금 소개: `CardRewardOverlay`, `CardSetRewardOverlay`, `PackRewardOverlay`, `RewardClaimPopup`, `RankPromoteOverlay`, `UnlockIntroOverlay`, `ContentUnlockIntroView`.
+- 남은 풀 화면: `SimpleYNPopup`, `PooledCardElement`, `MissionCutInView`, `SettingsPanel`. StartScene의 직접 배치 확인 팝업은 `ScenePooledUIRegistrar`가 명시적으로 초기화·등록한다. 카드 설명의 잔여 딤 페이드와 설정의 닫는 중 재열기 처리를 유지한다.
+- 카드팩 개봉·매칭·출전 덱 선택: `PackOpenOverlay`, `MatchmakingShell`, `MatchDeckShell`. 개봉 브레인·뷰와 덱 선택 표시도 명시적으로 초기화한다. 매칭 정상 핸드오프는 다음 덱의 등장까지 공유 시퀀스를 유지하고, 일반 숨김은 토큰·트윈·스캔을 정리한다.
+
+비풀 화면은 `ContentsUIBehaviour`를 사용한다. 직렬화된 `viewContents`는 직계 Contents를 가리키며 초기 비활성이다. 초기화는 멱등이고 `IUIInitializationRoot` 경계에서 각 프리팹 소유자가 하위 초기화를 맡는다. 기존 풀 화면의 즉시 숨김 훅과 달리 비풀 화면의 `OnViewShown`/`OnViewHidden`은 `ContentsVisibilityRelay`를 통해 실제 활성화·퇴장 완료 시점에 호출된다. 기존 닫힘 콜백과 튜토리얼 진행 순서를 보존하기 위한 차이다. 즉시 취소해야 하는 요청은 각 화면의 Close/Hide에서 처리한다.
+
+`IsViewVisible`은 Contents의 실제 계층 활성 상태이므로 퇴장 연출 중에도 true다. `VisibilityVersion`은 개폐 요청이 바뀔 때 증가하며 지연 팝업 요청이 이전 표시 세션을 재사용하지 못하게 한다. 피벗·앵커·크기 등 기존 자식 배치는 보존하며, 상세 화면의 배경 Graphic과 스와이프 입력, 페이드용 CanvasGroup은 Contents로 옮긴다. 새 래퍼는 RectTransform 전체 stretch 또는 원래 3D Transform의 단위 변환을 사용한다.
+
+검증: 기존 RectTransform 459개의 기하값 보존(탭·덱 188개, 상세·도감·모험·보상 271개), 래퍼의 직계 관계·컴포넌트 참조·초기 활성 상태를 확인했다. Unity에서 36개 프리팹의 실제 비활성 초기화 및 재호출과 공통 개폐 수명 검증 1개 묶음이 통과했다. 수명 검사는 편집 모드에서 relay 콜백을 명시적으로 호출한다. 실제 플레이의 서버 왕복·전투 진입·매칭은 이 격리 검증에 포함하지 않았다. 검증 중 작업 씬의 활성·dirty 상태를 보존했다.
 
 ## SafeArea 편집 미리보기
 

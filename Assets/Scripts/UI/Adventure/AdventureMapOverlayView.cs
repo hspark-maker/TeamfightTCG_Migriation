@@ -10,7 +10,7 @@ using UnityEngine.UI;
 // 좌표의 진실원은 챕터 타일 프리팹이다 — 정점 자리도 길 조각도 디자이너가 타일 안에 저작하고,
 // 코드는 타일을 쌓고 저작된 자리에 정점을 놓고 길 조각을 상태에 따라 틴트할 뿐 좌표를 만들지 않는다.
 // 자기 여닫음은 스스로 소유하고, 씬 전환만 모른다 — 도전을 이벤트로 올리면 LobbyRoot(LobbyMatchLauncher)가 잇는다.
-public class AdventureMapOverlayView : MonoBehaviour, IPointerClickHandler
+public class AdventureMapOverlayView : ContentsUIBehaviour, IPointerClickHandler
 {
     [SerializeField] ScrollRect scrollRect;
     [SerializeField] RectTransform content;          // 타일과 정점이 놓일 Content(레이아웃 그룹 없이 코드가 좌표를 잡는다)
@@ -84,7 +84,7 @@ public class AdventureMapOverlayView : MonoBehaviour, IPointerClickHandler
     public event Action<int> NodeSelected;
 
     /// <summary>맵이 화면에 떠 있는가.</summary>
-    public bool IsOpen => this.gameObject.activeInHierarchy;
+    public bool IsOpen => this.IsViewVisible;
 
     // 정점 앵커가 등록돼 있어도 되는 상태 — 켜져 있고 퇴장 중이 아닐 때만.
     bool IsOnStage => this.IsOpen && !this.m_closing;
@@ -167,17 +167,18 @@ public class AdventureMapOverlayView : MonoBehaviour, IPointerClickHandler
     // 해금 사슬이 화면을 쥐고 있는가 — 대상이 남아 있으면 대기 시퀀스가 없는 틈에도 참이다.
     bool IsIntroPending => this.m_introSeq != null || this.m_introTargets.Count > 0;
 
-    void Awake()
+    protected override void OnInitializeUI()
     {
         if (this.backButton != null) this.backButton.onClick.AddListener(this.Close);
     }
 
-    void OnDestroy()
+    protected override void OnDestroy()
     {
+        base.OnDestroy();
         if (this.backButton != null) this.backButton.onClick.RemoveListener(this.Close);
     }
 
-    void OnEnable()
+    protected override void OnViewShown()
     {
         AdventureProgress.OnChanged += this.RefreshNodes;
 
@@ -189,7 +190,7 @@ public class AdventureMapOverlayView : MonoBehaviour, IPointerClickHandler
         this.ApplyTutorialAnchor(true);
     }
 
-    void OnDisable()
+    protected override void OnViewHidden()
     {
         AdventureProgress.OnChanged -= this.RefreshNodes;
 
@@ -199,12 +200,13 @@ public class AdventureMapOverlayView : MonoBehaviour, IPointerClickHandler
         this.m_closing = false;
 
         LobbyShellBars.Show(this);            // 씬 이탈로 잘려도 바가 걷힌 채 굳지 않게
-        this.transition.HandleDisabled(this.gameObject);
+        this.transition.HandleDisabled(viewContents);
     }
 
     /// <summary>맵을 연다. 정점 세우기·스크롤은 활성화 뒤에 돈다 — rect가 0이면 스크롤 계산이 깨진다.</summary>
     public void Open()
     {
+        InitializeUI();
         // 퇴장 트윈 중에도 IsOpen은 참이다 — 여기서 물러나면 앵커가 해제된 채 맵만 되살아난다.
         if (this.IsOnStage) return;
 
@@ -213,7 +215,7 @@ public class AdventureMapOverlayView : MonoBehaviour, IPointerClickHandler
         // 억제 스위치가 켜진 채 남아 있으면 아래 RefreshNodes가 통째로 무시돼 맵이 옛 그림으로 굳는다.
         this.AbortClaimSequence();
 
-        this.transition.SetVisible(this.gameObject, true);
+        SetContentsVisible(true, this.transition);
 
         if (this.m_built) this.RefreshNodes();
         else this.Build();
@@ -244,7 +246,7 @@ public class AdventureMapOverlayView : MonoBehaviour, IPointerClickHandler
         this.ApplyTutorialAnchor(false);
 
         LobbyShellBars.Show(this);
-        this.transition.SetVisible(this.gameObject, false);
+        SetContentsVisible(false, this.transition);
     }
 
     /// <summary>전투에서 막 돌아온 정점의 보상을 곧바로 연다(맵이 이미 열려 있어야 한다).
@@ -765,7 +767,7 @@ public class AdventureMapOverlayView : MonoBehaviour, IPointerClickHandler
         this.RefreshNodes();
 
         this.m_claimNode = _index;
-        this.m_claimSeq = DOTween.Sequence().SetLink(this.gameObject);
+        this.m_claimSeq = DOTween.Sequence().SetLink(viewContents);
 
         // 정박 없이 곧바로 차오른다 — 도장은 이미 꽂혔고, 이 점등이 "확정됐다"를 잇는 두 번째 박이다.
         float t_at = 0f;
@@ -1197,7 +1199,7 @@ public class AdventureMapOverlayView : MonoBehaviour, IPointerClickHandler
 
             // 이동도 m_introSeq에 담는다 — 이 자리를 비우면 마지막 대상의 이동 중에 IsIntroPending이 새어
             // 그 틈으로 복귀 수령·정점 탭이 통과한다.
-            Sequence t_move = DOTween.Sequence().SetLink(this.gameObject);
+            Sequence t_move = DOTween.Sequence().SetLink(viewContents);
             t_move.AppendInterval(Mathf.Max(0.01f, t_travel));
             t_move.OnComplete(() =>
             {
@@ -1247,7 +1249,7 @@ public class AdventureMapOverlayView : MonoBehaviour, IPointerClickHandler
             t_wait = Mathf.Max(t_wait, this.ChapterStepsEnd(t_playing.Index, t_length, t_step));
         }
 
-        Sequence t_seq = DOTween.Sequence().SetLink(this.gameObject);
+        Sequence t_seq = DOTween.Sequence().SetLink(viewContents);
         t_seq.AppendInterval(t_wait);   // Append는 현재 길이 뒤에 붙는다 — 계단 콜백보다 먼저 세워야 대기가 밀리지 않는다
 
         // 띠 안무가 끝나는 시각이 곧 그 장이 열리는 시각이다 — 딸려 세운 정점들을 여기서부터 계단으로 풀어 준다.
@@ -1332,7 +1334,7 @@ public class AdventureMapOverlayView : MonoBehaviour, IPointerClickHandler
         this.m_scrollTween = this.scrollRect
             .DOVerticalNormalizedPos(t_normalized, t_duration)
             .SetEase(Ease.InOutSine)
-            .SetLink(this.gameObject);
+            .SetLink(viewContents);
 
         return t_duration;
     }

@@ -59,7 +59,7 @@ public sealed class DeckEditData : UIData
 // 풀드 UI다. 예전에는 로비 탭 안에 한 벌, 매치 오버레이 안에 한 벌(MatchDeckEditPanel 배리언트) —
 // 저작본이 둘로 갈려 레이아웃 오버라이드가 쌓였다. 지금은 UIPoolManager가 세우는 인스턴스 하나뿐이고
 // 두 호스트의 차이는 전부 DeckEditData로 들어온다.
-public class DeckEditController : PooledUIBase, IPointerClickHandler
+public class DeckEditController : ContentsPooledUI, IPointerClickHandler
 {
     [SerializeField] TMP_InputField    nameInput;      // 덱 이름 입력/표시
     [SerializeField] Button            backButton;
@@ -193,11 +193,11 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     // 이번 진입 요청. Open은 Show에서 돈다 — BeginEdit이 컬렉션 그리드를 세우므로 활성 상태여야 한다.
     DeckEditData m_request;
 
-    protected override void Awake()
-    {
-        // 풀은 타입 키 하나다 — 등록하면 매치 덱 화면이 로비 계층에 박힌 이 인스턴스를 빌려 간다.
-        if (!hostEmbedded) base.Awake();          // 풀 등록(UIPoolManager.RegisterUI)
+    protected override bool UsePopupTransition => false;
+    protected override bool UseScreenDim => false;
 
+    protected override void OnInitializeUI()
+    {
         if (backButton != null)
         {
             backButton.onClick.RemoveAllListeners();
@@ -250,15 +250,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         // 시너지 아이콘 롱프레스 → 그 시너지를 가진 카드만 강조. 어떤 카드가 대상인지는 편성/컬렉션을 아는 여기서 정한다.
         if (synergyStrip != null) synergyStrip.onFocusChanged = ApplySynergyFocus;
 
-        // 열리기 전에는 반드시 꺼져 있다. 켜고 끄는 주인은 풀(Show/Hide)뿐이다.
-        //
-        // 왜 코드로 강제하나: 씬/프리팹에 저작된 인스턴스가 켜진 채로 남아 있으면
-        // (Tab_Deck의 DeckEditPanel 인스턴스가 m_IsActive=1로 저작돼 있다) 전체화면 편집 화면이
-        // 로비 위에 깔려 하단 탭바까지 클릭을 먹는다 — 예전엔 호스트의 SetActive(false)가 매번 지웠지만
-        // 그 책임이 풀로 옮겨간 지금은 "열 때만 켠다"를 여기서 불변식으로 박아야 한다.
-        // 배선은 이 위에서 이미 끝났으므로 지금 꺼도 다음 열기에 그대로 살아 있다.
-        // 호스트 계층에 박힌 인스턴스는 켜고 끄는 주인이 호스트다 — 여기서 끄면 탭이 켜 준 화면을 도로 지운다.
-        if (!this.isShow && !hostEmbedded) gameObject.SetActive(false);
+
     }
 
     // _synergy가 null이면 강조 해제. 대상 카드는 살짝 커지고 나머지는 흐려진다.
@@ -299,6 +291,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     /// 재사용 인스턴스는 이 시점에 아직 비활성이고, BeginEdit이 세우는 컬렉션 그리드는 활성이라야 레이아웃이 선다.</summary>
     public override void Initialization(UIData _data)
     {
+        InitializeUI();
         this.data    = _data;
         this.m_request = _data as DeckEditData;
 
@@ -316,8 +309,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
     {
         if (this.m_request == null) return;
 
-        gameObject.SetActive(true);   // OnEnable이 여기서 돌아 소유 변경·해금 구독이 선다
-        this.isShow = true;
+        SetContentsVisible(true);
 
         // 박힌 인스턴스는 호스트 계층의 정렬을 따른다 — 올리면 상단 바·탭 바 위로 튀어나온다.
         // 드래그 고스트만은 올린다: 그러지 않으면 튜토리얼 게이트 딤 아래에서 끌린다.
@@ -346,13 +338,17 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         if (this.deckStrip != null) this.deckStrip.gameObject.SetActive(this.m_request.showDeckStrip);
     }
 
-    /// <summary>닫기는 편집 상태를 버리고 루트를 내린다. <b>저장 판정은 여기서 하지 않는다</b> —
+    /// <summary>닫기는 편집 상태를 버리고 Contents를 내린다. <b>저장 판정은 여기서 하지 않는다</b> —
     /// 그건 RequestLeave 한 곳뿐이고, 호스트는 허가가 떨어진 뒤에 이걸 부른다.
     /// (곧바로 부르면 확인 없이 편성분이 사라진다.)</summary>
     public override void Hide()
     {
-        this.isShow = false;
+        if (isShow) SetContentsVisible(false);
+        else ClearSession();
+    }
 
+    void ClearSession()
+    {
         Close();
 
         // 패널 재사용 전에 튜토리얼 앵커를 명시로 걷는다.
@@ -364,8 +360,6 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         this.data = null;
         this.m_request = null;
         this.m_onExit = null;
-
-        gameObject.SetActive(false);   // OnDisable이 드래그 고스트까지 걷는 최종 방어선
     }
 
     /// <summary>덱 편집을 여는 유일한 창구. 두 호스트가 같은 한 인스턴스를 쓴다.
@@ -482,7 +476,7 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         ClearSearch();
     }
 
-    void OnEnable()
+    protected override void OnViewShown()
     {
         OwnershipManager.OnOwnershipChanged += OnOwnershipChanged;
 
@@ -514,29 +508,12 @@ public class DeckEditController : PooledUIBase, IPointerClickHandler
         ScrollToHoldout();
     }
 
-    // 패널이 어떤 경로로 꺼지든(탭 전환·씬 전환·부모 비활성) 드래그 고스트가 남지 않게 하는 최종 방어선.
-    // Close()는 DeckTabController를 거치는 경로에서만 불린다.
-    // 편집 상태(m_mode)도 같이 내려야 한다 — 안 그러면 패널이 꺼졌는데 IsOpen이 true로 남아
-    // 다음 진입 전까지 편집 중인 것처럼 보고된다.
-    void OnDisable()
+    // 정상 닫힘과 외부 비활성 모두 구독·편집 사본·드래그 고스트를 같은 경로로 정리한다.
+    protected override void OnViewHidden()
     {
         OwnershipManager.OnOwnershipChanged -= OnOwnershipChanged;
-        OutgameFeatureLock.OnChanged        -= OnFeatureLockChanged;
-
-        if (s_open == this) s_open = null;
-
-        m_mode      = EDeckEditMode.None;
-        m_slotIndex = -1;
-        m_dirty     = false;
-        m_savedName = null;
-        Array.Clear(m_working, 0, m_working.Length);
-        ClearSlotPickVisual();
-
-        if (dragController != null) dragController.Cancel();
-        if (synergyStrip   != null) synergyStrip.Clear();
-        if (deckStrip      != null) deckStrip.Clear();
-        if (nameInput      != null) nameInput.DeactivateInputField();
-        if (searchInput    != null) searchInput.DeactivateInputField();
+        OutgameFeatureLock.OnChanged -= OnFeatureLockChanged;
+        ClearSession();
     }
 
     // 튜토리얼이 지목한 카드를 이번 편집에서만 빼 둔다 — 세이브는 건드리지 않는다(m_working 위에서만 일어난다).

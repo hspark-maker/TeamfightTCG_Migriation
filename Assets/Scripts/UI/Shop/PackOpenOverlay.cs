@@ -8,12 +8,9 @@ using UnityEngine;
 //   오버레이는 씬을 바꾸지 않으므로 아무도 해주지 않는다. 그래서 OnOpened/OnClosed 두 신호로 명시한다.
 //   구독자가 씬 이름을 보지 않게 하는 것이 목적이다(PackRevealView.OnAnyPackOpened와 같은 방향).
 //
-// 여닫는 대상은 이 오브젝트의 **root** 하나다(로비의 다른 저작 오버레이 — CardDetailOverlayView ·
-//   RewardClaimPopup · MatchDeckShell — 와 같은 축). 그래서 씬에는 비활성으로 배치되고,
-//   비활성 오브젝트는 Awake가 돌지 않으므로 인스턴스는 Awake 선점이 아니라 첫 호출 때
-//   비활성 포함으로 찾아 캐시한다(CardDetailOverlayView.Resolve와 같은 관용구).
+// 제어 루트는 유지하고 Contents만 여닫는다. 숨겨진 자식의 고정 배선은 소유자가 먼저 준비한다.
 [DisallowMultipleComponent]
-public class PackOpenOverlay : MonoBehaviour
+public class PackOpenOverlay : ContentsUIBehaviour
 {
     static PackOpenOverlay s_instance;
 
@@ -58,7 +55,7 @@ public class PackOpenOverlay : MonoBehaviour
         // 먼저 되돌린 뒤 끈다 — 반대로 하면 OnDisable이 요약 상태를 일부러 남겨(중복 발화 방지)
         // 다음 BeginOpen이 재진입 가드에 막힌다.
         if (this.view != null) this.view.ResetSession();
-        gameObject.SetActive(false);
+        SetContentsVisible(false);
 
         OnClosed?.Invoke();
     }
@@ -73,7 +70,7 @@ public class PackOpenOverlay : MonoBehaviour
         return s_instance;
     }
 
-    void Awake()
+    protected override void OnInitializeUI()
     {
         if (s_instance != null && s_instance != this)
         {
@@ -84,14 +81,10 @@ public class PackOpenOverlay : MonoBehaviour
 
         s_instance = this;
         ResolveWiring();
-
-        // 저작이 켜진 채로 남아 있어도 시작은 닫힌 상태다. Open이 켜는 중이면(IsOpen) 건드리지 않는다 —
-        // Awake는 그 SetActive(true) 호출 안에서 돌기 때문에 여기서 끄면 열리다 만 화면이 된다.
-        if (!IsOpen) gameObject.SetActive(false);
     }
 
     // 바깥이 Close를 거치지 않고 root를 껐을 때의 안전판. Close는 IsOpen을 먼저 내리므로 여기 걸리지 않는다.
-    void OnDisable()
+    protected override void OnViewHidden()
     {
         if (!IsOpen) return;
 
@@ -104,8 +97,9 @@ public class PackOpenOverlay : MonoBehaviour
         OnClosed?.Invoke();
     }
 
-    void OnDestroy()
+    protected override void OnDestroy()
     {
+        base.OnDestroy();
         if (s_instance != this) return;
 
         s_instance = null;
@@ -115,30 +109,28 @@ public class PackOpenOverlay : MonoBehaviour
 
     bool Open()
     {
+        InitializeUI();
         if (IsOpen) return false;   // 이미 열려 있으면 진행 중인 세션을 덮지 않는다.
         if (!PackHandoff.HasPending) return false;
 
-        // IsOpen을 켜는 것보다 먼저 세운다 — SetActive(true)가 그 안에서 Awake를 돌리고,
-        // Awake는 "열리는 중이 아니면 닫는다"로 저작 실수를 자가교정하기 때문이다.
-        // 연출 신호 순서로도 이쪽이 맞다: 구독자가 "안 열린 개봉"을 보지 않는다(튜토리얼이 이 플래그로 안내를 억제한다).
+        // 표시 구독자가 열림 상태를 읽을 수 있도록 플래그를 먼저 세운다.
         IsOpen = true;
 
-        // 켜는 것이 먼저다 — 비활성으로 시작한 오브젝트는 이 시점에 Awake가 돌아 배선이 성립하고,
-        // 브레인·뷰의 OnEnable 구독이 붙기 전에 세션을 태우면 연출 신호가 유실된다.
-        gameObject.SetActive(true);
+        // 브레인·뷰의 표시 구독이 붙은 뒤에 세션을 태워야 연출 신호가 유실되지 않는다.
+        SetContentsVisible(true);
 
         if (this.controller == null || this.view == null)
         {
             Debug.LogWarning("[PackOpenOverlay] controller/view are unwired — the reveal screen cannot be opened.");
             IsOpen = false;
-            gameObject.SetActive(false);
+            SetContentsVisible(false);
             return false;
         }
 
         if (!this.controller.BeginSession())
         {
             IsOpen = false;
-            gameObject.SetActive(false);
+            SetContentsVisible(false);
             return false;
         }
 

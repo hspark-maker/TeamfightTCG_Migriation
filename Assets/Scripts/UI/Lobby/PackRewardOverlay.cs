@@ -21,7 +21,6 @@ using TMPro;
 public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
 {
     [Tooltip("켜고 끌 대상. 미배선이면 자기 gameObject를 토글한다.")]
-    [SerializeField] GameObject root;
 
     [SerializeField] TMP_Text titleText;
     [SerializeField] Button confirmButton;
@@ -90,6 +89,7 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
     /// (화면은 그 연출에 자리를 넘기고 걷힌다).</summary>
     public void Show(string _title, string _packId, Action _onClosed)
     {
+        InitializeUI();
         this.m_onClosed = _onClosed;
         this.KillIntro();
 
@@ -136,13 +136,13 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
 
     // 잠금은 등장 안무가 푼다. Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서는 그 안무가 없어
     // [확인]이 잠긴 모달로 남으므로, 켜질 때 일단 열어 둔다(Show는 이 뒤에 다시 잠근다).
-    void OnEnable()
+    protected override void OnViewShown()
     {
         this.SetInputEnabled(true);
     }
 
     // 오버레이는 자기 자신이 토글 대상이라 OnDisable이 정상 동작한다 — 잘린 퇴장 마무리를 여기서 위임한다.
-    void OnDisable()
+    protected override void OnViewHidden()
     {
         this.transition.HandleDisabled(this.ResolveTarget());
         this.KillIntro();
@@ -258,8 +258,8 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
 
     void SetVisible(bool _visible)
     {
-        this.transition.SetVisible(this.ResolveTarget(), _visible);
+        SetContentsVisible(_visible, this.transition);
     }
 
-    GameObject ResolveTarget() => this.root != null ? this.root : this.gameObject;
+    GameObject ResolveTarget() => viewContents;
 }

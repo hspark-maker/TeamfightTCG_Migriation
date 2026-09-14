@@ -6,18 +6,18 @@ using UnityEngine;
 public sealed class OutgameConfigStep : MainInitializer
 {
     // 카드 앨범(신규 도감) 스킨 SO. 구조·표시 텍스트는 스펙시트가 정하고, 여기선 테마 그림 4종만 온다.
-    [SerializeField] CardAlbumConfig albumConfig;
+    CardAlbumConfig albumConfig => RuntimeContentCache.Config.albumConfig;
     // 재화 아이콘·표시명 표 SO. 미배선이면 아이콘은 프리팹 그림 그대로, 이름은 코드 기본값으로 떨어진다.
-    [SerializeField] CurrencyLook currencyLook;
+    CurrencyLook currencyLook => RuntimeContentCache.Config.currencyLook;
     // 모험 경로 SO. 미배선이면 정점이 0개라 모험 진입이 열리지 않는다.
-    [SerializeField] AdventureConfig adventureConfig;
+    AdventureConfig adventureConfig => RuntimeContentCache.Config.adventureConfig;
     // 프로필 아바타·프레임 표 SO. 미배선이면 아바타·프레임 그림이 전부 프리팹 저작값 그대로 남는다.
-    [SerializeField] ProfileConfig profileConfig;
-    [SerializeField] EmoteCatalog emoteCatalog;
+    ProfileConfig profileConfig => RuntimeContentCache.Config.profileConfig;
+    EmoteCatalog emoteCatalog => RuntimeContentCache.Config.emoteCatalog;
     // 덱 대표 이미지 후보 SO. 미배선이면 신규 덱이 이미지 키를 못 받고 표시가 첫 카드 아트로 떨어진다.
-    [SerializeField] DeckImageCatalog deckImageCatalog;
+    DeckImageCatalog deckImageCatalog => RuntimeContentCache.Config.deckImageCatalog;
     // 룰렛 판 표현 SO. 값(비용·칸)은 Roulette·RouletteSlot 표가 덮고 여기선 사본의 바탕만 준다 — 미배선이면 룰렛만 꺼진다.
-    [SerializeField] RouletteConfig rouletteConfig;
+    RouletteConfig rouletteConfig => RuntimeContentCache.Config.rouletteConfig;
 
     public override UniTask Initialize(InitializationContext _context)
     {

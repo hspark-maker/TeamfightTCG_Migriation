@@ -205,7 +205,8 @@ public class UIPoolManager : MonoBehaviour
 
     async UniTask OpenDeferredAsync<T>(MonoBehaviour _owner, UIData _data, int _version) where T : PooledUIBase
     {
-        int t_ownerVersion = (_owner as ContentsPooledUI)?.VisibilityVersion ?? 0;
+        int t_ownerVersion = _owner is ContentsPooledUI t_pool ? t_pool.VisibilityVersion
+            : _owner is ContentsUIBehaviour t_view ? t_view.VisibilityVersion : 0;
         object t_waitOwner = new object();
         Exception t_error = null;
         UniTask<GameObject> t_load = default;
@@ -261,8 +262,11 @@ public class UIPoolManager : MonoBehaviour
     {
         if (_owner == null || !_owner.isActiveAndEnabled) return false;
         // 제어 루트는 닫아도 켜져 있다. 화면 표시와 같은 개폐 세션인지 함께 확인한다.
-        return _owner is not ContentsPooledUI t_panel ||
-            (t_panel.isShow && (!_version.HasValue || t_panel.VisibilityVersion == _version.Value));
+        if (_owner is ContentsPooledUI t_panel)
+            return t_panel.isShow && (!_version.HasValue || t_panel.VisibilityVersion == _version.Value);
+        if (_owner is ContentsUIBehaviour t_view)
+            return t_view.IsViewVisible && (!_version.HasValue || t_view.VisibilityVersion == _version.Value);
+        return true;
     }
 
     public void RegisterUI(PooledUIBase _ui)

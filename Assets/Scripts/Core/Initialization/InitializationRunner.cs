@@ -72,8 +72,22 @@ public sealed class InitializationRunner : MonoBehaviour
 
     async UniTask RestartFromRetryEntry()
     {
-        // 다운로드 실패는 이미 끝난 로그인·세이브·스펙 동기화를 다시 실행하지 않는다.
-        if (RemoteCardArtDownload.HasFailed || PackArtCache.HasFailed || UiPrefabCache.HasFailed)
+        // 다운로드·설정 실패는 이미 끝난 로그인·세이브·스펙 동기화를 다시 실행하지 않는다.
+        if (RemoteCardArtDownload.HasFailed || RuntimeContentCache.HasFailed)
+        {
+            int t_contentStep = initializers.FindIndex(_step => _step is RuntimeContentPreloadStep);
+            if (t_contentStep >= 0)
+            {
+                GameInitialization.ResetForRetry();
+                var t_profile = m_context?.Profile;
+                m_context = new InitializationContext(this);
+                m_context.SetProfile(t_profile);
+                await RunFrom(t_contentStep);
+                return;
+            }
+        }
+
+        if (CardArtCache.HasFailed || PackArtCache.HasFailed || UiPrefabCache.HasFailed)
         {
             int t_assetStep = initializers.FindIndex(_step => _step is WaitAssetPreloadStep);
             if (t_assetStep >= 0)

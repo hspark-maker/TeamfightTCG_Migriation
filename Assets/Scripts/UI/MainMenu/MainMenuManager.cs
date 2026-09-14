@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 public class MainMenuManager : MonoBehaviour
 {
@@ -51,7 +50,7 @@ public class MainMenuManager : MonoBehaviour
         DeckConfig.ClearEnemyDeck();
         DeckConfig.SetMultiplayer(false);
         SceneTransitionVideo.Instance?.PlayOverlay();
-        SceneManager.LoadScene("BattleScene");
+        LoadingCoverView.LoadScene("BattleScene");
     }
 
     // GameReadyPanel → 멀티플레이 대전 → 코드 매칭 로비
@@ -101,7 +100,7 @@ public class MainMenuManager : MonoBehaviour
 
         TutorialConfig.Begin(this.tutorialScenario);
         SceneTransitionVideo.Instance?.PlayOverlay();
-        SceneManager.LoadScene("BattleScene");
+        LoadingCoverView.LoadScene("BattleScene");
     }
 
     public void OnDeckPressed()

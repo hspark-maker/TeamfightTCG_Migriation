@@ -7,7 +7,7 @@ using UnityEngine;
 public sealed class CardCatalogStep : MainInitializer
 {
     // 카드 목록은 SpecData가 단일 진실원이며 CardCatalog가 초기화 시 구성한다. 시너지 표만 저작물로 받는다.
-    [SerializeField] SynergyRegistry synergyRegistry;
+    SynergyRegistry synergyRegistry => RuntimeContentCache.Config.synergyRegistry;
 
     public override UniTask Initialize(InitializationContext _context)
     {

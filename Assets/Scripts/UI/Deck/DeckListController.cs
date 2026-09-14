@@ -7,7 +7,7 @@ using TMPro;
 // DeckSaveManager 6슬롯을 읽어 유효 덱만 칸으로 만들고, 0행 0열에 "신규 생성" 칸을 고정한다.
 // 갱신 경로는 "패널이 켜질 때 재빌드" + DeckSaveManager.OnDeckChanged 구독 둘이다.
 // 덱 세이브 접근은 이 클래스에만 가둔다(덱 목록 화면에서 세이브를 만지는 파일 1개).
-public class DeckListController : MonoBehaviour
+public class DeckListController : MonoBehaviour, IUIInitializable
 {
     [SerializeField] Transform         content;        // GridLayoutGroup(2열) + ContentSizeFitter
     [SerializeField] DeckSlotView      slotPrefab;     // DeckCard.prefab
@@ -29,8 +29,14 @@ public class DeckListController : MonoBehaviour
     // 마지막 Build가 실제로 그린 덱 칸 수. 편집 토글 활성 판정에 쓴다(countText와 같은 값).
     int m_deckSlotCount;
 
-    void Awake()
+    bool m_initialized;
+
+    void Awake() => InitializeUI();
+
+    public void InitializeUI()
     {
+        if (m_initialized) return;
+        m_initialized = true;
         // 배선은 프리팹에서 한 번뿐이므로 등록도 한 번뿐 — OnEnable에 두면 탭 재진입마다 중복 등록된다.
         if (editToggleButton != null)
         {
@@ -43,6 +49,7 @@ public class DeckListController : MonoBehaviour
 
     void OnEnable()
     {
+        InitializeUI();
         // 탭을 나갔다 오면 편집 모드는 항상 해제한다(DeckTabController가 "항상 목록부터"를 보장하는 것과 같은 이유).
         m_editMode = false;
         Build();

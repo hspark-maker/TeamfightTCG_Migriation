@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 /// <summary>전투 씬 진입의 <b>단일 지점</b>. 멀티에서도 두 클라가 <b>각자</b> 부른다.
 ///
@@ -13,8 +12,7 @@ using UnityEngine.SceneManagement;
 /// SceneReady 핸드셰이크가 맞춘다 — 씬 로드 자체를 동기화할 이유가 없다.</para></summary>
 public static class BattleSceneEntry
 {
-    /// <summary>전투 씬을 연다. Build Settings 에 없으면 <c>false</c> 를 돌려주고 로드하지 않는다
-    /// (<see cref="SceneManager.LoadScene(string)"/> 는 그 경우 예외를 던져 호출부를 통째로 깬다).</summary>
+    /// <summary>등록된 로컬/원격 전투 씬을 연다. 알 수 없는 씬이면 false를 돌려준다.</summary>
     public static bool Load(string _sceneName)
     {
         if (string.IsNullOrEmpty(_sceneName))
@@ -22,14 +20,13 @@ public static class BattleSceneEntry
             Debug.LogError("[BattleSceneEntry] The battle scene name is empty — cannot enter the battle.");
             return false;
         }
-        if (SceneUtility.GetBuildIndexByScenePath($"Assets/Scenes/{_sceneName}.unity") < 0
-            && SceneUtility.GetBuildIndexByScenePath(_sceneName) < 0)
+        if (!GameSceneLoadOperation.CanLoad(_sceneName))
         {
-            Debug.LogError($"[BattleSceneEntry] '{_sceneName}' is not in Build Settings — cannot enter the battle.");
+            Debug.LogError($"[BattleSceneEntry] '{_sceneName}' is not registered — cannot enter the battle.");
             return false;
         }
 
-        SceneManager.LoadScene(_sceneName);
+        LoadingCoverView.LoadScene(_sceneName);
         return true;
     }
 }

@@ -18,7 +18,7 @@ using UnityEngine.UI;
 //  · 정점 뒤에 **어둠이 한 번 낀다**(담금질에는 없다). 빛이 가장 셀 때 화면을 꺼 버리면
 //    남는 광원이 카드 하나뿐이라, 그 실루엣이 "여기서 무엇이 바뀌는가"를 손가락질한다.
 //  · 실패의 얼굴이 없다 — 진화 레벨의 성공률은 1이다.
-public class CardEvolveRitualView : CardGrowthRitualView
+public class CardEvolveRitualView : CardGrowthRitualView, IUIInitializable
 {
     [Header("무대 (미배선이면 연출 없이 콜백만 즉시 흘린다)")]
     [Tooltip("⚠ LayoutGroup에 구동되지 않는 노드여야 한다 — 매 프레임 좌표가 되돌려지면 부양이 보이지 않는다.")]
@@ -319,7 +319,15 @@ public class CardEvolveRitualView : CardGrowthRitualView
 
     // 재질 사본은 미리 만들어 둔다(진화 순간의 생성 렉 제거). 카드에 얹는 것은 연출이 시작할 때다 —
     // 평상시까지 얹어두면 카드가 연출 셰이더로 그려져 상세창 좌우 전환의 페이드에서 색이 틀어진다.
-    void Awake() => this.shading.Warm();
+    bool m_uiInitialized;
+    void Awake() => InitializeUI();
+
+    public void InitializeUI()
+    {
+        if (m_uiInitialized) return;
+        m_uiInitialized = true;
+        this.shading.Warm();
+    }
 
     void OnDestroy() => this.shading.Release();
 

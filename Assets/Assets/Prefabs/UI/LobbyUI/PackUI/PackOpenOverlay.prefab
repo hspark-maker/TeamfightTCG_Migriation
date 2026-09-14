@@ -209,7 +209,7 @@ Transform:
   m_Children:
   - {fileID: 4425463247801641937}
   - {fileID: 774682167079057830}
-  m_Father: {fileID: 3597434991347890582}
+  m_Father: {fileID: 8906000000000000012}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &510386488297406874
 GameObject:
@@ -2821,7 +2821,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 703896174192520432}
+  - {fileID: 8906000000000000012}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &9108108196316362847
@@ -2838,6 +2838,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PackOpenOverlay
   controller: {fileID: 827844586720592769}
   view: {fileID: 1623875942876989043}
+  viewContents: {fileID: 8906000000000000011}
 --- !u!1 &4603258059214006836
 GameObject:
   m_ObjectHideFlags: 0
@@ -4713,3 +4714,34 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &8906000000000000011
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8906000000000000012}
+  m_Layer: 0
+  m_Name: Contents
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!4 &8906000000000000012
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8906000000000000011}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 703896174192520432}
+  m_Father: {fileID: 3597434991347890582}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
