@@ -164,10 +164,12 @@ export const claimMission = onCall(async (request) => {
       // 읽기가 콜백의 첫 줄이고, 아래 쓰기보다 앞이다(Firestore 트랜잭션 규칙).
       // beginMissionBump 이 기간 리셋까지 반영하므로, 어제 진행도로 오늘 보상을 타는 경로가 없다.
       const missions = await beginMissionBump(transaction, db, env, uid, period, current);
+      const rankSnapshot = itemContext !== null || definition?.period === "guide" ?
+        await transaction.get(rankRef(db, env, uid)) : null;
       if (definition?.period === "guide") {
-        missions.state.progress = evaluateGuideProgress(current, guideCards, catalog, missions.state.progress);
+        missions.state.progress = evaluateGuideProgress(
+          current, guideCards, catalog, missions.state.progress, rankSnapshot?.data());
       }
-      const rankSnapshot = itemContext === null ? null : await transaction.get(rankRef(db, env, uid));
       // Keep this read before commitMissionClaim and all other transaction writes.
       const pass = activePassSeason === null ? undefined :
         await beginPassMutation(transaction, db, env, uid, activePassSeason.seasonId);

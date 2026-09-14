@@ -54,6 +54,7 @@ exports.readPinnedSpecRows = readPinnedSpecRows;
 exports.specPayloadHash = specPayloadHash;
 exports.parseSpecPayload = parseSpecPayload;
 exports.readSpecRows = readSpecRows;
+exports.readSpecRowsWithContentMajor = readSpecRowsWithContentMajor;
 exports.clearSpecCache = clearSpecCache;
 const node_crypto_1 = require("node:crypto");
 const logger = __importStar(require("firebase-functions/logger"));
@@ -61,11 +62,11 @@ const firebaseApp_1 = require("../firebaseApp");
 const requestMetrics_1 = require("../observability/requestMetrics");
 /** 현재 테이블 세대. C# ContentVersion.Major와 같으며 앱 빌드 버전과는 별개다. */
 // content-version:major
-const CONTENT_MAJOR = 5;
-// 서버는 열 이름으로 읽고 제거된 강화 확률 열을 무시하므로 v4 라이브와 v5 테스트를 함께 처리한다.
+const CONTENT_MAJOR = 6;
+// 라이브 v5와 기존 v4 전투 pin을 유지하면서 v6 테스트 표도 읽는다.
 // 클라이언트는 열 구조가 정확히 같아야 하므로 서버의 지원 목록이 더 넓을 수 있다.
 // content-version:supported
-const SUPPORTED_CONTENT_MAJORS = new Set([CONTENT_MAJOR, 4]);
+const SUPPORTED_CONTENT_MAJORS = new Set([CONTENT_MAJOR, 5, 4]);
 exports.BATTLE_REPLAY_SPEC_TABLES = [
     "Card", "SynergyDef", "SynergyTierDef", "SynergyEffectDef",
 ];
@@ -86,7 +87,7 @@ const INDEX_CACHE_TTL_MS = 30 * 1000;
 // 서버와 클라가 같은 발행본을 보게 하는 것이 이 목록을 비워 두는 이유다.
 const UNINDEXED_TABLES = new Set();
 const UNINDEXED_CACHE_TTL_MS = 30 * 1000;
-async function readPublishedSpec(env, table) {
+async function readIndex(env) {
     let cached = indexCache.get(env);
     if (cached === undefined || cached.expiresAt <= Date.now()) {
         cached = await loadOnce(indexLoads, env, () => loadPublishedIndex(env), "specIndex");
@@ -94,7 +95,10 @@ async function readPublishedSpec(env, table) {
     else {
         (0, requestMetrics_1.recordMetric)("specIndexCacheHits");
     }
-    const published = cached.tables[table];
+    return cached;
+}
+async function readPublishedSpec(env, table) {
+    const published = (await readIndex(env)).tables[table];
     if (published === undefined)
         throw new Error(`published content index has no ${table} entry`);
     return published;
@@ -129,7 +133,7 @@ async function loadPublishedIndex(env) {
         }
         tables[name] = { blobPath, payloadHash };
     }
-    const loaded = { expiresAt: now + INDEX_CACHE_TTL_MS, tables };
+    const loaded = { major, expiresAt: now + INDEX_CACHE_TTL_MS, tables };
     if (generation === cacheGeneration)
         indexCache.set(env, loaded);
     return loaded;
@@ -324,6 +328,20 @@ async function readSpecRows(env, table) {
     }
     const published = await readPublishedSpec(env, table);
     return readCachedBlob(env, table, published.blobPath, published.payloadHash);
+}
+/**
+ * 같은 공개 인덱스의 세대와 표를 읽어 스키마 호환 판정에 전달한다.
+ * @param {string} env 환경 id
+ * @param {string} table 표 이름
+ * @return {Promise<object>} 공개 세대와 해당 포인터의 행
+ */
+async function readSpecRowsWithContentMajor(env, table) {
+    const index = await readIndex(env);
+    const published = index.tables[table];
+    if (published === undefined)
+        throw new Error(`published content index has no ${table} entry`);
+    const rows = await readCachedBlob(env, table, published.blobPath, published.payloadHash);
+    return { major: index.major, rows };
 }
 async function readCachedBlob(env, table, blobPath, payloadHash, pinned = false) {
     const currentKey = `${env}/${table}`;

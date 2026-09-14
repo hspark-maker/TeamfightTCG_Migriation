@@ -34,6 +34,10 @@ internal static class MissionContentNavigation
             case "OpenPack": return EOutgameFeature.LobbyPackTab;
             case "EnhanceCard":
             case "LimitBreakCard":
+            case GuideMissionTrack.EVENT_ENHANCE_COMPLETED:
+            case GuideMissionTrack.EVENT_EVOLVE_COMPLETED:
+            case GuideMissionTrack.EVENT_STARTER_CARDS_STAR1:
+            case GuideMissionTrack.EVENT_STARTER_CARDS_STAR2:
             case "Guide.CaretakerCardsAtStar1":
             case "Guide.DeckCardsAtStar2":
                 return EOutgameFeature.LobbyCollectionTab;
@@ -43,6 +47,7 @@ internal static class MissionContentNavigation
             case "Guide.DeckCardsAtStar3":
                 return EOutgameFeature.LobbyDeckTab;
             case "CompleteBattle":
+            case GuideMissionTrack.EVENT_BRONZE2_REACHED:
             case "WinBattle":
             case "WinRankedBattle":
             case "DestroyCards":

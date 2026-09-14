@@ -20,11 +20,11 @@ import {measurePhase, recordMetric} from "../observability/requestMetrics";
 
 /** 현재 테이블 세대. C# ContentVersion.Major와 같으며 앱 빌드 버전과는 별개다. */
 // content-version:major
-const CONTENT_MAJOR = 5;
-// 서버는 열 이름으로 읽고 제거된 강화 확률 열을 무시하므로 v4 라이브와 v5 테스트를 함께 처리한다.
+const CONTENT_MAJOR = 6;
+// 라이브 v5와 기존 v4 전투 pin을 유지하면서 v6 테스트 표도 읽는다.
 // 클라이언트는 열 구조가 정확히 같아야 하므로 서버의 지원 목록이 더 넓을 수 있다.
 // content-version:supported
-const SUPPORTED_CONTENT_MAJORS = new Set<number>([CONTENT_MAJOR, 4]);
+const SUPPORTED_CONTENT_MAJORS = new Set<number>([CONTENT_MAJOR, 5, 4]);
 
 /** 표 한 행. 열 이름 → 값. 정수로 읽히는 값은 number, 나머지는 string 이다. */
 export type SpecRow = Record<string, unknown>;
@@ -48,6 +48,7 @@ export const BATTLE_REPLAY_SPEC_TABLES = [
 ] as const;
 
 interface IndexCacheEntry {
+  major: number;
   expiresAt: number;
   tables: Record<string, PublishedSpec>;
 }
@@ -71,14 +72,18 @@ const INDEX_CACHE_TTL_MS = 30 * 1000;
 const UNINDEXED_TABLES = new Set<string>();
 const UNINDEXED_CACHE_TTL_MS = 30 * 1000;
 
-async function readPublishedSpec(env: string, table: string): Promise<PublishedSpec> {
+async function readIndex(env: string): Promise<IndexCacheEntry> {
   let cached = indexCache.get(env);
   if (cached === undefined || cached.expiresAt <= Date.now()) {
     cached = await loadOnce(indexLoads, env, () => loadPublishedIndex(env), "specIndex");
   } else {
     recordMetric("specIndexCacheHits");
   }
-  const published = cached.tables[table];
+  return cached;
+}
+
+async function readPublishedSpec(env: string, table: string): Promise<PublishedSpec> {
+  const published = (await readIndex(env)).tables[table];
   if (published === undefined) throw new Error(`published content index has no ${table} entry`);
   return published;
 }
@@ -112,7 +117,7 @@ async function loadPublishedIndex(env: string): Promise<IndexCacheEntry> {
     }
     tables[name] = {blobPath, payloadHash};
   }
-  const loaded = {expiresAt: now + INDEX_CACHE_TTL_MS, tables};
+  const loaded = {major, expiresAt: now + INDEX_CACHE_TTL_MS, tables};
   if (generation === cacheGeneration) indexCache.set(env, loaded);
   return loaded;
 }
@@ -323,6 +328,22 @@ export async function readSpecRows(env: string, table: string): Promise<SpecRow[
 
   const published = await readPublishedSpec(env, table);
   return readCachedBlob(env, table, published.blobPath, published.payloadHash);
+}
+
+/**
+ * 같은 공개 인덱스의 세대와 표를 읽어 스키마 호환 판정에 전달한다.
+ * @param {string} env 환경 id
+ * @param {string} table 표 이름
+ * @return {Promise<object>} 공개 세대와 해당 포인터의 행
+ */
+export async function readSpecRowsWithContentMajor(
+  env: string, table: string,
+): Promise<{major: number; rows: SpecRow[]}> {
+  const index = await readIndex(env);
+  const published = index.tables[table];
+  if (published === undefined) throw new Error(`published content index has no ${table} entry`);
+  const rows = await readCachedBlob(env, table, published.blobPath, published.payloadHash);
+  return {major: index.major, rows};
 }
 
 async function readCachedBlob(

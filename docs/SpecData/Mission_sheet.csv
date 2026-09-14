@@ -1,35 +1,37 @@
-﻿행 고유번호,미션 고유키,활성화 여부,주기,집계 이벤트 키,목표 횟수,표시 제목,표시 설명,패스 경험치,표시 순서,메모
-id,missionId,enabled,period,eventKey,targetCount,title,description,passExp,sortOrder,#memo
-int,string,int,string,string,int,string,string,long,int,string
-1,daily.openPack1,1,daily,OpenPack,1,카드 팩 1회 개봉,카드 팩을 1회 개봉하세요,15,6,콘텐츠별 보상 배분안 적용 목표; 서버 catalog 동기화 대기
-2,daily.openPack3,0,daily,OpenPack,3,카드 팩 3회 개봉,카드 팩을 3회 개봉하세요,0,2,퇴역; 일일 팩 1회 미션으로 통합; 서버 catalog 동기화 대기
-3,weekly.openPack10,1,weekly,OpenPack,10,카드 팩 10회 개봉,카드 팩을 10회 개봉하세요,30,3,서버 catalog 동기화 및 보상 팩 지급 구현 대기
-4,weekly.enhanceCard5,0,weekly,EnhanceCard,5,카드 5회 강화,카드를 5회 강화하세요,0,2,퇴역; weekly.enhanceCard10으로 교체; 서버 catalog 동기화 대기
-5,weekly.limitBreakCard1,0,weekly,LimitBreakCard,1,카드 1회 한계 돌파,카드를 1회 한계 돌파하세요,0,3,퇴역; 한계돌파를 주간 필수 조건에서 제외; 서버 catalog 동기화 대기
-6,daily.completeBattle3,1,daily,CompleteBattle,3,전투 3회 완료,전투를 3회 완료하세요,20,1,하루 누적; 패배 포함; 모험 집계 연결 및 서버 catalog 동기화 대기
-7,weekly.winRankedBattle5,0,weekly,WinRankedBattle,5,랭크 전투 5회 승리,랭크 전투에서 5회 승리하세요,0,4,퇴역; weekly.winBattle10으로 교체; 서버 catalog 동기화 대기
-8,daily.claimReward1,0,daily,ClaimReward,1,보상 1회 수령,보상을 1회 수령하세요,0,4,퇴역; 보상 수령을 일일 필수 조건에서 제외; 서버 catalog 동기화 대기
-9,daily.destroyCards3,1,daily,DestroyCards,3,전투에서 상대 카드 3장 파괴,전투에서 상대 카드를 3장 파괴하세요,15,3,모험 집계 연결 및 서버 catalog 동기화 대기
-10,daily.triggerSynergy2,1,daily,TriggerSynergy,2,전투에서 시너지 2회 발동,전투에서 시너지를 2회 발동하세요,15,5,모험 집계 연결 및 서버 catalog 동기화 대기
-11,daily.triggerKeyword2,1,daily,TriggerKeyword,2,전투에서 키워드 2회 발동,전투에서 키워드를 2회 발동하세요,15,4,모험 집계 연결 및 서버 catalog 동기화 대기
-12,weekly.attackTimes50,0,weekly,AttackTimes,50,공격 50회 수행,공격을 50회 수행하세요,0,5,퇴역; 전투 완료 미션으로 통합; 서버 catalog 동기화 대기
-13,daily.completeBattle5,1,daily,EnhanceCard,1,카드 강화 1회 시도,카드 강화를 1회 시도하세요,20,2,전투 5회 항목을 강화로 교체; 무료 강화와 실패한 시도 포함; 보상 참조와 수령 기록 보존을 위해 미션 고유키 유지
-14,weekly.completeBattle20,1,weekly,CompleteBattle,20,전투 20회 완료,전투를 20회 완료하세요,30,1,주간 누적; 패배 포함; 모험 집계 및 서버 catalog 등록 대기
-15,weekly.completeBattle35,1,weekly,TriggerKeyword,20,전투에서 키워드 20회 발동,전투에서 키워드를 20회 발동하세요,40,2,전투 35회 항목을 키워드 발동으로 교체; 보상 참조와 수령 기록 보존을 위해 미션 고유키 유지
-16,weekly.enhanceCard10,1,weekly,EnhanceCard,10,카드 강화 10회 시도,카드 강화를 10회 시도하세요,20,4,무료 강화와 실패한 시도 포함; 서버 catalog 등록 대기
-17,weekly.winBattle10,1,weekly,WinBattle,10,전투 10회 승리,전투에서 10회 승리하세요,40,5,예약 이벤트 WinBattle; 모험 포함 승리 집계 및 서버 catalog 등록 대기
-18,guide.01,1,guide,Guide.DeckSaved6,1,6장 덱 저장,유효한 6장 덱을 저장하세요. 기존 튜토리얼에서 저장했다면 자동 인정합니다,0,1,가이드 실행 대기; 계정당 1회; 만료 없음; 순차 수령; 미리 달성한 상태도 인정
-19,guide.02,1,guide,Guide.AdventureNode01,1,모험 1번 정점 클리어,모험 1번 정점을 클리어하세요. 이미 클리어했다면 자동 인정합니다,0,2,가이드 실행 대기; 서버 클리어 상태 소급 인정; 계정당 1회 순차 수령
-20,guide.03,1,guide,Guide.CaretakerCardsAtStar1,3,서로 다른 1성 이상 돌보미 카드 3장 보유,서로 다른 돌보미 카드 3장을 1성 이상으로 성장시키세요. 이미 성장했다면 인정합니다,0,3,가이드 실행 대기; 강화 횟수 아님; 잠긴 단계 달성도 기록; 계정당 1회 순차 수령
-21,guide.04,1,guide,Guide.CaretakerDeckAtStar2,3,2성 이상 돌보미 카드 3장을 같은 덱에 편성,돌보미 카드 3장을 2성 이상으로 성장시키고 같은 덱에 편성하세요. 미리 달성해도 인정합니다,0,4,가이드 실행 대기; 잠긴 단계 달성도 기록; 완료 후 덱 변경으로 취소하지 않음
-22,guide.05,1,guide,Guide.AdventureNode02,1,모험 2번 정점 클리어,모험 2번 정점을 클리어하세요. 돌보미 덱 사용을 권장하며 이미 클리어했다면 인정합니다,0,5,가이드 실행 대기; 정점 클리어만 판정; 버섯냥 지급 구현 대기
-23,guide.06,1,guide,Guide.CaretakerTraceDeck,2,모두 2성 이상인 돌보미 3장·깜밤이·버섯냥을 같은 덱에 편성,깜밤이와 버섯냥을 2성 이상으로 성장시키고 2성 이상 돌보미 3장과 함께 편성하세요. 미리 달성해도 인정합니다,0,6,가이드 실행 대기; 목표 2는 돌보미와 추적 조합 수; 잠긴 단계 달성도 기록; 완료 후 덱 변경으로 취소하지 않음
-24,guide.07,1,guide,Guide.AdventureNode03,1,모험 3번 정점 클리어,모험 3번 정점을 클리어하세요. 이미 클리어했다면 자동 인정합니다,0,7,가이드 실행 대기; 서버 클리어 상태 소급 인정; 계정당 1회 순차 수령
-25,guide.08,1,guide,Guide.DeckCardsAtStar3,1,현재 덱에 3성 이상 카드 1장 편성,현재 덱에 3성 카드 1장을 편성하세요. 앞서 키운 2성 카드 중 선택하며 미리 달성해도 인정합니다,0,8,가이드 실행 대기; 잠긴 단계 달성도 기록; 완료 후 덱 변경으로 취소하지 않음
-26,guide.09,1,guide,Guide.AdventureNode04,1,모험 4번 정점 클리어,모험 4번 정점을 클리어하세요. 3성 카드 사용을 권장하며 이미 클리어했다면 인정합니다,0,9,가이드 실행 대기; 정점 클리어만 판정; 계정당 1회 순차 수령
-27,guide.10,1,guide,Guide.DeckCardsAtStar2,6,현재 덱 6장을 모두 2성 이상으로 성장,현재 덱 6장을 모두 2성 이상으로 성장시키세요. 3성 카드와 미리 달성한 상태도 인정합니다,0,10,가이드 실행 대기; 잠긴 단계 달성도 기록; 완료 후 덱 변경으로 취소하지 않음
-28,guide.11,1,guide,Guide.AdventureNode05,1,모험 5번 정점 클리어,모험 5번 정점을 클리어하세요. 이미 클리어했다면 자동 인정합니다,0,11,가이드 실행 대기; 서버 클리어 상태 소급 인정; 계정당 1회 순차 수령
-29,guide.12,1,guide,Guide.DeckCardsAtStar3,2,현재 덱에 서로 다른 3성 이상 카드 2장 편성,현재 덱에 서로 다른 3성 카드 2장을 편성하세요. 미리 달성해도 인정합니다,0,12,가이드 실행 대기; 잠긴 단계 달성도 기록; 완료 후 덱 변경으로 취소하지 않음; 팩 지급 구현 대기
-30,guide.13,1,guide,Guide.AdventureChapter01,1,모험 6번 정점 클리어로 1장 완료,모험 6번 정점을 클리어해 1장을 완료하세요. 이미 완료했다면 자동 인정합니다,0,13,가이드 실행 대기; 서버 클리어 상태 소급 인정; 계정당 1회 순차 수령
-31,daily.completeMissions5,1,daily,CompleteDailyMissions,5,일일 미션 5개 완료,일일 미션을 5개 완료하고 추가 보상을 받으세요,0,7,일일 일반 미션 달성 개수 집계; 개별 보상 수령 불필요; 누적 보상 자신 제외; 매일 1회
-32,weekly.completeMissions5,1,weekly,CompleteWeeklyMissions,5,주간 미션 5개 완료,주간 미션을 5개 완료하고 추가 보상을 받으세요,0,6,주간 일반 미션 달성 개수 집계; 개별 보상 수령 불필요; 누적 보상 자신 제외; 매주 1회
+﻿행 고유번호,미션 고유키,활성화 여부,주기,집계 이벤트 키,목표 횟수,표시 제목,표시 설명,패스 경험치,표시 순서,가이드 막 고유 ID,가이드 막 이름,메모
+id,missionId,enabled,period,eventKey,targetCount,title,description,passExp,sortOrder,guideActId,guideActName,#memo
+int,string,int,string,string,int,string,string,long,int,int,string,string
+1,daily.openPack1,1,daily,OpenPack,1,카드 팩 1회 개봉,카드 팩을 1회 개봉하세요,15,6,0,,콘텐츠별 보상 배분안 적용 목표; 서버 catalog 동기화 대기
+2,daily.openPack3,0,daily,OpenPack,3,카드 팩 3회 개봉,카드 팩을 3회 개봉하세요,0,2,0,,퇴역; 일일 팩 1회 미션으로 통합; 서버 catalog 동기화 대기
+3,weekly.openPack10,1,weekly,OpenPack,10,카드 팩 10회 개봉,카드 팩을 10회 개봉하세요,30,3,0,,서버 catalog 동기화 및 보상 팩 지급 구현 대기
+4,weekly.enhanceCard5,0,weekly,EnhanceCard,5,카드 5회 강화,카드를 5회 강화하세요,0,2,0,,퇴역; weekly.enhanceCard10으로 교체; 서버 catalog 동기화 대기
+5,weekly.limitBreakCard1,0,weekly,LimitBreakCard,1,카드 1회 한계 돌파,카드를 1회 한계 돌파하세요,0,3,0,,퇴역; 한계돌파를 주간 필수 조건에서 제외; 서버 catalog 동기화 대기
+6,daily.completeBattle3,1,daily,CompleteBattle,3,전투 3회 완료,전투를 3회 완료하세요,20,1,0,,하루 누적; 패배 포함; 모험 집계 연결 및 서버 catalog 동기화 대기
+7,weekly.winRankedBattle5,0,weekly,WinRankedBattle,5,랭크 전투 5회 승리,랭크 전투에서 5회 승리하세요,0,4,0,,퇴역; weekly.winBattle10으로 교체; 서버 catalog 동기화 대기
+8,daily.claimReward1,0,daily,ClaimReward,1,보상 1회 수령,보상을 1회 수령하세요,0,4,0,,퇴역; 보상 수령을 일일 필수 조건에서 제외; 서버 catalog 동기화 대기
+9,daily.destroyCards3,1,daily,DestroyCards,3,전투에서 상대 카드 3장 파괴,전투에서 상대 카드를 3장 파괴하세요,15,3,0,,모험 집계 연결 및 서버 catalog 동기화 대기
+10,daily.triggerSynergy2,1,daily,TriggerSynergy,2,전투에서 시너지 2회 발동,전투에서 시너지를 2회 발동하세요,15,5,0,,모험 집계 연결 및 서버 catalog 동기화 대기
+11,daily.triggerKeyword2,1,daily,TriggerKeyword,2,전투에서 키워드 2회 발동,전투에서 키워드를 2회 발동하세요,15,4,0,,모험 집계 연결 및 서버 catalog 동기화 대기
+12,weekly.attackTimes50,0,weekly,AttackTimes,50,공격 50회 수행,공격을 50회 수행하세요,0,5,0,,퇴역; 전투 완료 미션으로 통합; 서버 catalog 동기화 대기
+13,daily.completeBattle5,1,daily,EnhanceCard,1,카드 강화 1회 시도,카드 강화를 1회 시도하세요,20,2,0,,전투 5회 항목을 강화로 교체; 무료 강화와 실패한 시도 포함; 보상 참조와 수령 기록 보존을 위해 미션 고유키 유지
+14,weekly.completeBattle20,1,weekly,CompleteBattle,20,전투 20회 완료,전투를 20회 완료하세요,30,1,0,,주간 누적; 패배 포함; 모험 집계 및 서버 catalog 등록 대기
+15,weekly.completeBattle35,1,weekly,TriggerKeyword,20,전투에서 키워드 20회 발동,전투에서 키워드를 20회 발동하세요,40,2,0,,전투 35회 항목을 키워드 발동으로 교체; 보상 참조와 수령 기록 보존을 위해 미션 고유키 유지
+16,weekly.enhanceCard10,1,weekly,EnhanceCard,10,카드 강화 10회 시도,카드 강화를 10회 시도하세요,20,4,0,,무료 강화와 실패한 시도 포함; 서버 catalog 등록 대기
+17,weekly.winBattle10,1,weekly,WinBattle,10,전투 10회 승리,전투에서 10회 승리하세요,40,5,0,,예약 이벤트 WinBattle; 모험 포함 승리 집계 및 서버 catalog 등록 대기
+18,guide.02,1,guide,Guide.Bronze2Reached,1,브론즈 2 이상 달성,브론즈 2 이상을 달성하세요. 이전에 도달했다면 자동 인정합니다,0,2,1,출발,계정당 1회 순차 수령; 이전 성장 및 잠긴 단계 달성 인정; 구 조건 카운터 이관 없음
+19,guide.03,1,guide,Guide.AdventureNode01,1,모험 1번 정점 클리어,모험 1번 정점을 클리어하세요. 이미 클리어했다면 자동 인정합니다,0,3,1,출발,가이드 실행 대기; 서버 클리어 상태 소급 인정; 계정당 1회 순차 수령
+20,guide.04,1,guide,Guide.StarterCardsAtStar1,3,별토리·솜구름몽·포슬램 모두 1성 이상,별토리·솜구름몽·포슬램을 모두 보유하고 1성 이상으로 성장시키세요. 덱 편성 없이 이전 성장도 인정합니다,0,4,2,돌보미 결성,계정당 1회 순차 수령; 이전 성장 및 잠긴 단계 달성 인정; 구 조건 카운터 이관 없음
+21,guide.06,1,guide,Guide.StarterCardsAtStar2,3,별토리·솜구름몽·포슬램 모두 2성 이상,별토리·솜구름몽·포슬램을 모두 보유하고 2성 이상으로 성장시키세요. 덱 편성 없이 이전 성장도 인정합니다,0,6,2,돌보미 결성,계정당 1회 순차 수령; 이전 성장 및 잠긴 단계 달성 인정; 구 조건 카운터 이관 없음
+22,guide.07,1,guide,Guide.AdventureNode02,1,모험 2번 정점 클리어,모험 2번 정점을 클리어하세요. 돌보미 덱 사용을 권장하며 이미 클리어했다면 인정합니다,0,7,2,돌보미 결성,가이드 실행 대기; 정점 클리어만 판정; 버섯냥 지급 구현 대기
+23,guide.08,1,guide,Guide.CaretakerTraceDeck,2,모두 2성 이상인 돌보미 3장·깜밤이·버섯냥을 같은 덱에 편성,깜밤이와 버섯냥을 2성 이상으로 성장시키고 2성 이상 돌보미 3장과 함께 편성하세요. 미리 달성해도 인정합니다,0,8,3,두 가지 힘,가이드 실행 대기; 목표 2는 돌보미와 추적 조합 수; 잠긴 단계 달성도 기록; 완료 후 덱 변경으로 취소하지 않음
+24,guide.09,1,guide,Guide.AdventureNode03,1,모험 3번 정점 클리어,모험 3번 정점을 클리어하세요. 이미 클리어했다면 자동 인정합니다,0,9,3,두 가지 힘,가이드 실행 대기; 서버 클리어 상태 소급 인정; 계정당 1회 순차 수령
+25,guide.10,1,guide,Guide.DeckCardsAtStar3,1,현재 덱에 3성 이상 카드 1장 편성,현재 덱에 3성 카드 1장을 편성하세요. 앞서 키운 2성 카드 중 선택하며 미리 달성해도 인정합니다,0,10,4,에이스,가이드 실행 대기; 잠긴 단계 달성도 기록; 완료 후 덱 변경으로 취소하지 않음
+26,guide.11,1,guide,Guide.AdventureNode04,1,모험 4번 정점 클리어,모험 4번 정점을 클리어하세요. 3성 카드 사용을 권장하며 이미 클리어했다면 인정합니다,0,11,4,에이스,가이드 실행 대기; 정점 클리어만 판정; 계정당 1회 순차 수령
+27,guide.12,1,guide,Guide.DeckCardsAtStar2,6,현재 덱 6장을 모두 2성 이상으로 성장,현재 덱 6장을 모두 2성 이상으로 성장시키세요. 3성 카드와 미리 달성한 상태도 인정합니다,0,12,4,에이스,가이드 실행 대기; 잠긴 단계 달성도 기록; 완료 후 덱 변경으로 취소하지 않음
+28,guide.13,1,guide,Guide.AdventureNode05,1,모험 5번 정점 클리어,모험 5번 정점을 클리어하세요. 이미 클리어했다면 자동 인정합니다,0,13,4,에이스,가이드 실행 대기; 서버 클리어 상태 소급 인정; 계정당 1회 순차 수령
+29,guide.14,1,guide,Guide.DeckCardsAtStar3,2,현재 덱에 서로 다른 3성 이상 카드 2장 편성,현재 덱에 서로 다른 3성 카드 2장을 편성하세요. 미리 달성해도 인정합니다,0,14,4,에이스,가이드 실행 대기; 잠긴 단계 달성도 기록; 완료 후 덱 변경으로 취소하지 않음; 팩 지급 구현 대기
+30,guide.15,1,guide,Guide.AdventureChapter01,1,모험 6번 정점 클리어로 1장 완료,모험 6번 정점을 클리어해 1장을 완료하세요. 이미 완료했다면 자동 인정합니다,0,15,4,에이스,가이드 실행 대기; 서버 클리어 상태 소급 인정; 계정당 1회 순차 수령
+31,daily.completeMissions5,1,daily,CompleteDailyMissions,5,일일 미션 5개 완료,일일 미션을 5개 완료하고 추가 보상을 받으세요,0,7,0,,일일 일반 미션 달성 개수 집계; 개별 보상 수령 불필요; 누적 보상 자신 제외; 매일 1회
+32,weekly.completeMissions5,1,weekly,CompleteWeeklyMissions,5,주간 미션 5개 완료,주간 미션을 5개 완료하고 추가 보상을 받으세요,0,6,0,,주간 일반 미션 달성 개수 집계; 개별 보상 수령 불필요; 누적 보상 자신 제외; 매주 1회
+33,guide.01,1,guide,Guide.EnhanceCompleted,1,카드 강화 1회 완료,보유 카드에 조각을 투입해 강화하세요. 이전 성장과 무료 강화도 인정합니다,0,1,1,출발,계정당 1회 순차 수령; 조각 진행도 또는 기본 레벨 초과로 판정; 간식·한계돌파만 진행한 상태 제외
+34,guide.05,1,guide,Guide.EvolveCompleted,1,카드 진화 1회 완료,보유 카드를 진화시켜 별을 올리세요. 이전 성장과 무료 진화도 인정합니다,0,5,2,돌보미 결성,계정당 1회 순차 수령; 기본 레벨 초과로 판정; 간식·한계돌파만 진행한 상태 제외

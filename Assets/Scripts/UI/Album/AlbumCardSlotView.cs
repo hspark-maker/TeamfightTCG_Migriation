@@ -40,8 +40,21 @@ public class AlbumCardSlotView : MonoBehaviour
 
     // 안내 타깃으로 등록된 상태. 남의 등록을 날리지 않으려고 자기 것만 해제한다(AlbumThemeCellView와 같은 관용구)
     bool m_anchored;
+    UnityEngine.Events.UnityAction m_onClick;
+    bool m_clickBound;
 
     public Button Button => button;
+
+    /// <summary>튜토리얼 클릭 구독을 보존하면서 이 칸의 상세 열기 동작을 교체한다.</summary>
+    public void SetClickAction(UnityEngine.Events.UnityAction _onClick)
+    {
+        m_onClick = _onClick;
+        if (button == null || m_clickBound) return;
+        button.onClick.AddListener(InvokeClick);
+        m_clickBound = true;
+    }
+
+    void InvokeClick() => m_onClick?.Invoke();
 
     /// <summary>이 칸을 튜토리얼 안내 타깃으로 세우거나 내린다. 칸은 페이지를 넘길 때마다 다른 카드로 다시
     /// 묶이므로 프리팹 표식(TutorialAnchor)을 붙일 수 없다 — 지금 무엇이 꽂혀 있는지 아는 오버레이가 정한다.</summary>

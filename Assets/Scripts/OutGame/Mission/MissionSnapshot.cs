@@ -23,6 +23,8 @@ internal sealed class MissionDefinition
     [JsonProperty("title")] public string Title { get; set; }
     [JsonProperty("description")] public string Description { get; set; }
     [JsonProperty("sortOrder")] public int SortOrder { get; set; }
+    [JsonProperty("guideActId")] public int GuideActId { get; set; }
+    [JsonProperty("guideActName")] public string GuideActName { get; set; }
     [JsonProperty("reward")] public MissionReward Reward { get; set; }
 }
 

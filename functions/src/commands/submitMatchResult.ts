@@ -12,6 +12,7 @@ import {withCountedTransaction} from "../observability/countedTransaction";
 import {EVENTS} from "../analytics/eventNames";
 import {recordEvent} from "../observability/analyticsEvent";
 import {commitMissionBumps, missionBumpFromSnapshot, missionsRef} from "../missions/missionStore";
+import {evaluateGuideRankProgress} from "../missions/guideProgress";
 import {missionPeriod} from "../missions/period";
 import {
   decideMatch,
@@ -655,6 +656,8 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
       }
       rankState.points = rank.after;
       rankState.bestTierIndex = Math.max(rankState.bestTierIndex, rank.afterTierIndex);
+      const guideProgress = evaluateGuideRankProgress(rankSnapshots[i].data(), missionBumps[i].state.progress);
+      missionBumps[i].state.progress = evaluateGuideRankProgress(rankState, guideProgress);
       const rankProgress = rankProgressResponse(rankState);
       const payout = {
         status: "ready",

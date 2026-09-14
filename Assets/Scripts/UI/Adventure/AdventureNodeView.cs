@@ -24,10 +24,12 @@ public class AdventureNodeView : MonoBehaviour
 
     [SerializeField] Button tapButton;       // 정점 = 도전 버튼
 
-    [Tooltip("보상이 여러 건일 때 재화 아이콘 대신 놓을 상자. 칸 = 보상 건수다 —\n" +
-             "0번 칸이 2건, 1번 칸이 3건이고, 저작한 칸보다 보상이 많으면 마지막 칸이 계속 쓰인다.\n" +
-             "비우면 첫 보상의 아이콘이 그대로 선다(상자 미저작으로 원판이 비지 않게).")]
-    [SerializeField] Sprite[] multiRewardChests;
+    [Tooltip("보상이 여러 건일 때 건수와 관계없이 쓰는 수령 전 아이콘. 수령 대기까지 유지한다.\n" +
+             "비우면 첫 보상 아이콘을 사용한다.")]
+    [SerializeField] Sprite multiRewardUnclaimedIcon;
+
+    [Tooltip("다중 보상 수령 후 아이콘. 비우면 수령 전 아이콘을 사용한다.")]
+    [SerializeField] Sprite multiRewardClaimedIcon;
 
     [Header("상태 레이어(선택 — 미배선 시 null 가드)")]
     [Tooltip("상태마다 켜지는 '묶음'이다 — 표식 한 장이 아니라 그 상태에서만 보여야 할 것을 통째로 담는다.\n" +
@@ -268,7 +270,7 @@ public class AdventureNodeView : MonoBehaviour
         // 챕터의 마지막 정점만 지도의 랜드마크로 선다. 깨고 나면 물러난다.
         bool t_final = t_node.kind == EAdventureNodeKind.Elite && !t_rankLocked && !t_cleared;
 
-        this.ApplyRewardIcon();
+        this.ApplyRewardIcon(t_cleared);
 
         // 미수령 정점도 눌러야 한다(진입이 아니라 수령이다) — 그래서 탭 자격은 CanEnter에 선물을 더한 값이다.
         if (this.tapButton != null) this.tapButton.interactable = t_gift || AdventureProgress.CanEnter(this.m_index);
@@ -291,23 +293,20 @@ public class AdventureNodeView : MonoBehaviour
         if (t_justCleared) this.PlayClearStamp();
     }
 
-    // 원판 한 자리. 이 정점을 깨면 무엇이 오는지를 그림으로 말한다. 상태가 갈려도 그림은 그대로다 —
-    // 수령 대기까지 그림을 바꾸면 원판이 상태마다 다른 물건이 되어 한 벌로 안 읽힌다.
-    // 그 상태가 말할 것은 그림이 아니라 움직임(등장 + 흔들림)이 맡는다.
-    void ApplyRewardIcon()
+    void ApplyRewardIcon(bool _claimed)
     {
         if (this.rewardImage == null) return;
 
         // 프리팹 저작값은 처음 볼 때 받아 둔다 — 보상이 없는 정점이 여기로 떨어진다.
         if (this.m_rewardSprite0 == null) this.m_rewardSprite0 = this.rewardImage.sprite;
 
-        Sprite t_icon = this.RewardSprite();
+        Sprite t_icon = this.RewardSprite(_claimed);
         if (t_icon != null) this.rewardImage.sprite = t_icon;
     }
 
     // 보상 1건이면 그 재화 아이콘, 여러 건이면 상자. 수량은 어디에도 적지 않는다 —
     // 정점이 답해야 하는 것은 "무엇이 걸렸나"까지고, 얼마인지는 눌러서 여는 화면의 몫이다.
-    Sprite RewardSprite()
+    Sprite RewardSprite(bool _claimed)
     {
         AdventureProgress.FillRewards(this.m_index, s_rewardBuffer);
 
@@ -316,18 +315,9 @@ public class AdventureNodeView : MonoBehaviour
         Sprite t_first = s_rewardBuffer[0].Icon;
         if (s_rewardBuffer.Count == 1) return t_first != null ? t_first : this.m_rewardSprite0;
 
-        Sprite t_chest = this.ChestOf(s_rewardBuffer.Count);
+        Sprite t_chest = _claimed && this.multiRewardClaimedIcon != null
+            ? this.multiRewardClaimedIcon : this.multiRewardUnclaimedIcon;
         return t_chest != null ? t_chest : t_first != null ? t_first : this.m_rewardSprite0;
-    }
-
-    // 칸 = 보상 건수(0번 칸이 2건). 저작한 칸보다 보상이 많으면 마지막 칸이 계속 쓰인다 —
-    // 보상을 한 건 더 얹었다고 원판이 비면 저작 실수가 화면에서 사고가 된다.
-    Sprite ChestOf(int _count)
-    {
-        if (this.multiRewardChests == null || this.multiRewardChests.Length == 0) return null;
-
-        int t_slot = Mathf.Clamp(_count - 2, 0, this.multiRewardChests.Length - 1);
-        return this.multiRewardChests[t_slot];
     }
 
     // 종류 표식. 상태보다 먼저 세운다 — 잠김 무채색화가 이 표식까지 함께 덮어야 한 덩어리로 읽힌다.
@@ -881,7 +871,7 @@ public class AdventureNodeView : MonoBehaviour
     {
         AdventureProgress.TryGetNode(this.m_index, out AdventureNodeDef t_node);
 
-        this.ApplyRewardIcon();
+        this.ApplyRewardIcon(false);
 
         if (this.tapButton != null) this.tapButton.interactable = false;
         if (this.lockedMark != null) this.lockedMark.SetActive(true);

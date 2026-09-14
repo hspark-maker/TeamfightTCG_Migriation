@@ -207,6 +207,10 @@ public partial class Mission
     public long passExp;
     /// 표시 순서
     public int sortOrder;
+    /// 가이드 막 고유 ID
+    public int guideActId;
+    /// 가이드 막 이름
+    public string guideActName;
 }
 
 [GeneratorSpecData]
