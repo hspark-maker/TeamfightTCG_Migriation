@@ -57,7 +57,7 @@ export function evaluateGuideProgress(
       progress = [...owned].some((id) => (growth[String(id)]?.shardProgress ?? 0) > 0 ||
         levelOfCard(growth, id) > BASE_LEVEL) ? 1 : 0;
     } else if (event === "Guide.EvolveCompleted") {
-      progress = [...owned].some((id) => levelOfCard(growth, id) > BASE_LEVEL) ? 1 : 0;
+      progress = [...owned].some((id) => star(id) >= 2) ? 1 : 0;
     } else if (event === "Guide.StarterCardsAtStar1" || event === "Guide.StarterCardsAtStar2") {
       const targetStar = event === "Guide.StarterCardsAtStar1" ? 1 : 2;
       progress = STARTER_CARD_IDS.filter((id) => owned.has(id) && star(id) >= targetStar).length;

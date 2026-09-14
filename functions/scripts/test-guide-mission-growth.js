@@ -88,15 +88,30 @@ test("starter cards: count 0..3 owned fixed IDs; no deck; greater stars count", 
   assert.equal(evaluate(save([3, 3, 4, 1], entries))[key("StarterCardsAtStar2")], 3);
 });
 
-test("growth: partial shards enhance only; evolved/free/legacy levels count both", () => {
+test("growth: partial shards and 1 star enhance only; 2+ stars count both", () => {
   const partial = evaluate(save([99], {99: entry(0, {shardProgress: 1})}));
   assert.equal(partial[key("EnhanceCompleted")], 1);
   assert.equal(partial[key("EvolveCompleted")], 0);
-  for (const entries of [{99: {level: BASE_LEVEL + 1}}, applyEnhanceLevel({}, 99, BASE_LEVEL + 1)]) {
+  const oneStar = evaluate(save([99], {99: entry(1, {shardProgress: 1})}));
+  assert.equal(oneStar[key("EnhanceCompleted")], 1);
+  assert.equal(oneStar[key("EvolveCompleted")], 0);
+  for (const entries of [{99: {level: BASE_LEVEL + 2}}, applyEnhanceLevel({}, 99, BASE_LEVEL + 2),
+    {99: entry(3)}]) {
     const progress = evaluate(save([99], entries));
     assert.equal(progress[key("EnhanceCompleted")], 1);
     assert.equal(progress[key("EvolveCompleted")], 1);
   }
+});
+
+test("guide 04 completion does not complete guide 05 until one owned card reaches 2 stars", () => {
+  const current = save([1, 3, 4], {1: entry(1), 3: entry(1), 4: entry(1)});
+  const before = evaluate(current);
+  assert.equal(before[key("StarterCardsAtStar1")], 3);
+  assert.equal(before[key("EvolveCompleted")], 0);
+  current.cardGrowth.entries[1] = entry(2);
+  const after = evaluate(current, before);
+  assert.equal(after[key("EvolveCompleted")], 1);
+  assert.equal(after[key("StarterCardsAtStar2")], 1);
 });
 
 test("growth: snack/limit break only and unowned growth do not count", () => {
