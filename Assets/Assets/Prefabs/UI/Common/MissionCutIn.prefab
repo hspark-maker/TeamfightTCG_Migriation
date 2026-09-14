@@ -251,7 +251,7 @@ MonoBehaviour:
   hintText: {fileID: 4862533000032494414}
   accent: {fileID: 6915159878367990643}
   progressFill: {fileID: 7010807608079577932}
-  progressColor: {r: 0.87, g: 0.94, b: 1, a: 1}
+  progressColor: {r: 1, g: 1, b: 1, a: 1}
   completeColor: {r: 1, g: 1, b: 1, a: 1}
   enterSeconds: 0.3
   holdSeconds: 1.5

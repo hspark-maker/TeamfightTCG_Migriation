@@ -51,9 +51,9 @@ int,string,string,int,string,string,long,string
 78,Rank,18,1,Currency,Gold,350,다이아몬드 3
 80,Rank,19,1,Currency,Gold,350,다이아몬드 4
 81,Rank,19,2,Currency,Diamond,30,다이아몬드 4 완주
-82,Battle,win.perCard,1,Currency,Gold,10,승리 시 생존 카드 1장당 지급(계수)
-83,Battle,win.floor,1,Currency,Gold,10,승리 지급액 하한(부전승 바닥)
-84,Battle,lose.flat,1,Currency,Gold,5,패배 고정 지급(생존 카드 무관)
+82,Battle,win.perCard,1,Currency,Gold,5,승리 시 생존 카드 1장당 지급(계수)
+83,Battle,win.floor,1,Currency,Gold,20,승리 지급액 하한(부전승 바닥)
+84,Battle,lose.flat,1,Currency,Gold,10,패배 고정 지급(생존 카드 무관)
 85,Mission,daily.openPack1,1,Currency,Gold,50,미션 catalog/모험 집계 동기화 대기
 93,Mission,daily.destroyCards3,1,Currency,Gold,80,미션 catalog/모험 집계 동기화 대기
 101,Pass,S1:1,1,Currency,Gold,200,시즌 1 무료 트랙 레벨 1
