@@ -452,6 +452,7 @@ public class AlbumPageOverlayView : MonoBehaviour
             var t_slot = _slots[t_i];
             if (t_i >= t_shown)
             {
+                t_slot.SetClickAction(null);
                 t_slot.ApplyTutorialAnchor(false);
                 t_slot.gameObject.SetActive(false);
                 continue;
@@ -463,7 +464,7 @@ public class AlbumPageOverlayView : MonoBehaviour
                 t_slot.ApplyTutorialAnchor(false);
                 t_slot.gameObject.SetActive(true);
                 t_slot.Bind(0, false, 0);
-                if (t_slot.Button != null) t_slot.Button.onClick.RemoveAllListeners();
+                t_slot.SetClickAction(null);
                 continue;
             }
 
@@ -472,8 +473,6 @@ public class AlbumPageOverlayView : MonoBehaviour
             t_slot.gameObject.SetActive(true);
             t_slot.Bind(t_card, t_owned, t_page.FirstNumber + t_i);
 
-            t_slot.ApplyTutorialAnchor(t_i == t_anchorSlot);
-
             // 자리 소비는 버튼 유무보다 먼저다 — 미배선 칸에서 건너뛰면 이후 칸의 인덱스가 통째로 밀린다
             int t_orderIndex = t_owned ? t_orderOffset + t_ownedInPage++ : -1;
 
@@ -481,15 +480,20 @@ public class AlbumPageOverlayView : MonoBehaviour
             // 뒤쪽 버퍼의 입력 차단은 칸마다가 아니라 Grid_Slots_Under의 CanvasGroup이 통째로 맡는다.
             var t_button = t_slot.Button;
             if (t_button == null) continue;
-            t_button.onClick.RemoveAllListeners();
-            if (!_interactive || AlbumInsertMask.IsHidden(t_card)) continue;
+            if (!_interactive || AlbumInsertMask.IsHidden(t_card))
+            {
+                t_slot.SetClickAction(null);
+                t_slot.ApplyTutorialAnchor(false);
+                continue;
+            }
 
-            t_button.onClick.AddListener(() =>
+            t_slot.SetClickAction(() =>
             {
                 if (IsLocked || m_dragging || m_flipping) return;
                 if (t_orderIndex >= 0) CardDetailOverlayView.Open(m_order, t_orderIndex);
                 else CardDetailOverlayView.Open(t_card);
             });
+            t_slot.ApplyTutorialAnchor(t_i == t_anchorSlot);
         }
     }
 

@@ -112,21 +112,21 @@ int,string,string,int,string,string,long,string
 163,Pass,S1:9,1,Currency,Shard,120,시즌 1 무료 트랙 레벨 9
 164,Pass,S1:9,2,Pack,NormalPack_TEST,2,시즌 1 무료 트랙 레벨 9; 팩 지급 구현 대기
 165,Pass,S1:10,2,PackChoice,UnlockedThemePack,1,시즌 1 무료 트랙 레벨 10; 팩 지급 구현 대기
-166,Guide,guide.01,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
-167,Guide,guide.02,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
-168,Guide,guide.03,1,Currency,Shard,40,계정당 1회 가이드 지급 구현 대기
-169,Guide,guide.04,1,Currency,Gold,50,계정당 1회 가이드 지급 구현 대기
-170,Guide,guide.05,1,Currency,Shard,30,계정당 1회 가이드 지급 구현 대기
-171,Guide,guide.05,2,Card,9,1,계정당 1회 가이드 지급 구현 대기
-172,Guide,guide.06,1,Currency,Shard,30,계정당 1회 가이드 지급 구현 대기
-173,Guide,guide.07,1,Currency,Shard,90,계정당 1회 가이드 지급 구현 대기
-174,Guide,guide.08,1,Currency,Gold,60,계정당 1회 가이드 지급 구현 대기
-175,Guide,guide.09,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
-176,Guide,guide.10,1,Currency,Shard,20,계정당 1회 가이드 지급 구현 대기
-177,Guide,guide.11,1,Currency,Shard,60,계정당 1회 가이드 지급 구현 대기
-178,Guide,guide.12,1,Pack,NormalPack_TEST,1,계정당 1회 가이드 지급 구현 대기
-179,Guide,guide.13,1,Currency,Diamond,10,계정당 1회 가이드 지급 구현 대기
-180,Guide,guide.13,2,Currency,RouletteTicket,1,계정당 1회 가이드 지급 구현 대기
+166,Guide,guide.02,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
+167,Guide,guide.03,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
+168,Guide,guide.04,1,Currency,Shard,40,계정당 1회 가이드 지급 구현 대기
+169,Guide,guide.06,1,Currency,Gold,50,계정당 1회 가이드 지급 구현 대기
+170,Guide,guide.07,1,Currency,Shard,30,계정당 1회 가이드 지급 구현 대기
+171,Guide,guide.07,2,Card,9,1,계정당 1회 가이드 지급 구현 대기
+172,Guide,guide.08,1,Currency,Shard,30,계정당 1회 가이드 지급 구현 대기
+173,Guide,guide.09,1,Currency,Shard,90,계정당 1회 가이드 지급 구현 대기
+174,Guide,guide.10,1,Currency,Gold,60,계정당 1회 가이드 지급 구현 대기
+175,Guide,guide.11,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
+176,Guide,guide.12,1,Currency,Shard,20,계정당 1회 가이드 지급 구현 대기
+177,Guide,guide.13,1,Currency,Shard,60,계정당 1회 가이드 지급 구현 대기
+178,Guide,guide.14,1,Pack,NormalPack_TEST,1,계정당 1회 가이드 지급 구현 대기
+179,Guide,guide.15,1,Currency,Diamond,10,계정당 1회 가이드 지급 구현 대기
+180,Guide,guide.15,2,Currency,RouletteTicket,1,계정당 1회 가이드 지급 구현 대기
 181,CardDuplicate,Common,1,Currency,Shard,1,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
 182,CardDuplicate,Rare,1,Currency,Shard,2,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
 183,CardDuplicate,Arcane,1,Currency,Shard,5,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
@@ -151,3 +151,10 @@ int,string,string,int,string,string,long,string
 202,Pass,S1:premium:9,2,Pack,NormalPack_TEST,4,시즌 1 프리미엄 트랙 레벨 9
 203,Pass,S1:premium:10,1,Currency,Diamond,100,시즌 1 프리미엄 트랙 레벨 10
 204,Pass,S1:premium:10,2,PackChoice,UnlockedThemePack,2,시즌 1 프리미엄 트랙 레벨 10
+205,Guide,guide.01,1,Currency,Shard,10,카드 강화 완료 가이드; 계정당 1회
+206,Guide,guide.05,1,Currency,Shard,10,카드 진화 완료 가이드; 계정당 1회
+207,Album,p:Theme_Nature/P1,1,Currency,Energy,10,자연 테마 P1 페이지 완성
+208,Album,p:Theme_Nature/P2,1,Currency,Energy,10,자연 테마 P2 페이지 완성
+209,Album,p:Theme_Nature/P3,1,Currency,Energy,10,자연 테마 P3 페이지 완성
+210,Album,p:Theme_Nature/P4,1,Currency,Energy,10,자연 테마 P4 페이지 완성
+211,Album,p:Theme_Nature/P5,1,Currency,Energy,10,자연 테마 P5 페이지 완성

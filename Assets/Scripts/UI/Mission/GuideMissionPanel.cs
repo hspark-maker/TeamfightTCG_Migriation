@@ -71,6 +71,7 @@ public class GuideMissionPanel : PooledUIBase
     // 지금 화면에 깔린 행이 어느 정의·수령 상태로 만들어졌는지. 바뀌면 다시 깐다 —
     // 수령이 서명에 들어가는 이유는 앞 미션 수령이 다음 줄의 잠금 표시를 바꾸기 때문이다.
     string m_builtSignature;
+    long m_builtDefinitionsVersion;
 
     const string PERIOD_GUIDE = "guide";
 
@@ -116,7 +117,8 @@ public class GuideMissionPanel : PooledUIBase
 
     void HandleMissionsChanged()
     {
-        if (BuildSignature() != this.m_builtSignature) this.Rebuild();
+        // ID가 같아도 새 조회의 제목·조건·보상·이동 콜백은 다시 바인딩해야 한다.
+        if (MissionManager.DefinitionsVersion != this.m_builtDefinitionsVersion || BuildSignature() != this.m_builtSignature) this.Rebuild();
         else this.RefreshRows();
     }
 
@@ -124,6 +126,7 @@ public class GuideMissionPanel : PooledUIBase
     {
         this.m_rows.Clear();
         this.m_builtSignature = BuildSignature();
+        this.m_builtDefinitionsVersion = MissionManager.DefinitionsVersion;
         if (this.listContent == null || this.rowPrefab == null) return;
 
         // Destroy 는 프레임 끝에 처리되므로 먼저 비활성화한다 — 레이아웃 계산에서 빠져야 이번 프레임 배치가 맞는다.

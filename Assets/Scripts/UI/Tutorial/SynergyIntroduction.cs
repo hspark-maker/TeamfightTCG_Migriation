@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>저장된 덱의 최초 활성 시너지를 설명한다. 가이드 수령과 온보딩 커서를 변경하지 않는다.</summary>
+/// <summary>가이드 달성에 맞춰 시너지를 소개한다. 가이드 수령과 온보딩 커서를 변경하지 않는다.</summary>
 public sealed class SynergyIntroduction : MonoBehaviour
 {
     static SynergyIntroduction s_instance;
@@ -19,11 +19,11 @@ public sealed class SynergyIntroduction : MonoBehaviour
 
     static SynergyIntroductionSaveData State => DataSaveManager.Data?.Tutorial?.SynergyIntroduction;
     public static bool IsActive => s_instance != null && s_instance.m_active;
-    public static bool HasPending => State != null && State.DeckSlot >= 0
+    public static bool HasPending => State != null && (State.SynergyId == CARETAKER_ID || State.DeckSlot >= 0)
         && !string.IsNullOrEmpty(State.SynergyId) && !State.IsDone(State.SynergyId)
         && (s_instance == null || !s_instance.m_deferred);
 
-    // 가이드 미션 축에 고정된 소개 대상. 미션 4(돌보미 3장 2성 편성) 달성 → 돌보미, 미션 6(추적 조합) 달성 → 추적.
+    // 돌보미는 지정 카드 성장, 추적은 실제 덱 조합 달성 후 소개한다.
     const string CARETAKER_ID = "Caretaker";
     const string TRACE_ID = "Trace";
 
@@ -91,7 +91,7 @@ public sealed class SynergyIntroduction : MonoBehaviour
         string t_id = PendingSynergyId();
         int t_slot = -1;
         SynergyProgress t_target = null;
-        if (!string.IsNullOrEmpty(t_id))
+        if (!string.IsNullOrEmpty(t_id) && t_id != CARETAKER_ID)
         {
             // 저장한 슬롯이 여전히 그 시너지를 켜고 있으면 유지한다. 아니면 선택 슬롯 → 나머지 순서로 다시 고른다.
             if (State.SynergyId == t_id && TryResolve(State.DeckSlot, t_id, out t_target)) t_slot = State.DeckSlot;
@@ -117,7 +117,7 @@ public sealed class SynergyIntroduction : MonoBehaviour
     {
         if (!MissionManager.IsReady) return "";
         if (!State.IsDone(CARETAKER_ID))
-            return IsGuideComplete(GuideMissionTrack.EVENT_CARETAKER_DECK_STAR2) ? CARETAKER_ID : "";
+            return IsGuideComplete(GuideMissionTrack.EVENT_STARTER_CARDS_STAR2) ? CARETAKER_ID : "";
         if (!State.IsDone(TRACE_ID))
             return IsGuideComplete(GuideMissionTrack.EVENT_CARETAKER_TRACE_DECK) ? TRACE_ID : "";
         return "";
@@ -152,6 +152,7 @@ public sealed class SynergyIntroduction : MonoBehaviour
         Reevaluate();
         if (IsActive || !HasPending || !OutgameTutorialProgress.IsCompleted || UIPoolManager.instance == null) return false;
         SynergyIntroduction t_self = Ensure();
+        if (State.SynergyId == CARETAKER_ID) return t_self.TryBeginCaretaker();
         if (!TryResolve(State.DeckSlot, State.SynergyId, out t_self.m_target)) return false;
         t_self.m_slot = State.DeckSlot;
         t_self.m_active = true;
@@ -181,6 +182,33 @@ public sealed class SynergyIntroduction : MonoBehaviour
             return true;
         }
         t_self.m_active = false;
+        return false;
+    }
+
+    bool TryBeginCaretaker()
+    {
+        if (!CardCatalog.TryGetSynergyData(new SynergyRuntime(CARETAKER_ID), out SynergyData t_synergy)) return false;
+        ExplainPopupData t_data = ExplainPopupData.ForSynergy(t_synergy, 3);
+        if (t_data == null) return false;
+        m_active = true;
+        bool t_accept = false;
+        m_proposal = UIPoolManager.instance.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
+        {
+            titleText = $"{t_data.displayName} 시너지를 소개할게요.\n시너지가 해금된 돌보미 카드 3장을 덱에 모으면\n{t_data.explain}",
+            yesText = "확인",
+            noText = "나중에",
+            yesAction = () => t_accept = true,
+            noAction = () => m_deferred = true,
+            onHide = () =>
+            {
+                m_proposal = null;
+                if (!m_active) return;
+                if (t_accept) Complete();
+                else m_active = false;
+            },
+        });
+        if (m_proposal != null) return true;
+        m_active = false;
         return false;
     }
 

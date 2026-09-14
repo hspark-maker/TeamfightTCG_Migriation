@@ -34,6 +34,5 @@ export function applyGuideProgress(
   bump: MissionBump, current: Record<string, unknown>, slots: Record<string, unknown>,
   cards: Record<string, unknown>[], catalog: readonly MissionDef[],
 ): void {
-  if (cards.length === 0) return;
   bump.state.progress = evaluateGuideProgress({...current, ...slots}, cards, catalog, bump.state.progress);
 }

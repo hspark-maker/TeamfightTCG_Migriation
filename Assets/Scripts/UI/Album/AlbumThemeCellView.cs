@@ -25,6 +25,8 @@ public class AlbumThemeCellView : MonoBehaviour
     [SerializeField] float lockedAlpha = 0.6f;
 
     AlbumTheme        m_theme;
+    Action<AlbumTheme> m_onOpen;
+    bool m_clickBound;
     AspectRatioFitter m_iconFitter;
     bool       m_anchored;   // 안내 타깃으로 등록된 상태. 남의 등록을 날리지 않으려고 자기 것만 해제한다
 
@@ -36,6 +38,7 @@ public class AlbumThemeCellView : MonoBehaviour
     public void Bind(AlbumTheme _theme, int _order, Action<AlbumTheme> _onOpen, bool _tutorialTarget = false)
     {
         m_theme = _theme;
+        m_onOpen = _onOpen;
 
         ApplyLocked(_theme.IsLocked);
 
@@ -79,14 +82,16 @@ public class AlbumThemeCellView : MonoBehaviour
         }
         else chest.Bind(t_info, ClaimReward);
 
-        if (thumbButton != null)
+        if (thumbButton != null && !m_clickBound)
         {
-            thumbButton.onClick.RemoveAllListeners();
-            thumbButton.onClick.AddListener(() => _onOpen?.Invoke(m_theme));
+            thumbButton.onClick.AddListener(OpenTheme);
+            m_clickBound = true;
         }
 
         ApplyTutorialAnchor(_tutorialTarget);
     }
+
+    void OpenTheme() => m_onOpen?.Invoke(m_theme);
 
     // 썸네일은 액자(ArtClip)를 꽉 채우고 넘치는 만큼만 잘린다 — 잘라내기는 ArtClip의 Mask가 맡는다.
     // 테마마다 원화 비율이 달라 저작값 하나로는 못 맞추므로 스프라이트를 꽂을 때마다 다시 잰다.

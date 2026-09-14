@@ -12,6 +12,7 @@ internal static class GuideMissionNavigator
         GuideMissionTrack.GuideRoute t_route = GuideMissionTrack.RouteOf(_definition);
         switch (t_route.Kind)
         {
+            case GuideMissionTrack.ERouteKind.Match: MissionContentNavigation.TryNavigate(_definition, null); break;
             case GuideMissionTrack.ERouteKind.DeckEditor: GoDeckEditor(); break;
             case GuideMissionTrack.ERouteKind.AdventureNode: GoAdventure(t_route.NodeId); break;
             case GuideMissionTrack.ERouteKind.CollectionEnhance: GoCollection(); break;

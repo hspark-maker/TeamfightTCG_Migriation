@@ -44,6 +44,7 @@ const countedTransaction_1 = require("../observability/countedTransaction");
 const eventNames_1 = require("../analytics/eventNames");
 const analyticsEvent_1 = require("../observability/analyticsEvent");
 const missionStore_1 = require("../missions/missionStore");
+const guideProgress_1 = require("../missions/guideProgress");
 const period_1 = require("../missions/period");
 const matchResult_1 = require("../matchResult");
 const payout_1 = require("../payout");
@@ -591,6 +592,8 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
             }
             rankState.points = rank.after;
             rankState.bestTierIndex = Math.max(rankState.bestTierIndex, rank.afterTierIndex);
+            const guideProgress = (0, guideProgress_1.evaluateGuideRankProgress)(rankSnapshots[i].data(), missionBumps[i].state.progress);
+            missionBumps[i].state.progress = (0, guideProgress_1.evaluateGuideRankProgress)(rankState, guideProgress);
             const rankProgress = (0, rankStore_1.rankProgressResponse)(rankState);
             const payout = {
                 status: "ready",

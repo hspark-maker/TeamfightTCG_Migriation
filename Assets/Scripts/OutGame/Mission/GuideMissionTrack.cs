@@ -5,6 +5,11 @@ internal static class GuideMissionTrack
 {
     internal const string PERIOD = "guide";
 
+    internal const string EVENT_BRONZE2_REACHED = "Guide.Bronze2Reached";
+    internal const string EVENT_ENHANCE_COMPLETED = "Guide.EnhanceCompleted";
+    internal const string EVENT_EVOLVE_COMPLETED = "Guide.EvolveCompleted";
+    internal const string EVENT_STARTER_CARDS_STAR1 = "Guide.StarterCardsAtStar1";
+    internal const string EVENT_STARTER_CARDS_STAR2 = "Guide.StarterCardsAtStar2";
     internal const string EVENT_DECK_SAVED = "Guide.DeckSaved6";
     internal const string EVENT_CARETAKER_CARDS_STAR1 = "Guide.CaretakerCardsAtStar1";
     internal const string EVENT_CARETAKER_DECK_STAR2 = "Guide.CaretakerDeckAtStar2";
@@ -16,7 +21,7 @@ internal static class GuideMissionTrack
 
     const string ADVENTURE_CHAPTER01_NODE_ID = "node_06";
 
-    internal enum ERouteKind { None, DeckEditor, AdventureNode, CollectionEnhance, CardGrowth }
+    internal enum ERouteKind { None, DeckEditor, AdventureNode, CollectionEnhance, CardGrowth, Match }
 
     /// <summary>"이동" 버튼이 여는 화면. 모험은 정점 id 문자열로 들고 화면이 index 로 바꾼다.</summary>
     internal readonly struct GuideRoute
@@ -55,10 +60,10 @@ internal static class GuideMissionTrack
 
     static readonly GuideAct[] s_acts =
     {
-        new GuideAct(1, "출발", 1, 2),
-        new GuideAct(2, "돌보미 결성", 3, 5),
-        new GuideAct(3, "두 가지 힘", 6, 7),
-        new GuideAct(4, "에이스", 8, 13),
+        new GuideAct(1, "출발", 1, 3),
+        new GuideAct(2, "돌보미 결성", 4, 7),
+        new GuideAct(3, "두 가지 힘", 8, 9),
+        new GuideAct(4, "에이스", 10, 15),
     };
 
     internal static IReadOnlyList<GuideAct> Acts => s_acts;
@@ -137,11 +142,17 @@ internal static class GuideMissionTrack
         string t_event = _definition?.Event ?? string.Empty;
         switch (t_event)
         {
+            case EVENT_BRONZE2_REACHED:
+                return new GuideRoute(ERouteKind.Match);
             case EVENT_DECK_SAVED:
             case EVENT_CARETAKER_DECK_STAR2:
             case EVENT_CARETAKER_TRACE_DECK:
                 return new GuideRoute(ERouteKind.DeckEditor);
             case EVENT_CARETAKER_CARDS_STAR1:
+            case EVENT_ENHANCE_COMPLETED:
+            case EVENT_EVOLVE_COMPLETED:
+            case EVENT_STARTER_CARDS_STAR1:
+            case EVENT_STARTER_CARDS_STAR2:
                 return new GuideRoute(ERouteKind.CollectionEnhance);
             case EVENT_DECK_CARDS_STAR3:
             case EVENT_DECK_CARDS_STAR2:

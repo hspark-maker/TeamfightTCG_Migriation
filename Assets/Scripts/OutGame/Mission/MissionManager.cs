@@ -16,6 +16,7 @@ internal static class MissionManager
 
     internal static bool IsReady => s_snapshot != null;
     internal static long StateVersion { get; private set; }
+    internal static long DefinitionsVersion { get; private set; }
     internal static IReadOnlyList<MissionDefinition> Definitions => s_definitions;
     internal static string DailyKey => s_snapshot?.DailyKey ?? string.Empty;
     internal static string WeeklyKey => s_snapshot?.WeeklyKey ?? string.Empty;
@@ -48,7 +49,7 @@ internal static class MissionManager
         if (_snapshot == null) return;
         Normalize(_snapshot);
         s_snapshot = _snapshot;
-        unchecked { StateVersion++; }
+        unchecked { StateVersion++; DefinitionsVersion++; }
 
         s_definitions.Clear();
         if (_definitions != null)
@@ -138,7 +139,7 @@ internal static class MissionManager
     static void ResetRuntimeState()
     {
         s_snapshot = null;
-        unchecked { StateVersion++; }
+        unchecked { StateVersion++; DefinitionsVersion++; }
         s_definitions.Clear();
         OnChanged = null;
         OnPeriodReset = null;
