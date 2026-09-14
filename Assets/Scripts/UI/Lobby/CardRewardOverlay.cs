@@ -35,8 +35,8 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
     [Header("연출")]
     [SerializeField] PopupTransition transition = new PopupTransition();
 
-    [Tooltip("카드가 서는 순간 화면이 반응하는 축. dim에 딤 이미지를 물린다(알파는 그대로, 색만 밀린다).")]
-    [SerializeField] ScreenDimTint dimTint = new ScreenDimTint();
+    [Tooltip("공통 딤의 농도·색과 카드 착지 순간의 색상 펄스.")]
+    [SerializeField] OverlayDim dim = new OverlayDim();
 
     [Tooltip("꽂히는 순간 딤이 밝아졌다 돌아오는 시간. 상승 구간은 없다 — 섬광은 즉발이어야 터진 것으로 읽힌다.")]
     [SerializeField] float dimPulseDuration = 0.28f;
@@ -154,7 +154,6 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
 
         MarkOpen();
         this.SetVisible(true);
-        this.dimTint.Capture();
         this.CaptureHome();
 
         // 등장이 도는 동안은 손을 막는다 — 카드가 다 서기 전에 눌러 닫히면 무엇을 받았는지 못 본다.
@@ -174,9 +173,10 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
     // 오버레이는 자기 자신이 토글 대상이라 OnDisable이 정상 동작한다 — 잘린 퇴장 마무리를 여기서 위임한다.
     protected override void OnViewHidden()
     {
+        this.dim.Clear();
         this.transition.HandleDisabled(this.ResolveTarget());
         this.KillChoreo();
-        this.dimTint.Reset();
+        this.dim.Reset();
         this.ResetChoreography();
 
         // 꺼진 화면은 떠 있는 것이 아니다. [획득]을 거치지 않고 꺼지는 경로(부모 비활성·씬 언로드)에서
@@ -236,8 +236,7 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
 
         // 밝기는 트윈이 시작하는 프레임에 1로 튄 뒤 잦아든다(From) — 올라가는 구간을 두면 섬광이 아니라 점등이 된다.
         // setImmediately는 반드시 false다 — true면 조립하는 순간(t=0) 딤이 밝아져 등장 내내 밝은 채로 있는다.
-        // ScreenDimTint.TweenLevel을 쓰지 않는 이유는 그쪽 반환형이 Tween이라 From(float, bool)이 붙지 않기 때문이다.
-        t_seq.Insert(t_slam, DOTween.To(() => this.dimTint.Level, _v => this.dimTint.Level = _v, 0f, this.dimPulseDuration)
+        t_seq.Insert(t_slam, DOTween.To(() => this.dim.Level, _v => this.dim.Level = _v, 0f, this.dimPulseDuration)
                                     .From(1f, false).SetEase(Ease.OutQuad));
 
         float t_claimAt = t_slam + this.claimDelay;
@@ -495,6 +494,8 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
 
     void SetVisible(bool _visible)
     {
+        if (_visible) this.dim.Show(this, UiSortingOrder.RewardDim, this.transition.OpenDuration);
+        else this.dim.Hide(this.transition.CloseDuration);
         SetContentsVisible(_visible, this.transition);
     }
 

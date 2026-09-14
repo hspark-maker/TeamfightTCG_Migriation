@@ -324,7 +324,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_Color: {r: 0, g: 0, b: 0, a: 0}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -587,6 +587,11 @@ MonoBehaviour:
   _confirmButton: {fileID: 6467030482586034364}
   iconRoot: {fileID: 5373120218496253276}
   glowRoot: {fileID: 7720656102033531328}
+  dim:
+    alpha: 0.72
+    color: {r: 0, g: 0, b: 0, a: 1}
+    darkColor: {r: 0.02, g: 0.02, b: 0.05, a: 1}
+    brightColor: {r: 0.3, g: 0.28, b: 0.45, a: 1}
   transition:
     panel: {fileID: 49140182612230803}
     openDuration: 0.12

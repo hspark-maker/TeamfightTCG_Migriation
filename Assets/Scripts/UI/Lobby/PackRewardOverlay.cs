@@ -33,6 +33,7 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
 
     [Header("연출")]
     [SerializeField] PopupTransition transition = new PopupTransition();
+    [SerializeField] OverlayDim dim = new OverlayDim();
 
     [Tooltip("등장 안무가 미는 노드. 팩 그림 자신이 아니라 그 부모여야 한다 — "
            + "그림 쪽은 아이들 부유(PackIdleMotion)가 쥐고 있다. 미배선이면 등장 안무 없이 그냥 뜬다.")]
@@ -144,6 +145,7 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
     // 오버레이는 자기 자신이 토글 대상이라 OnDisable이 정상 동작한다 — 잘린 퇴장 마무리를 여기서 위임한다.
     protected override void OnViewHidden()
     {
+        this.dim.Clear();
         this.transition.HandleDisabled(this.ResolveTarget());
         this.KillIntro();
         this.ResetChoreography();
@@ -258,6 +260,8 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
 
     void SetVisible(bool _visible)
     {
+        if (_visible) this.dim.Show(this, UiSortingOrder.RewardDim, this.transition.OpenDuration);
+        else this.dim.Hide(this.transition.CloseDuration);
         SetContentsVisible(_visible, this.transition);
     }
 

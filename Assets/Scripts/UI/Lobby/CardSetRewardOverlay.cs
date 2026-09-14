@@ -27,6 +27,7 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
 
     [Header("연출")]
     [SerializeField] PopupTransition transition = new PopupTransition();
+    [SerializeField] OverlayDim dim = new OverlayDim();
 
     [Tooltip("카드가 다 선 뒤 [받기]가 열리기까지의 뜸. 이 구간이 무엇을 받았는지 읽는 시간이다 — " +
              "0이면 손이 카드보다 빨라져 못 보고 넘어간다. 격자의 순차 팝이 끝나는 시간보다 길어야 한다.")]
@@ -142,6 +143,7 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
     // 오버레이는 자기 자신이 토글 대상이라 OnDisable이 정상 동작한다 — 잘린 퇴장 마무리를 여기서 위임한다.
     protected override void OnViewHidden()
     {
+        this.dim.Clear();
         this.transition.HandleDisabled(this.ResolveTarget());
         this.KillIntro();
 
@@ -224,6 +226,8 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
 
     void SetVisible(bool _visible)
     {
+        if (_visible) this.dim.Show(this, UiSortingOrder.RewardDim, this.transition.OpenDuration);
+        else this.dim.Hide(this.transition.CloseDuration);
         SetContentsVisible(_visible, this.transition);
     }
 

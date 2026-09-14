@@ -17,6 +17,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 
     [Header("연출")]
     [SerializeField] PopupTransition transition = new PopupTransition();
+    [SerializeField] OverlayDim dim = new OverlayDim();
 
     [Tooltip("첫 행이 들어오기까지의 뜸. 딤이 깔리는 동안은 아직 읽을 것이 없다.")]
     [SerializeField] float rowDelay = 0.12f;
@@ -104,6 +105,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 
     protected override void OnViewHidden()
     {
+        this.dim.Clear();
         this.transition.HandleDisabled(ResolveTarget());
         KillIntro();
         EndDemo();
@@ -305,6 +307,8 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 
     void SetVisible(bool _visible)
     {
+        if (_visible) this.dim.Show(this, UiSortingOrder.IntroDim, this.transition.OpenDuration);
+        else this.dim.Hide(this.transition.CloseDuration);
         SetContentsVisible(_visible, this.transition);
     }
 

@@ -18,6 +18,7 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
     [SerializeField] RectTransform iconRoot;
     [SerializeField] RectTransform glowRoot;
     [SerializeField] PopupTransition transition = new PopupTransition();
+    [SerializeField] OverlayDim dim = new OverlayDim();
     [SerializeField] EOutgameSound _introSound = EOutgameSound.PopupOpen;
 
     [Header("등장 · 제목")]
@@ -81,6 +82,7 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
         _confirmButton.onClick.RemoveListener(Confirm);
         _confirmButton.onClick.AddListener(Confirm);
         MarkOpen();
+        dim.Show(this, UiSortingOrder.IntroDim, transition.OpenDuration);
         SetContentsVisible(true, transition);
         _confirmButton.interactable = false;
         BuildIntro();
@@ -88,6 +90,10 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
 
     /// <summary>스텝 취소는 완료 통지 없이 즉시 무대를 걷는다.</summary>
     public void Close() => Finish(false);
+
+    /// <summary>연속 소개의 다음 페이지가 준비될 때까지 같은 암막을 유지한다.</summary>
+    public ScreenDim.Handle HoldDim(object owner)
+        => dim.Hold(owner, UiSortingOrder.IntroDim, transition.OpenDuration);
 
     void CaptureHome()
     {
@@ -155,6 +161,7 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
         _closing = true;
         _confirmButton.interactable = false;
         KillChoreography();
+        dim.Hide(transition.CloseDuration);
         SetContentsVisible(false, transition);
         ResolveTarget().GetComponent<CanvasGroup>().blocksRaycasts = true;
         // 후속 스텝이 자체 PopupDim 아래에 먼저 서지 않게 퇴장을 마친 뒤 넘긴다.
@@ -166,6 +173,7 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
 
     void Finish(bool confirmed)
     {
+        dim.Clear();
         bool wasOpen = ConsumeOpen();
         Action callback = confirmed ? _onConfirmed : _onCancelled;
         _onConfirmed = null;

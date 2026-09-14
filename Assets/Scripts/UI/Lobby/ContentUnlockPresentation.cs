@@ -16,6 +16,7 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
     bool m_playing;
     bool m_pendingIntro;
     int m_sessionVersion;
+    ScreenDim.Handle m_pageDim;
 
     public static bool IsPlaying => s_instance != null && s_instance.m_playing;
     public static bool IsReady => s_instance != null && s_instance.m_visible && s_instance.isActiveAndEnabled;
@@ -65,8 +66,12 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
     {
         m_pendingIntro = false;
         ContentUnlockIntroDef t_intro = m_intros[m_introIndex];
+        // 다음 페이지는 Update에서 열리므로 그 사이의 암막을 호출자가 보유한다.
+        if (m_introIndex + 1 < m_intros.Count)
+            m_pageDim = m_intro.HoldDim(this);
         m_intro.Show(t_intro.contentName + " 오픈 !", t_intro.description,
             new[] { t_intro.icon }, Finish, Cancel);
+        if (m_introIndex + 1 == m_intros.Count) ReleasePageDim();
         PlayButton(ContentUnlockIntroDef.KeyOf(t_intro.content));
     }
 
@@ -123,6 +128,7 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
 
     void Clear()
     {
+        ReleasePageDim();
         m_playing = false;
         m_pendingIntro = false;
         m_intro = null;
@@ -139,6 +145,12 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
     {
         m_visible = false;
         Cancel();
+    }
+
+    void ReleasePageDim()
+    {
+        m_pageDim?.Release();
+        m_pageDim = null;
     }
 
     void OnDestroy()

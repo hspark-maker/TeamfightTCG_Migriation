@@ -80,19 +80,35 @@ public static class ContentUnlockIntroValidation
     public static void RunViewBehaviour()
     {
         Require(!EditorApplication.isPlaying, "Run isolated view validation outside play mode.");
+        Require(!ScreenDim.IsAvailable, "Isolated view validation requires no registered Full dim.");
         var scene = EditorSceneManager.NewPreviewScene();
         GameObject instance = null;
+        GameObject dimInstance = null;
         try
         {
+            var dimPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/Assets/Prefabs/UI/Common/ScreenDim.prefab");
+            Require(dimPrefab != null, "Shared dim prefab missing.");
+            dimInstance = (GameObject)PrefabUtility.InstantiatePrefab(dimPrefab, scene);
+            var dimCanvas = dimInstance.AddComponent<Canvas>();
+            dimCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            dimInstance.AddComponent<GraphicRaycaster>();
+            var screenDim = dimInstance.GetComponent<ScreenDim>();
+            var dimSerialized = new SerializedObject(screenDim);
+            dimSerialized.FindProperty("layer").enumValueIndex = (int)EDimLayer.Full;
+            dimSerialized.FindProperty("sortingCanvas").objectReferenceValue = dimCanvas;
+            dimSerialized.ApplyModifiedPropertiesWithoutUndo();
+            ScreenDimValidation.InvokeLifecycle(screenDim, "Awake");
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
                 "Assets/Assets/Prefabs/UI/OverlayUI/ContentUnlockIntroView.prefab");
             Require(prefab != null, "Intro prefab missing.");
             Require(prefab.GetComponent<Canvas>() != null && prefab.transform.Find("Contents/SafeArea/Stage") != null,
                 "Onboarding overlay requires its own canvas and SafeArea/Stage.");
             var dim = prefab.transform.Find("Contents/PopupDim");
-            Require(dim != null && dim.GetComponent<Image>().color.a == 1f
-                && dim.GetComponent<Image>().raycastTarget && dim.GetComponent<Button>() == null,
-                "Reward-style PopupDim must cover input without confirming the step.");
+            Require(dim != null && dim.GetComponent<Image>().color.a == 0f
+                && dim.GetComponent<Image>().enabled && dim.GetComponent<Image>().raycastTarget
+                && dim.GetComponent<Button>() == null,
+                "PopupDim must remain a transparent input blocker without confirming the step.");
             instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, scene);
             var view = instance.GetComponent<ContentUnlockIntroView>();
             instance.SetActive(true);
@@ -209,6 +225,11 @@ public static class ContentUnlockIntroValidation
             finally
             {
                 if (instance != null) UnityEngine.Object.DestroyImmediate(instance);
+                if (dimInstance != null)
+                {
+                    ScreenDimValidation.InvokeLifecycle(dimInstance.GetComponent<ScreenDim>(), "OnDestroy");
+                    UnityEngine.Object.DestroyImmediate(dimInstance);
+                }
                 EditorSceneManager.ClosePreviewScene(scene);
             }
         }
