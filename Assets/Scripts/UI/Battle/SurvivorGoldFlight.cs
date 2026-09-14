@@ -359,11 +359,11 @@ public class SurvivorGoldFlight
     }
 
     // 카드 생김새의 정본 경로. 이 줄은 장수를 세는 물건이라 이름·HP는 잔글씨로 뭉갠다 →
-    // 아트와 프레임만 남긴다(SetArtOnly는 값만 세우므로 Bind가 뒤에 와야 실제로 반영된다).
+    // 아트·프레임과 키워드·시너지 배지를 남긴다(SetArtOnly는 값만 세우므로 Bind가 뒤에 와야 실제로 반영된다).
     RectTransform CreateFromPrefab(int _card)
     {
         var t_view = UnityEngine.Object.Instantiate(this.cardPrefab);
-        t_view.SetArtOnly(true);
+        t_view.SetArtOnly(true, _showBadges: true);
         t_view.Bind(_card, true);   // 내가 전투에 들고 나온 카드다 — 소유는 확정.
 
         // 팝업의 전체화면 터치(스킵·메인 이동)를 날아가는 카드가 가로채지 않게.
