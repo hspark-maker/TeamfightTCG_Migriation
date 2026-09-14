@@ -32,19 +32,65 @@ public sealed class PreBattleMatchData
 public static class PreBattleMatchHandoff
 {
     static PreBattleMatchData s_data;
+    static NetworkSession s_session;
+    static Fusion.NetworkRunner s_runner;
 
     public static bool HasValue => s_data != null;
+    public static bool WasInvalidated { get; private set; }
 
-    internal static void Set(PreBattleMatchData _data) => s_data = _data;
+    // 서버 승인 뒤에도 대치 연출·콘텐츠 확인 동안 상대가 취소할 수 있다.
+    public static bool CanEnterBattle => s_data != null && s_session == NetworkSession.Instance
+        && s_session != null && s_session.Runner == s_runner && HasConnectedPeer(s_session);
+
+    internal static bool HasConnectedPeer(NetworkSession _session)
+    {
+        if (_session?.Runner == null || !_session.Runner.IsRunning) return false;
+        foreach (Fusion.PlayerRef t_player in _session.Runner.ActivePlayers)
+            if (t_player != _session.Runner.LocalPlayer) return true;
+        return false;
+    }
+
+    internal static void Set(PreBattleMatchData _data)
+    {
+        Clear();
+        s_data = _data;
+        s_session = NetworkSession.Instance;
+        s_runner = s_session?.Runner;
+        if (s_session == null) return;
+        s_session.OnPlayerLeftRoom += OnPlayerLeft;
+        s_session.OnConnectionFailed += OnConnectionFailed;
+    }
+
+    static void OnPlayerLeft(Fusion.PlayerRef _player) => Invalidate();
+    static void OnConnectionFailed(string _reason) => Invalidate();
+
+    public static void Invalidate()
+    {
+        if (s_data == null) return;
+        Clear();
+        // 씬 전환 직후 취소되어도 구 덱 교환 절차로 재진입하지 않게 흔적을 남긴다.
+        WasInvalidated = true;
+    }
 
     public static bool TryConsume(out PreBattleMatchData _data)
     {
         _data = s_data;
-        s_data = null;
+        Clear();
         return _data != null;
     }
 
-    public static void Clear() => s_data = null;
+    public static void Clear()
+    {
+        if (s_session != null)
+        {
+            s_session.OnPlayerLeftRoom -= OnPlayerLeft;
+            s_session.OnConnectionFailed -= OnConnectionFailed;
+        }
+        s_session = null;
+        s_runner = null;
+        s_data = null;
+        WasInvalidated = false;
+    }
 }
 
 public enum EPreBattleSyncResult
@@ -269,9 +315,10 @@ public static class PreBattleMatchSync
                 return t_token.IsCancellationRequested ? EPreBattleSyncResult.Canceled : EPreBattleSyncResult.Failed;
             }
 
-            // 잠금이 취소 뒤 최종 확인으로 건져진 경우가 있다. 그래도 로비가 화면을 내렸다면 진행하면
-            // 안 되므로 외부 토큰만 다시 본다 — 방 이벤트·준비 상한은 승인이 난 이상 더 볼 이유가 없다.
+            // 시간 초과 뒤 최종 조회로 승인을 얻을 수는 있지만, 상대 이탈·중단은 승인으로 되돌리지 않는다.
             if (_ct.IsCancellationRequested) return EPreBattleSyncResult.Canceled;
+            if (t_abortCause != null || t_receiver.Failed || !PreBattleMatchHandoff.HasConnectedPeer(t_session))
+                return EPreBattleSyncResult.Failed;
 
             PreBattleMatchHandoff.Set(new PreBattleMatchData
             {

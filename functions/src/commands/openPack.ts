@@ -140,7 +140,7 @@ export const openPack = onCall(measuredCallable("openPack", async (request) => {
       const missionReference = missionsRef(db, env, uid);
       const [missionSnapshot, rankSnapshot] = await transaction.getAll(
         missionReference, rankRef(db, env, uid));
-      const missions = missionBumpFromSnapshot(missionReference, missionSnapshot, period);
+      const missions = missionBumpFromSnapshot(missionReference, missionSnapshot, period, current);
       // 트랜잭션이 재실행되면 이전 추첨을 버리고 다시 뽑는다 — 잔액·소유와 정합해야 한다.
       const points = Number(rankSnapshot.data()?.points ?? (current.rank as {points?: unknown} | undefined)?.points ?? 0);
       const grade = gradeOf(thresholds, points);

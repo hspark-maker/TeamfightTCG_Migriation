@@ -122,7 +122,7 @@ export const enhanceCard = onCall(measuredCallable("enhanceCard", async (request
     async (current, transaction, wallet): Promise<SaveMutation> => {
       // 미션 읽기가 콜백의 첫 줄이다. 아래 grants 읽기와는 둘 다 읽기라 순서를 다투지 않지만,
       // 미션 **쓰기**는 그 grants 읽기보다 뒤여야 해서 콜백 맨 끝으로 갈라 두었다.
-      const missions = await beginMissionBump(transaction, db, env, uid, period);
+      const missions = await beginMissionBump(transaction, db, env, uid, period, current);
 
       // Retry from the committed growth and wallet state.
       const entries = readGrowthEntries(current.cardGrowth);

@@ -124,7 +124,7 @@ export const spinRoulette = onCall(async (request) => {
       granted = slot.currency === null ? itemGrant.currencies :
         [{currency: slot.currency, amount: slot.amount}];
       if (itemContext && itemGrant.cards.length > 0) {
-        const missions = await beginMissionBump(transaction, db, env, uid, period);
+        const missions = await beginMissionBump(transaction, db, env, uid, period, current);
         applyGuideProgress(missions, current, itemGrant.slots, itemContext.cards, catalog);
         applySnackGrowthProgress(missions, itemGrant.cards);
         commitMissionProgress(transaction, missions, FieldValue.serverTimestamp());

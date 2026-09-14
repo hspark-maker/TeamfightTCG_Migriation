@@ -7,14 +7,14 @@ using UnityEngine;
 ///
 /// 규칙
 ///  · 공격자: **3계층 사다리**로 후보군(pool)을 먼저 정하고, 그 안에서 체력 가중 룰렛으로 뽑는다.
-///      1계층 — 체력 30% 이상인 **키워드 카드**(<see cref="AttackKeywords"/>)
+///      1계층 — 체력 30% 이상인 **키워드 카드**(<see cref="HasActiveKeyword"/>)
 ///      2계층 — 1계층이 비면, 체력 30% 이상인 나머지 카드
 ///      3계층 — 전원 빈사(30% 미만)면 전체. 가중치를 뒤집어 **체력이 낮을수록** 먼저 나간다
 ///              (죽어 슬롯을 비우면 새 카드가 보충돼 보드가 회전한다).
-///  · 타깃  : 유효 타깃 중 **실효 체력이 가장 낮은** 카드(= 가장 잘 죽는 카드) 우선.
+///  · 타깃  : 유효 타깃 중 실효 체력이 낮은 카드 우선. 키워드 보유 시 체력 점수를 절반으로 본다.
 ///
 /// 이 게임에서 공격력은 곧 현재 체력이다(<see cref="CardInstance.AttackDamage"/>) — 체력 가중치는
-/// 생존력이자 화력 가중치다. 유일한 예외인 도발(체력의 절반)은 그래서 키워드 계층에서 뺐다.
+/// 생존력이자 화력 가중치다. 키워드 종류와 관계없이 현재 활성화된 키워드 카드를 우선한다.
 ///
 /// 결정론: 랜덤은 <see cref="MatchRandom.AiRange"/>(AI 전용 파생 스트림)만 쓰고, 공격자 1회 선택당 **정확히 1회** 소비한다
 /// (계층이 어디로 갈리든 소비 횟수는 같다). 룰렛은 후보 리스트 순서(슬롯 오름차순)를 그대로 훑는다.
@@ -32,29 +32,13 @@ public static class EnemyAi
     /// <summary>체력 가중치 상한.</summary>
     public const int HpWeightMax = 10;
 
-    /// <summary>"키워드 카드"(1계층) 판정 대상.
-    ///
-    /// 도발은 뺐다 — 공격력이 체력의 절반이라 같은 체력이면 실제 화력이 낮다(과대평가 방지).
-    /// 힐러도 아니다: 공격에 내보내는 것보다 살아서 회복시키는 쪽이 이득이다.
-    /// 표식·무적·추가생명력은 방어 성능이라 공격자 우선순위와 무관하다.</summary>
-    public static readonly CardKeyword[] AttackKeywords =
-    {
-        CardKeyword.Ranged,
-        CardKeyword.Execution,
-        CardKeyword.Peerless,
-        CardKeyword.Cunning,
-    };
+    /// <summary>키워드 보유 카드의 선택 가중치 배수.</summary>
+    public const int KeywordWeightMultiplier = 2;
 
-    /// <summary>공격 계층에 올릴 키워드를 하나라도 가졌는가.
-    /// 판정은 <see cref="CardInstance.HasKeyword"/> — 시너지·패시브가 런타임에 얹어 준 키워드도 그대로 반영된다.
-    /// (여러 비트를 한 번에 넘기지 않는다. HasKeyword는 HasFlag 기반이라 마스크를 주면 "전부 보유"가 된다.)</summary>
-    public static bool HasAttackKeyword(CardInstance _card)
-    {
-        if (_card == null) return false;
-        for (int i = 0; i < AttackKeywords.Length; i++)
-            if (_card.HasKeyword(AttackKeywords[i])) return true;
-        return false;
-    }
+    /// <summary>현재 활성 키워드가 하나라도 있는가. 미해금 키워드는 제외하고 런타임·시너지 부여분은 포함한다.</summary>
+    public static bool HasActiveKeyword(CardInstance _card)
+        => _card != null &&
+           (_card.unlockedKeywords | _card.runtimeKeywords | _card.synergyKeywords) != CardKeyword.None;
 
     /// <summary>실효 체력 비율(0~1). 분자에 <c>bonusHp</c>를 넣는 이유: 추가생명력·덩치는 피해를 먼저 먹는
     /// 껍데기라 실제 생존력에 포함된다. 분모는 인스턴스의 <c>maxHp</c>(= data.maxHp + 영구 강화분)로,
@@ -83,7 +67,7 @@ public static class EnemyAi
     /// <summary>공격자 선택 계층. 값이 작을수록 우선한다.</summary>
     public enum AttackerTier
     {
-        /// <summary>체력 30% 이상 + 공격 키워드 보유.</summary>
+        /// <summary>체력 30% 이상 + 활성 키워드 보유.</summary>
         KeywordHealthy,
         /// <summary>체력 30% 이상(키워드 무관).</summary>
         Healthy,
@@ -102,17 +86,19 @@ public static class EnemyAi
 
         bool t_healthy = !IsLowHp(_card);
         if (_tier == AttackerTier.Healthy) return t_healthy;
-        return t_healthy && HasAttackKeyword(_card);   // KeywordHealthy
+        return t_healthy && HasActiveKeyword(_card);   // KeywordHealthy
     }
 
     /// <summary>계층 안에서 쓰는 룰렛 가중치. 항상 1 이상이라 후보가 있으면 합도 반드시 양수다.
     ///
     /// 빈사 계층만 가중치를 뒤집는다(<c>HpWeightMax + 1 - w</c>): 어차피 다음 공격에 죽을 카드를 먼저
-    /// 내보내 슬롯을 비우고 새 카드를 받는 편이 낫다. 성한 카드를 아끼는 게 아니라 <b>보드를 회전</b>시키는 수다.</summary>
+    /// 내보내 슬롯을 비우고 새 카드를 받는 편이 낫다. 빈사만 남아도 키워드 카드에는 2배 가중치를 준다.</summary>
     public static int SelectWeight(CardInstance _card, AttackerTier _tier)
     {
         int t_w = HpWeight(_card);
-        return _tier == AttackerTier.Desperate ? HpWeightMax + HpWeightMin - t_w : t_w;
+        if (_tier != AttackerTier.Desperate) return t_w;
+        t_w = HpWeightMax + HpWeightMin - t_w;
+        return HasActiveKeyword(_card) ? t_w * KeywordWeightMultiplier : t_w;
     }
 
     /// <summary>후보 중 실제로 쓸 계층을 정한다. 위에서부터 훑어 비어 있지 않은 첫 계층.
@@ -164,12 +150,16 @@ public static class EnemyAi
         return t_last;   // 부동소수 없는 정수 합이라 도달 불가. 방어용.
     }
 
-    /// <summary>타깃 우선순위 기준값. 낮을수록 먼저 맞는다.
+    /// <summary>타깃의 실효 체력.
     /// 보너스HP는 피해를 먼저 먹는 껍데기라 실효 체력에 포함한다(치사 판정 <see cref="CardInstance"/>와 같은 기준).</summary>
     public static int EffectiveHp(CardInstance _card)
         => _card == null ? int.MaxValue : _card.hp + _card.bonusHp;
 
-    /// <summary>타깃 1장을 고른다: 실효 체력 최소 → 동점이면 슬롯 오름차순. 랜덤 미소비.
+    // 키워드 카드의 체력 점수를 절반으로 보는 비교를 정수로 보존한다(일반 카드 쪽에 2배).
+    static long TargetPriority(CardInstance _card)
+        => (long)EffectiveHp(_card) * (HasActiveKeyword(_card) ? 1 : KeywordWeightMultiplier);
+
+    /// <summary>타깃 1장을 고른다: 키워드 보정 체력 점수 최소 → 동점이면 슬롯 오름차순. 랜덤 미소비.
     /// 후보 목록은 반드시 <see cref="BattleField.GetValidTargets"/> 결과여야 한다
     /// (지정 타깃·도발 필터는 규칙 쪽 단독 책임 — 여기서 다시 판단하지 않는다).</summary>
     public static CardInstance PickTarget(IReadOnlyList<CardInstance> _targets)
@@ -183,7 +173,7 @@ public static class EnemyAi
             if (t_c == null) continue;
             if (t_best == null) { t_best = t_c; continue; }
 
-            int t_cmp = EffectiveHp(t_c).CompareTo(EffectiveHp(t_best));
+            int t_cmp = TargetPriority(t_c).CompareTo(TargetPriority(t_best));
             if (t_cmp < 0 || (t_cmp == 0 && t_c.slotIndex < t_best.slotIndex)) t_best = t_c;
         }
         return t_best;

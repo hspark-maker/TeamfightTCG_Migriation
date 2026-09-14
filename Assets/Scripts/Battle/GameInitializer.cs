@@ -256,6 +256,13 @@ public class GameInitializer : MonoBehaviour
     /// 상한이 없으면 러너가 죽었거나 스테일인 경우 여기서 영원히 멈춘다(전투가 시작조차 안 됨).</summary>
     async UniTask<bool> InitializeMultiplayerFields()
     {
+        if (PreBattleMatchHandoff.WasInvalidated ||
+            (PreBattleMatchHandoff.HasValue && !PreBattleMatchHandoff.CanEnterBattle))
+        {
+            this.multiplayerFieldFailureReason = EMatchEndReason.OpponentLeftDuringInit;
+            PreBattleMatchHandoff.Clear();
+            return false;
+        }
         if (PreBattleMatchHandoff.TryConsume(out PreBattleMatchData t_preSynced))
             return InitializePreSyncedMultiplayerFields(t_preSynced);
 

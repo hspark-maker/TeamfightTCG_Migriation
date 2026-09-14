@@ -583,7 +583,7 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
     // 미션 문서는 payout 쓰기보다 먼저 전부 읽는다. 정산 트랜잭션의 pending -> confirmed 전이가
     // matchId 멱등 게이트라 같은 제출을 다시 보내도 이 경로에는 재진입하지 않는다.
     const missionBumps = missionRefs.map((ref, i) =>
-      missionBumpFromSnapshot(ref, snapshots[count * 3 + i], period));
+      missionBumpFromSnapshot(ref, snapshots[count * 3 + i], period, saveSnapshots[i].data()));
 
     const settledAt = Timestamp.now();
     const payoutExpiresAt = Timestamp.fromMillis(settledAt.toMillis() + 180 * 24 * 60 * 60 * 1000);

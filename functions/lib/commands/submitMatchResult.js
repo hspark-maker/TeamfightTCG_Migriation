@@ -550,7 +550,7 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
         const saveSnapshots = snapshots.slice(count * 2, count * 3);
         // 미션 문서는 payout 쓰기보다 먼저 전부 읽는다. 정산 트랜잭션의 pending -> confirmed 전이가
         // matchId 멱등 게이트라 같은 제출을 다시 보내도 이 경로에는 재진입하지 않는다.
-        const missionBumps = missionRefs.map((ref, i) => (0, missionStore_1.missionBumpFromSnapshot)(ref, snapshots[count * 3 + i], period));
+        const missionBumps = missionRefs.map((ref, i) => (0, missionStore_1.missionBumpFromSnapshot)(ref, snapshots[count * 3 + i], period, saveSnapshots[i].data()));
         const settledAt = firestore_1.Timestamp.now();
         const payoutExpiresAt = firestore_1.Timestamp.fromMillis(settledAt.toMillis() + 180 * 24 * 60 * 60 * 1000);
         const payoutSummary = {};

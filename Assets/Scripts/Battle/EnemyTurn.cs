@@ -172,7 +172,7 @@ public class EnemyTurn : TurnBase
 
     /// <summary>이 공격자가 칠 대상. <b>처형 재공격이면 대상 선택의 단일 진실원은 <see cref="ExecutionRule"/>다</b> —
     /// 도발을 무시하고 살아 있는 적 전부에서 뽑는 그 규칙을 AI도 그대로 따른다(사람 쪽 PlayerTurn과 동형).
-    /// 첫 공격만 <see cref="EnemyAi"/>의 최저 체력 우선 규칙을 쓴다.
+    /// 첫 공격만 <see cref="EnemyAi"/>의 키워드·체력 우선 규칙을 쓴다.
     /// <paramref name="_executionChain"/>이 false거나 <see cref="BattleUxFlags.ExecutionRandomTarget"/>가
     /// 꺼져 있으면(=대상을 직접 고르던 구 경로) AI는 고를 주체가 없으므로 EnemyAi로 폴백한다.</summary>
     CardInstance PickTargetFor(CardInstance _attacker, bool _executionChain)

@@ -136,7 +136,7 @@ export const reportAdventureWin = onCall(async (request) => {
 
       // pending/cleared 판정이 영수증 없는 재신고도 막는다. 최초 승인과 같은
       // 트랜잭션에서만 집계하므로 커밋 실패·콜백 재실행에 카운터가 따로 남지 않는다.
-      const missions = await beginMissionBump(transaction, db, env, uid, period);
+      const missions = await beginMissionBump(transaction, db, env, uid, period, current);
       commitMissionBumps(transaction, missions, [
         {event: EVENTS.battleCompleted.missionKey, amount: 1},
         {event: "WinBattle", amount: 1},
