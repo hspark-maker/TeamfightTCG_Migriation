@@ -6,9 +6,10 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 
-// Cards 라벨의 번들을 디스크 캐시에 먼저 받는다. Sprite 적재는 CardArtCache가 이어받는다.
+// 카드·팩·UI 번들을 디스크 캐시에 먼저 받는다. 실제 적재는 각 캐시가 이어받는다.
 public static class RemoteCardArtDownload
 {
+    static readonly string[] DownloadLabels = { "Cards", "Packs", "RemoteUI" };
     public static bool IsDownloading { get; private set; }
     public static bool IsComplete { get; private set; }
     public static bool HasFailed { get; private set; }
@@ -49,14 +50,14 @@ public static class RemoteCardArtDownload
                     throw t_catalogUpdate.OperationException ?? new InvalidOperationException("Remote catalog update failed.");
             }
 
-            t_size = Addressables.GetDownloadSizeAsync("Cards");
+            t_size = Addressables.GetDownloadSizeAsync(DownloadLabels);
             while (!t_size.IsDone) await UniTask.Yield(PlayerLoopTiming.Update, _cancellationToken);
             if (t_size.Status != AsyncOperationStatus.Succeeded)
-                throw t_size.OperationException ?? new InvalidOperationException("Card art download size lookup failed.");
+                throw t_size.OperationException ?? new InvalidOperationException("Game resource download size lookup failed.");
             TotalBytes = t_size.Result;
             if (TotalBytes > 0)
             {
-                t_download = Addressables.DownloadDependenciesAsync("Cards", false);
+                t_download = Addressables.DownloadDependenciesAsync(DownloadLabels, Addressables.MergeMode.Union, false);
                 while (!t_download.IsDone)
                 {
                     DownloadStatus t_status = t_download.GetDownloadStatus();
@@ -64,7 +65,7 @@ public static class RemoteCardArtDownload
                     await UniTask.Yield(PlayerLoopTiming.Update, _cancellationToken);
                 }
                 if (t_download.Status != AsyncOperationStatus.Succeeded)
-                    throw t_download.OperationException ?? new InvalidOperationException("Card art download failed.");
+                    throw t_download.OperationException ?? new InvalidOperationException("Game resource download failed.");
             }
             DownloadedBytes = TotalBytes;
             IsComplete = true;

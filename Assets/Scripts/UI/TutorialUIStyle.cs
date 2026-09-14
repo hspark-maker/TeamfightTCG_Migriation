@@ -10,6 +10,8 @@ public static class TutorialUIStyle
     const string FontAddress = "MalgunGothic_TMP";
     static TMP_FontAsset s_font;
 
+    public static void SetFont(TMP_FontAsset _font) => s_font = _font;
+
     static TMP_FontAsset Font =>
         s_font != null ? s_font : (s_font = SyncAddressable.Load<TMP_FontAsset>(FontAddress));
 

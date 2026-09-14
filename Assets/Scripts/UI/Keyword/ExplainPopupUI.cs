@@ -11,8 +11,11 @@ using TMPro;
 /// 프리팹은 Addressables "UIPrefab" 라벨이 있어야 UiPrefabCache가 색인한다.
 /// 풀 키가 C# 타입이라 이 타입에 대응하는 프리팹은 ExplainPopup.prefab 하나뿐이다.
 /// </summary>
-public class ExplainPopupUI : PooledUIBase
+public class ExplainPopupUI : ContentsPooledUI
 {
+    protected override bool UsePopupTransition => false;
+    protected override bool UseScreenDim => false;
+
     [SerializeField] Image    iconImage;
     [SerializeField] TMP_Text nameText;
     [SerializeField] TMP_Text explainText;
@@ -28,6 +31,7 @@ public class ExplainPopupUI : PooledUIBase
 
     public override void Initialization(UIData _data)
     {
+        this.InitializeUI();
         if (_data is not ExplainPopupData t_d) return;
 
         if (this.iconImage != null)
@@ -72,17 +76,9 @@ public class ExplainPopupUI : PooledUIBase
            || Screen.width != this.m_lastScreen.x || Screen.height != this.m_lastScreen.y
            || Screen.orientation != this.m_lastOrientation;
 
-    public override void Show()
-    {
-        this.contents.SetActive(true);
-        this.isShow = true;
-    }
+    public override void Show() => this.SetContentsVisible(true);
 
-    public override void Hide()
-    {
-        this.contents.SetActive(false);
-        this.isShow = false;
-    }
+    public override void Hide() => this.SetContentsVisible(false);
 }
 
 /// <summary>팝업에 넘길 **완성된 표시 데이터**. 도메인 객체를 그대로 넣지 말고

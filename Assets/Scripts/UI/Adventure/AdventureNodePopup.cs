@@ -7,7 +7,7 @@ using UnityEngine.UI;
 // 정점 도전 확인 팝업. "누구와 싸우는가 · 얼마나 센가 · 무엇을 받는가"를 한 화면에 세우고 도전 여부만 묻는다.
 // 진입 자격과 전투 연결은 맵(AdventureMapOverlayView)이 계속 쥔다 — 여기서는 [전투]를 콜백으로 올릴 뿐이다.
 // 그래서 이 팝업은 정점의 인덱스만 알면 되고, 씬 전환도 보상 지급도 모른다.
-public class AdventureNodePopup : PooledUIBase
+public class AdventureNodePopup : ContentsPooledUI
 {
     [SerializeField] TMP_Text titleText;
 
@@ -26,9 +26,6 @@ public class AdventureNodePopup : PooledUIBase
     [SerializeField] Button battleButton;
     [SerializeField] Button backButton;
 
-    [Header("연출")]
-    [SerializeField] PopupTransition transition = new PopupTransition();
-
     [Tooltip("권장 전투력 표기. {0}에 수가 들어간다.")]
     [SerializeField] string powerFormat = "권장 전투력 {0:N0}";
 
@@ -40,8 +37,11 @@ public class AdventureNodePopup : PooledUIBase
     // 표시용 보상 줄. 매번 새로 담아 쓰는 버퍼다(정점마다 건수가 갈린다).
     readonly List<RewardLine> m_rewards = new List<RewardLine>();
 
+    protected override bool UseScreenDim => false;
+
     public override void Initialization(UIData _data)
     {
+        this.InitializeUI();
         this.data = _data;
         this.m_onBattle = null;
 
@@ -50,8 +50,10 @@ public class AdventureNodePopup : PooledUIBase
             this.m_onBattle = t_d.onBattle;
             this.Bind(t_d.nodeIndex);
         }
+    }
 
-        // 재표시마다 중복 등록 방지 — 풀이 같은 인스턴스를 되돌려준다.
+    protected override void OnInitializeUI()
+    {
         if (this.battleButton != null)
         {
             this.battleButton.onClick.RemoveAllListeners();
@@ -67,20 +69,15 @@ public class AdventureNodePopup : PooledUIBase
 
     public override void Show()
     {
-        this.transition.SetVisible(this.contents, true);
-        this.isShow = true;
+        this.SetContentsVisible(true);
         this.data?.showCustomMethod?.Invoke();
     }
 
     public override void Hide()
     {
-        this.transition.SetVisible(this.contents, false);
-        this.isShow = false;
+        this.SetContentsVisible(false);
         this.data?.onHide?.Invoke();
     }
-
-    // 퇴장이 끝나기 전에 부모가 꺼지면 contents가 켜진 채 남는다 — 다음 열기의 유령 프레임을 막는다.
-    void OnDisable() => this.transition.HandleDisabled(this.contents);
 
     void OnBattlePressed()
     {

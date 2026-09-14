@@ -140,6 +140,7 @@ public class UIPoolManager : MonoBehaviour
     {
         if (this.activeUIs.TryGetValue(typeof(T), out var existingUI))
         {
+            if (existingUI is IUIInitializable t_existingInitializer) t_existingInitializer.InitializeUI();
             existingUI.transform.SetAsLastSibling();
             existingUI.Initialization(_data);
             existingUI.Show();
@@ -153,29 +154,44 @@ public class UIPoolManager : MonoBehaviour
             return null;
         }
 
-        T uiInstance = Instantiate(uiPrefab, uiRoot).GetComponent<T>();
+        GameObject t_instance = Instantiate(uiPrefab, uiRoot);
+        T uiInstance = t_instance.GetComponent<T>();
         if (uiInstance == null)
         {
             Debug.LogError($"UI Component Not Exist: {typeof(T).Name}");
+            Destroy(t_instance);
             return null;
         }
 
-        if (_data == null || _data.order == -1)
-            uiInstance.transform.SetAsLastSibling();
-        else
-            uiInstance.transform.SetSiblingIndex(_data.order);
+        try
+        {
+            if (_data == null || _data.order == -1)
+                uiInstance.transform.SetAsLastSibling();
+            else
+                uiInstance.transform.SetSiblingIndex(_data.order);
 
-        this.activeUIs[typeof(T)] = uiInstance;
-        uiInstance.Initialization(_data);
-        uiInstance.Show();
-
-        return uiInstance;
+            // 활성화로 Awake가 실행되기를 기다리지 않고, 비활성 Contents까지 준비한 뒤 등록한다.
+            if (uiInstance is IUIInitializable t_initializer) t_initializer.InitializeUI();
+            this.RegisterUI(uiInstance);
+            if (uiInstance is ContentsPooledUI) uiInstance.gameObject.SetActive(true);
+            uiInstance.Initialization(_data);
+            uiInstance.Show();
+            return uiInstance;
+        }
+        catch
+        {
+            // 잘못된 Contents 배선·초기화 실패로 풀 밖에 인스턴스가 누적되지 않게 한다.
+            this.UnregisterUI(uiInstance);
+            t_instance.SetActive(false);
+            Destroy(t_instance);
+            throw;
+        }
     }
 
     /// <summary>버튼 진입점. 첫 적재 동안 입력을 막고, 호출 화면이 닫혔으면 뒤늦게 팝업을 열지 않는다.</summary>
     public void RequestUI<T>(MonoBehaviour _owner, UIData _data = null) where T : PooledUIBase
     {
-        if (_owner == null || !_owner.isActiveAndEnabled) return;
+        if (!IsRequestOwnerVisible(_owner)) return;
         if (UiPrefabCache.TryGet(typeof(T), out _))
         {
             this.pendingRequests.Remove(typeof(T));
@@ -189,6 +205,7 @@ public class UIPoolManager : MonoBehaviour
 
     async UniTask OpenDeferredAsync<T>(MonoBehaviour _owner, UIData _data, int _version) where T : PooledUIBase
     {
+        int t_ownerVersion = (_owner as ContentsPooledUI)?.VisibilityVersion ?? 0;
         object t_waitOwner = new object();
         Exception t_error = null;
         UniTask<GameObject> t_load = default;
@@ -204,7 +221,7 @@ public class UIPoolManager : MonoBehaviour
             while (t_load.Status == UniTaskStatus.Pending)
             {
                 await UniTask.Yield(t_token);
-                if (this == null || _owner == null || !_owner.isActiveAndEnabled ||
+                if (this == null || !IsRequestOwnerVisible(_owner, t_ownerVersion) ||
                     !this.pendingRequests.TryGetValue(typeof(T), out int t_pendingVersion) || t_pendingVersion != _version)
                     return;
             }
@@ -225,7 +242,7 @@ public class UIPoolManager : MonoBehaviour
 
         if (!this.pendingRequests.TryGetValue(typeof(T), out int t_version) || t_version != _version) return;
         this.pendingRequests.Remove(typeof(T));
-        if (this == null || _owner == null || !_owner.isActiveAndEnabled) return;
+        if (this == null || !IsRequestOwnerVisible(_owner, t_ownerVersion)) return;
         if (t_error != null)
         {
             Debug.LogException(t_error);
@@ -238,6 +255,14 @@ public class UIPoolManager : MonoBehaviour
             return;
         }
         AddOrUpdateUI<T>(_data);
+    }
+
+    static bool IsRequestOwnerVisible(MonoBehaviour _owner, int? _version = null)
+    {
+        if (_owner == null || !_owner.isActiveAndEnabled) return false;
+        // 제어 루트는 닫아도 켜져 있다. 화면 표시와 같은 개폐 세션인지 함께 확인한다.
+        return _owner is not ContentsPooledUI t_panel ||
+            (t_panel.isShow && (!_version.HasValue || t_panel.VisibilityVersion == _version.Value));
     }
 
     public void RegisterUI(PooledUIBase _ui)

@@ -1,0 +1,155 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!687078895 &4343727234628468602
+SpriteAtlas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: UILobby
+  m_EditorData:
+    serializedVersion: 2
+    textureSettings:
+      serializedVersion: 2
+      anisoLevel: 1
+      compressionQuality: 50
+      maxTextureSize: 2048
+      textureCompression: 0
+      filterMode: 1
+      generateMipMaps: 0
+      readable: 0
+      crunchedCompression: 0
+      sRGB: 1
+    platformSettings:
+    - serializedVersion: 4
+      m_BuildTarget: DefaultTexturePlatform
+      m_MaxTextureSize: 2048
+      m_ResizeAlgorithm: 0
+      m_TextureFormat: -1
+      m_TextureCompression: 1
+      m_CompressionQuality: 50
+      m_CrunchedCompression: 0
+      m_AllowsAlphaSplitting: 0
+      m_Overridden: 0
+      m_IgnorePlatformSupport: 0
+      m_AndroidETC2FallbackOverride: 0
+      m_ForceMaximumCompressionQuality_BC6H_BC7: 0
+    - serializedVersion: 4
+      m_BuildTarget: Android
+      m_MaxTextureSize: 2048
+      m_ResizeAlgorithm: 0
+      m_TextureFormat: 50
+      m_TextureCompression: 1
+      m_CompressionQuality: 50
+      m_CrunchedCompression: 0
+      m_AllowsAlphaSplitting: 0
+      m_Overridden: 1
+      m_IgnorePlatformSupport: 0
+      m_AndroidETC2FallbackOverride: 0
+      m_ForceMaximumCompressionQuality_BC6H_BC7: 0
+    - serializedVersion: 4
+      m_BuildTarget: iOS
+      m_MaxTextureSize: 2048
+      m_ResizeAlgorithm: 0
+      m_TextureFormat: 50
+      m_TextureCompression: 1
+      m_CompressionQuality: 50
+      m_CrunchedCompression: 0
+      m_AllowsAlphaSplitting: 0
+      m_Overridden: 1
+      m_IgnorePlatformSupport: 0
+      m_AndroidETC2FallbackOverride: 0
+      m_ForceMaximumCompressionQuality_BC6H_BC7: 0
+    packingSettings:
+      serializedVersion: 2
+      padding: 4
+      blockOffset: 1
+      allowAlphaSplitting: 0
+      enableRotation: 0
+      enableTightPacking: 0
+      enableAlphaDilation: 0
+    secondaryTextureSettings: {}
+    variantMultiplier: 1
+    packables:
+    - {fileID: 2800000, guid: 95938dc48c63e07499dc095027d6ec80, type: 3}
+    - {fileID: 2800000, guid: 11f7ebc392d166c428a98cbdb97ebef7, type: 3}
+    - {fileID: 2800000, guid: de6ef981ee44f264f95418568a15b2e1, type: 3}
+    - {fileID: 2800000, guid: fff2965b14924ce49a7fd375e3fb00b5, type: 3}
+    - {fileID: 2800000, guid: ac4695ace04927c4e816fbd670457fc4, type: 3}
+    - {fileID: 2800000, guid: dd53f82e04cd6de44974e88fc815b92f, type: 3}
+    - {fileID: 2800000, guid: 79124e21a5578954aab823c435b37393, type: 3}
+    - {fileID: 2800000, guid: 5799dc3b60777e74cb56f4787cd3ded7, type: 3}
+    - {fileID: 2800000, guid: 36cec807e688c7348ba208af3e508e07, type: 3}
+    - {fileID: 2800000, guid: 01abe575afda7ba4e9de5818e43d2df2, type: 3}
+    - {fileID: 2800000, guid: 4ae51f75cd49a6e44bd08095f8d3a211, type: 3}
+    - {fileID: 2800000, guid: a7b9718d5b9ff2a439862739d39e65e6, type: 3}
+    - {fileID: 2800000, guid: 2203a2fbf19522b4ea2251fa6f1b5c8a, type: 3}
+    - {fileID: 2800000, guid: 2763db2f9663e934bb72ae0d9446f253, type: 3}
+    - {fileID: 2800000, guid: 17de27ca2d170964ebadc7f29f952d3b, type: 3}
+    - {fileID: 2800000, guid: 1326d453583871140b5dc2e73dee18d5, type: 3}
+    - {fileID: 2800000, guid: c1a3ff09e5016fc46a3ef67667f57e9d, type: 3}
+    - {fileID: 2800000, guid: 15da4c3a76d10d345b9e6491bd862f1a, type: 3}
+    bindAsDefault: 1
+    isAtlasV2: 0
+    cachedData: {fileID: 0}
+    packedSpriteRenderDataKeys:
+    - 79124e21a5578954aab823c435b37393: 21300000
+    - de6ef981ee44f264f95418568a15b2e1: 21300000
+    - 1326d453583871140b5dc2e73dee18d5: 21300000
+    - 11f7ebc392d166c428a98cbdb97ebef7: 21300000
+    - 95938dc48c63e07499dc095027d6ec80: 21300000
+    - 01abe575afda7ba4e9de5818e43d2df2: 21300000
+    - 4ae51f75cd49a6e44bd08095f8d3a211: 21300000
+    - 36cec807e688c7348ba208af3e508e07: 21300000
+    - c1a3ff09e5016fc46a3ef67667f57e9d: 21300000
+    - 15da4c3a76d10d345b9e6491bd862f1a: 21300000
+    - 17de27ca2d170964ebadc7f29f952d3b: 21300000
+    - 5799dc3b60777e74cb56f4787cd3ded7: 21300000
+    - fff2965b14924ce49a7fd375e3fb00b5: 21300000
+    - 2203a2fbf19522b4ea2251fa6f1b5c8a: 21300000
+    - ac4695ace04927c4e816fbd670457fc4: 21300000
+    - a7b9718d5b9ff2a439862739d39e65e6: 21300000
+    - dd53f82e04cd6de44974e88fc815b92f: 21300000
+    - 2763db2f9663e934bb72ae0d9446f253: 21300000
+  m_MasterAtlas: {fileID: 0}
+  m_PackedSprites:
+  - {fileID: 21300000, guid: 79124e21a5578954aab823c435b37393, type: 3}
+  - {fileID: 21300000, guid: de6ef981ee44f264f95418568a15b2e1, type: 3}
+  - {fileID: 21300000, guid: 1326d453583871140b5dc2e73dee18d5, type: 3}
+  - {fileID: 21300000, guid: 11f7ebc392d166c428a98cbdb97ebef7, type: 3}
+  - {fileID: 21300000, guid: 95938dc48c63e07499dc095027d6ec80, type: 3}
+  - {fileID: 21300000, guid: 01abe575afda7ba4e9de5818e43d2df2, type: 3}
+  - {fileID: 21300000, guid: 4ae51f75cd49a6e44bd08095f8d3a211, type: 3}
+  - {fileID: 21300000, guid: 36cec807e688c7348ba208af3e508e07, type: 3}
+  - {fileID: 21300000, guid: c1a3ff09e5016fc46a3ef67667f57e9d, type: 3}
+  - {fileID: 21300000, guid: 15da4c3a76d10d345b9e6491bd862f1a, type: 3}
+  - {fileID: 21300000, guid: 17de27ca2d170964ebadc7f29f952d3b, type: 3}
+  - {fileID: 21300000, guid: 5799dc3b60777e74cb56f4787cd3ded7, type: 3}
+  - {fileID: 21300000, guid: fff2965b14924ce49a7fd375e3fb00b5, type: 3}
+  - {fileID: 21300000, guid: 2203a2fbf19522b4ea2251fa6f1b5c8a, type: 3}
+  - {fileID: 21300000, guid: ac4695ace04927c4e816fbd670457fc4, type: 3}
+  - {fileID: 21300000, guid: a7b9718d5b9ff2a439862739d39e65e6, type: 3}
+  - {fileID: 21300000, guid: dd53f82e04cd6de44974e88fc815b92f, type: 3}
+  - {fileID: 21300000, guid: 2763db2f9663e934bb72ae0d9446f253, type: 3}
+  m_PackedSpriteNamesToIndex:
+  - ic_Battle
+  - Edit_Icon
+  - Rank_Rewarkd_Icon
+  - Edit_Button
+  - Adventure_Map_Icon
+  - ic_Pack
+  - ic_store
+  - ic_Deck
+  - setting_Icon
+  - Spin_Roulette_Icon
+  - Ranking_Reward_Icon
+  - ic_Collection
+  - GrowthBtn_Icon
+  - Pass_Icon
+  - Guide_Mission_Icon
+  - Mission_Icon
+  - Icon_Button
+  - profile_Icon
+  m_RenderDataMap: {}
+  m_Tag: UILobby
+  m_IsVariant: 0

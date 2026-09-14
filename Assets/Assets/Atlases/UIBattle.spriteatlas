@@ -1,0 +1,119 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!687078895 &4343727234628468602
+SpriteAtlas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: UIBattle
+  m_EditorData:
+    serializedVersion: 2
+    textureSettings:
+      serializedVersion: 2
+      anisoLevel: 1
+      compressionQuality: 50
+      maxTextureSize: 2048
+      textureCompression: 0
+      filterMode: 1
+      generateMipMaps: 0
+      readable: 0
+      crunchedCompression: 0
+      sRGB: 1
+    platformSettings:
+    - serializedVersion: 4
+      m_BuildTarget: DefaultTexturePlatform
+      m_MaxTextureSize: 2048
+      m_ResizeAlgorithm: 0
+      m_TextureFormat: -1
+      m_TextureCompression: 1
+      m_CompressionQuality: 50
+      m_CrunchedCompression: 0
+      m_AllowsAlphaSplitting: 0
+      m_Overridden: 0
+      m_IgnorePlatformSupport: 0
+      m_AndroidETC2FallbackOverride: 0
+      m_ForceMaximumCompressionQuality_BC6H_BC7: 0
+    - serializedVersion: 4
+      m_BuildTarget: Android
+      m_MaxTextureSize: 2048
+      m_ResizeAlgorithm: 0
+      m_TextureFormat: 50
+      m_TextureCompression: 1
+      m_CompressionQuality: 50
+      m_CrunchedCompression: 0
+      m_AllowsAlphaSplitting: 0
+      m_Overridden: 1
+      m_IgnorePlatformSupport: 0
+      m_AndroidETC2FallbackOverride: 0
+      m_ForceMaximumCompressionQuality_BC6H_BC7: 0
+    - serializedVersion: 4
+      m_BuildTarget: iOS
+      m_MaxTextureSize: 2048
+      m_ResizeAlgorithm: 0
+      m_TextureFormat: 50
+      m_TextureCompression: 1
+      m_CompressionQuality: 50
+      m_CrunchedCompression: 0
+      m_AllowsAlphaSplitting: 0
+      m_Overridden: 1
+      m_IgnorePlatformSupport: 0
+      m_AndroidETC2FallbackOverride: 0
+      m_ForceMaximumCompressionQuality_BC6H_BC7: 0
+    packingSettings:
+      serializedVersion: 2
+      padding: 4
+      blockOffset: 1
+      allowAlphaSplitting: 0
+      enableRotation: 0
+      enableTightPacking: 0
+      enableAlphaDilation: 0
+    secondaryTextureSettings: {}
+    variantMultiplier: 1
+    packables:
+    - {fileID: 2800000, guid: 222c40443a900434b9cf05c347b0103e, type: 3}
+    - {fileID: 2800000, guid: 3237a1a45fb1e9d4f87c4ae7364ca5fc, type: 3}
+    - {fileID: 2800000, guid: 907ce29f21f022949991206a7677b268, type: 3}
+    - {fileID: 2800000, guid: 9e9205fbdf2fefe4fb10b1eeb9cda22b, type: 3}
+    - {fileID: 2800000, guid: 00032503578262e44b4c73d1f884cd81, type: 3}
+    - {fileID: 2800000, guid: 0f5785883d5f47949bb641b19522448d, type: 3}
+    - {fileID: 2800000, guid: efb0879309abd38449efae22931fb381, type: 3}
+    - {fileID: 2800000, guid: 69771907e629cbb4c93d864fae1918d8, type: 3}
+    - {fileID: 2800000, guid: 190d88c1198bfed468f91463a7f6f6cf, type: 3}
+    bindAsDefault: 1
+    isAtlasV2: 0
+    cachedData: {fileID: 0}
+    packedSpriteRenderDataKeys:
+    - 190d88c1198bfed468f91463a7f6f6cf: 21300000
+    - 00032503578262e44b4c73d1f884cd81: 21300000
+    - efb0879309abd38449efae22931fb381: 21300000
+    - 222c40443a900434b9cf05c347b0103e: 21300000
+    - 3237a1a45fb1e9d4f87c4ae7364ca5fc: 21300000
+    - 69771907e629cbb4c93d864fae1918d8: 21300000
+    - 0f5785883d5f47949bb641b19522448d: 21300000
+    - 9e9205fbdf2fefe4fb10b1eeb9cda22b: 21300000
+    - 907ce29f21f022949991206a7677b268: 21300000
+  m_MasterAtlas: {fileID: 0}
+  m_PackedSprites:
+  - {fileID: 21300000, guid: 190d88c1198bfed468f91463a7f6f6cf, type: 3}
+  - {fileID: 21300000, guid: 00032503578262e44b4c73d1f884cd81, type: 3}
+  - {fileID: 21300000, guid: efb0879309abd38449efae22931fb381, type: 3}
+  - {fileID: 21300000, guid: 222c40443a900434b9cf05c347b0103e, type: 3}
+  - {fileID: 21300000, guid: 3237a1a45fb1e9d4f87c4ae7364ca5fc, type: 3}
+  - {fileID: 21300000, guid: 69771907e629cbb4c93d864fae1918d8, type: 3}
+  - {fileID: 21300000, guid: 0f5785883d5f47949bb641b19522448d, type: 3}
+  - {fileID: 21300000, guid: 9e9205fbdf2fefe4fb10b1eeb9cda22b, type: 3}
+  - {fileID: 21300000, guid: 907ce29f21f022949991206a7677b268, type: 3}
+  m_PackedSpriteNamesToIndex:
+  - Time_Icon
+  - Emote_Icon
+  - Image_BattleTurn_Player
+  - Attack_coin_Back
+  - Attack_coin_Front
+  - Menu_bar
+  - Image_BattleTurn_Enemy
+  - defeat
+  - DeckPile
+  m_RenderDataMap: {}
+  m_Tag: UIBattle
+  m_IsVariant: 0

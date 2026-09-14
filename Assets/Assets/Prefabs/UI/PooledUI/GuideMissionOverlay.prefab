@@ -181,12 +181,12 @@ GameObject:
   m_Component:
   - component: {fileID: 4171121905590021432}
   m_Layer: 0
-  m_Name: Root
+  m_Name: Contents
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &4171121905590021432
 RectTransform:
   m_ObjectHideFlags: 0
@@ -258,9 +258,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GuideMissionPanel
   animator: {fileID: 0}
-  contents: {fileID: 0}
+  contents: {fileID: 3375942486813688512}
   isShow: 0
-  root: {fileID: 3375942486813688512}
   listContent: {fileID: 9100000000000000002}
   rowPrefab: {fileID: 9100000000000000024, guid: 5b2074d3365f43eea16ffa8324468415, type: 3}
   completionRow: {fileID: 8300000000000000035}

@@ -50,6 +50,7 @@ public static class AdventureNodePopupBuilder
 
         // 루트는 풀 컨테이너를 가득 채운다(딤이 화면 전체를 덮어야 뒤의 맵이 눌리지 않는다).
         GameObject t_root = NewRect("AdventureNodePopup", null, new Vector2(SCREEN_W, SCREEN_H), Vector2.zero);
+        t_root.SetActive(false); // Contents와 표시 참조를 배선한 뒤 초기화한다.
         Stretch(t_root);
         var t_view = t_root.AddComponent<AdventureNodePopup>();
 
@@ -115,6 +116,7 @@ public static class AdventureNodePopupBuilder
 
         // 저작 상태는 '꺼짐'이다 — 켠 채로 저장하면 인스턴스화된 프레임에 배선 전 목업이 한 번 번쩍인다.
         t_contents.SetActive(false);
+        t_root.SetActive(true);
 
         System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(PREFAB_PATH));
         PrefabUtility.SaveAsPrefabAsset(t_root, PREFAB_PATH);

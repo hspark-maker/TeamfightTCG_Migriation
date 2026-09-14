@@ -9,7 +9,7 @@ using UnityEngine.UI;
 ///
 /// 버튼 onClick을 인스펙터로 배선하지 않는 이유는 LobbySettingsButton과 같다: 팝업은 씬 오브젝트가
 /// 아니라 풀에서 꺼내 띄우는 것이라 인스펙터에서 가리킬 대상이 없다.
-public class LobbyProfileButton : MonoBehaviour
+public class LobbyProfileButton : MonoBehaviour, IUIInitializable
 {
     [SerializeField] Button button;
     [Tooltip("판·얼굴·링 한 덩어리.")]
@@ -17,10 +17,16 @@ public class LobbyProfileButton : MonoBehaviour
     [Tooltip("옵션 — 미배선이면 그림만 갱신한다.")]
     [SerializeField] TMP_Text nicknameText;
 
-    void Awake()
+    bool m_initialized;
+
+    void Awake() => InitializeUI();
+
+    public void InitializeUI()
     {
+        if (this.m_initialized) return;
         if (this.button == null) this.button = GetComponent<Button>();
         if (this.button != null) this.button.onClick.AddListener(this.Open);
+        this.m_initialized = true;
     }
 
     void OnDestroy()

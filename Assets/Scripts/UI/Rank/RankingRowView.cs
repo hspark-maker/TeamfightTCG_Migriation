@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 서버 순위·프로필을 저작된 행에 표시한다.
-public class RankingRowView : MonoBehaviour
+public class RankingRowView : MonoBehaviour, IUIInitializable
 {
     [SerializeField] TMP_Text rankText;
     [SerializeField] TMP_Text nicknameText;
@@ -14,9 +14,14 @@ public class RankingRowView : MonoBehaviour
     [SerializeField] Image crownImage;
     [SerializeField] Sprite[] crowns;
     Sprite m_defaultAvatar;
+    bool m_initialized;
 
-    void Awake()
+    void Awake() => InitializeUI();
+
+    public void InitializeUI()
     {
+        if (m_initialized) return;
+        m_initialized = true;
         if (avatarImage != null) m_defaultAvatar = avatarImage.sprite;
     }
 
@@ -42,6 +47,7 @@ public class RankingRowView : MonoBehaviour
 
     public void Bind(int _rank, string _nickname, string _tierName, Sprite _badge, long _points, bool _isSelf)
     {
+        InitializeUI();
         if (rankText != null) rankText.text = _rank > 0 ? _rank.ToString() : "-";
         if (nicknameText != null)
         {

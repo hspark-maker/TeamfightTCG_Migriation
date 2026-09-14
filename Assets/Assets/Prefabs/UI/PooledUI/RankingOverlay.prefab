@@ -2546,12 +2546,12 @@ GameObject:
   m_Component:
   - component: {fileID: 4171121905590021432}
   m_Layer: 0
-  m_Name: Root
+  m_Name: Contents
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &4171121905590021432
 RectTransform:
   m_ObjectHideFlags: 0
@@ -4040,9 +4040,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RankingBoardPanel
   animator: {fileID: 0}
-  contents: {fileID: 0}
+  contents: {fileID: 3375942486813688512}
   isShow: 0
-  root: {fileID: 3375942486813688512}
   scrollRect: {fileID: 9800000000000204}
   content: {fileID: 9800000000000203}
   rowPrefab: {fileID: 9800000000000104}

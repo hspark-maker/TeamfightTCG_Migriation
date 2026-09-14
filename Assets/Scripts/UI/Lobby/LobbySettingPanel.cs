@@ -11,8 +11,11 @@ using UnityEngine.UI;
 ///
 /// <para>풀(UIPoolManager)이 수명을 쥔다. 표시값은 판 안의 <see cref="LobbyProfileButton"/>·
 /// <c>ProfileAvatarView</c>가 <c>ProfileManager</c>에서 스스로 당기므로 UIData 를 받지 않는다.</para></summary>
-public class LobbySettingPanel : PooledUIBase
+public class LobbySettingPanel : ContentsPooledUI
 {
+    protected override bool UsePopupTransition => false;
+    protected override bool UseScreenDim => false;
+
     [Tooltip("프로필 편집으로 가는 버튼. 미배선이면 그 길만 없다 — 판은 그대로 뜬다.")]
     [SerializeField] Button editButton;
 
@@ -33,46 +36,35 @@ public class LobbySettingPanel : PooledUIBase
     bool loggingOut;
 
     // 풀 계약. 표시값을 밖에서 받지 않으므로 할 일이 없다.
-    public override void Initialization(UIData _data) { }
+    public override void Initialization(UIData _data) => this.InitializeUI();
 
     public override void Show()
     {
-        this.isShow = true;
-        gameObject.SetActive(true);
+        this.SetContentsVisible(true);
         RefreshAccount();
     }
 
-    public override void Hide()
-    {
-        this.isShow = false;
-        gameObject.SetActive(false);
-    }
+    public override void Hide() => this.SetContentsVisible(false);
 
-    protected override void Awake()
+    protected override void OnInitializeUI()
     {
-        base.Awake();
-
         // 인스펙터로 걸지 않는 이유는 LobbyProfileButton과 같다 — 가리킬 대상이 풀에서 세워지는 화면이라
         // 저작 시점에는 존재하지 않는다.
         if (this.editButton    != null) this.editButton.onClick.AddListener(OpenProfileEdit);
         if (this.closeButton   != null) this.closeButton.onClick.AddListener(Hide);
         if (this.dimButton     != null) this.dimButton.onClick.AddListener(Hide);
-        FirebaseAuthService.Instance.OnStateChanged += RefreshAccount;
     }
 
-    protected override void OnDestroy()
-    {
-        if (this.editButton    != null) this.editButton.onClick.RemoveListener(OpenProfileEdit);
-        if (this.closeButton   != null) this.closeButton.onClick.RemoveListener(Hide);
-        if (this.dimButton     != null) this.dimButton.onClick.RemoveListener(Hide);
-        FirebaseAuthService.Instance.OnStateChanged -= RefreshAccount;
+    protected override void OnViewShown()
+        => FirebaseAuthService.Instance.OnStateChanged += RefreshAccount;
 
-        base.OnDestroy();
-    }
+    protected override void OnViewHidden()
+        => FirebaseAuthService.Instance.OnStateChanged -= RefreshAccount;
 
     // 이 판은 닫는다 — 편집 팝업이 그 위에 겹쳐 뜨면 뒤로가기의 목적지가 둘이 된다.
     void OpenProfileEdit()
     {
+        if (!this.isShow) return;
         ProfileEditPanel t_panel = UIPoolManager.Instance?.AddOrUpdateUI<ProfileEditPanel>(new UIData
         {
             onHide = () =>
@@ -85,6 +77,7 @@ public class LobbySettingPanel : PooledUIBase
 
     void RefreshAccount()
     {
+        if (!this.isShow) return;
         // 다른 목록 패널처럼 프리팹을 한 번 생성하고, 풀 재개방 시 같은 셀을 재사용한다.
         if (this.serviceCell == null && this.serviceRoot != null && this.serviceCellPrefab != null)
         {
@@ -105,7 +98,7 @@ public class LobbySettingPanel : PooledUIBase
 
     void ConfirmLogout()
     {
-        if (this.confirmingLogout || this.loggingOut || GameManager.IsLoggingOut ||
+        if (!this.isShow || this.confirmingLogout || this.loggingOut || GameManager.IsLoggingOut ||
             !FirebaseAuthService.Instance.IsCurrentUserActive) return;
 
         this.confirmingLogout = true;

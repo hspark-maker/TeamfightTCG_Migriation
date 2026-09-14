@@ -4,7 +4,8 @@
 - 전용 Hosting 사이트: `bm-cardbattle-assets`
 - 주소: `https://bm-cardbattle-assets.web.app/{앱 버전}/{플랫폼}/`
 - 배포 폴더: 저장소 루트의 `ServerData/` (Git 제외)
-- 첫 원격 대상: `CardArt` 그룹의 `Cards` 라벨. UI·폰트·설정·팩 아트는 로컬 유지.
+- 원격 대상: `CardArt` 그룹의 `Cards`·`Packs` 라벨과 `RemoteUI` 그룹의 `RemoteUI` 라벨. UI 그룹은 프리팹·아틀라스 18개·UI 카탈로그·튜토리얼 폰트 등 48개 명시적 항목과 그 의존성을 포함한다.
+- 시작 씬의 로딩·로그인·실패 복구 UI는 다운로드 전에 표시해야 하므로 앱에 남긴다. 씬·설정 SO에 직접 연결된 자산을 모두 원격화하는 변경은 아니다.
 
 ## 첫 빌드·배포
 
@@ -17,7 +18,7 @@
 3. `Tools > Addressables > Build Firebase Resources`를 실행한다.
 4. 저장소 루트에서 `firebase deploy --only hosting --project bm-cardbattle` 실행.
    PowerShell에서는 `firebase.cmd`를 사용한다. Functions·Firestore는 배포하지 않는다.
-5. 같은 플랫폼·앱 버전으로 앱을 빌드한다. 첫 설치에서 카드 리소스 다운로드 용량이 표시되는지 확인한다.
+5. 같은 플랫폼·앱 버전으로 앱을 빌드한다. Addressables의 Build Addressables on Player Build는 `Do Not Build Addressables content on Player Build`로 유지한다. 이미 빌드·배포한 리소스를 앱에 연결하며, 리소스 변경 시에는 3~4번을 다시 실행한다. 첫 설치에서 카드와 UI를 합친 다운로드 용량이 표시되는지 확인한다. UI 로컬→원격 전환은 새 앱 빌드가 필요하다. 설정을 바꿔 앱 빌드가 리소스를 다시 생성했다면 마지막 산출물을 배포한다.
 6. 다시 실행했을 때 캐시된 번들의 다운로드 용량이 0인지, 다운로드 중 망을 끊었다 복구 화면에서 재시도가 되는지 확인한다.
 
 Editor의 Use Asset Database 모드는 HTTP 다운로드를 하지 않는다. 원격 다운로드 검증은
@@ -39,11 +40,40 @@ Editor의 Use Asset Database 모드는 HTTP 다운로드를 하지 않는다. �
 
 ## 다운로드 동작
 
-시작 UI의 동기 로딩이 원격 통신을 기다리지 않도록 자동 카탈로그 업데이트를 끄고,
-로그인·스펙 동기화 이후 비동기로 카탈로그를 확인·갱신한다. 이어 Cards 라벨의
-미캐시 번들 용량을 조회하고 다운로드한 다음 CardArtCache가 Sprite를 적재한다.
+시작 UI가 원격 통신을 기다리지 않도록 자동 카탈로그 업데이트를 끄고,
+로그인·스펙 동기화 이후 비동기로 카탈로그를 확인·갱신한다. 이어 Cards·Packs·RemoteUI
+라벨 번들의 미캐시 용량을 중복 없이 합산하고 다운로드한다.
+다운로드가 끝난 뒤 CardArtCache·PackArtCache·UiPrefabCache가 적재를 시작한다. UI 카탈로그와
+튜토리얼 폰트도 비동기로 선로드해 동기 소비자에 주입한다. 선택형 화면의 지연 적재 정책은 유지한다.
 다운로드 실패는 기존 복구 화면에 표시하며, 재시도는 리소스 단계부터 진행한다.
 번들 요청은 30초 타임아웃·2회 재시도를 사용한다. 정상 다운로드를 로딩 연출 시간 제한으로 끊지 않는다.
+에디터 단독 씬의 UI 폴백은 AssetDatabase를 사용하며 원격 HTTP를 동기로 기다리지 않는다.
+
+## UI 원격 전환 검증 (2026-09-14)
+
+- Android 리소스 빌드 성공. `RemoteUI` 항목 48개(아틀라스 18개 포함)가 원격 UI 번들 한 개, 27,040,485 bytes로 생성됐다.
+- 빌드 보고서 `Library/com.unity.addressables/BuildReports/buildlayout_2026.09.14.16.47.38.json`에서 HTTPS LoadPath와 명시적 자산·라벨, 번들 간 중복 자산 0개를 확인했다.
+- 배포 전 로컬 검사 통과. `SpecData.bytes` SHA-256 변경 없음.
+- UI 적재 실패 재시도는 이전 Abort 컨텍스트를 재사용하지 않고 프로필을 보존한 새 컨텍스트로 이어간다.
+- 앱 빌드·캐시가 없는 실기기 다운로드 및 망 복구 재시도는 미실행이다. 리소스 배포 결과는 아래 기록을 따른다.
+
+## 테스트 리소스 배포 완료 (2026-09-14)
+
+- `0.0.0/Android` 리소스를 `bm-cardbattle-assets` Hosting 사이트에 배포했다. Functions·Firestore 배포는 실행하지 않았다.
+- 배포 전 팩 이미지 4개의 초기 적재 순서를 수정했다. `Cards`·`Packs`·`RemoteUI`를 모두 다운로드한 뒤 각 캐시를 적재하며, 팩 적재 실패도 리소스 단계부터 재시도한다.
+- 원본 프로젝트에서 최종 빌드 성공. 보고서: `Library/com.unity.addressables/BuildReports/buildlayout_2026.09.14.17.07.21.json`. CardArt 162개, RemoteUI 48개, 번들 간 중복 자산 0개.
+- 배포 검사 테스트 6개와 기존 배포 파일 보존 검사 통과. `SpecData.bytes` SHA-256 변경 없음.
+- CDN의 리소스 172개 모두 HTTP 성공·CORS·캐시 헤더 검사 통과. 카탈로그·해시와 카드·팩·UI 대표 번들 등 12개를 실제 다운로드하여 원본 SHA-256과 일치함을 확인했다.
+- CDN 검증 기록: `Build/ResourceDeploymentChecks/1789373378492.json`. 공개 파일 목록: `https://bm-cardbattle-assets.web.app/resources-manifest.json`.
+- 이번 배포는 리소스만이다. 새 Android 앱은 같은 버전·플랫폼으로 빌드한다. 앱 빌드에서 Addressables를 재생성했다면 마지막 리소스를 다시 배포한다.
+- Unity 연결 장애 동안 만든 `Build/ResourceBuildSnapshot-20260914-1701`은 사용하지 않았다. 삭제가 자동 승인 검토에서 정책상 차단되어 임시 복사본이 남아 있다.
+
+## APK 최초 실행 카탈로그 404 복구 (2026-09-14)
+
+- APK 빌드가 새로 생성한 `catalog_2026.09.14.08.21.50.hash`를 요청했지만, Hosting에는 이전 리소스 빌드까지만 배포되어 있었다.
+- 해당 카탈로그 JSON·해시를 기존 리소스와 함께 추가 배포했다. 기존 APK는 재빌드 없이 앱 재실행으로 다시 확인할 수 있다.
+- 프로젝트의 `BuildAddressablesWithPlayerBuild`를 `DoNotBuildWithPlayer`로 저장했다. 이후 리소스 전체 빌드 → Hosting 배포 → 앱 빌드 순서에서 앱 빌드가 새 카탈로그를 생성하지 않는다.
+- 배포 후 174개 파일 HTTPS 응답 검사와 14개 다운로드 SHA-256 대조 통과. 검증 기록: `Build/ResourceDeploymentChecks/1789374520098.json`.
 
 ## 확인 명령
 

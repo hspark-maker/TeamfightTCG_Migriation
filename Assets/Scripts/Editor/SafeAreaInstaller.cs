@@ -36,12 +36,12 @@ public static class SafeAreaInstaller
     // 이름/anchor 추론은 조용히 잘못 감쌀 수 있으므로 풀링 프리팹 계약을 명시한다.
     static readonly PooledLayout[] PooledLayouts =
     {
-        new("Assets/Assets/Prefabs/UI/PooledUI/ProfileEditPanel.prefab", "Root", "Panel"),
+        new("Assets/Assets/Prefabs/UI/PooledUI/ProfileEditPanel.prefab", "Contents", "Panel"),
         new("Assets/Assets/Prefabs/UI/PooledUI/SimpleYNPopup.prefab", "Contents", "TitleText", "YesButton", "NoButton"),
         new("Assets/Assets/Prefabs/UI/PooledUI/PooledCardElement.prefab", "", "CardElement"),
         new("Assets/Assets/Prefabs/UI/PooledUI/AdventureNodePopup.prefab", "Contents", "Panel"),
-        new("Assets/Assets/Prefabs/UI/PooledUI/RankRewardOverlay.prefab", "Root", "Panel"),
-        new("Assets/Assets/Prefabs/UI/PooledUI/KeywordGrowthOverlay.prefab", "Root", "Panel"),
+        new("Assets/Assets/Prefabs/UI/PooledUI/RankRewardOverlay.prefab", "Contents", "Panel"),
+        new("Assets/Assets/Prefabs/UI/PooledUI/KeywordGrowthOverlay.prefab", "Contents", "Panel"),
         new("Assets/Assets/Prefabs/UI/PooledUI/SettingUI.prefab", "Contents", "Panel"),
         new("Assets/Assets/Prefabs/UI/PooledUI/PackOddsPopup.prefab", "Contents", "Panel"),
         new("Assets/Assets/Prefabs/UI/LobbyUI/Tabs/Tab_Deck/DeckEditPanel.prefab", "",
@@ -156,7 +156,7 @@ public static class SafeAreaInstaller
                 }
 
                 t_go.AddComponent<SafeAreaFitter>();
-                Stretch(t_rect); // ExecuteAlways가 현재 Device Simulator 값을 굽지 않게 저작 상태는 full stretch로 저장.
+                Stretch(t_rect); // 새 래퍼의 기준 배치. 미리보기 계산값은 Fitter의 tracker가 저장에서 제외한다.
                 PrefabUtility.SaveAsPrefabAsset(t_root, t_layout.assetPath);
                 Debug.Log($"[SafeArea] Applied to pooled prefab: {t_layout.assetPath} ({t_children.Count} content item(s))");
                 t_added++;

@@ -1,0 +1,107 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!687078895 &4343727234628468602
+SpriteAtlas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: UIRoulette
+  m_EditorData:
+    serializedVersion: 2
+    textureSettings:
+      serializedVersion: 2
+      anisoLevel: 1
+      compressionQuality: 50
+      maxTextureSize: 2048
+      textureCompression: 0
+      filterMode: 1
+      generateMipMaps: 0
+      readable: 0
+      crunchedCompression: 0
+      sRGB: 1
+    platformSettings:
+    - serializedVersion: 4
+      m_BuildTarget: DefaultTexturePlatform
+      m_MaxTextureSize: 2048
+      m_ResizeAlgorithm: 0
+      m_TextureFormat: -1
+      m_TextureCompression: 1
+      m_CompressionQuality: 50
+      m_CrunchedCompression: 0
+      m_AllowsAlphaSplitting: 0
+      m_Overridden: 0
+      m_IgnorePlatformSupport: 0
+      m_AndroidETC2FallbackOverride: 0
+      m_ForceMaximumCompressionQuality_BC6H_BC7: 0
+    - serializedVersion: 4
+      m_BuildTarget: Android
+      m_MaxTextureSize: 2048
+      m_ResizeAlgorithm: 0
+      m_TextureFormat: 50
+      m_TextureCompression: 1
+      m_CompressionQuality: 50
+      m_CrunchedCompression: 0
+      m_AllowsAlphaSplitting: 0
+      m_Overridden: 1
+      m_IgnorePlatformSupport: 0
+      m_AndroidETC2FallbackOverride: 0
+      m_ForceMaximumCompressionQuality_BC6H_BC7: 0
+    - serializedVersion: 4
+      m_BuildTarget: iOS
+      m_MaxTextureSize: 2048
+      m_ResizeAlgorithm: 0
+      m_TextureFormat: 50
+      m_TextureCompression: 1
+      m_CompressionQuality: 50
+      m_CrunchedCompression: 0
+      m_AllowsAlphaSplitting: 0
+      m_Overridden: 1
+      m_IgnorePlatformSupport: 0
+      m_AndroidETC2FallbackOverride: 0
+      m_ForceMaximumCompressionQuality_BC6H_BC7: 0
+    packingSettings:
+      serializedVersion: 2
+      padding: 4
+      blockOffset: 1
+      allowAlphaSplitting: 0
+      enableRotation: 0
+      enableTightPacking: 0
+      enableAlphaDilation: 0
+    secondaryTextureSettings: {}
+    variantMultiplier: 1
+    packables:
+    - {fileID: 2800000, guid: 204679430672ade4999630cd20f6643f, type: 3}
+    - {fileID: 2800000, guid: 97be3fcf53bc03e4c96ce3c059d0572f, type: 3}
+    - {fileID: 2800000, guid: 6e2bd4d4788c7eb4b9ae79be2707bbdf, type: 3}
+    - {fileID: 2800000, guid: 16c5e95186626b5469de68a0eaa13e7b, type: 3}
+    - {fileID: 2800000, guid: 825d2f0732669ed4cb7dd201a3c05bf4, type: 3}
+    - {fileID: 2800000, guid: 4fc0395b2c2d92140b258623257c642e, type: 3}
+    bindAsDefault: 1
+    isAtlasV2: 0
+    cachedData: {fileID: 0}
+    packedSpriteRenderDataKeys:
+    - 16c5e95186626b5469de68a0eaa13e7b: 21300000
+    - 204679430672ade4999630cd20f6643f: 21300000
+    - 6e2bd4d4788c7eb4b9ae79be2707bbdf: 21300000
+    - 825d2f0732669ed4cb7dd201a3c05bf4: 21300000
+    - 4fc0395b2c2d92140b258623257c642e: 21300000
+    - 97be3fcf53bc03e4c96ce3c059d0572f: 21300000
+  m_MasterAtlas: {fileID: 0}
+  m_PackedSprites:
+  - {fileID: 21300000, guid: 16c5e95186626b5469de68a0eaa13e7b, type: 3}
+  - {fileID: 21300000, guid: 204679430672ade4999630cd20f6643f, type: 3}
+  - {fileID: 21300000, guid: 6e2bd4d4788c7eb4b9ae79be2707bbdf, type: 3}
+  - {fileID: 21300000, guid: 825d2f0732669ed4cb7dd201a3c05bf4, type: 3}
+  - {fileID: 21300000, guid: 4fc0395b2c2d92140b258623257c642e, type: 3}
+  - {fileID: 21300000, guid: 97be3fcf53bc03e4c96ce3c059d0572f, type: 3}
+  m_PackedSpriteNamesToIndex:
+  - Spin_Bulb_Off
+  - Lucky Spin_Letter
+  - lucky_spin_board
+  - Spin_Bulb_On
+  - Tilte_Ribbon_Red_02
+  - lucky_spin
+  m_RenderDataMap: {}
+  m_Tag: UIRoulette
+  m_IsVariant: 0

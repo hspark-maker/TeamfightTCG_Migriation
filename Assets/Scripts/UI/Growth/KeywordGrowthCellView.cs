@@ -5,7 +5,7 @@ using TMPro;
 
 // 키워드 강화 그리드의 한 칸. 강화는 이 칸이 하지 않는다 — 누르면 선택만 바뀌고
 // 실제 강화는 하단 업그레이드 버튼 하나가 맡는다(선택과 실행을 갈라 오조작을 막는 레퍼런스 구조).
-public class KeywordGrowthCellView : MonoBehaviour
+public class KeywordGrowthCellView : MonoBehaviour, IUIInitializable
 {
     [SerializeField] Image     iconImage;    // 키워드 아이콘(KeywordIconConfig가 정본)
     [SerializeField] TMP_Text  levelText;    // "Lv 0"
@@ -20,20 +20,28 @@ public class KeywordGrowthCellView : MonoBehaviour
     CardKeyword m_keyword = CardKeyword.None;
 
     Action<CardKeyword> m_onSelect;
+    bool m_initialized;
 
     // 안내 타깃으로 등록된 상태. 남의 등록을 날리지 않으려고 자기 것만 해제한다(AlbumCardSlotView와 같은 관용구)
     bool m_anchored;
 
-    public void Bind(CardKeyword _keyword, Action<CardKeyword> _onSelect)
+    public void InitializeUI()
     {
-        this.m_keyword  = _keyword;
-        this.m_onSelect = _onSelect;
+        if (this.m_initialized) return;
 
         if (this.selectButton != null)
         {
             this.selectButton.onClick.RemoveAllListeners();
             this.selectButton.onClick.AddListener(this.HandleClick);
         }
+        this.m_initialized = true;
+    }
+
+    public void Bind(CardKeyword _keyword, Action<CardKeyword> _onSelect)
+    {
+        this.InitializeUI();
+        this.m_keyword  = _keyword;
+        this.m_onSelect = _onSelect;
 
         // 아이콘은 강화로 변하지 않는다 — 바인딩 때 한 번만 세운다.
         KeywordIconConfig t_config = DataLibrary.instance != null ? DataLibrary.instance.keywordIconConfig : null;

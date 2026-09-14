@@ -10,11 +10,8 @@ using UnityEngine.UI;
 //
 // 멈출 칸도 상품도 이 화면이 정하지 않는다. 결과값이 칸 번호와 상품을 함께 운반하고,
 // 여기서 저작 표를 되읽지 않으므로 서버 블롭과 클라 저작이 어긋나도 연출이 실지급과 갈리지 않는다.
-public class RoulettePanel : PooledUIBase
+public class RoulettePanel : ContentsPooledUI
 {
-    [Tooltip("켜고 끌 대상(딤 + 패널). 미배선이면 자기 gameObject를 토글한다.")]
-    [SerializeField] GameObject root;
-
     [SerializeField] RouletteWheelView wheel;
 
     [Tooltip("판의 칸 8개. 순서가 곧 칸 번호다 — 0번이 12시이고 시계방향으로 1, 2, 3...입니다.")]
@@ -41,14 +38,6 @@ public class RoulettePanel : PooledUIBase
     [SerializeField] CanvasGroup spinGroup;
 
     [Header("연출")]
-    [Tooltip("panel에는 딤을 뺀 내용물 컨테이너(Board)를 배선한다 — root를 물리면 전체화면 딤까지 함께 커지고, " +
-             "프레임 하나만 물리면 판과 버튼이 제자리에 남아 팝업이 한 덩어리로 열리지 않는다.")]
-    [SerializeField] PopupTransition transition = new PopupTransition();
-
-    [Tooltip("공용 ScreenDim(Full)에 요청할 암막 짙기입니다. 다른 로비 오버레이(랭크 보상 0.72 · 키워드 강화 0.75)와 결을 맞춘 값입니다.\n\n" +
-             "Panel은 알파 0으로 남아 밖을 눌러 닫는 판정만 맡습니다 — 이 값을 올려도 그 판이 짙어지는 것이 아니라 공용 딤이 짙어집니다.")]
-    [Range(0f, 1f)] [SerializeField] float dimAlpha = 0.75f;
-
     [Tooltip("결과가 즉시 와도 판이 이만큼은 돈다(밀리초). 손맛의 바닥이라 왕복이 이보다 길면 그냥 통과합니다.")]
     [SerializeField] int minSpinMs = 2500;
 
@@ -78,13 +67,7 @@ public class RoulettePanel : PooledUIBase
     // 풀 컨테이너에서 떨어져 나오려고 확보한 Canvas(LiftToOverlayLayer 참조)
     Canvas m_sortingCanvas;
 
-    public override void Initialization(UIData _data) { }
-
-    protected override void Awake()
-    {
-        base.Awake();
-        this.LiftToOverlayLayer();
-    }
+    public override void Initialization(UIData _data) => this.InitializeUI();
 
     public override void Show() => this.Open();
 
@@ -98,10 +81,7 @@ public class RoulettePanel : PooledUIBase
             this.Close();
             return;
         }
-        this.SetVisible(true);
-
-        // 이 판은 상단바를 덮는다 — 회전 비용과 보상이 곧 재화라 잔액이 보이는 채로 돌아야 한다.
-        LobbyShellBars.LiftTop(this, this.transform);
+        this.SetContentsVisible(true);
 
         this.BuildSlots();
         this.RefreshTicketText();
@@ -111,19 +91,11 @@ public class RoulettePanel : PooledUIBase
         if (this.bulbRing != null) this.bulbRing.PlayIdle();
     }
 
-    public void Close()
+    public void Close() => this.SetContentsVisible(false);
+
+    protected override void OnInitializeUI()
     {
-        this.CancelSpin();
-
-        this.SetVisible(false);
-
-        // 판이 아직 페이드로 남아 있는 동안 상단바가 그 뒤로 사라지지 않게 퇴장이 끝난 뒤에 내린다.
-        LobbyShellBars.DropTopAfter(this, this.transition.CloseDuration);
-    }
-
-    void OnEnable()
-    {
-        // 재활성마다 중복 등록 방지.
+        this.LiftToOverlayLayer();
         if (this.spinButton != null)
         {
             this.spinButton.onClick.RemoveAllListeners();
@@ -140,33 +112,41 @@ public class RoulettePanel : PooledUIBase
             this.dimButton.onClick.AddListener(this.Close);
         }
 
-        CurrencyManager.OnCurrencyChanged += this.HandleCurrencyChanged;
     }
 
-    void OnDisable()
+    protected override void OnViewShown()
+    {
+        CurrencyManager.OnCurrencyChanged += this.HandleCurrencyChanged;
+        LobbyShellBars.LiftTop(this, this.transform);
+    }
+
+    protected override void OnViewHidden()
     {
         CurrencyManager.OnCurrencyChanged -= this.HandleCurrencyChanged;
-
-        // 안전망 — 씬 전환·풀 회수처럼 Close를 거치지 않는 길이 있다. 되돌리기의 정규 자리는 Close다.
-        LobbyShellBars.DropTop(this);
-
-        // 같은 이유로 공용 딤도 여기서 걷는다. 켜진 채 남으면 로비 입력이 통째로 죽는다.
-        ScreenDim.Hide(this);
-
+        // isShow가 내려간 뒤 취소해야 취소 완료 콜백이 전구 연출을 다시 켜지 않는다.
         this.CancelSpin();
+        if (this.bulbRing != null) this.bulbRing.Stop();
+        LobbyShellBars.DropTopAfter(this, this.transition.CloseDuration);
+    }
 
+    protected override void OnDisable()
+    {
+        base.OnDisable();
+        LobbyShellBars.DropTop(this);
         if (this.wheel != null) this.wheel.Stop();
         if (this.bulbRing != null) this.bulbRing.Stop();
+    }
 
-        // root가 미배선이면 페이드 대상이 이 오브젝트 자신이라 닫을 때마다 여기로 온다.
-        // 잘린 퇴장을 마무리하는 것이 이 호출의 일이므로 그 경로로 와도 무해하다.
-        this.transition.HandleDisabled(this.ResolveTarget());
+    protected override void OnDestroy()
+    {
+        base.OnDestroy();
+        LobbyShellBars.DropTop(this);
     }
 
     void OnSpinPressed()
     {
         // interactable=false만으로는 같은 프레임의 두 번째 클릭이 통과한다.
-        if (this.m_spinning) return;
+        if (!this.isShow || this.m_spinning) return;
 
         ERouletteSpinResult t_precheck = RouletteManager.Precheck();
         if (t_precheck != ERouletteSpinResult.Success)
@@ -275,7 +255,7 @@ public class RoulettePanel : PooledUIBase
     // 비용 재화를 매니저에서 묻는다 — 티켓으로 못박으면 다이아로 도는 판에서 버튼이 잔액을 따라오지 않는다.
     void HandleCurrencyChanged(ECurrencyType _type, long _balance)
     {
-        if (_type != RouletteManager.PriceType) return;
+        if (!this.isShow || _type != RouletteManager.PriceType) return;
 
         this.RefreshTicketText();
 
@@ -406,26 +386,8 @@ public class RoulettePanel : PooledUIBase
         this.m_spinCts?.Cancel();
     }
 
-    void SetVisible(bool _visible)
-    {
-        // 저작본은 루트가 꺼진 채로 들어온다 — 여기서 켜 주지 않으면 하위 root만 토글돼 화면에 아무것도 뜨지 않는다.
-        if (_visible && !this.gameObject.activeSelf) this.gameObject.SetActive(true);
-
-        // 암막은 공용 ScreenDim(Full)이 그린다 — Panel은 알파 0으로 남아 뒤쪽 입력만 삼킨다.
-        if (_visible) ScreenDim.Show(this, this.dimAlpha, true, this.transition.OpenDuration);
-        else ScreenDim.Hide(this);
-
-        // 풀 계약(PooledUIBase.isShow). 열고 닫는 길이 여기 하나뿐이라 상태도 여기서만 쓴다.
-        this.isShow = _visible;
-
-        this.transition.SetVisible(this.ResolveTarget(), _visible);
-
-        if (!_visible && this.bulbRing != null) this.bulbRing.Stop();
-    }
-
     // 풀 컨테이너(UiSortingOrder.Pool)에서 떨어져 나와 로비 오버레이 층에 내려앉는다(절차는 UiSortingOrder가 쥔다).
     void LiftToOverlayLayer()
         => this.m_sortingCanvas = UiSortingOrder.LiftNested(gameObject, UiSortingOrder.PooledOverlay);
 
-    GameObject ResolveTarget() => this.root != null ? this.root : this.gameObject;
 }

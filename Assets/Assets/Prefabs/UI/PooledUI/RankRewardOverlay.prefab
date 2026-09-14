@@ -220,12 +220,12 @@ GameObject:
   m_Component:
   - component: {fileID: 9017184902450823463}
   m_Layer: 0
-  m_Name: Root
+  m_Name: Contents
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &9017184902450823463
 RectTransform:
   m_ObjectHideFlags: 0
@@ -822,9 +822,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RankRewardPanel
   animator: {fileID: 0}
-  contents: {fileID: 0}
+  contents: {fileID: 1942211734502512221}
   isShow: 0
-  root: {fileID: 1942211734502512221}
   scrollRect: {fileID: 9211548164941347223}
   content: {fileID: 5655762576460979311}
   rowPrefab: {fileID: 2277039532059551791, guid: 3e73acab0ea34f04f8f10b0f6f843862, type: 3}

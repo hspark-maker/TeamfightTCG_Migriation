@@ -7,7 +7,7 @@ using TMPro;
 
 // 랭크 보상 한 행(RankRewardRow 프리팹 루트에 부착).
 // 티어 인덱스만 들고 표시값은 매번 RankRewardManager.GetInfo로 다시 받는다(행이 스냅샷을 캐싱하면 수령 후 stale).
-public class RankRewardRowView : MonoBehaviour
+public class RankRewardRowView : MonoBehaviour, IUIInitializable
 {
     [SerializeField] Image badgeImage;       // 티어 배지(미저작이면 프리팹 기본 유지)
     [SerializeField] TMP_Text tierNameText;  // 티어 표시명
@@ -37,6 +37,7 @@ public class RankRewardRowView : MonoBehaviour
     int m_tierIndex = -1;
 
     Action<int> m_onClick;
+    bool m_initialized;
 
     // 최상위 행의 상시 펄스.
     Tween m_pulseTween;
@@ -47,17 +48,24 @@ public class RankRewardRowView : MonoBehaviour
     /// <summary>이 행의 보상 칸(보상 목록과 같은 순서). 수령 팝업이 닫힌 뒤 획득 빛이 피어날 자리로 쓴다.</summary>
     public IReadOnlyList<CurrencyRewardSlotView> RewardSlots => this.rewardSlots;
 
-    // 티어 인덱스 배선 + 리스너 1회 등록(재빌드마다 중복 방지). _isLast면 쉐브론을 끈다.
-    public void Bind(int _tierIndex, bool _isLast, Action<int> _onClick)
+    public void InitializeUI()
     {
-        this.m_tierIndex = _tierIndex;
-        this.m_onClick = _onClick;
-
+        if (this.m_initialized) return;
+        this.m_initialized = true;
         if (this.rewardBox != null)
         {
             this.rewardBox.onClick.RemoveAllListeners();
             this.rewardBox.onClick.AddListener(this.OnRewardBoxClicked);
         }
+        if (this.highlight != null) this.m_highlightImage = this.highlight.GetComponent<Image>();
+    }
+
+    // 티어별 표시 데이터는 재바인딩하고 버튼 연결은 인스턴스당 한 번만 준비한다.
+    public void Bind(int _tierIndex, bool _isLast, Action<int> _onClick)
+    {
+        this.InitializeUI();
+        this.m_tierIndex = _tierIndex;
+        this.m_onClick = _onClick;
 
         if (this.chevron != null) this.chevron.SetActive(!_isLast);
 

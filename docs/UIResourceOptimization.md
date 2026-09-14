@@ -26,6 +26,8 @@ RankingBoardPanel, RoulettePanel(주소 RouletteOverlay).
 카드 원격 번들의 초기 다운로드 정책과 디스크 캐시는 기존 Firebase 리소스 흐름을 따른다.
 이번 카드 변경은 모든 진화 아트의 메모리 선적재를 제거한다. 다운로드 용량 감소 수치가 아니다.
 공유 폰트·아이콘 중복을 피하기 위해 UI 번들의 Pack Together는 유지한다.
+이후 UI는 `RemoteUI` 그룹으로 원격 전환했다. 카드·UI 다운로드 후 UI 카탈로그·폰트·프리팹을 적재한다.
+시작 씬의 로딩·로그인·복구 UI는 앱에 유지한다. 현재 빌드·검증 결과는 `FirebaseResourceHosting.md`를 따른다.
 
 ## 확인 범위
 

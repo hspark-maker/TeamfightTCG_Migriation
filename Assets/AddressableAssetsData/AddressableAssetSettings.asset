@@ -15,9 +15,10 @@ MonoBehaviour:
   m_DefaultGroup: 14d31794b2ffd944c93f9d90b507687b
   m_currentHash:
     serializedVersion: 2
-    Hash: 14886f5e944352f38c123f35c54c4464
+    Hash: 00000000000000000000000000000000
   m_OptimizeCatalogSize: 0
   m_BuildRemoteCatalog: 1
+  m_BundleLocalCatalog: 0
   m_CatalogRequestsTimeout: 15
   m_DisableCatalogUpdateOnStart: 1
   m_InternalIdNamingMode: 0
@@ -58,12 +59,13 @@ MonoBehaviour:
   m_ContentStateBuildPathProfileVariableName: <default settings path>
   m_CustomContentStateBuildPath: 
   m_ContentStateBuildPath: 
-  m_BuildAddressablesWithPlayerBuild: 0
+  m_BuildAddressablesWithPlayerBuild: 2
   m_overridePlayerVersion: 
   m_GroupAssets:
   - {fileID: 11400000, guid: 1b8d167b9c4b2304ead27568583e4d21, type: 2}
   - {fileID: 11400000, guid: 77f64bc92f897ca4b93f9b4cd57eb504, type: 2}
   - {fileID: 11400000, guid: 8b3735c2deed89b46b568a1f8ef84d5c, type: 2}
+  - {fileID: 11400000, guid: 1af0fdf69432cfc40b2f4a9b9b82f5dd, type: 2}
   - {fileID: 11400000, guid: f27a2eaa55c791c449e4f7af05dc9e38, type: 2}
   m_BuildSettings:
     m_LogResourceManagerExceptions: 1
@@ -107,6 +109,7 @@ MonoBehaviour:
     - Cards
     - Packs
     - UIPrefab
+    - RemoteUI
   m_SchemaTemplates: []
   m_GroupTemplateObjects:
   - {fileID: 11400000, guid: bd0015e072740b841a3a5530a37d3da7, type: 2}

@@ -24,8 +24,11 @@ using UnityEngine.UI;
 /// <b>형제 순서로만</b> 위아래가 갈린다(AddOrUpdateUI가 열 때마다 SetAsLastSibling을 건다).
 /// "안내가 대기에 묻히지 않는다"를 보장하는 것은 정렬 층이 아니라 <b>호출부가 Release를 먼저 하고 팝업을 띄우는 순서</b>
 /// 하나뿐이다(<see cref="PackPurchaseFlow"/> 참조).</summary>
-public class ServerWaitOverlay : PooledUIBase
+public class ServerWaitOverlay : ContentsPooledUI
 {
+    protected override bool UsePopupTransition => false;
+    protected override bool UseScreenDim => false;
+
     // UIPoolManager.GetUI는 없을 때 로그를 남긴다 — 대기가 이미 걷힌 뒤의 Release는 정상 갈래라
     // 조용히 넘어갈 수 있게 자기 인스턴스를 직접 들고 있는다.
     static ServerWaitOverlay s_instance;
@@ -83,20 +86,18 @@ public class ServerWaitOverlay : PooledUIBase
         s_instance = null;
     }
 
-    protected override void Awake()
+    protected override void OnInitializeUI()
     {
-        base.Awake();   // RegisterUI — 이걸 빠뜨리면 풀이 이 인스턴스를 영영 못 찾는다
         s_instance = this;
 
         BindFallbacks();
         ResetToIdle();
-
-        if (this.contents != null) this.contents.SetActive(false);
     }
 
     /// <summary>owner 하나를 대기 목록에 <b>더한다</b>. 왕복이 겹치면 두 번째 Hold가 여기로 다시 들어오므로 덮어쓰지 않는다.</summary>
     public override void Initialization(UIData _data)
     {
+        this.InitializeUI();
         this.data = _data;
 
         if (_data is ServerWaitData t_waitData) Push(t_waitData.owner);
@@ -105,18 +106,17 @@ public class ServerWaitOverlay : PooledUIBase
     /// <summary>차단막을 세운다. Contents가 켜지는 것이 곧 입력 차단이라, 임계 전에도 이 호출은 먼저 일어나야 한다.</summary>
     public override void Show()
     {
-        if (this.contents != null) this.contents.SetActive(true);
-        this.isShow = true;
+        this.SetContentsVisible(true);
         this.data?.showCustomMethod?.Invoke();
     }
 
     /// <summary>차단막과 그림을 모두 걷고 대기 상태를 초기값으로 되돌린다.</summary>
     public override void Hide()
     {
+        this.InitializeUI();
         ResetToIdle();
 
-        if (this.contents != null) this.contents.SetActive(false);
-        this.isShow = false;
+        this.SetContentsVisible(false);
         this.data?.onHide?.Invoke();   // data는 풀이 인스턴스를 만든 직후 Hide가 오면 null일 수 있다
     }
 
@@ -335,13 +335,18 @@ public class ServerWaitOverlay : PooledUIBase
         if (this.spinner != null) this.spinner.localRotation = Quaternion.identity;
     }
 
+    protected override void OnDisable()
+    {
+        ResetToIdle();
+        base.OnDisable();
+    }
+
     protected override void OnDestroy()
     {
+        ResetToIdle();
         base.OnDestroy();
 
         if (s_instance == this) s_instance = null;
-        this.m_owners.Clear();
-        this.m_spin = null;
     }
 }
 

@@ -4,8 +4,11 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 카드팩 등장 확률 고지 팝업. 확률 계산은 PackOdds 단독 — 여기선 표시만 한다.
-public class PackOddsPopup : PooledUIBase
+public class PackOddsPopup : ContentsPooledUI
 {
+    protected override bool UsePopupTransition => false;
+    protected override bool UseScreenDim => false;
+
     [SerializeField] TextMeshProUGUI titleText;
     [SerializeField] TextMeshProUGUI footerText;    // 고지 문구(옵션 — 미배선 무시).
     [SerializeField] Button closeButton;
@@ -20,24 +23,16 @@ public class PackOddsPopup : PooledUIBase
 
     public override void Initialization(UIData _data)
     {
+        this.InitializeUI();
         this.data = _data;
         if (_data is PackOddsData t_d) Bind(t_d.pack);
-        Show();
     }
 
-    public override void Show()
-    {
-        this.contents.SetActive(true);
-        this.isShow = true;
-    }
+    public override void Show() => this.SetContentsVisible(true);
 
-    public override void Hide()
-    {
-        this.contents.SetActive(false);
-        this.isShow = false;
-    }
+    public override void Hide() => this.SetContentsVisible(false);
 
-    void OnEnable()
+    protected override void OnInitializeUI()
     {
         if (this.closeButton != null)
         {
@@ -49,12 +44,6 @@ public class PackOddsPopup : PooledUIBase
             this.dimCloseButton.onClick.RemoveListener(OnClosePressed);
             this.dimCloseButton.onClick.AddListener(OnClosePressed);
         }
-    }
-
-    void OnDisable()
-    {
-        if (this.closeButton != null) this.closeButton.onClick.RemoveListener(OnClosePressed);
-        if (this.dimCloseButton != null) this.dimCloseButton.onClick.RemoveListener(OnClosePressed);
     }
 
     void OnClosePressed() => Hide();

@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 // 룰렛 프레임을 두르는 전구 링. 만지는 것은 Image.sprite 와 알파뿐이고 Transform 은 한 번도 건드리지 않는다 —
 // 링 노드가 기울어 앉아 있고 전구 8개도 손배치라, 회전·스케일을 얹는 순간 전부 제각각 어긋난다.
-public class RouletteBulbRing : MonoBehaviour
+public class RouletteBulbRing : MonoBehaviour, IUIInitializable
 {
     [Tooltip("전구 8개입니다. 비워 두면 이 노드의 Image와 자식 Image를 자동으로 모읍니다 — " +
              "목업 저작이 \"첫 전구 밑에 나머지 7개\" 모양이라 그대로 성립합니다.\n\n" +
@@ -27,11 +27,16 @@ public class RouletteBulbRing : MonoBehaviour
     Color[] m_authoredColors;
 
     Sequence m_idle;
+    bool m_initialized;
 
-    void Awake()
+    void Awake() => this.InitializeUI();
+
+    public void InitializeUI()
     {
+        if (this.m_initialized) return;
         this.CollectBulbs();
         this.CaptureAuthored();
+        this.m_initialized = true;
 
         // 켜짐·꺼짐 그림이 없으면 마퀴가 화면에 아무 변화를 못 낸다 — 조용히 죽지 않게 드러낸다.
         if (this.onSprite == null || this.offSprite == null)
@@ -47,6 +52,7 @@ public class RouletteBulbRing : MonoBehaviour
     /// <summary>평시 마퀴로 되돌린다. 저작 패턴에서 시작하므로 여는 순간에는 저작 그림이 그대로 보인다.</summary>
     public void PlayIdle()
     {
+        this.InitializeUI();
         this.KillIdle();
         this.RestoreAuthored();
 

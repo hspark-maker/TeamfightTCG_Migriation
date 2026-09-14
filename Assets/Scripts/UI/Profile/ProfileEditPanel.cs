@@ -8,24 +8,24 @@ using UnityEngine.EventSystems;
 // 프로필 편집 팝업(아바타·프레임·감정표현·닉네임). 풀(UIPoolManager)이 수명을 쥐고 로비 위에 덮인다.
 //
 // 편집 중에는 드래프트만 바꾸고 저장·닫기·외부 숨김 시 ProfileManager.Apply로 한 번 확정한다.
-public class ProfileEditPanel : PooledUIBase, IPointerClickHandler
+public class ProfileEditPanel : ContentsPooledUI, IPointerClickHandler
 {
     const int TAB_AVATAR = 0;
     const int TAB_FRAME  = 1;
     const int TAB_EMOTE  = 2;
 
     // 표시값은 ProfileManager에서 읽고, 호출 화면의 복귀 동작만 전달받는다.
-    public override void Initialization(UIData _data) => this.data = _data;
+    public override void Initialization(UIData _data)
+    {
+        this.InitializeUI();
+        this.data = _data;
+    }
     public override void Show() => this.Open();
     public override void Hide()
     {
-        this.CancelEmoteDrag();
         // 풀 정리 등 외부 숨김에서는 호출 화면을 다시 열지 않는다.
         this.data = null;
-        this.isShow = false;
-        this.CommitSession();
-        if (this.nicknameInput != null) this.nicknameInput.DeactivateInputField();
-        this.SetVisible(false);
+        this.SetContentsVisible(false);
     }
 
     [Header("미리보기")]
@@ -69,13 +69,6 @@ public class ProfileEditPanel : PooledUIBase, IPointerClickHandler
     [Tooltip("바깥 암막 클릭 판정. 닫기와 같은 동작이다.")]
     [SerializeField] Button dimButton;
 
-    [Header("연출")]
-    [Tooltip("panel에는 팝업 창을 배선한다 — contents를 물리면 전체화면 딤까지 함께 커진다.")]
-    [SerializeField] PopupTransition transition = new PopupTransition();
-
-    [Tooltip("공용 ScreenDim(Full)에 요청할 암막 짙기.")]
-    [Range(0f, 1f)] [SerializeField] float dimAlpha = 0.72f;
-
     readonly List<ProfileItemCell> m_avatarCells = new List<ProfileItemCell>();
     readonly List<ProfileItemCell> m_frameCells = new List<ProfileItemCell>();
     readonly List<EmoteItemCell> m_equippedEmoteCells = new List<EmoteItemCell>();
@@ -106,6 +99,7 @@ public class ProfileEditPanel : PooledUIBase, IPointerClickHandler
     /// <summary>드래프트를 현재 프로필로 리셋하고 팝업을 띄운다.</summary>
     public void Open()
     {
+        this.InitializeUI();
         if (this.m_sessionOpen) return;
         this.m_draftAvatarId = ProfileManager.AvatarId;
         this.m_draftFrameId = ProfileManager.FrameId;
@@ -124,7 +118,7 @@ public class ProfileEditPanel : PooledUIBase, IPointerClickHandler
         this.RefreshNicknameField();
         if (this.saveButton != null) this.saveButton.interactable = false;
         this.m_sessionOpen = true;
-        this.SetVisible(true);
+        this.SetContentsVisible(true);
     }
 
     /// <summary>드래프트를 저장하고 닫은 뒤 호출 화면으로 복귀한다.</summary>
@@ -136,9 +130,12 @@ public class ProfileEditPanel : PooledUIBase, IPointerClickHandler
         t_onHide?.Invoke();
     }
 
-    void OnEnable()
+    protected override void OnInitializeUI()
     {
-        // 재활성마다 중복 등록 방지.
+        this.m_emoteDrag = this.GetComponent<EmoteEditDragController>() ?? this.gameObject.AddComponent<EmoteEditDragController>();
+        this.m_emoteDrag.Initialize((RectTransform)this.contents.transform, this.m_equippedEmoteCells, this.OnEmoteDropped, this.OnEmoteDragEnded);
+
+        // 비활성 뷰에서도 고정 입력은 한 번 연결한다.
         Rewire(this.saveButton, this.Save);
         Rewire(this.closeButton, this.Close);
         Rewire(this.dimButton, this.Close);
@@ -166,35 +163,19 @@ public class ProfileEditPanel : PooledUIBase, IPointerClickHandler
         }
     }
 
-    void OnDisable()
+    protected override void OnViewHidden()
     {
         this.CancelEmoteDrag();
         this.data = null;
-        this.isShow = false;
         this.CommitSession();
         // 소프트키보드가 팝업 밖까지 살아남지 않게 — 팝업이 풀에서 꺼지는 경로는 Close를 거치지 않는다.
-        if (this.nicknameInput != null)
-        {
-            this.nicknameInput.onValueChanged.RemoveListener(this.OnNicknameChanged);
-            this.nicknameInput.onValidateInput -= this.ValidateNameCharacter;
-            this.nicknameInput.onSubmit.RemoveListener(this.EndNicknameEdit);
-            this.nicknameInput.onEndEdit.RemoveListener(this.EndNicknameEdit);
-            this.nicknameInput.onDeselect.RemoveListener(this.EndNicknameEdit);
-            this.nicknameInput.DeactivateInputField();
-        }
-
-        // 안전망 — Close를 거치지 않고 꺼지면 공용 딤이 남는다.
-        ScreenDim.Hide(this);
-        this.transition.HandleDisabled(this.ResolveTarget());
+        if (this.nicknameInput != null) this.nicknameInput.DeactivateInputField();
     }
 
     // 세 그리드를 한 번에 세운다. 설정이 아직 없으면(초기화 배선 전) 그 축만 조용히 비운다 — 씬이 죽지 않게.
     void Build()
     {
         this.CancelEmoteDrag();
-        if (this.m_emoteDrag == null)
-            this.m_emoteDrag = this.GetComponent<EmoteEditDragController>() ?? this.gameObject.AddComponent<EmoteEditDragController>();
-        this.m_emoteDrag.Initialize((RectTransform)this.ResolveTarget().transform, this.m_equippedEmoteCells, this.OnEmoteDropped, this.OnEmoteDragEnded);
         this.m_avatarCells.Clear();
         this.m_frameCells.Clear();
         this.m_equippedEmoteCells.Clear();
@@ -605,19 +586,6 @@ public class ProfileEditPanel : PooledUIBase, IPointerClickHandler
         || this.m_draftFrameId != ProfileManager.FrameId
         || this.m_draftNickname != ProfileManager.Nickname
         || !LoadoutsEqual(this.m_draftEmoteIds, ProfileManager.EmoteIds);
-
-    void SetVisible(bool _visible)
-    {
-        // 암막은 공용 ScreenDim(Full)이 그린다 — 팝업마다 딤 한 장씩 들고 있지 않는다.
-        if (_visible) ScreenDim.Show(this, this.dimAlpha, true, this.transition.OpenDuration);
-        else ScreenDim.Hide(this);
-
-        this.isShow = _visible;   // 풀 계약(PooledUIBase.isShow).
-        this.transition.SetVisible(this.ResolveTarget(), _visible);
-    }
-
-    // 토글 대상은 풀 관용구대로 contents다(SettingsPanel·SimpleYNPopup과 같음). 미배선이면 자기 자신.
-    GameObject ResolveTarget() => this.contents != null ? this.contents : this.gameObject;
 
     static void Rewire(Button _button, UnityEngine.Events.UnityAction _action)
     {

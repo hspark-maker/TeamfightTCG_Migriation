@@ -10,7 +10,7 @@ using UnityEngine.UI;
 ///
 /// 비선택 배경을 투명하게 두면 탭바 자체의 배경판이 비쳐 세그먼트 컨트롤처럼 보인다.
 /// 스프라이트 슬롯이 비어 있으면 색만 바꾼다 — 나중에 이미지 에셋을 꽂으면 코드 수정 없이 룩이 바뀐다.
-public class TabButtonView : MonoBehaviour
+public class TabButtonView : MonoBehaviour, IUIInitializable
 {
     [Header("배선 (비우면 자동 탐색)")]
     [SerializeField] Image background;          // 탭 배경. 비우면 자기 자신의 Image
@@ -41,7 +41,9 @@ public class TabButtonView : MonoBehaviour
     /// 알약(LobbyTabBarView.focus)이 선택 탭의 그림을 복사해 갈 때 여기를 본다.
     public Image Icon { get { EnsureRefs(); return this.icon != null ? this.icon : this.background; } }
 
-    void Awake() => EnsureRefs();
+    void Awake() => InitializeUI();
+
+    public void InitializeUI() => EnsureRefs();
 
     // 인스펙터 배선을 강요하지 않는다 — 탭을 복제해 늘릴 때 손이 덜 간다.
     // 탭바(LobbyTabBarView)와 Awake 순서가 정해져 있지 않아 어느 쪽이 먼저 불러도 같은 결과가 나와야 한다.
@@ -71,6 +73,7 @@ public class TabButtonView : MonoBehaviour
     /// 선택 여부에 맞춰 배경·라벨·아이콘을 한 번에 적용한다.
     public void SetSelected(bool _on)
     {
+        InitializeUI();
         if (m_selected == _on) return;
         m_selected = _on;
 

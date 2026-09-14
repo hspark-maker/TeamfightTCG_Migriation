@@ -6,9 +6,8 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 서버 시즌 랭킹의 표시 창구. 풀 재사용 중 이전 요청의 응답은 버린다.
-public class RankingBoardPanel : PooledUIBase
+public class RankingBoardPanel : ContentsPooledUI
 {
-    [SerializeField] GameObject root;
     [SerializeField] ScrollRect scrollRect;
     [SerializeField] RectTransform content;
     [SerializeField] RankingRowView rowPrefab;
@@ -18,8 +17,6 @@ public class RankingBoardPanel : PooledUIBase
     [SerializeField] TMP_Text statusText;
     [SerializeField] Button retryButton;
     [SerializeField] Button closeButton;
-    [SerializeField] PopupTransition transition = new PopupTransition();
-    [Range(0f, 1f)] [SerializeField] float dimAlpha = 0.72f;
 
     readonly List<RankingRowView> m_rows = new List<RankingRowView>();
     int m_requestVersion;
@@ -27,52 +24,37 @@ public class RankingBoardPanel : PooledUIBase
     long m_endAtMs;
     float m_nextClockUpdate;
 
-    protected override void Awake()
+    protected override void OnInitializeUI()
     {
-        base.Awake();
         UiSortingOrder.LiftNested(gameObject, UiSortingOrder.PooledOverlay);
+        if (closeButton != null) closeButton.onClick.AddListener(Close);
+        if (retryButton != null) retryButton.onClick.AddListener(Refresh);
         ClearRows();
     }
 
-    public override void Initialization(UIData _data) { }
+    public override void Initialization(UIData _data) => InitializeUI();
     public override void Show() => Open();
     public override void Hide() => Close();
 
     public void Open()
     {
-        SetVisible(true);
+        SetContentsVisible(true);
         BeginRefresh(false);
     }
 
-    public void Close()
+    public void Close() => SetContentsVisible(false);
+
+    protected override void OnViewHidden()
     {
         ++m_requestVersion;
         m_loading = false;
-        SetVisible(false);
-    }
-
-    void OnEnable()
-    {
-        if (closeButton != null) closeButton.onClick.AddListener(Close);
-        if (retryButton != null) retryButton.onClick.AddListener(Refresh);
-    }
-
-    void OnDisable()
-    {
-        if (closeButton != null) closeButton.onClick.RemoveListener(Close);
-        if (retryButton != null) retryButton.onClick.RemoveListener(Refresh);
-        ++m_requestVersion;
-        m_loading = false;
-        isShow = false;
-        ScreenDim.Hide(this);
-        transition.HandleDisabled(ResolveTarget());
     }
 
     void Refresh() => BeginRefresh(true);
 
     void BeginRefresh(bool _force)
     {
-        if (m_loading) return;
+        if (!isShow || m_loading) return;
         m_loading = true;
         m_endAtMs = 0;
         if (seasonText != null) seasonText.text = string.Empty;
@@ -181,14 +163,4 @@ public class RankingBoardPanel : PooledUIBase
             : $"종료까지 {Math.Ceiling(t_hours):N0}시간";
     }
 
-    void SetVisible(bool _visible)
-    {
-        if (_visible && !gameObject.activeSelf) gameObject.SetActive(true);
-        if (_visible) ScreenDim.Show(this, dimAlpha, true, transition.OpenDuration);
-        else ScreenDim.Hide(this);
-        isShow = _visible;
-        transition.SetVisible(ResolveTarget(), _visible);
-    }
-
-    GameObject ResolveTarget() => root != null ? root : gameObject;
 }

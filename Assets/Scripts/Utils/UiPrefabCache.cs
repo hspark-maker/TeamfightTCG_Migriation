@@ -27,6 +27,8 @@ public static class UiPrefabCache
     static readonly Dictionary<Type, AsyncOperationHandle<GameObject>> s_deferredHandles = new();
     static readonly Dictionary<Type, UniTaskCompletionSource<GameObject>> s_requests = new();
     static AsyncOperationHandle<IList<IResourceLocation>> s_catalogHandle;
+    static AsyncOperationHandle<SyncUiPrefabCatalog> s_syncCatalogHandle;
+    static AsyncOperationHandle<TMPro.TMP_FontAsset> s_fontHandle;
 
     static AsyncOperationHandle<IList<GameObject>> s_handle;
     static bool s_started;
@@ -70,6 +72,12 @@ public static class UiPrefabCache
             if (t_handle.IsValid()) Addressables.Release(t_handle);
         s_deferredHandles.Clear();
         s_locations.Clear();
+        SyncUiPrefabs.SetSource(null);
+        TutorialUIStyle.SetFont(null);
+        if (s_syncCatalogHandle.IsValid()) Addressables.Release(s_syncCatalogHandle);
+        s_syncCatalogHandle = default;
+        if (s_fontHandle.IsValid()) Addressables.Release(s_fontHandle);
+        s_fontHandle = default;
         if (s_catalogHandle.IsValid()) Addressables.Release(s_catalogHandle);
         s_catalogHandle = default;
         if (s_handle.IsValid()) Addressables.Release(s_handle);
@@ -91,6 +99,19 @@ public static class UiPrefabCache
         int t_generation = s_generation;
         try
         {
+            // 다운로드 이후에만 들어온다. 동기 소비자도 HTTP를 기다리지 않도록 먼저 적재한다.
+            s_syncCatalogHandle = Addressables.LoadAssetAsync<SyncUiPrefabCatalog>("SyncUiPrefabCatalog");
+            var t_syncCatalog = await s_syncCatalogHandle.ToUniTask();
+            if (t_generation != s_generation) return;
+            if (t_syncCatalog == null) throw new InvalidOperationException("Sync UI catalog is missing.");
+            SyncUiPrefabs.SetSource(t_syncCatalog);
+
+            s_fontHandle = Addressables.LoadAssetAsync<TMPro.TMP_FontAsset>("MalgunGothic_TMP");
+            var t_font = await s_fontHandle.ToUniTask();
+            if (t_generation != s_generation) return;
+            if (t_font == null) throw new InvalidOperationException("Tutorial font is missing.");
+            TutorialUIStyle.SetFont(t_font);
+
             s_catalogHandle = Addressables.LoadResourceLocationsAsync("UIPrefab", typeof(GameObject));
             var t_locations = await s_catalogHandle.ToUniTask();
             if (t_generation != s_generation) return;

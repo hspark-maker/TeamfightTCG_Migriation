@@ -11,7 +11,7 @@ public enum EAccountServiceCellState
 
 /// <summary>서비스 셀의 상태별 표시. 인증과 클릭 동작은 소유 패널이 담당한다.</summary>
 [ExecuteAlways]
-public sealed class AccountServiceCellView : MonoBehaviour
+public sealed class AccountServiceCellView : MonoBehaviour, IUIInitializable
 {
     [Serializable]
     sealed class Appearance
@@ -37,12 +37,17 @@ public sealed class AccountServiceCellView : MonoBehaviour
     Sprite serviceIcon;
     Action onClick;
     Button boundButton;
+    bool initialized;
 
-    void Awake()
+    void Awake() => InitializeUI();
+
+    public void InitializeUI()
     {
+        if (this.initialized) return;
         this.boundButton = this.disconnectButton;
         if (this.boundButton != null)
             this.boundButton.onClick.AddListener(OnClick);
+        this.initialized = true;
     }
 
     void OnEnable() => ApplyAppearance();
@@ -59,6 +64,7 @@ public sealed class AccountServiceCellView : MonoBehaviour
 
     public void Bind(EAccountServiceCellState _state, Sprite _icon, bool _interactable, Action _onClick)
     {
+        InitializeUI();
         this.state = _state;
         this.serviceIcon = _icon;
         this.onClick = _onClick;

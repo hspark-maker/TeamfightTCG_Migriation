@@ -1,0 +1,339 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: RemoteUI
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: RemoteUI
+  m_GUID: c993a00f3241b5846818633e56411b36
+  m_SerializeEntries:
+  - m_GUID: 02aab46ebb075e94b8f1d49d31c05343
+    m_Address: Atlases/UISharedButtons
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 03a74c087c5b40f41b0ce9b00d7e8651
+    m_Address: ContentUnlockIntroView
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0a52b3ddd93b99847afa605113552c84
+    m_Address: RouletteOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0a80f89b64b393f41853432f24fdd505
+    m_Address: Atlases/UIMatch
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1538dcd081334f64ebf7f0e6803135a0
+    m_Address: RankPromoteOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1d8b5cf616c727c498973742ebde3c54
+    m_Address: Atlases/UISharedFrames
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1e08d022c5d050b4a9cc1f226c80e0f6
+    m_Address: Atlases/UIShop
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1e7b8a7296825684d885b8ac33a91c4f
+    m_Address: ExplainPopupUI
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 20a600274526bcf4f8ec46ea6bd8d07f
+    m_Address: SimpleYNPopup
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 28d286ceaf199ed4896b5edc5dc50ea1
+    m_Address: MissionPanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 397e58311ca372c4abd78f896f53a9f2
+    m_Address: Atlases/UILobby
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4124b08d48d20e947a8ce81242bc1032
+    m_Address: KeywordGrowthPanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 433bc64ee546c684e85071d606a25a87
+    m_Address: SyncUiPrefabCatalog
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 43ad026baedb4d5439d1e023ca9c7ddd
+    m_Address: Atlases/UICurrency
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 443948c77e9cab24494f8e3a8664f486
+    m_Address: Atlases/UIAdventure
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5f4f37ca2ecd36b439ad37965b38836e
+    m_Address: Atlases/UIBattle
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 61430c10ca6949a798ec10b366fae820
+    m_Address: PackOddsPopup
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 68b36cb830f92924791a391bd740bce1
+    m_Address: PassPanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 72510d8af51ef38479005e5413776af4
+    m_Address: RankingBoardPanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 72d7da6530f06a248b355782d6b6bca8
+    m_Address: Atlases/UIAlbum
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7955134a9329f754e94d66987747f26c
+    m_Address: Atlases/UIMission
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8134ddc58443c3348a644266ea3669ec
+    m_Address: DeckEditController
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 846d825ba21303740ae41a6a317b231e
+    m_Address: UnlockDemoStage
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 89e5ccc4ebffa9547a10d9ea5b9a0f13
+    m_Address: SettingsPanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8a64cbb246ea50344ac445bc7d85e0c7
+    m_Address: RankRewardPanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8c92fb32c19ee614ebe69e688fea51eb
+    m_Address: Atlases/UIRoulette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 900576455767af6468c2f5dfdb5ff54b
+    m_Address: RewardClaimPopup
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9565f53f65a9f22449e6e57bafae0b18
+    m_Address: Atlases/UIRank
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 989268d4665958247b1249a1dbfee49d
+    m_Address: Atlases/UIPass
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a64b31e8fbca7b04989d81542f9ad953
+    m_Address: Atlases/UIDetail
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b43fd212a19425d4db544e64d1db58bd
+    m_Address: Atlases/UIRewards
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b694ca028ef9afa418ad1ee4737e4a2a
+    m_Address: MissionCutInView
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b8ffda38cc32cce4390406846a163820
+    m_Address: MalgunGothic_TMP
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bab0c173e1415bd49a7b0ffd3bb1567c
+    m_Address: UnlockIntroOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c13b3b433a2a86949bf04ff4423eb01e
+    m_Address: Atlases/UIDeck
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ce8e0425d90f4b843a806f6d4ab5f045
+    m_Address: CardRewardOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d39777ec9f35af14b9b4397582338e12
+    m_Address: ProfileEditPanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d6e19f59ebf8d1e469e3206f09162b0f
+    m_Address: CardSetRewardOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d70eb0251677e1e469c2fd8e9f864c2f
+    m_Address: ServerWaitOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dee8a2231ae459847a16e01635c0f514
+    m_Address: AdventureNodePopup
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e1f5b07b5d4d84344a0e499946bdaa69
+    m_Address: GuideMissionOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e3a3eb8c4f0a22d49bc6694e76c685ec
+    m_Address: Atlases/UIVictory
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e6b465e52d99e8b4b9cc9eb742fbc1ac
+    m_Address: CloudSyncBannerView
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f541ddb0494e8c94f96c26596bdc750c
+    m_Address: Atlases/CardIcons
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f66336ab30b21e64c8eef4b3efd7f862
+    m_Address: PooledCardElement
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f95d3da55cfb6f44f84adfc2fbdc308d
+    m_Address: TouchEffectOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fa7b83a15c5ed524abfc6e6a4e87a418
+    m_Address: LobbySettingPanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fb2856c6be5c5864b80e81dca6d06777
+    m_Address: PackRewardOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 886280ed4ce95ea4fa7b0c1bf828dbdc, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 8ab4738a93cee4f4fac0355dcdb666c2, type: 2}
+    - {fileID: 11400000, guid: a75b4c091d1d5ff4baf4191a2266562c, type: 2}

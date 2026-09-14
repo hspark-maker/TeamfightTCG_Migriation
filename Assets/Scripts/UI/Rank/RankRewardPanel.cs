@@ -8,36 +8,20 @@ using UnityEngine.UI;
 // 풀(UIPoolManager)이 수명을 쥔다 — 로비 프리팹에 상주하지 않고 필요할 때 세워진다.
 // 풀의 uiRoot(Initialize 캔버스)와 로비 캔버스가 같은 1080x1920 기준이라 좌표계가 어긋나지 않는다.
 // **두 캔버스의 기준 해상도가 갈리면 이 화면 배치가 통째로 어긋난다** — 바꿀 땐 같이 맞출 것.
-public class RankRewardPanel : PooledUIBase
+public class RankRewardPanel : ContentsPooledUI
 {
     // 풀 계약. 열고 닫는 실제 동작은 예전부터 있던 Open/Close가 그대로 쥔다 —
     // 표시 데이터는 RankRewardManager에서 스스로 당기므로 UIData가 필요 없다.
-    public override void Initialization(UIData _data) { }
-
-    protected override void Awake()
-    {
-        base.Awake();
-        this.LiftToOverlayLayer();
-    }
+    public override void Initialization(UIData _data) => this.InitializeUI();
 
     public override void Show() => this.Open();
 
     public override void Hide() => this.Close();
 
-    [Tooltip("켜고 끌 대상(딤 + 패널). 미배선이면 자기 gameObject를 토글한다.")]
-    [SerializeField] GameObject root;
-
     [SerializeField] ScrollRect scrollRect;
     [SerializeField] Transform content;              // 행이 세로로 쌓일 Content(VerticalLayoutGroup)
     [SerializeField] RankRewardRowView rowPrefab;    // 행 프리팹
     [SerializeField] Button closeButton;
-
-    [Header("연출")]
-    [Tooltip("panel에는 Root/Panel을 배선한다 — root를 물리면 전체화면 딤까지 함께 커진다.")]
-    [SerializeField] PopupTransition transition = new PopupTransition();
-
-    [Tooltip("공용 ScreenDim(Full)에 요청할 암막 짙기. 예전 Root/Dim 저작값과 같은 0.72다.")]
-    [Range(0f, 1f)] [SerializeField] float dimAlpha = 0.72f;
 
     readonly List<RankRewardRowView> m_rows = new List<RankRewardRowView>();
 
@@ -58,36 +42,44 @@ public class RankRewardPanel : PooledUIBase
     public void Close()
     {
         HideClaimPopup();
-        this.SetVisible(false);
-
-        // 판이 아직 페이드로 남아 있는 동안 상단바가 그 뒤로 사라지지 않게 퇴장이 끝난 뒤에 내린다.
-        LobbyShellBars.DropTopAfter(this, this.transition.CloseDuration);
+        this.SetContentsVisible(false);
     }
 
-    void OnEnable()
+    protected override void OnInitializeUI()
     {
-        // 재활성마다 중복 등록 방지.
+        this.LiftToOverlayLayer();
         if (this.closeButton != null)
         {
             this.closeButton.onClick.RemoveAllListeners();
             this.closeButton.onClick.AddListener(this.Close);
         }
 
-        RankRewardManager.OnChanged += this.RefreshRows;
     }
 
-    void OnDisable()
+    protected override void OnViewShown()
+    {
+        RankRewardManager.OnChanged += this.RefreshRows;
+        // 수령한 보상이 날아가 꽂히는 재화 HUD를 패널 위에 유지한다.
+        LobbyShellBars.LiftTop(this, this.transform);
+    }
+
+    protected override void OnViewHidden()
     {
         RankRewardManager.OnChanged -= this.RefreshRows;
+        // 정상 닫기는 판의 퇴장이 끝난 뒤 상단바를 내린다.
+        LobbyShellBars.DropTopAfter(this, this.transition.CloseDuration);
+    }
 
-        // 안전망 — Close를 거치지 않고 꺼지면 공용 딤이 남는다.
-        ScreenDim.Hide(this);
-
-        // 같은 안전망. 이 뷰는 root만 토글하므로 열고 닫기로는 여기 오지 않는다 — 되돌리기의 정규 자리는 Close다.
+    protected override void OnDisable()
+    {
+        base.OnDisable();
         LobbyShellBars.DropTop(this);
+    }
 
-        // 오버레이 자체가 꺼지는 경로(씬 정리 등)에서만 온다 — 열고 닫기로는 불리지 않는다.
-        this.transition.HandleDisabled(this.ResolveTarget());
+    protected override void OnDestroy()
+    {
+        base.OnDestroy();
+        LobbyShellBars.DropTop(this);
     }
 
     // Open 경로 공통부. 스크롤 타겟만 호출자가 정한다.
@@ -96,10 +88,7 @@ public class RankRewardPanel : PooledUIBase
         // 패널보다 먼저 닫는다 — 아직 화면에 없는 동안이라 팝업이 트윈 없이 즉시 정리된다(퇴장 중 열림 경합 차단).
         HideClaimPopup();
 
-        this.SetVisible(true);
-
-        // 공용 딤이 상단바까지 덮는다 — 수령한 보상이 날아가 꽂히는 자리(재화 HUD)가 보이는 채로 둔다.
-        LobbyShellBars.LiftTop(this, this.transform);
+        this.SetContentsVisible(true);
 
         // 열 때마다 재생성하면 등장 첫 프레임에 20행 Destroy+Instantiate가 얹힌다 — 생성은 1회, 이후엔 표시만 갱신.
         if (this.m_built) this.RefreshRows();
@@ -140,6 +129,7 @@ public class RankRewardPanel : PooledUIBase
     // 수령 통지 → 전 행 재바인딩(수령한 행 = 완료, 다음 행 = 수령 가능). 재빌드가 아니라 Refresh라 스크롤 위치가 보존된다.
     void RefreshRows()
     {
+        if (!this.isShow) return;
         for (int t_i = 0; t_i < this.m_rows.Count; t_i++)
             if (this.m_rows[t_i] != null) this.m_rows[t_i].Refresh();
     }
@@ -180,8 +170,7 @@ public class RankRewardPanel : PooledUIBase
         if (t_outcome.HasCards && this != null)
         {
             // 팩 개봉보다 높은 목록만 걷는다. 공용 보상 팝업의 합산 연출은 계속 재생한다.
-            this.SetVisible(false);
-            LobbyShellBars.DropTopAfter(this, this.transition.CloseDuration);
+            this.SetContentsVisible(false);
             await UniTask.Delay(Mathf.CeilToInt(this.transition.CloseDuration * 1000f), DelayType.UnscaledDeltaTime);
         }
         return t_outcome;
@@ -206,28 +195,8 @@ public class RankRewardPanel : PooledUIBase
         this.scrollRect.verticalNormalizedPosition = Mathf.Clamp01(1f - t_ratio);
     }
 
-    // 여는 순간 오버레이 자신을 켠다 — 저작본은 루트가 꺼진 채로 들어오므로, 여기서 켜 주지 않으면
-    // 하위 Root만 토글돼 화면에 아무것도 뜨지 않는다. 켠 뒤로는 root만 토글되므로 이 뷰의 OnDisable은 열고 닫아도 오지 않는다 —
-    // 재진입마다 트윈을 걷고 시작값을 다시 잡는 PopupTransition 쪽 처리가 실질 방어선이다.
-    void SetVisible(bool _visible)
-    {
-        if (_visible && !this.gameObject.activeSelf) this.gameObject.SetActive(true);
-
-        // 암막은 공용 ScreenDim(Full)이 그린다 — 오버레이마다 딤 한 장씩 들고 있던 것을 걷었다.
-        // Root/Dim 오브젝트는 알파 0으로 남아 "바깥 눌러 닫기" 판정만 맡는다.
-        if (_visible) ScreenDim.Show(this, this.dimAlpha, true, this.transition.OpenDuration);
-        else ScreenDim.Hide(this);
-
-        // 풀 계약(PooledUIBase.isShow). 열고 닫는 길이 여기 하나뿐이라 상태도 여기서만 쓴다 —
-        // 이 값을 읽고 닫힘을 기다리는 쪽(LobbyRankEffectDirector)이 있으므로 빠뜨리면 그쪽이 멈춘다.
-        this.isShow = _visible;
-
-        this.transition.SetVisible(this.ResolveTarget(), _visible);
-    }
-
     // 풀 컨테이너(UiSortingOrder.Pool)에서 떨어져 나와 로비 오버레이 층에 내려앉는다(절차는 UiSortingOrder가 쥔다).
     void LiftToOverlayLayer()
         => this.m_sortingCanvas = UiSortingOrder.LiftNested(gameObject, UiSortingOrder.PooledOverlay);
 
-    GameObject ResolveTarget() => this.root != null ? this.root : this.gameObject;
 }

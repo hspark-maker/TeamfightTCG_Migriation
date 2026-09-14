@@ -9,7 +9,7 @@ using UnityEngine.UI;
 /// <para>행이 자기 판정을 갖지 않는다 — 도달 여부와 수령 낙인은 <see cref="PassManager"/> 에 묻고,
 /// 최종 판정은 서버(claimPassReward)다. 여기 표시는 왕복을 아끼는 낙관 표시다.</para>
 /// </summary>
-public class PassLevelRowView : MonoBehaviour
+public class PassLevelRowView : MonoBehaviour, IUIInitializable
 {
     [SerializeField] TMP_Text levelText;
     [SerializeField] TMP_Text lockedLevelText;
@@ -62,23 +62,12 @@ public class PassLevelRowView : MonoBehaviour
     long? m_nextRequiredExp;
     Sprite m_authoredRewardIcon;
     bool m_hasBound;
+    bool m_initialized;
 
-    internal void Bind(PassLevelDefinition _definition, long? _nextRequiredExp, Action<int> _onClaim, Action<int> _onPremiumClaim = null)
+    public void InitializeUI()
     {
-        this.m_onClaim = _onClaim;
-        this.m_onPremiumClaim = _onPremiumClaim;
-        bool t_sameDefinition = this.m_hasBound && ReferenceEquals(this.m_definition, _definition);
-        this.m_nextRequiredExp = _nextRequiredExp;
-        // 다음 레벨 문턱은 목록 변경 때 따로 갱신하고, 정의가 같으면 진행 상태만 그린다.
-        if (t_sameDefinition)
-        {
-            this.Refresh();
-            return;
-        }
-        if (!this.m_hasBound && this.rewardIcon != null) this.m_authoredRewardIcon = this.rewardIcon.sprite;
-        this.m_hasBound = true;
-        this.m_definition = _definition;
-
+        if (this.m_initialized) return;
+        if (this.rewardIcon != null) this.m_authoredRewardIcon = this.rewardIcon.sprite;
         if (this.claimButton != null)
         {
             this.claimButton.onClick.RemoveAllListeners();
@@ -90,6 +79,24 @@ public class PassLevelRowView : MonoBehaviour
             this.premiumClaimButton.onClick.RemoveAllListeners();
             this.premiumClaimButton.onClick.AddListener(this.HandlePremiumClaim);
         }
+        this.m_initialized = true;
+    }
+
+    internal void Bind(PassLevelDefinition _definition, long? _nextRequiredExp, Action<int> _onClaim, Action<int> _onPremiumClaim = null)
+    {
+        this.InitializeUI();
+        this.m_onClaim = _onClaim;
+        this.m_onPremiumClaim = _onPremiumClaim;
+        bool t_sameDefinition = this.m_hasBound && ReferenceEquals(this.m_definition, _definition);
+        this.m_nextRequiredExp = _nextRequiredExp;
+        // 다음 레벨 문턱은 목록 변경 때 따로 갱신하고, 정의가 같으면 진행 상태만 그린다.
+        if (t_sameDefinition)
+        {
+            this.Refresh();
+            return;
+        }
+        this.m_hasBound = true;
+        this.m_definition = _definition;
 
         if (this.levelText != null) this.levelText.text = (_definition?.Level ?? 0).ToString();
         if (this.lockedLevelText != null) this.lockedLevelText.text = (_definition?.Level ?? 0).ToString();

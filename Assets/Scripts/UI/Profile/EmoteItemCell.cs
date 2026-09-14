@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 // 장착 슬롯과 목록 셀의 입력·표시. 편집 상태는 ProfileEditPanel이 관리한다.
-public class EmoteItemCell : MonoBehaviour, IPointerDownHandler
+public class EmoteItemCell : MonoBehaviour, IPointerDownHandler, IUIInitializable
 {
     [SerializeField] Image icon;
     [SerializeField] GameObject equippedMark;
@@ -30,12 +30,24 @@ public class EmoteItemCell : MonoBehaviour, IPointerDownHandler
     Tween m_swapTween;
     Tween m_punchTween;
     UiGlowBlink m_swapGlowBlink;
+    bool m_initialized;
 
     public int EmoteId { get; private set; }
     public bool IsSlot { get; private set; }
     public RectTransform Rect => (RectTransform)this.transform;
     public Sprite Sprite => this.icon != null ? this.icon.sprite : null;
     public int Key => this.m_key;
+
+    public void InitializeUI()
+    {
+        if (this.m_initialized) return;
+        if (this.button != null)
+        {
+            this.button.onClick.RemoveAllListeners();
+            this.button.onClick.AddListener(this.HandleClick);
+        }
+        this.m_initialized = true;
+    }
 
     public void BindSlot(int _slot, EmoteEntry _entry, Action<int> _onSlotClick)
     {
@@ -96,6 +108,7 @@ public class EmoteItemCell : MonoBehaviour, IPointerDownHandler
 
     public void ConfigureDrag(Action<EmoteItemCell, PointerEventData> _onDrag)
     {
+        this.InitializeUI();
         this.m_onDrag = _onDrag;
         if (this.m_longPress == null) this.m_longPress = this.GetComponent<LongPressDetector>();
         if (!this.IsSlot && this.m_longPress == null)
@@ -137,6 +150,7 @@ public class EmoteItemCell : MonoBehaviour, IPointerDownHandler
 
     void Bind(int _key, EmoteEntry _entry, bool _owned, Action<int> _onClick)
     {
+        this.InitializeUI();
         this.CancelGesture();
         this.m_key = _key;
         this.m_onClick = _onClick;
@@ -150,11 +164,6 @@ public class EmoteItemCell : MonoBehaviour, IPointerDownHandler
             this.icon.sprite = t_hasSprite ? _entry.sprite : null;
         }
         if (this.emptyMark != null) this.emptyMark.SetActive(this.IsSlot && this.EmoteId <= 0);
-        if (this.button != null)
-        {
-            this.button.onClick.RemoveAllListeners();
-            if (_onClick != null) this.button.onClick.AddListener(this.HandleClick);
-        }
         this.SetHighlight(false);
         this.SetEquipped(false);
         this.ApplyFocusScale(false, true);

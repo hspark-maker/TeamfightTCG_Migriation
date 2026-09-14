@@ -7,28 +7,19 @@ using TMPro;
 
 // 키워드 강화 패널(KeywordGrowthOverlay에 부착). 키워드 칸을 전부 생성하고 강화 흐름을 중계한다.
 // 풀(UIPoolManager)이 수명을 쥔다 — 규약은 RankRewardPanel과 같다(캔버스 기준 해상도 주의 포함).
-public class KeywordGrowthPanel : PooledUIBase
+public class KeywordGrowthPanel : ContentsPooledUI
 {
-    public override void Initialization(UIData _data) { }
-
-    protected override void Awake()
-    {
-        base.Awake();
-        this.LiftToOverlayLayer();
-    }
+    public override void Initialization(UIData _data) => this.InitializeUI();
 
     public override void Show() => this.Open();
 
     public override void Hide() => this.Close();
 
-    [Tooltip("켜고 끌 대상(딤 + 패널). 미배선이면 자기 gameObject를 토글한다.")]
-    [SerializeField] GameObject root;
-
     [SerializeField] Transform grid;                    // 칸이 격자로 쌓일 Content(GridLayoutGroup)
     [SerializeField] KeywordGrowthCellView cellPrefab;  // 칸 프리팹
     [SerializeField] Button closeButton;
 
-    [Tooltip("패널 밖(딤)을 눌러 닫는 판. Root/Dim의 알파 0 Image에 배선한다 — 미배선이면 밖을 눌러도 닫히지 않는다.")]
+    [Tooltip("패널 밖(딤)을 눌러 닫는 판. Contents/Dim의 알파 0 Image에 배선한다 — 미배선이면 밖을 눌러도 닫히지 않는다.")]
     [SerializeField] Button dimButton;
     [SerializeField] TMP_Text energyText;
     [SerializeField] Image energyIcon;
@@ -41,13 +32,6 @@ public class KeywordGrowthPanel : PooledUIBase
 
     [Tooltip("비용을 감당 못 하거나 만렙일 때 버튼에 씌울 알파.")]
     [SerializeField] float disabledAlpha = 0.5f;
-
-    [Header("연출")]
-    [Tooltip("panel에는 Root/Panel을 배선한다 — root를 물리면 전체화면 딤까지 함께 커진다.")]
-    [SerializeField] PopupTransition transition = new PopupTransition();
-
-    [Tooltip("공용 ScreenDim(Full)에 요청할 암막 짙기. 예전 Root/Dim 저작값과 같은 0.75다.")]
-    [Range(0f, 1f)] [SerializeField] float dimAlpha = 0.75f;
 
     readonly List<KeywordGrowthCellView> m_cells = new List<KeywordGrowthCellView>();
 
@@ -81,14 +65,13 @@ public class KeywordGrowthPanel : PooledUIBase
     // 풀 컨테이너에서 떨어져 나오려고 확보한 Canvas(LiftToOverlayLayer 참조)
     Canvas m_sortingCanvas;
 
-    // 화면이 서 있는가. 이 컴포넌트는 늘 켜져 있는 루트에 붙어 닫혀도 OnDisable이 안 도는데,
-    // 구독은 살아 있어 RefreshAll이 계속 불린다 — 그때 꺼진 칸을 안내 타깃으로 다시 올리지 않게 한다.
-    bool m_visible;
-
     // 씬 버튼 UnityEvent가 인자 없는 이 시그니처에 바인딩된다 — 매개변수를 붙이면 배선이 끊긴다.
     public void Open()
     {
-        this.SetVisible(true);
+        this.SetContentsVisible(true);
+        // Contents가 켜진 뒤 등록해야 안내의 등록 콜백이 활성 타깃을 받는다.
+        this.ApplyUpgradeAnchor(true);
+        this.ApplyPanelAnchor(true);
         this.ApplyEnergyIcon();
 
         if (this.m_built) this.RefreshAll();
@@ -99,15 +82,11 @@ public class KeywordGrowthPanel : PooledUIBase
             () => this != null && this.isShow);
     }
 
-    public void Close()
-    {
-        this.KillUpgradeFx();
-        this.SetVisible(false);
-    }
+    public void Close() => this.SetContentsVisible(false);
 
-    void OnEnable()
+    protected override void OnInitializeUI()
     {
-        // 재활성마다 중복 등록 방지.
+        this.LiftToOverlayLayer();
         if (this.closeButton != null)
         {
             this.closeButton.onClick.RemoveAllListeners();
@@ -123,24 +102,24 @@ public class KeywordGrowthPanel : PooledUIBase
             this.upgradeButton.onClick.RemoveAllListeners();
             this.upgradeButton.onClick.AddListener(this.OnUpgradePressed);
         }
+    }
 
+    protected override void OnViewShown()
+    {
         KeywordGrowthManager.OnChanged    += this.RefreshAll;
         CurrencyManager.OnCurrencyChanged += this.HandleCurrencyChanged;
     }
 
-    void OnDisable()
+    protected override void OnViewHidden()
     {
         this.KillUpgradeFx();
 
         KeywordGrowthManager.OnChanged    -= this.RefreshAll;
         CurrencyManager.OnCurrencyChanged -= this.HandleCurrencyChanged;
 
-        // 안전망 — Close를 거치지 않고 꺼지면 공용 딤도, 죽은 안내 타깃도 남는다.
-        ScreenDim.Hide(this);
         this.ApplyUpgradeAnchor(false);
-
-        // 오버레이 자체가 꺼지는 경로(씬 정리 등)에서만 온다 — 열고 닫기로는 불리지 않는다.
-        this.transition.HandleDisabled(this.ResolveTarget());
+        this.ApplyPanelAnchor(false);
+        this.ClearCellAnchors();
     }
 
     // grid의 목업 하드코딩 칸을 지우고 대상 키워드 수만큼 재생성(칸 수는 Config에서 파생 — 상수 하드코딩 금지).
@@ -171,8 +150,8 @@ public class KeywordGrowthPanel : PooledUIBase
             t_drawn |= t_keyword;
 
             var t_cell = Instantiate(this.cellPrefab, this.grid);
-            t_cell.gameObject.SetActive(true);   // 위에서 원본을 숨겼을 수 있다 — 사본은 항상 보이게.
             t_cell.Bind(t_keyword, this.OnCellSelected);
+            t_cell.gameObject.SetActive(true);   // 비활성 사본도 초기화·바인딩을 마친 뒤 표시한다.
             this.m_cells.Add(t_cell);
         }
 
@@ -187,7 +166,7 @@ public class KeywordGrowthPanel : PooledUIBase
 
     void OnCellSelected(CardKeyword _keyword)
     {
-        if (this.m_fxPlaying) return;
+        if (!this.isShow || this.m_fxPlaying) return;
 
         this.m_selected = _keyword;
         this.RefreshAll();
@@ -195,7 +174,7 @@ public class KeywordGrowthPanel : PooledUIBase
 
     void OnUpgradePressed()
     {
-        if (this.m_fxPlaying || this.m_selected == CardKeyword.None) return;
+        if (!this.isShow || this.m_fxPlaying || this.m_selected == CardKeyword.None) return;
 
         if (!KeywordGrowthManager.TryGetNextStep(this.m_selected, out GrowthStep t_step)) return;
 
@@ -213,6 +192,7 @@ public class KeywordGrowthPanel : PooledUIBase
     // 실패로 끝나는 모든 갈래에서 잠금을 반드시 되돌린다(안 풀면 이 패널이 통째로 굳는다).
     async UniTaskVoid UpgradeAsync(CardKeyword _keyword, long _cost)
     {
+        int t_visibilityVersion = this.VisibilityVersion;
         // 연출 대상은 누른 시점의 키워드로 굳힌다 — 늦게 온 응답이 그 사이 바뀐 선택을 건드리지 않게.
         KeywordGrowthCellView t_cell = this.FindCell(_keyword);
 
@@ -239,8 +219,9 @@ public class KeywordGrowthPanel : PooledUIBase
         // 왕복 중 패널이 사라졌으면 맺을 무대가 없다(레벨·잔액은 서버가 이미 확정했다).
         if (this == null) return;
 
-        // 닫힌 뒤에 돌아온 응답도, 서버가 거절한 응답도 같다 — 앞세운 연출을 콜백 없이 걷고 잠금만 되돌린다.
-        if (!this.m_visible || t_result.Outcome != EEnhanceOutcome.Success)
+        // 닫거나 다시 연 뒤 도착한 응답은 이전 화면의 연출을 재생하지 않고 잠금만 되돌린다.
+        if (!this.isShow || this.VisibilityVersion != t_visibilityVersion
+            || t_result.Outcome != EEnhanceOutcome.Success)
         {
             this.KillUpgradeFx();
             this.RefreshAction();
@@ -252,7 +233,7 @@ public class KeywordGrowthPanel : PooledUIBase
         if (this == null) return;
 
         // 왕복이 연출보다 빨랐다면 이 자리가 곧 코인이 닿는 순간이고, 늦었다면 연출 끝에서 기다렸다 여기서 맺는다.
-        if (this.m_visible) t_cell?.PlayUpgradePop();
+        if (this.isShow && this.VisibilityVersion == t_visibilityVersion) t_cell?.PlayUpgradePop();
 
         this.m_fxPlaying = false;
         this.RefreshAction();
@@ -298,6 +279,8 @@ public class KeywordGrowthPanel : PooledUIBase
 
     void RefreshAll()
     {
+        if (!this.isShow) return;
+
         for (int t_i = 0; t_i < this.m_cells.Count; t_i++)
         {
             if (this.m_cells[t_i] == null) continue;
@@ -306,7 +289,7 @@ public class KeywordGrowthPanel : PooledUIBase
             this.m_cells[t_i].Refresh(t_selected);
 
             // 안내는 "지금 올릴 칸"을 가리킨다 — 선택이 바뀌면 타깃도 따라간다.
-            this.m_cells[t_i].ApplyTutorialAnchor(t_selected && this.m_visible);
+            this.m_cells[t_i].ApplyTutorialAnchor(t_selected);
         }
 
         this.RefreshAction();
@@ -354,7 +337,7 @@ public class KeywordGrowthPanel : PooledUIBase
         // 칸 팝은 여기서 태우지 않는다 — 성립을 확인하기 전에 튀기면 거절당한 강화를 축하하게 된다.
         Sequence t_sequence = t_burst.BuildBurst(null);
         this.m_upgradeFx = t_sequence;
-        t_sequence.SetLink(this.ResolveTarget(), LinkBehaviour.KillOnDisable);
+        t_sequence.SetLink(this.contents, LinkBehaviour.KillOnDisable);
 
         // 종료와 걷힘에 모두 건다 — OnKill 하나에 기대면 DOTween 전역 defaultAutoKill이 꺼지는 순간
         // 정상 종료에서 대기가 맺히지 않아 잠금이 선 채로 남는다(CompleteUpgradeFxWait는 멱등이라 둘 다 불려도 안전).
@@ -371,7 +354,7 @@ public class KeywordGrowthPanel : PooledUIBase
 
         var t_go = new GameObject("UpgradeEnergyBurst", typeof(RectTransform), typeof(CoinBurstEffect));
         var t_rt = (RectTransform)t_go.transform;
-        t_rt.SetParent(this.root != null ? this.root.transform : transform, false);
+        t_rt.SetParent(this.contents.transform, false);
         t_rt.anchorMin = t_rt.anchorMax = t_rt.pivot = new Vector2(0.5f, 0.5f);
         t_rt.sizeDelta = Vector2.zero;
         t_rt.localPosition = Vector3.zero;
@@ -425,22 +408,6 @@ public class KeywordGrowthPanel : PooledUIBase
         t_done?.TrySetResult();
     }
 
-    void SetVisible(bool _visible)
-    {
-        this.m_visible = _visible;
-
-        // 암막은 공용 ScreenDim(Full)이 그린다 — Root/Dim은 알파 0으로 남아 뒤쪽 입력만 삼킨다.
-        if (_visible) ScreenDim.Show(this, this.dimAlpha, true, this.transition.OpenDuration);
-        else ScreenDim.Hide(this);
-
-        this.transition.SetVisible(this.ResolveTarget(), _visible);
-
-        // 안내 타깃은 이 화면이 서 있는 동안만 유효하다 — 닫히고도 남으면 로비 표면에 죽은 타깃이 남는다.
-        this.ApplyUpgradeAnchor(_visible);
-        this.ApplyPanelAnchor(_visible);
-        if (!_visible) this.ClearCellAnchors();
-    }
-
     // 하단 업그레이드 버튼을 안내 타깃으로 세우거나 내린다(칸과 달리 하나뿐이라 패널이 직접 쥔다).
     void ApplyUpgradeAnchor(bool _on)
     {
@@ -481,6 +448,4 @@ public class KeywordGrowthPanel : PooledUIBase
     // 이 화면은 튜토리얼 안내가 가리키는 무대라 게이트 아래 층으로 내려앉는다(절차는 UiSortingOrder가 쥔다).
     void LiftToOverlayLayer()
         => this.m_sortingCanvas = UiSortingOrder.LiftNested(gameObject, UiSortingOrder.PooledOverlay);
-
-    GameObject ResolveTarget() => this.root != null ? this.root : this.gameObject;
 }

@@ -14,13 +14,13 @@ using UnityEngine;
 /// <remarks>
 /// <see cref="ExecuteAlways"/> — 플레이 중이 아니어도 계속 돈다. Game 뷰 해상도를 노치 프리셋으로 바꾸거나
 /// Device Simulator를 켜면 <b>에디터에서 바로</b> 안전 영역이 반영된다(플레이 눌러야만 보이면 배치를 못 잡는다).
-/// 대신 에디터에서 해상도를 바꿀 때마다 앵커가 갱신되어 씬이 dirty로 표시될 수 있다 — 값이 실제로
-/// 바뀔 때만 쓰므로 저장하지 않으면 그만이다.
+/// 자동 계산하는 앵커·위치·크기는 DrivenRectTransformTracker로 관리해 씬 저장에서 제외한다.
+/// SafeArea 아래의 실제 UI는 미리보기를 보면서 평소처럼 편집·저장할 수 있다.
 /// </remarks>
 [ExecuteAlways]
 [DisallowMultipleComponent]
 [RequireComponent(typeof(RectTransform))]
-public class SafeAreaFitter : MonoBehaviour
+public class SafeAreaFitter : MonoBehaviour, IUIInitializable
 {
     [Tooltip("각 변에 안전 영역을 적용할지. 끄면 그 방향은 화면 끝까지 쓴다")]
     [SerializeField] bool applyLeft   = true;
@@ -29,13 +29,19 @@ public class SafeAreaFitter : MonoBehaviour
     [SerializeField] bool applyBottom = true;
 
     RectTransform     rect;
+    DrivenRectTransformTracker tracker;
     Rect              lastSafeArea = new Rect(0f, 0f, 0f, 0f);
     Vector2Int        lastScreen   = Vector2Int.zero;
     ScreenOrientation lastOrientation = ScreenOrientation.AutoRotation;
     bool              suppressedByAncestor;
     bool              warnedAboutAncestor;
 
-    void Awake() => this.rect = (RectTransform)transform;
+    void Awake() => this.InitializeUI();
+
+    public void InitializeUI()
+    {
+        if (this.rect == null) this.rect = (RectTransform)transform;
+    }
 
     void OnEnable()
     {
@@ -46,9 +52,19 @@ public class SafeAreaFitter : MonoBehaviour
 
     void OnTransformParentChanged()
     {
+        if (!isActiveAndEnabled) return;
         if (this.rect == null) this.rect = (RectTransform)transform;
         RefreshSuppression();
         if (!this.suppressedByAncestor) Apply();
+    }
+
+    void OnDisable()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.delayCall -= RefreshInEditor;
+#endif
+        this.tracker.Clear();
+        this.lastScreen = Vector2Int.zero;
     }
 
     // 회전·해상도·안전영역은 언제든 바뀐다(분할화면, 폴더블 접기, 회전).
@@ -88,8 +104,18 @@ public class SafeAreaFitter : MonoBehaviour
         // 비정상 값(에디터 시뮬레이터 전환 순간 등)에서 UI가 사라지지 않게 막는다.
         if (t_max.x <= t_min.x || t_max.y <= t_min.y) return;
 
-        this.rect.anchorMin = t_min;
-        this.rect.anchorMax = t_max;
+        SetDrivenAnchors(t_min, t_max);
+    }
+
+    void SetDrivenAnchors(Vector2 _min, Vector2 _max)
+    {
+        // offsetMin/Max는 anchoredPosition과 sizeDelta를 바꾸므로 두 속성도 함께 소유한다.
+        // 피벗·회전·스케일과 자식 RectTransform은 편집 가능한 저작값으로 남긴다.
+        this.tracker.Clear();
+        this.tracker.Add(this, this.rect, DrivenTransformProperties.Anchors
+            | DrivenTransformProperties.AnchoredPosition | DrivenTransformProperties.SizeDelta);
+        this.rect.anchorMin = _min;
+        this.rect.anchorMax = _max;
         this.rect.offsetMin = Vector2.zero;
         this.rect.offsetMax = Vector2.zero;
     }
@@ -100,22 +126,19 @@ public class SafeAreaFitter : MonoBehaviour
             ? transform.parent.GetComponentInParent<SafeAreaFitter>(true)
             : null;
         bool t_suppressed = t_ancestor != null;
-        if (t_suppressed == this.suppressedByAncestor) return;
-
+        bool t_changed = t_suppressed != this.suppressedByAncestor;
         this.suppressedByAncestor = t_suppressed;
 
         if (!this.suppressedByAncestor)
         {
-            this.lastScreen = Vector2Int.zero;
+            if (t_changed) this.lastScreen = Vector2Int.zero;
             this.warnedAboutAncestor = false;
             return;
         }
 
         // 조상이 이미 안전영역을 적용하므로 이 래퍼는 전체 stretch로 남아야 두 번 줄지 않는다.
-        this.rect.anchorMin = Vector2.zero;
-        this.rect.anchorMax = Vector2.one;
-        this.rect.offsetMin = Vector2.zero;
-        this.rect.offsetMax = Vector2.zero;
+        // 재활성화 때는 억제 상태가 같아도 OnDisable에서 해제한 tracker를 다시 등록한다.
+        SetDrivenAnchors(Vector2.zero, Vector2.one);
 
         if (this.warnedAboutAncestor) return;
         this.warnedAboutAncestor = true;
@@ -131,14 +154,17 @@ public class SafeAreaFitter : MonoBehaviour
     void OnValidate()
     {
         if (!isActiveAndEnabled) return;
-        UnityEditor.EditorApplication.delayCall += () =>
-        {
-            if (this == null) return;               // 지연 중 삭제됐을 수 있다
-            this.rect = (RectTransform)transform;
-            this.lastScreen = Vector2Int.zero;      // 다음 Apply를 강제
-            RefreshSuppression();
-            if (!this.suppressedByAncestor) Apply();
-        };
+        UnityEditor.EditorApplication.delayCall -= RefreshInEditor;
+        UnityEditor.EditorApplication.delayCall += RefreshInEditor;
+    }
+
+    void RefreshInEditor()
+    {
+        if (this == null || !isActiveAndEnabled) return;
+        this.rect = (RectTransform)transform;
+        this.lastScreen = Vector2Int.zero;
+        RefreshSuppression();
+        if (!this.suppressedByAncestor) Apply();
     }
 #endif
 }

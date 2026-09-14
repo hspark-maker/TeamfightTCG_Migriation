@@ -20,6 +20,9 @@ public static class FirebaseResourceBuild
         var t_settings = AddressableAssetSettingsDefaultObject.Settings;
         if (t_settings == null || !t_settings.BuildRemoteCatalog || !t_settings.EnableJsonCatalog)
             throw new InvalidOperationException("원격 JSON 카탈로그 설정이 필요합니다.");
+#if !ENABLE_JSON_CATALOG
+        throw new InvalidOperationException("현재 플랫폼의 Scripting Define Symbols에 ENABLE_JSON_CATALOG를 추가하고 컴파일이 끝난 뒤 다시 빌드하세요.");
+#else
 
         string t_loadPath = t_settings.RemoteCatalogLoadPath.GetValue(t_settings);
         if (!t_loadPath.StartsWith("https://bm-cardbattle-assets.web.app/", StringComparison.Ordinal))
@@ -40,5 +43,6 @@ public static class FirebaseResourceBuild
         }
         Debug.Log("[FirebaseResourceBuild] 리소스 빌드 완료: " + t_loadPath +
                   "\n배포: firebase deploy --only hosting --project bm-cardbattle");
+#endif
     }
 }

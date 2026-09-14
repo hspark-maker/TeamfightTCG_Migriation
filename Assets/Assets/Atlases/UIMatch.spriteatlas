@@ -1,0 +1,115 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!687078895 &4343727234628468602
+SpriteAtlas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: UIMatch
+  m_EditorData:
+    serializedVersion: 2
+    textureSettings:
+      serializedVersion: 2
+      anisoLevel: 1
+      compressionQuality: 50
+      maxTextureSize: 2048
+      textureCompression: 0
+      filterMode: 1
+      generateMipMaps: 0
+      readable: 0
+      crunchedCompression: 0
+      sRGB: 1
+    platformSettings:
+    - serializedVersion: 4
+      m_BuildTarget: DefaultTexturePlatform
+      m_MaxTextureSize: 2048
+      m_ResizeAlgorithm: 0
+      m_TextureFormat: -1
+      m_TextureCompression: 1
+      m_CompressionQuality: 50
+      m_CrunchedCompression: 0
+      m_AllowsAlphaSplitting: 0
+      m_Overridden: 0
+      m_IgnorePlatformSupport: 0
+      m_AndroidETC2FallbackOverride: 0
+      m_ForceMaximumCompressionQuality_BC6H_BC7: 0
+    - serializedVersion: 4
+      m_BuildTarget: Android
+      m_MaxTextureSize: 2048
+      m_ResizeAlgorithm: 0
+      m_TextureFormat: 50
+      m_TextureCompression: 1
+      m_CompressionQuality: 50
+      m_CrunchedCompression: 0
+      m_AllowsAlphaSplitting: 0
+      m_Overridden: 1
+      m_IgnorePlatformSupport: 0
+      m_AndroidETC2FallbackOverride: 0
+      m_ForceMaximumCompressionQuality_BC6H_BC7: 0
+    - serializedVersion: 4
+      m_BuildTarget: iOS
+      m_MaxTextureSize: 2048
+      m_ResizeAlgorithm: 0
+      m_TextureFormat: 50
+      m_TextureCompression: 1
+      m_CompressionQuality: 50
+      m_CrunchedCompression: 0
+      m_AllowsAlphaSplitting: 0
+      m_Overridden: 1
+      m_IgnorePlatformSupport: 0
+      m_AndroidETC2FallbackOverride: 0
+      m_ForceMaximumCompressionQuality_BC6H_BC7: 0
+    packingSettings:
+      serializedVersion: 2
+      padding: 4
+      blockOffset: 1
+      allowAlphaSplitting: 0
+      enableRotation: 0
+      enableTightPacking: 0
+      enableAlphaDilation: 0
+    secondaryTextureSettings: {}
+    variantMultiplier: 1
+    packables:
+    - {fileID: 2800000, guid: 9ffd9b4106849e949a2a5fd50df8e111, type: 3}
+    - {fileID: 2800000, guid: 0867e295bd7336c46aa085ffc5f22d1a, type: 3}
+    - {fileID: 2800000, guid: 6f08f390b7d238b47a4f6cd6bf19cdc9, type: 3}
+    - {fileID: 2800000, guid: facf8d42a3ff2b1478a7c5dffd7791d5, type: 3}
+    - {fileID: 2800000, guid: 24a0a9b6336836948b5e2cc71210d396, type: 3}
+    - {fileID: 2800000, guid: 43d24ce073282b247ae845147f7d5980, type: 3}
+    - {fileID: 2800000, guid: 95951c9a0823a8e429e11e6b308a69b1, type: 3}
+    - {fileID: 2800000, guid: eaa2ef1274fc35d41a1fcaa312a722ae, type: 3}
+    bindAsDefault: 1
+    isAtlasV2: 0
+    cachedData: {fileID: 0}
+    packedSpriteRenderDataKeys:
+    - 6f08f390b7d238b47a4f6cd6bf19cdc9: 21300000
+    - 43d24ce073282b247ae845147f7d5980: 21300000
+    - 9ffd9b4106849e949a2a5fd50df8e111: 21300000
+    - eaa2ef1274fc35d41a1fcaa312a722ae: 21300000
+    - facf8d42a3ff2b1478a7c5dffd7791d5: 21300000
+    - 0867e295bd7336c46aa085ffc5f22d1a: 21300000
+    - 24a0a9b6336836948b5e2cc71210d396: 21300000
+    - 95951c9a0823a8e429e11e6b308a69b1: 21300000
+  m_MasterAtlas: {fileID: 0}
+  m_PackedSprites:
+  - {fileID: 21300000, guid: 6f08f390b7d238b47a4f6cd6bf19cdc9, type: 3}
+  - {fileID: 21300000, guid: 43d24ce073282b247ae845147f7d5980, type: 3}
+  - {fileID: 21300000, guid: 9ffd9b4106849e949a2a5fd50df8e111, type: 3}
+  - {fileID: 21300000, guid: eaa2ef1274fc35d41a1fcaa312a722ae, type: 3}
+  - {fileID: 21300000, guid: facf8d42a3ff2b1478a7c5dffd7791d5, type: 3}
+  - {fileID: 21300000, guid: 0867e295bd7336c46aa085ffc5f22d1a, type: 3}
+  - {fileID: 21300000, guid: 24a0a9b6336836948b5e2cc71210d396, type: 3}
+  - {fileID: 21300000, guid: 95951c9a0823a8e429e11e6b308a69b1, type: 3}
+  m_PackedSpriteNamesToIndex:
+  - Battle_Frame
+  - MatchMaking_Player
+  - Battle_Enemy_Bar
+  - VS_Badge
+  - Battle_My_Bar
+  - Battle_Enemy_Frame
+  - MatchMaking_Enemy
+  - Tilte_Ribbon_Yellow
+  m_RenderDataMap: {}
+  m_Tag: UIMatch
+  m_IsVariant: 0

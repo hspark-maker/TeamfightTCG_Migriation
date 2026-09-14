@@ -167,7 +167,6 @@ MonoBehaviour:
   - CardCatalog
   - SpecSheetPreload
   retryEntry: 0
-  syncUiPrefabs: {fileID: 11400000, guid: 433bc64ee546c684e85071d606a25a87, type: 2}
   albumConfig: {fileID: 11400000, guid: 5c04cd167e805484b92609d72e119abd, type: 2}
   currencyLook: {fileID: 11400000, guid: b9d217f7eca0f6345ae5bd3b654b4a37, type: 2}
   adventureConfig: {fileID: 11400000, guid: ff32166a7a94716469f68bae386a7555, type: 2}

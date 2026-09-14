@@ -1,0 +1,147 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!687078895 &4343727234628468602
+SpriteAtlas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: UIVictory
+  m_EditorData:
+    serializedVersion: 2
+    textureSettings:
+      serializedVersion: 2
+      anisoLevel: 1
+      compressionQuality: 50
+      maxTextureSize: 2048
+      textureCompression: 0
+      filterMode: 1
+      generateMipMaps: 0
+      readable: 0
+      crunchedCompression: 0
+      sRGB: 1
+    platformSettings:
+    - serializedVersion: 4
+      m_BuildTarget: DefaultTexturePlatform
+      m_MaxTextureSize: 2048
+      m_ResizeAlgorithm: 0
+      m_TextureFormat: -1
+      m_TextureCompression: 1
+      m_CompressionQuality: 50
+      m_CrunchedCompression: 0
+      m_AllowsAlphaSplitting: 0
+      m_Overridden: 0
+      m_IgnorePlatformSupport: 0
+      m_AndroidETC2FallbackOverride: 0
+      m_ForceMaximumCompressionQuality_BC6H_BC7: 0
+    - serializedVersion: 4
+      m_BuildTarget: Android
+      m_MaxTextureSize: 2048
+      m_ResizeAlgorithm: 0
+      m_TextureFormat: 50
+      m_TextureCompression: 1
+      m_CompressionQuality: 50
+      m_CrunchedCompression: 0
+      m_AllowsAlphaSplitting: 0
+      m_Overridden: 1
+      m_IgnorePlatformSupport: 0
+      m_AndroidETC2FallbackOverride: 0
+      m_ForceMaximumCompressionQuality_BC6H_BC7: 0
+    - serializedVersion: 4
+      m_BuildTarget: iOS
+      m_MaxTextureSize: 2048
+      m_ResizeAlgorithm: 0
+      m_TextureFormat: 50
+      m_TextureCompression: 1
+      m_CompressionQuality: 50
+      m_CrunchedCompression: 0
+      m_AllowsAlphaSplitting: 0
+      m_Overridden: 1
+      m_IgnorePlatformSupport: 0
+      m_AndroidETC2FallbackOverride: 0
+      m_ForceMaximumCompressionQuality_BC6H_BC7: 0
+    packingSettings:
+      serializedVersion: 2
+      padding: 4
+      blockOffset: 1
+      allowAlphaSplitting: 0
+      enableRotation: 0
+      enableTightPacking: 0
+      enableAlphaDilation: 0
+    secondaryTextureSettings: {}
+    variantMultiplier: 1
+    packables:
+    - {fileID: 2800000, guid: b52c5a5f6b09d83459e3f4080288874e, type: 3}
+    - {fileID: 2800000, guid: 73f4b6d6c173ec44f87aa8def4f60fb9, type: 3}
+    - {fileID: 2800000, guid: 1504fb45b6790bf4b99b77fd1827d109, type: 3}
+    - {fileID: 2800000, guid: 33edd1b1ef454d44181cb2a14242e799, type: 3}
+    - {fileID: 2800000, guid: 70b727a9e83ea4c4daf234211966c0ac, type: 3}
+    - {fileID: 2800000, guid: 5de88263d3d098e4bb6a7dd4af54d7af, type: 3}
+    - {fileID: 2800000, guid: ae390b97d8e81c748bc6a44aacc69c53, type: 3}
+    - {fileID: 2800000, guid: b02aba974af14724594db3fdeee5aedb, type: 3}
+    - {fileID: 2800000, guid: b9df69d18f2f6b944a8fbb2120f7188a, type: 3}
+    - {fileID: 2800000, guid: 19b411c626c20b04086cd8061c4f333b, type: 3}
+    - {fileID: 2800000, guid: f6b6bccf4ccac0d4e94d35d797fbd627, type: 3}
+    - {fileID: 2800000, guid: 91628faf2bd6a304cb1d8659b19af7cb, type: 3}
+    - {fileID: 2800000, guid: e762a2b14ae080e44952206e56fec44d, type: 3}
+    - {fileID: 2800000, guid: a1fed0f78a8f9384798ec0f1dcfafb5f, type: 3}
+    - {fileID: 2800000, guid: c0f830cd991060041ac6bf3a5b1b4727, type: 3}
+    - {fileID: 2800000, guid: 4a6f2223423a0d344b9b110dab20852b, type: 3}
+    bindAsDefault: 1
+    isAtlasV2: 0
+    cachedData: {fileID: 0}
+    packedSpriteRenderDataKeys:
+    - 33edd1b1ef454d44181cb2a14242e799: 21300000
+    - e762a2b14ae080e44952206e56fec44d: 21300000
+    - b9df69d18f2f6b944a8fbb2120f7188a: 21300000
+    - 4a6f2223423a0d344b9b110dab20852b: 21300000
+    - 5de88263d3d098e4bb6a7dd4af54d7af: 21300000
+    - 1504fb45b6790bf4b99b77fd1827d109: 21300000
+    - 19b411c626c20b04086cd8061c4f333b: 21300000
+    - 73f4b6d6c173ec44f87aa8def4f60fb9: 21300000
+    - b02aba974af14724594db3fdeee5aedb: 21300000
+    - ae390b97d8e81c748bc6a44aacc69c53: 21300000
+    - a1fed0f78a8f9384798ec0f1dcfafb5f: 21300000
+    - 70b727a9e83ea4c4daf234211966c0ac: 21300000
+    - c0f830cd991060041ac6bf3a5b1b4727: 21300000
+    - b52c5a5f6b09d83459e3f4080288874e: 21300000
+    - 91628faf2bd6a304cb1d8659b19af7cb: 21300000
+    - f6b6bccf4ccac0d4e94d35d797fbd627: 21300000
+  m_MasterAtlas: {fileID: 0}
+  m_PackedSprites:
+  - {fileID: 21300000, guid: 33edd1b1ef454d44181cb2a14242e799, type: 3}
+  - {fileID: 21300000, guid: e762a2b14ae080e44952206e56fec44d, type: 3}
+  - {fileID: 21300000, guid: b9df69d18f2f6b944a8fbb2120f7188a, type: 3}
+  - {fileID: 21300000, guid: 4a6f2223423a0d344b9b110dab20852b, type: 3}
+  - {fileID: 21300000, guid: 5de88263d3d098e4bb6a7dd4af54d7af, type: 3}
+  - {fileID: 21300000, guid: 1504fb45b6790bf4b99b77fd1827d109, type: 3}
+  - {fileID: 21300000, guid: 19b411c626c20b04086cd8061c4f333b, type: 3}
+  - {fileID: 21300000, guid: 73f4b6d6c173ec44f87aa8def4f60fb9, type: 3}
+  - {fileID: 21300000, guid: b02aba974af14724594db3fdeee5aedb, type: 3}
+  - {fileID: 21300000, guid: ae390b97d8e81c748bc6a44aacc69c53, type: 3}
+  - {fileID: 21300000, guid: a1fed0f78a8f9384798ec0f1dcfafb5f, type: 3}
+  - {fileID: 21300000, guid: 70b727a9e83ea4c4daf234211966c0ac, type: 3}
+  - {fileID: 21300000, guid: c0f830cd991060041ac6bf3a5b1b4727, type: 3}
+  - {fileID: 21300000, guid: b52c5a5f6b09d83459e3f4080288874e, type: 3}
+  - {fileID: 21300000, guid: 91628faf2bd6a304cb1d8659b19af7cb, type: 3}
+  - {fileID: 21300000, guid: f6b6bccf4ccac0d4e94d35d797fbd627, type: 3}
+  m_PackedSpriteNamesToIndex:
+  - victory_decor_front
+  - victory_letter_t
+  - victory_letter_c
+  - victory_ribbon
+  - victory_decor_trumpet_right
+  - victory_decor_crown
+  - victory_letter_i
+  - victory_decor_card_right
+  - victory_decor_wing_right
+  - victory_decor_wing_left
+  - victory_letter_v
+  - victory_decor_trumpet_left
+  - victory_letter_y
+  - victory_decor_card_left
+  - victory_letter_r
+  - victory_letter_o
+  m_RenderDataMap: {}
+  m_Tag: UIVictory
+  m_IsVariant: 0

@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>로비와 전투 설정창이 공유하는 환경설정 컨트롤.</summary>
-public class SettingsOptionsView : MonoBehaviour
+public class SettingsOptionsView : MonoBehaviour, IUIInitializable
 {
     [SerializeField] Slider   bgmSlider;
     [SerializeField] TMP_Text bgmValueText;
@@ -19,19 +19,26 @@ public class SettingsOptionsView : MonoBehaviour
     [SerializeField] Button screenShakeOnButton;
     [SerializeField] Button screenShakeOffButton;
 
-    void Awake()
+    bool m_initialized;
+
+    void Awake() => InitializeUI();
+
+    public void InitializeUI()
     {
+        if (this.m_initialized) return;
         BindFrameRateButtons();
         this.screenShakeOnButton?.onClick.AddListener(() => OnScreenShakeChanged(true));
         this.screenShakeOffButton?.onClick.AddListener(() => OnScreenShakeChanged(false));
         this.bgmSlider?.onValueChanged.AddListener(OnBGMChanged);
         this.sfxSlider?.onValueChanged.AddListener(OnSFXChanged);
+        this.m_initialized = true;
     }
 
     void OnEnable() => Refresh();
 
     public void Refresh()
     {
+        InitializeUI();
         if (SoundManager.Instance != null)
         {
             this.bgmSlider?.SetValueWithoutNotify(SoundManager.Instance.BGMVolume);

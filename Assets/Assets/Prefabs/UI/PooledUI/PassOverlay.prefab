@@ -2783,9 +2783,8 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::PassPanel
   animator: {fileID: 0}
-  contents: {fileID: 0}
+  contents: {fileID: 8833489070096946964}
   isShow: 0
-  root: {fileID: 8833489070096946964}
   seasonText: {fileID: 5231473699210045674}
   remainText: {fileID: 1742248292439537787}
   levelText: {fileID: 5220466580455268828}
@@ -3057,12 +3056,12 @@ GameObject:
   m_Component:
   - component: {fileID: 6446288699895481122}
   m_Layer: 0
-  m_Name: Root
+  m_Name: Contents
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &6446288699895481122
 RectTransform:
   m_ObjectHideFlags: 0

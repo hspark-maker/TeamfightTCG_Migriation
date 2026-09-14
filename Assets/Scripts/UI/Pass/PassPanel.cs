@@ -15,17 +15,14 @@ using UnityEngine.UI;
 /// <para>게임 시작 때 미리 받은 캐시로 즉시 그리고
 /// <see cref="PassManager.OnChanged"/> 가 오면 다시 그린다.</para>
 /// </summary>
-public partial class PassPanel : PooledUIBase
+public partial class PassPanel : ContentsPooledUI
 {
     // 풀 계약. 표시 데이터는 PassManager 에서 스스로 당기므로 UIData 가 필요 없다.
-    public override void Initialization(UIData _data) { }
+    public override void Initialization(UIData _data) => this.InitializeUI();
 
     public override void Show() => this.Open();
 
     public override void Hide() => this.Close();
-
-    [Tooltip("켜고 끌 대상(딤 + 패널). 미배선이면 자기 gameObject를 토글한다.")]
-    [SerializeField] GameObject root;
 
     [Header("시즌 머리")]
     [Tooltip("시즌 표시명. 시즌이 없으면 안내 문구로 바뀐다.")]
@@ -62,13 +59,6 @@ public partial class PassPanel : PooledUIBase
     [Tooltip("패널 밖(딤)을 눌러 닫는 판. 알파 0 Image 의 Button 에 배선한다.")]
     [SerializeField] Button dimButton;
 
-    [Header("연출")]
-    [Tooltip("panel 에는 Root/Panel 을 배선한다 — root 를 물리면 전체화면 딤까지 함께 커진다.")]
-    [SerializeField] PopupTransition transition = new PopupTransition();
-
-    [Tooltip("공용 ScreenDim(Full)에 요청할 암막 짙기.")]
-    [Range(0f, 1f)] [SerializeField] float dimAlpha = 0.72f;
-
     readonly List<PassLevelRowView> m_rows = new List<PassLevelRowView>();
     Action<int> m_claimHandler;
     Action<int> m_premiumClaimHandler;
@@ -84,7 +74,7 @@ public partial class PassPanel : PooledUIBase
         this.m_scrollOnOpen = true;
         this.m_openGeneration++;
         this.m_waitForOpeningRefresh = false;
-        this.SetVisible(true);
+        this.SetContentsVisible(true);
         this.Rebuild();
 
         // 선조회 실패·진행도 변경·시즌 경계만 재조회한다. 시즌 판정은 서버 응답을 따른다.
@@ -112,16 +102,11 @@ public partial class PassPanel : PooledUIBase
         }
     }
 
-    public void Close()
-    {
-        this.m_scrollOnOpen = false;
-        this.m_openGeneration++;
-        this.SetVisible(false);
-    }
+    public void Close() => this.SetContentsVisible(false);
 
-    void OnEnable()
+    protected override void OnInitializeUI()
     {
-        // 재활성마다 중복 등록 방지.
+        // 화면 표시와 무관하게 고정 버튼을 한 번 배선한다.
         if (this.closeButton != null)
         {
             this.closeButton.onClick.RemoveAllListeners();
@@ -138,18 +123,20 @@ public partial class PassPanel : PooledUIBase
             this.claimAllButton.onClick.AddListener(this.HandleClaimAll);
         }
 
-        PassManager.OnChanged += this.HandlePassChanged;
         this.BindExtraButtons();
     }
 
-    void OnDisable()
+    protected override void OnViewShown()
+    {
+        PassManager.OnChanged += this.HandlePassChanged;
+    }
+
+    protected override void OnViewHidden()
     {
         this.m_scrollOnOpen = false;
+        this.m_waitForOpeningRefresh = false;
+        this.m_openGeneration++;
         PassManager.OnChanged -= this.HandlePassChanged;
-
-        // 안전망 — Close 를 거치지 않고 꺼지면 공용 딤이 남는다.
-        ScreenDim.Hide(this);
-        this.transition.HandleDisabled(this.ResolveTarget());
     }
 
     void Update()
@@ -164,7 +151,10 @@ public partial class PassPanel : PooledUIBase
         }
     }
 
-    void HandlePassChanged() => this.Rebuild();
+    void HandlePassChanged()
+    {
+        if (this.isShow) this.Rebuild();
+    }
 
     void LateUpdate()
     {
@@ -403,19 +393,4 @@ public partial class PassPanel : PooledUIBase
             if (t_rewards.Count > 0) MissionPanel.ShowClaimedRewards(t_rewards, "패스 보상");
         }
     }
-
-    // 여는 순간 오버레이 자신을 켠다 — 저작본은 루트가 꺼진 채로 들어오므로, 켜 주지 않으면
-    // 하위 Root 만 토글돼 화면에 아무것도 뜨지 않는다(MissionPanel 과 같은 규약).
-    void SetVisible(bool _visible)
-    {
-        if (_visible && !this.gameObject.activeSelf) this.gameObject.SetActive(true);
-
-        if (_visible) ScreenDim.Show(this, this.dimAlpha, true, this.transition.OpenDuration);
-        else ScreenDim.Hide(this);
-
-        this.isShow = _visible;
-        this.transition.SetVisible(this.ResolveTarget(), _visible);
-    }
-
-    GameObject ResolveTarget() => this.root != null ? this.root : this.gameObject;
 }

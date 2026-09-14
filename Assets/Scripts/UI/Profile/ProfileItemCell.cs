@@ -10,7 +10,7 @@ using UnityEngine.UI;
 //
 // 미소유 룩(딤 + 클릭 차단)은 지금 호출측이 항상 소유(true)로만 부르지만 미리 심어 둔다 —
 // 잠금 상품이 생기는 순간 이 클래스를 다시 열지 않기 위해서다.
-public class ProfileItemCell : MonoBehaviour
+public class ProfileItemCell : MonoBehaviour, IUIInitializable
 {
     [Tooltip("판·얼굴·링 한 덩어리.")]
     [SerializeField] ProfileAvatarView avatarView;
@@ -47,15 +47,35 @@ public class ProfileItemCell : MonoBehaviour
 
     string m_id;
     Action<string> m_onClick;
+    bool m_initialized;
+    bool m_owned;
 
     public Button Button => this.button;
 
     public string Id => this.m_id;
 
-    /// <summary>칸에 항목 하나를 묶는다. 클릭 리스너는 매번 갈아 끼운다(재바인딩 시 중복 등록 방지).</summary>
+    public void InitializeUI()
+    {
+        if (this.m_initialized) return;
+        if (this.pressRelay != null)
+        {
+            this.pressRelay.onPressStart = this.HandlePressStart;
+            this.pressRelay.onPressEnd = this.HandlePressEnd;
+        }
+        if (this.button != null)
+        {
+            this.button.onClick.RemoveAllListeners();
+            this.button.onClick.AddListener(this.HandleClick);
+        }
+        this.m_initialized = true;
+    }
+
+    /// <summary>입력은 한 번 연결하고, 재바인딩에서는 항목과 클릭 대상을 바꾼다.</summary>
     public void Bind(string _id, in ProfileLook _look, EProfileAxis _axis, bool _owned, Action<string> _onClick)
     {
+        this.InitializeUI();
         this.m_id = _id;
+        this.m_owned = _owned;
 
         if (this.avatarView != null)
         {
@@ -68,18 +88,10 @@ public class ProfileItemCell : MonoBehaviour
         this.m_onClick = _onClick;
 
         if (this.pressRelay != null)
-        {
-            this.pressRelay.onPressStart = this.HandlePressStart;   // 대입이라 재바인딩해도 중복되지 않는다
-            this.pressRelay.onPressEnd   = this.HandlePressEnd;
             this.pressRelay.SetInteractable(_owned);
-        }
 
         if (this.button != null)
-        {
-            this.button.onClick.RemoveAllListeners();
             this.button.interactable = _owned;
-            if (_owned && _onClick != null) this.button.onClick.AddListener(this.HandleClick);
-        }
 
         this.SetSelected(false);
     }
@@ -104,6 +116,6 @@ public class ProfileItemCell : MonoBehaviour
 
     void HandleClick()
     {
-        if (this.m_onClick != null) this.m_onClick(this.m_id);
+        if (this.m_owned) this.m_onClick?.Invoke(this.m_id);
     }
 }

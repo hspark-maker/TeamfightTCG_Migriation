@@ -8,7 +8,7 @@ using UnityEngine.UI;
 ///
 /// 켜고 끄기만 한다 — 어느 칸이 선택인지는 줄을 쥔 쪽(SettingsPanel 등)이 정한다.
 /// </summary>
-public class SelectionStateView : MonoBehaviour
+public class SelectionStateView : MonoBehaviour, IUIInitializable
 {
     [Tooltip("색을 바꿀 바탕 이미지. 비우면 Button.targetGraphic 을 쓴다")]
     [SerializeField] Image targetImage;
@@ -19,18 +19,24 @@ public class SelectionStateView : MonoBehaviour
 
     Button button;
     Image  image;
+    bool initialized;
 
     public bool IsSelected { get; private set; }
 
-    void Awake()
+    void Awake() => InitializeUI();
+
+    public void InitializeUI()
     {
+        if (this.initialized) return;
         this.button = GetComponent<Button>();
         this.image  = this.targetImage != null ? this.targetImage : this.button?.targetGraphic as Image;
+        this.initialized = true;
     }
 
     /// <summary>선택 표시 갱신. 같은 값으로 여러 번 불러도 안전하다(창을 다시 열 때마다 통째로 다시 건다).</summary>
     public void SetSelected(bool _on)
     {
+        InitializeUI();
         IsSelected = _on;
 
         Color t_tint = _on ? this.selectedTint : this.unselectedTint;

@@ -11,7 +11,7 @@ using UnityEngine.UI;
 /// 에서 읽고, 완료 여부는 <see cref="MissionManager"/> 에 묻는다 — 행이 자기 판정을 갖는 순간
 /// 화면에 보이는 조건과 서버가 거절하는 조건이 갈린다.</para>
 /// </summary>
-public class MissionRowView : MonoBehaviour
+public class MissionRowView : MonoBehaviour, IUIInitializable
 {
     [SerializeField] TMP_Text titleText;
     [SerializeField] TMP_Text descriptionText;
@@ -75,6 +75,7 @@ public class MissionRowView : MonoBehaviour
     System.Action<string> m_onNavigate;
     Sprite m_authoredRewardIcon;
     bool m_hasBound;
+    bool m_initialized;
 
     readonly Vector3[] m_fillCorners = new Vector3[4];
     readonly Vector3[] m_textCorners = new Vector3[4];
@@ -83,24 +84,12 @@ public class MissionRowView : MonoBehaviour
     // OnChanged 마다 전 행이 다시 그려지므로 여기서 GC 를 만들면 그대로 누적된다.
     static readonly StringBuilder s_text = new StringBuilder(64);
 
-    /// <summary>이 줄이 그릴 미션을 정한다. 수령 콜백은 미션 id 를 그대로 넘긴다.</summary>
-    internal void Bind(MissionDefinition _definition, System.Action<string> _onClaim, System.Action<string> _onNavigate = null)
+    public void InitializeUI()
     {
-        this.m_onClaim = _onClaim;
-        this.m_onNavigate = _onNavigate;
-        // 상태만 채택한 응답은 같은 정의 객체를 유지한다. 새 조회의 같은 ID도 다시 바인딩한다.
-        if (this.m_hasBound && ReferenceEquals(this.m_definition, _definition))
-        {
-            this.Refresh();
-            return;
-        }
-        if (!this.m_hasBound && this.rewardIcon != null) this.m_authoredRewardIcon = this.rewardIcon.sprite;
-        this.m_hasBound = true;
-        this.m_definition = _definition;
-
+        if (this.m_initialized) return;
+        if (this.rewardIcon != null) this.m_authoredRewardIcon = this.rewardIcon.sprite;
         if (this.claimButton != null)
         {
-            // 재바인딩마다 중복 등록 방지(RankRewardPanel 의 버튼 규약과 같다).
             this.claimButton.onClick.RemoveAllListeners();
             this.claimButton.onClick.AddListener(this.HandleClaim);
         }
@@ -109,6 +98,23 @@ public class MissionRowView : MonoBehaviour
             this.navigateButton.onClick.RemoveAllListeners();
             this.navigateButton.onClick.AddListener(this.HandleNavigate);
         }
+        this.m_initialized = true;
+    }
+
+    /// <summary>이 줄이 그릴 미션을 정한다. 수령 콜백은 미션 id 를 그대로 넘긴다.</summary>
+    internal void Bind(MissionDefinition _definition, System.Action<string> _onClaim, System.Action<string> _onNavigate = null)
+    {
+        this.InitializeUI();
+        this.m_onClaim = _onClaim;
+        this.m_onNavigate = _onNavigate;
+        // 상태만 채택한 응답은 같은 정의 객체를 유지한다. 새 조회의 같은 ID도 다시 바인딩한다.
+        if (this.m_hasBound && ReferenceEquals(this.m_definition, _definition))
+        {
+            this.Refresh();
+            return;
+        }
+        this.m_hasBound = true;
+        this.m_definition = _definition;
 
         if (this.titleText != null) this.titleText.text = (_definition?.Period == "guide" ? "가이드 · " : "") + (_definition?.Title ?? string.Empty);
         if (this.descriptionText != null) this.descriptionText.text = _definition?.Description ?? string.Empty;
