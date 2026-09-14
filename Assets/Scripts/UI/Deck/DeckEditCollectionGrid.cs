@@ -23,12 +23,33 @@ public class DeckEditCollectionGrid : MonoBehaviour
     [SerializeField, TextArea] string emptyOwnedMessage  = "소지한 카드가 없습니다.\n카드팩을 열어 카드를 모아보세요.";
     [SerializeField, TextArea] string emptySearchMessage = "검색 결과가 없습니다.\n다른 이름으로 찾아보세요.";
 
-    readonly List<DeckEditCardTile> m_tiles = new List<DeckEditCardTile>();
-    // 앞 m_tileCount개만 현재 목록이다. 나머지는 다음 편집에 재사용할 비활성 타일이다.
-    int m_tileCount;
+    sealed class Entry
+    {
+        public int Card;
+        public string Name;
+        public RectTransform Slot;
+        public DeckEditCardTile Tile;
+        public bool Visible;
+        public bool Wanted;
+    }
 
-    // m_tiles와 같은 순서로 카드 이름을 소문자로 눕혀 들고 있는다 — 타이핑 한 글자마다 스펙을 다시 조회하지 않으려는 캐시다.
-    readonly List<string> m_tileNames = new List<string>();
+    // 빈 RectTransform만 전체 배치하고 카드 그래픽은 화면과 여유 한 행에만 만든다.
+    // GridRatioFitter/ContentSizeFitter의 저작값과 검색 레이아웃은 그대로 사용한다.
+    readonly List<Entry> m_entries = new List<Entry>();
+    readonly List<DeckEditCardTile> m_tiles = new List<DeckEditCardTile>();
+    readonly Vector3[] m_corners = new Vector3[4];
+    int m_entryCount;
+    RectTransform m_poolRoot;
+    Action<DeckEditCardTile, PointerEventData> m_onDragRequest;
+    Action<DeckEditCardTile> m_onClick;
+    int[] m_deck;
+    SynergyData m_synergy;
+    int m_pickedCard;
+    bool m_buildPending;
+    bool m_dirty;
+    Vector2 m_lastPosition;
+    Vector2 m_lastViewportSize;
+    Vector2 m_lastCellSize;
 
     // 걸려 있는 검색어(없으면 null). Build가 목록을 다시 만들어도 이 값은 살아남아 재적용된다.
     string m_filter;
@@ -67,6 +88,14 @@ public class DeckEditCollectionGrid : MonoBehaviour
 
     public void Build(Action<DeckEditCardTile, PointerEventData> _onDragRequest, Action<DeckEditCardTile> _onClick)
     {
+        m_onDragRequest = _onDragRequest;
+        m_onClick = _onClick;
+        if (HasPressedTile())
+        {
+            m_buildPending = true;
+            return;
+        }
+        m_buildPending = false;
         TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.DeckEditCollectionCard);
         m_anchorCard = 0;
         if (content == null || tilePrefab == null)
@@ -82,8 +111,8 @@ public class DeckEditCollectionGrid : MonoBehaviour
             return;
         }
 
-        m_tileNames.Clear();
-        int t_count = 0;
+        ReleaseTiles();
+        m_entryCount = 0;
         var t_cards = CardCatalog.AllIds;
         for (int t_i = 0; t_i < t_cards.Count; t_i++)
         {
@@ -91,20 +120,19 @@ public class DeckEditCollectionGrid : MonoBehaviour
             if (t_card <= 0) continue;
             if (!OwnershipManager.IsOwned(t_card)) continue;  // 소유 카드만 편성 가능
 
-            if (t_count == m_tiles.Count) m_tiles.Add(Instantiate(tilePrefab, content));
-            var t_tile = m_tiles[t_count];
-            // ID가 같아도 화면 밖에서 성장·키워드가 바뀔 수 있으므로 표시는 다시 바인딩한다.
-            t_tile.Bind(t_card, _onDragRequest, _onClick);
-            m_tileNames.Add(NameOf(t_card));
-            t_count++;
+            if (m_entryCount == m_entries.Count)
+            {
+                var t_slot = new GameObject("CardSlot", typeof(RectTransform));
+                t_slot.transform.SetParent(content, false);
+                m_entries.Add(new Entry { Slot = (RectTransform)t_slot.transform });
+            }
+            Entry t_entry = m_entries[m_entryCount++];
+            t_entry.Card = t_card;
+            t_entry.Name = NameOf(t_card);
         }
 
-        for (int t_i = t_count; t_i < m_tileCount; t_i++)
-        {
-            m_tiles[t_i].Unbind();
-            m_tiles[t_i].gameObject.SetActive(false);
-        }
-        m_tileCount = t_count;
+        for (int t_i = m_entryCount; t_i < m_entries.Count; t_i++)
+            m_entries[t_i].Slot.gameObject.SetActive(false);
 
         // 소유가 바뀌어 다시 그려도 걸려 있던 검색어가 풀리지 않게 여기서 재적용한다.
         // 재적용을 호출측에 흩뿌리면 Build 호출처 두 곳 중 하나를 반드시 빠뜨린다.
@@ -133,25 +161,127 @@ public class DeckEditCollectionGrid : MonoBehaviour
         if (scrollRect != null) scrollRect.verticalNormalizedPosition = 1f;
     }
 
-    // 타일을 다시 만들지 않고 표시 여부만 바꾼다 — GridLayoutGroup이 비활성 자식을 배치에서 빼 주므로 재배치는 공짜다.
+    // 이름 검색은 빈 슬롯 배치를 갱신하고 화면에 들어온 슬롯만 카드 타일을 확보한다.
     void ApplyFilter()
     {
         int t_visible = 0;
-        for (int t_i = 0; t_i < m_tileCount; t_i++)
+        for (int t_i = 0; t_i < m_entryCount; t_i++)
         {
-            var t_tile = m_tiles[t_i];
-            if (t_tile == null) continue;
-
-            bool t_on = m_filter == null
-                     || (m_anchorCard > 0 && t_tile.Card == m_anchorCard)
-                     || m_tileNames[t_i].Contains(m_filter);
-
-            t_tile.gameObject.SetActive(t_on);
-            if (t_on) t_visible++;
+            Entry t_entry = m_entries[t_i];
+            t_entry.Visible = m_filter == null || t_entry.Card == m_anchorCard || t_entry.Name.Contains(m_filter);
+            t_entry.Slot.gameObject.SetActive(t_entry.Visible);
+            if (t_entry.Visible) t_visible++;
         }
 
         if (emptyHint     != null) emptyHint.SetActive(t_visible == 0);
         if (emptyHintText != null) emptyHintText.text = m_filter == null ? emptyOwnedMessage : emptySearchMessage;
+        if (content != null) LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+        m_dirty = true;
+        RefreshVisible();
+    }
+
+    void LateUpdate()
+    {
+        if (m_buildPending && !HasPressedTile())
+        {
+            int t_anchor = m_anchorCard;
+            Build(m_onDragRequest, m_onClick);
+            ApplyTutorialAnchor(t_anchor);
+            if (t_anchor > 0) EnsureVisible(t_anchor);
+        }
+        if (m_entryCount == 0 || content == null) return;
+        if (m_dirty || m_lastPosition != content.anchoredPosition || m_lastViewportSize != ListArea.rect.size || m_lastCellSize != CellSize)
+            RefreshVisible();
+    }
+
+    bool HasPressedTile()
+    {
+        for (int t_i = 0; t_i < m_tiles.Count; t_i++)
+            if (m_tiles[t_i].HasActivePointer) return true;
+        return false;
+    }
+
+    void RefreshVisible()
+    {
+        if (content == null || tilePrefab == null || !content.gameObject.activeInHierarchy) return;
+        RectTransform t_viewport = ListArea;
+        t_viewport.GetWorldCorners(m_corners);
+        float t_bottom = float.MaxValue;
+        float t_top = float.MinValue;
+        for (int t_i = 0; t_i < m_corners.Length; t_i++)
+        {
+            float t_y = content.InverseTransformPoint(m_corners[t_i]).y;
+            t_bottom = Mathf.Min(t_bottom, t_y);
+            t_top = Mathf.Max(t_top, t_y);
+        }
+        float t_margin = CellSize.y + (m_grid != null ? Mathf.Abs(m_grid.spacing.y) : 0f);
+        bool t_pinnedOutside = false;
+        for (int t_i = 0; t_i < m_entryCount; t_i++)
+        {
+            Entry t_entry = m_entries[t_i];
+            float t_y = t_entry.Slot.localPosition.y;
+            bool t_inRange = t_entry.Visible && t_y + t_entry.Slot.rect.yMax >= t_bottom - t_margin
+                                               && t_y + t_entry.Slot.rect.yMin <= t_top + t_margin;
+            bool t_pressed = t_entry.Tile != null && t_entry.Tile.HasActivePointer;
+            t_entry.Wanted = t_inRange || (t_entry.Visible && t_entry.Card == m_anchorCard) || t_pressed;
+            t_pinnedOutside |= t_pressed && !t_inRange;
+            if (!t_entry.Wanted && t_entry.Tile != null) ReleaseTile(t_entry);
+        }
+        for (int t_i = 0; t_i < m_entryCount; t_i++)
+        {
+            Entry t_entry = m_entries[t_i];
+            if (t_entry.Wanted && t_entry.Tile == null) BindTile(t_entry);
+        }
+        m_lastPosition = content.anchoredPosition;
+        m_lastViewportSize = t_viewport.rect.size;
+        m_lastCellSize = CellSize;
+        // 화면 밖에서 잡고 있던 타일은 손을 떼면 스크롤 없이도 반환한다.
+        m_dirty = t_pinnedOutside;
+    }
+
+    void BindTile(Entry _entry)
+    {
+        DeckEditCardTile t_tile = null;
+        for (int t_i = 0; t_i < m_tiles.Count; t_i++)
+            if (m_tiles[t_i].Card == 0) { t_tile = m_tiles[t_i]; break; }
+        if (t_tile == null)
+        {
+            t_tile = Instantiate(tilePrefab, _entry.Slot);
+            m_tiles.Add(t_tile);
+        }
+        RectTransform t_rect = (RectTransform)t_tile.transform;
+        t_rect.SetParent(_entry.Slot, false);
+        t_rect.anchorMin = Vector2.zero;
+        t_rect.anchorMax = Vector2.one;
+        t_rect.offsetMin = Vector2.zero;
+        t_rect.offsetMax = Vector2.zero;
+        t_tile.Bind(_entry.Card, m_onDragRequest, m_onClick);
+        t_tile.SetInDeck(m_deck != null && Contains(m_deck, _entry.Card));
+        if (m_synergy != null) t_tile.SetFocus(true, SynergyPreview.Has(_entry.Card, m_synergy));
+        else t_tile.SetFocus(m_pickedCard > 0, _entry.Card == m_pickedCard);
+        _entry.Tile = t_tile;
+        t_tile.gameObject.SetActive(true);
+    }
+
+    void ReleaseTile(Entry _entry)
+    {
+        DeckEditCardTile t_tile = _entry.Tile;
+        _entry.Tile = null;
+        t_tile.Unbind();
+        t_tile.gameObject.SetActive(false);
+        if (m_poolRoot == null)
+        {
+            m_poolRoot = (RectTransform)new GameObject("InactiveCardTiles", typeof(RectTransform)).transform;
+            m_poolRoot.SetParent(content, false);
+            m_poolRoot.gameObject.SetActive(false);
+        }
+        t_tile.transform.SetParent(m_poolRoot, false);
+    }
+
+    void ReleaseTiles()
+    {
+        for (int t_i = 0; t_i < m_entries.Count; t_i++)
+            if (m_entries[t_i].Tile != null) ReleaseTile(m_entries[t_i]);
     }
 
     static string NameOf(int _card)
@@ -164,10 +294,11 @@ public class DeckEditCollectionGrid : MonoBehaviour
     // _deck에 들어있는 카드 타일만 딤 처리. _deck이 null이면 전부 해제.
     public void RefreshInDeck(int[] _deck)
     {
-        for (int t_i = 0; t_i < m_tileCount; t_i++)
+        m_deck = _deck;
+        for (int t_i = 0; t_i < m_tiles.Count; t_i++)
         {
             var t_tile = m_tiles[t_i];
-            if (t_tile == null) continue;
+            if (t_tile == null || t_tile.Card <= 0) continue;
 
             t_tile.SetInDeck(_deck != null && Contains(_deck, t_tile.Card));
         }
@@ -176,10 +307,12 @@ public class DeckEditCollectionGrid : MonoBehaviour
     // 시너지 아이콘 롱프레스 중 해당 시너지를 가진 타일만 남기고 나머지를 죽인다. null이면 전부 해제.
     public void SetSynergyFocus(SynergyData _synergy)
     {
-        for (int t_i = 0; t_i < m_tileCount; t_i++)
+        m_synergy = _synergy;
+        m_pickedCard = 0;
+        for (int t_i = 0; t_i < m_tiles.Count; t_i++)
         {
             var t_tile = m_tiles[t_i];
-            if (t_tile == null) continue;
+            if (t_tile == null || t_tile.Card <= 0) continue;
 
             t_tile.SetFocus(_synergy != null, SynergyPreview.Has(t_tile.Card, _synergy));
         }
@@ -189,10 +322,12 @@ public class DeckEditCollectionGrid : MonoBehaviour
     // SetSynergyFocus와 같은 알파 축을 쓴다 — 두 강조는 배타라(컨트롤러가 보장) 서로 덮어써도 흐린 채 굳지 않는다.
     public void SetPickedCard(int _card)
     {
-        for (int t_i = 0; t_i < m_tileCount; t_i++)
+        m_pickedCard = _card;
+        m_synergy = null;
+        for (int t_i = 0; t_i < m_tiles.Count; t_i++)
         {
             var t_tile = m_tiles[t_i];
-            if (t_tile == null) continue;
+            if (t_tile == null || t_tile.Card <= 0) continue;
 
             t_tile.SetFocus(_card > 0, t_tile.Card == _card);
         }
@@ -238,7 +373,10 @@ public class DeckEditCollectionGrid : MonoBehaviour
             if (m_filter != null) ApplyFilter();
         }
 
-        var t_tile = _card > 0 ? FindTile(_card) : null;
+        Entry t_entry = FindEntry(_card);
+        if (t_entry != null && t_entry.Visible && t_entry.Tile == null) BindTile(t_entry);
+        m_dirty = true;
+        var t_tile = t_entry != null ? t_entry.Tile : null;
         if (t_tile == null)
         {
             TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.DeckEditCollectionCard);
@@ -257,8 +395,8 @@ public class DeckEditCollectionGrid : MonoBehaviour
     {
         if (scrollRect == null || content == null || _card <= 0) return;
 
-        var t_tile = FindTile(_card);
-        if (t_tile == null) return;
+        Entry t_entry = FindEntry(_card);
+        if (t_entry == null || !t_entry.Visible) return;
 
         // 방금 Build한 타일은 아직 배치 전이라 좌표가 0이다.
         Canvas.ForceUpdateCanvases();
@@ -270,22 +408,25 @@ public class DeckEditCollectionGrid : MonoBehaviour
         if (t_range <= 0f)
         {
             scrollRect.verticalNormalizedPosition = 1f;
+            RefreshVisible();
             return;
         }
 
-        var t_rect = t_tile.transform as RectTransform;
+        var t_rect = t_entry.Slot;
         if (t_rect == null) return;
 
         float t_offset = Mathf.Clamp(-t_rect.anchoredPosition.y - t_viewport.rect.height * 0.5f, 0f, t_range);
 
         scrollRect.StopMovement();
         scrollRect.verticalNormalizedPosition = 1f - t_offset / t_range;
+        RefreshVisible();
     }
 
-    DeckEditCardTile FindTile(int _card)
+    Entry FindEntry(int _card)
     {
-        for (int t_i = 0; t_i < m_tileCount; t_i++)
-            if (m_tiles[t_i] != null && m_tiles[t_i].Card == _card) return m_tiles[t_i];
+        if (_card <= 0) return null;
+        for (int t_i = 0; t_i < m_entryCount; t_i++)
+            if (m_entries[t_i].Card == _card) return m_entries[t_i];
 
         return null;
     }
@@ -295,15 +436,14 @@ public class DeckEditCollectionGrid : MonoBehaviour
         TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.DeckEditCollectionCard);
 
         SetScrollLocked(false);
-        for (int t_i = 0; t_i < m_tileCount; t_i++)
-        {
-            m_tiles[t_i].Unbind();
-            m_tiles[t_i].gameObject.SetActive(false);
-        }
-
-        m_tileCount = 0;
-        m_tileNames.Clear();
+        ReleaseTiles();
+        for (int t_i = 0; t_i < m_entries.Count; t_i++) m_entries[t_i].Slot.gameObject.SetActive(false);
+        m_entryCount = 0;
         m_anchorCard = 0;
+        m_buildPending = false;
+        m_deck = null;
+        m_synergy = null;
+        m_pickedCard = 0;
 
         // m_filter는 남긴다 — 소유 변경 재빌드(DeckEditController.OnOwnershipChanged)에서 검색어가 풀리면 안 된다.
     }

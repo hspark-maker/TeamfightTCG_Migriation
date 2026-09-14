@@ -8,7 +8,7 @@ using UnityEngine;
 /// 모드 · 카드 표 · 검증 · 콘텐츠 버전을 한 화면에 묶는다. 따로 놀면 조용히 어긋나기 때문이다:
 /// 모드만 바꾸고 표를 안 실으면 수치가 틀리고, 표만 갈고 내보내면 런타임 프로필과 데이터가 갈린다.
 ///
-/// <para>빌드는 여기서 하지 않는다. Unity 의 Build Profiles 로만 만든다 —
+/// <para>앱 빌드는 여기서 하지 않는다. Unity 의 Build Profiles 로만 만든다 —
 /// 이 창이 BuildPipeline.BuildPlayer 를 부르면 그 옵션이 Build Profiles 의 공유 설정
 /// (Library/BuildProfiles/SharedProfile.asset 의 m_Development)까지 바꿔 놓아서,
 /// 여기서 Test 빌드를 한 번 뽑으면 이후 Build Profiles 빌드가 전부 개발 빌드로 나갔다.</para>
@@ -26,6 +26,7 @@ public partial class ReleaseManagerWindow : EditorWindow
         Data,
         Auth,
         Sheets = 3,
+        Resources = 4,
     }
 
     Tab selectedTab;
@@ -48,7 +49,7 @@ public partial class ReleaseManagerWindow : EditorWindow
 
     void OnEnable()
     {
-        this.selectedTab = (Tab)Mathf.Clamp(EditorPrefs.GetInt(PREF_TAB, 0), 0, (int)Tab.Sheets);
+        this.selectedTab = (Tab)Mathf.Clamp(EditorPrefs.GetInt(PREF_TAB, 0), 0, (int)Tab.Resources);
         Revalidate();
         EnableDataTab();
         EnableVersionManagement();
@@ -72,11 +73,11 @@ public partial class ReleaseManagerWindow : EditorWindow
         }
 
         // Firestore 관리자 로그인은 로그인 탭, Google Sheets 연결은 Sheets 탭에서 관리한다.
-        using (new EditorGUI.DisabledScope(this.sheetsBusy))
+        using (new EditorGUI.DisabledScope(this.sheetsBusy || resourceCommandBusy))
         {
             this.selectedTab = (Tab)GUILayout.Toolbar(
                 (int)this.selectedTab,
-                new[] { "릴리즈", "데이터", AdminReady ? "로그인 ●" : "로그인", "Google Sheet" },
+                new[] { "릴리즈", "데이터", AdminReady ? "로그인 ●" : "로그인", "Google Sheet", "리소스" },
                 GUILayout.Height(26));
         }
 
@@ -95,6 +96,12 @@ public partial class ReleaseManagerWindow : EditorWindow
         if (this.selectedTab == Tab.Sheets)
         {
             DrawSheetsTab();
+            return;
+        }
+
+        if (this.selectedTab == Tab.Resources)
+        {
+            DrawResourcesTab();
             return;
         }
 

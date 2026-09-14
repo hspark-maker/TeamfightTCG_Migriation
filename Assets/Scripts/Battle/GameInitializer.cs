@@ -1,4 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using System.Threading;
 using UnityEngine;
 
@@ -545,6 +545,6 @@ public class GameInitializer : MonoBehaviour
     
     public void OnSettingButton()
     {
-        UIPoolManager.Instance?.AddOrUpdateUI<SettingsPanel>();
+        UIPoolManager.Instance?.RequestUI<SettingsPanel>(this);
     }
 }

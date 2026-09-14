@@ -26,7 +26,8 @@ public static class GameInitialization
             float t_syncProgress = SaveDependentManagersStep.IsInstalled ? 1f : 0.5f;
             float t_artProgress = CardArtCache.IsComplete ? 1f : Mathf.Min(CardArtCache.LoadProgress, 0.99f);
             float t_packArtProgress = PackArtCache.IsComplete ? 1f : Mathf.Min(PackArtCache.LoadProgress, 0.99f);
-            return (t_dataProgress + t_syncProgress + t_artProgress + t_packArtProgress) / 4f;
+            return (t_dataProgress + t_syncProgress + t_artProgress + t_packArtProgress
+                    + RemoteCardArtDownload.Progress) / 5f;
         }
     }
 

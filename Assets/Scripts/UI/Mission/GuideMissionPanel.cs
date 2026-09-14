@@ -33,6 +33,9 @@ public class GuideMissionPanel : PooledUIBase
     [Tooltip("가이드·일일·주간이 공유하는 미션 행 프리팹 에셋.")]
     [SerializeField] MissionRowView rowPrefab;
 
+    [Tooltip("가이드 전체 진행도와 마지막 단계의 달성 보상을 표시하는 고정 행.")]
+    [SerializeField] MissionRowView completionRow;
+
     [Tooltip("가이드 미션이 하나도 없을 때 켤 안내(서버 정의 미도착 포함).")]
     [SerializeField] GameObject emptyNotice;
 
@@ -52,6 +55,7 @@ public class GuideMissionPanel : PooledUIBase
     readonly List<MissionRowView> m_rows = new List<MissionRowView>();
     Action<string> m_claimHandler;
     Action<string> m_navigateHandler;
+    MissionDefinition m_completionDefinition;
 
     const string PERIOD_GUIDE = "guide";
 
@@ -99,18 +103,20 @@ public class GuideMissionPanel : PooledUIBase
 
     void Rebuild()
     {
+        this.m_claimHandler ??= this.HandleClaim;
+        this.m_navigateHandler ??= this.HandleNavigate;
+        this.RefreshCompletionRow();
         if (this.listContent == null || this.rowPrefab == null) return;
 
         if (this.rowPrefab.transform.parent == this.listContent) this.rowPrefab.gameObject.SetActive(false);
 
         int t_count = 0;
-        this.m_claimHandler ??= this.HandleClaim;
-        this.m_navigateHandler ??= this.HandleNavigate;
         IReadOnlyList<MissionDefinition> t_definitions = MissionManager.Definitions;
         for (int i = 0; i < t_definitions.Count; i++)
         {
             MissionDefinition t_definition = t_definitions[i];
             if (!string.Equals(t_definition.Period, PERIOD_GUIDE, StringComparison.Ordinal)) continue;
+            if (ReferenceEquals(t_definition, this.m_completionDefinition)) continue;
 
             if (t_count == this.m_rows.Count) this.m_rows.Add(null);
             MissionRowView t_row = this.m_rows[t_count];
@@ -123,7 +129,31 @@ public class GuideMissionPanel : PooledUIBase
 
         for (int i = t_count; i < this.m_rows.Count; i++)
             if (this.m_rows[i] != null && this.m_rows[i].gameObject.activeSelf) this.m_rows[i].gameObject.SetActive(false);
-        if (this.emptyNotice != null) this.emptyNotice.SetActive(t_count == 0);
+        if (this.emptyNotice != null) this.emptyNotice.SetActive(t_count == 0 && this.m_completionDefinition == null);
+    }
+
+    void RefreshCompletionRow()
+    {
+        this.m_completionDefinition = null;
+        if (this.completionRow == null) return;
+
+        int t_total = 0;
+        int t_completed = 0;
+        foreach (MissionDefinition t_definition in MissionManager.Definitions)
+        {
+            if (t_definition.Period != PERIOD_GUIDE) continue;
+            t_total++;
+            if (MissionManager.IsComplete(t_definition)) t_completed++;
+            if (this.m_completionDefinition == null || t_definition.SortOrder > this.m_completionDefinition.SortOrder)
+                this.m_completionDefinition = t_definition;
+        }
+
+        this.completionRow.gameObject.SetActive(this.m_completionDefinition != null);
+        if (this.m_completionDefinition == null) return;
+
+        // 표시는 전체 진행도, 수령·순차 해금은 서버의 마지막 미션 정의를 그대로 따른다.
+        this.completionRow.BindCompletion(this.m_completionDefinition, t_completed, t_total, this.m_claimHandler,
+            MissionContentNavigation.HasDestination(this.m_completionDefinition) ? this.m_navigateHandler : null);
     }
 
     void HandleClaim(string _missionId)

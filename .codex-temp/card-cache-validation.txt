@@ -1,0 +1,1 @@
+PASS: catalog only; 32 actual sprites; shared load; active lease protected; idle cap 24; stale rebind; disable/re-enable lifecycle.

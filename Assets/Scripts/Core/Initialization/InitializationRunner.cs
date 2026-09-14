@@ -72,6 +72,18 @@ public sealed class InitializationRunner : MonoBehaviour
 
     async UniTask RestartFromRetryEntry()
     {
+        // 다운로드 실패는 이미 끝난 로그인·세이브·스펙 동기화를 다시 실행하지 않는다.
+        if (RemoteCardArtDownload.HasFailed)
+        {
+            int t_assetStep = initializers.FindIndex(_step => _step is WaitAssetPreloadStep);
+            if (t_assetStep >= 0)
+            {
+                GameInitialization.ResetForRetry();
+                await RunFrom(t_assetStep);
+                return;
+            }
+        }
+
         int t_start = initializers.FindIndex(_step => _step != null && _step.RetryEntry);
         if (t_start < 0)
         {

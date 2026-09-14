@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using UnityEngine;
@@ -328,6 +328,7 @@ public class CardView : MonoBehaviour
 
         if (t_isEmpty)
         {
+            CardArtBinding.Clear(gameObject);
             SetShieldVisible(false);
             ImmortalVfx.SetAura(this, false);   // 빈 슬롯에 지난 카드의 표식이 남지 않게
             SetFaceDownLook(false, null);
@@ -351,11 +352,12 @@ public class CardView : MonoBehaviour
             this.nameText.text = t_isFaceDown ? "???" : _card.spec.DisplayName;
 
         // 뒷면이면 덱 뒷면 그림으로 갈아 끼운다 — 앞면 일러스트가 남아 있으면 뒷면 그림 밖으로 비친다.
-        Sprite t_art = CardVisualRules.PickBattleArt(_card);
+        string t_artAddress = CardVisualRules.BattleArtAddress(_card);
         // 프레임 교체는 SetFaceDownLook보다 **먼저** 한다 — 뒷면 일러스트 배율을 테두리 높이에서 재기 때문에
         // 순서가 뒤집히면 한 프레임 동안 옛 테두리 크기로 계산된다.
         ApplyFrame(_card);
-        SetFaceDownLook(t_isFaceDown, t_art);
+        CardArtBinding.Bind(gameObject, t_artAddress, sprite =>
+            SetFaceDownLook(this.boundCard != null && !this.boundCard.isRevealed, sprite));
         SetShieldVisible(!t_isFaceDown && _card.hasShield);
         // 불사 대기 표식: **아직 안 쓴 부활이 있을 때만**. 진실원은 reviveUsed 하나다.
         ImmortalVfx.SetAura(this, !t_isFaceDown && _card.HasKeyword(CardKeyword.Immortal) && !_card.reviveUsed);

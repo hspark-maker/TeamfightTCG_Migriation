@@ -52,6 +52,9 @@ public class OutgameTutorialGateUI : MonoBehaviour
     const int GateOrder     = UiSortingOrder.TutorialGate;
     const int TargetOrder   = GateOrder + 1;
     const int OrnamentOrder = TargetOrder + 1;
+    const float HandHoldDuration = 2.1f;
+    const float HandHoldLift = 70f;
+    const float HandHoldShake = 1.8f;
 
     [Header("표시 요소 (blocker 미배선 = 코드 폴백)")]
     [SerializeField] Image           blocker;       // 전체화면 딤 겸 입력 흡수막
@@ -132,6 +135,10 @@ public class OutgameTutorialGateUI : MonoBehaviour
     readonly List<CardVisualView> m_cardBuffer = new List<CardVisualView>();   // 카드 수집 재사용 버퍼
 
     Tween m_handTween;
+    bool m_holdPointer;
+    Vector2 m_handMotionOffset;
+    ShardEnhanceHoldInput m_handHoldInput;
+    bool m_playerHolding;
 
     struct Promotion
     {
@@ -180,7 +187,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     /// 없으면(null) 종전대로 타깃만 올라간다.
     /// <paramref name="_owner"/>는 무대를 가져가는 브리지다(불변식 3).</summary>
     public void ShowGate(MonoBehaviour _owner, RectTransform _target, Button _targetButton, string _message, Action _onSatisfied,
-                         bool _dim = true, RectTransform _spotlight = null)
+                         bool _dim = true, RectTransform _spotlight = null, bool _holdPointer = false)
     {
         if (_target == null)
         {
@@ -210,6 +217,9 @@ public class OutgameTutorialGateUI : MonoBehaviour
         m_blockWarned  = false;
         m_armed        = true;
         m_dim          = _dim;
+        m_holdPointer  = _holdPointer;
+        m_handHoldInput = _holdPointer && _targetButton != null
+            ? _targetButton.GetComponent<ShardEnhanceHoldInput>() : null;
 
         if (_onSatisfied != null) m_targetButton.onClick.AddListener(OnTargetClicked);
 
@@ -454,7 +464,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         // 회전·이동시켜 손끝을 맞춘다. 여기서 자기 크기만큼 밀면 저작해 둔 각도와 어긋난다.
         // 메시지 모드는 손가락을 쓰지 않는다 — 숨겨 둔 채 좌표만 계산할 이유가 없다.
         if (this.hand != null && !m_confirmMode)
-            this.hand.anchoredPosition = t_center + this.handOffset;
+            this.hand.anchoredPosition = t_center + this.handOffset + m_handMotionOffset;
 
         PlaceMessage(t_full, t_min.y, t_max.y);
     }
@@ -678,7 +688,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         if (t_has && this.messageText != null) this.messageText.text = _message;
     }
 
-    // localScale만 건드린다 — sizeDelta·anchoredPosition은 Layout이 매 프레임 덮어써 트윈이 조용히 사라진다.
+    // 배율과 m_handMotionOffset으로 안무를 만든다. 위치는 Layout의 타깃 추종에 합성한다.
     //
     // 안무는 한 번의 탭이다: 천천히 들었다가(lift) 빠르게 내려찍고(press), 닿은 자세로 눌렸다 풀린 뒤
     // (squash·hold·recover) 다음 탭까지 쉰다(rest). 드는 시간이 찍는 시간보다 뚜렷하게 길다는 것이
@@ -693,30 +703,76 @@ public class OutgameTutorialGateUI : MonoBehaviour
     void StartHandTap()
     {
         float t_cycle = this.tapLiftDuration + this.tapPressDuration + this.tapSquashDuration
-                      + this.tapHoldDuration + this.tapRecoverDuration + this.tapRestDuration;
+                      + (m_holdPointer ? HandHoldDuration : this.tapHoldDuration)
+                      + this.tapRecoverDuration + this.tapRestDuration;
         if (t_cycle <= 0f) return;   // 길이 0짜리 무한 루프는 프레임을 잠근다
 
         // 숨겨 둔 손가락(메시지 모드)까지 돌릴 이유가 없다 — SetPointerActive가 먼저 활성 여부를 확정한다.
         if (this.hand == null || !this.hand.gameObject.activeSelf) return;
 
         // IsActive까지 묻는다: 밖에서 죽은 트윈은 필드에 non-null로 남아, null 검사만으로는 영영 다시 서지 않는다.
-        if (m_handTween != null && m_handTween.IsActive()) return;
+        bool t_playerHolding = m_holdPointer && m_handHoldInput != null && m_handHoldInput.IsPressed;
+        if (m_handTween != null && m_handTween.IsActive() && m_playerHolding == t_playerHolding) return;
+        StopHandTap();
+        m_playerHolding = t_playerHolding;
 
         if (this.tapFx != null) this.tapFx.gameObject.SetActive(false);   // 지난 발의 잔상을 안고 켜지지 않게
 
-        this.hand.localScale = Vector3.one;
+        // 실제 누름 중에는 들어 올리는 안내를 중단한다. 손을 떼면 다음 프레임에 기본 안내로 돌아간다.
+        if (m_playerHolding)
+        {
+            this.hand.localScale = Vector3.one * this.tapSquashScale;
+            EmitHandTouchFx();
+            m_handTween = CreateHandHoldShake(false).SetLoops(-1).SetLink(this.hand.gameObject);
+            return;
+        }
 
-        m_handTween = DOTween.Sequence()
-            .Append(this.hand.DOScale(this.tapLiftScale,   this.tapLiftDuration).SetEase(Ease.OutQuad))
-            .Append(this.hand.DOScale(1f,                  this.tapPressDuration).SetEase(Ease.InQuad))
-            .AppendCallback(EmitHandTouchFx)
-            .Append(this.hand.DOScale(this.tapSquashScale, this.tapSquashDuration).SetEase(Ease.OutQuad))
-            .AppendInterval(this.tapHoldDuration)
-            .Append(this.hand.DOScale(1f,                  this.tapRecoverDuration).SetEase(Ease.OutQuad))
+        this.hand.localScale = Vector3.one * (m_holdPointer ? this.tapLiftScale : 1f);
+        SetHandMotionOffset(m_holdPointer ? Vector2.up * HandHoldLift : Vector2.zero);
+
+        Sequence t_sequence = DOTween.Sequence();
+        if (m_holdPointer)
+        {
+            float t_descendDuration = this.tapLiftDuration + this.tapPressDuration;
+            t_sequence
+                .Append(DOTween.To(() => m_handMotionOffset, SetHandMotionOffset, Vector2.zero, t_descendDuration).SetEase(Ease.InOutQuad))
+                .Join(this.hand.DOScale(1f, t_descendDuration).SetEase(Ease.InQuad));
+        }
+        else
+            t_sequence
+                .Append(this.hand.DOScale(this.tapLiftScale, this.tapLiftDuration).SetEase(Ease.OutQuad))
+                .Append(this.hand.DOScale(1f, this.tapPressDuration).SetEase(Ease.InQuad));
+
+        t_sequence.AppendCallback(EmitHandTouchFx)
+            .Append(this.hand.DOScale(this.tapSquashScale, this.tapSquashDuration).SetEase(Ease.OutQuad));
+
+        if (m_holdPointer)
+        {
+            t_sequence.Append(CreateHandHoldShake(true));
+        }
+        else t_sequence.AppendInterval(this.tapHoldDuration);
+
+        t_sequence.Append(this.hand.DOScale(m_holdPointer ? this.tapLiftScale : 1f,
+            this.tapRecoverDuration).SetEase(Ease.OutQuad));
+        if (m_holdPointer)
+            t_sequence.Join(DOTween.To(() => m_handMotionOffset, SetHandMotionOffset,
+                Vector2.up * HandHoldLift, this.tapRecoverDuration).SetEase(Ease.OutQuad));
+
+        m_handTween = t_sequence
             .AppendInterval(this.tapRestDuration)
             .SetLoops(-1)
             .SetLink(this.hand.gameObject);
     }
+
+    // 자동 안내는 접촉·복귀 때 진폭을 줄이고, 실제 누름은 같은 진폭으로 끊김 없이 반복한다.
+    Tween CreateHandHoldShake(bool _fadeEdges)
+        => DOVirtual.Float(0f, 1f, HandHoldDuration, t_progress =>
+        {
+            float t_amplitude = HandHoldShake * (_fadeEdges ? Mathf.Sin(t_progress * Mathf.PI) : 1f);
+            SetHandMotionOffset(new Vector2(
+                Mathf.Sin(t_progress * Mathf.PI * 42f),
+                Mathf.Sin(t_progress * Mathf.PI * 58f) * 0.5f) * t_amplitude);
+        }).SetEase(Ease.Linear);
 
     // 손끝이 화면에 닿는 박에 이펙트를 한 발 터뜨려 "여기를 누르라"를 눈으로 보여 준다.
     // Hand의 자식이라 로컬 원점이 곧 손끝이고, 그래서 좌표를 계산해 넘길 것이 없다.
@@ -728,7 +784,14 @@ public class OutgameTutorialGateUI : MonoBehaviour
         this.tapFx.Play(Vector2.zero);
     }
 
-    // SetLink는 파괴에만 반응하고 비활성화에는 반응하지 않는다 → 숨길 때 직접 죽이고 스케일을 되돌린다.
+    // Layout의 타깃 추종과 애니메이션을 합성한다. 접촉 콜백 전에 실제 손끝 위치도 즉시 갱신한다.
+    void SetHandMotionOffset(Vector2 _offset)
+    {
+        if (this.hand != null) this.hand.anchoredPosition += _offset - m_handMotionOffset;
+        m_handMotionOffset = _offset;
+    }
+
+    // SetLink는 파괴에만 반응하고 비활성화에는 반응하지 않는다 → 숨길 때 직접 죽이고 자세를 되돌린다.
     void StopHandTap()
     {
         if (m_handTween != null)
@@ -737,6 +800,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
             m_handTween = null;
             if (this.hand != null) this.hand.localScale = Vector3.one;
         }
+        SetHandMotionOffset(Vector2.zero);
+        m_playerHolding = false;
     }
 
     // 원래 동작은 그대로 실행되고(기존 리스너 무접촉) 콜백만 1회 얹는다.
@@ -767,6 +832,9 @@ public class OutgameTutorialGateUI : MonoBehaviour
     // 한쪽만 풀면 버튼이 모든 UI 위에 영구히 떠 있거나 다음 스텝이 오발화한다.
     void Release()
     {
+        StopHandTap();
+        m_holdPointer = false;
+        m_handHoldInput = null;
         Demote();
 
         if (m_targetButton != null) m_targetButton.onClick.RemoveListener(OnTargetClicked);

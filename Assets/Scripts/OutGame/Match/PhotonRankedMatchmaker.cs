@@ -28,6 +28,9 @@ public sealed class PhotonRankedMatchmaker : IMatchmaker
     readonly IMatchmaker m_aiFallback;
     readonly int? m_tierOverride;
 
+    // 방에서 상대를 찾은 시점. 프로필 검증·덱 잠금 완료보다 먼저 UI 취소를 막는다.
+    public event Action OnOpponentPaired;
+
     public PhotonRankedMatchmaker(IMatchmaker _aiFallback, int? _tierOverride = null)
     {
         this.m_aiFallback = _aiFallback;
@@ -65,6 +68,8 @@ public sealed class PhotonRankedMatchmaker : IMatchmaker
             await SearchRankedOpponentAsync(t_session, t_localProfile, _ct);
         if (t_search.outcome != EOutcome.Matched)
             return (t_search.outcome, default);
+
+        OnOpponentPaired?.Invoke();
 
         MatchmakingProfile t_opponentProfile = await ExchangeProfilesAsync(
             t_localProfile, t_search.knownOpponent, _ct);

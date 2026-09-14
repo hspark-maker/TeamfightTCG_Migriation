@@ -13,6 +13,7 @@ import {
 } from "../save/saveDocument";
 import {rejectDomain} from "../save/domainReject";
 import {clientReceiptId, isClientReceiptId} from "../save/receiptId";
+import {HEX_32, objectRecord} from "../match/payloadGuards";
 import {readSpecRows} from "../packs/packSpecReader";
 import {readMissionCatalog} from "../missions/missionSpec";
 import {missionPeriod} from "../missions/period";
@@ -57,21 +58,23 @@ function reject(reason: ReportReject, message: string, context: Record<string, u
  * 모험 정점 격파 신고 — 선행 사슬과 랭크 잠금을 서버가 재고 통과하면 미수령 낙인을 세운다.
  * 지급과 클리어 확정은 claimReward 몫이라 여기서는 지갑도 clearedNodeIds 도 건드리지 않는다.
  *
- * won 을 받지 않는다 — 서버가 전투를 검증할 방법이 없어 "항상 true 인 인자"가 되고,
- * 그런 인자는 읽는 사람에게 검증되는 것처럼 보인다. 패배는 아예 호출하지 않는 것이 계약이다.
- * 최초 승인한 정점만 전투 완료·승리 미션에 함께 기록한다. 보상 수령 때는 다시 세지 않는다.
- * 전투 재생 증거는 없으므로 파괴·시너지·키워드 발동 수는 집계하지 않는다.
+ * 새 클라는 matchId의 서버 재생 승리를 확인한다. 미션은 submitMatchResult가 이미 집계한다.
+ * matchId가 없는 구 클라는 최초 승인 때 전투 완료·승리만 기록하는 기존 계약을 유지한다.
  */
 export const reportAdventureWin = onCall(async (request) => {
   const uid = requireUid(request.auth);
   const env = String(request.data?.env ?? "");
   const nodeId = String(request.data?.nodeId ?? "").trim();
+  const matchId = request.data?.matchId;
 
   if (!isKnownEnv(env)) {
     throw new HttpsError("invalid-argument", `Unknown env: ${env}`);
   }
   if (nodeId.length === 0 || nodeId.length > MAX_NODE_ID_LENGTH) {
     throw new HttpsError("invalid-argument", "nodeId must be a non-empty string.");
+  }
+  if (matchId != null && (typeof matchId !== "string" || !HEX_32.test(matchId))) {
+    throw new HttpsError("invalid-argument", "invalid adventure matchId");
   }
 
   const context = {uid, env, nodeId};
@@ -104,6 +107,22 @@ export const reportAdventureWin = onCall(async (request) => {
 
   const result = await mutateSave(env, uid, "reportAdventureWin", {kind: "client", txId},
     async (current, transaction): Promise<SaveMutation> => {
+      if (typeof matchId === "string") {
+        const match = (await transaction.get(db.doc(`envs/${env}/matches/${matchId}`))).data();
+        const simulation = objectRecord(match?.serverSimulation);
+        const participants = match?.participantUids;
+        if (match?.adventureNodeId !== nodeId || match.mode !== "solo" ||
+            match.resultProtocol !== 1 || match.expectedParticipants !== 1 ||
+            !Array.isArray(participants) || participants.length !== 1 || participants[0] !== uid) {
+          throw new HttpsError("permission-denied", "adventure match does not belong to this node and player");
+        }
+        if (match.status !== "confirmed") {
+          throw new HttpsError("failed-precondition", "adventure match is not confirmed");
+        }
+        if (simulation?.ok !== true || simulation.draw === true || simulation.winnerOwner !== 0) {
+          throw new HttpsError("failed-precondition", "adventure match is not a verified win");
+        }
+      }
       const adventure = current.adventure as Record<string, unknown> | undefined;
       const cleared = readNodeIdList(adventure?.clearedNodeIds);
       const pending = typeof adventure?.pendingRewardNodeId === "string" ?
@@ -136,14 +155,15 @@ export const reportAdventureWin = onCall(async (request) => {
 
       // pending/cleared 판정이 영수증 없는 재신고도 막는다. 최초 승인과 같은
       // 트랜잭션에서만 집계하므로 커밋 실패·콜백 재실행에 카운터가 따로 남지 않는다.
-      const missions = await beginMissionBump(transaction, db, env, uid, period, current);
-      commitMissionBumps(transaction, missions, [
-        {event: EVENTS.battleCompleted.missionKey, amount: 1},
-        {event: "WinBattle", amount: 1},
-      ], FieldValue.serverTimestamp());
-      // 정의 없이 파생 완료 수를 0으로 채택시키지 않는다. 카운터는 위에서
-      // 그대로 저장하고, 정의가 돌아오면 getMissions가 저장값으로 응답한다.
-      missionState = catalog === null ? undefined : missionResponse(missions.state, period, catalog);
+      if (matchId == null) {
+        const missions = await beginMissionBump(transaction, db, env, uid, period, current);
+        commitMissionBumps(transaction, missions, [
+          {event: EVENTS.battleCompleted.missionKey, amount: 1},
+          {event: "WinBattle", amount: 1},
+        ], FieldValue.serverTimestamp());
+        // 정의 없이 파생 완료 수를 0으로 채택시키지 않는다.
+        missionState = catalog === null ? undefined : missionResponse(missions.state, period, catalog);
+      }
 
       // 슬롯 **전체 값**을 쓴다 — clearedNodeIds·claimedChapterIds 를 그대로 실어야 지워지지 않는다.
       return {

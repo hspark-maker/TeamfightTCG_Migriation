@@ -72,8 +72,14 @@ public class MissionPanel : PooledUIBase
 
     [SerializeField] Button weeklyTabButton;
 
-    [Tooltip("선택 안 된 탭 그림에 씌울 틴트. 선택 탭은 저작 색(백색 곱)으로 돌아간다.")]
-    [SerializeField] Color tabDimColor = new Color(0.6f, 0.6f, 0.6f, 1f);
+    [Tooltip("선택된 탭에 표시할 눌림 스프라이트.")]
+    [SerializeField] Sprite selectedTabSprite;
+
+    [Tooltip("선택되지 않은 탭에 표시할 기본 스프라이트.")]
+    [SerializeField] Sprite unselectedTabSprite;
+
+    [Tooltip("선택되지 않은 탭 배경에 적용할 옅은 회색.")]
+    [SerializeField] Color unselectedTabColor = new Color(0.85f, 0.85f, 0.85f, 1f);
 
     [Header("버튼")]
     [SerializeField] Button closeButton;
@@ -229,9 +235,16 @@ public class MissionPanel : PooledUIBase
         if (this.dailyEmptyNotice != null) this.dailyEmptyNotice.SetActive(!this.m_weeklyTab && this.m_dailyRowCount == 0);
         if (this.weeklyEmptyNotice != null) this.weeklyEmptyNotice.SetActive(this.m_weeklyTab && this.m_weeklyRowCount == 0);
 
-        // 선택 표시는 그림 틴트 하나다. Button 의 ColorTint 전이는 canvasRenderer 색을 곱하므로 여기와 충돌하지 않는다.
-        if (this.dailyTabButton.targetGraphic != null) this.dailyTabButton.targetGraphic.color = this.m_weeklyTab ? this.tabDimColor : Color.white;
-        if (this.weeklyTabButton.targetGraphic != null) this.weeklyTabButton.targetGraphic.color = this.m_weeklyTab ? Color.white : this.tabDimColor;
+        if (this.dailyTabButton.targetGraphic is Image t_dailyImage)
+        {
+            t_dailyImage.sprite = this.m_weeklyTab ? this.unselectedTabSprite : this.selectedTabSprite;
+            t_dailyImage.color = this.m_weeklyTab ? this.unselectedTabColor : Color.white;
+        }
+        if (this.weeklyTabButton.targetGraphic is Image t_weeklyImage)
+        {
+            t_weeklyImage.sprite = this.m_weeklyTab ? this.selectedTabSprite : this.unselectedTabSprite;
+            t_weeklyImage.color = this.m_weeklyTab ? Color.white : this.unselectedTabColor;
+        }
     }
 
     int BuildSection(Transform _content, MissionRowView _rowPrefab, List<MissionRowView> _rows,

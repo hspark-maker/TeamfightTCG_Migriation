@@ -97,10 +97,20 @@ public class DeckSlotView : MonoBehaviour
 
         if (previewImage != null)
         {
+            CardArtBinding.Clear(previewImage.gameObject);
             previewImage.gameObject.SetActive(true);
             // null이면 대입하지 않는다 — 프리팹 기본 스프라이트를 남기는 게 폴백 사양이다.
             // (null을 대입하면 흰 사각형이 된다)
-            if (_preview != null) previewImage.sprite = _preview;
+            if (_preview != null)
+            {
+                previewImage.sprite = _preview;
+                previewImage.enabled = true;
+            }
+            else
+            {
+                string address = DeckImages.CardAddressForSlot(_slotIndex);
+                if (address != null) CardArtBinding.Bind(previewImage, address);
+            }
         }
 
         SetInteractable(true);

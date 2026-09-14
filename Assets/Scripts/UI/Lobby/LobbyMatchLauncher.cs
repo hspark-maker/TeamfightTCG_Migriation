@@ -321,15 +321,9 @@ public class LobbyMatchLauncher : MonoBehaviour
     {
         if (TutorialConfig.IsActive) return true;
 
-        // 모험(모험) 정점도 제외한다. 상대·덱·AI 레벨이 저작 고정이라 이 경로는 findAiMatch를 태우지 않고
-        // (RunEntryChainAsync가 매칭 블록을 건너뛴다), 그래서 서버 매치 신원 자체가 없다 —
-        // SoloMatchSync는 그것을 "findAiMatch가 발급한 매치 신원이 없다"로 거절하므로 정점이 영영 시작되지 않는다.
-        //
-        // 여기서 통과시켜도 보상 자격은 클라가 못 만든다: 정점 격파는 reportAdventureWin이,
-        // 지급은 claimReward가 서버에서 선행 사슬·랭크 잠금을 다시 재고 결정한다(matchId를 쓰지 않는 경로).
-        // 남는 구멍은 정점 전투에 한해 출전 덱 소유·성장 대조가 빠진다는 것 — 그건 findAiMatch에
-        // 모험 모드를 여는 서버 작업이 필요하다.
-        if (AdventureRun.IsActive) return true;
+        // 모험도 고정 상대와 서버 시드를 먼저 봉인한 뒤 같은 덱 검증·결과 재생을 거친다.
+        if (AdventureRun.IsActive && !await ServerMatchmaker.PrepareAdventureAsync(
+                AdventureRun.NodeId, this.GetCancellationTokenOnDestroy())) return false;
 
         ESoloMatchSyncResult t_result = await SoloMatchSync.RunAsync(this.GetCancellationTokenOnDestroy());
 
@@ -643,7 +637,8 @@ public class LobbyMatchLauncher : MonoBehaviour
         adventurePanel?.Open();
         // 복귀 재오픈(HandleAdventureReturn)은 이 자리를 거치지 않는다 — 안내가 전투 복귀 연출 위에 겹치지 않는 이유다.
         if (AdventureUnlock.GuideTrigger == EOutgameTutorialTrigger.AdventureMapFirstOpen)
-            GuidanceCoordinator.TryFire(EOutgameTutorialTrigger.AdventureMapFirstOpen);
+            GuidanceCoordinator.TryFire(EOutgameTutorialTrigger.AdventureMapFirstOpen,
+                () => this != null && this.IsAdventureMapOpen);
     }
 
     // 정점 전투 복귀 — 떠났던 화면(배틀 탭 + 맵)을 되돌린다. 승패 무관하게 맵으로 온다.

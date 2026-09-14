@@ -37,12 +37,10 @@ public sealed class BattleOutcome
 
         if (AdventureRun.IsActive)
         {
-            // 로비까지 미루지 않는다: 캐리어는 메모리라 씬 로딩 중 종료가 승리를 삼킨다.
-            // 기다리지도 않는다 — 낙인은 로비 복귀가 한 번 더 신고해 메운다(AdventureReturnFlow).
-            // 취소 토큰을 물리지 않는다: 씬 파괴가 업로드 봉인 해제(InvokeAsync 의 finally) 전에
-            // 취소를 던지면 이후 저장이 통째로 막힌다.
-            if (_won) AdventureWinCommand.ReportWinAsync(AdventureRun.NodeId).Forget();
-            AdventureResultHandoff.Set(AdventureRun.NodeId, _won);
+            // 승리 낙인은 서버 재생 확정 뒤 제출 큐가 신고한다. 검증 실패 시 로비가 재신고하지 않도록
+            // 결과 캐리어는 기본 패배로 두고 서버 응답이 실제 승패로 갱신한다.
+            AdventureResultHandoff.Set(AdventureRun.NodeId, false);
+            SubmitMatchEvidence(_won, t_remaining, RankManager.Points, _reason);
             Reward = default;
             RankDelta = 0;
             return true;

@@ -1239,7 +1239,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
             {
                 this.m_tutorialQueuedShards++;
                 this.m_shardAbsorb?.Play(this.enhanceButton.transform as RectTransform,
-                    this.cardView != null ? this.cardView.transform as RectTransform : null);
+                    this.m_holdInput);
                 RefreshGrowthActions(_card, true);
                 return;
             }
@@ -1258,7 +1258,7 @@ public class CardDetailOverlayView : MonoBehaviour, IPointerClickHandler
         // 홀드 중에는 Button의 Pressed 상태를 유지한다. 중복 요청은 pending 가드가 막는다.
         SetActionsEnabled(this.m_holdActive && this.m_holdInput != null && this.m_holdInput.IsPressed);
         this.m_shardAbsorb?.Play(this.enhanceButton.transform as RectTransform,
-            this.cardView != null ? this.cardView.transform as RectTransform : null);
+            this.m_holdInput);
         if (t_start) FlushShardQueueAsync(_card, this.m_viewVersion).Forget();
     }
 

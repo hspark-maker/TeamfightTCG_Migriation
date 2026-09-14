@@ -41,7 +41,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: c8eb7ff3955f4ca6b2a72ad14134aadb, type: 3}
+        m_Texture: {fileID: 2800000, guid: dc1504da60856e747a11f936b44954b7, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
@@ -49,7 +49,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _ColorRamp:
-        m_Texture: {fileID: 2800000, guid: f78e27daaed644f3869414dc5d5ee5a1, type: 3}
+        m_Texture: {fileID: 2800000, guid: d886c0cb73a19514a8be80f38031dd73, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _DetailAlbedoMap:
@@ -65,7 +65,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Distortion:
-        m_Texture: {fileID: 2800000, guid: 96e3ce6318344a57b8bd00e7feb109bb, type: 3}
+        m_Texture: {fileID: 2800000, guid: 82f4b06147155c54da475b309b9e24fa, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _EmissionMap:
@@ -73,11 +73,11 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Gradient:
-        m_Texture: {fileID: 2800000, guid: 361ed9c8b21e4fa8b304b6f1339c68f8, type: 3}
+        m_Texture: {fileID: 2800000, guid: 28c7aad1372ff114b90d330f8a2dd938, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: 83f0e9de6bdf4002beb237f59a40ab67, type: 3}
+        m_Texture: {fileID: 2800000, guid: f967218f2af851240a1e43437f13e560, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTexutre:
@@ -85,7 +85,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Mask:
-        m_Texture: {fileID: 2800000, guid: 6ed6cf384cca402d818090e14cbba63d, type: 3}
+        m_Texture: {fileID: 2800000, guid: 663540ab948415c4bac0ba0ab5ccc1da, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:

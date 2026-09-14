@@ -57,6 +57,12 @@ static class MatchResultSubmission
         /// 서버 재시뮬 대조는 이 값과 해야 한다. 합의 해시는 두 클라가 같은 지점까지 같았는지 보는 용도다.</summary>
         public string endStateHash;
         public int attempts;
+        public string adventureNodeId;
+
+        [NonSerialized] public bool confirmed;
+        [NonSerialized] public bool rejected;
+        [NonSerialized] public bool collected;
+        [NonSerialized] public bool adventureWon;
     }
 
     [Serializable]
@@ -70,12 +76,14 @@ static class MatchResultSubmission
     static bool s_sending;
     static int s_generation;
     static CancellationTokenSource s_retryCancellation;
+    static PendingSubmission s_battleSubmission;
 
     internal static void Initialize(string _envId)
     {
         s_generation++;
         CancelRetry();
         s_sending = false;
+        s_battleSubmission = null;
         s_envId = _envId;
         LoadPending();
     }
@@ -86,6 +94,7 @@ static class MatchResultSubmission
         CancelRetry();
         SavePending();
         s_envId = null;
+        s_battleSubmission = null;
     }
 
     internal static void DiscardPending()
@@ -94,6 +103,7 @@ static class MatchResultSubmission
         CancelRetry();
         s_sending = false;
         s_pending.Clear();
+        s_battleSubmission = null;
         SavePending();
     }
 
@@ -116,9 +126,13 @@ static class MatchResultSubmission
 
         string t_matchId = t_multiplayer ? t_turn.MatchId : t_soloMatchId;
         for (int i = 0; i < s_pending.Count; i++)
-            if (s_pending[i].matchId == t_matchId) return true;
+            if (s_pending[i].matchId == t_matchId)
+            {
+                s_battleSubmission = s_pending[i];
+                return true;
+            }
 
-        s_pending.Add(new PendingSubmission
+        s_battleSubmission = new PendingSubmission
         {
             env = s_envId,
             matchId = t_matchId,
@@ -146,7 +160,9 @@ static class MatchResultSubmission
             boardOrder1 = BattleBoardOrder.For(1),
             draw = _draw,
             endStateHash = _endStateHash.ToString("x16"),
-        });
+            adventureNodeId = AdventureRun.IsActive ? AdventureRun.NodeId : null,
+        };
+        s_pending.Add(s_battleSubmission);
         SavePending();
         RetryPending();
         return true;
@@ -159,6 +175,34 @@ static class MatchResultSubmission
     }
 
     internal static UniTask FlushAsync() => SendPending();
+
+    /// <summary>이번 전투의 판정과 지급 ack를 기다린다. pending·통신 지연은 실패로 처리하지 않는다.</summary>
+    internal static async UniTask WaitForBattleResultAsync()
+    {
+        PendingSubmission t_item = s_battleSubmission;
+        if (t_item == null) return;
+        int t_generation = s_generation;
+        try
+        {
+            while (t_generation == s_generation && !GameInitialization.IsTerminated &&
+                   !t_item.rejected && !t_item.collected)
+            {
+                if (t_item.confirmed && string.IsNullOrEmpty(t_item.adventureNodeId)) await PayoutInbox.FlushAsync();
+                else RetryPending();
+                // 배속·일시 정지와 무관하게 확인한다. 전송 중이면 기존 요청을 기다리므로 중복 제출하지 않는다.
+                await UniTask.Delay(TimeSpan.FromSeconds(2), DelayType.Realtime);
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(s_battleSubmission, t_item)) s_battleSubmission = null;
+        }
+    }
+
+    internal static void NotifyPayoutCollected(string _matchId)
+    {
+        if (s_battleSubmission?.matchId == _matchId) s_battleSubmission.collected = true;
+    }
 
     static async UniTask SendPending()
     {
@@ -192,10 +236,19 @@ static class MatchResultSubmission
                         .AsUniTask()
                         .AttachExternalCancellation(FirebaseManager.Lifetime);
                     if (t_generation != s_generation) return;
-                    if (TryHandleResponse(t_response.Data, t_item.matchId, out bool t_complete) && t_complete)
+                    if (TryHandleResponse(t_response.Data, t_item, out bool t_complete) && t_complete)
                     {
-                        t_drop = true;
-                        PayoutInbox.RetryPending();
+                        if (t_item.confirmed && !string.IsNullOrEmpty(t_item.adventureNodeId))
+                        {
+                            // 모험은 랭크·골드 payout이 없다. 승리 낙인 응답까지 받아야 복귀 보상을 열 수 있다.
+                            t_drop = await CompleteAdventureAsync(t_item, t_generation);
+                            if (t_generation != s_generation) return;
+                        }
+                        else
+                        {
+                            t_drop = true;
+                            if (t_item.confirmed) PayoutInbox.RetryPending();
+                        }
                     }
                 }
                 catch (Exception t_exception)
@@ -207,9 +260,9 @@ static class MatchResultSubmission
                         Debug.LogError($"[MatchResult] The server permanently rejected the submission (match={t_item.matchId}, " +
                                        $"code={t_code}, uid={FirebaseAuthService.Instance.UserId}): " +
                                        $"{t_exception.GetBaseException().Message}");
-                        // 큐에서 버리는 순간 이 판의 보상·랭크는 영영 오지 않는다. 결과 화면이 방금 보여 준 수치가
-                        // 조용히 어긋나는 것을 막으려면 여기서 반드시 알려야 한다.
+                        // 제출 거절은 매치 무효 확정과 다르다. 다른 제출로 정산될 수도 있어 미지급을 단정하지 않는다.
                         MatchResultFailurePopup.Show();
+                        t_item.rejected = true;
                         t_drop = true;
                     }
                     else
@@ -249,6 +302,18 @@ static class MatchResultSubmission
                _code == FunctionsErrorCode.AlreadyExists ||
                _code == FunctionsErrorCode.PermissionDenied ||
                _code == FunctionsErrorCode.FailedPrecondition;
+    }
+
+    static async UniTask<bool> CompleteAdventureAsync(PendingSubmission _item, int _generation)
+    {
+        if (_item.adventureWon &&
+            !await AdventureWinCommand.ReportWinAsync(_item.adventureNodeId, _item.matchId)) return false;
+        if (_generation != s_generation) return false;
+        if (ReferenceEquals(s_battleSubmission, _item))
+            AdventureResultHandoff.Set(_item.adventureNodeId, _item.adventureWon);
+        _item.collected = true;
+        MissionCommands.RefreshAsync().Forget();
+        return true;
     }
 
     /// <summary>전송 루프 앞에서 물러나는 경로의 재시도 지수를 올린다. 여기서 큐를 버리지는 않는다 —
@@ -352,7 +417,7 @@ static class MatchResultSubmission
         ["endStateHash"] = _item.endStateHash ?? "",
     };
 
-    static bool TryHandleResponse(object _raw, string _matchId, out bool _complete)
+    static bool TryHandleResponse(object _raw, PendingSubmission _item, out bool _complete)
     {
         _complete = false;
         if (!TryMap(_raw, out IDictionary t_root) || !TryString(t_root, "status", out string t_status)) return false;
@@ -360,20 +425,29 @@ static class MatchResultSubmission
         if (t_status == "flagged")
         {
             _complete = true;
+            _item.rejected = true;
             TryString(t_root, "reason", out string t_reason);
-            Debug.LogError($"[MatchResult] The server voided the match (match={_matchId}, reason={t_reason}).");
+            Debug.LogError($"[MatchResult] The server voided the match (match={_item.matchId}, reason={t_reason}).");
             // 무효는 payout 문서를 아예 만들지 않는다 — PayoutInbox가 나중에 메워 줄 것도 없다.
-            MatchResultFailurePopup.Show();
+            MatchResultFailurePopup.Show(_voided: true);
             return true;
         }
         if (t_status != "confirmed") return false;
+        if (!string.IsNullOrEmpty(_item.adventureNodeId))
+        {
+            if (!TryString(t_root, "adventureNodeId", out string t_nodeId) || t_nodeId != _item.adventureNodeId ||
+                !t_root.Contains("won") || t_root["won"] is not bool t_won ||
+                !t_root.Contains("draw") || t_root["draw"] is not bool t_draw) return false;
+            _item.adventureWon = t_won && !t_draw;
+        }
+        _item.confirmed = true;
         MissionCommands.Invalidate();
 
         // confirmed 트랜잭션이 양쪽 payout을 함께 만들었고 별도 inbox가 적용·ack한다.
         // 제출 큐를 내린 뒤 PayoutInbox가 서버 원장을 로컬 세이브에 반영한다.
         _complete = true;
         Debug.Log(
-            $"[MatchResult] Server cross-check matched; starting payout collection (match={_matchId}, " +
+            $"[MatchResult] Server cross-check matched; starting payout collection (match={_item.matchId}, " +
             $"saveUploadsThisSession={PlayerSaveCloud.UploadCountThisSession}).");
         return true;
     }

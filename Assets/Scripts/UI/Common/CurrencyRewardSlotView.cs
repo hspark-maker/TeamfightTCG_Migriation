@@ -10,11 +10,14 @@ public class CurrencyRewardSlotView
     [SerializeField] GameObject root;
     [SerializeField] Image icon;
     [SerializeField] TMP_Text amountLabel;
+    [Tooltip("보상 아이콘 뒤의 파티클 묶음. 아이콘 퇴장과 같은 시간에 함께 숨긴다.")]
+    [SerializeField] CanvasGroup backgroundEffects;
 
     // 칸 '안'을 안무하는 쪽(랭크 보상 오버레이)을 위한 손잡이. 같은 노드를 저쪽에서 또 배선하면 진실원이 갈린다.
     public GameObject Root => this.root;
     public Image Icon => this.icon;
     public TMP_Text Amount => this.amountLabel;
+    public CanvasGroup BackgroundEffects => this.backgroundEffects;
 
     public void Bind(Sprite _icon, long _amount)
     {

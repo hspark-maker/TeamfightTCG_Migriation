@@ -21,9 +21,7 @@ public class PackOddsRow : MonoBehaviour
 
         if (this.cardImage != null)
         {
-            Sprite t_art = CardVisualRules.PickCardArt(t_card);
-            this.cardImage.sprite = t_art;
-            this.cardImage.enabled = t_art != null;
+            CardArtBinding.Bind(this.cardImage, CardVisualRules.CardArtAddress(t_card));
         }
     }
 }

@@ -123,6 +123,6 @@ public class MainMenuManager : MonoBehaviour
 
     public void OnSettingButton()
     {
-        UIPoolManager.Instance?.AddOrUpdateUI<SettingsPanel>();
+        UIPoolManager.Instance?.RequestUI<SettingsPanel>(this);
     }
 }
