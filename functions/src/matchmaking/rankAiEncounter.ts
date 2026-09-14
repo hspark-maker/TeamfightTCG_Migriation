@@ -1,5 +1,6 @@
 import {AiCardGrowth, parseAiCardGrowth} from "../deckValidation";
 import {AiDeckRow} from "./aiDeckDraw";
+import {computeRankPayout, RankGradeRow} from "../payout";
 
 export type RankAiBattleKind = "Normal" | "DivisionFinal" | "GradeFinal";
 export type RankAiEncounter = {
@@ -10,6 +11,12 @@ export type RankAiEncounter = {
   cardGrowth: AiCardGrowth[];
   highlightCardId: number;
 };
+
+// 실제 점수 정산과 같은 승급 대기 판정이다. 경계에 닿기 전 일반전이나
+// 등급 내부 단계 이동은 승급전이 아니며, 마지막 등급에는 승급전이 없다.
+export function resolveRankAiBattleKind(points: number, grades: RankGradeRow[]): RankAiBattleKind {
+  return computeRankPayout(points, true, grades).promoBattle ? "GradeFinal" : "Normal";
+}
 
 function integer(value: unknown, min: number, max: number): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= min && value <= max;

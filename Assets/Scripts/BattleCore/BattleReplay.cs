@@ -36,13 +36,14 @@ public static class BattleReplay
             if (t_deck0 == null || t_deck1 == null)
                 return BattleReplayResult.Fail("deck_owner_missing");
 
+            // 오프닝 배치에서도 덩치 등 시너지가 발동하므로 필드 생성부터 수집한다.
+            using (BattleEventStream.CaptureScope t_eventCapture = BattleEventStream.BeginCapture())
+            {
             if (!TryBuildField(t_deck0, out BattleFieldState t_field0, out string t_reason))
                 return BattleReplayResult.Fail(t_reason);
             if (!TryBuildField(t_deck1, out BattleFieldState t_field1, out t_reason))
                 return BattleReplayResult.Fail(t_reason);
 
-            using (BattleEventStream.CaptureScope t_eventCapture = BattleEventStream.BeginCapture())
-            {
             var t_fields = new[] { t_field0, t_field1 };
             var t_attacksByOwner = new[] { 0, 0 };
             int t_turns = 0;

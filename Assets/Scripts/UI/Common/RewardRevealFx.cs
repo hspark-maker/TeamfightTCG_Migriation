@@ -250,6 +250,11 @@ public class RewardRevealFx
 
                 var t_icon   = this.m_slots[t_i].Icon;
                 var t_amount = this.m_slots[t_i].Amount;
+                var t_background = this.m_slots[t_i].BackgroundEffects;
+
+                if (t_background != null)
+                    _seq.Insert(this.launchRise,
+                                t_background.DOFade(0f, this.launchDuration).SetEase(Ease.InQuad));
 
                 if (t_icon != null)
                 {
@@ -299,6 +304,12 @@ public class RewardRevealFx
 
                 RestoreSlotGraphic(this.m_slots[t_i].Icon);
                 RestoreSlotGraphic(this.m_slots[t_i].Amount);
+                var t_background = this.m_slots[t_i].BackgroundEffects;
+                if (t_background != null)
+                {
+                    t_background.DOKill();
+                    t_background.alpha = 1f;
+                }
             }
         }
 

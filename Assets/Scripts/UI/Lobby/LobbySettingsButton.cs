@@ -27,5 +27,5 @@ public class LobbySettingsButton : MonoBehaviour
     }
 
     /// 이미 떠 있으면 UIPoolManager가 맨 앞으로 올리고 Show를 다시 태운다(중복 생성 없음).
-    void Open() => UIPoolManager.Instance?.AddOrUpdateUI<LobbySettingPanel>();
+    void Open() => UIPoolManager.Instance?.RequestUI<LobbySettingPanel>(this);
 }

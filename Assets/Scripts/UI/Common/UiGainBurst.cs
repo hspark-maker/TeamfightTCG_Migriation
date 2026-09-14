@@ -57,11 +57,13 @@ public static class UiGainBurst
     /// _spawn(i)는 i번째 날아갈 것을 만들어 준다 — 부모 붙이기·앵커·초기 배율은 이 코어가 맞춘다.
     /// _despawn은 그 하나가 목적지에 닿은 순간 불린다(숨기기 담당, 실제 파괴·반납은 호출자 몫).
     /// _onArrived(도착 수, 전체 수)는 닿을 때마다 불린다 — 수치 증가·강조를 여기에 맞물린다.
+    /// _followTarget이 있으면 수렴 중 매 프레임 목적지를 다시 읽는다.
     /// </summary>
     public static Sequence Build(RectTransform _layer, Vector2 _from, Vector2 _to, in Settings _settings,
                                  Func<int, RectTransform> _spawn,
                                  Action<RectTransform> _despawn = null,
-                                 Action<int, int> _onArrived = null)
+                                 Action<int, int> _onArrived = null,
+                                 Func<Vector2> _followTarget = null)
     {
         var t_seq = DOTween.Sequence();
 
@@ -91,8 +93,8 @@ public static class UiGainBurst
             // 수렴은 두 갈래다. 직선은 InBack으로 잠깐 뒤로 물렸다 빨려들고,
             // 휘어진 궤적은 그 물림이 필요 없다 — 옆으로 부푼 곡선 자체가 "돌아 들어가는" 시간을 이미 만든다.
             t_seq.Insert(t_delay + _settings.ScatterDuration,
-                         _settings.ArcHeight > 0f
-                       ? ArcTo(t_rt, t_mid, _to, _settings.GatherDuration, _settings.ArcHeight, t_i)
+                         _settings.ArcHeight > 0f || _followTarget != null
+                       ? ArcTo(t_rt, t_mid, _to, _settings.GatherDuration, _settings.ArcHeight, t_i, _followTarget)
                        : t_rt.DOAnchorPos(_to, _settings.GatherDuration).SetEase(Ease.InBack));
 
             if (!Mathf.Approximately(_settings.GatherScale, 1f))
@@ -135,7 +137,18 @@ public static class UiGainBurst
     /// </summary>
     // 대상을 트윈에 물려 둔다 — 호출자가 조각별로 거는 DOKill(transform)이 이 트윈도 함께 잡아야 잔해가 안 남는다.
     public static Tween ArcTo(RectTransform _rt, Vector2 _from, Vector2 _to, float _duration,
-                              float _height, int _index)
+                              float _height, int _index, Func<Vector2> _followTarget = null)
+    {
+        return DOTween.To(() => 0f, _t =>
+        {
+            Vector2 t_to = _followTarget != null ? _followTarget() : _to;
+            _rt.anchoredPosition = ArcPosition(_from, t_to, _height, _index, _t);
+        }, 1f, _duration)
+                      .SetEase(Ease.InCubic)
+                      .SetTarget(_rt.transform);
+    }
+
+    static Vector2 ArcPosition(Vector2 _from, Vector2 _to, float _height, int _index, float _t)
     {
         Vector2 t_delta = _to - _from;
         float   t_dist  = t_delta.magnitude;
@@ -147,9 +160,7 @@ public static class UiGainBurst
         Vector2 t_perp = t_dist > 0.001f ? new Vector2(-t_delta.y, t_delta.x) / t_dist : Vector2.up;
         Vector2 t_ctrl = _from + t_delta * 0.5f + t_perp * t_bow;
 
-        return DOTween.To(() => 0f, _t => _rt.anchoredPosition = Bezier(_from, t_ctrl, _to, _t), 1f, _duration)
-                      .SetEase(Ease.InCubic)     // 목적지에서 가속해야 "빨려든다"로 읽힌다
-                      .SetTarget(_rt.transform);
+        return Bezier(_from, t_ctrl, _to, _t);
     }
 
     static Vector2 Bezier(Vector2 _a, Vector2 _ctrl, Vector2 _b, float _t)

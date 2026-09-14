@@ -352,6 +352,86 @@ public static class OutgameDebugActions
         Debug.Log($"[OutgameDebug] Tutorial chapter {t_chapter + 1} back to the start — only the position is rewound (ownership and currency are kept). Applied on scene re-entry ({OutgameTutorialRunner.ForcedChapterCount} forced chapter(s) authored)");
     }
 
+    public static string DescribeTutorialStep(int _chapter, int _step)
+    {
+        if (!OutgameTutorialRunner.TryGetStepForDebug(_chapter, _step, out var t_step))
+            return $"단계 없음 (전체 {OutgameTutorialRunner.ChapterCount}챕터)";
+
+        return $"#{t_step.StepId} {t_step.Action} / {t_step.Anchor}\n{t_step.GuideMessage}";
+    }
+
+    // Enter/완료 콜백을 실행하지 않고 저작된 안내만 표시한다. 실제 튜토리얼의 게이트를 빼앗지 않는다.
+    public static bool PreviewTutorialStep(int _chapter, int _step)
+    {
+        if (!Application.isPlaying ||
+            !OutgameTutorialRunner.TryGetStepForDebug(_chapter, _step, out var t_step))
+        {
+            Debug.LogWarning("[OutgameDebug] 플레이 중 유효한 튜토리얼 챕터·단계를 선택하세요.");
+            return false;
+        }
+
+        if (OutgameTutorialRunner.IsRunning || OutgameTutorialRunner.IsGuidedRunning)
+        {
+            Debug.LogWarning("[OutgameDebug] 진행 중인 튜토리얼이 끝난 뒤 미리보기를 실행하세요.");
+            return false;
+        }
+
+        RectTransform t_target = null;
+        UnityEngine.UI.Button t_button = null;
+        if (t_step.Anchor != EOutgameTutorialAnchor.None &&
+            (!TutorialAnchorRegistry.TryGet(t_step.Anchor, out t_target, out t_button) ||
+             t_target == null || !t_target.gameObject.activeInHierarchy))
+        {
+            Debug.LogWarning($"[OutgameDebug] {t_step.Anchor} 대상이 없습니다. 해당 화면을 먼저 열어 주세요.");
+            return false;
+        }
+
+        if (t_step.Completion != EOutgameTutorialCompletion.Confirm && t_button != null && !t_button.IsInteractable())
+        {
+            Debug.LogWarning($"[OutgameDebug] {t_step.Anchor} 버튼이 비활성 상태입니다. 누를 수 있는 상태에서 실행하세요.");
+            return false;
+        }
+
+        var t_bridge = Object.FindFirstObjectByType<OutgameTutorialBridge>();
+        var t_gate = OutgameTutorialGateUI.Instance;
+        if (t_gate == null && t_bridge != null && t_bridge.GatePrefabForDebug != null)
+            t_gate = OutgameTutorialGateUI.Ensure(t_bridge.GatePrefabForDebug);
+        if (t_gate == null)
+        {
+            Debug.LogWarning("[OutgameDebug] 튜토리얼 안내 프리팹이 연결된 화면에서 실행하세요.");
+            return false;
+        }
+
+        RectTransform t_spotlight = null;
+        if (t_step.Spotlight != EOutgameTutorialAnchor.None)
+            TutorialAnchorRegistry.TryGet(t_step.Spotlight, out t_spotlight, out _);
+        if (t_spotlight != null && !t_spotlight.gameObject.activeInHierarchy) t_spotlight = null;
+
+        // 게이트 자신을 소유자로 써서 종료 버튼이 실제 튜토리얼 안내를 닫지 못하게 한다.
+        if (t_step.Completion == EOutgameTutorialCompletion.Confirm)
+            t_gate.ShowMessageGate(t_gate, t_target, t_step.GuideMessage, CloseTutorialPreview,
+                t_step.MessageAtBottom, t_step.UseDim, t_spotlight);
+        else if (t_target != null)
+            t_gate.ShowGate(t_gate, t_target, t_button, t_step.GuideMessage, null,
+                t_step.UseDim, t_spotlight, _holdPointer: t_step.Action == EOutgameTutorialAction.WaitEnhance);
+        else if (!string.IsNullOrEmpty(t_step.GuideMessage))
+            t_gate.ShowBanner(t_gate, t_step.GuideMessage);
+        else
+        {
+            Debug.LogWarning($"[OutgameDebug] {t_step.Action} 단계에는 미리 볼 안내 문구나 대상이 없습니다.");
+            return false;
+        }
+
+        Debug.Log($"[OutgameDebug] 튜토리얼 {_chapter + 1}챕터 {_step + 1}단계 미리보기: {t_step.Action}");
+        return true;
+    }
+
+    public static void CloseTutorialPreview()
+    {
+        var t_gate = OutgameTutorialGateUI.Instance;
+        if (t_gate != null) t_gate.Clear(t_gate);
+    }
+
     // 계정 경험치 더하기. 만렙 구간은 전승 1,000판대라 이 문 없이는 확인할 수 없다.
     public static void AddAccountExp(long _amount)
     {
@@ -374,53 +454,59 @@ public static class OutgameDebugActions
         Debug.Log("[OutgameDebug] Account level reset — Lv.1");
     }
 
-    // 티어 1단계 올리기/내리기
-    public static void RaiseTier() => StepTier(+1);
+    // 서버가 티어·최고 도달·랭킹 색인을 함께 확정한다. 로컬 점수를 먼저 바꾸지 않는다.
+    public static void RaiseTier() => ChangeRankAsync("step", +1).Forget();
+    public static void LowerTier() => ChangeRankAsync("step", -1).Forget();
+    public static void JumpToPromoStandby() => ChangeRankAsync("promo").Forget();
+    public static void ResetTier() => ChangeRankAsync("reset").Forget();
 
-    public static void LowerTier() => StepTier(-1);
+    static bool s_rankChangePending;
 
-    static void StepTier(int _step)
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetRankDebugState() => s_rankChangePending = false;
+
+    static async UniTaskVoid ChangeRankAsync(string _action, int _step = 0)
     {
-        int t_before  = RankManager.GetInfo().TierIndex;
-        long t_points = RankManager.Points;
-        int t_after   = RankManager.StepTierForDebug(_step);
-
-        RankInfo t_info = RankManager.GetInfo();
-
-        // 캐리어에 실어 두면 씬 재진입 때 로비 디렉터가 소비해 승급·강등 연출을 그대로 재생한다 —
-        // 이 버튼은 포인트만 옮기므로, 싣지 않으면 연출을 볼 방법이 전투밖에 없다.
-        RankResultHandoff.Set(new RankApplyResult(t_info.Points - t_points, t_before, t_after));
-
-        Debug.Log($"[OutgameDebug] Tier {t_before} → {t_after} ({t_info.DisplayName}) / points {t_info.Points} — the presentation plays on scene re-entry");
-    }
-
-    // 승급전 대기선으로 바로 점프. 티어 버튼은 임계치에 세우므로 이 상태엔 못 간다.
-    public static void JumpToPromoStandby()
-    {
-        int t_before  = RankManager.GetInfo().TierIndex;
-        long t_points = RankManager.Points;
-
-        if (!RankManager.SetPromoStandbyForDebug())
+        if (ContentProfileConfig.Active == null || ContentProfileConfig.Active.CloudEnvId != "test")
         {
-            Debug.Log("[OutgameDebug] Cannot go to promotion standby — unranked, or already at the top grade");
+            Debug.LogWarning("[OutgameDebug] Rank controls are available on the test env only.");
             return;
         }
-
-        RankInfo t_info = RankManager.GetInfo();
-
-        // StepTier와 같은 이유로 캐리어에 싣는다 — 실어야 씬 재진입 때 승급전 진입 연출이 재생된다.
-        RankResultHandoff.Set(new RankApplyResult(t_info.Points - t_points, t_before, t_info.TierIndex, false, true));
-
-        Debug.Log($"[OutgameDebug] Promotion standby — {t_info.DisplayName} / points {t_info.Points} — the presentation plays on scene re-entry");
+        if (s_rankChangePending)
+        {
+            Debug.Log("[OutgameDebug] Waiting for the previous rank change.");
+            return;
+        }
+        s_rankChangePending = true;
+        try
+        {
+            RankInfo t_before = RankManager.GetInfo();
+            bool t_wasPromo = RankManager.IsPromoPending;
+            var t_result = await ServerSaveCommands.InvokeAsync<DebugRankResult>(
+                "devSetRank", new { env = "test", action = _action, step = _step });
+            RankSnapshotResult t_rank = t_result.Rank;
+            if (t_rank == null || string.IsNullOrEmpty(t_rank.SeasonId) || t_rank.Points < 0
+                || !RankManager.TryGetTier(t_rank.TierIndex, out _))
+                throw new System.InvalidOperationException("The server rank response is invalid.");
+            RankManager.AdoptServerProgress(t_rank.Points, t_rank.SeasonId,
+                t_rank.BestTierIndex, t_rank.ClaimedTierIndexes);
+            RankResultHandoff.Set(new RankApplyResult(t_rank.Points - t_before.Points,
+                t_before.TierIndex, t_rank.TierIndex, t_wasPromo, RankManager.IsPromoPending));
+            Debug.Log($"[OutgameDebug] Server rank confirmed: {RankManager.GetInfo().DisplayName} / points {t_rank.Points}");
+        }
+        catch (System.Exception t_exception)
+        {
+            Debug.LogWarning($"[OutgameDebug] Rank change failed — {t_exception.GetBaseException().Message}");
+        }
+        finally
+        {
+            s_rankChangePending = false;
+        }
     }
 
-    // 랭크 포인트 재설정(브론즈 1로)
-    public static void ResetTier()
+    sealed class DebugRankResult : ServerCommandResult
     {
-        RankManager.ResetForDebug();
-
-        RankInfo t_info = RankManager.GetInfo();
-        Debug.Log($"[OutgameDebug] Rank reset — {t_info.DisplayName}");
+        [Newtonsoft.Json.JsonProperty("rank")] public RankSnapshotResult Rank { get; set; }
     }
 
     // 잠긴 기능 전체 해금 토글 (튜토리얼 딤은 별개 축이라 걷히지 않는다)

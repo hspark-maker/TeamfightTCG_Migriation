@@ -106,7 +106,7 @@ export const claimPassReward = onCall(async (request) => {
         throw new HttpsError("permission-denied", "PASS_PREMIUM_LOCKED");
       }
       const rankSnapshot = itemContext === null ? null : await transaction.get(rankRef(db, env, uid));
-      const missions = itemContext ? await beginMissionBump(transaction, db, env, uid, period) : null;
+      const missions = itemContext ? await beginMissionBump(transaction, db, env, uid, period, current) : null;
       const claims = track === "premium" ? pass.state.premiumClaimed : pass.state.claimed;
       if (claims[String(level)] === true) {
         throw new HttpsError("already-exists", `PASS_ALREADY_CLAIMED level=${level} track=${track}`);

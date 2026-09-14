@@ -116,7 +116,7 @@ exports.enhanceCard = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
     const result = await (0, saveDocument_1.mutateSave)(env, uid, "enhanceCard", { kind: "client", txId }, async (current, transaction, wallet) => {
         // 미션 읽기가 콜백의 첫 줄이다. 아래 grants 읽기와는 둘 다 읽기라 순서를 다투지 않지만,
         // 미션 **쓰기**는 그 grants 읽기보다 뒤여야 해서 콜백 맨 끝으로 갈라 두었다.
-        const missions = await (0, missionStore_1.beginMissionBump)(transaction, firebaseApp_1.db, env, uid, period);
+        const missions = await (0, missionStore_1.beginMissionBump)(transaction, firebaseApp_1.db, env, uid, period, current);
         // Retry from the committed growth and wallet state.
         const entries = (0, cardGrowth_1.readGrowthEntries)(current.cardGrowth);
         const currentLevel = (0, cardGrowth_1.levelOfCard)(entries, cardId);

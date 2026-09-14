@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -11,7 +12,7 @@ using UnityEngine.UI;
 //          다음 목적지를 스스로 판정해 씬을 넘긴다.
 //  - 전환: LoadScene(scene)이 동기 UI 카탈로그에서 띄운 인스턴스. 전투 → 로비 복귀처럼 초기화가 이미 끝난
 //          상태의 씬 전환을 덮는다(BattleCleanup 경유).
-// 어느 쪽이든 로비로 들어오는 화면은 같은 커버를 탄다.
+// 초기화·계정 변경은 기존 커버, 전투에서 로비로 복귀할 때는 전용 커버를 쓴다.
 //
 // 커버를 제자리에서 페이드아웃하지 않는 이유: 초기화 씬에는 커버 말고 아무것도 없어(카메라도 검은 단색 배경)
 // 알파를 내리면 다음 씬이 오기 전에 검은 화면이 드러난다. 그래서 순서를 뒤집는다 —
@@ -88,6 +89,7 @@ public class LoadingCoverView : MonoBehaviour
 
     // 씬 교체 직전에 돌려줄 정리 훅(전환 모드 전용). LoadScene의 _onBeforeLoad 참고.
     Action m_beforeLoad;
+    bool m_waitForBattleResult;
 
     // 커버가 최소 1초는 도니 커튼(0.25초)보다 넉넉하게 뺀다.
     const float BgmFadeOutSeconds = 0.5f;
@@ -97,24 +99,26 @@ public class LoadingCoverView : MonoBehaviour
     /// <param name="_onBeforeLoad">씬 교체 **직전** 1회 호출. 화면을 망가뜨리는 정리(오브젝트 파괴·풀 비우기)는
     /// 반드시 여기로 넘긴다 — 커버는 1초 넘게 도는데, 그 전에 정리하면 이전 씬이 파괴된 오브젝트를 붙잡은 채
     /// 그 시간만큼 더 살아 돌며 진행 중이던 연출 체인이 깨어나 그걸 만진다(MissingReferenceException).</param>
-    public static void LoadScene(string _scene, Action _onBeforeLoad = null)
+    public static void LoadScene(string _scene, Action _onBeforeLoad = null, bool _fromBattle = false)
     {
         // 씬을 벗어나는 모든 호출부가 이 창구를 지나므로 BGM 퇴장은 여기 한 곳에서 책임진다.
         SoundManager.Instance?.FadeOutBGM(BgmFadeOutSeconds);
 
-        var t_prefab = SyncUiPrefabs.Get(ESyncUiPrefab.LoadingCover);
+        var t_cover = _fromBattle && _scene == LobbyScene
+            ? ESyncUiPrefab.BattleReturnLoadingCover : ESyncUiPrefab.LoadingCover;
+        var t_prefab = SyncUiPrefabs.Get(t_cover);
         var t_view   = t_prefab != null ? Instantiate(t_prefab).GetComponent<LoadingCoverView>() : null;
 
         // 커버를 못 얻어도 전환 자체는 반드시 되게 한다 — 연출 때문에 화면이 갇히면 탈출로가 없다.
         if (t_view == null)
         {
             Debug.LogWarning("[LoadingCoverView] Could not find the loading cover in the sync UI catalog, so the transition runs without a cover.");
-            _onBeforeLoad?.Invoke();
-            SceneManager.LoadScene(_scene);
+            LoadWithoutCoverAsync(_scene, _onBeforeLoad, _fromBattle && _scene == LobbyScene).Forget();
             return;
         }
 
         t_view.m_beforeLoad = _onBeforeLoad;
+        t_view.m_waitForBattleResult = _fromBattle && _scene == LobbyScene;
 
         // Instantiate는 Awake를 그 자리에서 돌리지만 Start는 프레임 끝에 온다 — 이 대입이 모드 분기보다 먼저다.
         t_view.m_targetScene = _scene;
@@ -122,6 +126,13 @@ public class LoadingCoverView : MonoBehaviour
         // 페이드인 시작값도 같은 이유로 여기서 준다. Start를 기다리면 프리팹의 alpha 1이 한 프레임 그려져
         // 하드컷으로 덮은 뒤 페이드인이 도는 꼴이 된다. alpha 0이어도 blocksRaycasts는 그대로라 입력은 이미 막힌다.
         if (t_view.m_group != null && t_view.fadeInDuration > 0f) t_view.m_group.alpha = 0f;
+    }
+
+    static async UniTaskVoid LoadWithoutCoverAsync(string _scene, Action _onBeforeLoad, bool _waitForBattleResult)
+    {
+        if (_waitForBattleResult) await MatchResultSubmission.WaitForBattleResultAsync();
+        _onBeforeLoad?.Invoke();
+        SceneManager.LoadScene(_scene);
     }
 
     void Awake()
@@ -185,12 +196,19 @@ public class LoadingCoverView : MonoBehaviour
 
         // 완료 플래그 전에는 바가 1에 닿지 못하게 막는다 — PercentComplete는 프리팹 등록 콜백이
         // 끝나기 전에 1이 될 수 있어, 그대로 쓰면 등록이 덜 된 채로 다음 씬에 넘어간다.
-        yield return CoFillBar(() => GameInitialization.Progress);
+        yield return CoFillBar(() => GameInitialization.Progress, true);
 
         // 타임아웃은 로딩 화면의 진행 정책으로 유지하되, 완료 조건은 전역 초기화 창구만 본다.
         float t_initializeWaitStarted = Time.realtimeSinceStartup;
         while (!GameInitialization.IsReady && !GameInitialization.IsTerminated)
         {
+            UpdateResourceDownloadStatus();
+            if (RemoteCardArtDownload.IsDownloading)
+            {
+                // 리소스 전송은 번들 요청별 타임아웃을 따른다. 정상 다운로드를 로딩 연출 시간으로 끊지 않는다.
+                t_initializeWaitStarted = Time.realtimeSinceStartup;
+                if (progressBar != null) progressBar.normalizedValue = GameInitialization.Progress;
+            }
             if (Time.realtimeSinceStartup - t_initializeWaitStarted >= initializeWaitTimeout)
             {
                 Debug.LogError($"[LoadingCoverView] Game initialization did not finish within {initializeWaitTimeout}s, switching to the recovery screen. " +
@@ -265,7 +283,7 @@ public class LoadingCoverView : MonoBehaviour
     void ShowRecovery()
     {
         bool t_updateRequired = GameInitialization.State == EGameInitState.UpdateRequired;
-        bool t_assetFailed   = CardArtCache.HasFailed || PackArtCache.HasFailed || UiPrefabCache.HasFailed;
+        bool t_assetFailed   = RemoteCardArtDownload.HasFailed || CardArtCache.HasFailed || PackArtCache.HasFailed || UiPrefabCache.HasFailed;
 
         SetRecoveryVisible(true);
 
@@ -418,6 +436,13 @@ public class LoadingCoverView : MonoBehaviour
             // 활성화를 막아둔 동안 progress는 0.9에서 멈춘다 — 그 구간을 0~1로 편다.
             yield return CoFillBar(() => t_op.progress / 0.9f);
 
+            // 연출 시간 상한으로 서버 검증을 건너뛰지 않는다. 씬 활성화·전투 정리보다 먼저 기다린다.
+            if (m_waitForBattleResult)
+            {
+                if (statusText != null) statusText.text = "전투 결과를 확인하고 있습니다...";
+                yield return MatchResultSubmission.WaitForBattleResultAsync().ToCoroutine();
+            }
+
             if (holdBeforeLoad > 0f) yield return new WaitForSecondsRealtime(holdBeforeLoad);
 
             // 정리는 여기 — 씬 교체와 붙어 있어야 파괴된 오브젝트를 붙잡은 연출 체인이 깨어날 틈이 없다.
@@ -441,7 +466,18 @@ public class LoadingCoverView : MonoBehaviour
 
     // 바를 목표치까지 따라 올린다. 목표는 "실제 진행도"와 "최소 시간 진척" 중 느린 쪽이라
     // 로딩이 즉시 끝나도 바가 순간이동하지 않는다 — 커버가 minDuration만큼은 눈에 남는다.
-    IEnumerator CoFillBar(Func<float> _progress)
+    void UpdateResourceDownloadStatus()
+    {
+        if (statusText == null) return;
+        if (RemoteCardArtDownload.IsDownloading)
+            statusText.text = RemoteCardArtDownload.TotalBytes > 0
+                ? $"게임 리소스 다운로드 중 {RemoteCardArtDownload.DownloadedBytes / 1048576f:0.0} / {RemoteCardArtDownload.TotalBytes / 1048576f:0.0} MB"
+                : "게임 리소스를 확인하는 중입니다.";
+        else if (GameInitialization.State == EGameInitState.LoadingAssets)
+            statusText.text = "게임 리소스를 불러오는 중입니다.";
+    }
+
+    IEnumerator CoFillBar(Func<float> _progress, bool _initializing = false)
     {
         float t_elapsed = 0f;
         float t_shown   = 0f;   // 실제로 슬라이더에 그려지는 값(보간 결과)
@@ -449,6 +485,7 @@ public class LoadingCoverView : MonoBehaviour
         while (true)
         {
             t_elapsed += Time.unscaledDeltaTime;
+            if (_initializing) UpdateResourceDownloadStatus();
 
             float t_target = Mathf.Min(_progress(), t_elapsed / Mathf.Max(minDuration, 0.01f));
             t_shown = Mathf.MoveTowards(t_shown, t_target, barFollowSpeed * Time.unscaledDeltaTime);
@@ -461,7 +498,7 @@ public class LoadingCoverView : MonoBehaviour
             // 0.833을 넘지 못해 1f에 닿을 수 없고, 그대로 두면 복구 화면이 maxDuration만큼 늦게 뜬다.
             if (GameInitialization.IsTerminated) break;
 
-            if (t_elapsed >= maxDuration)
+            if (t_elapsed >= maxDuration && !(_initializing && RemoteCardArtDownload.IsDownloading))
             {
                 Debug.LogWarning($"[LoadingCoverView] Loading did not finish within {maxDuration}s, so it proceeds anyway.");
                 break;

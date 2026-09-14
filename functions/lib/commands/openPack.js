@@ -136,7 +136,7 @@ exports.openPack = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)("o
         // 독립 문서는 함께 읽고, 미션·지갑 쓰기 전에 모두 확보한다.
         const missionReference = (0, missionStore_1.missionsRef)(firebaseApp_1.db, env, uid);
         const [missionSnapshot, rankSnapshot] = await transaction.getAll(missionReference, (0, rankStore_1.rankRef)(firebaseApp_1.db, env, uid));
-        const missions = (0, missionStore_1.missionBumpFromSnapshot)(missionReference, missionSnapshot, period);
+        const missions = (0, missionStore_1.missionBumpFromSnapshot)(missionReference, missionSnapshot, period, current);
         // 트랜잭션이 재실행되면 이전 추첨을 버리고 다시 뽑는다 — 잔액·소유와 정합해야 한다.
         const points = Number(rankSnapshot.data()?.points ?? current.rank?.points ?? 0);
         const grade = (0, rankGrade_1.gradeOf)(thresholds, points);

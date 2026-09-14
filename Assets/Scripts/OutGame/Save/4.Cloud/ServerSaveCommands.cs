@@ -27,12 +27,12 @@ internal static class ServerSaveCommands
     /// <summary>세이브를 쓰는 서버 호출. 업로드를 봉인하고 응답의 revision·슬롯을 채택한 뒤 봉인을 푼다.
     /// <paramref name="_pending"/> 를 넘기면 서버 잔액을 채택하기 직전에 낙관 델타를 걷는다.</summary>
     internal static async UniTask<TResponse> InvokeAsync<TResponse>(
-        string _commandName, object _request, CurrencyPendingTicket _pending = null)
+        string _commandName, object _request, CurrencyPendingTicket _pending = null, string _receiptId = null)
         where TResponse : ServerCommandResult
     {
         try
         {
-            return await RunAsync<TResponse>(_commandName, _request, _pending);
+            return await RunAsync<TResponse>(_commandName, _request, _pending, _receiptId);
         }
         finally
         {
@@ -43,7 +43,7 @@ internal static class ServerSaveCommands
     }
 
     static async UniTask<TResponse> RunAsync<TResponse>(
-        string _commandName, object _request, CurrencyPendingTicket _pending)
+        string _commandName, object _request, CurrencyPendingTicket _pending, string _receiptId)
         where TResponse : ServerCommandResult
     {
         ICallableService t_service = RequireService(_commandName);
@@ -54,7 +54,8 @@ internal static class ServerSaveCommands
         // 영수증 번호는 호출 하나당 하나다. 화면·세션 단위로 재사용하면 인자가 다른 요청이 첫 응답을
         // 그대로 받는다 — 서버 대조는 명령 이름만 가르고 인자는 가르지 않는다.
         Dictionary<string, object> t_payload = CallablePayload.ToPrimitiveMap(_request);
-        t_payload[TX_ID_FIELD] = $"{_commandName}:{Guid.NewGuid():N}";
+        // 응답 유실 뒤 같은 요청을 재개하는 호출부만 기존 영수증을 넘긴다. 다른 요청에는 재사용하지 않는다.
+        t_payload[TX_ID_FIELD] = _receiptId ?? $"{_commandName}:{Guid.NewGuid():N}";
 
         // 명령을 직렬화한다 — 겹치면 나중 명령의 SuspendUploadsAsync가 앞선 명령의 기준선을 덮어써,
         // 통화 중에 생긴 로컬 변경이 "이미 서버에 있다"고 잘못 기록되고 영영 업로드되지 않는다.

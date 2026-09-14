@@ -42,6 +42,9 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
     public int Card   => m_card;
     public bool     InDeck => m_inDeck;
 
+    // 입력 모듈이 누름을 소유한 동안에는 화면 밖으로 나가도 다른 카드로 재사용하지 않는다.
+    internal bool HasActivePointer => m_pointerData != null && m_pointerData.pointerPress == gameObject;
+
     public void Bind(int _card, Action<DeckEditCardTile, PointerEventData> _onDragRequest, Action<DeckEditCardTile> _onClick)
     {
         ClearPointer();

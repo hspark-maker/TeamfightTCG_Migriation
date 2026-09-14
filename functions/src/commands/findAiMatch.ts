@@ -5,7 +5,8 @@ import * as logger from "firebase-functions/logger";
 import {createHash, randomBytes, randomInt, randomUUID} from "node:crypto";
 import {db} from "../firebaseApp";
 import {AiDeckDraw, drawAiDeck, parseAiDeckRows} from "../matchmaking/aiDeckDraw";
-import {drawRankAiEncounter, parseRankAiEncounters, RankAiEncounter} from "../matchmaking/rankAiEncounter";
+import {drawRankAiEncounter, parseRankAiEncounters, RankAiEncounter,
+  resolveRankAiBattleKind} from "../matchmaking/rankAiEncounter";
 import {AiCardGrowth, buildAiDeckSnapshots, CardSnapshot, parseCardSpecRow, readAiDeckSnapshots} from "../deckValidation";
 import {parseCardEnhanceRule} from "../growth/enhanceRules";
 import {parseLimitBreakCurve} from "../growth/limitBreakTable";
@@ -17,6 +18,7 @@ import {ensureRankState} from "../rank/rankStore";
 import {HEX_16, HEX_32, HEX_64, objectRecord, safeInteger} from "../match/payloadGuards";
 import {clientReceiptId} from "../save/receiptId";
 import {isKnownEnv, requireUid} from "../save/saveDocument";
+import {judgeNodeUnlock, MAX_NODE_ID_LENGTH, parseChapterNodeRows, readNodeIdList} from "../adventureTable";
 import {
   BATTLE_REPLAY_SPEC_TABLES,
   fingerprintOfSpecPins,
@@ -40,6 +42,7 @@ type AuthoredFindAiMatchData = {
   txId: string;
   resultProtocol: 1;
   aiGrowthVersion: 0 | 1;
+  adventureNodeId?: string;
 };
 
 type FindAiMatchData = LegacyFindAiMatchData | AuthoredFindAiMatchData;
@@ -53,12 +56,22 @@ function parseData(raw: unknown): FindAiMatchData {
 
   const fingerprint = data?.contentFingerprint;
   const rawPlayerDeck = data?.playerDeck;
-  if (data?.aiGrowthVersion != null && data.aiGrowthVersion !== 1) {
+  const adventureNodeId = data?.adventureNodeId;
+  if (adventureNodeId != null && (typeof adventureNodeId !== "string" ||
+      adventureNodeId.trim().length === 0 || adventureNodeId.length > MAX_NODE_ID_LENGTH)) {
+    throw new HttpsError("invalid-argument", "invalid adventure node");
+  }
+  if (data?.aiGrowthVersion != null && data.aiGrowthVersion !== 1 &&
+      !(adventureNodeId != null && data.aiGrowthVersion === 0)) {
     throw new HttpsError("invalid-argument", "unsupported AI growth version");
+  }
+  if (adventureNodeId != null && data?.aiGrowthVersion === 1) {
+    throw new HttpsError("invalid-argument", "adventure requires fixed AI growth");
   }
   // 서버 선배포 창. 구 클라는 env만 보내고 덱 선택만 받는다. 새 필드 중 하나만 보낸 반쪽
   // 페이로드는 구 버전으로 접지 않는다 — 매치가 봉인됐다고 믿는 클라를 만들 수 있다.
-  if (fingerprint == null && rawPlayerDeck == null && data?.aiGrowthVersion == null) return {env, legacy: true};
+  if (fingerprint == null && rawPlayerDeck == null && data?.aiGrowthVersion == null &&
+      adventureNodeId == null) return {env, legacy: true};
   if (typeof fingerprint !== "string" || !HEX_64.test(fingerprint) ||
       !Array.isArray(rawPlayerDeck) || rawPlayerDeck.length !== DECK_SIZE) {
     throw new HttpsError("invalid-argument", "invalid AI match payload");
@@ -79,6 +92,7 @@ function parseData(raw: unknown): FindAiMatchData {
     txId: clientReceiptId(data?.txId, randomUUID()),
     resultProtocol: 1,
     aiGrowthVersion: data?.aiGrowthVersion === 1 ? 1 : 0,
+    ...(typeof adventureNodeId === "string" ? {adventureNodeId: adventureNodeId.trim()} : {}),
   };
 }
 
@@ -115,6 +129,7 @@ function storedResponse(raw: Record<string, unknown>, data: AuthoredFindAiMatchD
       deck.length !== DECK_SIZE || playerBoardOrder.length !== DECK_SIZE ||
       enemyBoardOrder.length !== DECK_SIZE || !Number.isInteger(aiDeck?.cardLevel)) return null;
   if ((raw.aiGrowthVersion ?? 0) !== data.aiGrowthVersion) return null;
+  if ((raw.adventureNodeId ?? null) !== (data.adventureNodeId ?? null)) return null;
   const snapshots = data.aiGrowthVersion === 1 ?
     readAiDeckSnapshots(deck as number[], aiDeck.cardGrowth, aiDeck.snapshots) : null;
   if (data.aiGrowthVersion === 1 && snapshots == null) return null;
@@ -130,6 +145,7 @@ function storedResponse(raw: Record<string, unknown>, data: AuthoredFindAiMatchD
     playerBoardOrder,
     enemyBoardOrder,
     resultProtocol: 1,
+    ...(data.adventureNodeId == null ? {} : {adventureNodeId: data.adventureNodeId}),
   };
 }
 
@@ -157,6 +173,76 @@ export const findAiMatch = onCall(measuredCallable("findAiMatch", async (request
       if (stored == null) throw new HttpsError("already-exists", "AI match receipt was reused");
       if (prior.data()?.resultProtocol === 1) return stored;
     }
+  }
+  if (!data.legacy && data.adventureNodeId != null && matchRef != null && matchId != null) {
+    const nodeId = data.adventureNodeId;
+    const specPins = await readSpecPins(data.env,
+      [...BATTLE_REPLAY_SPEC_TABLES, "AdventureChapter", "AIDeck"]);
+    if (fingerprintOfSpecPins(data.env, specPins, ["Card"]) !== data.contentFingerprint) {
+      throw new HttpsError("failed-precondition", "content_fingerprint_mismatch");
+    }
+    const [chapterRows, deckRows, cardRows] = await Promise.all([
+      readPinnedSpecRows(data.env, "AdventureChapter", specPins.AdventureChapter),
+      readPinnedSpecRows(data.env, "AIDeck", specPins.AIDeck),
+      readPinnedSpecRows(data.env, "Card", specPins.Card),
+    ]);
+    const nodes = parseChapterNodeRows(chapterRows);
+    const authoredNodes = chapterRows.filter((row) => String(row.nodeId ?? "").trim() === nodeId);
+    const node = authoredNodes.length === 1 ? authoredNodes[0] : null;
+    const cardLevel = safeInteger(node?.aiCardLevel);
+    const deck = parseAiDeckRows(deckRows).rows.find((row) => row.deckId === String(node?.aiDeckId ?? ""));
+    if (node == null || cardLevel == null || cardLevel < 1 || deck == null) {
+      throw new HttpsError("failed-precondition", "Adventure opponent spec is invalid.");
+    }
+    const cardSpecs = new Map(cardRows.map((row) => {
+      const spec = parseCardSpecRow(row);
+      if (spec == null) throw new HttpsError("failed-precondition", "Card spec is invalid.");
+      return [spec.id, spec] as const;
+    }));
+    const snapshots = buildAiDeckSnapshots(deck.cardIds, cardLevel, cardSpecs);
+    if (snapshots == null) throw new HttpsError("failed-precondition", "Adventure AI growth is invalid.");
+    const cardGrowth = snapshots.map((card) => ({cardId: card.cardId, level: card.level, limitBreak: 0}));
+    const seedHex = randomBytes(8).toString("hex");
+    const playerBoardOrder = shuffle(data.playerDeck);
+    const enemyBoardOrder = shuffle(deck.cardIds);
+    const saveRef = db.doc(`envs/${data.env}/users/${uid}/save/current`);
+    return withCountedTransaction("findAiMatch", async (tx) => {
+      const prior = await tx.get(matchRef);
+      if (prior.exists) {
+        const stored = storedResponse(prior.data() ?? {}, data);
+        if (stored == null) throw new HttpsError("already-exists", "AI match receipt was reused");
+        return stored;
+      }
+      const save = (await tx.get(saveRef)).data();
+      if (save == null) throw new HttpsError("failed-precondition", "Save document is missing.");
+      const adventure = objectRecord(save.adventure);
+      const cleared = readNodeIdList(adventure?.clearedNodeIds);
+      const pending = adventure?.pendingRewardNodeId;
+      if (typeof pending === "string" && pending.length > 0) {
+        throw new HttpsError("failed-precondition", "Adventure reward is pending.");
+      }
+      if (cleared.includes(nodeId)) throw new HttpsError("failed-precondition", "Adventure node is already cleared.");
+      const rank = objectRecord(save.rank);
+      const points = Math.max(0, safeInteger(rank?.points) ?? 0);
+      const verdict = judgeNodeUnlock(nodes, nodeId, new Set(cleared), points);
+      if (!verdict.ok) throw new HttpsError("failed-precondition", verdict.reason);
+      const now = Timestamp.now();
+      tx.set(matchRef, {
+        matchId, env: data.env, phase: "pairing", status: "pending", pairingStatus: "paired",
+        seedSource: "server", seedHex, rulesetVersion: SERVER_RULESET_VERSION,
+        cardDataVersion: data.contentFingerprint, specPins, participantUids: [uid], expectedParticipants: 1,
+        mode: "solo", resultProtocol: 1, adventureNodeId: nodeId,
+        ownerIndexByUid: {[uid]: 0}, playerDeckCardIds: [...data.playerDeck].sort((a, b) => a - b),
+        aiDeck: {deckId: deck.deckId, cardIds: deck.cardIds, cardLevel, cardGrowth, snapshots},
+        serverBoardOrders: {owner0: playerBoardOrder, owner1: enemyBoardOrder},
+        pairingCreatedAt: now, pairedAt: FieldValue.serverTimestamp(),
+        expiresAt: Timestamp.fromMillis(now.toMillis() + MATCH_PAIRING_TTL_MS),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return {revision: 0, matchId, seedHex, rulesetVersion: SERVER_RULESET_VERSION,
+        deck: deck.cardIds, cardLevel, playerBoardOrder, enemyBoardOrder, resultProtocol: 1,
+        adventureNodeId: nodeId};
+    });
   }
   const [rankRows, deckRows, seasonRows] = await Promise.all([
     readSpecRows(data.env, "RankGrade"),
@@ -209,8 +295,8 @@ export const findAiMatch = onCall(measuredCallable("findAiMatch", async (request
       ]);
       const pinnedDecks = parseAiDeckRows(pinnedDeckRows);
       const profiles = parseRankAiEncounters(encounterRows, pinnedDecks.rows);
-      // 마지막전 판정은 별도 기능이다. 현재는 일반전 저작 프로필만 사용한다.
-      const selected = drawRankAiEncounter(profiles, pinnedDecks.rows, tierIndex, "Normal", randomInt);
+      const battleKind = resolveRankAiBattleKind(points, grades);
+      const selected = drawRankAiEncounter(profiles, pinnedDecks.rows, tierIndex, battleKind, randomInt);
       encounter = selected.profile;
       draw = {deckId: selected.deck.deckId, deck: [...selected.deck.cardIds], cardLevel: 0};
       const rule = parseCardEnhanceRule(ruleRows);
@@ -296,6 +382,7 @@ export const findAiMatch = onCall(measuredCallable("findAiMatch", async (request
     });
     logger.info("AI match created", {
       uid, env: authoredData.env, matchId, tierIndex, deckId: draw.deckId,
+      battleKind: encounter?.battleKind ?? "Normal",
     });
     return response;
   } catch (error) {

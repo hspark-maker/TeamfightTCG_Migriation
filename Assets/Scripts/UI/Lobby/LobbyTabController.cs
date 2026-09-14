@@ -262,10 +262,12 @@ public class LobbyTabController : MonoBehaviour
         }
 
         // 화면 좌표를 재는 일은 패널이 제자리에 선 뒤로 미룬다 — 도중에 재면 화면 밖을 짚는다.
+        int t_entryVersion = m_swipeVersion;
         m_pendingArrive = () =>
         {
             t_next?.OnSettled();
-            if (_fireTrigger) GuidanceCoordinator.TryFire(tabs[_index].tutorialTrigger);
+            if (_fireTrigger) GuidanceCoordinator.TryFire(tabs[_index].tutorialTrigger,
+                () => this != null && isActiveAndEnabled && m_currentIndex == _index && m_swipeVersion == t_entryVersion);
         };
 
         // 알약과 콘텐츠는 반드시 같은 프레임에 떠난다(LobbyTabBarView.focusSlideSeconds와 한 박자 계약).

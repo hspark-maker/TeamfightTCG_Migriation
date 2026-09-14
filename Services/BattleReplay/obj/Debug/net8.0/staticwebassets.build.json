@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "yKSAmH1ubdGl+I94jxZIX1InMpejaXKCbwfrFH9LvKc=",
+  "Source": "TeamfightTCG.BattleReplayService",
+  "BasePath": "_content/TeamfightTCG.BattleReplayService",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

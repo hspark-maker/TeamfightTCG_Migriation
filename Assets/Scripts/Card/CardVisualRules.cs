@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -16,10 +16,7 @@ public static class CardVisualRules
     /// 프리팹 직렬화 값(CardView / CardVisualView의 synergyMaxBadges)의 기본값 소스 = 여기 하나.</summary>
     public const int MaxSynergyBadges = 3;
 
-    /// <summary>카드 한 장에 그릴 아트 스프라이트를 고른다(없으면 null → 호출부가 렌더러를 끈다).
-    /// 소스는 battleImage 하나뿐이다 — 인게임 CardView.Render가 그리는 것과 같은 그림이라 로비/전투가 갈라지지 않는다.
-    /// (예전엔 fullImage → portrait 폴백이 뒤에 붙어 있었지만, battleImage가 늘 채워져 있어 도달한 적이 없다.)
-    /// "카드 아트가 아닌 목적 전용" 그림은 여기 넣지 않는다 — 호출부가 앞단에서 고른다.</summary>
+    // 주소 선택은 로드 상태와 무관하다. 실제 적재/해제는 CardArtBinding이 표시 수명에 맞춘다.
     static System.Func<int, int> s_evolutionStage;
 
     /// <summary>아웃게임에서 내 카드의 현재 진화 단계를 공급한다. 미주입이면 미진화 아트를 쓴다.</summary>
@@ -28,10 +25,10 @@ public static class CardVisualRules
         set => s_evolutionStage = value;
     }
 
-    public static Sprite PickCardArt(int _cardId)
+    public static string CardArtAddress(int _cardId)
     {
         if (_cardId <= 0) return null;
-        return PickCardArt(_cardId, s_evolutionStage != null ? s_evolutionStage(_cardId) : 0);
+        return CardArtAddress(_cardId, s_evolutionStage != null ? s_evolutionStage(_cardId) : 0);
     }
 
 
@@ -40,7 +37,7 @@ public static class CardVisualRules
     /// 폴백 판정은 **"그 단계에 그림이 배선되어 있는가"** 로 한다. 결과가 null인지로 판정하면
     /// Addressables 이관 뒤에 깨진다 — 배선은 됐지만 아직 안 받아온 단계가 "빈 슬롯"으로 오해되어
     /// 한 단계 아래 그림이 뜨고, 로드가 끝나면 그림이 갑자기 바뀐다. 배선 여부는 로드 없이 판정 가능하다.</summary>
-    public static Sprite PickCardArt(int _cardId, int _stage)
+    public static string CardArtAddress(int _cardId, int _stage)
     {
         if (!CardCatalog.TryGetSpec(_cardId, out CardSpec t_spec)) return null;
 
@@ -48,23 +45,23 @@ public static class CardVisualRules
         {
             string t_address = CardArtCache.AddressOf(t_spec, t_stage);
             if (!CardArtCache.Exists(t_address)) continue;
-            return CardArtCache.Get(t_address);
+            return t_address;
         }
 
         return null;
     }
 
     /// <summary>미보유 카드의 전용 실루엣. 원본 아트로 대체하지 않는다.</summary>
-    public static Sprite PickCardSilhouette(int _cardId)
+    public static string SilhouetteAddress(int _cardId)
     {
         if (!CardCatalog.TryGetSpec(_cardId, out CardSpec t_spec)) return null;
         string t_address = CardArtCache.SilhouetteAddressOf(t_spec);
-        return CardArtCache.Exists(t_address) ? CardArtCache.Get(t_address) : null;
+        return CardArtCache.Exists(t_address) ? t_address : null;
     }
 
     /// <summary>전투 카드 인스턴스의 진화 단계를 반영한 아트.</summary>
-    public static Sprite PickBattleArt(CardInstance _card)
-        => _card == null ? null : PickCardArt(_card.cardId, _card.evolutionStage);
+    public static string BattleArtAddress(CardInstance _card)
+        => _card == null ? null : CardArtAddress(_card.cardId, _card.evolutionStage);
 
     /// <summary>카드 한 장에 그릴 테두리(프레임). 미해금은 키워드 전용(시너지 0개), 해금 후에는 등급 × 시너지 개수로 고른다.
     /// 표가 없거나(초기화 프리팹을 거치지 않은 씬) 그 칸이 비면 null — 호출부는 프리팹 저작 그림을 그대로 둔다.</summary>

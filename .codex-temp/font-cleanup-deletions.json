@@ -1,0 +1,37 @@
+[
+  {
+    "path": "Assets/Fonts/PretendardVariable.ttf",
+    "guid": "571b7867ea9a5744da7272a0234513ec",
+    "bytes": 6739336
+  },
+  {
+    "path": "Assets/Fonts/ONE Mobile POP/ONE Mobile POP.ttf",
+    "guid": "ba9856754f72db8498a97e7ca366a0fd",
+    "bytes": 4014868
+  },
+  {
+    "path": "Assets/Fonts/nDlVcfwW7fVXLTZeKX4WdTVY1Yk/JalnanGothic/JalnanGothic.otf",
+    "guid": "291fc1b1a4ac2b745a0bc6c1725dfa8b",
+    "bytes": 1723800
+  },
+  {
+    "path": "Assets/Fonts/nDlVcfwW7fVXLTZeKX4WdTVY1Yk/JalnanGothic/JalnanGothicTTF.ttf",
+    "guid": "35852a5b6b2801b45af64b1c192ec96f",
+    "bytes": 2234992
+  },
+  {
+    "path": "Assets/Fonts/ONE Mobile POP OTF SDF.mat",
+    "guid": "76e04ec10573e2343ad156cbe7af0266",
+    "bytes": 3146
+  },
+  {
+    "path": "Assets/Fonts/uK4mTd9JFejCoAXNZyXHV6glsI/Jalnan2/Jalnan2TTF SDF_outline - Tutorial.mat",
+    "guid": "3f7c1a94e2b04d0e9a6d5c81b7f2a4d6",
+    "bytes": 3226
+  },
+  {
+    "path": "Assets/Fonts/uK4mTd9JFejCoAXNZyXHV6glsI/Jalnan2/Jalnan2TTF SDF_outline 1.asset",
+    "guid": "6ab76551a29073c4e8e33d805d164ff2",
+    "bytes": 34214298
+  }
+]

@@ -3,6 +3,7 @@ export {devBumpRevision} from "./commands/devBumpRevision";
 export {devResetSave} from "./commands/devResetSave";
 export {devCompleteMissions} from "./commands/devCompleteMissions";
 export {devResetDailyMissions} from "./commands/devResetDailyMissions";
+export {devSetRank} from "./commands/devSetRank";
 export {ensureAccount} from "./commands/ensureAccount";
 export {ensureWallet} from "./commands/ensureWallet";
 export {repairSaveSlots} from "./commands/repairSaveSlots";

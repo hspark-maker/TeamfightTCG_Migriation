@@ -9,7 +9,6 @@ public sealed class MissionCutInView : PooledUIBase
 {
     static MissionCutInView s_instance;
 
-    [SerializeField] Canvas overlayCanvas;
     [SerializeField] CanvasGroup canvasGroup;
     [SerializeField] RectTransform panel;
     [SerializeField] TMP_Text statusText;
@@ -64,7 +63,7 @@ public sealed class MissionCutInView : PooledUIBase
         base.Awake();
         s_instance = this;
         m_home = panel.anchoredPosition;
-        UiSortingOrder.LiftNested(overlayCanvas.gameObject, UiSortingOrder.MissionCutIn);
+        UiSortingOrder.LiftNested(gameObject, UiSortingOrder.MissionCutIn);
         canvasGroup.blocksRaycasts = false;
         canvasGroup.interactable = false;
         canvasGroup.alpha = 0f;

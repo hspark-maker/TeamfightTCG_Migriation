@@ -118,13 +118,21 @@ public class MissionRowView : MonoBehaviour
         this.Refresh();
     }
 
+    /// <summary>가이드 마지막 미션을 전체 달성 보상으로 표시한다. 수령 판정과 ID는 원래 정의를 유지한다.</summary>
+    internal void BindCompletion(MissionDefinition _definition, int _completed, int _total,
+        System.Action<string> _onClaim, System.Action<string> _onNavigate)
+    {
+        this.Bind(_definition, _onClaim, _onNavigate);
+        if (this.titleText != null) this.titleText.text = "가이드 미션 달성 보상";
+        if (this.descriptionText != null) this.descriptionText.text = "마지막 목표 · " + _definition.Title;
+        this.ApplyProgress(_completed, _total, _completed >= _total);
+    }
+
     /// <summary>진행도·수령 상태만 다시 그린다. 정의가 그대로면 Bind 를 다시 부르지 않는다.</summary>
     internal void Refresh()
     {
         if (this.m_definition == null) return;
 
-        long t_progress = MissionManager.ProgressOf(this.m_definition);
-        long t_target = this.m_definition.Target;
         bool t_complete = MissionManager.IsComplete(this.m_definition);
         bool t_claimed = MissionManager.IsClaimed(this.m_definition.Id);
         bool t_canClaim = MissionManager.CanClaim(this.m_definition);
@@ -134,25 +142,7 @@ public class MissionRowView : MonoBehaviour
         // 요청 중 입력 잠금은 표시 상태와 분리해 배경이 미완료로 깜빡이지 않게 한다.
         bool t_rewardAvailable = t_complete && MissionManager.IsGuideUnlocked(this.m_definition);
 
-        if (this.progressText != null)
-        {
-            // 목표를 넘겨 쌓여도 표시는 목표에서 멈춘다 — 서버도 수령을 한 번만 허용한다.
-            long t_shown = t_target > 0 ? System.Math.Min(t_progress, t_target) : t_progress;
-            s_text.Clear();
-            s_text.Append(t_shown).Append(" / ").Append(t_target);
-            this.progressText.text = s_text.ToString();
-            if (this.filledProgressText != null) this.filledProgressText.text = this.progressText.text;
-        }
-
-        if (this.progressFill != null)
-        {
-            float t_ratio = t_target > 0
-                ? Mathf.Clamp01((float)t_progress / t_target)
-                : (t_complete ? 1f : 0f);
-            // Sliced의 테두리 두께를 유지하며, 고정된 최대 영역 안에서 너비만 바꾼다.
-            this.progressFill.rectTransform.anchorMax = new Vector2(t_ratio, 1f);
-            this.progressFill.gameObject.SetActive(t_ratio > 0f);
-        }
+        this.ApplyProgress(MissionManager.ProgressOf(this.m_definition), this.m_definition.Target, t_complete);
 
         if (this.claimedMark != null) this.claimedMark.SetActive(t_claimed);
 
@@ -164,11 +154,31 @@ public class MissionRowView : MonoBehaviour
         }
 
         if (this.claimLabel != null)
-            this.claimLabel.text = t_claimed ? "V 완료됨" : t_rewardAvailable ? "받기" : t_canNavigate ? "이동" : "진행 중";
+            this.claimLabel.text = t_claimed ? "완료됨" : t_rewardAvailable ? "받기" : t_canNavigate ? "이동" : "진행 중";
 
         // 버튼은 끄지 않고 상호작용만 막는다 — 꺼 버리면 레이아웃이 흔들리고 "받은 줄"이 사라진 것처럼 보인다.
         if (this.claimButton != null) this.claimButton.interactable = t_canClaim || t_canNavigate;
         if (this.claimGroup != null) this.claimGroup.alpha = t_canClaim || t_canNavigate ? 1f : this.disabledAlpha;
+    }
+
+    void ApplyProgress(long _progress, long _target, bool _complete)
+    {
+        if (this.progressText != null)
+        {
+            long t_shown = _target > 0 ? System.Math.Min(_progress, _target) : _progress;
+            s_text.Clear();
+            s_text.Append(t_shown).Append(" / ").Append(_target);
+            this.progressText.text = s_text.ToString();
+            if (this.filledProgressText != null) this.filledProgressText.text = this.progressText.text;
+        }
+
+        if (this.progressFill != null)
+        {
+            float t_ratio = _target > 0 ? Mathf.Clamp01((float)_progress / _target) : (_complete ? 1f : 0f);
+            // Sliced의 테두리 두께를 유지하며 고정된 최대 영역 안에서 너비만 바꾼다.
+            this.progressFill.rectTransform.anchorMax = new Vector2(t_ratio, 1f);
+            this.progressFill.gameObject.SetActive(t_ratio > 0f);
+        }
     }
 
     void LateUpdate()

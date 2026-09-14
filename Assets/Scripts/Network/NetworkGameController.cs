@@ -272,6 +272,7 @@ public class NetworkGameController : MonoBehaviour
                         RejectMessage($"MatchAbort 사유 오류({t_buf[t_offset + 1]})");
                         return;
                     }
+                    PreBattleMatchHandoff.Invalidate();
                     if (preBattleReceiver != null) preBattleReceiver.OnMatchAbort(t_reason);
                     else if (this.awaitingSceneReady)
                     {

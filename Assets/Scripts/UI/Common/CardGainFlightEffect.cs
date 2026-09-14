@@ -120,28 +120,21 @@ public class CardGainFlightEffect : MonoBehaviour
     // 프리팹 미배선 폴백: 카드 아트 한 장으로도 "무엇이 날아갔는지"는 전달된다.
     RectTransform CreateFromArt(int _card)
     {
-        var t_sprite = ArtOf(_card);
-        if (t_sprite == null) return null;
+        var t_address = CardVisualRules.CardArtAddress(_card);
+        if (t_address == null) return null;
 
         var t_go = new GameObject("GainCard", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         ((RectTransform)t_go.transform).sizeDelta = this.cardSize;
 
         var t_img = t_go.GetComponent<Image>();
-        t_img.sprite = t_sprite;
+        CardArtBinding.Bind(t_img, t_address);
         t_img.raycastTarget = false;
         t_img.preserveAspect = true;
 
         return (RectTransform)t_go.transform;
     }
 
-    // 아트 선택은 CardVisualRules 하나에 맡긴다(여기서 필드를 직접 적으면 드리프트).
-    static Sprite ArtOf(int _card)
-    {
-        if (_card <= 0) return null;
-        return CardVisualRules.PickCardArt(_card);
-    }
-
-    // 날아가는 카드가 탭 터치를 가로채지 않게.
+    // 날아가는 카드가 탭 터치를 가로채지 않게 한다.
     static void BlockRaycast(GameObject _go)
     {
         var t_group = _go.GetComponent<CanvasGroup>();

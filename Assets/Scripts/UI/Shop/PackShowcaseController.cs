@@ -300,7 +300,7 @@ public class PackShowcaseController : MonoBehaviour
         var t_pack = ResolvePack();
         if (string.IsNullOrEmpty(t_pack) || !PackUnlockRules.IsUnlocked(t_pack)) return;
 
-        UIPoolManager.Instance?.AddOrUpdateUI<PackOddsPopup>(new PackOddsData { pack = t_pack });
+        UIPoolManager.Instance?.RequestUI<PackOddsPopup>(this, new PackOddsData { pack = t_pack });
     }
 
     // 구매 클릭: 낙관 검사를 통과하면 서버 왕복을 태우고, 성립하면 캐리어에 실어 개봉 오버레이로. 실패면 사유별 팝업(전역 1회 가드).

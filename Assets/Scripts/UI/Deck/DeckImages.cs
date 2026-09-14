@@ -41,14 +41,21 @@ public static class DeckImages
     public static Sprite Resolve(string _key) => s_catalog != null ? s_catalog.Find(_key) : null;
 
     // 덱 슬롯 하나의 표시용 이미지. 덱 목록·매치 선택 화면이 같은 그림을 보게 하는 단일 진실원이다.
-    // 이미지 키가 붙기 전에 저장된 덱(구 세이브)과 카탈로그 미배선 상태는 옛 규칙인 "첫 카드 아트"로 떨어진다.
+    // 키가 없으면 뷰가 CardAddressForSlot으로 첫 카드의 아트를 비동기 표시한다.
     public static Sprite ResolveForSlot(int _slotIndex)
     {
         if (_slotIndex < 0 || _slotIndex >= DeckSaveManager.SLOT_COUNT) return null;
 
         Sprite t_image = Resolve(DeckSaveManager.GetImageKey(_slotIndex));
 
-        return t_image != null ? t_image : ResolveFromFirstCard(DeckSaveManager.GetSlot(_slotIndex));
+        return t_image;
+    }
+
+    public static string CardAddressForSlot(int slotIndex)
+    {
+        if (slotIndex < 0 || slotIndex >= DeckSaveManager.SLOT_COUNT) return null;
+        var deck = DeckSaveManager.GetSlot(slotIndex);
+        return deck == null || deck.Count == 0 ? null : CardVisualRules.CardArtAddress(deck[0]);
     }
 
     static bool IsKeyInUse(string _key)
@@ -59,16 +66,4 @@ public static class DeckImages
         return false;
     }
 
-    // 덱 첫 카드의 아트 → 없으면 null.
-    // 폴백을 CardVisualRules에 맡기는 건 여기서 카드 아트를 직접 적으면
-    // 같은 카드가 덱 목록에서만 다른 그림으로 뜨는 드리프트가 생기기 때문이다.
-    static Sprite ResolveFromFirstCard(List<int> _deck)
-    {
-        if (_deck == null || _deck.Count == 0) return null;
-
-        var t_first = _deck[0];
-        if (t_first <= 0) return null;
-
-        return CardVisualRules.PickCardArt(t_first);
-    }
 }

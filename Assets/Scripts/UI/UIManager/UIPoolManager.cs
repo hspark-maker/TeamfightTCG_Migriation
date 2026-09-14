@@ -32,6 +32,8 @@ public class UIPoolManager : MonoBehaviour
     [SerializeField] Transform uiRoot;
 
     readonly Dictionary<Type, PooledUIBase> activeUIs = new Dictionary<Type, PooledUIBase>();
+    readonly Dictionary<Type, int> pendingRequests = new();
+    int requestVersion;
 
     private void Awake()
     {
@@ -63,6 +65,7 @@ public class UIPoolManager : MonoBehaviour
 
     public void DestroyAllUI()
     {
+        this.pendingRequests.Clear();
         foreach (var ui in activeUIs)
         {
             Destroy(ui.Value.gameObject);
@@ -83,12 +86,18 @@ public class UIPoolManager : MonoBehaviour
     public bool HasVisibleUIExcept(PooledUIBase except = null)
     {
         foreach (var ui in activeUIs.Values)
-            if (ui != null && ui != except && ui.isShow && ui.gameObject.activeInHierarchy) return true;
+        {
+            if (ui == null || ui == except || !ui.isShow || !ui.gameObject.activeInHierarchy) continue;
+            // 미션 컷인은 알림을 기다리기 위해 상시 열려 있다. 실제 재생 중일 때만 화면을 점유한다.
+            if (ui is MissionCutInView && !MissionCutInView.IsPlaying) continue;
+            return true;
+        }
         return false;
     }
 
     public T HideUI<T>() where T : PooledUIBase
     {
+        this.pendingRequests.Remove(typeof(T));
         if (this.activeUIs.TryGetValue(typeof(T), out var t_ui))
         {
             t_ui.Hide();
@@ -161,6 +170,74 @@ public class UIPoolManager : MonoBehaviour
         uiInstance.Show();
 
         return uiInstance;
+    }
+
+    /// <summary>버튼 진입점. 첫 적재 동안 입력을 막고, 호출 화면이 닫혔으면 뒤늦게 팝업을 열지 않는다.</summary>
+    public void RequestUI<T>(MonoBehaviour _owner, UIData _data = null) where T : PooledUIBase
+    {
+        if (_owner == null || !_owner.isActiveAndEnabled) return;
+        if (UiPrefabCache.TryGet(typeof(T), out _))
+        {
+            this.pendingRequests.Remove(typeof(T));
+            AddOrUpdateUI<T>(_data);
+            return;
+        }
+        int t_version = ++this.requestVersion;
+        this.pendingRequests[typeof(T)] = t_version;
+        OpenDeferredAsync<T>(_owner, _data, t_version).Forget();
+    }
+
+    async UniTask OpenDeferredAsync<T>(MonoBehaviour _owner, UIData _data, int _version) where T : PooledUIBase
+    {
+        object t_waitOwner = new object();
+        Exception t_error = null;
+        UniTask<GameObject> t_load = default;
+        bool t_started = false;
+        bool t_observed = false;
+        bool t_finished = false;
+        ServerWaitOverlay.Hold(t_waitOwner);
+        try
+        {
+            t_load = UiPrefabCache.LoadAsync<T>();
+            t_started = true;
+            var t_token = _owner.GetCancellationTokenOnDestroy();
+            while (t_load.Status == UniTaskStatus.Pending)
+            {
+                await UniTask.Yield(t_token);
+                if (this == null || _owner == null || !_owner.isActiveAndEnabled ||
+                    !this.pendingRequests.TryGetValue(typeof(T), out int t_pendingVersion) || t_pendingVersion != _version)
+                    return;
+            }
+            t_observed = true;
+            await t_load;
+            t_finished = true;
+        }
+        catch (OperationCanceledException) { return; }
+        catch (Exception t_exception) { t_error = t_exception; t_finished = true; }
+        finally
+        {
+            ServerWaitOverlay.Release(t_waitOwner);
+            if (!t_finished && this.pendingRequests.TryGetValue(typeof(T), out int t_pendingVersion) && t_pendingVersion == _version)
+                this.pendingRequests.Remove(typeof(T));
+            // 호출 화면은 닫혔어도 공유 적재는 끝까지 진행된다. 소비자가 사라진 요청의 예외도 회수한다.
+            if (t_started && !t_observed) t_load.Forget(_exception => { });
+        }
+
+        if (!this.pendingRequests.TryGetValue(typeof(T), out int t_version) || t_version != _version) return;
+        this.pendingRequests.Remove(typeof(T));
+        if (this == null || _owner == null || !_owner.isActiveAndEnabled) return;
+        if (t_error != null)
+        {
+            Debug.LogException(t_error);
+            AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
+            {
+                titleText = "화면을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+                yesText = "확인",
+                noText = "닫기"
+            });
+            return;
+        }
+        AddOrUpdateUI<T>(_data);
     }
 
     public void RegisterUI(PooledUIBase _ui)

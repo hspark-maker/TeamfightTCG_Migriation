@@ -2368,6 +2368,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: BG
       objectReference: {fileID: 0}
+    - target: {fileID: 5832931444992188211, guid: bde99aec1470b3145a75b9761237d42e, type: 3}
+      propertyPath: m_RaycastTarget
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3130036885897510504, guid: bde99aec1470b3145a75b9761237d42e, type: 3}
+      propertyPath: m_RaycastTarget
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 2557617228809941094, guid: bde99aec1470b3145a75b9761237d42e, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5

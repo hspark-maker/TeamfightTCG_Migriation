@@ -368,7 +368,7 @@ exports.claimReward = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
     let rankProgress;
     const result = await (0, saveDocument_1.mutateSave)(env, uid, "claimReward", { kind: "client", txId }, async (current, transaction, wallet) => {
         // 미션 읽기가 콜백의 첫 줄이다 — 아래 쓰기보다 반드시 앞이어야 한다(Firestore 트랜잭션 규칙).
-        const missions = await (0, missionStore_1.beginMissionBump)(transaction, firebaseApp_1.db, env, uid, period);
+        const missions = await (0, missionStore_1.beginMissionBump)(transaction, firebaseApp_1.db, env, uid, period, current);
         const itemRankSnapshot = itemContext !== null && ownerType !== "Rank" ?
             await transaction.get((0, rankStore_1.rankRef)(firebaseApp_1.db, env, uid)) : null;
         let rankState;

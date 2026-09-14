@@ -386,6 +386,13 @@ public static class OutgameTutorialRunner
     // 저작된 챕터의 스텝 수(범위 밖·빈 챕터는 0)
     public static int StepCountOf(int _chapter) => TryGetChapter(_chapter, out var t_chapter) ? t_chapter.StepCount : 0;
 
+    // 미리보기는 강제·자율 챕터 모두 읽는다. 실행 커서의 강제 챕터 경계는 그대로 둔다.
+    public static bool TryGetStepForDebug(int _chapter, int _step, out TutorialStepDef _def)
+    {
+        _def = null;
+        return TryGetChapterRaw(_chapter, out var t_chapter) && t_chapter.TryGetStep(_step, out _def);
+    }
+
     // 임의 좌표의 스텝 조회(진행도와 무관 — 되감기 재생이 좌표째 훑는 창구)
     public static bool TryGetStepAt(int _chapter, int _step, out TutorialStepDef _def)
     {
