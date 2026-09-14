@@ -35,7 +35,7 @@ MonoBehaviour:
   - content: 1
     contentName: "\uB7AD\uD06C\uC804"
     description: "\uB2E4\uB978 \uC720\uC800\uB4E4\uACFC \uACBD\uC7C1\uD558\uC138\uC694!"
-    icon: {fileID: 21300000, guid: 17de27ca2d170964ebadc7f29f952d3b, type: 3}
+    icon: {fileID: 21300000, guid: dc3329f3c0eecb24ca41103d72245414, type: 3}
   - content: 2
     contentName: "\uBBF8\uC158"
     description: "\uBBF8\uC158\uC744 \uD074\uB9AC\uC5B4\uD558\uACE0 \uBCF4\uC0C1\uC744
@@ -635,7 +635,8 @@ MonoBehaviour:
       action: 0
       anchor: 19
       spotlight: 19
-      guideMessage: "샤드를 하나씩 넣어 카드를 강화해 봅시다."
+      guideMessage: "\uC0E4\uB4DC\uB97C \uD558\uB098\uC529 \uB123\uC5B4 \uCE74\uB4DC\uB97C
+        \uAC15\uD654\uD574 \uBD05\uC2DC\uB2E4."
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
@@ -659,7 +660,8 @@ MonoBehaviour:
       action: 0
       anchor: 20
       spotlight: 0
-      guideMessage: "카드를 눌러 강화 화면을 열어 보세요."
+      guideMessage: "\uCE74\uB4DC\uB97C \uB20C\uB7EC \uAC15\uD654 \uD654\uBA74\uC744
+        \uC5F4\uC5B4 \uBCF4\uC138\uC694."
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
@@ -683,7 +685,10 @@ MonoBehaviour:
       action: 11
       anchor: 21
       spotlight: 0
-      guideMessage: "강화 버튼을 꾹 누르세요!\n샤드가 점점 빠르게 들어가고, 필요량을 채우면 자동으로 진화해요.\n이번 진화에 필요한 샤드는 무료예요."
+      guideMessage: "\uAC15\uD654 \uBC84\uD2BC\uC744 \uAFB9 \uB204\uB974\uC138\uC694!\n\uC0E4\uB4DC\uAC00
+        \uC810\uC810 \uBE60\uB974\uAC8C \uB4E4\uC5B4\uAC00\uACE0, \uD544\uC694\uB7C9\uC744
+        \uCC44\uC6B0\uBA74 \uC790\uB3D9\uC73C\uB85C \uC9C4\uD654\uD574\uC694.\n\uC774\uBC88
+        \uC9C4\uD654\uC5D0 \uD544\uC694\uD55C \uC0E4\uB4DC\uB294 \uBB34\uB8CC\uC608\uC694."
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
@@ -755,7 +760,11 @@ MonoBehaviour:
       action: 1
       anchor: 0
       spotlight: 0
-      guideMessage: "샤드를 넣을수록 능력치가 조금씩 올라요.\n필요량을 채우면 별이 늘어나며 진화해요.\n이제 강화한 카드를 전투에서 사용해 보세요!"
+      guideMessage: "\uC0E4\uB4DC\uB97C \uB123\uC744\uC218\uB85D \uB2A5\uB825\uCE58\uAC00
+        \uC870\uAE08\uC529 \uC62C\uB77C\uC694.\n\uD544\uC694\uB7C9\uC744 \uCC44\uC6B0\uBA74
+        \uBCC4\uC774 \uB298\uC5B4\uB098\uBA70 \uC9C4\uD654\uD574\uC694.\n\uC774\uC81C
+        \uAC15\uD654\uD55C \uCE74\uB4DC\uB97C \uC804\uD22C\uC5D0\uC11C \uC0AC\uC6A9\uD574
+        \uBCF4\uC138\uC694!"
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
