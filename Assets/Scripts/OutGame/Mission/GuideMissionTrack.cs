@@ -36,37 +36,22 @@ internal static class GuideMissionTrack
         }
     }
 
-    /// <summary>표시용 막. 시트에는 없고 클라 상수다 — sortOrder 구간으로 나눈다.</summary>
+    /// <summary>시트의 막 ID·이름과 진행 순서로 정한 표시 번호.</summary>
     internal readonly struct GuideAct
     {
+        internal int Id { get; }
         internal int Number { get; }
         internal string Name { get; }
-        internal int FirstOrder { get; }
-        internal int LastOrder { get; }
 
-        internal GuideAct(int _number, string _name, int _firstOrder, int _lastOrder)
+        internal GuideAct(int _id, int _number, string _name)
         {
+            Id = _id;
             Number = _number;
             Name = _name;
-            FirstOrder = _firstOrder;
-            LastOrder = _lastOrder;
         }
-
-        internal bool Contains(MissionDefinition _definition)
-            => _definition != null && _definition.SortOrder >= FirstOrder && _definition.SortOrder <= LastOrder;
 
         internal string Label => $"{Number}막 · {Name}";
     }
-
-    static readonly GuideAct[] s_acts =
-    {
-        new GuideAct(1, "출발", 1, 3),
-        new GuideAct(2, "돌보미 결성", 4, 7),
-        new GuideAct(3, "두 가지 힘", 8, 9),
-        new GuideAct(4, "에이스", 10, 15),
-    };
-
-    internal static IReadOnlyList<GuideAct> Acts => s_acts;
 
     internal static bool IsGuide(MissionDefinition _definition)
         => _definition != null && _definition.Period == PERIOD;
@@ -109,11 +94,15 @@ internal static class GuideMissionTrack
 
     internal static bool TryGetAct(MissionDefinition _definition, out GuideAct _act)
     {
-        for (int i = 0; i < s_acts.Length; i++)
+        if (IsGuide(_definition))
         {
-            if (!s_acts[i].Contains(_definition)) continue;
-            _act = s_acts[i];
-            return true;
+            GuideMissionList t_list = GuideMissionList.Build(MissionManager.Definitions, null, false);
+            foreach (GuideMissionList.Group t_group in t_list.Groups)
+            {
+                if (!t_group.HasHeader || t_group.Act.Id != _definition.GuideActId) continue;
+                _act = t_group.Act;
+                return true;
+            }
         }
         _act = default;
         return false;
@@ -121,20 +110,14 @@ internal static class GuideMissionTrack
 
     /// <summary>막의 마지막 미션인지. 수령 연출 제목을 "N막 완료"로 바꾸는 판정.</summary>
     internal static bool IsActFinale(MissionDefinition _definition)
-        => TryGetAct(_definition, out GuideAct t_act) && t_act.LastOrder == _definition.SortOrder;
-
-    /// <summary>막 안의 (수령 수, 전체 수).</summary>
-    internal static (int claimed, int total) CountOf(GuideAct _act)
     {
-        int t_claimed = 0, t_total = 0;
-        IReadOnlyList<MissionDefinition> t_definitions = MissionManager.Definitions;
-        for (int i = 0; i < t_definitions.Count; i++)
+        if (!IsGuide(_definition)) return false;
+        GuideMissionList t_list = GuideMissionList.Build(MissionManager.Definitions, null, false);
+        foreach (GuideMissionList.Group t_group in t_list.Groups)
         {
-            if (!IsGuide(t_definitions[i]) || !_act.Contains(t_definitions[i])) continue;
-            t_total++;
-            if (MissionManager.IsClaimed(t_definitions[i].Id)) t_claimed++;
+            if (t_group.HasHeader && t_group.LastMission.Id == _definition.Id) return true;
         }
-        return (t_claimed, t_total);
+        return false;
     }
 
     internal static GuideRoute RouteOf(MissionDefinition _definition)

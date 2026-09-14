@@ -74,6 +74,8 @@ export const getMissions = onCall(async (request) => {
       title: mission.title,
       description: mission.description,
       sortOrder: mission.sortOrder,
+      guideActId: mission.guideActId,
+      guideActName: mission.guideActName,
       reward: {
         currencies: resolveRewards(rewardRows, mission.period === "guide" ? "Guide" : "Mission", mission.id).gains,
         items: resolveRewards(rewardRows, mission.period === "guide" ? "Guide" : "Mission", mission.id).items,

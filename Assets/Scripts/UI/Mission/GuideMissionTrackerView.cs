@@ -29,7 +29,15 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
     void Rebind()
     {
         MissionDefinition t_definition = GuideMissionTrack.Current;
-        if (t_definition == null) return;
+        if (t_definition == null)
+        {
+            if (this.actText != null) this.actText.text = string.Empty;
+            if (this.titleText != null) this.titleText.text = string.Empty;
+            if (this.progressText != null) this.progressText.text = string.Empty;
+            if (this.rewardIcon != null) this.rewardIcon.gameObject.SetActive(false);
+            if (this.rewardCountText != null) this.rewardCountText.text = string.Empty;
+            return;
+        }
 
         if (this.actText != null)
             this.actText.text = GuideMissionTrack.TryGetAct(t_definition, out GuideMissionTrack.GuideAct t_act) ? t_act.Label : string.Empty;
