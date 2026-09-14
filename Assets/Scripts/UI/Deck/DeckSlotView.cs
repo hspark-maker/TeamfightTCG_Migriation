@@ -52,6 +52,8 @@ public class DeckSlotView : MonoBehaviour
 
     // 클릭 시 돌려줄 저장 슬롯 인덱스. 화면 표시 번호(numberText)와 절대 같은 값이 아니다.
     int m_slotIndex = -1;
+    Sprite m_defaultPreview;
+    bool m_previewCaptured;
     Action<int> m_onClick;
 
     // 생성 칸은 저장 좌표를 들지 않는다 — 큐 삽입 위치는 저장이 확정되는 순간에만 생긴다.
@@ -97,10 +99,16 @@ public class DeckSlotView : MonoBehaviour
 
         if (previewImage != null)
         {
+            if (!m_previewCaptured)
+            {
+                m_defaultPreview = previewImage.sprite;
+                m_previewCaptured = true;
+            }
             CardArtBinding.Clear(previewImage.gameObject);
             previewImage.gameObject.SetActive(true);
-            // null이면 대입하지 않는다 — 프리팹 기본 스프라이트를 남기는 게 폴백 사양이다.
-            // (null을 대입하면 흰 사각형이 된다)
+            // 유효한 대표 이미지·카드가 없으면 프리팹 기본 그림으로 복원한다.
+            previewImage.sprite = m_defaultPreview;
+            previewImage.enabled = m_defaultPreview != null;
             if (_preview != null)
             {
                 previewImage.sprite = _preview;
