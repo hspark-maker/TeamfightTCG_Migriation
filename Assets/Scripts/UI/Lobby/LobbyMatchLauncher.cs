@@ -134,6 +134,7 @@ public class LobbyMatchLauncher : MonoBehaviour
 
     void OnEnable()
     {
+        MissionCutInView.SetMatchEntry(false);
         if (matchPanel != null)
         {
             matchPanel.PlayRequested += StartAiBattle;
@@ -269,6 +270,7 @@ public class LobbyMatchLauncher : MonoBehaviour
     {
         if (m_running) return;
         m_running = true;
+        MissionCutInView.SetMatchEntry(true);
 
         EBattleContentGateResult t_result = await BattleContentSync.CheckBeforeBattleAsync(
             DeckConfig.IsMultiplayer, this.GetCancellationTokenOnDestroy());
@@ -371,6 +373,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         SoloMatchHandoff.Clear();
         m_matchShell?.Close();
         m_running = false;
+        MissionCutInView.SetMatchEntry(false);
         UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
         {
             titleText = _message,
@@ -415,6 +418,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         // 랭크 정산이 통째로 스킵된다. m_running과 같은 finally에 두는 이유도 같다(체인이 던져도 새지 않게).
         bool t_confirmed = false;
         m_running = true;
+        MissionCutInView.SetMatchEntry(true);
         try
         {
             t_confirmed = await RunEntryChainAsync(t_ct, _preset);
@@ -422,7 +426,11 @@ public class LobbyMatchLauncher : MonoBehaviour
         finally
         {
             m_running = false;
-            if (!t_confirmed) AdventureRun.End();
+            if (!t_confirmed)
+            {
+                AdventureRun.End();
+                MissionCutInView.SetMatchEntry(false);
+            }
         }
 
         // 씬이 내려가며 취소된 경우 — 파괴 중인 오브젝트를 건드리지 않는다.

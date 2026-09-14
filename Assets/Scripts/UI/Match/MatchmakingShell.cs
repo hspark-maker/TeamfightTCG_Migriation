@@ -507,12 +507,22 @@ public class MatchmakingShell : MonoBehaviour
     async UniTask<MatchOpponent?> RunStagesAsync(IMatchmaker _matchmaker, CancellationToken _ct)
     {
         OpenSearching();
+        MissionCutInView.SetOpponentSearch(true);
 
         // 취소를 누른 순간 기다리기를 그만둔다 — Photon 로비 참가·방 생성처럼 토큰을 못 받는 왕복이
         // 끝나기를 기다리면 취소가 몇 초씩 늦는다. 매칭 자체는 MatchmakingRun 이 끝까지 돌려 정리한다.
-        var (t_abandoned, t_opponent) = await MatchmakingRun.Run(_matchmaker, m_cts.Token)
-                                                           .AttachExternalCancellation(m_cts.Token)
-                                                           .SuppressCancellationThrow();
+        bool t_abandoned;
+        MatchOpponent? t_opponent;
+        try
+        {
+            (t_abandoned, t_opponent) = await MatchmakingRun.Run(_matchmaker, m_cts.Token)
+                .AttachExternalCancellation(m_cts.Token)
+                .SuppressCancellationThrow();
+        }
+        finally
+        {
+            MissionCutInView.SetOpponentSearch(false);
+        }
         if (t_abandoned) return null;
 
         // 씬이 내려가는 중이다 — 파괴될 오브젝트를 건드리지 않는다.
