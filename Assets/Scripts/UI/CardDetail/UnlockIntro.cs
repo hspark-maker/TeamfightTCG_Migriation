@@ -22,6 +22,10 @@ public readonly struct UnlockIntro
     /// <summary>덱 편성 규칙(시너지)인가.</summary>
     public bool IsSynergy => this.Keyword == CardKeyword.None;
 
+    public UnlockIntro WithIntroduction(string _body)
+        => string.IsNullOrEmpty(_body) ? this
+            : new UnlockIntro(Icon, IconScale, Name, _body + "\n\n" + Body, Keyword, Synergy);
+
     UnlockIntro(Sprite _icon, float _iconScale, string _name, string _body, CardKeyword _keyword,
                 SynergyData _synergy)
     {

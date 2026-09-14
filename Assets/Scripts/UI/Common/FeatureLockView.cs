@@ -29,12 +29,23 @@ public class FeatureLockView : MonoBehaviour
     Sequence m_unlockFx;
     Tween m_unlockPunch;
     bool m_explicitPresentation;
+    bool _holdUnlock;
     bool     m_wasLocked;        // 직전 적용 결과. 잠김→활성 뒤집힘을 이 컴포넌트가 스스로 잡는다
     bool     m_synced;           // 첫 적용은 상태 맞추기일 뿐이라 연출을 태우지 않는다
 
     List<UiGrayscale.Toned> m_toned;
 
     public EOutgameFeature Feature => feature;
+
+    /// <summary>해금 아이콘이 도착할 버튼 영역.</summary>
+    public RectTransform UnlockTarget => transform as RectTransform;
+
+    /// <summary>이용 자격을 바꾸지 않고 소개할 버튼의 잠김 표현을 유지한다.</summary>
+    public void HoldUnlockPresentation()
+    {
+        _holdUnlock = true;
+        if (isActiveAndEnabled) Apply(_silent: true);
+    }
 
     /// <summary>명시적으로 시작한 해금 연출이 살아 있는가.</summary>
     public bool IsPresenting => m_explicitPresentation && m_unlockFx != null && m_unlockFx.IsActive();
@@ -78,6 +89,7 @@ public class FeatureLockView : MonoBehaviour
 
     void OnDisable()
     {
+        _holdUnlock = false;
         OutgameFeatureLock.OnChanged -= OnLockChanged;
         KillUnlockFx();
         HideBadge();
@@ -89,7 +101,7 @@ public class FeatureLockView : MonoBehaviour
     {
         // 판정을 먼저 받는다 — 조회가 내부에서 OnChanged를 동기 발화해 이 메서드가 스스로 재진입할 수 있다.
         // 상태를 그 뒤에만 만지면 중첩 호출이 먼저 끝나도 바깥이 같은 값으로 다시 세워 결과가 어긋나지 않는다.
-        bool t_unlocked = OutgameFeatureLock.IsUnlocked(this.feature);
+        bool t_unlocked = OutgameFeatureLock.IsUnlocked(this.feature) && !_holdUnlock;
 
         // 잠김→활성 뒤집힘은 이 위젯이 스스로 잡는다. OnChanged는 "무엇이 열렸는지"를 실어 주지 않지만
         // 각자 자기 직전 상태를 알고 있어 그것만으로 "방금 내가 열렸다"가 성립한다.
@@ -168,6 +180,7 @@ public class FeatureLockView : MonoBehaviour
     public bool PresentUnlock(Action _onComplete)
     {
         if (!isActiveAndEnabled || IsLocked) return false;
+        _holdUnlock = false;
         EnsureBadge();
         UiGrayscale.Restore(this.m_toned);
         PlayUnlockFx(_onComplete);
@@ -178,6 +191,7 @@ public class FeatureLockView : MonoBehaviour
     /// <summary>중단된 연출을 걷고 현재 잠금 상태로 돌아간다.</summary>
     public void CancelPresentation()
     {
+        _holdUnlock = false;
         KillUnlockFx();
         Apply(_silent: true);
     }

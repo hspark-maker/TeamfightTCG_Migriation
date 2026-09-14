@@ -13,4 +13,10 @@ public enum EOutgameTutorialTrigger
     ContentUnlocksAvailable = 9, // 미션·룰렛 해금 소개
     GuideCaretakerEnhanceArrived = 10, // 폐기(가이드 도착 코치마크) — 카드 소지가 전제라 성립하지 않아 저작·발화처 0. 값만 남긴다
     GuideAceEnhanceArrived = 11,       // 폐기(가이드 도착 코치마크) — 위와 같음
+    GuideMissionIntroduction = 12,
+    KeywordIntroduction = 13,
+    SynergyIntroduction = 14,
+    CaretakerPreparation = 15,
+    CaretakerReady = 16,
+    CaretakerActivation = 17,
 }

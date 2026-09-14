@@ -23,7 +23,11 @@ internal static class MissionContentNavigation
         }
 
         var t_shell = UnityEngine.Object.FindFirstObjectByType<LobbyTabController>();
-        return t_shell != null && t_shell.TrySelectFeature(t_destination, _beforeNavigate);
+        return t_shell != null && t_shell.TrySelectFeature(t_destination, _beforeNavigate, _onArrived: () =>
+        {
+            if (t_destination == EOutgameFeature.LobbyCollectionTab) GuidanceCoordinator.RequestMissionEnhance(t_shell);
+            if (t_destination == EOutgameFeature.LobbyDeckTab) SynergyIntroduction.RequestRelevantAction();
+        });
     }
 
     static EOutgameFeature DestinationOf(MissionDefinition _definition)

@@ -240,18 +240,6 @@ MonoBehaviour:
   m_BlockingMask:
     serializedVersion: 2
     m_Bits: 4294967295
---- !u!225 &5094890747121428149
-CanvasGroup:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8909000000000000001}
-  m_Enabled: 1
-  m_Alpha: 1
-  m_Interactable: 1
-  m_BlocksRaycasts: 1
-  m_IgnoreParentGroups: 0
 --- !u!114 &7339965254467976638
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -264,23 +252,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3ef045785f507c949b02789682eba8c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CardSetRewardOverlay
+  viewContents: {fileID: 8909000000000000001}
   titleText: {fileID: 7863546268192744097}
   claimButton: {fileID: 7856946437835751216}
   grid: {fileID: 1041424122099593929}
-  dim:
-    alpha: 0.72
-    color: {r: 0, g: 0, b: 0, a: 1}
-    darkColor: {r: 0.02, g: 0.02, b: 0.05, a: 1}
-    brightColor: {r: 0.3, g: 0.28, b: 0.45, a: 1}
   transition:
     panel: {fileID: 7147919034864819992}
     openDuration: 0.18
     closeDuration: 0.15
     openFromScale: 0.92
     closeToScale: 0.94
+  dim:
+    alpha: 0.92
+    color: {r: 0, g: 0, b: 0, a: 1}
+    darkColor: {r: 0.02, g: 0.02, b: 0.05, a: 1}
+    brightColor: {r: 0.3, g: 0.28, b: 0.45, a: 1}
   claimDelay: 0.8
   claimFadeDuration: 0.16
-  viewContents: {fileID: 8909000000000000001}
 --- !u!1 &1618820920085967210
 GameObject:
   m_ObjectHideFlags: 0
@@ -824,3 +812,15 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!225 &5094890747121428149
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8909000000000000001}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0

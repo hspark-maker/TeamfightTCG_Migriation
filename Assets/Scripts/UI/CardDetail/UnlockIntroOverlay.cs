@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 // 해금된 개념(키워드·시너지)을 전면에서 한 장으로 가르치고 [확인]을 기다리는 오버레이.
 // 딤을 눌러서는 닫히지 않고, 행의 등장은 자리 대신 배율로 준다(레이아웃 그룹이 자리를 되돌린다).
@@ -14,6 +15,20 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 
     [Tooltip("행이 깔리는 노드. 자식은 UnlockIntroRow를 단 노드여야 하고, 런타임 Instantiate는 없다.")]
     [SerializeField] Transform rowRoot;
+    [Header("단계형 안내")]
+    [SerializeField] GameObject pageRoot;
+    [SerializeField] TMP_Text pageTitle;
+    [SerializeField] TMP_Text pageBody;
+    [SerializeField] TMP_Text pageCounter;
+    [SerializeField] Transform previewRoot;
+    [SerializeField] CardVisualView[] previewCards;
+    [SerializeField] TMP_Text[] previewStates;
+    [SerializeField] Button deferButton;
+
+    IReadOnlyList<UnlockIntroPage> m_pages;
+    Action<bool> m_onFinished;
+    int m_pageIndex;
+    int m_pageCard;
 
     [Header("연출")]
     [SerializeField] PopupTransition transition = new PopupTransition();
@@ -57,6 +72,48 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
     /// <summary>_intros를 세우고 [확인]을 기다린다(_onClose는 걷힌 뒤 한 번, 빈 목록이면 곧바로 온다).</summary>
     public void Show(IReadOnlyList<UnlockIntro> _intros, int _card, Action _onClose)
     {
+        CancelPages();
+        if (pageRoot != null) pageRoot.SetActive(false);
+        if (pageCounter != null) pageCounter.gameObject.SetActive(false);
+        if (deferButton != null) deferButton.gameObject.SetActive(false);
+        if (rowRoot != null) rowRoot.gameObject.SetActive(true);
+        ShowEffects(_intros, _card, _onClose);
+    }
+
+    /// <summary>마지막 확인에서만 true, 화면 이탈에서는 false를 한 번 돌려준다.</summary>
+    public void ShowPages(IReadOnlyList<UnlockIntroPage> _pages, int _card, Action<bool> _onFinished)
+    {
+        CancelPages();
+        if (_pages == null || _pages.Count == 0 || pageRoot == null || pageTitle == null || pageBody == null)
+        {
+            _onFinished?.Invoke(false);
+            return;
+        }
+        m_pages = _pages;
+        m_pageCard = _card;
+        m_pageIndex = 0;
+        m_onFinished = _onFinished;
+        if (deferButton != null)
+        {
+            deferButton.gameObject.SetActive(true);
+            deferButton.onClick.RemoveAllListeners();
+            deferButton.onClick.AddListener(Cancel);
+        }
+        RenderPage();
+    }
+
+    /// <summary>소유 화면이 떠나면 완료 처리 없이 안내를 닫는다.</summary>
+    public void Cancel()
+    {
+        CancelPages();
+        m_onClose = null;
+        bool t_open = ConsumeOpen();
+        SetVisible(false);
+        NotifyClosed(t_open);
+    }
+
+    void ShowEffects(IReadOnlyList<UnlockIntro> _intros, int _card, Action _onClose)
+    {
         InitializeUI();
         // 시퀀스에 중첩된 트윈은 대상의 DOKill이 잡지 못해 새 안무와 같은 노드를 함께 민다.
         KillIntro();
@@ -64,7 +121,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 
         this.m_shownRows = BuildRows(_intros);
 
-        if (this.m_shownRows == 0)
+        if (this.m_shownRows == 0 && m_pages == null)
         {
             this.m_onClose = null;
 
@@ -85,13 +142,13 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
             this.confirmButton.onClick.AddListener(OnConfirmClicked);
         }
 
-        MarkOpen();
+        if (!IsOpen) MarkOpen();
         SetVisible(true);
 
         // 다 서기 전에 눌러 닫히면 무엇이 열렸는지 못 본다.
         SetInputEnabled(false);
 
-        BeginDemo(_intros, _card);
+        if (m_pages == null || m_pages[m_pageIndex].PlayDemo) BeginDemo(_intros, _card);
 
         this.m_intro = BuildIntro();
         this.m_intro.Play();
@@ -105,6 +162,8 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 
     protected override void OnViewHidden()
     {
+        CancelPages();
+        m_onClose = null;
         this.dim.Clear();
         this.transition.HandleDisabled(ResolveTarget());
         KillIntro();
@@ -119,6 +178,16 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
     {
         // 콜백 유무로 연타를 막으면 뒤처리가 없는 호출부에서 [확인]이 아무 일도 안 하는 모달이 된다.
         if (!IsOpen) return;
+        if (confirmButton != null && !confirmButton.interactable) return;
+        if (m_pages != null && m_pageIndex + 1 < m_pages.Count)
+        {
+            m_pageIndex++;
+            RenderPage();
+            return;
+        }
+        Action<bool> t_finished = m_onFinished;
+        m_onFinished = null;
+        m_pages = null;
 
         // 정리 도중 다시 들어와도 두 번 흐르지 않게 먼저 비운다.
         var t_callback = this.m_onClose;
@@ -137,6 +206,49 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 
         // 받는 쪽이 이 화면의 상태를 다시 물어볼 수 있어야 해서 정리가 끝난 뒤에 넘긴다.
         t_callback?.Invoke();
+        t_finished?.Invoke(true);
+    }
+
+    void RenderPage()
+    {
+        UnlockIntroPage t_page = m_pages[m_pageIndex];
+        bool t_effect = t_page.Intros != null && t_page.Intros.Count > 0;
+        if (rowRoot != null) rowRoot.gameObject.SetActive(t_effect);
+        pageRoot.SetActive(!t_effect);
+        pageTitle.text = t_page.Title ?? string.Empty;
+        pageBody.text = t_page.Body ?? string.Empty;
+        if (pageCounter != null)
+        {
+            pageCounter.gameObject.SetActive(true);
+            pageCounter.text = (t_effect && !string.IsNullOrEmpty(t_page.Title) ? t_page.Title + "  ·  " : string.Empty)
+                + $"{m_pageIndex + 1} / {m_pages.Count}";
+        }
+        if (previewRoot != null) previewRoot.gameObject.SetActive(t_page.ShowCards);
+        if (t_page.ShowCards)
+            for (int t_i = 0; t_i < GuideMissionPreparation.CardIds.Count; t_i++)
+            {
+                int t_card = GuideMissionPreparation.CardIds[t_i];
+                if (previewCards != null && t_i < previewCards.Length && previewCards[t_i] != null)
+                    previewCards[t_i].Bind(t_card, OwnershipManager.IsOwned(t_card));
+                if (previewStates != null && t_i < previewStates.Length && previewStates[t_i] != null)
+                    previewStates[t_i].text = GuideMissionPreparation.StatusTextOf(t_card);
+            }
+        IReadOnlyList<UnlockIntro> t_intros = t_page.Intros;
+        if (t_effect && !string.IsNullOrEmpty(t_page.Body))
+        {
+            var t_presented = new List<UnlockIntro>();
+            foreach (var t_intro in t_intros) t_presented.Add(t_intro.WithIntroduction(t_page.Body));
+            t_intros = t_presented;
+        }
+        ShowEffects(t_intros, m_pageCard, null);
+    }
+
+    void CancelPages()
+    {
+        Action<bool> t_finished = m_onFinished;
+        m_onFinished = null;
+        m_pages = null;
+        t_finished?.Invoke(false);
     }
 
     // 프리팹에 미리 깔린 행을 꺼내 쓰고 남는 것은 끈다. 돌려주는 값은 실제로 세운 수.

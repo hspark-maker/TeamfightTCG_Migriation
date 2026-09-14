@@ -295,6 +295,14 @@ public class TutorialAuthoringWindow : EditorWindow
                 new GUIContent("콘텐츠 해금 조건"), true);
             EditorGUILayout.PropertyField(this.serialized.FindProperty("contentIntros"),
                 new GUIContent("콘텐츠 해금 소개"), true);
+            EditorGUILayout.PropertyField(this.serialized.FindProperty("keywordIntroduction"),
+                new GUIContent("첫 키워드 해금 설명"), true);
+            EditorGUILayout.PropertyField(this.serialized.FindProperty("synergyIntroduction"),
+                new GUIContent("첫 시너지 해금 설명"), true);
+            EditorGUILayout.PropertyField(this.serialized.FindProperty("caretakerPreparation"),
+                new GUIContent("돌보미 조합 목표 예고"), true);
+            EditorGUILayout.PropertyField(this.serialized.FindProperty("caretakerReady"),
+                new GUIContent("돌보미 조합 준비 확인"), true);
         }
 
         EditorGUILayout.Space(2);

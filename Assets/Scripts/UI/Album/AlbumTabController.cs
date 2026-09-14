@@ -102,6 +102,11 @@ public class AlbumTabController : LobbyTabPanel
 
     public override void OnSettled() => m_settled = true;
 
+    public override void OnLeave()
+    {
+        OutgameTutorialRunner.AbortGuided(EOutgameTutorialTrigger.CollectionTabFirstEnter);
+    }
+
     // 탭이 켜진 그 프레임엔 그리드 cellSize가 아직 없다 — 양보 후 강제 갱신해야 세션이 슬롯 rect를 실측할 수 있다.
     // 전환 슬라이드가 도는 동안도 마찬가지라 제자리에 설 때까지 함께 기다린다.
     IEnumerator BeginInsertNextFrame(AlbumInsertSession _session)
@@ -258,7 +263,15 @@ public class AlbumTabController : LobbyTabPanel
 
     void OpenTheme(AlbumTheme _theme)
     {
-        OpenThemePage(_theme, 0);
+        int t_page = 0;
+        if (OutgameTutorialRunner.GuidedTrigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
+            && OutgameTutorialGuide.TryGetAnchorCard(out int t_card))
+        {
+            for (int t_i = 0; t_i < _theme.Pages.Count; t_i++)
+                foreach (int t_candidate in _theme.Pages[t_i].CardIds)
+                    if (t_candidate == t_card) t_page = t_i;
+        }
+        OpenThemePage(_theme, t_page);
 
         // 안내 중이면 이 클릭이 세션의 출발 신호다 — 그전까지는 오버레이가 닫혀 있어 대기했다
         TryBeginInsert();

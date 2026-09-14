@@ -21,6 +21,9 @@ public static class OutgameTutorialRunner
     // 진행도가 다음 스텝으로 넘어갈 때 발화
     public static event Action OnStepChanged;
 
+    /// <summary>강제 온보딩을 처음 졸업한 순간.</summary>
+    public static event Action OnSequenceCompleted;
+
     // 자율 안내가 실제로 시작됐을 때(세션 중간에 시작되므로 브리지가 pull만으로는 잡을 수 없다)
     public static event Action OnGuidedActivated;
 
@@ -65,6 +68,7 @@ public static class OutgameTutorialRunner
         if (OutgameTutorialProgress.IsCompleted) return;
 
         OutgameTutorialProgress.Complete();
+        OnSequenceCompleted?.Invoke();
 
         // 졸업으로 전 기능이 열린다. 게이트를 거치지 않고 닫히는 경로(전투에서 돌아와 확정하는 졸업·디버그 스킵)에도
         // 잠김 룩이 따라오게 여기서 알린다 — FeatureLockView는 OnChanged로만 다시 그린다.
@@ -99,11 +103,20 @@ public static class OutgameTutorialRunner
         if (IsGuidedRunning) return;
         if (!HasPending(_trigger)) return;
 
-        TryGetGuidedChapter(_trigger, out s_guidedChapter, out _);
+        TryGetGuidedChapter(_trigger, out int t_chapterIndex, out var t_chapter);
+        if (_trigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
+            && !OutgameTutorialGuide.PrepareEnhanceCard(t_chapter)) return;
+        s_guidedChapter = t_chapterIndex;
         s_guidedStep = 0;
 
         OnGuidedActivated?.Invoke();
         OnGuidedChanged?.Invoke();
+    }
+
+    /// <summary>명시적으로 다시 요청한 안내의 이번 세션 미루기만 해제한다.</summary>
+    public static void ResumeDeferred(EOutgameTutorialTrigger _trigger)
+    {
+        if (s_deferred.Remove(_trigger)) OnGuidedChanged?.Invoke();
     }
 
     // 자율 커서가 가리키는 스텝(미실행·범위 밖·빈 칸이면 false)
@@ -183,6 +196,7 @@ public static class OutgameTutorialRunner
             s_deferred.Clear();
         }
 
+        OutgameTutorialGuide.ClearEnhanceCard();
         s_guidedChapter = -1;
         s_guidedStep    = 0;
 
@@ -199,6 +213,7 @@ public static class OutgameTutorialRunner
 
         OutgameTutorialProgress.MarkTriggerDone(t_trigger);
 
+        OutgameTutorialGuide.ClearEnhanceCard();
         s_guidedChapter = -1;
         s_guidedStep    = 0;
 

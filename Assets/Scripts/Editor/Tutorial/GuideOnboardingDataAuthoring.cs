@@ -1,0 +1,115 @@
+#if UNITY_EDITOR
+using System.Collections.Generic;
+using UnityEditor;
+using UnityEngine;
+
+/// <summary>가이드 안내의 최초 저작과 저장 계약을 검증한다.</summary>
+public static class GuideOnboardingDataAuthoring
+{
+    const string PATH = "Assets/SO/TutorialConfig/Outgame/OutgameTutorial.asset";
+
+    [MenuItem("Tools/Tutorial/Author Guide Onboarding Data")]
+    public static void Author()
+    {
+        var t_data = AssetDatabase.LoadAssetAtPath<OutgameTutorialData>(PATH);
+        Undo.RecordObject(t_data, "Author guide onboarding");
+        if (t_data.keywordIntroduction.Count == 0)
+            t_data.keywordIntroduction.AddRange(new[]
+            {
+                Page(EGuideOnboardingPage.Concept, "새로운 키워드가 열렸어요!", "카드가 성장하면 새로운 키워드가 열려요.\n키워드는 전투에서 사용하는 특별한 능력이에요."),
+                Page(EGuideOnboardingPage.Effect, "이 카드의 능력", ""),
+                Page(EGuideOnboardingPage.Demo, "전투에서 이렇게 사용해요", ""),
+            });
+        if (t_data.synergyIntroduction.Count == 0)
+            t_data.synergyIntroduction.AddRange(new[]
+            {
+                Page(EGuideOnboardingPage.Concept, "시너지가 해금됐어요!", "2성으로 성장한 카드는 시너지에 참여할 수 있어요.\n해금만으로 덱의 효과가 켜지는 것은 아니에요."),
+                Page(EGuideOnboardingPage.Concept, "같은 덱에 모으면 활성화!", "같은 시너지가 해금된 카드를 필요한 수만큼\n같은 덱에 편성하면 시너지 효과가 활성화돼요."),
+                Page(EGuideOnboardingPage.Effect, "이번에 열린 시너지", ""),
+                Page(EGuideOnboardingPage.Demo, "함께 쓰는 효과", ""),
+            });
+        if (t_data.caretakerPreparation.Count == 0)
+            t_data.caretakerPreparation.Add(Page(EGuideOnboardingPage.Cards, "다음 목표는 돌보미 조합!",
+                "별토리·솜구름몽·포슬램을\n모두 2성으로 키워\n돌보미 시너지를 준비해 보세요."));
+        if (t_data.caretakerReady.Count == 0)
+            t_data.caretakerReady.Add(Page(EGuideOnboardingPage.Cards, "돌보미 조합 준비 완료!",
+                "돌보미 카드가 준비됐어요.\n세 카드를 같은 덱에 편성해 보세요."));
+        foreach (var t_page in t_data.caretakerReady)
+            if (string.IsNullOrEmpty(t_page.activeBody)) t_page.activeBody =
+                "돌보미 시너지가 이미 활성화됐어요!\n덱에서 참여 카드와 효과를 확인하고\n모험에서 함께 사용해 보세요.";
+        int t_chapterIndex = t_data.chapters.FindIndex(_chapter => _chapter.Trigger == EOutgameTutorialTrigger.GuideMissionIntroduction);
+        if (t_chapterIndex < 0)
+        {
+            var t_chapter = new OutgameTutorialChapter();
+            t_chapter.EditorLabel = "가이드 미션 소개";
+            t_chapter.EditorKind = EOutgameTutorialChapterKind.Guided;
+            t_chapter.EditorTrigger = EOutgameTutorialTrigger.GuideMissionIntroduction;
+            t_chapter.EditorPrerequisite = EOutgameFeature.Mission;
+            t_chapter.EditorSteps.Add(new TutorialStepDef());
+            t_data.chapters.Add(t_chapter);
+            t_chapterIndex = t_data.chapters.Count - 1;
+            var t_serialized = new SerializedObject(t_data);
+            var t_step = t_serialized.FindProperty("chapters").GetArrayElementAtIndex(t_chapterIndex)
+                .FindPropertyRelative("stepDefs").GetArrayElementAtIndex(0);
+            t_step.FindPropertyRelative("action").intValue = (int)EOutgameTutorialAction.Message;
+            t_step.FindPropertyRelative("guideMessage").stringValue = "가이드 미션이 다음 목표를 알려줘요.\n현재 목표와 보상을 확인하고 [이동]을 눌러 시작해 보세요.\n목표를 달성하면 직접 보상을 받을 수 있어요.";
+            t_step.FindPropertyRelative("useDim").boolValue = true;
+            t_serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+        var t_so = new SerializedObject(t_data);
+        var t_chapters = t_so.FindProperty("chapters");
+        for (int t_c = 0; t_c < t_chapters.arraySize; t_c++)
+        {
+            var t_steps = t_chapters.GetArrayElementAtIndex(t_c).FindPropertyRelative("stepDefs");
+            for (int t_s = 0; t_s < t_steps.arraySize; t_s++)
+            {
+                var t_step = t_steps.GetArrayElementAtIndex(t_s);
+                int t_id = t_step.FindPropertyRelative("stepId").intValue;
+                if (t_id == 28 || t_id == 29) t_step.FindPropertyRelative("anchorCardId").intValue = 0;
+                if (t_id == 30) t_step.FindPropertyRelative("guideMessage").stringValue =
+                    "강화 버튼을 꾹 누르세요!\n샤드가 점점 빠르게 들어가고, 필요량을 채우면 별이 늘어나요.\n{enhanceCost}";
+            }
+        }
+        t_so.ApplyModifiedPropertiesWithoutUndo();
+        t_data.AssignMissingStepIds();
+        EditorUtility.SetDirty(t_data);
+        AssetDatabase.SaveAssetIfDirty(t_data);
+        Debug.Log("[GuideOnboarding] Authored introduction pages and mission chapter.");
+    }
+
+    [MenuItem("Tools/Tutorial/Validate Guide Onboarding")]
+    public static void Validate()
+    {
+        var t_data = AssetDatabase.LoadAssetAtPath<OutgameTutorialData>(PATH);
+        Require(t_data.keywordIntroduction.Exists(_p => _p.kind == EGuideOnboardingPage.Concept)
+            && t_data.keywordIntroduction.Exists(_p => _p.kind == EGuideOnboardingPage.Demo), "Keyword concept/demo authoring missing");
+        Require(t_data.synergyIntroduction.Count >= 3 && t_data.caretakerPreparation.Count > 0 && t_data.caretakerReady.Count > 0, "Synergy authoring missing");
+        var t_ids = new HashSet<int>();
+        foreach (var t_chapter in t_data.chapters)
+            for (int t_i = 0; t_i < t_chapter.StepCount; t_i++)
+            {
+                t_chapter.TryGetStep(t_i, out var t_step);
+                Require(t_step.StepId > 0 && t_ids.Add(t_step.StepId), "Duplicate step id");
+                if (t_step.StepId == 30) Require(t_step.WaitUnlockIntro, "Enhance must await all intro pages");
+                if (t_step.StepId == 28 || t_step.StepId == 29) Require(t_step.AnchorCardId == 0, "Fixed enhance card remains");
+            }
+        var t_save = new TutorialSaveData { OutgameCompleted = true, StepId = 25 };
+        t_save.CompletedTriggers.Add("CollectionTabFirstEnter");
+        t_save.CompletedTriggers.Add(EOutgameTutorialTrigger.KeywordIntroduction.ToString());
+        t_save.CompletedTriggers.Add(EOutgameTutorialTrigger.CaretakerPreparation.ToString());
+        var t_copy = Newtonsoft.Json.JsonConvert.DeserializeObject<TutorialSaveData>(Newtonsoft.Json.JsonConvert.SerializeObject(t_save));
+        Require(t_copy.OutgameCompleted && t_copy.StepId == 25 && t_copy.CompletedTriggers.Count == 3
+            && t_copy.CompletedTriggers.Contains("KeywordIntroduction"), "Completed explanations lost in round trip");
+        GuidanceIntegrationValidation.Run();
+        Debug.Log("[GuideOnboarding] PASS: authoring, step ids, unlock wait, old/new completion round trip.");
+    }
+
+    static GuideOnboardingPage Page(EGuideOnboardingPage _kind, string _title, string _body)
+        => new GuideOnboardingPage { kind = _kind, title = _title, body = _body };
+
+    static void Require(bool _condition, string _message)
+    {
+        if (!_condition) throw new System.InvalidOperationException(_message);
+    }
+}
+#endif

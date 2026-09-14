@@ -432,6 +432,13 @@ MonoBehaviour:
   animator: {fileID: 0}
   contents: {fileID: 1963540571}
   isShow: 0
+  transition:
+    panel: {fileID: 0}
+    openDuration: 0.25
+    closeDuration: 0.15
+    openFromScale: 0.9
+    closeToScale: 0.9
+  dimAlpha: 0.72
   yesButton: {fileID: 316298083}
   noButton: {fileID: 1521251003}
   yesText: {fileID: 870721085}
@@ -447,8 +454,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: cb8dac1c06b446898a7e50e3c8777450, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   view: {fileID: 347921183}
 --- !u!1 &671515559
 GameObject:

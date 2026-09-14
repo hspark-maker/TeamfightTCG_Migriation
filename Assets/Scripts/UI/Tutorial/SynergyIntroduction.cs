@@ -8,6 +8,8 @@ public sealed class SynergyIntroduction : MonoBehaviour
 {
     static SynergyIntroduction s_instance;
     bool m_active;
+    bool m_relevantAction;
+    UnlockIntroOverlay m_readyOverlay;
     bool m_deferred;
     bool m_presentingDeck;
     SimpleYNPopup m_proposal;
@@ -19,8 +21,8 @@ public sealed class SynergyIntroduction : MonoBehaviour
 
     static SynergyIntroductionSaveData State => DataSaveManager.Data?.Tutorial?.SynergyIntroduction;
     public static bool IsActive => s_instance != null && s_instance.m_active;
-    public static bool HasPending => State != null && (State.SynergyId == CARETAKER_ID || State.DeckSlot >= 0)
-        && !string.IsNullOrEmpty(State.SynergyId) && !State.IsDone(State.SynergyId)
+    public static bool HasPending => s_instance != null && s_instance.m_relevantAction && State != null && (State.SynergyId == CARETAKER_ID || State.DeckSlot >= 0)
+        && !string.IsNullOrEmpty(State.SynergyId) && !IsIntroductionDone(State.SynergyId)
         && (s_instance == null || !s_instance.m_deferred);
 
     // 돌보미는 지정 카드 성장, 추적은 실제 덱 조합 달성 후 소개한다.
@@ -33,6 +35,7 @@ public sealed class SynergyIntroduction : MonoBehaviour
         if (s_instance == null) return;
         s_instance.ClearPresentation();
         s_instance.m_deferred = false;
+        s_instance.m_relevantAction = false;
         s_instance.m_target = null;
         s_instance.m_slot = -1;
     }
@@ -73,6 +76,7 @@ public sealed class SynergyIntroduction : MonoBehaviour
 
     void OnStateChanged()
     {
+        m_relevantAction = true;
         m_deferred = false;
         Reevaluate();
     }
@@ -83,6 +87,20 @@ public sealed class SynergyIntroduction : MonoBehaviour
             || m_editor.CurrentSlot != m_slot)) ClearPresentation();
     }
 
+    /// <summary>미션 열기와 덱·성장 행동에서 미완료 안내를 다시 허용한다.</summary>
+    public static void RequestRelevantAction()
+    {
+        var t_self = Ensure();
+        t_self.m_relevantAction = true;
+        t_self.m_deferred = false;
+        Reevaluate();
+    }
+
+    static bool IsIntroductionDone(string _id)
+        => _id == CARETAKER_ID
+            ? OutgameTutorialProgress.IsTriggerDone(EOutgameTutorialTrigger.CaretakerActivation)
+            : State.IsDone(_id);
+
     public static void Reevaluate()
     {
         if (!CardCatalog.IsReady || !CardGrowthManager.IsReady || State == null) return;
@@ -91,7 +109,7 @@ public sealed class SynergyIntroduction : MonoBehaviour
         string t_id = PendingSynergyId();
         int t_slot = -1;
         SynergyProgress t_target = null;
-        if (!string.IsNullOrEmpty(t_id) && t_id != CARETAKER_ID)
+        if (!string.IsNullOrEmpty(t_id))
         {
             // 저장한 슬롯이 여전히 그 시너지를 켜고 있으면 유지한다. 아니면 선택 슬롯 → 나머지 순서로 다시 고른다.
             if (State.SynergyId == t_id && TryResolve(State.DeckSlot, t_id, out t_target)) t_slot = State.DeckSlot;
@@ -103,7 +121,7 @@ public sealed class SynergyIntroduction : MonoBehaviour
                     for (int t_i = 0; t_i < DeckSaveManager.SLOT_COUNT; t_i++)
                         if (t_i != t_selected && TryResolve(t_i, t_id, out t_target)) { t_slot = t_i; break; }
             }
-            if (t_slot < 0) t_id = "";
+            if (t_slot < 0 && (t_id != CARETAKER_ID || OutgameTutorialProgress.IsTriggerDone(EOutgameTutorialTrigger.CaretakerReady))) t_id = "";
         }
         if (State.DeckSlot == t_slot && State.SynergyId == t_id) return;
         State.DeckSlot = t_slot;
@@ -116,7 +134,7 @@ public sealed class SynergyIntroduction : MonoBehaviour
     static string PendingSynergyId()
     {
         if (!MissionManager.IsReady) return "";
-        if (!State.IsDone(CARETAKER_ID))
+        if (!IsIntroductionDone(CARETAKER_ID))
             return IsGuideComplete(GuideMissionTrack.EVENT_STARTER_CARDS_STAR2) ? CARETAKER_ID : "";
         if (!State.IsDone(TRACE_ID))
             return IsGuideComplete(GuideMissionTrack.EVENT_CARETAKER_TRACE_DECK) ? TRACE_ID : "";
@@ -152,7 +170,7 @@ public sealed class SynergyIntroduction : MonoBehaviour
         Reevaluate();
         if (IsActive || !HasPending || !OutgameTutorialProgress.IsCompleted || UIPoolManager.instance == null) return false;
         SynergyIntroduction t_self = Ensure();
-        if (State.SynergyId == CARETAKER_ID) return t_self.TryBeginCaretaker();
+        if (State.SynergyId == CARETAKER_ID && State.DeckSlot < 0) return t_self.TryBeginCaretaker();
         if (!TryResolve(State.DeckSlot, State.SynergyId, out t_self.m_target)) return false;
         t_self.m_slot = State.DeckSlot;
         t_self.m_active = true;
@@ -187,29 +205,24 @@ public sealed class SynergyIntroduction : MonoBehaviour
 
     bool TryBeginCaretaker()
     {
-        if (!CardCatalog.TryGetSynergyData(new SynergyRuntime(CARETAKER_ID), out SynergyData t_synergy)) return false;
-        ExplainPopupData t_data = ExplainPopupData.ForSynergy(t_synergy, 3);
-        if (t_data == null) return false;
+        var t_authored = OutgameTutorialRunner.Data?.caretakerReady;
+        if (t_authored == null || t_authored.Count == 0 || !UnlockIntroOverlay.TryGet(out m_readyOverlay)) return false;
+        var t_pages = new List<UnlockIntroPage>();
+        foreach (var t_page in t_authored)
+            if (t_page != null) t_pages.Add(new UnlockIntroPage(t_page.title, t_page.body,
+                showCards: t_page.kind == EGuideOnboardingPage.Cards));
+        if (t_pages.Count == 0) return false;
         m_active = true;
-        bool t_accept = false;
-        m_proposal = UIPoolManager.instance.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
+        m_readyOverlay.ShowPages(t_pages, 0, _completed =>
         {
-            titleText = $"{t_data.displayName} 시너지를 소개할게요.\n시너지가 해금된 돌보미 카드 3장을 덱에 모으면\n{t_data.explain}",
-            yesText = "확인",
-            noText = "나중에",
-            yesAction = () => t_accept = true,
-            noAction = () => m_deferred = true,
-            onHide = () =>
-            {
-                m_proposal = null;
-                if (!m_active) return;
-                if (t_accept) Complete();
-                else m_active = false;
-            },
+            m_readyOverlay = null;
+            if (!m_active) return;
+            if (_completed) OutgameTutorialProgress.MarkTriggerDone(EOutgameTutorialTrigger.CaretakerReady);
+            m_active = false;
+            m_deferred = true;
+            Reevaluate();
         });
-        if (m_proposal != null) return true;
-        m_active = false;
-        return false;
+        return true;
     }
 
     IEnumerator OpenDeck()
@@ -220,10 +233,18 @@ public sealed class SynergyIntroduction : MonoBehaviour
         LobbyTabController t_shell = FindFirstObjectByType<LobbyTabController>();
         DeckTabController t_tab = t_shell != null ? t_shell.GetComponentInChildren<DeckTabController>(true) : null;
         if (t_shell == null || t_tab == null) { ClearPresentation(); yield break; }
-        t_shell.Select(t_tab, false);
-        t_tab.OpenEditor(m_slot);
-        // 탭 슬라이드와 편집기 레이아웃이 자리를 잡은 다음 강조한다.
-        yield return new WaitForSecondsRealtime(0.5f);
+        bool t_arrived = false;
+        if (!t_shell.TrySelectFeature(EOutgameFeature.LobbyDeckTab, _onArrived: () =>
+        {
+            if (!m_active) return;
+            t_tab.OpenEditor(m_slot);
+            t_arrived = true;
+        })) { ClearPresentation(); yield break; }
+        int t_entry = t_shell.SwipeVersion;
+        while (!t_arrived && m_active && t_shell != null && t_shell.isActiveAndEnabled && t_shell.SwipeVersion == t_entry)
+            yield return null;
+        if (!t_arrived) { ClearPresentation(); yield break; }
+        yield return null;
         if (!m_active || !TryResolve(m_slot, State?.SynergyId, out m_target))
         { ClearPresentation(); yield break; }
         foreach (DeckEditController t_editor in FindObjectsByType<DeckEditController>(FindObjectsSortMode.None))
@@ -257,6 +278,11 @@ public sealed class SynergyIntroduction : MonoBehaviour
     {
         string t_id = State.SynergyId;
         State.MarkDone(t_id);
+        if (t_id == CARETAKER_ID)
+        {
+            OutgameTutorialProgress.MarkTriggerDone(EOutgameTutorialTrigger.CaretakerReady);
+            OutgameTutorialProgress.MarkTriggerDone(EOutgameTutorialTrigger.CaretakerActivation);
+        }
         DataSaveManager.SaveCoalesced();
         Debug.Log("[SynergyIntroduction] Completed " + t_id);
         ClearPresentation();
@@ -274,6 +300,8 @@ public sealed class SynergyIntroduction : MonoBehaviour
         m_active = false;
         m_presentingDeck = false;
         StopAllCoroutines();
+        if (m_readyOverlay != null) m_readyOverlay.Cancel();
+        m_readyOverlay = null;
         if (m_proposal != null && m_proposal.isShow) m_proposal.Hide();
         m_proposal = null;
         OutgameTutorialGateUI.Instance?.Clear(this);

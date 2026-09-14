@@ -110,6 +110,7 @@ public static class ContentUnlockIntroValidation
                 && dim.GetComponent<Button>() == null,
                 "PopupDim must remain a transparent input blocker without confirming the step.");
             instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, scene);
+            PrefabUtility.UnpackPrefabInstance(instance, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
             var view = instance.GetComponent<ContentUnlockIntroView>();
             instance.SetActive(true);
             var serialized = new SerializedObject(view);
@@ -146,18 +147,18 @@ public static class ContentUnlockIntroValidation
             view.Show("모험 오픈 !", "스테이지를 클리어하고 보상을 받으세요.",
                 new[] { mission.icon }, () => confirmations++, () => cancellations++);
             Require(!button.interactable, "Reopening must reset entrance input.");
-            bool OnlyFirstIconVisible()
+            bool IconsVisible(int count = 1)
             {
                 var slots = serialized.FindProperty("_icons");
                 if (slots.arraySize == 0) return false;
                 for (int i = 0; i < slots.arraySize; i++)
                 {
                     var icon = (Image)slots.GetArrayElementAtIndex(i).objectReferenceValue;
-                    if (icon == null || icon.gameObject.activeSelf != (i == 0)) return false;
+                    if (icon == null || icon.gameObject.activeSelf != (i < count)) return false;
                 }
                 return true;
             }
-            Require(OnlyFirstIconVisible(), "Single intro must show only its first icon.");
+            Require(IconsVisible(), "Single intro must show only its first icon.");
             view.Close();
             view.Close();
             Require(confirmations == 1 && cancellations == 1 && !ContentUnlockIntroView.IsOpen,
@@ -182,8 +183,8 @@ public static class ContentUnlockIntroValidation
                 ShowNext();
             }
             Prepare();
-            Require(message.text == "미션 오픈 !" && OnlyFirstIconVisible(),
-                "First queued content must have its own panel and one icon.");
+            Require(message.text == "일일미션 / 가이드 미션 오픈 !" && IconsVisible(2),
+                "Mission introduction must present both mission types on one panel.");
             DOTween.Complete(view, true);
             button.onClick.Invoke();
             DOTween.Complete(view, true);
@@ -191,7 +192,7 @@ public static class ContentUnlockIntroValidation
                 && (bool)ownerType.GetField("m_pendingIntro", flags).GetValue(owner),
                 "First confirmation must queue the next panel without completing the step.");
             ShowNext();
-            Require(message.text == "룰렛 오픈 !" && OnlyFirstIconVisible() && !button.interactable,
+            Require(message.text == "룰렛 오픈 !" && IconsVisible() && !button.interactable,
                 "Next content must reopen with its own title and entrance gate.");
             var firstIcon = (Image)serialized.FindProperty("_icons").GetArrayElementAtIndex(0).objectReferenceValue;
             Require(firstIcon.sprite == roulette.icon, "Next content retained the previous icon.");
@@ -209,7 +210,129 @@ public static class ContentUnlockIntroValidation
             Require(confirmations == 2 && cancellations == 2
                 && !(bool)ownerType.GetField("m_pendingIntro", flags).GetValue(owner),
                 "Cancellation between panels must clear the remaining queue without completion.");
-            Debug.Log("[ContentUnlockIntroValidation] VIEW PASS: separate panels, ordered icons, final-only completion, early input, double click, cancel between panels.");
+            var flightRoot = (RectTransform)serialized.FindProperty("_flightRoot").objectReferenceValue;
+            var iconRoot = (RectTransform)serialized.FindProperty("iconRoot").objectReferenceValue;
+            var stageGroup = (CanvasGroup)serialized.FindProperty("_contentGroup").objectReferenceValue;
+            Require(flightRoot != null && !flightRoot.IsChildOf(stageGroup.transform),
+                "Flight root must remain outside the fading stage.");
+            Transform iconParent = iconRoot.parent;
+            Vector2 iconHome = iconRoot.anchoredPosition;
+            Vector3 iconScale = iconRoot.localScale;
+            var targetObject = new GameObject("FlightTarget", typeof(RectTransform));
+            UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(targetObject, scene);
+            var target = (RectTransform)targetObject.transform;
+            target.SetParent(flightRoot, false);
+            target.sizeDelta = new Vector2(80f, 80f);
+            target.anchoredPosition = new Vector2(220f, -340f);
+            int arrivals = 0;
+            Action arrivalDone = null;
+            view.Show("이동 검사", "", icons, () => confirmations++, () => cancellations++, target,
+                done => { arrivals++; arrivalDone = done; });
+            DOTween.Complete(view, true);
+            button.onClick.Invoke();
+            Require(arrivals == 0 && confirmations == 2 && firstIcon.transform.parent == flightRoot,
+                "Confirmation must start flight without completing or playing the button effect.");
+            DOTween.Goto(view, 0.09f);
+            Require(stageGroup.alpha < 1f && stageGroup.alpha > 0f
+                && firstIcon.GetComponent<CanvasGroup>().alpha == 1f && arrivals == 0,
+                "Only the surrounding stage may fade before flight.");
+            DOTween.Complete(view, true);
+            Require(arrivals == 1 && confirmations == 2 && ContentUnlockIntroView.IsOpen && stageGroup.alpha == 0f,
+                "Arrival must wait for the button effect while keeping the input blocker open.");
+            Require(Vector3.Distance(firstIcon.rectTransform.TransformPoint(firstIcon.rectTransform.rect.center),
+                target.TransformPoint(target.rect.center)) < 0.1f, "Icon missed the destination center.");
+            arrivalDone();
+            arrivalDone();
+            Require(confirmations == 3 && !ContentUnlockIntroView.IsOpen
+                && iconRoot.parent == iconParent && iconRoot.anchoredPosition == iconHome && iconRoot.localScale == iconScale,
+                "Effect completion must notify once and restore the icon.");
+            view.Show("취소 검사", "", icons, () => confirmations++, () => cancellations++, target,
+                done => arrivalDone = done);
+            DOTween.Complete(view, true);
+            button.onClick.Invoke();
+            DOTween.Complete(view, true);
+            view.Close();
+            arrivalDone();
+            Require(confirmations == 3 && cancellations == 3 && !ContentUnlockIntroView.IsOpen,
+                "A stale effect callback must not complete a cancelled intro.");
+            targetObject.SetActive(false);
+            view.Show("대상 없음", "", icons, () => confirmations++, () => cancellations++, target,
+                done => { arrivals++; done(); });
+            DOTween.Complete(view, true);
+            button.onClick.Invoke();
+            DOTween.Complete(view, true);
+            Require(confirmations == 4 && arrivals == 1 && !ContentUnlockIntroView.IsOpen,
+                "Inactive destination must finish without playing its effect.");
+            targetObject.SetActive(true);
+            foreach (float canvasScale in new[] { 0.75f, 1.5f })
+            {
+                flightRoot.localScale = Vector3.one * canvasScale;
+                view.Show("배율 검사", "", icons, () => confirmations++, () => cancellations++, target,
+                    done => arrivalDone = done);
+                DOTween.Complete(view, true);
+                button.onClick.Invoke();
+                DOTween.Complete(view, true);
+                Require(Vector3.Distance(firstIcon.rectTransform.TransformPoint(firstIcon.rectTransform.rect.center),
+                    target.TransformPoint(target.rect.center)) < 0.1f, "Scaled flight root missed the target.");
+                arrivalDone();
+            }
+            flightRoot.localScale = Vector3.one;
+            view.Show("이동 중 취소", "", icons, () => confirmations++, () => cancellations++, target);
+            DOTween.Complete(view, true);
+            button.onClick.Invoke();
+            view.Close();
+            Require(confirmations == 6 && cancellations == 4 && iconRoot.parent == iconParent
+                && iconRoot.anchoredPosition == iconHome && iconRoot.localScale == iconScale,
+                "Mid-flight cancellation must restore the icon without success.");
+            var secondIcon = (Image)serialized.FindProperty("_icons").GetArrayElementAtIndex(1).objectReferenceValue;
+            var secondTargetObject = new GameObject("GuideMissionTarget", typeof(RectTransform));
+            UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(secondTargetObject, scene);
+            var secondTarget = (RectTransform)secondTargetObject.transform;
+            secondTarget.SetParent(flightRoot, false);
+            secondTarget.sizeDelta = new Vector2(100f, 100f);
+            secondTarget.anchoredPosition = new Vector2(-220f, -340f);
+            var pairDone = new Action[2];
+            int pairArrivals = 0;
+            void ShowPair()
+            {
+                pairDone = new Action[2];
+                view.ShowTogether("일일미션 / 가이드 미션 오픈 !", mission.description,
+                    new[] { mission.icon, mission.guideMissionIcon },
+                    new[] { mission.contentName, mission.guideMissionName }, new[] { target, secondTarget },
+                    () => confirmations++, () => cancellations++,
+                    (index, done) => { pairArrivals++; pairDone[index] = done; });
+                DOTween.Complete(view, true);
+                button.onClick.Invoke();
+                button.onClick.Invoke();
+                DOTween.Complete(view, true);
+            }
+            ShowPair();
+            Require(pairArrivals == 2 && confirmations == 6 && IconsVisible(2),
+                $"Both icons must arrive once without finishing the step early: arrivals={pairArrivals}, confirmations={confirmations}, visible={IconsVisible(2)}, guideIcon={mission.guideMissionIcon}.");
+            Require(Vector3.Distance(firstIcon.rectTransform.TransformPoint(firstIcon.rectTransform.rect.center),
+                target.TransformPoint(target.rect.center)) < 0.1f
+                && Vector3.Distance(secondIcon.rectTransform.TransformPoint(secondIcon.rectTransform.rect.center),
+                secondTarget.TransformPoint(secondTarget.rect.center)) < 0.1f,
+                "Each icon must reach its own mission button.");
+            pairDone[1]();
+            pairDone[1]();
+            Require(confirmations == 6 && ContentUnlockIntroView.IsOpen,
+                "One completed effect must not finish the pair or release input.");
+            pairDone[0]();
+            Require(confirmations == 7 && !ContentUnlockIntroView.IsOpen
+                && firstIcon.transform.parent == iconRoot && secondIcon.transform.parent == iconRoot,
+                "Both effects must finish before restoring the two icons and completing once.");
+            ShowPair();
+            pairDone[0]();
+            view.Close();
+            pairDone[1]();
+            Require(confirmations == 7 && cancellations == 5, "Cancelled pair accepted a stale effect callback.");
+            secondTargetObject.SetActive(false);
+            ShowPair();
+            Require(pairDone[1] == null && pairDone[0] != null, "Hidden guide button must skip only its own effect.");
+            pairDone[0]();
+            Require(confirmations == 8 && !ContentUnlockIntroView.IsOpen, "Remaining mission effect did not finish.");
+            Debug.Log("[ContentUnlockIntroValidation] VIEW PASS: single/pair flights, separate destinations, all-effects completion, queue, cancellation, restoration, inactive targets, scale.");
         }
         finally
         {

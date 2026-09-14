@@ -12,11 +12,18 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
     [SerializeField] TMP_Text _messageText;
     [SerializeField] TMP_Text _bodyText;
     [SerializeField] Image[] _icons;
+    [SerializeField] TMP_Text[] _iconNames;
     [SerializeField] RectTransform _contentRoot;
     [SerializeField] CanvasGroup _contentGroup;
     [SerializeField] Button _confirmButton;
     [SerializeField] RectTransform iconRoot;
     [SerializeField] RectTransform glowRoot;
+    [SerializeField] RectTransform _flightRoot;
+    [Header("퇴장 · 아이콘 이동")]
+    [SerializeField, Min(0f)] float _fadeDuration = 0.18f;
+    [SerializeField] Ease _fadeEase = Ease.OutCubic;
+    [SerializeField, Min(0f)] float _flightDuration = 0.4f;
+    [SerializeField] Ease _flightEase = Ease.OutCubic;
     [SerializeField] PopupTransition transition = new PopupTransition();
     [SerializeField] OverlayDim dim = new OverlayDim();
     [SerializeField] EOutgameSound _introSound = EOutgameSound.PopupOpen;
@@ -40,6 +47,7 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
     Sequence _intro;
     Sequence _exit;
     bool _closing;
+    bool _arrived;
     bool _captured;
     Vector2 _headingHome;
     Vector2 _stageHome;
@@ -53,6 +61,11 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
     CanvasGroup _iconGroup;
     CanvasGroup _confirmGroup;
     CanvasGroup _glowGroup;
+    IReadOnlyList<RectTransform> _destinations;
+    Action<int, Action> _onArrived;
+    readonly List<IconHome> _flyingIcons = new List<IconHome>();
+    int _pendingArrivals;
+    int _runVersion;
 
     protected override int SortingOrder => UiSortingOrder.Intro;
 
@@ -62,13 +75,23 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
 
     /// <summary>제목·콘텐츠·확인을 순서대로 드러낸다.</summary>
     public void Show(string title, string body, IReadOnlyList<Sprite> icons,
-        Action onConfirmed, Action onCancelled)
+        Action onConfirmed, Action onCancelled, RectTransform destination = null,
+        Action<Action> onArrived = null)
+        => ShowTogether(title, body, icons, null, new[] { destination },
+            onConfirmed, onCancelled, onArrived == null ? null : (index, done) => onArrived(done));
+
+    /// <summary>아이콘별 목적지로 함께 이동하고 모든 도착 효과가 끝난 뒤 완료한다.</summary>
+    public void ShowTogether(string title, string body, IReadOnlyList<Sprite> icons,
+        IReadOnlyList<string> names, IReadOnlyList<RectTransform> destinations,
+        Action onConfirmed, Action onCancelled, Action<int, Action> onArrived)
     {
         InitializeUI();
         Close();
         CaptureHome();
         _onConfirmed = onConfirmed;
         _onCancelled = onCancelled;
+        _destinations = destinations;
+        _onArrived = onArrived;
         _headingText.text = "신규 컨텐츠";
         _messageText.text = title;
         _bodyText.text = body;
@@ -78,6 +101,12 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
             bool visible = icons != null && i < icons.Count && icons[i] != null;
             _icons[i].gameObject.SetActive(visible);
             if (visible) _icons[i].sprite = icons[i];
+            if (_iconNames != null && i < _iconNames.Length && _iconNames[i] != null)
+            {
+                bool showName = visible && names != null && i < names.Count;
+                _iconNames[i].gameObject.SetActive(showName);
+                if (showName) _iconNames[i].text = names[i];
+            }
         }
         _confirmButton.onClick.RemoveListener(Confirm);
         _confirmButton.onClick.AddListener(Confirm);
@@ -86,14 +115,11 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
         SetContentsVisible(true, transition);
         _confirmButton.interactable = false;
         BuildIntro();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(iconRoot);
     }
 
     /// <summary>스텝 취소는 완료 통지 없이 즉시 무대를 걷는다.</summary>
     public void Close() => Finish(false);
-
-    /// <summary>연속 소개의 다음 페이지가 준비될 때까지 같은 암막을 유지한다.</summary>
-    public ScreenDim.Handle HoldDim(object owner)
-        => dim.Hold(owner, UiSortingOrder.IntroDim, transition.OpenDuration);
 
     void CaptureHome()
     {
@@ -142,6 +168,14 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
         _intro.InsertCallback(impact, () => SoundManager.Instance?.PlayCue(_introSound));
         _intro.Insert(impact, _contentRoot.DOPunchAnchorPos(Vector2.down * 20f, 0.14f, 2, 0.8f));
         _intro.Insert(impact, _messageGroup.DOFade(1f, 0.16f));
+        if (_iconNames != null)
+            foreach (var label in _iconNames)
+            {
+                if (label == null || !label.gameObject.activeSelf) continue;
+                var group = GroupOf(label.gameObject);
+                group.alpha = 0f;
+                _intro.Insert(impact, group.DOFade(1f, 0.16f));
+            }
         _intro.Insert(impact + 0.08f, _bodyGroup.DOFade(1f, 0.16f));
         if (_glowGroup != null)
         {
@@ -161,24 +195,110 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
         _closing = true;
         _confirmButton.interactable = false;
         KillChoreography();
-        dim.Hide(transition.CloseDuration);
-        SetContentsVisible(false, transition);
-        ResolveTarget().GetComponent<CanvasGroup>().blocksRaycasts = true;
-        // 후속 스텝이 자체 PopupDim 아래에 먼저 서지 않게 퇴장을 마친 뒤 넘긴다.
-        _exit = DOTween.Sequence().SetTarget(this)
-            .AppendInterval(transition.CloseDuration)
-            .OnComplete(() => Finish(true));
+        dim.Hide(_fadeDuration);
+        LayoutRebuilder.ForceRebuildLayoutImmediate(iconRoot);
+        _exit = DOTween.Sequence().SetTarget(this).SetLink(gameObject)
+            .Append(_contentGroup.DOFade(0f, _fadeDuration).SetEase(_fadeEase));
+        for (int i = 0; i < _icons.Length; i++)
+        {
+            if (_icons[i] == null || !_icons[i].gameObject.activeSelf) continue;
+            var rect = _icons[i].rectTransform;
+            _flyingIcons.Add(new IconHome(rect));
+        }
+        foreach (var home in _flyingIcons) home.Rect.SetParent(_flightRoot, true);
+        for (int i = 0; i < _icons.Length; i++)
+        {
+            if (_icons[i] == null || !_icons[i].gameObject.activeSelf) continue;
+            var rect = _icons[i].rectTransform;
+            if (TryGetDestination(rect, DestinationAt(i), out Vector3 position, out Vector3 scale))
+            {
+                _exit.Insert(_fadeDuration, rect.DOLocalMove(position, _flightDuration).SetEase(_flightEase));
+                _exit.Insert(_fadeDuration, rect.DOScale(scale, _flightDuration).SetEase(_flightEase));
+            }
+            else _exit.Insert(_fadeDuration, GroupOf(rect.gameObject).DOFade(0f, 0f));
+        }
+        _exit.OnComplete(Arrive);
         _exit.Play();
+    }
+
+    RectTransform DestinationAt(int index)
+        => _destinations != null && index < _destinations.Count ? _destinations[index] : null;
+
+    bool TryGetDestination(RectTransform icon, RectTransform destination, out Vector3 position, out Vector3 scale)
+    {
+        position = icon.localPosition;
+        scale = icon.localScale;
+        if (destination == null || !destination.gameObject.activeInHierarchy) return false;
+        Camera sourceCamera = CameraOf(destination);
+        Camera flightCamera = CameraOf(_flightRoot);
+        Vector2 screen = RectTransformUtility.WorldToScreenPoint(sourceCamera,
+            destination.TransformPoint(destination.rect.center));
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(_flightRoot, screen,
+            flightCamera, out Vector2 center)) return false;
+        var corners = new Vector3[4];
+        destination.GetWorldCorners(corners);
+        var local = new Vector2[4];
+        for (int i = 0; i < corners.Length; i++)
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(_flightRoot,
+                RectTransformUtility.WorldToScreenPoint(sourceCamera, corners[i]), flightCamera, out local[i]);
+        float width = Vector2.Distance(local[0], local[3]);
+        float height = Vector2.Distance(local[0], local[1]);
+        float ratio = Mathf.Min(1f, Mathf.Min(width / Mathf.Max(0.001f, icon.rect.width * Mathf.Abs(scale.x)),
+            height / Mathf.Max(0.001f, icon.rect.height * Mathf.Abs(scale.y))));
+        scale *= ratio;
+        position = (Vector3)center - icon.localRotation * Vector3.Scale(icon.rect.center, scale);
+        return true;
+    }
+
+    static Camera CameraOf(RectTransform rect)
+    {
+        var canvas = rect.GetComponentInParent<Canvas>();
+        return canvas == null || canvas.rootCanvas.renderMode == RenderMode.ScreenSpaceOverlay
+            ? null : canvas.rootCanvas.worldCamera;
+    }
+
+    void Arrive()
+    {
+        if (!_closing || _arrived) return;
+        _arrived = true;
+        int version = _runVersion;
+        var arrivals = new List<int>();
+        for (int i = 0; i < _icons.Length; i++)
+        {
+            if (_icons[i] == null || !_icons[i].gameObject.activeSelf) continue;
+            GroupOf(_icons[i].gameObject).alpha = 0f;
+            var destination = DestinationAt(i);
+            if (destination != null && destination.gameObject.activeInHierarchy && _onArrived != null)
+                arrivals.Add(i);
+        }
+        _pendingArrivals = arrivals.Count;
+        if (_pendingArrivals == 0) { Finish(true); return; }
+        foreach (int index in arrivals)
+        {
+            if (version != _runVersion) break;
+            bool completed = false;
+            _onArrived(index, () =>
+            {
+                if (completed || version != _runVersion || !IsOpen || !_closing) return;
+                completed = true;
+                if (--_pendingArrivals == 0) Finish(true);
+            });
+        }
     }
 
     void Finish(bool confirmed)
     {
+        _runVersion++;
         dim.Clear();
         bool wasOpen = ConsumeOpen();
         Action callback = confirmed ? _onConfirmed : _onCancelled;
         _onConfirmed = null;
         _onCancelled = null;
+        _onArrived = null;
+        _destinations = null;
+        _pendingArrivals = 0;
         _closing = false;
+        _arrived = false;
         KillChoreography();
         transition.HandleDisabled(ResolveTarget());
         ResetChoreography();
@@ -190,7 +310,7 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
     protected override void OnViewHidden()
     {
         transition.HandleDisabled(ResolveTarget());
-        Finish(_closing);
+        Finish(false);
     }
 
     void KillChoreography()
@@ -204,6 +324,10 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
     void ResetChoreography()
     {
         if (!_captured) return;
+        foreach (var home in _flyingIcons) home.Restore();
+        _flyingIcons.Clear();
+        foreach (var icon in _icons)
+            if (icon != null) GroupOf(icon.gameObject).alpha = 1f;
         _headingText.rectTransform.anchoredPosition = _headingHome;
         _contentRoot.anchoredPosition = _stageHome;
         iconRoot.anchoredPosition = _iconHome;
@@ -220,6 +344,44 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
     }
 
     GameObject ResolveTarget() => viewContents;
+
+    readonly struct IconHome
+    {
+        public readonly RectTransform Rect;
+        readonly Transform _parent;
+        readonly int _sibling;
+        readonly Vector3 _position;
+        readonly Vector3 _scale;
+        readonly Quaternion _rotation;
+        readonly Vector2 _anchorMin;
+        readonly Vector2 _anchorMax;
+        readonly Vector2 _size;
+
+        public IconHome(RectTransform rect)
+        {
+            Rect = rect;
+            _parent = rect.parent;
+            _sibling = rect.GetSiblingIndex();
+            _position = rect.localPosition;
+            _scale = rect.localScale;
+            _rotation = rect.localRotation;
+            _anchorMin = rect.anchorMin;
+            _anchorMax = rect.anchorMax;
+            _size = rect.sizeDelta;
+        }
+
+        public void Restore()
+        {
+            Rect.SetParent(_parent, false);
+            Rect.SetSiblingIndex(_sibling);
+            Rect.anchorMin = _anchorMin;
+            Rect.anchorMax = _anchorMax;
+            Rect.sizeDelta = _size;
+            Rect.localPosition = _position;
+            Rect.localScale = _scale;
+            Rect.localRotation = _rotation;
+        }
+    }
 
     static CanvasGroup GroupOf(GameObject target)
     {

@@ -57,6 +57,8 @@ public class OutgameTutorialBridge : MonoBehaviour
 
     // 강화 성공이 연 해금 연출이 끝나기를 기다리는 구간(waitUnlockIntro 저작이 켜진 스텝에서만).
     bool m_awaitingUnlockFx;
+    Tween m_enhanceResultClose;
+    bool m_waitingEnhanceRequest;
 
     // 개봉 오버레이가 떠 있는 동안은 로비 안내를 억제한다 — 예전에 개봉 "씬"이 이 플래그로 하던 일과 같다.
     bool SuppressGuideUI => suppressGuideUI || PackOpenOverlay.IsOpen;
@@ -197,6 +199,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     void PresentStep()
     {
         if (m_step == null) return;
+        if (m_enhancing || m_awaitingUnlockFx) return;
 
         if (m_step.Completion == EOutgameTutorialCompletion.ContentUnlockIntro)
         {
@@ -209,7 +212,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         // 억제 씬에서는 배너도 생략 — 완료는 개봉 신호(Subscribe에서 이미 구독)가 그대로 확정한다.
         if (m_step.Completion == EOutgameTutorialCompletion.PackOpen)
         {
-            if (!SuppressGuideUI) OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowBanner(this, m_step.GuideMessage);
+            if (!SuppressGuideUI) OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowBanner(this, OutgameTutorialGuide.MessageOf(m_step));
             return;
         }
 
@@ -268,7 +271,29 @@ public class OutgameTutorialBridge : MonoBehaviour
         // 미달성이면 잘라내지 않고 흘려보낸다 — 이 스텝의 딤을 세우는 것은 아래 TryOpenGate 하나뿐이다.
         if (m_step.FreeOfCharge && IsFreeShotSpent(m_step.Completion))
         {
+            if (m_step.Completion == EOutgameTutorialCompletion.Enhance && m_step.WaitUnlockIntro)
+            {
+                var t_step = m_step;
+                m_awaitingUnlockFx = true;
+                if (CardDetailOverlayView.TryShowPendingIntroduction(t_completed =>
+                {
+                    if (m_step != t_step || !m_awaitingUnlockFx) return;
+                    m_awaitingUnlockFx = false;
+                    if (t_completed) OnGateSatisfied();
+                    else OnUnlockIntroCancelled();
+                })) return;
+                if (m_step != t_step) return;
+                m_awaitingUnlockFx = false;
+            }
             OnGateSatisfied();
+            return;
+        }
+
+        if (m_step.Completion == EOutgameTutorialCompletion.Enhance
+            && OutgameTutorialRunner.GuidedTrigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
+            && !OutgameTutorialGuide.CanContinueEnhance())
+        {
+            OnUnlockIntroCancelled();
             return;
         }
 
@@ -283,7 +308,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_step.Completion == EOutgameTutorialCompletion.Confirm && m_step.Anchor == EOutgameTutorialAnchor.None)
         {
             OutgameTutorialGateUI.Ensure(this.gatePrefab)
-                .ShowMessageGate(this, null, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
+                .ShowMessageGate(this, null, OutgameTutorialGuide.MessageOf(m_step), OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
             return;
         }
 
@@ -309,7 +334,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_step.Completion == EOutgameTutorialCompletion.Confirm)
         {
             OutgameTutorialGateUI.Ensure(this.gatePrefab)
-                .ShowMessageGate(this, t_rect, m_step.GuideMessage, OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim, SpotlightRect());
+                .ShowMessageGate(this, t_rect, OutgameTutorialGuide.MessageOf(m_step), OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim, SpotlightRect());
             return;
         }
 
@@ -331,7 +356,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         }
 
         OutgameTutorialGateUI.Ensure(this.gatePrefab)
-            .ShowGate(this, t_rect, t_button, m_step.GuideMessage, t_onSatisfied, m_step.UseDim, SpotlightRect(),
+            .ShowGate(this, t_rect, t_button, OutgameTutorialGuide.MessageOf(m_step), t_onSatisfied, m_step.UseDim, SpotlightRect(),
                 _holdPointer: m_step.Action == EOutgameTutorialAction.WaitEnhance);
     }
 
@@ -421,6 +446,12 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 오버레이 하나가 닫혔다. 기다리던 화면이 아직 남아 있으면 계속 기다린다 — 어디까지 걷혀야 하는지는 완료 조건이 정한다.
     void OnOverlayClosed()
     {
+        if (m_step != null && m_step.Completion == EOutgameTutorialCompletion.Enhance
+            && !CardDetailOverlayView.IsOpen)
+        {
+            OnUnlockIntroCancelled();
+            return;
+        }
         if (m_step == null || !IsSurfaceWait(m_step.Completion)) return;
         if (!IsSurfaceReady(m_step.Completion)) return;
 
@@ -608,7 +639,12 @@ public class OutgameTutorialBridge : MonoBehaviour
             return;
         }
 
-        DOVirtual.DelayedCall(Mathf.Max(0f, this.enhanceResultHold), CardDetailOverlayView.CloseEnhanceResult)
+        m_enhanceResultClose?.Kill();
+        var t_step = m_step;
+        m_enhanceResultClose = DOVirtual.DelayedCall(Mathf.Max(0f, this.enhanceResultHold), () =>
+                 {
+                     if (m_step == t_step && m_enhancing) CardDetailOverlayView.CloseEnhanceResult();
+                 })
                  .SetLink(gameObject);
     }
 
@@ -637,10 +673,10 @@ public class OutgameTutorialBridge : MonoBehaviour
 
         if (_result.Outcome == EEnhanceOutcome.Success) { OnGateSatisfied(); return; }
 
-        TryOpenGate();
+        PresentStep();
     }
 
-    // 해금 연출이 마지막 축까지 끝났다(잘려 끝난 경우 포함) — 미뤄 둔 완료를 여기서 넘긴다.
+    // 해금 설명의 최종 확인 뒤 미뤄 둔 완료를 넘긴다.
     void OnUnlockFxFinished()
     {
         if (!m_awaitingUnlockFx) return;
@@ -648,6 +684,14 @@ public class OutgameTutorialBridge : MonoBehaviour
         m_awaitingUnlockFx = false;
         m_enhancing        = false;
         OnGateSatisfied();
+    }
+
+    void OnUnlockIntroCancelled()
+    {
+        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
+        CloseGate();
+        if (OutgameTutorialRunner.IsGuidedRunning)
+            OutgameTutorialRunner.AbortGuided(OutgameTutorialRunner.GuidedTrigger);
     }
 
     // 키워드 강화 성공. 카드 강화와 달리 무대를 쥐는 결과판이 없어 기다릴 것 없이 바로 넘긴다.
@@ -674,7 +718,11 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 개봉 오버레이 열림/닫힘. 씬이 바뀌지 않으므로 재개해 줄 새 브리지가 없다 — 이 브리지가 직접 이어간다.
     // 세션 도중 서버 소진 표식이 켜졌다 = 이 스텝이 시킨 강화가 이미 성립했다.
     // 다시 적용하면 PresentStep의 프리체크가 통과 판정을 한다(응답을 잃어 완료 신호만 못 받은 자리).
-    void OnServerFreeShotSpentChanged() => ApplyCurrentStep();
+    void OnServerFreeShotSpentChanged()
+    {
+        if (m_enhancing || m_awaitingUnlockFx || CardDetailOverlayView.IsRitualPlaying) return;
+        ApplyCurrentStep();
+    }
 
     void OnPackOverlayOpened() => ApplyCurrentStep();
 
@@ -683,6 +731,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 완료 → 커밋 후 다음 스텝을 같은 씬에서 이어간다(씬을 떠나는 스텝이면 다음 씬 브리지가 재개).
     void OnGateSatisfied()
     {
+        if (m_step == null || !TryGetCursorStep(out var t_current) || t_current != m_step) return;
         bool t_leftScene = m_step != null && m_step.LeavesScene;
 
         SatisfyCursorStep();
@@ -723,6 +772,11 @@ public class OutgameTutorialBridge : MonoBehaviour
 
     void CloseGate()
     {
+        m_enhanceResultClose?.Kill();
+        m_enhanceResultClose = null;
+        m_enhancing = false;
+        m_awaitingUnlockFx = false;
+        m_waitingEnhanceRequest = false;
         m_step = null;
         m_contentIntroVersion++;
         if (m_contentIntroStarted)
@@ -743,13 +797,31 @@ public class OutgameTutorialBridge : MonoBehaviour
 
     void Update()
     {
-        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.ContentUnlockIntro) return;
+        if (m_step == null) return;
         if (!TryGetCursorStep(out var t_current) || !ReferenceEquals(t_current, m_step))
         {
             CloseGate();
             return;
         }
-        TryPresentContentIntro();
+        if (m_step.Completion == EOutgameTutorialCompletion.Enhance && !m_enhancing && !m_awaitingUnlockFx)
+        {
+            if (CardDetailOverlayView.IsRitualPlaying)
+            {
+                if (!m_waitingEnhanceRequest) HideGuide();
+                m_waitingEnhanceRequest = true;
+                return;
+            }
+            if (m_waitingEnhanceRequest)
+            {
+                m_waitingEnhanceRequest = false;
+                PresentStep();
+                return;
+            }
+        }
+        if (m_step.Completion == EOutgameTutorialCompletion.ContentUnlockIntro) TryPresentContentIntro();
+        if (m_step.Completion == EOutgameTutorialCompletion.Enhance && !m_enhancing && !m_awaitingUnlockFx
+            && OutgameTutorialRunner.GuidedTrigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
+            && !OutgameTutorialGuide.CanContinueEnhance()) OnUnlockIntroCancelled();
     }
 
     void TryPresentContentIntro()
@@ -804,6 +876,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         CardDetailOverlayView.OnAnyEnhanceResultReady += OnEnhanceResultReady;
         CardDetailOverlayView.OnAnyEnhanceSettled     += OnEnhanceSettled;
         CardDetailOverlayView.OnAnyUnlockFxFinished   += OnUnlockFxFinished;
+        CardDetailOverlayView.OnUnlockIntroCancelled  += OnUnlockIntroCancelled;
         LobbyRankEffectDirector.OnAnyFinished     += OnRankEffectFinished;
         LobbyGainEffectDirector.OnAnyFinished     += OnCardGainFinished;
         CardDetailOverlayView.OnAnyClosed         += OnOverlayClosed;
@@ -833,6 +906,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         CardDetailOverlayView.OnAnyEnhanceResultReady -= OnEnhanceResultReady;
         CardDetailOverlayView.OnAnyEnhanceSettled     -= OnEnhanceSettled;
         CardDetailOverlayView.OnAnyUnlockFxFinished   -= OnUnlockFxFinished;
+        CardDetailOverlayView.OnUnlockIntroCancelled  -= OnUnlockIntroCancelled;
         LobbyRankEffectDirector.OnAnyFinished     -= OnRankEffectFinished;
         LobbyGainEffectDirector.OnAnyFinished     -= OnCardGainFinished;
         CardDetailOverlayView.OnAnyClosed         -= OnOverlayClosed;

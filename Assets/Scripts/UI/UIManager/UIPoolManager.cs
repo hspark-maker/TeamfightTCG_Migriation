@@ -82,12 +82,20 @@ public class UIPoolManager : MonoBehaviour
         return null;
     }
 
-    /// <summary>알림이 기존 팝업을 덮지 않도록 조회한다. 자신의 표시만 제외할 수 있다.</summary>
-    public bool HasVisibleUIExcept(PooledUIBase except = null)
+    /// <summary>기존 팝업과 퇴장 연출을 조회한다. 안내 대상 화면도 등장 연출이 끝나야 제외한다.</summary>
+    public bool HasVisibleUIExcept(PooledUIBase except = null, bool ignoreMissionCutIn = false, Type exceptType = null)
     {
         foreach (var ui in activeUIs.Values)
         {
-            if (ui == null || ui == except || !ui.isShow || !ui.gameObject.activeInHierarchy) continue;
+            if (ui == null || ui == except || !ui.gameObject.activeInHierarchy) continue;
+            if (ui is MissionCutInView && ignoreMissionCutIn) continue;
+            if (ui is ContentsPooledUI contentsUI)
+            {
+                if (contentsUI.IsViewTransitioning) return true;
+                if (!contentsUI.IsViewVisible && !ui.isShow) continue;
+            }
+            else if (!ui.isShow) continue;
+            if (exceptType != null && exceptType.IsInstanceOfType(ui)) continue;
             // 미션 컷인은 알림을 기다리기 위해 상시 열려 있다. 실제 재생 중일 때만 화면을 점유한다.
             if (ui is MissionCutInView && !MissionCutInView.IsPlaying) continue;
             return true;

@@ -187,6 +187,9 @@ public static class TutorialValidator
             else if (string.IsNullOrWhiteSpace(t_intro.contentName)
                   || string.IsNullOrWhiteSpace(t_intro.description) || t_intro.icon == null)
                 t_error = $"{t_intro.content} 해금 소개의 이름·본문·아이콘 중 빠진 값이 있습니다.";
+            else if (t_intro.content == EContentUnlockIntro.Mission
+                  && (string.IsNullOrWhiteSpace(t_intro.guideMissionName) || t_intro.guideMissionIcon == null))
+                t_error = "미션 해금 소개의 가이드 미션 이름·아이콘 중 빠진 값이 있습니다.";
 
             if (t_error != null)
                 _issues.Add(new TutorialIssue(ETutorialIssueLevel.Error, 0, 0, 0, "해금 소개 정의",
