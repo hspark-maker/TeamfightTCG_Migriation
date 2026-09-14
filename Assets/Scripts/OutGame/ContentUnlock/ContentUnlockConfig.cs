@@ -6,7 +6,7 @@ using UnityEngine;
 [Serializable]
 public sealed class ContentUnlockDef
 {
-    [Tooltip("Mission, Adventure, Roulette 중 하나. 콘텐츠당 한 항목만 등록한다.")]
+    [Tooltip("Mission, Adventure, Roulette, CardEnhance 중 하나. 콘텐츠당 한 항목만 등록한다.")]
     public EOutgameFeature feature;
     [Tooltip("강제 선형 FTUE 전체 완료를 요구한다. 자율 안내 완료는 포함하지 않는다.")]
     public bool requireFtue;
@@ -45,7 +45,7 @@ public readonly struct ContentUnlockRule
 /// <summary>초기화에서 주입받은 해금 설정. 튜토리얼 실행 상태와 독립적으로 조회한다.</summary>
 public static class ContentUnlockConfig
 {
-    static readonly string[] s_requiredKeys = { "Mission", "Adventure", "Roulette" };
+    static readonly string[] s_requiredKeys = { "Mission", "Adventure", "Roulette", "CardEnhance" };
     static IReadOnlyList<ContentUnlockRule> s_rules = Array.Empty<ContentUnlockRule>();
     public static bool IsReady { get; private set; }
     public static IReadOnlyList<ContentUnlockRule> Rules => s_rules;

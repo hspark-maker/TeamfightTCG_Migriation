@@ -201,6 +201,15 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_step == null) return;
         if (m_enhancing || m_awaitingUnlockFx) return;
 
+        if (m_step.Completion == EOutgameTutorialCompletion.UnlockIntro)
+        {
+            if (!CardDetailOverlayView.IsUnlockFxPlaying) { OnGateSatisfied(); return; }
+            if (!SuppressGuideUI)
+                OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowBanner(this,
+                    OutgameTutorialGuide.MessageOf(m_step), m_step.MessageAtBottom);
+            return;
+        }
+
         if (m_step.Completion == EOutgameTutorialCompletion.ContentUnlockIntro)
         {
             TryPresentContentIntro();
@@ -660,6 +669,12 @@ public class OutgameTutorialBridge : MonoBehaviour
 
         if (_result.Outcome == EEnhanceOutcome.Success && m_step.WaitUnlockIntro)
         {
+            if (NextStepWaitsForUnlockIntro())
+            {
+                m_enhancing = false;
+                OnGateSatisfied();
+                return;
+            }
             // 이 통지는 해금 연출을 트는 PlayPendingUnlockFx() "다음"에 온다 —
             // 그래서 지금의 IsUnlockFxPlaying이 "연출이 설지 말지"의 확정 답이다.
             if (CardDetailOverlayView.IsUnlockFxPlaying) { m_awaitingUnlockFx = true; return; }
@@ -679,6 +694,11 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 해금 설명의 최종 확인 뒤 미뤄 둔 완료를 넘긴다.
     void OnUnlockFxFinished()
     {
+        if (m_step?.Completion == EOutgameTutorialCompletion.UnlockIntro)
+        {
+            OnGateSatisfied();
+            return;
+        }
         if (!m_awaitingUnlockFx) return;
 
         m_awaitingUnlockFx = false;
@@ -688,10 +708,23 @@ public class OutgameTutorialBridge : MonoBehaviour
 
     void OnUnlockIntroCancelled()
     {
-        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
+        if (m_step == null || (m_step.Completion != EOutgameTutorialCompletion.Enhance
+            && m_step.Completion != EOutgameTutorialCompletion.UnlockIntro)) return;
         CloseGate();
         if (OutgameTutorialRunner.IsGuidedRunning)
             OutgameTutorialRunner.AbortGuided(OutgameTutorialRunner.GuidedTrigger);
+    }
+
+    bool NextStepWaitsForUnlockIntro()
+    {
+        var t_data = OutgameTutorialRunner.Data;
+        if (t_data == null) return false;
+        foreach (var t_chapter in t_data.chapters)
+            for (int t_i = 0; t_i + 1 < t_chapter.StepCount; t_i++)
+                if (t_chapter.TryGetStep(t_i, out var t_step) && t_step == m_step
+                    && t_chapter.TryGetStep(t_i + 1, out var t_next))
+                    return t_next.Action == EOutgameTutorialAction.WaitUnlockIntro;
+        return false;
     }
 
     // 키워드 강화 성공. 카드 강화와 달리 무대를 쥐는 결과판이 없어 기다릴 것 없이 바로 넘긴다.

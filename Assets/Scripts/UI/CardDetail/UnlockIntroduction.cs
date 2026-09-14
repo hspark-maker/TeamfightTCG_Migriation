@@ -10,9 +10,8 @@ public static class UnlockIntroduction
         foreach (UnlockIntro t_intro in _intros)
         {
             if (!IsUnlocked(_card, t_intro)) continue;
-            if (!OutgameTutorialProgress.IsTriggerDone(t_intro.IsSynergy
-                ? EOutgameTutorialTrigger.SynergyIntroduction : EOutgameTutorialTrigger.KeywordIntroduction)) return true;
-            if (t_intro.IsSynergy && !OutgameTutorialProgress.IsTriggerDone(EOutgameTutorialTrigger.CaretakerPreparation)) return true;
+            if (!t_intro.IsSynergy) continue;
+            if (!OutgameTutorialProgress.IsTriggerDone(EOutgameTutorialTrigger.SynergyIntroduction)) return true;
         }
         return false;
     }
@@ -23,14 +22,14 @@ public static class UnlockIntroduction
         if (_intros == null || _intros.Count == 0 || !UnlockIntroOverlay.TryGet(out var t_overlay)) return false;
         var t_pages = new List<UnlockIntroPage>();
         var t_marks = new HashSet<EOutgameTutorialTrigger>();
-        bool t_synergy = false;
         foreach (UnlockIntro t_intro in _intros)
         {
             bool t_unlocked = IsUnlocked(_card, t_intro);
-            var t_key = t_intro.IsSynergy ? EOutgameTutorialTrigger.SynergyIntroduction : EOutgameTutorialTrigger.KeywordIntroduction;
-            bool t_first = t_unlocked && !OutgameTutorialProgress.IsTriggerDone(t_key) && !t_marks.Contains(t_key);
-            IReadOnlyList<GuideOnboardingPage> t_authored = t_data == null ? Array.Empty<GuideOnboardingPage>()
-                : t_intro.IsSynergy ? t_data.synergyIntroduction : t_data.keywordIntroduction;
+            var t_key = EOutgameTutorialTrigger.SynergyIntroduction;
+            IReadOnlyList<GuideOnboardingPage> t_authored = t_intro.IsSynergy
+                ? t_data == null ? Array.Empty<GuideOnboardingPage>() : t_data.synergyIntroduction
+                : Array.Empty<GuideOnboardingPage>();
+            bool t_first = t_unlocked && t_intro.IsSynergy && !OutgameTutorialProgress.IsTriggerDone(t_key) && !t_marks.Contains(t_key);
             bool t_hasEffect = false;
             foreach (GuideOnboardingPage t_page in t_authored)
             {
@@ -48,16 +47,6 @@ public static class UnlockIntroduction
             }
             if (!t_hasEffect) t_pages.Add(new UnlockIntroPage(t_intro.Name, t_intro.Body, new[] { t_intro }, playDemo: true));
             if (t_first && t_authored.Count > 0) t_marks.Add(t_key);
-            t_synergy |= t_intro.IsSynergy && t_unlocked;
-        }
-        if (t_data != null && t_synergy && !OutgameTutorialProgress.IsTriggerDone(EOutgameTutorialTrigger.CaretakerPreparation))
-        {
-            var t_preview = GuideMissionPreparation.IsReady ? t_data.caretakerReady : t_data.caretakerPreparation;
-            foreach (GuideOnboardingPage t_page in t_preview)
-                if (t_page != null) t_pages.Add(new UnlockIntroPage(t_page.title,
-                    GuideMissionPreparation.IsActive && !string.IsNullOrEmpty(t_page.activeBody) ? t_page.activeBody : t_page.body,
-                    showCards: t_page.kind == EGuideOnboardingPage.Cards));
-            if (t_preview.Count > 0) t_marks.Add(EOutgameTutorialTrigger.CaretakerPreparation);
         }
         t_overlay.ShowPages(t_pages, _card, _confirmed =>
         {

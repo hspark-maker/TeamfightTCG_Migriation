@@ -13,13 +13,6 @@ public static class GuideOnboardingDataAuthoring
     {
         var t_data = AssetDatabase.LoadAssetAtPath<OutgameTutorialData>(PATH);
         Undo.RecordObject(t_data, "Author guide onboarding");
-        if (t_data.keywordIntroduction.Count == 0)
-            t_data.keywordIntroduction.AddRange(new[]
-            {
-                Page(EGuideOnboardingPage.Concept, "새로운 키워드가 열렸어요!", "카드가 성장하면 새로운 키워드가 열려요.\n키워드는 전투에서 사용하는 특별한 능력이에요."),
-                Page(EGuideOnboardingPage.Effect, "이 카드의 능력", ""),
-                Page(EGuideOnboardingPage.Demo, "전투에서 이렇게 사용해요", ""),
-            });
         if (t_data.synergyIntroduction.Count == 0)
             t_data.synergyIntroduction.AddRange(new[]
             {
@@ -28,15 +21,6 @@ public static class GuideOnboardingDataAuthoring
                 Page(EGuideOnboardingPage.Effect, "이번에 열린 시너지", ""),
                 Page(EGuideOnboardingPage.Demo, "함께 쓰는 효과", ""),
             });
-        if (t_data.caretakerPreparation.Count == 0)
-            t_data.caretakerPreparation.Add(Page(EGuideOnboardingPage.Cards, "다음 목표는 돌보미 조합!",
-                "별토리·솜구름몽·포슬램을\n모두 2성으로 키워\n돌보미 시너지를 준비해 보세요."));
-        if (t_data.caretakerReady.Count == 0)
-            t_data.caretakerReady.Add(Page(EGuideOnboardingPage.Cards, "돌보미 조합 준비 완료!",
-                "돌보미 카드가 준비됐어요.\n세 카드를 같은 덱에 편성해 보세요."));
-        foreach (var t_page in t_data.caretakerReady)
-            if (string.IsNullOrEmpty(t_page.activeBody)) t_page.activeBody =
-                "돌보미 시너지가 이미 활성화됐어요!\n덱에서 참여 카드와 효과를 확인하고\n모험에서 함께 사용해 보세요.";
         int t_chapterIndex = t_data.chapters.FindIndex(_chapter => _chapter.Trigger == EOutgameTutorialTrigger.GuideMissionIntroduction);
         if (t_chapterIndex < 0)
         {
@@ -68,6 +52,7 @@ public static class GuideOnboardingDataAuthoring
                 if (t_id == 28 || t_id == 29) t_step.FindPropertyRelative("anchorCardId").intValue = 0;
                 if (t_id == 30) t_step.FindPropertyRelative("guideMessage").stringValue =
                     "강화 버튼을 꾹 누르세요!\n샤드가 점점 빠르게 들어가고, 필요량을 채우면 별이 늘어나요.\n{enhanceCost}";
+
             }
         }
         t_so.ApplyModifiedPropertiesWithoutUndo();
@@ -81,9 +66,8 @@ public static class GuideOnboardingDataAuthoring
     public static void Validate()
     {
         var t_data = AssetDatabase.LoadAssetAtPath<OutgameTutorialData>(PATH);
-        Require(t_data.keywordIntroduction.Exists(_p => _p.kind == EGuideOnboardingPage.Concept)
-            && t_data.keywordIntroduction.Exists(_p => _p.kind == EGuideOnboardingPage.Demo), "Keyword concept/demo authoring missing");
-        Require(t_data.synergyIntroduction.Count >= 3 && t_data.caretakerPreparation.Count > 0 && t_data.caretakerReady.Count > 0, "Synergy authoring missing");
+        Require(HasEnhanceUnlockStep(t_data), "Enhance unlock explanation step missing");
+        Require(t_data.synergyIntroduction.Count >= 3, "Synergy authoring missing");
         var t_ids = new HashSet<int>();
         foreach (var t_chapter in t_data.chapters)
             for (int t_i = 0; t_i < t_chapter.StepCount; t_i++)
@@ -102,6 +86,19 @@ public static class GuideOnboardingDataAuthoring
             && t_copy.CompletedTriggers.Contains("KeywordIntroduction"), "Completed explanations lost in round trip");
         GuidanceIntegrationValidation.Run();
         Debug.Log("[GuideOnboarding] PASS: authoring, step ids, unlock wait, old/new completion round trip.");
+    }
+
+    public static bool HasEnhanceUnlockStep(OutgameTutorialData _data)
+    {
+        foreach (var t_chapter in _data.chapters)
+        {
+            if (t_chapter.Trigger != EOutgameTutorialTrigger.CollectionTabFirstEnter) continue;
+            for (int t_i = 0; t_i < t_chapter.StepCount; t_i++)
+            {
+                if (t_chapter.TryGetStep(t_i, out var t_step) && t_step.Action == EOutgameTutorialAction.WaitUnlockIntro && !string.IsNullOrEmpty(t_step.GuideMessage)) return true;
+            }
+        }
+        return false;
     }
 
     static GuideOnboardingPage Page(EGuideOnboardingPage _kind, string _title, string _body)

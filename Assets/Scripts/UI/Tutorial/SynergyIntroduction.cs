@@ -9,7 +9,6 @@ public sealed class SynergyIntroduction : MonoBehaviour
     static SynergyIntroduction s_instance;
     bool m_active;
     bool m_relevantAction;
-    UnlockIntroOverlay m_readyOverlay;
     bool m_deferred;
     bool m_presentingDeck;
     SimpleYNPopup m_proposal;
@@ -21,7 +20,7 @@ public sealed class SynergyIntroduction : MonoBehaviour
 
     static SynergyIntroductionSaveData State => DataSaveManager.Data?.Tutorial?.SynergyIntroduction;
     public static bool IsActive => s_instance != null && s_instance.m_active;
-    public static bool HasPending => s_instance != null && s_instance.m_relevantAction && State != null && (State.SynergyId == CARETAKER_ID || State.DeckSlot >= 0)
+    public static bool HasPending => s_instance != null && s_instance.m_relevantAction && State != null && State.DeckSlot >= 0
         && !string.IsNullOrEmpty(State.SynergyId) && !IsIntroductionDone(State.SynergyId)
         && (s_instance == null || !s_instance.m_deferred);
 
@@ -121,7 +120,7 @@ public sealed class SynergyIntroduction : MonoBehaviour
                     for (int t_i = 0; t_i < DeckSaveManager.SLOT_COUNT; t_i++)
                         if (t_i != t_selected && TryResolve(t_i, t_id, out t_target)) { t_slot = t_i; break; }
             }
-            if (t_slot < 0 && (t_id != CARETAKER_ID || OutgameTutorialProgress.IsTriggerDone(EOutgameTutorialTrigger.CaretakerReady))) t_id = "";
+            if (t_slot < 0) t_id = "";
         }
         if (State.DeckSlot == t_slot && State.SynergyId == t_id) return;
         State.DeckSlot = t_slot;
@@ -170,7 +169,6 @@ public sealed class SynergyIntroduction : MonoBehaviour
         Reevaluate();
         if (IsActive || !HasPending || !OutgameTutorialProgress.IsCompleted || UIPoolManager.instance == null) return false;
         SynergyIntroduction t_self = Ensure();
-        if (State.SynergyId == CARETAKER_ID && State.DeckSlot < 0) return t_self.TryBeginCaretaker();
         if (!TryResolve(State.DeckSlot, State.SynergyId, out t_self.m_target)) return false;
         t_self.m_slot = State.DeckSlot;
         t_self.m_active = true;
@@ -201,28 +199,6 @@ public sealed class SynergyIntroduction : MonoBehaviour
         }
         t_self.m_active = false;
         return false;
-    }
-
-    bool TryBeginCaretaker()
-    {
-        var t_authored = OutgameTutorialRunner.Data?.caretakerReady;
-        if (t_authored == null || t_authored.Count == 0 || !UnlockIntroOverlay.TryGet(out m_readyOverlay)) return false;
-        var t_pages = new List<UnlockIntroPage>();
-        foreach (var t_page in t_authored)
-            if (t_page != null) t_pages.Add(new UnlockIntroPage(t_page.title, t_page.body,
-                showCards: t_page.kind == EGuideOnboardingPage.Cards));
-        if (t_pages.Count == 0) return false;
-        m_active = true;
-        m_readyOverlay.ShowPages(t_pages, 0, _completed =>
-        {
-            m_readyOverlay = null;
-            if (!m_active) return;
-            if (_completed) OutgameTutorialProgress.MarkTriggerDone(EOutgameTutorialTrigger.CaretakerReady);
-            m_active = false;
-            m_deferred = true;
-            Reevaluate();
-        });
-        return true;
     }
 
     IEnumerator OpenDeck()
@@ -280,7 +256,6 @@ public sealed class SynergyIntroduction : MonoBehaviour
         State.MarkDone(t_id);
         if (t_id == CARETAKER_ID)
         {
-            OutgameTutorialProgress.MarkTriggerDone(EOutgameTutorialTrigger.CaretakerReady);
             OutgameTutorialProgress.MarkTriggerDone(EOutgameTutorialTrigger.CaretakerActivation);
         }
         DataSaveManager.SaveCoalesced();
@@ -300,8 +275,6 @@ public sealed class SynergyIntroduction : MonoBehaviour
         m_active = false;
         m_presentingDeck = false;
         StopAllCoroutines();
-        if (m_readyOverlay != null) m_readyOverlay.Cancel();
-        m_readyOverlay = null;
         if (m_proposal != null && m_proposal.isShow) m_proposal.Hide();
         m_proposal = null;
         OutgameTutorialGateUI.Instance?.Clear(this);

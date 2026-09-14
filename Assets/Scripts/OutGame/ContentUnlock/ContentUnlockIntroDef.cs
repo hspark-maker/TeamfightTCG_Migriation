@@ -9,6 +9,7 @@ public enum EContentUnlockIntro
     Mission = 2,
     Adventure = 3,
     Roulette = 4,
+    CardEnhance = 5,
 }
 
 /// <summary>공통 해금 소개의 이름·설명·아이콘 저작.</summary>
@@ -29,6 +30,7 @@ public sealed class ContentUnlockIntroDef
         EContentUnlockIntro.Mission => ContentUnlockManager.MISSION,
         EContentUnlockIntro.Adventure => ContentUnlockManager.ADVENTURE,
         EContentUnlockIntro.Roulette => ContentUnlockManager.ROULETTE,
+        EContentUnlockIntro.CardEnhance => ContentUnlockManager.CARD_ENHANCE,
         _ => null,
     };
 }

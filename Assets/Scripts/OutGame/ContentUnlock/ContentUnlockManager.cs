@@ -8,6 +8,7 @@ public static class ContentUnlockManager
     public const string MISSION = "Mission";
     public const string ADVENTURE = "Adventure";
     public const string ROULETTE = "Roulette";
+    public const string CARD_ENHANCE = "CardEnhance";
 
     static readonly HashSet<string> s_presented = new HashSet<string>(StringComparer.Ordinal);
     static Func<bool> s_canPersist;
@@ -36,6 +37,7 @@ public static class ContentUnlockManager
             EOutgameFeature.Mission => MISSION,
             EOutgameFeature.Adventure => ADVENTURE,
             EOutgameFeature.Roulette => ROULETTE,
+            EOutgameFeature.CardEnhance => CARD_ENHANCE,
             _ => null,
         };
         return _key != null;

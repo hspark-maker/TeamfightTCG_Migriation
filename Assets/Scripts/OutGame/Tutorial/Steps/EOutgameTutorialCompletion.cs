@@ -16,4 +16,5 @@ public enum EOutgameTutorialCompletion
     DeckEquip,   // 지목한 카드가 덱 칸에 들어가는 것이 완료. 클릭이 아니라 장착이라 드래그 배치도 인정된다
     DeckSave,    // 덱 편집의 저장이 확정되는 것이 완료. 클릭이 아니라 저장이라 미완성 덱의 헛클릭으로는 넘어가지 않는다
     ContentUnlockIntro, // 공통 해금 소개의 확인 버튼으로 완료
+    UnlockIntro, // 카드 해금 연출과 데모의 최종 확인
 }

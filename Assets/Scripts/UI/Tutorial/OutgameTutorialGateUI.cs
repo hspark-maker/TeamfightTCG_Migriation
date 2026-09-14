@@ -233,7 +233,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     /// 딤을 켜지 않는 것이 이 모드의 계약이다 — 개봉 스와이프(PackTearHandle)가 EventSystem.IsPointerOverGameObject로
     /// 시작 여부를 판정하므로, 전체화면 딤이 있으면 화면 어디를 눌러도 true가 되어 제스처가 영영 시작되지 않는다.
     /// 게다가 이 모드는 m_armed=false라 LateUpdate가 돌지 않아 탈출로도 없다.</summary>
-    public void ShowBanner(MonoBehaviour _owner, string _message)
+    public void ShowBanner(MonoBehaviour _owner, string _message, bool _atBottom = false)
     {
         Release();
 
@@ -244,6 +244,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         m_satisfied    = false;
         m_blockWarned  = false;
         m_armed        = false;   // 추종할 타깃이 없다 → LateUpdate 미개입
+        m_atBottom     = _atBottom;
 
         if (string.IsNullOrEmpty(_message)) { HideGate(_owner); return; }
 

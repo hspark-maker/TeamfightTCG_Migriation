@@ -17,6 +17,18 @@ public static class ContentUnlockIntroValidation
         var data = AssetDatabase.LoadAssetAtPath<OutgameTutorialData>(
             "Assets/SO/TutorialConfig/Outgame/OutgameTutorial.asset");
         Require(data != null, "Tutorial asset missing.");
+        Require(ContentUnlockConfig.TryValidate(data.contentUnlocks, out var unlockError), unlockError);
+        Require(ContentUnlockManager.TryGetKey(EOutgameFeature.CardEnhance, out var enhanceKey)
+            && ContentUnlockConfig.TryGet(data.contentUnlocks, enhanceKey, out var enhanceRule)
+            && enhanceRule.RequireFtue && !enhanceRule.RequireRank && enhanceRule.MinAccountLevel == 0,
+            "Card enhancement must require only FTUE completion.");
+        ContentUnlockConfig.TryGet(data.contentUnlocks, ContentUnlockManager.CARD_ENHANCE, out var rule);
+        Require(ContentUnlockRules.Evaluate(rule, false, false, false, -1, -1, false, 0).Missing
+            == EContentUnlockRequirement.Ftue, "Card enhancement opened before FTUE completion.");
+        Require(ContentUnlockRules.Evaluate(rule, true, false, false, -1, -1, false, 0).IsUnlocked,
+            "Card enhancement must open after FTUE without rank or account-level data.");
+        Require(ContentUnlockIntroDef.KeyOf(EContentUnlockIntro.CardEnhance) == ContentUnlockManager.CARD_ENHANCE,
+            "Card enhancement intro must commit the matching presentation key.");
         var ids = new HashSet<int>();
         int forced = 0;
         int intros = 0;
@@ -49,9 +61,10 @@ public static class ContentUnlockIntroValidation
                     Require(chapter.TryGetStep(i + 1, out var next)
                         && next.Action == EOutgameTutorialAction.WaitClick, "Adventure button guide must remain a separate step.");
                 if (chapter.Trigger == EOutgameTutorialTrigger.ContentUnlocksAvailable)
-                    Require(chapter.StepCount == 1 && step.ContentIntros.Count == 2
+                    Require(chapter.StepCount == 1 && step.ContentIntros.Count == 3
                         && step.ContentIntros[0] == EContentUnlockIntro.Mission
-                        && step.ContentIntros[1] == EContentUnlockIntro.Roulette, "Mission/roulette must be queued in authored order.");
+                        && step.ContentIntros[1] == EContentUnlockIntro.Roulette
+                        && step.ContentIntros[2] == EContentUnlockIntro.CardEnhance, "Mission/roulette/card enhancement must be queued in authored order.");
             }
         }
         Require(forced == 4 && intros == 3, "Forced boundary or intro placement changed.");
@@ -122,6 +135,8 @@ public static class ContentUnlockIntroValidation
             Require(data.TryGetContentIntro(EContentUnlockIntro.Mission, out var mission)
                 && data.TryGetContentIntro(EContentUnlockIntro.Roulette, out _), "Missing grouped definitions.");
             data.TryGetContentIntro(EContentUnlockIntro.Roulette, out var roulette);
+            Require(data.TryGetContentIntro(EContentUnlockIntro.CardEnhance, out var enhance),
+                "Missing card enhancement definition.");
             var icons = new[] { mission.icon };
             int confirmations = 0;
             int cancellations = 0;
@@ -173,7 +188,7 @@ public static class ContentUnlockIntroValidation
             void Prepare()
             {
                 Set("m_intro", view);
-                Set("m_intros", new List<ContentUnlockIntroDef> { mission, roulette });
+                Set("m_intros", new List<ContentUnlockIntroDef> { mission, roulette, enhance });
                 Set("m_introIndex", 0);
                 Set("m_visible", true);
                 Set("m_playing", true);
@@ -183,7 +198,7 @@ public static class ContentUnlockIntroValidation
                 ShowNext();
             }
             Prepare();
-            Require(message.text == "일일미션 / 가이드 미션 오픈 !" && IconsVisible(2),
+            Require(message.text == mission.contentName + " / " + mission.guideMissionName && IconsVisible(2),
                 "Mission introduction must present both mission types on one panel.");
             DOTween.Complete(view, true);
             button.onClick.Invoke();
@@ -192,10 +207,20 @@ public static class ContentUnlockIntroValidation
                 && (bool)ownerType.GetField("m_pendingIntro", flags).GetValue(owner),
                 "First confirmation must queue the next panel without completing the step.");
             ShowNext();
-            Require(message.text == "룰렛 오픈 !" && IconsVisible() && !button.interactable,
+            Require(message.text == roulette.contentName && IconsVisible() && !button.interactable,
                 "Next content must reopen with its own title and entrance gate.");
             var firstIcon = (Image)serialized.FindProperty("_icons").GetArrayElementAtIndex(0).objectReferenceValue;
             Require(firstIcon.sprite == roulette.icon, "Next content retained the previous icon.");
+            DOTween.Complete(view, true);
+            button.onClick.Invoke();
+            DOTween.Complete(view, true);
+            Require(confirmations == 1 && !ContentUnlockIntroView.IsOpen
+                && (bool)ownerType.GetField("m_pendingIntro", flags).GetValue(owner),
+                "Second confirmation must queue card enhancement without completing the step.");
+            ShowNext();
+            Require(message.text == enhance.contentName && IconsVisible() && !button.interactable
+                && firstIcon.sprite == enhance.icon,
+                "Card enhancement must show its own title and icon without a lobby button target.");
             DOTween.Complete(view, true);
             button.onClick.Invoke();
             button.onClick.Invoke();
