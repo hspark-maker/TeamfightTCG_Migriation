@@ -22,6 +22,8 @@ export interface MissionDef {
   description: string;
   passExp: number;
   sortOrder: number;
+  guideActId: number;
+  guideActName: string;
   /**
    * 꺼진 미션은 목록과 수령에서 제외한다. 이벤트 카운터는 미션과 분리돼 계속 쌓이므로,
    * 활성화는 기간 경계 직후에 수행해 소급 달성을 막는다.
@@ -42,16 +44,25 @@ export const MAX_MISSION_ID_LENGTH = 64;
 /**
  * 발행된 Mission 행을 해석한다. 결손·잘못된 저작은 이전 번들로 대체하지 않고 거절한다.
  * @param {Array} rows 스펙 리더가 읽은 행
+ * @param {object} options 발행 세대에 따른 막 저작 요구
  * @return {Array} 검증된 전체 미션 정의
  */
-export function parseMissionCatalog(rows: readonly Record<string, unknown>[]): MissionDef[] {
+export function parseMissionCatalog(
+  rows: readonly Record<string, unknown>[], options: {requireGuideActs?: boolean} = {},
+): MissionDef[] {
   if (rows.length === 0) throw new Error("Mission spec has no rows.");
+  const legacyGuideIds = new Set<string>();
   const integer = (value: unknown): number =>
     (typeof value === "number" || (typeof value === "string" && value.trim() !== "")) ?
       Number(value) : Number.NaN;
   const catalog = rows.map((row): MissionDef => {
     const enabled = integer(row.enabled);
     if (enabled !== 0 && enabled !== 1) throw new Error(`Mission '${row.missionId}' has invalid enabled.`);
+    if (options.requireGuideActs === false && row.period === "guide" &&
+      !Object.prototype.hasOwnProperty.call(row, "guideActId") &&
+      !Object.prototype.hasOwnProperty.call(row, "guideActName")) {
+      legacyGuideIds.add(String(row.missionId ?? ""));
+    }
     return {
       id: String(row.missionId ?? ""),
       period: String(row.period ?? "") as MissionPeriodKind,
@@ -61,10 +72,12 @@ export function parseMissionCatalog(rows: readonly Record<string, unknown>[]): M
       description: String(row.description ?? ""),
       passExp: integer(row.passExp),
       sortOrder: integer(row.sortOrder),
+      guideActId: row.guideActId === undefined ? 0 : integer(row.guideActId),
+      guideActName: String(row.guideActName ?? "").trim(),
       enabled: enabled === 1,
     };
   });
-  const issues = missionCatalogIssues(catalog);
+  const issues = missionCatalogIssues(catalog, legacyGuideIds);
   if (issues.length > 0) throw new Error(`Invalid Mission spec: ${issues.join("; ")}`);
   return catalog;
 }
@@ -95,13 +108,17 @@ export function findMission(missionId: string, catalog: readonly MissionDef[]): 
  * 모든 callable 을 죽인다. 미션 저작 실수 하나가 팩 개봉·강화까지 함께 멈추면 안 된다.
  * 표를 읽은 요청의 파싱 시점에만 검증한다.
  * @param {Array} catalog 검사할 정의 목록
+ * @param {Set<string>} legacyGuideIds 구세대 표에서 막 열 자체가 없던 미션
  * @return {Array} 문제 설명 목록
  */
 export function missionCatalogIssues(
   catalog: readonly MissionDef[],
+  legacyGuideIds: ReadonlySet<string> = new Set<string>(),
 ): string[] {
   const issues: string[] = [];
   const seen = new Set<string>();
+  const actNames = new Map<number, string>();
+  const guideOrders = new Set<number>();
 
   for (const mission of catalog) {
     if (seen.has(mission.id)) issues.push(`Duplicated mission id: ${mission.id}`);
@@ -130,6 +147,37 @@ export function missionCatalogIssues(
     if (!Number.isSafeInteger(mission.sortOrder) || mission.sortOrder <= 0) {
       issues.push(`Mission '${mission.id}' has an invalid sortOrder.`);
     }
+    if (mission.enabled && mission.period === "guide") {
+      if (guideOrders.has(mission.sortOrder)) {
+        issues.push(`Duplicated guide sortOrder: ${mission.sortOrder}`);
+      }
+      guideOrders.add(mission.sortOrder);
+      if (legacyGuideIds.has(mission.id)) continue;
+      if (!Number.isSafeInteger(mission.guideActId) || mission.guideActId <= 0) {
+        issues.push(`Mission '${mission.id}' has an invalid guideActId.`);
+      }
+      if (mission.guideActName.trim().length === 0) {
+        issues.push(`Mission '${mission.id}' has an empty guideActName.`);
+      }
+      const actName = actNames.get(mission.guideActId);
+      if (actName !== undefined && actName !== mission.guideActName) {
+        issues.push(`Guide act '${mission.guideActId}' has conflicting names.`);
+      }
+      actNames.set(mission.guideActId, mission.guideActName);
+    }
+  }
+  const seenActs = new Set<number>();
+  let previousAct: number | undefined;
+  const guide = catalog.filter((mission) => mission.enabled && mission.period === "guide")
+    .sort((left, right) => left.sortOrder - right.sortOrder);
+  for (const mission of guide) {
+    if (legacyGuideIds.has(mission.id)) continue;
+    if (mission.guideActId === previousAct) continue;
+    if (seenActs.has(mission.guideActId)) {
+      issues.push(`Guide act '${mission.guideActId}' has non-contiguous missions.`);
+    }
+    seenActs.add(mission.guideActId);
+    previousAct = mission.guideActId;
   }
   return issues;
 }

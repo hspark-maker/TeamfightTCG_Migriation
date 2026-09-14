@@ -138,11 +138,20 @@
 - 저장: `OutGame/Save/2.Domain/AdventureSaveData`
 - UI: `UI/Adventure/AdventureMapOverlayView` · `AdventureNodeView` · `AdventureRewardFlow` · `AdventureReturnFlow`
 
+## 가이드 미션 (`OutGame/Mission/`, `UI/Mission/`)
+
+- 진실원은 서버 미션 봉투(`getMissions` 가 세이브를 읽어 `guide.*` 진행도를 재계산한다, 순차 수령 `MissionManager.IsGuideUnlocked`) — 클라 판정 없음. 로비 복귀 재조회는 `UI/Lobby/LobbyMatchTabPanel.OnEnter` 한 곳(디바운스 업로드를 `PlayerSaveCloud.FlushAsync` 로 먼저 확정)
+- 현재 미션·막·목적지의 단일 지점 `OutGame/Mission/GuideMissionTrack` (`GuideMissionTrack.Current` · `ActOf` · `RouteOf` · `PickGrowthCard`, 이벤트 키 상수도 여기) — 막 구간은 클라 상수(시트 열 없음)
+- 트래커 카드: GuideMissionTrackerCard.prefab 이 배경·몸통 Button·레드닷(`LobbyEntryAlertDot`)·`UI/Mission/GuideMissionTrackerView` 를 전부 스스로 갖는 자체 완결 프리팹이고, Tab_Match.prefab 에는 그 인스턴스 하나만 중첩돼 있다(옛 `GuideMissionBtn` 노드는 삭제). 패널의 `guideMissionButton` 은 이 프리팹 안 Button 을 가리키며, 켜고 끄기·잠금 흑백은 종전대로 `LobbyMatchTabPanel` 소유(몸통 탭 = 목록, 알약 = 이동/받기). 루트·자식 전부 고정 크기 저작이라 프리팹 모드에서 그대로 보고 고친다
+- 이동 실행 `UI/Mission/GuideMissionNavigator.Go` — 덱 편집기 · 모험 맵(`LobbyMatchLauncher.TryOpenAdventureMapAt` → `AdventureMapOverlayView.FocusNode`) · 도감 탭 · 카드 상세. 도착 안내는 붙이지 않는다(카드 소지가 전제인 코치마크는 폐기됨)
+- 목록 `UI/Mission/GuideMissionPanel` 은 막 헤더(`MissionActHeaderView`, MissionActHeaderRow.prefab)로 묶고 완료 막은 접는다 · 행 강조 `MissionRowView.SetEmphasis`(일일·주간은 `Bind` 가 항상 Normal 로 되돌린다)
+- 시너지 소개 `UI/Tutorial/SynergyIntroduction` 은 가이드 미션 4(`Guide.CaretakerDeckAtStar2`) 달성 → 돌보미, 6(`Guide.CaretakerTraceDeck`) 달성 → 추적으로 고정 · 낙인은 `SynergyIntroductionSaveData.CompletedIds`(옛 `completed` 는 읽기 마이그레이션)
+
 ## 튜토리얼 (`OutGame/Tutorial/`, `UI/Tutorial/`)
 
 - 축은 하나다: `OutgameTutorial.asset` 의 챕터마다 `EOutgameTutorialChapterKind` 로 **강제(Forced) / 자율(Guided)** 를 표시한다. 강제는 선두 연속 챕터(`OutgameTutorialRunner.ForcedChapterCount`, 세이브 좌표·기능 잠금·졸업이 이 경계 안), 자율은 그 뒤에 서서 졸업 뒤 트리거(`OutgameTutorialChapter.Trigger`)로 깨어나 메모리 커서로 돌고 완주 낙인(`TutorialSaveData.CompletedTriggers`)만 남긴다. 화면 이탈 = 이번 세션 미루기(`OutgameTutorialRunner.AbortGuided`)
 - 실행: `OutgameTutorialRunner` (강제 커서 `EnterCurrentStep`/`NotifyStepSatisfied` · 자율 커서 `Fire`/`HasPending`/`EnterGuidedStep`/`NotifyGuidedStepSatisfied`/`FinishGuided`) · `OutGame/Tutorial/Steps/TutorialStepExecutor` · `TutorialStepDef` · `EOutgameTutorialAction` · `EOutgameTutorialCompletion` · `EOutgameTutorialFailure` · `EOutgameTutorialStepResult` · `OutgameTutorialStepContext`
-- 자율 발화의 유일한 창구는 `UI/Tutorial/GuidanceCoordinator.TryFire` — 무대(연출·커튼·게이트 표시 중)가 바쁘면 버린다(보류 큐 없음, 알림 점 `UI/Tutorial/TutorialAlertDot` 이 다시 부른다). 발화처는 탭 도착(`LobbyTabController`) · 키워드 패널 열림(`KeywordGrowthPanel`) · 모험 맵 열림(`LobbyMatchLauncher`) · 랭크 연출 종료(`LobbyRankEffectDirector`)
+- 자율 발화의 유일한 창구는 `UI/Tutorial/GuidanceCoordinator.TryFire` — 무대(연출·커튼·게이트 표시 중)가 바쁘면 버린다(보류 큐 없음, 알림 점 `UI/Tutorial/TutorialAlertDot` 이 다시 부른다). 발화처는 탭 도착(`LobbyTabController`) · 키워드 패널 열림(`KeywordGrowthPanel`) · 모험 맵 열림(`LobbyMatchLauncher`) · 랭크 연출 종료(`LobbyRankEffectDirector`). 트리거 값 10·11(가이드 도착)은 폐기돼 발화처·저작 0
 - 진행·잠금: `OutgameTutorialProgress` · `OutgameFeatureLock` · `EOutgameFeature` · `ITutorialProgressSink` · `OutgameTutorialRewind` · 모험 해금(랭크 이정표) `AdventureUnlock` (세이브 마이그레이션 v0/v1→2 도 여기)
 - 카드 지급은 **서버가 판정한다** — callable `grantTutorialCards(packId)` (`functions/src/commands/grantTutorialCards.ts`, 판정 순수 모듈 `functions/src/packs/tutorialGrantPack.ts`, 지도 범위 밖). 클라 창구 `TutorialGrantCommand.GrantAsync` · 응답 DTO `GrantTutorialCardsResult` · packId 는 스텝 저작의 `pack`(`CardPackData`)에서 꺼내고, 미배선은 `Editor/Tutorial/TutorialValidator` 가 Error 로 잡는다(요구 축은 `OutGame/Tutorial/Steps/TutorialActionMeta` 의 `EStepField.Pack`) · 저작 진실원은 CardPack·CardPackDrop 시트다 — 서버는 그 팩의 드롭 풀 전량을 확정 지급하므로 `drawCount`·`uniqueDraw`·`weight` 를 보지 않고, `price` 가 0 이 아니면 거절 사유 GrantNotAllowed 로 막는다. 소유 반영은 채택 배관(`ServerSlotRehydrator`)이 하고 `TutorialStepExecutor` 는 소유를 직접 만지지 않는다
 - 앵커·데이터: `TutorialAnchorRegistry` · `TutorialAnchor` · `EOutgameTutorialAnchor` · `OutgameTutorialData` · `OutgameTutorialChapter` · `EOutgameTutorialChapterKind` · `OutgameTutorialGuide` (강제·자율 커서를 합쳐 "지금 안내가 시키는 일"을 답한다) · `EOutgameTutorialTrigger` (값·이름이 세이브 낙인 키라 불변)

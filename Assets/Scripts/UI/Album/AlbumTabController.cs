@@ -76,6 +76,8 @@ public class AlbumTabController : LobbyTabPanel
         OwnershipManager.OnOwnershipChanged += Refresh;
         AlbumRewardManager.OnChanged += Refresh;
         AlbumInsertMask.OnChanged += Refresh;
+        // 자율 안내가 시작·종료될 때 테마 칸 앵커를 다시 고른다 — 안 하면 탭 진입 때 고른 폴백 칸에 안내가 붙는다.
+        OutgameTutorialRunner.OnGuidedChanged += Refresh;
 
         Refresh();
 
@@ -88,6 +90,7 @@ public class AlbumTabController : LobbyTabPanel
         OwnershipManager.OnOwnershipChanged -= Refresh;
         AlbumRewardManager.OnChanged -= Refresh;
         AlbumInsertMask.OnChanged -= Refresh;
+        OutgameTutorialRunner.OnGuidedChanged -= Refresh;
 
         // 비활성화가 시작 코루틴을 끊는다 — 플래그가 남으면 다음 진입에서 영영 시작하지 못한다
         m_insertPending = false;

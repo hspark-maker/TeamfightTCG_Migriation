@@ -3,6 +3,7 @@ import {isKnownEnv, requireUid, saveDocument} from "../save/saveDocument";
 import {db} from "../firebaseApp";
 import {FieldValue} from "firebase-admin/firestore";
 import {evaluateGuideProgress} from "../missions/guideProgress";
+import {rankRef} from "../rank/rankStore";
 import {enabledMissions} from "../missions/catalog";
 import {readMissionCatalog} from "../missions/missionSpec";
 import {
@@ -44,9 +45,11 @@ export const getMissions = onCall(async (request) => {
   ]);
   const state = await db.runTransaction(async (transaction) => {
     const reference = missionsRef(db, env, uid);
-    const [missionSnapshot, saveSnapshot] = await transaction.getAll(reference, saveDocument(env, uid));
+    const [missionSnapshot, saveSnapshot, rankSnapshot] = await transaction.getAll(
+      reference, saveDocument(env, uid), rankRef(db, env, uid));
     const stored = readMissions(missionSnapshot);
-    const progress = evaluateGuideProgress(saveSnapshot.data() ?? {}, guideCards, catalog, stored.progress);
+    const progress = evaluateGuideProgress(
+      saveSnapshot.data() ?? {}, guideCards, catalog, stored.progress, rankSnapshot.data());
     if (JSON.stringify(progress) !== JSON.stringify(stored.progress)) {
       transaction.set(reference, {progress, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
     }
@@ -71,6 +74,8 @@ export const getMissions = onCall(async (request) => {
       title: mission.title,
       description: mission.description,
       sortOrder: mission.sortOrder,
+      guideActId: mission.guideActId,
+      guideActName: mission.guideActName,
       reward: {
         currencies: resolveRewards(rewardRows, mission.period === "guide" ? "Guide" : "Mission", mission.id).gains,
         items: resolveRewards(rewardRows, mission.period === "guide" ? "Guide" : "Mission", mission.id).items,

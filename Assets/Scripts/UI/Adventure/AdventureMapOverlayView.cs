@@ -611,6 +611,13 @@ public class AdventureMapOverlayView : MonoBehaviour, IPointerClickHandler
             if (this.m_nodes[t_i] != null) this.m_nodes[t_i].ApplyTutorialAnchor(t_i == t_target);
     }
 
+    /// <summary>정점 하나를 화면 가운데로 옮긴다. 해금 사슬이 도는 중에는 사슬이 스크롤 주인이라 양보한다.</summary>
+    public void FocusNode(int _index)
+    {
+        if (!this.IsOnStage || this.IsIntroPending) return;
+        this.ScrollToNode(_index);
+    }
+
     // 받을 선물이 있으면 그 정점, 없으면 지금 도전할 정점을 화면 중앙에 둔다.
     // 전부 클리어(-1)면 마지막 챕터 띠로 — 끝 표지와 마지막 완주 보상이 거기 서 있다(정점 위가 아니다).
     void ScrollToCurrent()

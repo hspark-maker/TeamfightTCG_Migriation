@@ -1,0 +1,86 @@
+<style>
+#guide-ux {color-scheme:light dark;font-family:system-ui,sans-serif}
+#guide-ux .previews {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+#guide-ux .caption {margin:0 0 8px;font-size:13px}
+#guide-ux .mission {--paper:light-dark(#fff6df,#252b38);--ink:light-dark(#253249,#fff3dd);--sub:light-dark(#596174,#c7cbda);position:relative;background:var(--paper);color:var(--ink);border:2px solid #c49b59;border-radius:16px;padding:16px;box-shadow:0 4px 0 light-dark(#d8c09a,#141925)}
+#guide-ux .mission button {font:inherit;cursor:pointer}
+#guide-ux .summary {display:block;width:100%;text-align:left;border:0;padding:0;background:transparent;color:inherit;min-height:80px}
+#guide-ux .eyebrow {font-size:12px;color:var(--sub);display:flex;justify-content:space-between;gap:8px;align-items:center}
+#guide-ux .goal {display:block;font-size:19px;font-weight:700;margin:10px 0 8px;line-height:1.4}
+#guide-ux .count {display:flex;justify-content:space-between;gap:8px;font-size:13px;margin:8px 0}
+#guide-ux .meter {height:8px;background:light-dark(#e3d8c3,#111823);border-radius:6px;overflow:hidden}
+#guide-ux .fill {height:100%;width:66.667%;background:#33977d}
+#guide-ux .ready .fill {width:100%;background:#dca433}
+#guide-ux .footer {display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:15px;flex-wrap:wrap}
+#guide-ux .reward {font-size:13px}
+#guide-ux .action {border:0;border-radius:9px;background:#216b5e;color:#fff;padding:11px 15px;min-height:44px;box-shadow:0 3px 0 #134b43;font-size:14px!important;font-weight:700!important}
+#guide-ux .ready .action {background:#f1bd4c;color:#3b2a12;box-shadow:0 3px 0 #b88828}
+#guide-ux .badge {font-size:12px;color:light-dark(#876019,#f1bd4c);font-weight:700}
+#guide-ux .sheet {margin-top:24px;background:light-dark(#fff8e9,#252b38);color:light-dark(#253249,#fff3dd);padding:20px;border:2px solid #c49b59;border-radius:16px}
+#guide-ux .sheet[hidden] {display:none}
+#guide-ux .sheet header {display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:18px;font-weight:700}
+#guide-ux .sheet button {font:inherit;min-height:44px;cursor:pointer;border:0;border-radius:8px;padding:8px 14px;background:#216b5e;color:#fff}
+#guide-ux .sheet .row {padding:15px 0;border-bottom:1px solid light-dark(#dfd2b7,#525765);display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap}
+#guide-ux .sheet .current {font-weight:700}
+#guide-ux .sheet small {font-size:12px}
+#guide-ux .notice {margin:16px 0 0;font-size:14px;min-height:22px}
+@media(max-width:560px){#guide-ux .previews{grid-template-columns:1fr}}
+</style>
+<div id="guide-ux">
+  <div class="previews">
+    <section aria-label="진행 중 트래커">
+      <p class="caption">진행 중 · 문구와 수치는 예시</p>
+      <div class="mission">
+        <button class="summary" data-open="progress" aria-label="현재 미션과 전체 목록 열기">
+          <span class="eyebrow"><span>가이드 · 성장 시작</span><span>전체 보기 ›</span></span>
+          <span class="goal">카드 강화 3회 하기</span>
+        </button>
+        <div class="count"><span>1회 더 강화하면 완료</span><span>2 / 3</span></div>
+        <div class="meter" role="progressbar" aria-label="카드 강화" aria-valuemin="0" aria-valuemax="3" aria-valuenow="2"><div class="fill"></div></div>
+        <div class="footer"><span class="reward">보상 · 골드 500</span><button class="action" data-go>강화하러 가기</button></div>
+      </div>
+    </section>
+    <section aria-label="수령 가능 트래커">
+      <p class="caption">달성 · 보상 수령 전</p>
+      <div class="mission ready">
+        <button class="summary" data-open="ready" aria-label="달성한 미션과 전체 목록 열기">
+          <span class="eyebrow"><span>가이드 · 성장 시작</span><span>전체 보기 ›</span></span>
+          <span class="goal">카드 강화 3회 하기</span>
+        </button>
+        <div class="count"><span class="badge">✓ 미션 달성!</span><span>3 / 3</span></div>
+        <div class="meter" role="progressbar" aria-label="카드 강화" aria-valuemin="0" aria-valuemax="3" aria-valuenow="3"><div class="fill"></div></div>
+        <div class="footer"><span class="reward">보상 · 골드 500</span><button class="action" data-claim>보상 받기</button></div>
+      </div>
+    </section>
+  </div>
+  <section class="sheet" hidden aria-label="가이드 미션 상세 미리보기">
+    <header><span>가이드 미션</span><button data-close aria-label="가이드 미션 닫기">닫기</button></header>
+    <div class="row"><span>최종 보상까지</span><small>수령한 미션 2 / 8 · 예시</small></div>
+    <details><summary class="row">✓ 첫걸음 · 수령 완료</summary><p>첫 전투 완료 · 첫 카드팩 개봉</p></details>
+    <div class="row current"><span>현재 · 카드 강화 3회 하기</span><button data-sheet-action>강화하러 가기</button></div>
+    <div class="row"><span>다음 · 강화한 카드로 덱 편성</span><small>현재 미션 보상 수령 후</small></div>
+  </section>
+  <p class="notice" role="status" aria-live="polite"></p>
+</div>
+<script>
+(() => {
+ const root = document.getElementById('guide-ux');
+ const sheet = root.querySelector('.sheet');
+ const status = root.querySelector('.notice');
+ const sheetAction = root.querySelector('[data-sheet-action]');
+ let selected = 'progress';
+ function go(){status.textContent='강화 가능한 카드 선택 화면으로 이동. 카드 선택과 강화 실행은 사용자가 결정합니다.';sheet.hidden=true;}
+ function claim(){status.textContent='수령 성공 → 보상 표시 → 다음 미션으로 교체. 서버 수령 성공을 가정한 흐름입니다.';sheet.hidden=true;}
+ root.querySelectorAll('[data-open]').forEach(button=>button.addEventListener('click',()=>{
+   selected=button.dataset.open;sheet.hidden=false;sheetAction.textContent=selected==='ready'?'보상 받기':'강화하러 가기';status.textContent='현재 미션이 보이는 위치에서 목록을 엽니다.';
+ }));
+ root.querySelector('[data-go]').addEventListener('click',go);
+ root.querySelector('[data-claim]').addEventListener('click',claim);
+ root.querySelector('[data-close]').addEventListener('click',()=>{sheet.hidden=true;status.textContent='로비의 같은 위치로 복귀합니다.';});
+ sheetAction.addEventListener('click',()=>selected==='ready'?claim():go());
+ const options={progressBar:true};
+ function render(){root.querySelectorAll('.meter').forEach(meter=>meter.hidden=!options.progressBar);}
+ render();
+ if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:render});tweak.addToggle(options,'progressBar',{label:'진행 막대 표시'});}
+})();
+</script>

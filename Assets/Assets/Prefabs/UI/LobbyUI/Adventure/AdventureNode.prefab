@@ -1005,7 +1005,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: bea0b6e7083dc4167bcefa58b9e825ea, type: 3}
+  m_Sprite: {fileID: 21300000, guid: b4606bc313e68d84dba1db451ca8d998, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -1150,9 +1150,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AdventureNodeView
   rewardImage: {fileID: 5895009366919570037}
   tapButton: {fileID: 6241923198747452441}
-  multiRewardChests:
-  - {fileID: 21300000, guid: bea0b6e7083dc4167bcefa58b9e825ea, type: 3}
-  - {fileID: 21300000, guid: 2649df022e6c14ff792e3a0141607600, type: 3}
+  multiRewardUnclaimedIcon: {fileID: 21300000, guid: b4606bc313e68d84dba1db451ca8d998, type: 3}
+  multiRewardClaimedIcon: {fileID: 21300000, guid: ff7c513f16bfa5e45b87e7d0e4acd66a, type: 3}
   lockedMark: {fileID: 7709414635420645286}
   clearedMark: {fileID: 8260215473264900281}
   currentMark: {fileID: 4732277694781066035}

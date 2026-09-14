@@ -4,6 +4,7 @@ import {db, DATABASE_ID} from "../firebaseApp";
 import {isKnownEnv} from "../save/environments";
 import {readSpecRows} from "../packs/packSpecReader";
 import {evaluateGuideProgress} from "../missions/guideProgress";
+import {rankRef} from "../rank/rankStore";
 import {readMissionCatalog} from "../missions/missionSpec";
 import {missionsRef, readMissions} from "../missions/missionStore";
 
@@ -22,8 +23,9 @@ export const syncGuideProgress = onDocumentWritten({
   if (!cards.length) throw new Error("Guide card spec is unavailable.");
   const reference = missionsRef(db, env, uid);
   await db.runTransaction(async (transaction) => {
-    const state = readMissions(await transaction.get(reference));
-    const progress = evaluateGuideProgress(current, cards, catalog, state.progress);
+    const [missionSnapshot, rankSnapshot] = await transaction.getAll(reference, rankRef(db, env, uid));
+    const state = readMissions(missionSnapshot);
+    const progress = evaluateGuideProgress(current, cards, catalog, state.progress, rankSnapshot.data());
     // readMissions는 0을 생략한다. 미달성 가이드의 missing과 0은 같은 값이다.
     if (Object.entries(progress).some(([key, value]) => value !== (state.progress[key] ?? 0))) {
       transaction.set(reference, {progress, updatedAt: FieldValue.serverTimestamp()}, {merge: true});

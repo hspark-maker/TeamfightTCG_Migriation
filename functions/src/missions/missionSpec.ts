@@ -1,4 +1,4 @@
-import {readSpecRows} from "../specs/specBlobReader";
+import {readSpecRowsWithContentMajor} from "../specs/specBlobReader";
 import {MissionDef, parseMissionCatalog} from "./catalog";
 
 /**
@@ -7,5 +7,6 @@ import {MissionDef, parseMissionCatalog} from "./catalog";
  * @return {Promise<Array>} 발행된 미션 정의
  */
 export async function readMissionCatalog(env: string): Promise<readonly MissionDef[]> {
-  return parseMissionCatalog(await readSpecRows(env, "Mission"));
+  const {major, rows} = await readSpecRowsWithContentMajor(env, "Mission");
+  return parseMissionCatalog(rows, {requireGuideActs: major >= 6});
 }

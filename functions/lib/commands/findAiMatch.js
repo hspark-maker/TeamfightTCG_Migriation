@@ -53,6 +53,7 @@ const rankStore_1 = require("../rank/rankStore");
 const payloadGuards_1 = require("../match/payloadGuards");
 const receiptId_1 = require("../save/receiptId");
 const saveDocument_1 = require("../save/saveDocument");
+const adventureTable_1 = require("../adventureTable");
 const specBlobReader_1 = require("../specs/specBlobReader");
 const DECK_SIZE = 6;
 function parseData(raw) {
@@ -63,12 +64,22 @@ function parseData(raw) {
     }
     const fingerprint = data?.contentFingerprint;
     const rawPlayerDeck = data?.playerDeck;
-    if (data?.aiGrowthVersion != null && data.aiGrowthVersion !== 1) {
+    const adventureNodeId = data?.adventureNodeId;
+    if (adventureNodeId != null && (typeof adventureNodeId !== "string" ||
+        adventureNodeId.trim().length === 0 || adventureNodeId.length > adventureTable_1.MAX_NODE_ID_LENGTH)) {
+        throw new https_1.HttpsError("invalid-argument", "invalid adventure node");
+    }
+    if (data?.aiGrowthVersion != null && data.aiGrowthVersion !== 1 &&
+        !(adventureNodeId != null && data.aiGrowthVersion === 0)) {
         throw new https_1.HttpsError("invalid-argument", "unsupported AI growth version");
+    }
+    if (adventureNodeId != null && data?.aiGrowthVersion === 1) {
+        throw new https_1.HttpsError("invalid-argument", "adventure requires fixed AI growth");
     }
     // 서버 선배포 창. 구 클라는 env만 보내고 덱 선택만 받는다. 새 필드 중 하나만 보낸 반쪽
     // 페이로드는 구 버전으로 접지 않는다 — 매치가 봉인됐다고 믿는 클라를 만들 수 있다.
-    if (fingerprint == null && rawPlayerDeck == null && data?.aiGrowthVersion == null)
+    if (fingerprint == null && rawPlayerDeck == null && data?.aiGrowthVersion == null &&
+        adventureNodeId == null)
         return { env, legacy: true };
     if (typeof fingerprint !== "string" || !payloadGuards_1.HEX_64.test(fingerprint) ||
         !Array.isArray(rawPlayerDeck) || rawPlayerDeck.length !== DECK_SIZE) {
@@ -89,6 +100,7 @@ function parseData(raw) {
         txId: (0, receiptId_1.clientReceiptId)(data?.txId, (0, node_crypto_1.randomUUID)()),
         resultProtocol: 1,
         aiGrowthVersion: data?.aiGrowthVersion === 1 ? 1 : 0,
+        ...(typeof adventureNodeId === "string" ? { adventureNodeId: adventureNodeId.trim() } : {}),
     };
 }
 function shuffle(cards) {
@@ -125,6 +137,8 @@ function storedResponse(raw, data) {
         return null;
     if ((raw.aiGrowthVersion ?? 0) !== data.aiGrowthVersion)
         return null;
+    if ((raw.adventureNodeId ?? null) !== (data.adventureNodeId ?? null))
+        return null;
     const snapshots = data.aiGrowthVersion === 1 ?
         (0, deckValidation_1.readAiDeckSnapshots)(deck, aiDeck.cardGrowth, aiDeck.snapshots) : null;
     if (data.aiGrowthVersion === 1 && snapshots == null)
@@ -140,6 +154,7 @@ function storedResponse(raw, data) {
         playerBoardOrder,
         enemyBoardOrder,
         resultProtocol: 1,
+        ...(data.adventureNodeId == null ? {} : { adventureNodeId: data.adventureNodeId }),
     };
 }
 function growthResponse(growth, snapshots) {
@@ -167,6 +182,81 @@ exports.findAiMatch = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
             if (prior.data()?.resultProtocol === 1)
                 return stored;
         }
+    }
+    if (!data.legacy && data.adventureNodeId != null && matchRef != null && matchId != null) {
+        const nodeId = data.adventureNodeId;
+        const specPins = await (0, specBlobReader_1.readSpecPins)(data.env, [...specBlobReader_1.BATTLE_REPLAY_SPEC_TABLES, "AdventureChapter", "AIDeck"]);
+        if ((0, specBlobReader_1.fingerprintOfSpecPins)(data.env, specPins, ["Card"]) !== data.contentFingerprint) {
+            throw new https_1.HttpsError("failed-precondition", "content_fingerprint_mismatch");
+        }
+        const [chapterRows, deckRows, cardRows] = await Promise.all([
+            (0, specBlobReader_1.readPinnedSpecRows)(data.env, "AdventureChapter", specPins.AdventureChapter),
+            (0, specBlobReader_1.readPinnedSpecRows)(data.env, "AIDeck", specPins.AIDeck),
+            (0, specBlobReader_1.readPinnedSpecRows)(data.env, "Card", specPins.Card),
+        ]);
+        const nodes = (0, adventureTable_1.parseChapterNodeRows)(chapterRows);
+        const authoredNodes = chapterRows.filter((row) => String(row.nodeId ?? "").trim() === nodeId);
+        const node = authoredNodes.length === 1 ? authoredNodes[0] : null;
+        const cardLevel = (0, payloadGuards_1.safeInteger)(node?.aiCardLevel);
+        const deck = (0, aiDeckDraw_1.parseAiDeckRows)(deckRows).rows.find((row) => row.deckId === String(node?.aiDeckId ?? ""));
+        if (node == null || cardLevel == null || cardLevel < 1 || deck == null) {
+            throw new https_1.HttpsError("failed-precondition", "Adventure opponent spec is invalid.");
+        }
+        const cardSpecs = new Map(cardRows.map((row) => {
+            const spec = (0, deckValidation_1.parseCardSpecRow)(row);
+            if (spec == null)
+                throw new https_1.HttpsError("failed-precondition", "Card spec is invalid.");
+            return [spec.id, spec];
+        }));
+        const snapshots = (0, deckValidation_1.buildAiDeckSnapshots)(deck.cardIds, cardLevel, cardSpecs);
+        if (snapshots == null)
+            throw new https_1.HttpsError("failed-precondition", "Adventure AI growth is invalid.");
+        const cardGrowth = snapshots.map((card) => ({ cardId: card.cardId, level: card.level, limitBreak: 0 }));
+        const seedHex = (0, node_crypto_1.randomBytes)(8).toString("hex");
+        const playerBoardOrder = shuffle(data.playerDeck);
+        const enemyBoardOrder = shuffle(deck.cardIds);
+        const saveRef = firebaseApp_1.db.doc(`envs/${data.env}/users/${uid}/save/current`);
+        return (0, countedTransaction_1.withCountedTransaction)("findAiMatch", async (tx) => {
+            const prior = await tx.get(matchRef);
+            if (prior.exists) {
+                const stored = storedResponse(prior.data() ?? {}, data);
+                if (stored == null)
+                    throw new https_1.HttpsError("already-exists", "AI match receipt was reused");
+                return stored;
+            }
+            const save = (await tx.get(saveRef)).data();
+            if (save == null)
+                throw new https_1.HttpsError("failed-precondition", "Save document is missing.");
+            const adventure = (0, payloadGuards_1.objectRecord)(save.adventure);
+            const cleared = (0, adventureTable_1.readNodeIdList)(adventure?.clearedNodeIds);
+            const pending = adventure?.pendingRewardNodeId;
+            if (typeof pending === "string" && pending.length > 0) {
+                throw new https_1.HttpsError("failed-precondition", "Adventure reward is pending.");
+            }
+            if (cleared.includes(nodeId))
+                throw new https_1.HttpsError("failed-precondition", "Adventure node is already cleared.");
+            const rank = (0, payloadGuards_1.objectRecord)(save.rank);
+            const points = Math.max(0, (0, payloadGuards_1.safeInteger)(rank?.points) ?? 0);
+            const verdict = (0, adventureTable_1.judgeNodeUnlock)(nodes, nodeId, new Set(cleared), points);
+            if (!verdict.ok)
+                throw new https_1.HttpsError("failed-precondition", verdict.reason);
+            const now = firestore_1.Timestamp.now();
+            tx.set(matchRef, {
+                matchId, env: data.env, phase: "pairing", status: "pending", pairingStatus: "paired",
+                seedSource: "server", seedHex, rulesetVersion: matchPairing_1.SERVER_RULESET_VERSION,
+                cardDataVersion: data.contentFingerprint, specPins, participantUids: [uid], expectedParticipants: 1,
+                mode: "solo", resultProtocol: 1, adventureNodeId: nodeId,
+                ownerIndexByUid: { [uid]: 0 }, playerDeckCardIds: [...data.playerDeck].sort((a, b) => a - b),
+                aiDeck: { deckId: deck.deckId, cardIds: deck.cardIds, cardLevel, cardGrowth, snapshots },
+                serverBoardOrders: { owner0: playerBoardOrder, owner1: enemyBoardOrder },
+                pairingCreatedAt: now, pairedAt: firestore_1.FieldValue.serverTimestamp(),
+                expiresAt: firestore_1.Timestamp.fromMillis(now.toMillis() + matchPairing_1.MATCH_PAIRING_TTL_MS),
+                updatedAt: firestore_1.FieldValue.serverTimestamp(),
+            });
+            return { revision: 0, matchId, seedHex, rulesetVersion: matchPairing_1.SERVER_RULESET_VERSION,
+                deck: deck.cardIds, cardLevel, playerBoardOrder, enemyBoardOrder, resultProtocol: 1,
+                adventureNodeId: nodeId };
+        });
     }
     const [rankRows, deckRows, seasonRows] = await Promise.all([
         (0, specBlobReader_1.readSpecRows)(data.env, "RankGrade"),

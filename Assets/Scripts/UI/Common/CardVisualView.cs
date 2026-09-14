@@ -95,17 +95,23 @@ public class CardVisualView : MonoBehaviour
     // 프레임과 아트만 남기는 런타임 마스크. 프리팹 스위치(show*)를 끄지 않고 그 위에 얹는다 —
     // 직접 끄면 껐다 켤 때 그 타일이 원래 무엇을 보이던 타일이었는지를 잃는다.
     bool m_artOnly;
+    bool m_showBadges;
 
     // 소비 지점이 show* 와 m_artOnly 를 각자 곱하면 한 군데 빠뜨렸을 때 그 요소만 살아남는다 → 곱은 여기서만.
     bool ShowName      => this.showName      && !this.m_artOnly;
     bool ShowHp        => this.showHp        && !this.m_artOnly;
     bool ShowLevel     => this.showLevel     && !this.m_artOnly;
     bool ShowKeywords  => this.showKeywords  && !this.m_artOnly;
-    bool ShowSynergies => this.showSynergies && !this.m_artOnly;
+    bool ShowKeywordIcons => this.showKeywords && (!this.m_artOnly || this.m_showBadges);
+    bool ShowSynergies => this.showSynergies && (!this.m_artOnly || this.m_showBadges);
 
-    /// <summary>프레임·아트만 남기고 카드 위 정보(이름·HP·레벨·키워드 아이콘·프레임 장식·시너지 배지·아이콘 줄 배경판)를 전부 가린다.</summary>
+    /// <summary>프레임·아트만 남긴다. _showBadges가 켜져 있으면 키워드 아이콘·시너지 배지도 표시한다.</summary>
     // 값만 세우고 다시 그리지는 않는다 — 호출부가 이걸 세운 뒤 Bind를 다시 태워야 반영된다.
-    public void SetArtOnly(bool _on) => this.m_artOnly = _on;
+    public void SetArtOnly(bool _on, bool _showBadges = false)
+    {
+        this.m_artOnly = _on;
+        this.m_showBadges = _showBadges;
+    }
 
     // ── 인게임 좌표를 uGUI로 옮기는 환산값 ──────────────────────────────────
     //
@@ -185,7 +191,7 @@ public class CardVisualView : MonoBehaviour
         // 미소유는 실루엣만 노출한다 → 이름뿐 아니라 HP/키워드/시너지 같은 "정보"도 전부 숨긴다.
         SetHpDisplay(_card, _owned && this.ShowHp, _mine);
         SetLevelDisplay(_card, _owned && this.ShowLevel && this.m_instance == null, _mine);
-        RefreshKeywordIcons(_card, _owned && this.ShowKeywords, _mine);
+        RefreshKeywordIcons(_card, _owned && this.ShowKeywordIcons, _mine);
         RefreshKeywordFrames(_card, _owned && this.ShowKeywords, _mine);
         RefreshSynergyBadges(_card, _owned && this.ShowSynergies, _mine);
         RefreshKeywordBg(_card, _owned && this.ShowSynergies, _mine);
@@ -231,7 +237,7 @@ public class CardVisualView : MonoBehaviour
         if (_card <= 0) return;
 
         RefreshFrame(_card, _owned, _mine: true);
-        RefreshKeywordIcons(_card, _owned && this.ShowKeywords);
+        RefreshKeywordIcons(_card, _owned && this.ShowKeywordIcons);
         RefreshKeywordFrames(_card, _owned && this.ShowKeywords);
         // 시너지 해금(1차 진화 레벨)도 이 프레임에 같이 일어난다 — 여기서 안 다시 그리면
         // 강화 화면에서 레벨만 오르고 시너지는 다음 재바인딩까지 안 보인다.
