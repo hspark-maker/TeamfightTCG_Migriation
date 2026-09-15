@@ -34,4 +34,4 @@ int,string,int,string,string,int,string,string,long,int,int,string,string
 31,daily.completeMissions5,1,daily,CompleteDailyMissions,5,일일 미션 5개 완료,일일 미션을 5개 완료하고 추가 보상을 받으세요,0,7,0,,일일 일반 미션 달성 개수 집계; 개별 보상 수령 불필요; 누적 보상 자신 제외; 매일 1회
 32,weekly.completeMissions5,1,weekly,CompleteWeeklyMissions,5,주간 미션 5개 완료,주간 미션을 5개 완료하고 추가 보상을 받으세요,0,6,0,,주간 일반 미션 달성 개수 집계; 개별 보상 수령 불필요; 누적 보상 자신 제외; 매주 1회
 33,guide.01,1,guide,Guide.EnhanceCompleted,1,카드 강화 1회 완료,보유 카드에 조각을 투입해 강화하세요. 이전 성장과 무료 강화도 인정합니다,0,1,1,출발,계정당 1회 순차 수령; 조각 진행도 또는 기본 레벨 초과로 판정; 간식·한계돌파만 진행한 상태 제외
-34,guide.05,1,guide,Guide.EvolveCompleted,1,카드 1장 2성 도달,보유 카드 1장을 2성까지 성장시켜 시너지를 해금하세요. 이미 2성 이상인 카드도 인정합니다,0,5,2,돌보미 결성,계정당 1회 순차 수령; 소유 카드 1장 이상 2성(레벨 3) 도달로 판정; 간식·한계돌파만 진행한 상태 제외
+34,guide.05,1,guide,Guide.EvolveCompleted,1,카드 1장 2성 도달,보유 카드 1장을 2성까지 성장시켜 시너지를 해금하세요. 이미 2성 이상인 카드도 인정합니다.,0,5,2,돌보미 결성,계정당 1회 순차 수령; 소유 카드 1장 이상 2성(레벨 3) 도달로 판정; 간식·한계돌파만 진행한 상태 제외

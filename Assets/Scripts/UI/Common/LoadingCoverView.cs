@@ -11,7 +11,7 @@ using UnityEngine.UI;
 //          다음 목적지를 스스로 판정해 씬을 넘긴다.
 //  - 전환: LoadScene(scene)이 동기 UI 카탈로그에서 띄운 인스턴스. 전투 → 로비 복귀처럼 초기화가 이미 끝난
 //          상태의 씬 전환을 덮는다(BattleCleanup 경유).
-// 초기화·계정 변경은 기존 커버, 전투에서 로비로 복귀할 때는 전용 커버를 쓴다.
+// 첫 초기화는 LoadingCover, 게임 중 씬 전환은 BattleReturnLoadingCover로 저작을 분리한다.
 //
 // 커버를 제자리에서 페이드아웃하지 않는 이유: 초기화 씬에는 커버 말고 아무것도 없어(카메라도 검은 단색 배경)
 // 알파를 내리면 다음 씬이 오기 전에 검은 화면이 드러난다. 그래서 순서를 뒤집는다 —
@@ -21,6 +21,10 @@ public class LoadingCoverView : MonoBehaviour
 {
     // 저작 데이터가 아니라 시스템 고정 경로라 상수로 둔다(OutgameTutorialRunner와 같은 규약).
     const string LobbyScene = "LobbyScene";
+
+    [Header("로딩 화면 용도")]
+    [Tooltip("첫 로딩 프리팹만 켠다. 게임 중 전환 프리팹은 끄고 LoadScene으로 실행한다.")]
+    [SerializeField] bool initializeOnStart = true;
 
     // 전환 모드가 커버를 얻는 유일한 경로. Addressables 초기화보다 먼저 필요할 수 있으므로
     // Initialize 프리팹이 직렬화한 카탈로그에서 동기적으로 얻는다.
@@ -97,7 +101,7 @@ public class LoadingCoverView : MonoBehaviour
     const float BgmFadeOutSeconds = 0.5f;
 
     /// <summary>커버를 띄운 뒤 _scene을 비동기 로드하고, 새 씬 위에서 커버를 걷는다.
-    /// 초기화가 이미 끝난 뒤의 씬 전환용(전투 → 로비).</summary>
+    /// 초기화가 이미 끝난 뒤의 씬 전환용(전투 진입·로비 복귀).</summary>
     /// <param name="_onBeforeLoad">씬 교체 **직전** 1회 호출. 화면을 망가뜨리는 정리(오브젝트 파괴·풀 비우기)는
     /// 반드시 여기로 넘긴다 — 커버는 1초 넘게 도는데, 그 전에 정리하면 이전 씬이 파괴된 오브젝트를 붙잡은 채
     /// 그 시간만큼 더 살아 돌며 진행 중이던 연출 체인이 깨어나 그걸 만진다(MissingReferenceException).</param>
@@ -114,9 +118,9 @@ public class LoadingCoverView : MonoBehaviour
         // 씬을 벗어나는 모든 호출부가 이 창구를 지나므로 BGM 퇴장은 여기 한 곳에서 책임진다.
         SoundManager.Instance?.FadeOutBGM(BgmFadeOutSeconds);
 
-        var t_cover = _fromBattle && _scene == LobbyScene
-            ? ESyncUiPrefab.BattleReturnLoadingCover : ESyncUiPrefab.LoadingCover;
-        var t_prefab = SyncUiPrefabs.Get(t_cover);
+        // 목적지·호출자에 관계없이 전환 전용 프리팹을 쓴다.
+        // StartScene으로 돌아갈 때도 첫 초기화 화면은 도착한 씬이 직접 띄운다.
+        var t_prefab = SyncUiPrefabs.Get(ESyncUiPrefab.BattleReturnLoadingCover);
         var t_view   = t_prefab != null ? Instantiate(t_prefab).GetComponent<LoadingCoverView>() : null;
 
         // 커버를 못 얻어도 전환 자체는 반드시 되게 한다 — 연출 때문에 화면이 갇히면 탈출로가 없다.
@@ -160,8 +164,9 @@ public class LoadingCoverView : MonoBehaviour
 
         // 로그인 화면의 표시 여부는 여기서 정한다 — 화면 자신에게 맡기면 비활성으로 저작된 순간
         // Awake 가 돌지 않아 관문에 아무도 나타나지 않고, 관문은 상한 뒤 익명으로 넘어가 버린다.
-        // 전환 모드(m_targetScene != null)의 커버는 초기화가 아니므로 손대지 않는다.
-        if (m_targetScene == null && loginPanel != null && SignInGate.StoredMethod == ESignInMethod.None)
+        // Instantiate의 Awake는 목적지 대입보다 먼저 실행되므로 프리팹에 저작한 용도로 판정한다.
+        if (!initializeOnStart) SetAccountButtonVisible(false);
+        if (initializeOnStart && loginPanel != null && SignInGate.StoredMethod == ESignInMethod.None)
             loginPanel.Open();
     }
 
@@ -185,14 +190,14 @@ public class LoadingCoverView : MonoBehaviour
             ShowRecovery();
             return;
         }
-        StartCoroutine(m_targetScene == null ? CoRunInitialize() : CoRunSceneLoad());
+        StartCoroutine(initializeOnStart ? CoRunInitialize() : CoRunSceneLoad());
     }
 
     /// <summary>계정 전환으로 초기화를 다시 태울 때 로딩 화면도 되돌린다.
     /// 커버가 이미 걷혔으면(전투·로비로 넘어간 뒤) 할 일이 없다.</summary>
     public static void RestartLoadingForAccountChange()
     {
-        if (s_active == null || s_active.m_targetScene != null) return;
+        if (s_active == null || !s_active.initializeOnStart || s_active.m_targetScene != null) return;
 
         s_active.StopAllCoroutines();
         s_active.SetRecoveryVisible(false);

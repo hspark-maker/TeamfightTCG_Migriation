@@ -14,15 +14,19 @@ public abstract class ContentsPooledUI : PooledUIBase, IUIInitializationRoot
     [SerializeField] protected PopupTransition transition = new PopupTransition();
 
     [Tooltip("화면이 열린 동안 요청할 공용 딤의 짙기.")]
-    [Range(0f, 1f)] [SerializeField] float dimAlpha = 0.72f;
+    [Range(0f, 1f)] [SerializeField] float dimAlpha = 0.85f;
 
     bool m_initializing;
+    bool m_presented;
+    PopupTransition m_contentsTransition;
     public bool IsUIInitialized { get; private set; }
     public int VisibilityVersion { get; private set; }
 
     // 기존 팝업의 표시 방식을 유지한다. 즉시 개폐·자체 딤을 쓰는 뷰는 해당 기능만 제외한다.
     protected virtual bool UsePopupTransition => true;
     protected virtual bool UseScreenDim => true;
+    // 연출 완료 시 Contents가 실제로 꺼지는 시점에 표시 훅을 받는 공용 오버레이.
+    protected virtual bool UseContentsVisibilityRelay => false;
 
     // 레거시 PooledUIBase의 Awake 자동 등록을 사용하지 않는다.
     protected sealed override void Awake() => this.InitializeUI();
@@ -40,6 +44,12 @@ public abstract class ContentsPooledUI : PooledUIBase, IUIInitializationRoot
             // 표시 이벤트나 레이아웃·애니메이션을 실행하지 않고 준비한다.
             this.contents.SetActive(false);
             this.isShow = false;
+            if (this.UseContentsVisibilityRelay)
+            {
+                var relay = this.contents.GetComponent<ContentsVisibilityRelay>();
+                if (relay == null) relay = this.contents.AddComponent<ContentsVisibilityRelay>();
+                relay.Bind(this);
+            }
             foreach (var t_component in GetComponents<MonoBehaviour>())
                 if (t_component != this && t_component is IUIInitializable t_initializable)
                     t_initializable.InitializeUI();
@@ -58,6 +68,31 @@ public abstract class ContentsPooledUI : PooledUIBase, IUIInitializationRoot
 
     /// <summary>표시→숨김 또는 외부 비활성화 때 한 번 호출된다. 표시 구독과 대기를 정리한다.</summary>
     protected virtual void OnViewHidden() { }
+
+    // 오버레이는 각 연출이 지정한 전환(또는 즉시 개폐)을 유지한다.
+    protected void SetContentsVisible(bool visible, PopupTransition contentsTransition)
+    {
+        this.InitializeUI();
+        if (visible && !gameObject.activeSelf) gameObject.SetActive(true);
+        if (this.isShow != visible) this.VisibilityVersion++;
+        this.isShow = visible;
+        this.m_contentsTransition = contentsTransition;
+        if (contentsTransition != null) contentsTransition.SetVisible(this.contents, visible);
+        else this.contents.SetActive(visible);
+    }
+
+    internal void NotifyContentsVisibility(bool visible)
+    {
+        if (!this.IsUIInitialized || this.m_presented == visible) return;
+        this.m_presented = visible;
+        if (visible) this.OnViewShown();
+        else
+        {
+            if (this.isShow) this.VisibilityVersion++;
+            this.isShow = false;
+            this.OnViewHidden();
+        }
+    }
 
     protected void SetContentsVisible(bool _visible)
     {
@@ -99,6 +134,13 @@ public abstract class ContentsPooledUI : PooledUIBase, IUIInitializationRoot
     void ResetView()
     {
         if (!this.IsUIInitialized) return;
+        if (this.UseContentsVisibilityRelay)
+        {
+            this.m_contentsTransition?.HandleDisabled(this.contents);
+            if (this.contents != null) this.contents.SetActive(false);
+            this.NotifyContentsVisibility(false);
+            return;
+        }
         if (this.isShow)
         {
             this.isShow = false;

@@ -866,20 +866,12 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 21300000, guid: 6439cd0c2718d144d8bcf9cc1cd18a31, type: 3}
     - target: {fileID: 8681528260152137749, guid: 373baa34fe87d184d9c18e6ea0ffbb3d, type: 3}
-      propertyPath: m_WasSpriteAssigned
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 8681528260152137749, guid: 373baa34fe87d184d9c18e6ea0ffbb3d, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 4528e1e4fe9e46840b467a042b35524c, type: 2}
     - target: {fileID: 8681528261072580243, guid: 373baa34fe87d184d9c18e6ea0ffbb3d, type: 3}
       propertyPath: m_Name
       value: BattleSlot2
-      objectReference: {fileID: 0}
-    - target: {fileID: 8681528261072580243, guid: 373baa34fe87d184d9c18e6ea0ffbb3d, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8681528261072580252, guid: 373baa34fe87d184d9c18e6ea0ffbb3d, type: 3}
       propertyPath: m_RootOrder
@@ -1056,14 +1048,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 282937761}
     m_Modifications:
-    - target: {fileID: 8327822384652261773, guid: 373baa34fe87d184d9c18e6ea0ffbb3d, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8681528260152100001, guid: 373baa34fe87d184d9c18e6ea0ffbb3d, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 8681528260152137749, guid: 373baa34fe87d184d9c18e6ea0ffbb3d, type: 3}
       propertyPath: m_Size.x
       value: 2.019426
@@ -1076,10 +1060,6 @@ PrefabInstance:
       propertyPath: m_Sprite
       value: 
       objectReference: {fileID: 21300000, guid: 045b17ccb60ea412649b1b67e201d368, type: 3}
-    - target: {fileID: 8681528260152137749, guid: 373baa34fe87d184d9c18e6ea0ffbb3d, type: 3}
-      propertyPath: m_WasSpriteAssigned
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 8681528261072580243, guid: 373baa34fe87d184d9c18e6ea0ffbb3d, type: 3}
       propertyPath: m_Name
       value: BattleSlot 1
@@ -1127,10 +1107,6 @@ PrefabInstance:
     - target: {fileID: 8681528261072580252, guid: 373baa34fe87d184d9c18e6ea0ffbb3d, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 9032425798275430677, guid: 373baa34fe87d184d9c18e6ea0ffbb3d, type: 3}
-      propertyPath: m_Enabled
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -8023,14 +7999,6 @@ PrefabInstance:
     - target: {fileID: 1001, guid: 2c98023a88fc48eab8fd67b947bd3981, type: 3}
       propertyPath: m_Name
       value: ScreenDim
-      objectReference: {fileID: 0}
-    - target: {fileID: 1001, guid: 2c98023a88fc48eab8fd67b947bd3981, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 2001, guid: 2c98023a88fc48eab8fd67b947bd3981, type: 3}
-      propertyPath: m_IsActive
-      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

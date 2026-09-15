@@ -251,6 +251,8 @@ public class CardView : MonoBehaviour
         if (this.hpText != null) this.hpText.DOKill();
     }
 
+    void OnDisable() => this.deferredHealEffectCount = 0;
+
     // 튜토리얼: hintArrow를 강제 표시(정상 Update 로직 무시). 안내 중 "여기서 드래그" 포인터.
     bool tutorialPointer;
     public void SetTutorialPointer(bool _on)
@@ -311,6 +313,7 @@ public class CardView : MonoBehaviour
         // 슬롯 점유 카드가 바뀌면 카드에 속한 선택·표기 상태를 재설정한다.
         if (this.boundCard != _card)
         {
+            this.deferredHealEffectCount = 0;
             this.cardAnim.ResetHitEffect();
             // 표기 굴림/유예도 카드에 속한 상태다 — 이월되면 새 카드가 남의 체력에서 굴러 내려온다.
             KillHpRoll();
@@ -341,6 +344,7 @@ public class CardView : MonoBehaviour
         // 뒷면은 수치 자체가 비밀, 유예 중이면 **일부러 옛 값**(연출이 아직 안 왔다), 그 외엔 최신값 스냅.
         if (t_isFaceDown)
         {
+            this.deferredHealEffectCount = 0;
             KillHpRoll();
             this.hpPendingHeal = 0;
             SetHpDisplay("?", "");
@@ -996,6 +1000,33 @@ public class CardView : MonoBehaviour
         await t_seq.ToUniTask().SuppressCancellationThrow();
     }
 
+    bool deferHealEffect;
+    CardInstance deferredHealEffectCard;
+    int deferredHealEffectCount;
+
+    /// <summary>공격 연출에 참가한 카드의 회복 파티클을 슬롯 복귀까지 보류한다.</summary>
+    internal void BeginHealEffectDeferral()
+    {
+        this.deferHealEffect = true;
+        this.deferredHealEffectCard = this.boundCard;
+        this.deferredHealEffectCount = 0;
+    }
+
+    internal void EndHealEffectDeferral(bool _play)
+    {
+        int t_count = this.deferredHealEffectCount;
+        CardInstance t_card = this.deferredHealEffectCard;
+        this.deferHealEffect = false;
+        this.deferredHealEffectCard = null;
+        this.deferredHealEffectCount = 0;
+        if (!_play || this == null || !isActiveAndEnabled || t_card == null || this.boundCard != t_card
+            || !t_card.IsAlive || !t_card.isRevealed) return;
+        for (int i = 0; i < t_count; i++) PlayHealParticles();
+    }
+
+    void PlayHealParticles()
+        => BattleVfx.PlayAttached(BattleVfxId.Heal, transform, IsEnemySide, VfxSortingLayerId);
+
     /// <summary>회복 파티클 + HP 표기 갱신. CardInstance.Heal/ReviveAtHalf가 실제 회복량으로 호출.
     /// 회복이면 경로(힐러/돌보미/포식자/유산/부활) 불문 여기 하나로 수렴한다.</summary>
     public void PlayHealEffect(int _amount, bool _consumeDeferred = false)
@@ -1016,7 +1047,11 @@ public class CardView : MonoBehaviour
             int t_target    = Mathf.Min(this.hpDisplayTarget + t_step, t_revealed);
             AnimateHpDisplay(t_target, this.boundCard.bonusHp, _clearPending: false);
         }
-        BattleVfx.PlayAttached(BattleVfxId.Heal, transform, IsEnemySide, VfxSortingLayerId);
+        if (this.deferHealEffect)
+        {
+            if (this.boundCard == this.deferredHealEffectCard) this.deferredHealEffectCount++;
+        }
+        else PlayHealParticles();
     }
     public void FadeView(float _alpha, float _dur) => this.cardAnim.FadeView(_alpha, _dur);
 

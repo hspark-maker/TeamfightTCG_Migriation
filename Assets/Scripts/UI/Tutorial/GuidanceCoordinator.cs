@@ -7,6 +7,7 @@ public sealed class GuidanceCoordinator : MonoBehaviour
 {
     static GuidanceCoordinator s_instance;
     LobbyMatchLauncher m_launcher;
+    LobbyTabController m_shell;
     bool m_initialized;
     float m_nextEvaluation;
     readonly Dictionary<EOutgameTutorialTrigger, Func<bool>> m_pendingGuides = new Dictionary<EOutgameTutorialTrigger, Func<bool>>();
@@ -22,6 +23,13 @@ public sealed class GuidanceCoordinator : MonoBehaviour
         && !MissionCutInView.IsPlaying && !s_instance.AdventureMapOpen;
 
     bool AdventureMapOpen => m_launcher != null && m_launcher.IsAdventureMapOpen;
+
+    /// <summary>로비 탭 종류와 무관하게 다른 화면·연출이 없을 때 알림에서 화면 이동을 허용한다.</summary>
+    public static bool CanNavigateFromLobby(PooledUIBase _notification)
+        => s_instance != null && s_instance.m_shell != null && s_instance.m_shell.CanSwipe
+        && s_instance.m_shell.CurrentPanel != null && s_instance.m_shell.CurrentPanel.IsViewVisible
+        && !s_instance.AdventureMapOpen && !ContentUnlockPresentation.IsPlaying
+        && !OutgameTutorialRunner.IsRunning && s_instance.SafeToPresent(false, _notification);
 
     public static void Install(GameObject owner)
     {
@@ -77,6 +85,7 @@ public sealed class GuidanceCoordinator : MonoBehaviour
     {
         s_instance = this;
         m_launcher = FindFirstObjectByType<LobbyMatchLauncher>();
+        m_shell = GetComponent<LobbyTabController>();
     }
 
     bool HasPriorityActivity => !GameInitialization.IsReady || !isActiveAndEnabled
@@ -89,10 +98,10 @@ public sealed class GuidanceCoordinator : MonoBehaviour
         || CardRewardOverlay.IsOpen || CardSetRewardOverlay.IsOpen || PackRewardOverlay.IsOpen
         || OutgameTutorialGateUI.IsShowing;
 
-    bool SafeToPresent(bool _contentIntro = false)
+    bool SafeToPresent(bool _contentIntro = false, PooledUIBase _except = null)
         => !HasPriorityActivity && (_contentIntro || !OutgameTutorialRunner.IsGuidedRunning)
         && !SynergyIntroduction.IsActive && UIPoolManager.instance != null
-        && !UIPoolManager.instance.HasVisibleUIExcept();
+        && !UIPoolManager.instance.HasVisibleUIExcept(_except);
 
     void Update()
     {

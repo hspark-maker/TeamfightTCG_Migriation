@@ -52,7 +52,7 @@ public sealed class ServerMatchmaker : IMatchmaker
             IReadOnlyDictionary<int, CardGrowth> t_growth = AdoptMatch(t_result);
 
             MatchProfile t_profile = MatchProfile.OfOpponent(
-                this.m_pool != null ? this.m_pool.PickName() : OpponentProfilePool.FALLBACK_NAME,
+                !string.IsNullOrWhiteSpace(t_result.Nickname) ? t_result.Nickname : OpponentProfilePool.FALLBACK_NAME,
                 this.m_pool != null ? this.m_pool.PickAvatar() : null);
             return new MatchOpponent(t_profile, t_result.Deck, t_result.CardLevel, t_growth);
         }
@@ -187,6 +187,7 @@ public sealed class ServerMatchmaker : IMatchmaker
 
 internal sealed class FindAiMatchResult : ServerCommandResult
 {
+    [JsonProperty("nickname")] public string Nickname { get; set; }
     [JsonProperty("adventureNodeId")] public string AdventureNodeId { get; set; }
     [JsonProperty("matchId")] public string MatchId { get; set; }
     [JsonProperty("seedHex")] public string SeedHex { get; set; }

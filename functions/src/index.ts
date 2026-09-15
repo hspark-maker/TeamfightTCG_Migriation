@@ -26,6 +26,8 @@ export {reportAdventureWin} from "./commands/reportAdventureWin";
 export {limitBreakCard} from "./commands/limitBreakCard";
 export {spinRoulette} from "./commands/spinRoulette";
 export {getMissions} from "./commands/getMissions";
+export {getAttendance} from "./commands/getAttendance";
+export {claimAttendance} from "./commands/claimAttendance";
 export {claimMission} from "./commands/claimMission";
 export {syncGuideProgress} from "./commands/syncGuideProgress";
 export {syncRankProfile} from "./commands/syncRankProfile";

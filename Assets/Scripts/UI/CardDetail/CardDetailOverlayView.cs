@@ -31,7 +31,7 @@ public readonly struct CardDetailOpenOptions
     }
 }
 
-public class CardDetailOverlayView : ContentsUIBehaviour, IPointerClickHandler
+public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
 {
     const string LockedName  = "???";
     const string LockedValue = "?";
@@ -129,7 +129,6 @@ public class CardDetailOverlayView : ContentsUIBehaviour, IPointerClickHandler
     // 런타임은 이 프리팹을 만들지 않는다 — 칩을 깔아 주는 에디터 도구(CardDetailChipBaker)가 여기서 읽는다.
     [SerializeField] KeywordExplainItem chipPrefab;
     [SerializeField] KeywordIconConfig  keywordIconConfig;
-    [SerializeField] PopupTransition    transition = new PopupTransition();
 
     [Tooltip("좌우 스와이프 감지. 오버레이 전면을 덮는 raycastTarget Graphic 위에 올려야 한다.")]
     [SerializeField] HorizontalSwipeDetector swipeDetector;
@@ -170,7 +169,8 @@ public class CardDetailOverlayView : ContentsUIBehaviour, IPointerClickHandler
     public static bool IsUnlockFxPlaying => s_instance != null && s_instance.m_unlockFxPlaying;
 
     static CardDetailOverlayView s_instance;
-    static bool s_missingWarned;
+    protected override int SortingOrder => UiSortingOrder.CardDetail;
+    public override bool UsesSafeArea => true;
 
     // 목록은 호출처가 쥔 것을 참조로 들고 있을 뿐이라 여기서 복사하거나 수정하지 않는다.
     IReadOnlyList<int> m_cards;
@@ -247,7 +247,7 @@ public class CardDetailOverlayView : ContentsUIBehaviour, IPointerClickHandler
     // 이 구간의 탭은 닫기가 아니라 스킵이다 — 손이 스쳐 창이 사라지면 방금 열린 것을 다시 볼 자리가 없다.
     bool m_unlockFxPlaying;
 
-    /// <summary>_card의 상세를 띄운다(넘길 이웃이 없는 1장짜리 목록). 오버레이가 씬에 없으면 경고 1회 후 무시.</summary>
+    /// <summary>풀에서 _card의 상세를 띄운다(넘길 이웃이 없는 1장짜리 목록).</summary>
     public static void Open(int _card)
     {
         if (_card <= 0) return;
@@ -291,29 +291,23 @@ public class CardDetailOverlayView : ContentsUIBehaviour, IPointerClickHandler
         t_press.OnTap = () => Open(_cards, _index, _options);
     }
 
-    // 오버레이는 씬에 비활성으로 배치돼 Awake 싱글턴으로는 자신을 등록할 수 없다 → 첫 호출 때 비활성 포함으로 찾는다.
+    // 씬 배치 대신 풀에서 저작된 프리팹을 생성·재사용한다.
     static CardDetailOverlayView Resolve()
     {
         if (s_instance != null) return s_instance;
 
-        s_instance = FindFirstObjectByType<CardDetailOverlayView>(FindObjectsInactive.Include);
-
-        if (s_instance == null && !s_missingWarned)
-        {
-            s_missingWarned = true;
-            Debug.LogError("[CardDetailOverlayView] The card detail overlay is not placed in the current scene — a long press on a card will not open it.");
-        }
+        s_instance = UIPoolManager.Instance?.GetOrCreateUI<CardDetailOverlayView>();
 
         return s_instance;
     }
 
     // 층 값은 UiSortingOrder 표가 쥔다 — 떠 있는 캔버스를 재서 올라타면 상시 캔버스(UIPoolManager 400) 위로 뛴다.
-    /// <summary>이 창을 다른 화면 위 층으로 올리거나(_on) 로비 캔버스 안의 제자리로 되돌린다.</summary>
+    /// <summary>다른 화면 위로 올리거나 기본 카드 상세 층으로 되돌린다. 풀 Canvas의 층은 상속하지 않는다.</summary>
     void LiftAbove(bool _on)
     {
         if (!_on)
         {
-            UiSortingOrder.DropNested(this.m_sortingCanvas);
+            this.m_sortingCanvas = UiSortingOrder.LiftNested(gameObject, SortingOrder);
             return;
         }
 
@@ -472,7 +466,7 @@ public class CardDetailOverlayView : ContentsUIBehaviour, IPointerClickHandler
         RefreshArrows();
     }
 
-    void Hide()
+    public override void Hide()
     {
         this.m_viewVersion++;
         StopEnhanceHold();
@@ -1380,7 +1374,7 @@ public class CardDetailOverlayView : ContentsUIBehaviour, IPointerClickHandler
         // 매 샤드마다 결과창으로 흐름을 끊지 않는다. 정수 능력치가 그대로여도 누적 수치는 즉시 오른다.
         if (t_result.Outcome == EEnhanceOutcome.Success && !t_evolve)
         {
-            CompleteShardEnhance(t_card, t_result);
+            CompleteShardEnhance(t_card, t_result, t_fromHp);
             return t_result;
         }
 
@@ -1394,6 +1388,7 @@ public class CardDetailOverlayView : ContentsUIBehaviour, IPointerClickHandler
             return t_result;
         }
 
+        this.ritual?.StopGrowthFlash();
         this.m_activeRitual = t_ritual;
         this.m_ritualPlaying = true;
 
@@ -1461,11 +1456,16 @@ public class CardDetailOverlayView : ContentsUIBehaviour, IPointerClickHandler
         return t_result;
     }
 
-    void CompleteShardEnhance(int _card, EnhanceResult _result)
+    void CompleteShardEnhance(int _card, EnhanceResult _result, int _fromHp)
     {
         OnAnyEnhanceStarted?.Invoke();
         AbortEnhance(_card);
-        if (CardAt(this.m_index) == _card && this.cardView != null) this.cardView.FlashGrowth();
+        // 샤드 누적만 늘고 표시 능력치가 같으면 반짝임은 생략한다.
+        if (CardAt(this.m_index) == _card && DeckPower.MaxHpOf(_card) > _fromHp)
+        {
+            this.cardView?.FlashGrowth();
+            this.ritual?.FlashGrowth();
+        }
         OnAnyEnhanceResultReady?.Invoke(_result);
         NotifyEnhanceSettled(_result);
     }

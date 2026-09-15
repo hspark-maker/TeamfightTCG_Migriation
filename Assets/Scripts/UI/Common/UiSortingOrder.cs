@@ -24,13 +24,16 @@ public static class UiSortingOrder
     /// <summary>로비 캔버스와 그 안의 모든 탭. 아래 층들은 전부 이 위에 뜬다.</summary>
     public const int Lobby = 0;
 
+    /// <summary>풀에서 여는 기본 카드 상세. 로비 위, 카드팩 개봉 아래에 둔다.</summary>
+    public const int CardDetail = 50;
+
     /// <summary>카드팩 개봉 화면(PackOpenOverlay.prefab).</summary>
     public const int PackOpen = 100;
 
     /// <summary>획득 결과 오버레이(CardRewardOverlay·CardSetRewardOverlay·PackRewardOverlay.prefab).</summary>
     public const int Reward = 120;
 
-    /// <summary>개봉·보상 위에서 여는 카드 상세. 로비에서 열 때는 로비 캔버스 안(<see cref="Lobby"/>)에 그대로 있고,
+    /// <summary>개봉·보상 위에서 여는 카드 상세. 로비에서 열 때는 <see cref="CardDetail"/> 층에 있고,
     /// 다른 화면 위에서 열 때만 이 층으로 올라탄다(CardDetailOverlayView.LiftAbove).</summary>
     public const int CardDetailLifted = 130;
 
@@ -87,7 +90,7 @@ public static class UiSortingOrder
     /// 입력은 먹지 않는다(raycastTarget 없음).</summary>
     public const int GainLight = 420;
 
-    /// <summary>미션 진행·달성 컷인(MissionCutIn.prefab). 입력을 가로채지 않는 로비 알림.</summary>
+    /// <summary>미션 진행·달성 컷인(MissionCutIn.prefab). 알림 패널 클릭으로 미션 화면을 연다.</summary>
     public const int MissionCutIn = 430;
 
     /// <summary>설정 화면(SettingUI.prefab·SettingsPanel).</summary>

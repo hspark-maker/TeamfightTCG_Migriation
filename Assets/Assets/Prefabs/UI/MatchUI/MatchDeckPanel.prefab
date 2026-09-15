@@ -10,7 +10,6 @@ GameObject:
   m_Component:
   - component: {fileID: 6870404034472247805}
   - component: {fileID: 3592011220215043498}
-  - component: {fileID: 6416944339491517239}
   m_Layer: 0
   m_Name: EnemySection
   m_TagString: Untagged
@@ -55,7 +54,7 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 109873837837334765}
+  m_GameObject: {fileID: 6546516256799953779}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
@@ -849,6 +848,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6093111801467834047}
   - component: {fileID: 620257630267737567}
+  - component: {fileID: 7609972416411567334}
   m_Layer: 0
   m_Name: MyCardContainer
   m_TagString: Untagged
@@ -1064,7 +1064,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 5.700012, y: -4.9000015}
+  m_AnchoredPosition: {x: 4, y: -4.9000015}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &6873136423890467413
@@ -2368,6 +2368,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3785880677135705083}
   - component: {fileID: 2919207689685376605}
+  - component: {fileID: 6416944339491517239}
   m_Layer: 0
   m_Name: EnemyCardContainer
   m_TagString: Untagged
@@ -2432,7 +2433,6 @@ GameObject:
   m_Component:
   - component: {fileID: 6284538003045798158}
   - component: {fileID: 6195740187845894146}
-  - component: {fileID: 7609972416411567334}
   m_Layer: 0
   m_Name: MySection
   m_TagString: Untagged
@@ -2477,7 +2477,7 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6560567247882977205}
+  m_GameObject: {fileID: 1995415908149832063}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
@@ -3010,7 +3010,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 29, y: 0}
+  m_AnchoredPosition: {x: 12, y: 0}
   m_SizeDelta: {x: 571.5973, y: 120}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &4344111568278186390

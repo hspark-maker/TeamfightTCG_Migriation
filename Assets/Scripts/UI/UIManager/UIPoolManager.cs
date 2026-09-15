@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Cysharp.Threading.Tasks;
 
 // 팝업 인프라는 이걸 쓰는 UI들이 켜지기 전에 서 있어야 한다 —
@@ -30,6 +31,7 @@ public class UIPoolManager : MonoBehaviour
 
     [SerializeField] Canvas canvas;
     [SerializeField] Transform uiRoot;
+    Transform safeAreaRoot;
 
     readonly Dictionary<Type, PooledUIBase> activeUIs = new Dictionary<Type, PooledUIBase>();
     readonly Dictionary<Type, int> pendingRequests = new();
@@ -39,6 +41,7 @@ public class UIPoolManager : MonoBehaviour
     {
         if (!InitializeSingleton()) return;
         InitializeReferences();
+        SceneManager.sceneUnloaded += ReleaseSceneOverlays;
     }
 
     bool InitializeSingleton()
@@ -138,54 +141,114 @@ public class UIPoolManager : MonoBehaviour
 
     public T AddOrUpdateUI<T>(UIData _data = null) where T : PooledUIBase
     {
-        if (this.activeUIs.TryGetValue(typeof(T), out var existingUI))
+        bool existed = TryGetUI<T>(out _);
+        T ui = GetOrCreateUI<T>();
+        if (ui == null) return null;
+        if (existed || _data == null || _data.order == -1) ui.transform.SetAsLastSibling();
+        else ui.transform.SetSiblingIndex(_data.order);
+        try
         {
-            if (existingUI is IUIInitializable t_existingInitializer) t_existingInitializer.InitializeUI();
-            existingUI.transform.SetAsLastSibling();
-            existingUI.Initialization(_data);
-            existingUI.Show();
-            return existingUI as T;
+            ui.Initialization(_data);
+            ui.Show();
+            return ui;
+        }
+        catch
+        {
+            if (!existed)
+            {
+                UnregisterUI(ui);
+                ui.gameObject.SetActive(false);
+                Destroy(ui.gameObject);
+            }
+            throw;
+        }
+    }
+
+    /// <summary>Looks up an instance without changing its presentation.</summary>
+    public bool TryGetUI<T>(out T ui) where T : PooledUIBase
+    {
+        ui = this.activeUIs.TryGetValue(typeof(T), out var existing) ? existing as T : null;
+        return ui != null;
+    }
+
+    /// <summary>Creates or reuses a hidden UI so callers can supply presentation data before opening it.</summary>
+    public T GetOrCreateUI<T>() where T : PooledUIBase
+    {
+        if (TryGetUI<T>(out var existing))
+        {
+            if (existing is IUIInitializable initializer) initializer.InitializeUI();
+            return existing;
         }
 
-        GameObject uiPrefab = DataLibrary.instance.GetUI<T>();
-        if (uiPrefab == null)
+        UiPrefabCache.TryGet(typeof(T), out GameObject prefab);
+#if UNITY_EDITOR
+        // Standalone scene tests also use the authored Addressables prefab.
+        if (prefab == null && typeof(PooledOverlay).IsAssignableFrom(typeof(T)))
+            prefab = SyncAddressable.Load<GameObject>(typeof(T).Name);
+#endif
+        if (prefab == null)
         {
             Debug.LogError($"UI Prefab Not Exist: {typeof(T).Name}");
             return null;
         }
 
-        GameObject t_instance = Instantiate(uiPrefab, uiRoot);
-        T uiInstance = t_instance.GetComponent<T>();
-        if (uiInstance == null)
+        Transform parent = this.uiRoot;
+        if (prefab.TryGetComponent<PooledOverlay>(out var authoredOverlay) && authoredOverlay.UsesSafeArea)
+        {
+            if (this.safeAreaRoot == null)
+            {
+                var safeArea = new GameObject("SafeArea", typeof(RectTransform));
+                safeArea.transform.SetParent(this.uiRoot, false);
+                safeArea.AddComponent<SafeAreaFitter>();
+                this.safeAreaRoot = safeArea.transform;
+            }
+            parent = this.safeAreaRoot;
+        }
+        GameObject instance = Instantiate(prefab, parent);
+        T ui = instance.GetComponent<T>();
+        if (ui == null)
         {
             Debug.LogError($"UI Component Not Exist: {typeof(T).Name}");
-            Destroy(t_instance);
+            Destroy(instance);
             return null;
         }
-
         try
         {
-            if (_data == null || _data.order == -1)
-                uiInstance.transform.SetAsLastSibling();
-            else
-                uiInstance.transform.SetSiblingIndex(_data.order);
-
-            // 활성화로 Awake가 실행되기를 기다리지 않고, 비활성 Contents까지 준비한 뒤 등록한다.
-            if (uiInstance is IUIInitializable t_initializer) t_initializer.InitializeUI();
-            this.RegisterUI(uiInstance);
-            if (uiInstance is ContentsPooledUI) uiInstance.gameObject.SetActive(true);
-            uiInstance.Initialization(_data);
-            uiInstance.Show();
-            return uiInstance;
+            if (ui is IUIInitializable initializer) initializer.InitializeUI();
+            if (ui is PooledOverlay overlay) overlay.PrepareForPool(SceneManager.GetActiveScene());
+            RegisterUI(ui);
+            if (ui is ContentsPooledUI) ui.gameObject.SetActive(true);
+            return ui;
         }
         catch
         {
-            // 잘못된 Contents 배선·초기화 실패로 풀 밖에 인스턴스가 누적되지 않게 한다.
-            this.UnregisterUI(uiInstance);
-            t_instance.SetActive(false);
-            Destroy(t_instance);
+            UnregisterUI(ui);
+            instance.SetActive(false);
+            Destroy(instance);
             throw;
         }
+    }
+
+    // Preserve scene teardown for overlays that previously lived in the lobby scene.
+    void ReleaseSceneOverlays(Scene scene)
+    {
+        var expired = new List<PooledOverlay>();
+        foreach (var ui in this.activeUIs.Values)
+            if (ui is PooledOverlay overlay && overlay.SourceSceneHandle == scene.handle)
+                expired.Add(overlay);
+        foreach (var overlay in expired) UnregisterUI(overlay);
+        foreach (var overlay in expired)
+        {
+            overlay.IsSourceSceneUnloading = true;
+            overlay.gameObject.SetActive(false);
+            Destroy(overlay.gameObject);
+        }
+    }
+
+    void OnDestroy()
+    {
+        SceneManager.sceneUnloaded -= ReleaseSceneOverlays;
+        if (instance == this) instance = null;
     }
 
     /// <summary>버튼 진입점. 첫 적재 동안 입력을 막고, 호출 화면이 닫혔으면 뒤늦게 팝업을 열지 않는다.</summary>

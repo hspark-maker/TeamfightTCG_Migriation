@@ -18,7 +18,7 @@ public enum ERewardType { Currency, Card, Pack, PackChoice }
 public static class ServerOwnedRewardOwners
 {
     // Pass 도 같은 성격이다 — 지급은 claimPassReward 가 하고, 화면 값은 getPass 응답의 levels[].reward 로 온다.
-    static readonly string[] NAMES = { "Mission", "Pass", "Guide", "CardDuplicate" };
+    static readonly string[] NAMES = { "Mission", "Pass", "Guide", "CardDuplicate", "Attendance" };
 
     public static bool Contains(string _ownerType)
     {

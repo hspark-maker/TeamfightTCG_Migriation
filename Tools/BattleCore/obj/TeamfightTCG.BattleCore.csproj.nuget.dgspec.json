@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\cookapps\\TeamfightTCG_Migriation\\Tools\\BattleCore\\TeamfightTCG.BattleCore.csproj": {}
+    "C:\\Users\\cookapps\\TeamfightTCG_Migriation\\tools\\BattleCore\\TeamfightTCG.BattleCore.csproj": {}
   },
   "projects": {
-    "C:\\Users\\cookapps\\TeamfightTCG_Migriation\\Tools\\BattleCore\\TeamfightTCG.BattleCore.csproj": {
+    "C:\\Users\\cookapps\\TeamfightTCG_Migriation\\tools\\BattleCore\\TeamfightTCG.BattleCore.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\cookapps\\TeamfightTCG_Migriation\\Tools\\BattleCore\\TeamfightTCG.BattleCore.csproj",
+        "projectUniqueName": "C:\\Users\\cookapps\\TeamfightTCG_Migriation\\tools\\BattleCore\\TeamfightTCG.BattleCore.csproj",
         "projectName": "TeamfightTCG.BattleCore",
-        "projectPath": "C:\\Users\\cookapps\\TeamfightTCG_Migriation\\Tools\\BattleCore\\TeamfightTCG.BattleCore.csproj",
+        "projectPath": "C:\\Users\\cookapps\\TeamfightTCG_Migriation\\tools\\BattleCore\\TeamfightTCG.BattleCore.csproj",
         "packagesPath": "C:\\Users\\cookapps\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\cookapps\\TeamfightTCG_Migriation\\Tools\\BattleCore\\obj\\",
+        "outputPath": "C:\\Users\\cookapps\\TeamfightTCG_Migriation\\tools\\BattleCore\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\cookapps\\AppData\\Roaming\\NuGet\\NuGet.Config"

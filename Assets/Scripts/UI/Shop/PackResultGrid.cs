@@ -14,7 +14,7 @@ using UnityEngine.EventSystems;
 // 이 화면이 답해야 하는 질문은 "이번에 뭘 건졌나" 하나다. 그 답은 배치나 팝이 아니라 카드의 상태 차이가 준다
 //   — 신규는 테두리 림라이트가 계속 돌고 중복은 탈채도된 채 놓인다(PackCardView.ApplyResultContrast).
 //   팝은 전 카드 동일하게 둔다: 정렬과 리듬까지 갈라지면 결과판이 또 한 번의 연출로 읽힌다.
-public class PackResultGrid : MonoBehaviour, IPointerClickHandler
+public class PackResultGrid : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
     // 3열은 이 화면의 고정 규격(열 수는 배선의 자유가 아니다).
     public const int COLUMN_COUNT = 3;
@@ -48,6 +48,7 @@ public class PackResultGrid : MonoBehaviour, IPointerClickHandler
     CanvasGroup m_panel;
     int m_growthGeneration;
     PackCardView m_growthView;
+    PackCardView m_growthDragView;
 
     /// <summary>직접 카드 보상은 개봉 더미가 없으므로 결과판에서 성장을 순서대로 보여준다.</summary>
     public void PlaySnackGrowth(System.Action _onComplete)
@@ -78,6 +79,31 @@ public class PackResultGrid : MonoBehaviour, IPointerClickHandler
     public void OnPointerClick(PointerEventData _event)
     {
         if (_event.dragging || _event.button != PointerEventData.InputButton.Left) return;
+        AdvanceGrowth();
+    }
+
+    public void OnBeginDrag(PointerEventData _event)
+    {
+        m_growthDragView = _event.button == PointerEventData.InputButton.Left ? m_growthView : null;
+    }
+
+    // 결과 카드는 격자에 둔 채 손을 놓을 때 이동 거리만 판정한다.
+    public void OnDrag(PointerEventData _event) { }
+
+    public void OnEndDrag(PointerEventData _event)
+    {
+        var t_view = m_growthDragView;
+        m_growthDragView = null;
+        if (t_view == null || t_view != m_growthView) return;
+
+        var t_canvas = GetComponentInParent<Canvas>();
+        float t_scale = t_canvas != null && t_canvas.scaleFactor > 0f ? t_canvas.scaleFactor : 1f;
+        if ((_event.position - _event.pressPosition).magnitude / t_scale < 90f) return;
+        AdvanceGrowth();
+    }
+
+    void AdvanceGrowth()
+    {
         if (m_growthView == null || m_growthView.SkipSnackGrowth()) return;
         m_growthView.ConfirmSnackGrowthResult();
     }
@@ -248,6 +274,7 @@ public class PackResultGrid : MonoBehaviour, IPointerClickHandler
     //   지금은 개봉 중에 다른 경로로 상세를 열 길이 없어 문제가 되지 않는다.
     void Clear()
     {
+        m_growthDragView = null;
         ++m_growthGeneration;
         m_growthView = null;
         CardDetailOverlayView.Close();
@@ -264,6 +291,7 @@ public class PackResultGrid : MonoBehaviour, IPointerClickHandler
 
     void OnDisable()
     {
+        m_growthDragView = null;
         ++m_growthGeneration;
         m_growthView = null;
     }

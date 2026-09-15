@@ -11,6 +11,7 @@ public interface IUIController
 public abstract class PooledUIBase : MonoBehaviour, IUIController
 {
     [SerializeField] protected UIAnimator animator;
+    [UnityEngine.Serialization.FormerlySerializedAs("viewContents")]
     public GameObject contents;
     protected UIData data;
 

@@ -74,6 +74,9 @@ public class StatSynergyEffect : SynergyEffect
         if (_ctx.self == null || this.dmgReduction <= 0) return;   // 피해 감소가 없으면 피격과 무관한 스탯
         BattleEventStream.Emit(new BattleEvent(BattleEventKind.SynergyFired,
             _ctx.self.ownerIndex, _ctx.self.slotIndex));
+        // Attacked는 피해 적용 뒤에 호출된다. 치명타에도 피해 감소·발동 집계는 유효하지만,
+        // 쓰러지는 카드에 비늘 이펙트를 다시 예약하지 않는다.
+        if (!_ctx.self.IsAlive) return;
         SynergyPresentationStream.Emit(new SynergyFirePlan
         {
             self = _ctx.self,

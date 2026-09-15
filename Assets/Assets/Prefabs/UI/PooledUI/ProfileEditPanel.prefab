@@ -3670,7 +3670,7 @@ MonoBehaviour:
     closeDuration: 0.15
     openFromScale: 0.9
     closeToScale: 0.9
-  dimAlpha: 0.72
+  dimAlpha: 0.85
 --- !u!1 &9062519795303003447
 GameObject:
   m_ObjectHideFlags: 0
@@ -3959,10 +3959,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: EmoteItemCell (3)
       objectReference: {fileID: 0}
-    - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -4064,10 +4060,6 @@ PrefabInstance:
     - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_Name
       value: EmoteItemCell (1)
-      objectReference: {fileID: 0}
-    - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -4232,10 +4224,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: EmoteItemCell (5)
       objectReference: {fileID: 0}
-    - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -4337,10 +4325,6 @@ PrefabInstance:
     - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_Name
       value: EmoteItemCell (2)
-      objectReference: {fileID: 0}
-    - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -4444,10 +4428,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: EmoteItemCell (4)
       objectReference: {fileID: 0}
-    - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -4549,10 +4529,6 @@ PrefabInstance:
     - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_Name
       value: EmoteItemCell
-      objectReference: {fileID: 0}
-    - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

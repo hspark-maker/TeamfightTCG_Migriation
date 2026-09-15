@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-/// <summary>서버가 확정한 미션 진행을 로비 오른쪽에서 한 건씩 알린다. 입력과 보상 수령에는 관여하지 않는다.</summary>
+/// <summary>서버가 확정한 미션 진행을 로비 오른쪽에서 알리고, 클릭하면 해당 미션 화면을 연다.</summary>
 public sealed class MissionCutInView : ContentsPooledUI
 {
     static MissionCutInView s_instance;
@@ -13,6 +13,7 @@ public sealed class MissionCutInView : ContentsPooledUI
 
     [SerializeField] CanvasGroup canvasGroup;
     [SerializeField] RectTransform panel;
+    [SerializeField] Button missionButton;
     [SerializeField] TMP_Text statusText;
     [SerializeField] TMP_Text titleText;
     [SerializeField] TMP_Text progressText;
@@ -40,6 +41,9 @@ public sealed class MissionCutInView : ContentsPooledUI
         && !s_instance.m_applicationPaused && s_instance.HasActiveTween;
 
     bool HasActiveTween => m_sequence != null && m_sequence.IsActive();
+
+    bool CanOpenMission => !s_matchEntry && OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission)
+        && GuidanceCoordinator.CanNavigateFromLobby(this);
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetRuntimeState()
@@ -100,6 +104,19 @@ public sealed class MissionCutInView : ContentsPooledUI
         canvasGroup.blocksRaycasts = false;
         canvasGroup.interactable = false;
         canvasGroup.alpha = 0f;
+        missionButton.onClick.AddListener(OpenMission);
+    }
+
+    void OpenMission()
+    {
+        if (!IsPlaying || !CanShow || !CanOpenMission ||
+            !MissionProgressNotifications.IsCurrent(m_current) || UIPoolManager.Instance == null) return;
+
+        string t_period = m_current.Period;
+        Finish("Clicked");
+        if (t_period == "guide") UIPoolManager.Instance.RequestUI<GuideMissionPanel>(this);
+        else UIPoolManager.Instance.RequestUI<MissionPanel>(this,
+            new MissionPanelData { WeeklyTab = t_period == "weekly" });
     }
 
     protected override void OnViewShown()
@@ -152,6 +169,8 @@ public sealed class MissionCutInView : ContentsPooledUI
         if (m_preview) return;
 #endif
         if (!isShow) return;
+        canvasGroup.blocksRaycasts = canvasGroup.interactable = m_hasCurrent && CanShow
+            && !m_applicationPaused && CanOpenMission;
         if (m_applicationPaused || SceneManager.GetActiveScene().name != "LobbyScene")
         {
             Finish(m_applicationPaused ? "ApplicationPause" : "SceneExit");
@@ -250,7 +269,12 @@ public sealed class MissionCutInView : ContentsPooledUI
             t_sequence.OnKill(null);
             t_sequence.Kill();
         }
-        if (canvasGroup != null) canvasGroup.alpha = 0f;
+        if (canvasGroup != null)
+        {
+            canvasGroup.alpha = 0f;
+            canvasGroup.blocksRaycasts = false;
+            canvasGroup.interactable = false;
+        }
         if (panel != null)
         {
             panel.anchoredPosition = m_home;

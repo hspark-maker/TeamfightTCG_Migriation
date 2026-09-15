@@ -58,6 +58,8 @@ public struct VfxEntry
     public Vector3     initialRotation;
     [Min(0f)] public float lifetime;      // 풀 반납까지의 시간(PooledParticle 보유 프리팹이면 무시)
     public int sortingOrder;              // 카드와 같은 정렬 레이어에서의 order(구매 에셋이 카드 뒤로 깔리는 것 방지)
+    [Tooltip("루트 SortingGroup으로 묶지 않고 프리팹 렌더러의 Sorting Layer/Order를 유지한다. 카드 앞뒤로 나뉘는 파티클에 사용.")]
+    public bool preserveRendererSorting;
 
     // 프리팹 원본 크기에 곱하는 배율. **0 이하면 1로 본다** — 새로 생긴 필드라 기존 항목은 0으로
     // 역직렬화되고, 그걸 그대로 쓰면 모든 연출이 사라진다.

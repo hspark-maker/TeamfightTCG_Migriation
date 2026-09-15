@@ -101,6 +101,20 @@ public class TurnRunner : MonoBehaviour
         ForceEnd(true, EMatchEndReason.Surrender);
     }
 
+    bool TrySurrenderEnemyBeforeTurn(int _owner)
+    {
+        if (this.resultFinalized || TutorialConfig.IsActive || IsMyTurn(_owner)
+            || (DeckConfig.IsMultiplayer && !DeckConfig.AiTakeover)) return false;
+        if (this.enemyField == null || this.enemyField.OwnerIndex != _owner
+            || !EnemyAiSurrender.ShouldSurrender(this.enemyField.State, this.playerField?.State)) return false;
+
+        // AI 인수 뒤 동결된 로그는 RecordSurrender도 기존 계약대로 기록하지 않는다.
+        BattleCommandLog.RecordSurrender(_owner);
+        Debug.Log("[EnemyAI] No surviving attack remains; the opponent surrenders.");
+        ForceEnd(true, EMatchEndReason.Surrender);
+        return true;
+    }
+
     /// <summary>항복 메시지가 신뢰 전송으로 빠져나갈 시간을 준 뒤 러너를 내린다.
     /// 한 프레임으로는 부족하다 — 플러시 전에 끊기면 상대가 Surrender 대신 이탈 경로를 타고
     /// <see cref="HandleRemoteSurrender"/>를 부르지 않아 명령 로그가 한 개 어긋난다
@@ -508,7 +522,8 @@ public class TurnRunner : MonoBehaviour
             {
                 TurnCount = t_count;
                 SetTurnCountLabel();
-            });
+            },
+            TrySurrenderEnemyBeforeTurn);
 
         if (t_end == EBattleLoopEnd.PlayerWon)
             FinalizeResult(true, EMatchEndReason.Normal);

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TeamfightTCG.BattleCore")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2d1679249c418fc1492c33234a22d43807e2ead8")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+085076f889797f56de6eebd3aecb3d6cdfdc2b76")]
 [assembly: System.Reflection.AssemblyProductAttribute("TeamfightTCG.BattleCore")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TeamfightTCG.BattleCore")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

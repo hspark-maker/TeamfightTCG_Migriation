@@ -29,8 +29,8 @@ public enum EPromoteKind
 // 어두운 화면에 아무것도 없는 그 빈 박이 다음 프레임을 만든다.
 //
 // 판때기는 전부 프리팹 저작이고 코드는 알파·배율·회전만 민다(RankPromoStandby·CardEvolveRays와 같은 규약).
-// 씬에 저작하지 않고 Addressables 타입 색인에서 독립 Canvas로 세운다(UnlockIntroOverlay와 같은 규약).
-public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
+// Shared presentation is instantiated and reused by UIPoolManager.
+public class RankPromoteOverlay : PooledOverlay<RankPromoteOverlay>
 {
     [Tooltip("화면 어디를 눌러도 받는 투명 버튼. 안무 도중에 눌리면 건너뛰고 곧바로 닫힌다.")]
     [SerializeField] Button tapButton;
@@ -102,8 +102,6 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
     [SerializeField] string titleBrowse = "현재 랭크";
 
     [Header("연출")]
-    [Tooltip("암전 자체. openDuration이 곧 급암전 시간이다 — 0.1을 넘기면 '멈춰 세웠다'가 아니라 '어두워진다'로 읽힌다.")]
-    [SerializeField] PopupTransition transition = new PopupTransition();
 
     [Tooltip("암전이 끝나고 첫 그림이 서기까지, 어두운 화면에 **아무것도 없는** 시간.\n" +
              "**이 빈 박이 다음 걸 만든다 — 줄이지 마라.**")]
@@ -254,10 +252,9 @@ public class RankPromoteOverlay : SingletonOverlay<RankPromoteOverlay>
     /// <summary>이 화면이 서는 층.</summary>
     protected override int SortingOrder => UiSortingOrder.Intro;
 
-    /// <summary>승급 오버레이를 얻는다. 평소 꺼져 있는 노드라 이미 선 것을 찾을 때는 비활성까지 뒤진다
-    /// (UnlockIntroOverlay와 같은 규약).</summary>
+    /// <summary>Gets the authored presentation from the shared UI pool.</summary>
     public static bool TryGet(out RankPromoteOverlay _overlay)
-        => TryGetOrCreate(RuntimeOverlayPrefabs.Get<RankPromoteOverlay>, out _overlay);
+        => TryGetOrCreate(out _overlay);
 
     /// <summary>등급이 갈린 판(또는 첫 진입)을 전면에 세우고 탭을 기다린다.
     /// _kind는 옛 배지 파열 두 박이 서는지를 가른다 — 첫 진입은 옛 배지가 없어 그 박이 빠진다.

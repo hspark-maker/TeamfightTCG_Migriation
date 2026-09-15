@@ -6,7 +6,7 @@ using TMPro;
 
 // 카드팩 한 개를 세워 "이 팩이 도착했다"만 알리는 예고 오버레이.
 // 표시와 닫힘 콜백만 담당하고 지급·구매는 하지 않는다 — 실제 획득은 이 뒤의 상점 흐름 몫이다.
-// 씬에 저작하지 않고 Addressables 타입 색인에서 독립 Canvas로 세운다(두 카드 보상 오버레이와 같은 규약).
+// Shared presentation is instantiated and reused by UIPoolManager.
 //
 // ⚠ 딤을 눌러 닫히지 않는다. 나가는 문은 [확인] 하나뿐이다 — 닫는 순간이 팩이 탭으로 날아가는 순간이라
 //   유저가 모르게 새어 나가면 그 비행이 어디서 출발한 것인지 읽히지 않는다.
@@ -18,7 +18,7 @@ using TMPro;
 //
 // 카드 보상 오버레이(CardRewardOverlay)를 확장하지 않고 따로 세운 이유는 그쪽 안무가 전부 카드 1장 전제이기 때문이다 —
 // 림라이트·NEW는 카드를 사건으로 만드는 장치라 팩 그림에는 걸리지 않는다.
-public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
+public class PackRewardOverlay : PooledOverlay<PackRewardOverlay>
 {
     [Tooltip("켜고 끌 대상. 미배선이면 자기 gameObject를 토글한다.")]
 
@@ -32,7 +32,6 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
     [SerializeField] TMP_Text packNameText;
 
     [Header("연출")]
-    [SerializeField] PopupTransition transition = new PopupTransition();
 
     [Tooltip("등장 안무가 미는 노드. 팩 그림 자신이 아니라 그 부모여야 한다 — "
            + "그림 쪽은 아이들 부유(PackIdleMotion)가 쥐고 있다. 미배선이면 등장 안무 없이 그냥 뜬다.")]
@@ -75,10 +74,9 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
 
     CanvasGroup m_packGroup;
 
-    /// <summary>예고 오버레이를 얻는다. 씬에 저작해 두지 않고 Addressables 타입 색인에서 세운다.
-    /// 평소 꺼져 있는 노드라 이미 선 것을 찾을 때는 비활성까지 뒤진다(카드 보상 오버레이와 같은 규약).</summary>
+    /// <summary>Gets the authored presentation from the shared UI pool.</summary>
     public static bool TryGet(out PackRewardOverlay _overlay)
-        => TryGetOrCreate(RuntimeOverlayPrefabs.Get<PackRewardOverlay>, out _overlay);
+        => TryGetOrCreate(out _overlay);
 
     /// <summary>팩이 서 있는 자리. 닫은 뒤 이어지는 비행이 여기서 출발해야
     /// "방금 본 그 팩이 팩 탭으로 갔다"가 한 줄로 이어진다(CardRewardOverlay.CardAnchor와 같은 규약).</summary>

@@ -80,7 +80,7 @@ public static class BattleVfx
                                                Quaternion.Euler(t_entry.initialRotation));
         if (t_go == null) return default;
 
-        ApplySorting(t_go, _sortingLayerId, t_entry.sortingOrder);
+        ApplySorting(t_go, _sortingLayerId, t_entry.sortingOrder, t_entry.preserveRendererSorting);
         ApplyScale(t_go, t_entry.prefab, t_entry.scale);
         return new VfxHandle(t_poolId, t_go, t_entry.lifetime);
     }
@@ -99,7 +99,7 @@ public static class BattleVfx
                                                Quaternion.Euler(_entry.initialRotation));
         if (t_go == null) return default;
 
-        ApplySorting(t_go, _sortingLayerId, _entry.sortingOrder);
+        ApplySorting(t_go, _sortingLayerId, _entry.sortingOrder, _entry.preserveRendererSorting);
         ApplyScale(t_go, _entry.prefab, _entry.scale);
         return new VfxHandle(t_poolId, t_go, _entry.lifetime);
     }
@@ -171,7 +171,7 @@ public static class BattleVfx
                 t_go.transform.rotation = Quaternion.LookRotation(t_alignDir, Vector3.back)
                                         * Quaternion.Euler(t_entry.initialRotation);
 
-            ApplySorting(t_go, _sortingLayerId, t_entry.sortingOrder);
+            ApplySorting(t_go, _sortingLayerId, t_entry.sortingOrder, t_entry.preserveRendererSorting);
             ApplyScale(t_go, t_entry.prefab, t_entry.scale);
             ApplyStrength(t_go, t_entry, t_s01);
             new VfxHandle(t_poolId, t_go, t_entry.lifetime).ReleaseAfterLifetime();
@@ -193,7 +193,7 @@ public static class BattleVfx
                                         t_entry.initialRotation, _flip, out string t_poolId);
         if (t_go == null) return default;
 
-        ApplySorting(t_go, _sortingLayerId, t_entry.sortingOrder);
+        ApplySorting(t_go, _sortingLayerId, t_entry.sortingOrder, t_entry.preserveRendererSorting);
         ApplyScale(t_go, t_entry.prefab, t_entry.scale);
         return new VfxHandle(t_poolId, t_go, 0f);   // 수명 0 = 자동 반납 없음(호출부가 Release)
     }
@@ -253,19 +253,29 @@ public static class BattleVfx
     /// <summary>정렬 보정. 구매 에셋 VFX는 대개 Default 레이어라, Card 레이어인 카드 아트 **뒤로** 깔려 안 보인다.
     /// 정렬은 레이어가 order보다 먼저 판정되므로 레이어부터 맞춘 뒤 order를 올린다.
     ///
-    /// 정렬을 거는 지점은 **루트 SortingGroup 하나**다(없으면 붙인다) — 자식 파티클 렌더러는 건드리지 않는다.
+    /// 기본 정렬을 거는 지점은 **루트 SortingGroup 하나**다(없으면 붙인다) — 자식 파티클 렌더러는 건드리지 않는다.
     /// 예전엔 모든 자식 Renderer의 layer/order를 같은 값으로 덮었는데, 그러면 프리팹이 저작해 둔
     /// 자기들끼리의 앞뒤(글로우 뒤 · 코어 앞)가 같은 order로 뭉개져 그리기 순서가 임의로 갈렸다.
     /// SortingGroup은 그룹 <b>전체</b>를 씬에서 한 덩어리로 세우고, 안쪽 순서는 저작값 그대로 남긴다.
     ///
-    /// 풀 재사용분은 지난 값이 남아 있어 매 스폰마다 다시 잡아야 한다(이제 그룹 값 하나만 다시 쓴다).</summary>
-    public static void ApplySorting(GameObject _go, int _sortingLayerId, int _order)
+    /// preserveRendererSorting 항목은 루트 그룹을 끄고 렌더러의 저작 정렬을 그대로 사용한다.
+    /// 흐름처럼 카드 뒤·앞을 가로지르는 연출은 한 그룹으로 묶으면 카드와 교차할 수 없다.
+    /// 풀 재사용분은 지난 모드가 남아 있어 그룹 활성 여부도 매 스폰마다 다시 잡는다.</summary>
+    public static void ApplySorting(GameObject _go, int _sortingLayerId, int _order,
+                                    bool _preserveRendererSorting = false)
     {
         if (_go == null) return;
 
         var t_group = _go.GetComponent<SortingGroup>();
+        if (_preserveRendererSorting)
+        {
+            if (t_group != null) t_group.enabled = false;
+            return;
+        }
+
         if (t_group == null) t_group = _go.AddComponent<SortingGroup>();
 
+        t_group.enabled        = true;
         t_group.sortingLayerID = _sortingLayerId;
         t_group.sortingOrder   = _order;
     }

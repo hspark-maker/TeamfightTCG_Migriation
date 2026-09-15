@@ -1,4 +1,5 @@
 using DG.Tweening;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -15,8 +16,17 @@ public class ProfileAvatarView : MonoBehaviour
     [Tooltip("얼굴을 판 모양대로 오려내는 재질(UI/ProfileAvatarMask). 미배선이면 얼굴이 판 밖까지 네모로 그려진다.")]
     [SerializeField] Material faceMaskMaterial;
 
-    // 뷰마다 복제하면 UI 배칭이 뷰 수만큼 끊겨 한 벌을 나눠 쓴다.
-    static Material s_faceMaskInstance;
+    // 같은 번들의 원본끼리만 공유한다. 씬 번들이 내려간 뒤 그 셰이더를 가진 복제본을
+    // 다음 씬에서 재사용하면 분홍색으로 그려지므로, 마지막 뷰와 함께 복제본도 해제한다.
+    sealed class FaceMaskEntry
+    {
+        public Material Source;
+        public Material Instance;
+        public int Users;
+    }
+
+    static readonly Dictionary<Material, FaceMaskEntry> s_faceMasks = new();
+    FaceMaskEntry m_faceMask;
     static readonly int MASK_TEX_ID = Shader.PropertyToID("_MaskTex");
 
     Sequence m_pressSeq;
@@ -65,6 +75,8 @@ public class ProfileAvatarView : MonoBehaviour
         SetScale(this.plateImage, 1f);
         SetScale(this.ringImage, 1f);
     }
+
+    void OnDestroy() => this.ReleaseFaceMask();
 
     // 밑판은 뺀다 — 홀로 제자리에 남아야 눌린 깊이가 드러난다.
     void InsertScale(float _at, float _to, float _duration, Ease _ease)
@@ -117,13 +129,45 @@ public class ProfileAvatarView : MonoBehaviour
         if (this.faceImage.material != t_mask) this.faceImage.material = t_mask;
     }
 
-    static Material MaskMaterialWith(Material _source, Texture _maskTex)
+    Material MaskMaterialWith(Material _source, Texture _maskTex)
     {
+        if (this.m_faceMask != null && this.m_faceMask.Source != _source)
+            this.ReleaseFaceMask();
+
         // 에셋을 그대로 물리면 SetTexture가 에셋 파일을 고친다 — 인스턴스를 하나 떠서 그쪽만 만진다.
-        if (s_faceMaskInstance == null) s_faceMaskInstance = new Material(_source) { hideFlags = HideFlags.HideAndDontSave };
+        if (this.m_faceMask == null)
+        {
+            if (!s_faceMasks.TryGetValue(_source, out this.m_faceMask))
+            {
+                this.m_faceMask = new FaceMaskEntry
+                {
+                    Source = _source,
+                    Instance = new Material(_source) { hideFlags = HideFlags.HideAndDontSave }
+                };
+                s_faceMasks.Add(_source, this.m_faceMask);
+            }
+            this.m_faceMask.Users++;
+        }
 
-        if (s_faceMaskInstance.GetTexture(MASK_TEX_ID) != _maskTex) s_faceMaskInstance.SetTexture(MASK_TEX_ID, _maskTex);
+        Material t_mask = this.m_faceMask.Instance;
+        if (t_mask.GetTexture(MASK_TEX_ID) != _maskTex) t_mask.SetTexture(MASK_TEX_ID, _maskTex);
 
-        return s_faceMaskInstance;
+        return t_mask;
+    }
+
+    void ReleaseFaceMask()
+    {
+        FaceMaskEntry t_entry = this.m_faceMask;
+        if (t_entry == null) return;
+        this.m_faceMask = null;
+
+        if (this.faceImage != null && this.faceImage.material == t_entry.Instance)
+            this.faceImage.material = null;
+
+        if (--t_entry.Users > 0) return;
+        s_faceMasks.Remove(t_entry.Source);
+        if (t_entry.Instance == null) return;
+        if (Application.isPlaying) Destroy(t_entry.Instance);
+        else DestroyImmediate(t_entry.Instance);
     }
 }

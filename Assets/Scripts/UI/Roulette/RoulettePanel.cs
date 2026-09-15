@@ -205,7 +205,7 @@ public class RoulettePanel : ContentsPooledUI
 
             this.PlayWinPunch(t_outcome.SlotIndex);
 
-            await this.PlayGainEffectAsync(t_outcome);
+            await this.ShowRewardAsync(t_outcome);
         }
         finally
         {
@@ -309,8 +309,8 @@ public class RoulettePanel : ContentsPooledUI
         if (this.slots[_slotIndex] != null) this.slots[_slotIndex].PlayWinPunch();
     }
 
-    // 잔액은 서버 응답 채택이 이미 갈아끼웠다 — 롤업이 (잔액 − 획득량) → 잔액으로 세므로 끝값이 곧 실제 지급 뒤 잔액이다.
-    async UniTask PlayGainEffectAsync(RouletteSpinOutcome _outcome)
+    // 지급은 이미 끝났다. 팝업은 결과를 표시하고 확인 뒤 획득·개봉 연출만 잇는다.
+    async UniTask ShowRewardAsync(RouletteSpinOutcome _outcome)
     {
         if (_outcome.IsPack)
         {
@@ -318,7 +318,33 @@ public class RoulettePanel : ContentsPooledUI
             this.Close();
             await UniTask.Delay(Mathf.CeilToInt(this.transition.CloseDuration * 1000f),
                 DelayType.UnscaledDeltaTime, cancellationToken: this.GetCancellationTokenOnDestroy());
-            RewardPackPresentation.Show(new RewardClaimOutcome(_outcome.Granted, _outcome.Cards, _outcome.Packs));
+        }
+
+        IReadOnlyList<CurrencyGain> t_granted = _outcome.IsPack
+            ? _outcome.Granted
+            : new[] { new CurrencyGain(_outcome.Currency, _outcome.Amount) };
+        var t_reward = new RewardClaimOutcome(t_granted, _outcome.Cards, _outcome.Packs);
+        if (RewardClaimPopup.TryGet(out var t_popup) && t_popup.RewardSlotCount > 0)
+        {
+            var t_lines = new List<RewardLine>();
+            if (_outcome.IsPack)
+                t_lines.Add(new RewardLine(new AlbumRewardDef
+                {
+                    rewardType = ERewardType.Pack,
+                    rewardId = _outcome.PackId,
+                    amount = _outcome.Amount,
+                }));
+            if (t_granted != null)
+                foreach (var t_gain in t_granted) t_lines.Add(new RewardLine(t_gain));
+
+            t_popup.Show("룰렛 보상", t_lines, () => UniTask.FromResult(t_reward), _claimOnDim: true);
+            return;
+        }
+
+        // 팝업을 사용할 수 없는 환경에서도 기존 결과 연출은 남긴다.
+        if (_outcome.IsPack)
+        {
+            RewardPackPresentation.Show(t_reward);
             if (_outcome.Granted != null)
             {
                 var t_bucket = new CurrencyGainBucket();

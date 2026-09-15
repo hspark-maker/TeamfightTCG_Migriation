@@ -7,15 +7,14 @@ using TMPro;
 
 // 카드 여러 장을 한 묶음으로 보여주고 [받기]로 받게 하는 보상 오버레이(CardRewardOverlay의 N장 판).
 // 표시와 확인 콜백만 담당하고 지급은 호출자가 한다 — 그래서 출처(튜토리얼 기본 세트든 그 밖이든)를 알 필요가 없다.
-// 씬에 저작하지 않고 Addressables 타입 색인에서 독립 Canvas로 세운다(CardRewardOverlay와 같은 규약) — 로비 캔버스에 중첩하면
-// 그 프리팹을 저장할 때마다 다른 탭의 저작이 함께 흔들린다.
+// Shared presentation is instantiated and reused by UIPoolManager.
 //
 // ⚠ 딤을 눌러 닫히지 않는다. 받아야 넘어가는 자리에 쓰는 물건이라 나가는 문은 [받기] 하나뿐이다.
 //
 // 낱장 보상(CardRewardOverlay)을 확장하지 않고 따로 세운 이유는 그쪽 안무가 전부 1장 전제이기 때문이다 —
 // 위에서 내려꽂히는 슬램·무대 킥·광채 버스트는 카드 하나를 사건으로 만드는 장치라 격자에는 걸리지 않는다.
 // 여기서 카드가 서는 리듬은 PackResultGrid의 순차 팝이 대신 쥔다.
-public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
+public class CardSetRewardOverlay : PooledOverlay<CardSetRewardOverlay>
 {
     [Tooltip("켜고 끌 대상. 미배선이면 자기 gameObject를 토글한다.")]
 
@@ -26,7 +25,6 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
     [SerializeField] PackResultGrid grid;
 
     [Header("연출")]
-    [SerializeField] PopupTransition transition = new PopupTransition();
 
     [Tooltip("카드가 다 선 뒤 [받기]가 열리기까지의 뜸. 이 구간이 무엇을 받았는지 읽는 시간이다 — " +
              "0이면 손이 카드보다 빨라져 못 보고 넘어간다. 격자의 순차 팝이 끝나는 시간보다 길어야 한다.")]
@@ -56,10 +54,9 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
     /// "방금 본 그 카드들이 도감으로 갔다"가 한 줄로 이어진다.</summary>
     public RectTransform CardAnchor => this.grid != null ? (RectTransform)this.grid.transform : null;
 
-    /// <summary>보상 오버레이를 얻는다. 씬에 저작해 두지 않고 Addressables 타입 색인에서 세운다.
-    /// 평소 꺼져 있는 노드라 이미 선 것을 찾을 때는 비활성까지 뒤진다(CardRewardOverlay와 같은 규약).</summary>
+    /// <summary>Gets the authored presentation from the shared UI pool.</summary>
     public static bool TryGet(out CardSetRewardOverlay _overlay)
-        => TryGetOrCreate(RuntimeOverlayPrefabs.Get<CardSetRewardOverlay>, out _overlay);
+        => TryGetOrCreate(out _overlay);
 
     /// <summary>카드 묶음을 띄운다. _onClaim은 [받기]를 누른 <b>즉시</b> 불린다 —
     /// 그때 지급하고, 이어지는 획득 연출도 그쪽이 튼다(화면은 그 연출에 자리를 넘기고 걷힌다).</summary>
