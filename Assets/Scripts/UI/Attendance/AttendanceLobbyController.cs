@@ -40,8 +40,7 @@ public sealed class AttendanceLobbyController : MonoBehaviour
 
     static bool CanOpenAutomatically() => AttendanceCommands.IsReady && AttendanceCommands.CanClaim
         && AttendanceCommands.PromptedDay != AttendanceCommands.State.DailyKey
-        && GuidanceCoordinator.CanPresent && GuidanceCoordinator.CanNavigateFromLobby(null)
-        && !SynergyIntroduction.HasPending;
+        && GuidanceCoordinator.CanPresent && GuidanceCoordinator.CanNavigateFromLobby(null);
 
     async UniTaskVoid OpenAutomatically()
     {

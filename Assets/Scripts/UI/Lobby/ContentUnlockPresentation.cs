@@ -122,6 +122,13 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
 
     FeatureLockView FindButton(EContentUnlockIntro content)
     {
+        if (content == EContentUnlockIntro.CardEnhance)
+        {
+            if (!TutorialAnchorRegistry.TryGet(EOutgameTutorialAnchor.LobbyCollectionTab,
+                out _, out var collectionButton) || collectionButton == null) return null;
+            var collectionView = collectionButton.GetComponent<FeatureLockView>();
+            return collectionView != null && collectionView.isActiveAndEnabled ? collectionView : null;
+        }
         if (content == EContentUnlockIntro.Ranked)
             return _rankedButton != null && _rankedButton.isActiveAndEnabled ? _rankedButton : null;
         string _key = ContentUnlockIntroDef.KeyOf(content);

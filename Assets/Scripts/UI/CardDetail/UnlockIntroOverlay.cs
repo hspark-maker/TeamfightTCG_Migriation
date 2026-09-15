@@ -34,15 +34,9 @@ public class UnlockIntroOverlay : PooledOverlay<UnlockIntroOverlay>
 
     // 한 번 쓰면 비워 연타를 막는다.
     Action<bool> m_onFinished;
-    bool m_showingGuidance;
     IReadOnlyList<UnlockIntro> m_intros;
     int m_introIndex;
     int m_card;
-    string m_guideMessage;
-
-    /// <summary>해금 인트로의 개념 배너가 표시 중인가.</summary>
-    public static bool IsGuidanceShowing => IsOpen && UIPoolManager.instance != null
-        && UIPoolManager.instance.TryGetUI<UnlockIntroOverlay>(out var t_overlay) && t_overlay.m_showingGuidance;
 
     CanvasGroup m_confirmGroup;
 
@@ -62,7 +56,7 @@ public class UnlockIntroOverlay : PooledOverlay<UnlockIntroOverlay>
         => TryGetOrCreate(out _overlay);
 
     /// <summary>효과와 데모를 재생한다. 확인은 true, 중단은 false를 한 번 돌려준다.</summary>
-    public void Show(IReadOnlyList<UnlockIntro> _intros, int _card, Action<bool> _onFinished, string _guideMessage = null)
+    public void Show(IReadOnlyList<UnlockIntro> _intros, int _card, Action<bool> _onFinished)
     {
         if (IsOpen || m_onFinished != null) Cancel();
         InitializeUI();
@@ -76,7 +70,6 @@ public class UnlockIntroOverlay : PooledOverlay<UnlockIntroOverlay>
         m_intros = _intros;
         m_introIndex = 0;
         m_card = _card;
-        m_guideMessage = _guideMessage;
         if (confirmButton != null)
         {
             confirmButton.onClick.RemoveAllListeners();
@@ -91,7 +84,6 @@ public class UnlockIntroOverlay : PooledOverlay<UnlockIntroOverlay>
     {
         KillIntro();
         EndDemo();
-        ClearGuidance();
         if (rowRoot != null) rowRoot.gameObject.SetActive(true);
         var t_intros = new[] { m_intros[m_introIndex] };
         m_shownRows = BuildRows(t_intros);
@@ -100,9 +92,6 @@ public class UnlockIntroOverlay : PooledOverlay<UnlockIntroOverlay>
         BeginDemo(t_intros, m_card);
         m_intro = BuildIntro();
         m_intro.Play();
-        m_showingGuidance = t_intros[0].IsSynergy && !string.IsNullOrEmpty(m_guideMessage);
-        if (m_showingGuidance)
-            OutgameTutorialGateUI.Ensure().ShowBanner(this, m_guideMessage);
     }
 
     /// <summary>소유 화면이 떠나면 완료 처리 없이 안내를 닫는다.</summary>
@@ -115,8 +104,6 @@ public class UnlockIntroOverlay : PooledOverlay<UnlockIntroOverlay>
         var t_callback = m_onFinished;
         m_onFinished = null;
         m_intros = null;
-        m_guideMessage = null;
-        ClearGuidance();
         dim.Clear();
         transition.HandleDisabled(ResolveTarget());
         KillIntro();
@@ -143,9 +130,7 @@ public class UnlockIntroOverlay : PooledOverlay<UnlockIntroOverlay>
         var t_callback = m_onFinished;
         m_onFinished = null;
         m_intros = null;
-        m_guideMessage = null;
         bool t_open = ConsumeOpen();
-        ClearGuidance();
         SetInputEnabled(false);
         KillIntro();
         EndDemo();
@@ -153,12 +138,6 @@ public class UnlockIntroOverlay : PooledOverlay<UnlockIntroOverlay>
         ResetChoreography();
         NotifyClosed(t_open);
         t_callback?.Invoke(_confirmed);
-    }
-
-    void ClearGuidance()
-    {
-        if (m_showingGuidance) OutgameTutorialGateUI.Instance?.Clear(this);
-        m_showingGuidance = false;
     }
 
     // 프리팹에 미리 깔린 행을 꺼내 쓰고 남는 것은 끈다. 돌려주는 값은 실제로 세운 수.

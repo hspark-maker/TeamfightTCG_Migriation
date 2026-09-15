@@ -13,8 +13,6 @@ public static class GuideOnboardingDataAuthoring
     {
         var t_data = AssetDatabase.LoadAssetAtPath<OutgameTutorialData>(PATH);
         Undo.RecordObject(t_data, "Author guide onboarding");
-        if (string.IsNullOrWhiteSpace(t_data.guide.synergyIntroductionMessage))
-            t_data.guide.synergyIntroductionMessage = "시너지가 해금됐어요!\n같은 시너지가 해금된 카드를 필요한 수만큼\n같은 덱에 편성하면 시너지 효과가 활성화돼요.";
         int t_chapterIndex = t_data.guide.guideChapters.FindIndex(_chapter => _chapter.Trigger == EOutgameTutorialTrigger.GuideMissionIntroduction);
         if (t_chapterIndex < 0)
         {
@@ -61,7 +59,6 @@ public static class GuideOnboardingDataAuthoring
     {
         var t_data = AssetDatabase.LoadAssetAtPath<OutgameTutorialData>(PATH);
         Require(HasEnhanceUnlockStep(t_data), "Enhance unlock explanation step missing");
-        Require(!string.IsNullOrWhiteSpace(t_data.guide.synergyIntroductionMessage), "Synergy authoring missing");
         var t_ids = new HashSet<int>();
         foreach (var t_chapter in t_data.Chapters)
             for (int t_i = 0; t_i < t_chapter.StepCount; t_i++)

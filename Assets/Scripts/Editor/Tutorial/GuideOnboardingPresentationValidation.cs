@@ -51,22 +51,22 @@ public static class GuideOnboardingPresentationValidation
             int t_confirmed = 0, t_cancelled = 0;
             var t_intros = new[] { default(UnlockIntro) };
             System.Action<bool> t_result = _done => { if (_done) t_confirmed++; else t_cancelled++; };
-            t_overlay.Show(t_intros, 0, t_result, "시너지 안내 검증");
-            Require(UnlockIntroOverlay.IsOpen && UnlockIntroOverlay.IsGuidanceShowing && OutgameTutorialGateUI.IsShowing
+            t_overlay.Show(t_intros, 0, t_result);
+            Require(UnlockIntroOverlay.IsOpen && !OutgameTutorialGateUI.IsShowing
                 && t_confirmed == 0 && t_cancelled == 0,
-                $"Intro and guidance must appear together: open={UnlockIntroOverlay.IsOpen}, guidance={UnlockIntroOverlay.IsGuidanceShowing}, gate={OutgameTutorialGateUI.IsShowing}, confirmed={t_confirmed}, cancelled={t_cancelled}.");
+                $"Effect demo must open without concept guidance: open={UnlockIntroOverlay.IsOpen}, gate={OutgameTutorialGateUI.IsShowing}, confirmed={t_confirmed}, cancelled={t_cancelled}.");
             t_button.interactable = true;
             t_button.onClick.Invoke();
             Require(!UnlockIntroOverlay.IsOpen && t_confirmed == 1 && t_cancelled == 0, "Final confirmation must complete exactly once.");
             t_button.onClick.Invoke();
             Require(t_confirmed == 1, "Repeated click completed twice.");
             Require(!OutgameTutorialGateUI.IsShowing, "Confirmed intro left guidance visible.");
-            t_overlay.Show(t_intros, 0, t_result, "취소 안내 검증");
+            t_overlay.Show(t_intros, 0, t_result);
             t_overlay.Cancel();
             t_overlay.Cancel();
             Require(t_confirmed == 1 && t_cancelled == 1, "Cancellation must be distinct and idempotent.");
             Require(!OutgameTutorialGateUI.IsShowing, "Cancelled intro left guidance visible.");
-            t_overlay.Show(t_intros, 0, t_result, "비활성 안내 검증");
+            t_overlay.Show(t_intros, 0, t_result);
             typeof(ContentsPooledUI).GetMethod("NotifyContentsVisibility", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(t_overlay, new object[] { true });
             t_root.SetActive(false);
@@ -79,7 +79,7 @@ public static class GuideOnboardingPresentationValidation
             t_root.SetActive(true);
             t_overlay.Show(new[] { default(UnlockIntro), default(UnlockIntro) }, 0,
                 _done => { if (_done) t_multiConfirmed++; });
-            Require(!UnlockIntroOverlay.IsGuidanceShowing && !OutgameTutorialGateUI.IsShowing,
+            Require(!OutgameTutorialGateUI.IsShowing,
                 "Replay without an introduction message must not show guidance.");
             t_button.interactable = true;
             t_button.onClick.Invoke();
@@ -87,7 +87,7 @@ public static class GuideOnboardingPresentationValidation
             t_button.interactable = true;
             t_button.onClick.Invoke();
             Require(!UnlockIntroOverlay.IsOpen && t_multiConfirmed == 1, "All abilities must complete once.");
-            Debug.Log("[GuideOnboardingPresentation] PASS: concurrent guidance, confirm, repeated click, cancellation, simulated OnDisable, mission row reuse.");
+            Debug.Log("[GuideOnboardingPresentation] PASS: no concept guidance, confirm, repeated click, cancellation, simulated OnDisable, mission row reuse.");
         }
         finally
         {

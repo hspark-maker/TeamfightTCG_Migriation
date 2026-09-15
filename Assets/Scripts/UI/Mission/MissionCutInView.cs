@@ -159,7 +159,6 @@ public sealed class MissionCutInView : ContentsPooledUI
         && !ContentUnlockPresentation.IsPlaying
         && SceneManager.GetActiveScene().name == "LobbyScene"
         && !CurtainView.IsBusy
-        && !SynergyIntroduction.IsActive
         // 튜토리얼 완료 여부나 풀 UI는 진행 알림을 막지 않는다. 현재 재생 중인 소개만 기다린다.
         && (!s_matchEntry || s_opponentSearch);
 
