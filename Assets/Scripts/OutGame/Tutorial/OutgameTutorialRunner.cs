@@ -83,6 +83,9 @@ public static class OutgameTutorialRunner
     /// UI가 규칙을 복제하지 않도록 "띄울지"의 답을 여기서만 낸다(데이터 미주입이면 false).</summary>
     public static bool HasPending(EOutgameTutorialTrigger _trigger)
     {
+#if UNITY_EDITOR
+        if (OnboardingPlayTest.IsActive || OnboardingPlayTest.IsPreparing) return false;
+#endif
         if (_trigger == EOutgameTutorialTrigger.None) return false;
         if (!GuideMissionFlows.TryGet(_trigger, out var t_flow)
             || (!GuideResume.IsFor(_trigger) && !GuideMissionFlows.IsEligible(t_flow))) return false;
@@ -119,6 +122,23 @@ public static class OutgameTutorialRunner
         if (s_deferred.Remove(_trigger)) OnGuidedChanged?.Invoke();
     }
 
+#if UNITY_EDITOR
+    /// <summary>격리된 에디터 테스트에서 저작된 안내를 처음부터 재생한다.</summary>
+    public static void FirePlayTest(EOutgameTutorialTrigger _trigger)
+    {
+        if (!OnboardingPlayTest.IsActive || IsGuidedRunning)
+            throw new InvalidOperationException("격리된 온보딩 테스트 세션이 필요합니다.");
+        if ((_trigger != EOutgameTutorialTrigger.SynergyGrowthIntroduction
+                && _trigger != EOutgameTutorialTrigger.SynergyBattleIntroduction)
+            || !TryGetGuidedChapter(_trigger, out int t_index, out var t_chapter) || t_chapter.StepCount == 0)
+            throw new InvalidOperationException("테스트할 온보딩 챕터가 없습니다.");
+
+        s_guidedChapter = t_index;
+        s_guidedStep = 0;
+        OnGuidedActivated?.Invoke();
+        OnGuidedChanged?.Invoke();
+    }
+#endif
 
     // 자율 커서가 가리키는 스텝(미실행·범위 밖·빈 칸이면 false)
     public static bool TryGetGuidedStep(out TutorialStepDef _step)

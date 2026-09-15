@@ -1046,6 +1046,8 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     string ShardProgressLabel(int _card, bool _hasStep)
     {
         if (!_hasStep) return NoValue;
+        if (OutgameTutorialGuide.HasFreeCardEnhance(_card) && OutgameTutorialGuide.CanUseFreeSynergyGrowth(_card))
+            return "한 번에 2성 달성";
         int t_progress = CardGrowthManager.ShardProgressOf(_card);
         int t_required = CardGrowthManager.ShardRequiredOf(_card);
         return $"{t_progress:N0}/{t_required:N0}";

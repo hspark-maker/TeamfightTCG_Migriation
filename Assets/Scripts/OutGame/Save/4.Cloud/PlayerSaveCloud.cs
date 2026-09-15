@@ -908,6 +908,9 @@ static class PlayerSaveCloud
 
     static async UniTask UploadAsync(int _generation, bool _isImmediate)
     {
+#if UNITY_EDITOR
+        if (OnboardingPlayTest.IsActive || OnboardingPlayTest.IsPreparing) return;
+#endif
         // 서버 호출 중에는 문서의 주인이 서버다. dirty는 s_dirtySerial에 그대로 쌓여 ResumeUploads가 태운다.
         if (s_serverCommandDepth > 0) return;
         if (!s_initialized || !s_uploadApproved || s_uploading) return;

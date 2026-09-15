@@ -36,4 +36,5 @@ public enum EOutgameTutorialAnchor
     CardDetailKeywordDescription = 31,
     CardDetailCardView           = 32,
     DeckSynergyStrip             = 33,
+    CardDetailSynergyDescription = 34,
 }

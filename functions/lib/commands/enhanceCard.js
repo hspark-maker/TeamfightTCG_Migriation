@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.enhanceCard = void 0;
+exports.enhanceSynergyIntroduction = exports.enhanceCard = void 0;
 const requestMetrics_1 = require("../observability/requestMetrics");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
@@ -50,6 +50,8 @@ const saveDocument_1 = require("../save/saveDocument");
 const domainReject_1 = require("../save/domainReject");
 const receiptId_1 = require("../save/receiptId");
 const packSpecReader_1 = require("../packs/packSpecReader");
+const packSlots_1 = require("../packs/packSlots");
+const synergyIntroductionGrant_1 = require("../growth/synergyIntroductionGrant");
 const wallet_1 = require("../currency/wallet");
 const walletStore_1 = require("../currency/walletStore");
 const cardGrowth_1 = require("../growth/cardGrowth");
@@ -67,123 +69,159 @@ function reject(reason, message, context) {
     (0, domainReject_1.rejectDomain)(reason, message, context);
 }
 /** Feed up to the next evolution. The tutorial grant fills the remaining amount. */
-exports.enhanceCard = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)("enhanceCard", async (request) => {
-    const uid = (0, saveDocument_1.requireUid)(request.auth);
-    const env = String(request.data?.env ?? "");
-    const cardId = Number(request.data?.cardId ?? 0);
-    const freeShotRequested = request.data?.freeShot === true;
-    const amount = request.data?.amount === undefined ? 1 : request.data.amount;
-    if (!(0, saveDocument_1.isKnownEnv)(env)) {
-        throw new https_1.HttpsError("invalid-argument", `Unknown env: ${env}`);
-    }
-    if (!Number.isInteger(cardId) || cardId <= 0) {
-        throw new https_1.HttpsError("invalid-argument", "cardId must be a positive integer.");
-    }
-    if (!Number.isInteger(amount) || amount < 1 || amount > 150) {
-        throw new https_1.HttpsError("invalid-argument", "amount must be an integer from 1 to 150.");
-    }
-    // 스펙 읽기는 트랜잭션 밖이다 — 유저 문서와 무관하고, 재실행마다 다시 읽으면 비용만 는다.
-    const [ruleRows, overrideRows, catalog, guideCards] = await Promise.all([
-        (0, packSpecReader_1.readSpecRows)(env, "CardEnhanceRule"),
-        (0, packSpecReader_1.readSpecRows)(env, "CardEnhance"),
-        (0, missionSpec_1.readMissionCatalog)(env),
-        (0, guideMutation_1.readGuideCards)(env),
-    ]);
-    const rule = (0, enhanceRules_1.parseCardEnhanceRule)(ruleRows);
-    if (rule === null) {
-        // 곡선 없이 차감할 수는 없다. 이 로그가 뜨면 스펙 업로드가 빠진 것이고 강화가 통째로 막힌다.
-        logger.error("CardEnhanceRule spec is unusable", { uid, env, rowCount: ruleRows.length });
-        reject("RuleUnavailable", "Card enhance rule is not authored.", { uid, env, rowCount: ruleRows.length });
-    }
-    const overrides = (0, enhanceRules_1.parseCardEnhanceOverrides)(overrideRows);
-    let outcome = "Failed";
-    let level = 0;
-    let shardProgress = 0;
-    let shardRequired = 0;
-    let evolved = false;
-    let appliedShards = 0;
-    let currency = "";
-    let cost = 0;
-    let freeShotUsed = false;
-    let missionState;
-    // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
-    // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
-    let replayed = true;
-    // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
-    const txId = (0, receiptId_1.clientReceiptId)(request.data?.txId, (0, node_crypto_1.randomUUID)());
-    // 기간은 여기서 한 번만 잰다 — 콜백은 재실행되므로 그 안에서 재면 경계에 걸린 호출이 흔들린다.
-    const period = (0, period_1.missionPeriod)(Date.now());
-    const result = await (0, saveDocument_1.mutateSave)(env, uid, "enhanceCard", { kind: "client", txId }, async (current, transaction, wallet) => {
-        // 미션 읽기가 콜백의 첫 줄이다. 아래 grants 읽기와는 둘 다 읽기라 순서를 다투지 않지만,
-        // 미션 **쓰기**는 그 grants 읽기보다 뒤여야 해서 콜백 맨 끝으로 갈라 두었다.
-        const missions = await (0, missionStore_1.beginMissionBump)(transaction, firebaseApp_1.db, env, uid, period, current);
-        // Retry from the committed growth and wallet state.
-        const entries = (0, cardGrowth_1.readGrowthEntries)(current.cardGrowth);
-        const currentLevel = (0, cardGrowth_1.levelOfCard)(entries, cardId);
-        const step = (0, enhanceRules_1.cardEnhanceStep)(rule, overrides, currentLevel + 1);
-        if (step === null) {
-            reject("MaxLevel", `Card ${cardId} is already at the max level.`, { uid, env, cardId, level: currentLevel, maxLevel: rule.maxLevel });
+exports.enhanceCard = createEnhanceCard(false);
+exports.enhanceSynergyIntroduction = createEnhanceCard(true);
+/** Separate callable prevents older servers from falling back to a paid enhancement.
+ * @param {boolean} synergyIntroduction Dedicated introduction endpoint
+ * @return {object} Callable enhancement handler
+ */
+function createEnhanceCard(synergyIntroduction) {
+    const command = synergyIntroduction ? "enhanceSynergyIntroduction" : "enhanceCard";
+    return (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)(command, async (request) => {
+        const uid = (0, saveDocument_1.requireUid)(request.auth);
+        const env = String(request.data?.env ?? "");
+        const cardId = Number(request.data?.cardId ?? 0);
+        const freeShotRequested = synergyIntroduction || request.data?.freeShot === true;
+        const amount = request.data?.amount === undefined ? 1 : request.data.amount;
+        if (!(0, saveDocument_1.isKnownEnv)(env)) {
+            throw new https_1.HttpsError("invalid-argument", `Unknown env: ${env}`);
         }
-        // freeShot 이 false 면 문서를 읽지도 쓰지도 않는다 — 매 강화마다 왕복을 더할 이유가 없다.
-        // 읽기는 반드시 트랜잭션 안이다 — 동시 호출 둘이 같은 "미사용"을 보면 한 방이 두 번 나간다.
-        const grantsReference = freeShotRequested ? (0, tutorialGrants_1.grantsRef)(firebaseApp_1.db, env, uid) : null;
-        let freeShot = null;
-        if (grantsReference !== null) {
-            const grants = (0, tutorialGrants_1.readGrants)(await transaction.get(grantsReference));
-            if ((0, tutorialGrants_1.hasFreeShot)(grants, FREE_SHOT_AXIS))
-                freeShot = grants;
+        if (!Number.isInteger(cardId) || cardId <= 0) {
+            throw new https_1.HttpsError("invalid-argument", "cardId must be a positive integer.");
         }
-        const paid = freeShot === null && step.cost > 0;
-        const balances = wallet.balances;
-        if (paid && !(0, wallet_1.canAfford)(balances, step.currency, 1)) {
-            reject("NotAffordable", `Not enough ${step.currency} to enhance card ${cardId}.`, { uid, env, cardId, level: currentLevel, currency: step.currency, cost: 1,
-                balance: balances[step.currency] });
+        if (!Number.isInteger(amount) || amount < 1 || amount > 150) {
+            throw new https_1.HttpsError("invalid-argument", "amount must be an integer from 1 to 150.");
         }
-        const availableAmount = paid ? Math.min(amount, balances[step.currency] ?? 0) : amount;
-        const fed = (0, cardGrowth_1.feedShard)(entries, cardId, step.cost, freeShot !== null, availableAmount);
-        const charged = paid ? fed.appliedShards : 0;
-        if (grantsReference !== null && freeShot !== null) {
-            (0, tutorialGrants_1.writeGrantUsed)(transaction, grantsReference, FREE_SHOT_AXIS, firestore_1.FieldValue.serverTimestamp());
+        // 스펙 읽기는 트랜잭션 밖이다 — 유저 문서와 무관하고, 재실행마다 다시 읽으면 비용만 는다.
+        const [ruleRows, overrideRows, catalog, guideCards] = await Promise.all([
+            (0, packSpecReader_1.readSpecRows)(env, "CardEnhanceRule"),
+            (0, packSpecReader_1.readSpecRows)(env, "CardEnhance"),
+            (0, missionSpec_1.readMissionCatalog)(env),
+            (0, guideMutation_1.readGuideCards)(env),
+        ]);
+        const rule = (0, enhanceRules_1.parseCardEnhanceRule)(ruleRows);
+        if (rule === null) {
+            // 곡선 없이 차감할 수는 없다. 이 로그가 뜨면 스펙 업로드가 빠진 것이고 강화가 통째로 막힌다.
+            logger.error("CardEnhanceRule spec is unusable", { uid, env, rowCount: ruleRows.length });
+            reject("RuleUnavailable", "Card enhance rule is not authored.", { uid, env, rowCount: ruleRows.length });
         }
-        outcome = "Success";
-        level = fed.level;
-        shardProgress = fed.shardProgress;
-        const nextStep = (0, enhanceRules_1.cardEnhanceStep)(rule, overrides, level + 1);
-        shardRequired = nextStep === null ? 0 : (0, cardGrowth_1.shardRequirement)(nextStep.cost);
-        evolved = fed.evolved;
-        appliedShards = fed.appliedShards;
-        currency = step.currency;
-        cost = charged;
-        freeShotUsed = freeShot !== null;
-        const slots = {
-            cardGrowth: (0, cardGrowth_1.growthSlot)(fed.entries),
-        };
-        (0, guideMutation_1.applyGuideProgress)(missions, current, slots, guideCards, catalog);
-        // Count each accepted shard feed, including feeds below the evolution threshold.
-        // All mission writes follow the optional tutorial-grant read.
-        (0, missionStore_1.commitMissionBump)(transaction, missions, eventNames_1.EVENTS.cardEnhanceResolved.missionKey, freeShotUsed ? 1 : appliedShards, firestore_1.FieldValue.serverTimestamp());
-        missionState = (0, missionStore_1.missionResponse)(missions.state, period, catalog);
-        return {
-            slots,
-            wallet: (0, walletStore_1.nextWallet)(wallet, (0, wallet_1.spend)(balances, step.currency, charged), "enhanceCard"),
-        };
-    }, (adopted) => {
-        replayed = false;
-        return { ...adopted, outcome, level, shardProgress, shardRequired, evolved, appliedShards,
-            currency, cost, freeShotUsed, missions: missionState };
-    });
-    if (replayed) {
-        logger.info("receipt replay", { uid, env, source: "enhanceCard", txId, revision: result.revision });
-    }
-    else {
-        (0, analyticsEvent_1.recordEvent)(eventNames_1.EVENTS.cardEnhanceResolved.name, {
-            uid, env, eventId: txId, sourceCommand: "enhanceCard", result: outcome,
-            cardId, outcome, level, shardProgress, shardRequired, evolved, appliedShards, currency, cost,
-            freeShotRequested, freeShotUsed,
-            revision: result.revision,
-            txIdSource: (0, receiptId_1.isClientReceiptId)(request.data?.txId) ? "client" : "server",
+        if (synergyIntroduction && rule.maxLevel < synergyIntroductionGrant_1.SYNERGY_INTRODUCTION_LEVEL) {
+            reject("RuleUnavailable", "Card enhance rule cannot reach the synergy introduction goal.", { uid, env });
+        }
+        const overrides = (0, enhanceRules_1.parseCardEnhanceOverrides)(overrideRows);
+        let outcome = "Failed";
+        let level = 0;
+        let shardProgress = 0;
+        let shardRequired = 0;
+        let evolved = false;
+        let appliedShards = 0;
+        let currency = "";
+        let cost = 0;
+        let freeShotUsed = false;
+        let missionState;
+        // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
+        // finalize 안에서 뒤집는다 — 트랜잭션 재실행마다 다시 돌아도 결과가 같다.
+        let replayed = true;
+        // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
+        const txId = (0, receiptId_1.clientReceiptId)(request.data?.txId, (0, node_crypto_1.randomUUID)());
+        // 기간은 여기서 한 번만 잰다 — 콜백은 재실행되므로 그 안에서 재면 경계에 걸린 호출이 흔들린다.
+        const period = (0, period_1.missionPeriod)(Date.now());
+        const result = await (0, saveDocument_1.mutateSave)(env, uid, command, { kind: "client", txId }, async (current, transaction, wallet) => {
+            // 미션 읽기가 콜백의 첫 줄이다. 아래 grants 읽기와는 둘 다 읽기라 순서를 다투지 않지만,
+            // 미션 **쓰기**는 그 grants 읽기보다 뒤여야 해서 콜백 맨 끝으로 갈라 두었다.
+            const missions = await (0, missionStore_1.beginMissionBump)(transaction, firebaseApp_1.db, env, uid, period, current);
+            // Retry from the committed growth and wallet state.
+            const entries = (0, cardGrowth_1.readGrowthEntries)(current.cardGrowth);
+            const currentLevel = (0, cardGrowth_1.levelOfCard)(entries, cardId);
+            const step = (0, enhanceRules_1.cardEnhanceStep)(rule, overrides, currentLevel + 1);
+            if (step === null) {
+                reject("MaxLevel", `Card ${cardId} is already at the max level.`, { uid, env, cardId, level: currentLevel, maxLevel: rule.maxLevel });
+            }
+            // freeShot 이 false 면 문서를 읽지도 쓰지도 않는다 — 매 강화마다 왕복을 더할 이유가 없다.
+            // 읽기는 반드시 트랜잭션 안이다 — 동시 호출 둘이 같은 "미사용"을 보면 한 방이 두 번 나간다.
+            const grantsReference = freeShotRequested ? (0, tutorialGrants_1.grantsRef)(firebaseApp_1.db, env, uid) : null;
+            let freeShot = null;
+            if (grantsReference !== null) {
+                const snapshot = await transaction.get(grantsReference);
+                const grants = (0, tutorialGrants_1.readGrants)(snapshot);
+                if (synergyIntroduction) {
+                    if (!(0, synergyIntroductionGrant_1.canEnhanceSynergyIntroduction)(missions.state, catalog, (0, packSlots_1.readOwnedIds)(current.ownership), entries, cardId, snapshot.data()?.synergyIntroduction)) {
+                        reject("NotReady", "Synergy introduction free enhancement is not available.", { uid, env, cardId });
+                    }
+                    freeShot = grants;
+                }
+                else if ((0, tutorialGrants_1.hasFreeShot)(grants, FREE_SHOT_AXIS))
+                    freeShot = grants;
+            }
+            const paid = freeShot === null && step.cost > 0;
+            const balances = wallet.balances;
+            if (paid && !(0, wallet_1.canAfford)(balances, step.currency, 1)) {
+                reject("NotAffordable", `Not enough ${step.currency} to enhance card ${cardId}.`, { uid, env, cardId, level: currentLevel, currency: step.currency, cost: 1,
+                    balance: balances[step.currency] });
+            }
+            const availableAmount = paid ? Math.min(amount, balances[step.currency] ?? 0) : amount;
+            let fed = (0, cardGrowth_1.feedShard)(entries, cardId, step.cost, freeShot !== null, availableAmount);
+            if (synergyIntroduction) {
+                while (fed.level < synergyIntroductionGrant_1.SYNERGY_INTRODUCTION_LEVEL) {
+                    const remainingStep = (0, enhanceRules_1.cardEnhanceStep)(rule, overrides, fed.level + 1);
+                    if (remainingStep === null) {
+                        reject("RuleUnavailable", "Card enhance rule cannot reach the synergy introduction goal.", { uid, env });
+                    }
+                    const next = (0, cardGrowth_1.feedShard)(fed.entries, cardId, remainingStep.cost, true);
+                    fed = { ...next, appliedShards: fed.appliedShards + next.appliedShards };
+                }
+            }
+            const charged = paid ? fed.appliedShards : 0;
+            if (grantsReference !== null && freeShot !== null) {
+                if (synergyIntroduction) {
+                    transaction.set(grantsReference, {
+                        synergyIntroduction: { cardId, level: fed.level }, updatedAt: firestore_1.FieldValue.serverTimestamp(),
+                    }, { merge: true });
+                }
+                else {
+                    (0, tutorialGrants_1.writeGrantUsed)(transaction, grantsReference, FREE_SHOT_AXIS, firestore_1.FieldValue.serverTimestamp());
+                }
+            }
+            outcome = "Success";
+            level = fed.level;
+            shardProgress = fed.shardProgress;
+            const nextStep = (0, enhanceRules_1.cardEnhanceStep)(rule, overrides, level + 1);
+            shardRequired = nextStep === null ? 0 : (0, cardGrowth_1.shardRequirement)(nextStep.cost);
+            evolved = fed.evolved;
+            appliedShards = fed.appliedShards;
+            currency = step.currency;
+            cost = charged;
+            freeShotUsed = freeShot !== null;
+            const slots = {
+                cardGrowth: (0, cardGrowth_1.growthSlot)(fed.entries),
+            };
+            (0, guideMutation_1.applyGuideProgress)(missions, current, slots, guideCards, catalog);
+            // Count each accepted shard feed, including feeds below the evolution threshold.
+            // All mission writes follow the optional tutorial-grant read.
+            (0, missionStore_1.commitMissionBump)(transaction, missions, eventNames_1.EVENTS.cardEnhanceResolved.missionKey, freeShotUsed ? 1 : appliedShards, firestore_1.FieldValue.serverTimestamp());
+            missionState = (0, missionStore_1.missionResponse)(missions.state, period, catalog);
+            return {
+                slots,
+                wallet: (0, walletStore_1.nextWallet)(wallet, (0, wallet_1.spend)(balances, step.currency, charged), command),
+            };
+        }, (adopted) => {
+            replayed = false;
+            return { ...adopted, outcome, level, shardProgress, shardRequired, evolved, appliedShards,
+                currency, cost, freeShotUsed, missions: missionState };
         });
-    }
-    return result;
-}));
+        if (replayed) {
+            logger.info("receipt replay", { uid, env, source: command, txId, revision: result.revision });
+        }
+        else {
+            (0, analyticsEvent_1.recordEvent)(eventNames_1.EVENTS.cardEnhanceResolved.name, {
+                uid, env, eventId: txId, sourceCommand: command, result: outcome,
+                cardId, outcome, level, shardProgress, shardRequired, evolved, appliedShards, currency, cost,
+                freeShotRequested, freeShotUsed,
+                revision: result.revision,
+                txIdSource: (0, receiptId_1.isClientReceiptId)(request.data?.txId) ? "client" : "server",
+            });
+        }
+        return result;
+    }));
+}
 //# sourceMappingURL=enhanceCard.js.map

@@ -35,6 +35,23 @@ public static class OutgameTutorialGuide
         => OutgameTutorialRunner.GuidedTrigger == EOutgameTutorialTrigger.SynergyGrowthIntroduction
             && !IsGrowthGoalReached && s_enhanceCard > 0 && GuideMissionTrack.StarOf(s_enhanceCard) < 2;
 
+    /// <summary>시너지 도입의 지정 카드만 2성까지 무료로 성장한다.</summary>
+    public static bool CanUseFreeSynergyGrowth(int _cardId)
+    {
+        if (GrowthTrigger != EOutgameTutorialTrigger.SynergyGrowthIntroduction
+            || _cardId <= 0 || _cardId != s_enhanceCard || IsGrowthGoalReached) return false;
+        if (!OutgameTutorialRunner.TryGetGuidedChapter(EOutgameTutorialTrigger.SynergyGrowthIntroduction,
+            out _, out var t_chapter)) return false;
+        for (int t_i = 0; t_i < t_chapter.StepCount; t_i++)
+            if (t_chapter.TryGetStep(t_i, out var t_step) && t_step.Action == EOutgameTutorialAction.WaitEnhance)
+                return t_step.FreeOfCharge;
+        return false;
+    }
+
+    public static bool HasFreeCardEnhance(int _cardId)
+        => HasFreeShot(EOutgameTutorialAction.WaitEnhance)
+            && (GrowthTrigger != EOutgameTutorialTrigger.SynergyGrowthIntroduction || CanUseFreeSynergyGrowth(_cardId));
+
     /// <summary>서버 소진 표식이 바뀌었다. 안내가 서 있는 스텝을 다시 판정시키는 자리다(브리지가 구독한다).</summary>
     // 중계인 이유: 구독자가 클라우드 창구를 직접 참조하지 않게 이 창구 하나로 묶는다.
     public static event Action OnFreeShotSpentChanged
@@ -161,8 +178,8 @@ public static class OutgameTutorialGuide
         => SynergyBattleGuide.MessageOf((_step?.GuideMessage ?? string.Empty).Replace("{enhanceCost}",
             HasFreeShot(EOutgameTutorialAction.WaitEnhance) ? "이번 강화는 무료예요." : "샤드를 사용해 카드를 성장시켜요.")
             .Replace("{growthStatus}", s_growthAlreadyReached
-                ? "이미 2성 카드를 보유하고 있어요. 다시 강화할 필요는 없어요."
-                : "카드 한 장을 2성까지 성장시키면 시너지에 참여할 수 있어요."));
+                ? "이미 시너지가 해금된 2성 카드를 보유하고 있어요."
+                : "카드를 2성으로 성장시키면 그 카드의 시너지가 해금돼요."));
 
     /// <summary>지금 이 한 방을 안내가 대신 내주는가 = 저작이 무료라고 말한 스텝에 서 있고, 그 스텝이 아직 안 썼다.
     /// 무엇이 무료인지는 코드가 아니라 스텝의 freeOfCharge가 정한다.
@@ -170,16 +187,20 @@ public static class OutgameTutorialGuide
     /// 소진 표식까지 가져가 정작 안내가 시킨 강화에 값이 붙는다(그 반대도 같다).</summary>
     // 클라 표식(세션 내·스텝 단위)과 서버 표식(영구·축 단위)을 둘 다 본다 — 응답을 잃으면 서버만 소진을 알기 때문이다.
     public static bool HasFreeShot(EOutgameTutorialAction _axis)
-        => !IsFreeShotSpentOnServer(_axis)
-        && TryGetCurrentStep(out var t_step)
+        => TryGetCurrentStep(out var t_step)
         && t_step.Action == _axis
         && t_step.FreeOfCharge
-        && t_step != s_freeSpentStep;
+        && (_axis == EOutgameTutorialAction.WaitEnhance
+            && GrowthTrigger == EOutgameTutorialTrigger.SynergyGrowthIntroduction
+                ? CanUseFreeSynergyGrowth(s_enhanceCard)
+                : !IsFreeShotSpentOnServer(_axis) && t_step != s_freeSpentStep);
 
     /// <summary>이 축의 무료 한 방을 서버가 이미 소진했는가. 응답을 잃어 안내만 남은 자리를 여기서 가른다.</summary>
     // 묻는 쪽이 클라우드 창구를 직접 참조하지 않게 축 매핑을 여기 가둔다.
     public static bool IsFreeShotSpentOnServer(EOutgameTutorialAction _axis)
     {
+        if (_axis == EOutgameTutorialAction.WaitEnhance
+            && GrowthTrigger == EOutgameTutorialTrigger.SynergyGrowthIntroduction) return IsGrowthGoalReached;
         switch (_axis)
         {
             case EOutgameTutorialAction.WaitEnhance:        return TutorialGrantsCloud.EnhanceCardSpent;
@@ -197,6 +218,7 @@ public static class OutgameTutorialGuide
     /// 실패로 닫아 버리면 안내가 시키는 성장을 유저 돈으로 다시 해야 한다.</summary>
     public static void ConsumeFreeShot()
     {
+        if (GrowthTrigger == EOutgameTutorialTrigger.SynergyGrowthIntroduction) return;
         if (TryGetCurrentStep(out var t_step)) s_freeSpentStep = t_step;
     }
 
@@ -221,7 +243,8 @@ public static class OutgameTutorialGuide
     {
         if (_cardId <= 0 || !CardGrowthManager.IsReady || !OwnershipManager.IsOwned(_cardId)
             || !CardGrowthManager.TryGetNextStep(_cardId, out var t_step)) return false;
-        return CanShowGrowthCard(_cardId) && ((s_enhanceFree && !IsFreeShotSpentOnServer(EOutgameTutorialAction.WaitEnhance))
+        return CanShowGrowthCard(_cardId) && (CanUseFreeSynergyGrowth(_cardId)
+            || (s_enhanceFree && !IsFreeShotSpentOnServer(EOutgameTutorialAction.WaitEnhance))
             || CurrencyManager.CanAfford(t_step.Currency, t_step.Cost));
     }
 

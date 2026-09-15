@@ -19,7 +19,8 @@ public static class GuideResumeValidation
     [MenuItem("Tools/Tutorial/Validate Guide Resume")]
     public static void Run()
     {
-        Require(!EditorApplication.isPlayingOrWillChangePlaymode, "Stop play mode before validation.");
+        Require(!EditorApplication.isPlayingOrWillChangePlaymode && !OnboardingPlayTest.IsActive
+            && !OnboardingPlayTest.IsPreparing, "Stop play mode before validation.");
         RunTimeoutLifetime();
         var t_restore = new List<Action>();
         var t_data = ScriptableObject.CreateInstance<OutgameTutorialData>();
@@ -197,10 +198,10 @@ public static class GuideResumeValidation
                         && t_next.Anchor == EOutgameTutorialAnchor.CardDetailKeywordDescription;
                 if (t_step.StepId == 67)
                     t_synergy = t_step.Completion == EOutgameTutorialCompletion.Enhance
-                        && t_step.WaitUnlockIntro && !t_step.FreeOfCharge;
+                        && t_step.WaitUnlockIntro && t_step.FreeOfCharge;
             }
         Require(t_introPair, "#61 must follow the unlock-waiting #30 as a confirmation message.");
-        Require(t_synergy, "#67 must remain a paid growth step that waits for unlock presentation.");
+        Require(t_synergy, "#67 must be a free growth step that waits for unlock presentation.");
     }
 
     /// <summary>정상 종료 뒤 지연 콜백은 멈추고, 실제 타임아웃은 취소되는지 검사한다.</summary>

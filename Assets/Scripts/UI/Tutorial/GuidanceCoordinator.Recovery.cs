@@ -69,7 +69,8 @@ public sealed partial class GuidanceCoordinator
                     && t_step.Anchor == EOutgameTutorialAnchor.None
                     && t_index == t_chapter.StepCount - 1);
             bool t_page = t_detail || t_step.Anchor == EOutgameTutorialAnchor.AlbumCardSlot;
-            await SelectFlowTabAsync(EOutgameFeature.LobbyCollectionTab, _ct);
+            if (_flow.tutorial != EOutgameTutorialTrigger.CollectionTabFirstEnter || t_index > 0)
+                await SelectFlowTabAsync(EOutgameFeature.LobbyCollectionTab, _ct);
             int t_card = OutgameTutorialGuide.TargetCardId;
             if (t_page && t_card > 0)
             {

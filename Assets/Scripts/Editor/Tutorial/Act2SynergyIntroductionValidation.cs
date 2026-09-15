@@ -26,7 +26,7 @@ public static class Act2SynergyIntroductionValidation
         if (t_growth != null) ValidateGrowth(t_growth, t_errors);
         if (t_battle != null) ValidateBattle(t_battle, t_errors);
         if (t_errors.Count > 0) throw new InvalidOperationException(string.Join("\n", t_errors));
-        Debug.Log("[Act2SynergyIntroductionValidation] PASS: authored mission flows, trigger and step IDs, paid growth, unlock intro order, synergy deck guidance. Runtime play is not covered.", t_data);
+        Debug.Log("[Act2SynergyIntroductionValidation] PASS: authored mission flows, trigger and step IDs, free synergy growth, unlock intro order, synergy deck guidance. Runtime play is not covered.", t_data);
     }
 
     static void ValidateTriggerIds(List<string> _errors)
@@ -91,20 +91,25 @@ public static class Act2SynergyIntroductionValidation
     {
         int t_enhance = IndexOf(_chapter, EOutgameTutorialAction.WaitEnhance);
         int t_intro = IndexOf(_chapter, EOutgameTutorialAction.WaitUnlockIntro);
-        if (t_enhance < 0 || t_intro != t_enhance + 1)
-            _errors.Add("Growth must proceed from WaitEnhance directly to WaitUnlockIntro.");
+        if (t_enhance < 0 || t_intro >= 0)
+            _errors.Add("Growth must wait within WaitEnhance, without a separate WaitUnlockIntro action.");
         if (_chapter.TryGetStep(t_enhance, out var t_enhanceStep) && !t_enhanceStep.WaitUnlockIntro)
             _errors.Add("Growth enhancement must wait for the actual unlock introduction.");
-        if (t_intro < 0 || !_chapter.TryGetStep(t_intro + 1, out var t_message)
-            || t_message.Action != EOutgameTutorialAction.Message || string.IsNullOrWhiteSpace(t_message.GuideMessage))
-            _errors.Add("Growth must show an authored explanation after WaitUnlockIntro.");
+        if (t_enhanceStep != null && !t_enhanceStep.FreeOfCharge)
+            _errors.Add("Synergy introduction growth must be free.");
+        if (!_chapter.TryGetStep(t_enhance + 1, out var t_message)
+            || t_message.Action != EOutgameTutorialAction.Message || string.IsNullOrWhiteSpace(t_message.GuideMessage)
+            || t_message.Anchor != EOutgameTutorialAnchor.CardDetailSynergyDescription
+            || t_message.Spotlight != EOutgameTutorialAnchor.CardDetailCardView)
+            _errors.Add("Growth must show a synergy explanation with the card spotlight after the unlock-waiting enhancement.");
         if (!_chapter.TryGetStep(_chapter.StepCount - 1, out var t_final)
             || t_final.Action != EOutgameTutorialAction.Message || string.IsNullOrWhiteSpace(t_final.GuideMessage))
             _errors.Add("Growth chapter must end with an authored message.");
         foreach (var t_step in _chapter.EditorSteps)
         {
             if (t_step == null) continue;
-            if (t_step.FreeOfCharge) _errors.Add($"Growth step {t_step.StepId} grants an unapproved free enhancement.");
+            if (t_step.FreeOfCharge && t_step.Action != EOutgameTutorialAction.WaitEnhance)
+                _errors.Add($"Growth step {t_step.StepId} grants free support outside the enhancement.");
             if (t_step.Action == EOutgameTutorialAction.CardGrant || t_step.Action == EOutgameTutorialAction.CardSetGrant
                 || t_step.Action == EOutgameTutorialAction.DeckGrant || t_step.Action == EOutgameTutorialAction.AutoPurchase)
                 _errors.Add($"Growth step {t_step.StepId} must not grant additional growth support.");

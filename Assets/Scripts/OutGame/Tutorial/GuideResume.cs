@@ -65,6 +65,9 @@ public static class GuideResume
 
     public static async UniTask<bool> SaveConfirmedAsync(CancellationToken _ct)
     {
+#if UNITY_EDITOR
+        if (OnboardingPlayTest.IsActive || OnboardingPlayTest.IsPreparing) return true;
+#endif
         using var t_timeout = CancellationTokenSource.CreateLinkedTokenSource(_ct);
         using var t_timer = t_timeout.CancelAfterSlim(TimeSpan.FromSeconds(5));
         try { return await PlayerSaveCloud.FlushConfirmedAsync(t_timeout.Token); }

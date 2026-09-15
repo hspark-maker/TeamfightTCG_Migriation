@@ -9,6 +9,7 @@ using UnityEngine;
 internal static class EnhanceCommand
 {
     const string CARD_COMMAND    = "enhanceCard";
+    const string SYNERGY_COMMAND = "enhanceSynergyIntroduction";
     const string KEYWORD_COMMAND = "enhanceKeyword";
 
     // 거절 사유의 계약 코드. 서버 rejectDomain 이 message 앞머리에 실어 보내고
@@ -18,12 +19,14 @@ internal static class EnhanceCommand
 
     /// <summary>카드 강화 1회를 서버에 요청한다. 성공·확률실패는 결제가 끝난 것이고, 그 밖의 결말은 재화 소모가 없다.</summary>
     internal static async UniTask<EnhanceCommandResult> EnhanceCardAsync(
-        int _cardId, bool _freeShot, CurrencyPendingTicket _pending = null, int _amount = 1)
+        int _cardId, bool _freeShot, CurrencyPendingTicket _pending = null, int _amount = 1,
+        bool _synergyIntroduction = false)
     {
+        string t_command = _synergyIntroduction ? SYNERGY_COMMAND : CARD_COMMAND;
         try
         {
             var t_result = await ServerSaveCommands.InvokeAsync<EnhanceCardResult>(
-                CARD_COMMAND,
+                t_command,
                 new { env = ContentProfileConfig.Active.CloudEnvId, cardId = _cardId, freeShot = _freeShot, amount = _amount },
                 _pending);
 
@@ -32,7 +35,7 @@ internal static class EnhanceCommand
         }
         catch (ServerCommandRejectedException t_rejected)
         {
-            return Blocked(CARD_COMMAND, t_rejected);
+            return Blocked(t_command, t_rejected);
         }
         catch (ServerAdoptionException t_adoption)
         {
@@ -42,7 +45,7 @@ internal static class EnhanceCommand
         }
         catch (Exception t_exception)
         {
-            Debug.LogError($"[EnhanceCommand] {CARD_COMMAND} failed — {t_exception.GetBaseException().Message}");
+            Debug.LogError($"[EnhanceCommand] {t_command} failed — {t_exception.GetBaseException().Message}");
             return EnhanceCommandResult.Blocked(EEnhanceOutcome.NotReady);
         }
         finally

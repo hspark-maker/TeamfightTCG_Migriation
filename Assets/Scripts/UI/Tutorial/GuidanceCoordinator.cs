@@ -14,6 +14,9 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
 
     /// <summary>해금 연출 자체를 제외한 로비 무대 준비 상태.</summary>
     public static bool CanPresentContentUnlock => s_instance != null && s_instance.SafeToPresent()
+#if UNITY_EDITOR
+        && !OnboardingPlayTest.IsActive && !OnboardingPlayTest.IsPreparing
+#endif
         && !OutgameTutorialRunner.IsRunning;
 
     /// <summary>해금 소개 스텝과 소개 화면 자신은 무대 점유로 세지 않는다.</summary>
@@ -87,6 +90,9 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
 
     void Update()
     {
+#if UNITY_EDITOR
+        if (OnboardingPlayTest.IsActive || OnboardingPlayTest.IsPreparing) return;
+#endif
         if (AdvanceMatchMission()) return;
         if (!GameInitialization.IsReady || Time.unscaledTime < m_nextEvaluation) return;
         m_nextEvaluation = Time.unscaledTime + 0.25f;
