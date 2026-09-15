@@ -295,7 +295,7 @@ public class TutorialAuthoringWindow : EditorWindow
                 new GUIContent("콘텐츠 해금 조건"), true);
             EditorGUILayout.PropertyField(this.serialized.FindProperty("contentIntros"),
                 new GUIContent("콘텐츠 해금 소개"), true);
-            EditorGUILayout.PropertyField(this.serialized.FindProperty("synergyIntroduction"),
+            EditorGUILayout.PropertyField(this.serialized.FindProperty("synergyIntroductionMessage"),
                 new GUIContent("첫 시너지 해금 설명"), true);
         }
 

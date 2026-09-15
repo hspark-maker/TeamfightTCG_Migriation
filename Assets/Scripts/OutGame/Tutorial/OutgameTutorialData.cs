@@ -6,7 +6,8 @@ using UnityEngine;
 public class OutgameTutorialData : ScriptableObject
 {
     [Header("성장·가이드 미션 설명")]
-    public List<GuideOnboardingPage> synergyIntroduction = new List<GuideOnboardingPage>();
+    [Tooltip("첫 시너지 해금 인트로 재생 중 튜토리얼 배너에 표시한다.")]
+    [TextArea(2, 5)] public string synergyIntroductionMessage;
 
     [Header("콘텐츠 해금 조건")]
     [Tooltip("조건은 모두 AND로 평가한다. 스텝 실행과 독립적이며, 한번 해금한 콘텐츠는 조건을 올려도 다시 잠기지 않는다.")]

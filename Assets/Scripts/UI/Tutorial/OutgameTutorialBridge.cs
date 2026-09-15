@@ -204,7 +204,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_step.Completion == EOutgameTutorialCompletion.UnlockIntro)
         {
             if (!CardDetailOverlayView.IsUnlockFxPlaying) { OnGateSatisfied(); return; }
-            if (!SuppressGuideUI)
+            if (!SuppressGuideUI && !UnlockIntroOverlay.IsGuidanceShowing)
                 OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowBanner(this,
                     OutgameTutorialGuide.MessageOf(m_step), m_step.MessageAtBottom);
             return;

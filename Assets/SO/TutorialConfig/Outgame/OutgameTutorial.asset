@@ -12,27 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 75657545e05445d458099476ddb662f3, type: 3}
   m_Name: OutgameTutorial
   m_EditorClassIdentifier: Assembly-CSharp::OutgameTutorialData
-  synergyIntroduction:
-  - kind: 0
-    title: "\uC2DC\uB108\uC9C0\uAC00 \uD574\uAE08\uB410\uC5B4\uC694!"
-    body: "2\uC131\uC73C\uB85C \uC131\uC7A5\uD55C \uCE74\uB4DC\uB294 \uC2DC\uB108\uC9C0\uC5D0
-      \uCC38\uC5EC\uD560 \uC218 \uC788\uC5B4\uC694.\n\uD574\uAE08\uB9CC\uC73C\uB85C
-      \uB371\uC758 \uD6A8\uACFC\uAC00 \uCF1C\uC9C0\uB294 \uAC83\uC740 \uC544\uB2C8\uC5D0\uC694."
-    activeBody: 
-  - kind: 0
-    title: "\uAC19\uC740 \uB371\uC5D0 \uBAA8\uC73C\uBA74 \uD65C\uC131\uD654!"
-    body: "\uAC19\uC740 \uC2DC\uB108\uC9C0\uAC00 \uD574\uAE08\uB41C \uCE74\uB4DC\uB97C
-      \uD544\uC694\uD55C \uC218\uB9CC\uD07C\n\uAC19\uC740 \uB371\uC5D0 \uD3B8\uC131\uD558\uBA74
-      \uC2DC\uB108\uC9C0 \uD6A8\uACFC\uAC00 \uD65C\uC131\uD654\uB3FC\uC694."
-    activeBody: 
-  - kind: 1
-    title: "\uC774\uBC88\uC5D0 \uC5F4\uB9B0 \uC2DC\uB108\uC9C0"
-    body: 
-    activeBody: 
-  - kind: 2
-    title: "\uD568\uAED8 \uC4F0\uB294 \uD6A8\uACFC"
-    body: 
-    activeBody: 
+  synergyIntroductionMessage: "\uC2DC\uB108\uC9C0\uAC00 \uD574\uAE08\uB410\uC5B4\uC694!\n\uAC19\uC740
+    \uC2DC\uB108\uC9C0\uAC00 \uD574\uAE08\uB41C \uCE74\uB4DC\uB97C \uD544\uC694\uD55C
+    \uC218\uB9CC\uD07C\n\uAC19\uC740 \uB371\uC5D0 \uD3B8\uC131\uD558\uBA74 \uC2DC\uB108\uC9C0
+    \uD6A8\uACFC\uAC00 \uD65C\uC131\uD654\uB3FC\uC694."
   contentUnlocks:
   - feature: 14
     requireFtue: 1
@@ -88,8 +71,8 @@ MonoBehaviour:
     guideMissionIcon: {fileID: 0}
   - content: 5
     contentName: "\uCE74\uB4DC \uAC15\uD654"
-    description: "\uCE74\uB4DC\uB97C \uAC15\uD654\uD574 \uB354 \uAC15\uD558\uAC8C
-      \uC131\uC7A5\uC2DC\uD0A4\uC138\uC694!"
+    description: "\uCE74\uB4DC\uB97C \uC131\uC7A5\uC2DC\uCF1C \uC0C8\uB85C\uC6B4
+      \uB2A5\uB825\uC744 \uD574\uAE08\uD558\uC138\uC694!"
     icon: {fileID: 21300000, guid: 5799dc3b60777e74cb56f4787cd3ded7, type: 3}
     guideMissionName: 
     guideMissionIcon: {fileID: 0}
@@ -753,10 +736,8 @@ MonoBehaviour:
       action: 25
       anchor: 0
       spotlight: 0
-      guideMessage: "\uCE74\uB4DC\uAC00 \uC131\uC7A5\uD558\uBA74 \uC0C8\uB85C\uC6B4
-        \uB2A5\uB825\uC774 \uD574\uAE08\uB3FC\uC694. \n\uC9C0\uAE08 \uC5F4\uB9B0
-        \uB2A5\uB825\uC774 \uC804\uD22C\uC5D0\uC11C \uC5B4\uB5BB\uAC8C \uC4F0\uC774\uB294\uC9C0
-        \uC0B4\uD3B4\uBCF4\uC138\uC694!"
+      guideMessage: "\uCE74\uB4DC\uAC00 \uC131\uC7A5\uD558\uBA74 \uACE0\uC720 \uD0A4\uC6CC\uB4DC
+        \uB2A5\uB825\uC774 \uD574\uAE08\uB429\uB2C8\uB2E4."
       messageAtBottom: 1
       unlocks: 
       unlocksAll: 0
@@ -983,30 +964,6 @@ MonoBehaviour:
       deckName: 
       onFailure: 0
       contentIntros: 03000000
-    - stepId: 51
-      action: 0
-      anchor: 24
-      spotlight: 24
-      guideMessage: 
-      messageAtBottom: 0
-      unlocks: 
-      unlocksAll: 0
-      locks: 
-      useDim: 1
-      packId: 
-      packPriceLabel: 
-      anchorCardId: 0
-      freeOfCharge: 0
-      waitUnlockIntro: 0
-      rewardTitle: 
-      parallelGain: 0
-      scenario: {fileID: 0}
-      cardId: 0
-      cardIds: 
-      showDeckGate: 0
-      deckName: 
-      onFailure: 0
-      contentIntros: 
     - stepId: 37
       action: 1
       anchor: 26

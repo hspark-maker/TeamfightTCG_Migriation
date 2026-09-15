@@ -13,14 +13,8 @@ public static class GuideOnboardingDataAuthoring
     {
         var t_data = AssetDatabase.LoadAssetAtPath<OutgameTutorialData>(PATH);
         Undo.RecordObject(t_data, "Author guide onboarding");
-        if (t_data.synergyIntroduction.Count == 0)
-            t_data.synergyIntroduction.AddRange(new[]
-            {
-                Page(EGuideOnboardingPage.Concept, "시너지가 해금됐어요!", "2성으로 성장한 카드는 시너지에 참여할 수 있어요.\n해금만으로 덱의 효과가 켜지는 것은 아니에요."),
-                Page(EGuideOnboardingPage.Concept, "같은 덱에 모으면 활성화!", "같은 시너지가 해금된 카드를 필요한 수만큼\n같은 덱에 편성하면 시너지 효과가 활성화돼요."),
-                Page(EGuideOnboardingPage.Effect, "이번에 열린 시너지", ""),
-                Page(EGuideOnboardingPage.Demo, "함께 쓰는 효과", ""),
-            });
+        if (string.IsNullOrWhiteSpace(t_data.synergyIntroductionMessage))
+            t_data.synergyIntroductionMessage = "시너지가 해금됐어요!\n같은 시너지가 해금된 카드를 필요한 수만큼\n같은 덱에 편성하면 시너지 효과가 활성화돼요.";
         int t_chapterIndex = t_data.chapters.FindIndex(_chapter => _chapter.Trigger == EOutgameTutorialTrigger.GuideMissionIntroduction);
         if (t_chapterIndex < 0)
         {
@@ -59,7 +53,7 @@ public static class GuideOnboardingDataAuthoring
         t_data.AssignMissingStepIds();
         EditorUtility.SetDirty(t_data);
         AssetDatabase.SaveAssetIfDirty(t_data);
-        Debug.Log("[GuideOnboarding] Authored introduction pages and mission chapter.");
+        Debug.Log("[GuideOnboarding] Authored introduction message and mission chapter.");
     }
 
     [MenuItem("Tools/Tutorial/Validate Guide Onboarding")]
@@ -67,14 +61,14 @@ public static class GuideOnboardingDataAuthoring
     {
         var t_data = AssetDatabase.LoadAssetAtPath<OutgameTutorialData>(PATH);
         Require(HasEnhanceUnlockStep(t_data), "Enhance unlock explanation step missing");
-        Require(t_data.synergyIntroduction.Count >= 3, "Synergy authoring missing");
+        Require(!string.IsNullOrWhiteSpace(t_data.synergyIntroductionMessage), "Synergy authoring missing");
         var t_ids = new HashSet<int>();
         foreach (var t_chapter in t_data.chapters)
             for (int t_i = 0; t_i < t_chapter.StepCount; t_i++)
             {
                 t_chapter.TryGetStep(t_i, out var t_step);
                 Require(t_step.StepId > 0 && t_ids.Add(t_step.StepId), "Duplicate step id");
-                if (t_step.StepId == 30) Require(t_step.WaitUnlockIntro, "Enhance must await all intro pages");
+                if (t_step.StepId == 30) Require(t_step.WaitUnlockIntro, "Enhance must await the unlock intro");
                 if (t_step.StepId == 28 || t_step.StepId == 29) Require(t_step.AnchorCardId == 0, "Fixed enhance card remains");
             }
         var t_save = new TutorialSaveData { OutgameCompleted = true, StepId = 25 };
@@ -100,9 +94,6 @@ public static class GuideOnboardingDataAuthoring
         }
         return false;
     }
-
-    static GuideOnboardingPage Page(EGuideOnboardingPage _kind, string _title, string _body)
-        => new GuideOnboardingPage { kind = _kind, title = _title, body = _body };
 
     static void Require(bool _condition, string _message)
     {

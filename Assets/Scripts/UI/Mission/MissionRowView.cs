@@ -143,7 +143,7 @@ public class MissionRowView : MonoBehaviour, IUIInitializable
         this.m_hasBound = true;
         this.m_definition = _definition;
 
-        if (this.titleText != null) this.titleText.text = (_definition?.Period == "guide" ? "가이드 · " : "") + (_definition?.Title ?? string.Empty);
+        if (this.titleText != null) this.titleText.text = _definition?.Title ?? string.Empty;
         if (this.descriptionText != null) this.descriptionText.text = _definition?.Description ?? string.Empty;
         if (this.rewardText != null) this.rewardText.text = BuildRewardText(_definition);
         this.ApplyRewardVisual(_definition);

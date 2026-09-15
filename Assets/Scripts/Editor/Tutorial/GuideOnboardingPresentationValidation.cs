@@ -11,12 +11,18 @@ public static class GuideOnboardingPresentationValidation
     [MenuItem("Tools/Tutorial/Validate Guide Intro Presentation")]
     public static void Run()
     {
-        Require(!EditorApplication.isPlaying && !UnlockIntroOverlay.IsOpen && !ScreenDim.IsAvailable, "Close active UI and stop play mode before validation.");
+        Require(!EditorApplication.isPlaying && !UnlockIntroOverlay.IsOpen && !ScreenDim.IsAvailable
+            && OutgameTutorialGateUI.Instance == null, "Close active UI and stop play mode before validation.");
         var t_scene = EditorSceneManager.NewPreviewScene();
         ScreenDim t_dim = null;
         UnlockIntroOverlay t_overlay = null;
+        OutgameTutorialGateUI t_gate = null;
         try
         {
+            var t_gatePrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Assets/Prefabs/UI/Tutorial/OutgameTutorialGate.prefab");
+            var t_gateRoot = (GameObject)PrefabUtility.InstantiatePrefab(t_gatePrefab, t_scene);
+            t_gate = t_gateRoot.GetComponent<OutgameTutorialGateUI>();
+            typeof(OutgameTutorialGateUI).GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(t_gate, null);
             var t_dimPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Assets/Prefabs/UI/Common/ScreenDim.prefab");
             var t_dimRoot = (GameObject)PrefabUtility.InstantiatePrefab(t_dimPrefab, t_scene);
             t_dim = t_dimRoot.GetComponent<ScreenDim>();
@@ -27,30 +33,31 @@ public static class GuideOnboardingPresentationValidation
             var t_prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Assets/Prefabs/UI/OverlayUI/UnlockIntroOverlay.prefab");
             var t_root = (GameObject)PrefabUtility.InstantiatePrefab(t_prefab, t_scene);
             t_overlay = t_root.GetComponent<UnlockIntroOverlay>();
+            typeof(SingletonOverlay<UnlockIntroOverlay>).GetMethod("Adopt", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { t_overlay });
             var t_serialized = new SerializedObject(t_overlay);
             var t_button = (Button)t_serialized.FindProperty("confirmButton").objectReferenceValue;
-            var t_defer = (Button)t_serialized.FindProperty("deferButton").objectReferenceValue;
-            Require(t_button != null && t_serialized.FindProperty("pageRoot").objectReferenceValue != null, "Page controls are not authored.");
-            Require(t_defer != null, "An optional introduction needs a defer button.");
-            Require(t_serialized.FindProperty("previewCards").arraySize == 3 && t_serialized.FindProperty("previewStates").arraySize == 3, "Three preview slots are required.");
+            Require(t_button != null && t_serialized.FindProperty("rowRoot").objectReferenceValue != null, "Intro controls are not authored.");
+            Require(t_serialized.FindProperty("pageRoot") == null, "Retired page controls remain.");
             int t_confirmed = 0, t_cancelled = 0;
-            var t_pages = new[] { new UnlockIntroPage("첫 설명", "키워드 개념"), new UnlockIntroPage("두 번째 설명", "실제 능력 확인") };
+            var t_intros = new[] { default(UnlockIntro) };
             System.Action<bool> t_result = _done => { if (_done) t_confirmed++; else t_cancelled++; };
-            t_overlay.ShowPages(t_pages, 0, t_result);
-            Require(UnlockIntroOverlay.IsOpen && t_confirmed == 0 && t_cancelled == 0, "Showing a page must not complete it.");
-            t_button.interactable = true;
-            t_button.onClick.Invoke();
-            Require(UnlockIntroOverlay.IsOpen && t_confirmed == 0, "An intermediate confirmation completed the introduction.");
+            t_overlay.Show(t_intros, 0, t_result, "시너지 안내 검증");
+            Require(UnlockIntroOverlay.IsOpen && UnlockIntroOverlay.IsGuidanceShowing && OutgameTutorialGateUI.IsShowing
+                && t_confirmed == 0 && t_cancelled == 0,
+                $"Intro and guidance must appear together: open={UnlockIntroOverlay.IsOpen}, guidance={UnlockIntroOverlay.IsGuidanceShowing}, gate={OutgameTutorialGateUI.IsShowing}, confirmed={t_confirmed}, cancelled={t_cancelled}.");
             t_button.interactable = true;
             t_button.onClick.Invoke();
             Require(!UnlockIntroOverlay.IsOpen && t_confirmed == 1 && t_cancelled == 0, "Final confirmation must complete exactly once.");
             t_button.onClick.Invoke();
             Require(t_confirmed == 1, "Repeated click completed twice.");
-            t_overlay.ShowPages(t_pages, 0, t_result);
-            t_defer.onClick.Invoke();
+            Require(!OutgameTutorialGateUI.IsShowing, "Confirmed intro left guidance visible.");
+            t_overlay.Show(t_intros, 0, t_result, "취소 안내 검증");
+            t_overlay.Cancel();
             t_overlay.Cancel();
             Require(t_confirmed == 1 && t_cancelled == 1, "Cancellation must be distinct and idempotent.");
-            t_overlay.ShowPages(t_pages, 0, t_result);
+            Require(!OutgameTutorialGateUI.IsShowing, "Cancelled intro left guidance visible.");
+            t_overlay.Show(t_intros, 0, t_result, "비활성 안내 검증");
             typeof(ContentsUIBehaviour).GetMethod("NotifyContentsVisibility", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(t_overlay, new object[] { true });
             t_root.SetActive(false);
@@ -58,11 +65,25 @@ public static class GuideOnboardingPresentationValidation
             typeof(ContentsUIBehaviour).GetMethod("OnDisable", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(t_overlay, null);
             Require(t_confirmed == 1 && t_cancelled == 2 && !UnlockIntroOverlay.IsOpen, "Parent deactivation must cancel without completion.");
             ValidateMissionRow(t_scene);
-            Debug.Log("[GuideOnboardingPresentation] PASS: intermediate/final confirm, repeated click, cancellation, simulated OnDisable, mission row reuse.");
+            Require(!OutgameTutorialGateUI.IsShowing, "Disabled intro left guidance visible.");
+            int t_multiConfirmed = 0;
+            t_root.SetActive(true);
+            t_overlay.Show(new[] { default(UnlockIntro), default(UnlockIntro) }, 0,
+                _done => { if (_done) t_multiConfirmed++; });
+            Require(!UnlockIntroOverlay.IsGuidanceShowing && !OutgameTutorialGateUI.IsShowing,
+                "Replay without an introduction message must not show guidance.");
+            t_button.interactable = true;
+            t_button.onClick.Invoke();
+            Require(UnlockIntroOverlay.IsOpen && t_multiConfirmed == 0, "Another unlocked ability was skipped.");
+            t_button.interactable = true;
+            t_button.onClick.Invoke();
+            Require(!UnlockIntroOverlay.IsOpen && t_multiConfirmed == 1, "All abilities must complete once.");
+            Debug.Log("[GuideOnboardingPresentation] PASS: concurrent guidance, confirm, repeated click, cancellation, simulated OnDisable, mission row reuse.");
         }
         finally
         {
             if (t_overlay != null) t_overlay.Cancel();
+            if (t_gate != null) typeof(OutgameTutorialGateUI).GetMethod("OnDestroy", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(t_gate, null);
             if (t_dim != null) typeof(ScreenDim).GetMethod("OnDestroy", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(t_dim, null);
             EditorSceneManager.ClosePreviewScene(t_scene);
         }
