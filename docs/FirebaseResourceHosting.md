@@ -1,5 +1,17 @@
 # Firebase 리소스 배포
 
+## UI 아틀라스 보완 후 배포 (2026-09-15 18:01 KST 빌드)
+
+- Android / 앱 버전 `0.0.0` 리소스 전체 빌드 및 `bm-cardbattle-assets` Hosting 업로드 완료. UI 이미지 115개를 추가한 아틀라스 19개와 새 필터 UI를 포함한다. 아틀라스 세부 검수는 `UIAtlases.md`를 따른다.
+- 빌드 보고서: `Library/com.unity.addressables/BuildReports/buildlayout_2026.09.15.18.01.16.json`. `BuildError` 없음, 기존 C#·셰이더 경고는 남아 있다. RemoteUI는 현재 설정대로 `Pack Separately`, 69개 번들 / 135.49 MiB다.
+- 전체 원격 번들 합계 235.80 MiB. 보고서의 번들 간 중복 자산은 147개이며 공용 폰트·재질 등을 포함한다. 아틀라스 원본 GUID 중복 0개와는 별도 지표다. 이번 작업에서 공용 의존성 분리나 그룹 정책은 변경하지 않았다.
+- 기존 Hosting 파일을 모두 보존했다. 신규 파일 74개 / 162.81 MiB가 추가됐고 기존 이름 파일의 변경은 없다. 공개 목록은 카탈로그 8개를 포함해 리소스 260개다.
+- 배포 후 260개 파일의 HTTP·CORS·캐시 헤더를 확인했다. 신규 74개는 CDN에서 모두 다운로드해 SHA-256·크기를 대조했고, 공개 manifest 전체도 로컬과 일치했다.
+- 기록: `Build/UiAtlasDeployment-20260915/cdn-verification.json`, `deployment-diff.json`, `build-summary.json`, `metadata-validation.json`. 소스 메타와 기존 아틀라스 백업도 같은 폴더에 있다.
+- `SpecData.bytes` SHA-256은 작업 전후 `FF94F57DE95767C4F486CA304E4AEF2960C7DF60B536DC9AE6D496146BA19204`로 동일하다. Functions·Firestore·앱 빌드는 실행하지 않았다. 현재 전체 빌드와 맞는 새 앱을 만들 때는 아래 절차대로 Addressables를 다시 생성하지 않는다.
+
+## 배포 설정과 절차
+
 - 프로젝트: `bm-cardbattle`
 - 전용 Hosting 사이트: `bm-cardbattle-assets`
 - 주소: `https://bm-cardbattle-assets.web.app/{앱 버전}/{플랫폼}/`

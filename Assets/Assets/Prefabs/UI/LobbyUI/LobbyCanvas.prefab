@@ -848,7 +848,7 @@ MonoBehaviour:
     tutorialAnchor: 6
     tutorialTrigger: 0
     unlockFeature: 0
-    background: {fileID: 2489680180185390133}
+    background: {fileID: 0}
   - name: Deck
     panel: {fileID: 6544291220965658774}
     label: "\uB371"

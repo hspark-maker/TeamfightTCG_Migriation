@@ -6,7 +6,7 @@ SpriteAtlas:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: UIMission
+  m_Name: UIProfile
   m_EditorData:
     serializedVersion: 2
     textureSettings:
@@ -71,33 +71,37 @@ SpriteAtlas:
     secondaryTextureSettings: {}
     variantMultiplier: 1
     packables:
-    - {fileID: 2800000, guid: dc71d981f201c2141a4101b2b178a05a, type: 3}
-    - {fileID: 2800000, guid: a34319bf8d700c14f8c37911726ecc04, type: 3}
-    - {fileID: 2800000, guid: e485de3ae73097b46b89a49bc0a0a652, type: 3}
-    - {fileID: 2800000, guid: 94b960225ccace94bb4e00af9cab2e66, type: 3}
-    - {fileID: 2800000, guid: 6d7eca2f860554a399669da7e21265eb, type: 3}
+    - {fileID: 2800000, guid: 45de67f8923a4abcd3e4f5061728394a, type: 3}
+    - {fileID: 2800000, guid: 67f0892ab45c4cdef5061728394a5b6c, type: 3}
+    - {fileID: 2800000, guid: 56ef7819a34b4bcde4f5061728394a5b, type: 3}
+    - {fileID: 2800000, guid: 34cd56ef781249abc2d3e4f506172839, type: 3}
+    - {fileID: 2800000, guid: 12ab34cd56ef4789a0b1c2d3e4f50617, type: 3}
+    - {fileID: 2800000, guid: 23bc45de67f1489ab1c2d3e4f5061728, type: 3}
     bindAsDefault: 1
     isAtlasV2: 0
     cachedData: {fileID: 0}
     packedSpriteRenderDataKeys:
-    - dc71d981f201c2141a4101b2b178a05a: 21300000
-    - 94b960225ccace94bb4e00af9cab2e66: 21300000
-    - e485de3ae73097b46b89a49bc0a0a652: 21300000
-    - 6d7eca2f860554a399669da7e21265eb: 21300000
-    - a34319bf8d700c14f8c37911726ecc04: 21300000
+    - 45de67f8923a4abcd3e4f5061728394a: 21300000
+    - 56ef7819a34b4bcde4f5061728394a5b: 21300000
+    - 67f0892ab45c4cdef5061728394a5b6c: 21300000
+    - 12ab34cd56ef4789a0b1c2d3e4f50617: 21300000
+    - 23bc45de67f1489ab1c2d3e4f5061728: 21300000
+    - 34cd56ef781249abc2d3e4f506172839: 21300000
   m_MasterAtlas: {fileID: 0}
   m_PackedSprites:
-  - {fileID: 21300000, guid: dc71d981f201c2141a4101b2b178a05a, type: 3}
-  - {fileID: 21300000, guid: 94b960225ccace94bb4e00af9cab2e66, type: 3}
-  - {fileID: 21300000, guid: e485de3ae73097b46b89a49bc0a0a652, type: 3}
-  - {fileID: 21300000, guid: 6d7eca2f860554a399669da7e21265eb, type: 3}
-  - {fileID: 21300000, guid: a34319bf8d700c14f8c37911726ecc04, type: 3}
+  - {fileID: 21300000, guid: 45de67f8923a4abcd3e4f5061728394a, type: 3}
+  - {fileID: 21300000, guid: 56ef7819a34b4bcde4f5061728394a5b, type: 3}
+  - {fileID: 21300000, guid: 67f0892ab45c4cdef5061728394a5b6c, type: 3}
+  - {fileID: 21300000, guid: 12ab34cd56ef4789a0b1c2d3e4f50617, type: 3}
+  - {fileID: 21300000, guid: 23bc45de67f1489ab1c2d3e4f5061728, type: 3}
+  - {fileID: 21300000, guid: 34cd56ef781249abc2d3e4f506172839, type: 3}
   m_PackedSpriteNamesToIndex:
-  - Bar_08
-  - Title_01
-  - Main_Block_01
-  - PictoIcon_Clock_2
-  - button_Bar_unlock
+  - Image_ProfileFrame_HudRoseHeart
+  - Image_ProfileFrame_HudFrostCrown
+  - Image_ProfileFrame_HudIvoryBasic
+  - Image_ProfileFrame_HudEmberSun
+  - Image_ProfileFrame_HudEmeraldLeaf
+  - Image_ProfileFrame_HudAmethystMoon
   m_RenderDataMap: {}
-  m_Tag: UIMission
+  m_Tag: UIProfile
   m_IsVariant: 0

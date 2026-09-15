@@ -89,19 +89,35 @@ SpriteAtlas:
     - {fileID: 2800000, guid: 1326d453583871140b5dc2e73dee18d5, type: 3}
     - {fileID: 2800000, guid: c1a3ff09e5016fc46a3ef67667f57e9d, type: 3}
     - {fileID: 2800000, guid: 15da4c3a76d10d345b9e6491bd862f1a, type: 3}
+    - {fileID: 2800000, guid: 9f473dcddc8054f578575e207f0e467c, type: 3}
+    - {fileID: 2800000, guid: a5e1ce89d7fd44edfbb7339b21910b19, type: 3}
+    - {fileID: 2800000, guid: f2a99fed8cc274fa9af7d65d7e486e0c, type: 3}
+    - {fileID: 2800000, guid: f1a76f95358d94ca080a3e48691f8e5f, type: 3}
+    - {fileID: 2800000, guid: 88d4ae66f23b495eadb7060382569dc1, type: 3}
+    - {fileID: 2800000, guid: 0b315e607f3f34aacaadd5ab7d77254f, type: 3}
+    - {fileID: 2800000, guid: 50fd1275f68464c8ba906b8f825eb68d, type: 3}
+    - {fileID: 2800000, guid: f498d3b4fa44d4a4d943439a3fab4738, type: 3}
+    - {fileID: 2800000, guid: dc3329f3c0eecb24ca41103d72245414, type: 3}
     bindAsDefault: 1
     isAtlasV2: 0
     cachedData: {fileID: 0}
     packedSpriteRenderDataKeys:
+    - 0b315e607f3f34aacaadd5ab7d77254f: 21300000
     - 79124e21a5578954aab823c435b37393: 21300000
     - de6ef981ee44f264f95418568a15b2e1: 21300000
     - 1326d453583871140b5dc2e73dee18d5: 21300000
     - 11f7ebc392d166c428a98cbdb97ebef7: 21300000
+    - dc3329f3c0eecb24ca41103d72245414: 21300000
+    - f498d3b4fa44d4a4d943439a3fab4738: 21300000
     - 95938dc48c63e07499dc095027d6ec80: 21300000
+    - 50fd1275f68464c8ba906b8f825eb68d: 21300000
     - 01abe575afda7ba4e9de5818e43d2df2: 21300000
     - 4ae51f75cd49a6e44bd08095f8d3a211: 21300000
+    - f1a76f95358d94ca080a3e48691f8e5f: 21300000
+    - 88d4ae66f23b495eadb7060382569dc1: 21300000
     - 36cec807e688c7348ba208af3e508e07: 21300000
     - c1a3ff09e5016fc46a3ef67667f57e9d: 21300000
+    - a5e1ce89d7fd44edfbb7339b21910b19: 21300000
     - 15da4c3a76d10d345b9e6491bd862f1a: 21300000
     - 17de27ca2d170964ebadc7f29f952d3b: 21300000
     - 5799dc3b60777e74cb56f4787cd3ded7: 21300000
@@ -109,19 +125,28 @@ SpriteAtlas:
     - 2203a2fbf19522b4ea2251fa6f1b5c8a: 21300000
     - ac4695ace04927c4e816fbd670457fc4: 21300000
     - a7b9718d5b9ff2a439862739d39e65e6: 21300000
+    - 9f473dcddc8054f578575e207f0e467c: 21300000
+    - f2a99fed8cc274fa9af7d65d7e486e0c: 21300000
     - dd53f82e04cd6de44974e88fc815b92f: 21300000
     - 2763db2f9663e934bb72ae0d9446f253: 21300000
   m_MasterAtlas: {fileID: 0}
   m_PackedSprites:
+  - {fileID: 21300000, guid: 0b315e607f3f34aacaadd5ab7d77254f, type: 3}
   - {fileID: 21300000, guid: 79124e21a5578954aab823c435b37393, type: 3}
   - {fileID: 21300000, guid: de6ef981ee44f264f95418568a15b2e1, type: 3}
   - {fileID: 21300000, guid: 1326d453583871140b5dc2e73dee18d5, type: 3}
   - {fileID: 21300000, guid: 11f7ebc392d166c428a98cbdb97ebef7, type: 3}
+  - {fileID: 21300000, guid: dc3329f3c0eecb24ca41103d72245414, type: 3}
+  - {fileID: 21300000, guid: f498d3b4fa44d4a4d943439a3fab4738, type: 3}
   - {fileID: 21300000, guid: 95938dc48c63e07499dc095027d6ec80, type: 3}
+  - {fileID: 21300000, guid: 50fd1275f68464c8ba906b8f825eb68d, type: 3}
   - {fileID: 21300000, guid: 01abe575afda7ba4e9de5818e43d2df2, type: 3}
   - {fileID: 21300000, guid: 4ae51f75cd49a6e44bd08095f8d3a211, type: 3}
+  - {fileID: 21300000, guid: f1a76f95358d94ca080a3e48691f8e5f, type: 3}
+  - {fileID: 21300000, guid: 88d4ae66f23b495eadb7060382569dc1, type: 3}
   - {fileID: 21300000, guid: 36cec807e688c7348ba208af3e508e07, type: 3}
   - {fileID: 21300000, guid: c1a3ff09e5016fc46a3ef67667f57e9d, type: 3}
+  - {fileID: 21300000, guid: a5e1ce89d7fd44edfbb7339b21910b19, type: 3}
   - {fileID: 21300000, guid: 15da4c3a76d10d345b9e6491bd862f1a, type: 3}
   - {fileID: 21300000, guid: 17de27ca2d170964ebadc7f29f952d3b, type: 3}
   - {fileID: 21300000, guid: 5799dc3b60777e74cb56f4787cd3ded7, type: 3}
@@ -129,18 +154,27 @@ SpriteAtlas:
   - {fileID: 21300000, guid: 2203a2fbf19522b4ea2251fa6f1b5c8a, type: 3}
   - {fileID: 21300000, guid: ac4695ace04927c4e816fbd670457fc4, type: 3}
   - {fileID: 21300000, guid: a7b9718d5b9ff2a439862739d39e65e6, type: 3}
+  - {fileID: 21300000, guid: 9f473dcddc8054f578575e207f0e467c, type: 3}
+  - {fileID: 21300000, guid: f2a99fed8cc274fa9af7d65d7e486e0c, type: 3}
   - {fileID: 21300000, guid: dd53f82e04cd6de44974e88fc815b92f, type: 3}
   - {fileID: 21300000, guid: 2763db2f9663e934bb72ae0d9446f253, type: 3}
   m_PackedSpriteNamesToIndex:
+  - Toggle_Check_White_Bg
   - ic_Battle
   - Edit_Icon
   - Rank_Rewarkd_Icon
   - Edit_Button
+  - Rank_Battle_Icon_v2
+  - Image_Effect_Light01_Yellow
   - Adventure_Map_Icon
+  - Toggle_Check_White_Icon
   - ic_Pack
   - ic_store
+  - Icon_Close02
+  - Icon_Roading_Icon
   - ic_Deck
   - setting_Icon
+  - Image_Glow_Rectangle
   - Spin_Roulette_Icon
   - Ranking_Reward_Icon
   - ic_Collection
@@ -148,6 +182,8 @@ SpriteAtlas:
   - Pass_Icon
   - Guide_Mission_Icon
   - Mission_Icon
+  - Slider21_Icon02
+  - ItemIcon_Star_Gold
   - Icon_Button
   - profile_Icon
   m_RenderDataMap: {}

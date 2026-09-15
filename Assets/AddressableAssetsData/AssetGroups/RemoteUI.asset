@@ -15,20 +15,6 @@ MonoBehaviour:
   m_GroupName: RemoteUI
   m_GUID: c993a00f3241b5846818633e56411b36
   m_SerializeEntries:
-  - m_GUID: 1d1367fb4b947b84e92369f7fc324787
-    m_Address: PackOpenOverlay
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteUI
-    - UIPrefab
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: d13625a8928721c4d8c58190b4816059
-    m_Address: CardDetailOverlayView
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteUI
-    - UIPrefab
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 02aab46ebb075e94b8f1d49d31c05343
     m_Address: Atlases/UISharedButtons
     m_ReadOnly: 0
@@ -75,6 +61,20 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 1538dcd081334f64ebf7f0e6803135a0
     m_Address: RankPromoteOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 16c4ec9f0841455f97055344726ce82c
+    m_Address: CollectionFilterResults
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1d1367fb4b947b84e92369f7fc324787
+    m_Address: PackOpenOverlay
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteUI
@@ -161,6 +161,13 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5bdad5e7213243de9e59f1666819c287
+    m_Address: CardFilterPopup
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 5c04cd167e805484b92609d72e119abd
     m_Address: Config/albumConfig
@@ -272,6 +279,13 @@ MonoBehaviour:
     m_SerializedLabels:
     - RemoteUI
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a6b490a5a78a4b4a94efa42a069973ee
+    m_Address: AttendancePanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b43fd212a19425d4db544e64d1db58bd
     m_Address: Atlases/UIRewards
     m_ReadOnly: 0
@@ -323,6 +337,13 @@ MonoBehaviour:
     - RemoteUI
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d13625a8928721c4d8c58190b4816059
+    m_Address: CardDetailOverlayView
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d37d99e23546412baf9b3e76ad7573f2
     m_Address: RuntimeContentCatalog
     m_ReadOnly: 0
@@ -349,6 +370,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - RemoteUI
     - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ddfef2f085c324d488e5803ca68958d8
+    m_Address: Atlases/UIProfile
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: dee8a2231ae459847a16e01635c0f514
     m_Address: AdventureNodePopup
@@ -434,27 +461,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteUI
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: a6b490a5a78a4b4a94efa42a069973ee
-    m_Address: AttendancePanel
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteUI
-    - UIPrefab
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 5bdad5e7213243de9e59f1666819c287
-    m_Address: CardFilterPopup
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteUI
-    - UIPrefab
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 16c4ec9f0841455f97055344726ce82c
-    m_Address: CollectionFilterResults
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteUI
-    - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 886280ed4ce95ea4fa7b0c1bf828dbdc, type: 2}

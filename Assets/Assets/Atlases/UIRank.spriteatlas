@@ -81,6 +81,10 @@ SpriteAtlas:
     - {fileID: 2800000, guid: 56990de5e7816cc46b37b9661df3b8b4, type: 3}
     - {fileID: 2800000, guid: 52f0ae0e55139a146a509a823189c2a0, type: 3}
     - {fileID: 2800000, guid: a947bc24ff6acdb4a87da52528c39b2a, type: 3}
+    - {fileID: 2800000, guid: 7eb59ebd096ba460086df01f3b397977, type: 3}
+    - {fileID: 2800000, guid: 4066ff6fd9c8c4ab1984fd59c287522b, type: 3}
+    - {fileID: 2800000, guid: 4e586959ba40745bbbdff61135256ac3, type: 3}
+    - {fileID: 2800000, guid: 1bedaa6e9f7ec466595a171d3b00925c, type: 3}
     bindAsDefault: 1
     isAtlasV2: 0
     cachedData: {fileID: 0}
@@ -89,35 +93,47 @@ SpriteAtlas:
     - a947bc24ff6acdb4a87da52528c39b2a: 21300000
     - 56990de5e7816cc46b37b9661df3b8b4: 21300000
     - ddd616378259fe14fa837694fa420222: 21300000
+    - 4e586959ba40745bbbdff61135256ac3: 21300000
     - f570943a6f8979f4dbb486d975fc107d: 21300000
     - 1395995a0f74d5a4f8ea9112249e03c6: 21300000
     - 372238dadd0fed04298ffce7512bb6ff: 21300000
     - 6953e97c168b9bb4681606c1ddaf85a0: 21300000
+    - 7eb59ebd096ba460086df01f3b397977: 21300000
     - 52f0ae0e55139a146a509a823189c2a0: 21300000
+    - 1bedaa6e9f7ec466595a171d3b00925c: 21300000
     - 600886ee52163fd4aaf6f72dd03991ba: 21300000
+    - 4066ff6fd9c8c4ab1984fd59c287522b: 21300000
   m_MasterAtlas: {fileID: 0}
   m_PackedSprites:
   - {fileID: 21300000, guid: 7147e2e1221f7d2419d92ab4a59f10a7, type: 3}
   - {fileID: 21300000, guid: a947bc24ff6acdb4a87da52528c39b2a, type: 3}
   - {fileID: 21300000, guid: 56990de5e7816cc46b37b9661df3b8b4, type: 3}
   - {fileID: 21300000, guid: ddd616378259fe14fa837694fa420222, type: 3}
+  - {fileID: 21300000, guid: 4e586959ba40745bbbdff61135256ac3, type: 3}
   - {fileID: 21300000, guid: f570943a6f8979f4dbb486d975fc107d, type: 3}
   - {fileID: 21300000, guid: 1395995a0f74d5a4f8ea9112249e03c6, type: 3}
   - {fileID: 21300000, guid: 372238dadd0fed04298ffce7512bb6ff, type: 3}
   - {fileID: 21300000, guid: 6953e97c168b9bb4681606c1ddaf85a0, type: 3}
+  - {fileID: 21300000, guid: 7eb59ebd096ba460086df01f3b397977, type: 3}
   - {fileID: 21300000, guid: 52f0ae0e55139a146a509a823189c2a0, type: 3}
+  - {fileID: 21300000, guid: 1bedaa6e9f7ec466595a171d3b00925c, type: 3}
   - {fileID: 21300000, guid: 600886ee52163fd4aaf6f72dd03991ba, type: 3}
+  - {fileID: 21300000, guid: 4066ff6fd9c8c4ab1984fd59c287522b, type: 3}
   m_PackedSpriteNamesToIndex:
   - ranking_3rd_crown
   - Tier_Silver
   - Tier_Gold
   - My_Ranking
+  - PictoIcon_Mark_Check
   - Ranking_1st_Crown
   - Tilte_Ribbon_Red
   - Tier_Diamond
   - ranking_2nd_Crown
+  - PictoIcon_Arrow_Bottom
   - Tier_Platinum
+  - Icon_RankIcon_Star01_l
   - Tier_Bronze
+  - PictoIcon_Lock_1
   m_RenderDataMap: {}
   m_Tag: UIRank
   m_IsVariant: 0

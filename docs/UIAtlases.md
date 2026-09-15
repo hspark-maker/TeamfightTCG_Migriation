@@ -1,5 +1,28 @@
 # UI 이미지 아틀라스
 
+## 프로필 원형 마스크 회귀 수정 (2026-09-15)
+
+아래 추가 등록 중 아바타 사진 3개는 `UIProfile`에서 다시 제외했다. `ProfileAvatarMask.shader`는 얼굴과 마스크에 같은 UV를 사용하므로 **얼굴·판 모두 단독 텍스처**여야 한다. 마스크 판의 Texture2D 직접 참조만 검사하면 얼굴 아틀라스 등록으로 생기는 회귀를 놓친다.
+
+- `UIProfile`에는 테두리 6개만 남긴다. 현재 전체 아틀라스 19개 / 원본 304개 / 이번 순증 112개다.
+- 아바타 3개의 UV 0~1 및 GPU 렌더 결과를 검사했다. 중앙 알파 1, 네 모서리 알파 0으로 원형 잘림을 확인했다. 결과 PNG는 `Build/ProfileMaskFix-20260915/`에 있다.
+- 프로필 아바타와 마스크 판은 향후 자동 등록 대상에서도 제외한다. 현재 셰이더를 아틀라스 UV에 대응시키기 전에는 이 제외를 유지한다.
+
+## 추가 점검·등록 (2026-09-15)
+
+새 UI와 RemoteUI 의존성을 다시 점검해 소형 UI 이미지 115개를 추가했다. 현재 UI 아틀라스 18개와 CardIcons 1개에 원본 307개가 등록돼 있다. 아래 2026-09-14 표는 최초 구성 기록이다.
+
+- 새 필터 UI의 `Button_Round06_White`, `Popup02~09_Topber_White_Bg`, `InputField_Frame` 누락을 보완했다. 덱 검색·필터 아이콘, 프로필·덱 이미지와 기존 UI 소형 이미지도 포함한다.
+- 프로필 9개는 `UIProfile.spriteatlas`를 만들고 `RemoteUI` 그룹의 `Atlases/UIProfile` 주소·`RemoteUI` 라벨로 등록했다. 나머지는 기존 화면별 아틀라스에 추가했다.
+- Android 실제 패킹 및 스프라이트 바인딩 307개 통과. 전부 ASTC 6×6이며 UILobby만 2048×2048 + 1024×1024의 2페이지, 나머지는 1페이지다. UILobby 추가분의 별도 묶음은 페이지 하나가 더 필요하므로 현재 2페이지를 유지했다.
+- GUID 중복·신규 누락 0개. 원본 메타 115개의 크기·피벗·PPU·border·sprite rect·알파·mipmap·wrap 보존을 검증했다. 압축만 109개에서 해제했고 6개는 이미 비압축이었다.
+- 기동·로그인 UI, RawImage·재질의 직접 텍스처 참조, 배경·기존 애니메이션 시트 등 69개는 제외했다. 대형 카드 프레임·장식 29개는 해상도·페이지 구성의 별도 검토 대상으로 남겼다.
+- 상세 후보·제외 사유: `Build/UiAtlasDeployment-20260915/audit.json`. 패킹: `packing-android.tsv`, 원본 검수: `metadata-validation.json`. 같은 폴더의 `build-summary.json`에 빌드 결과를 기록했다.
+
+현재 RemoteUI는 `Pack Separately`이며, 아래 최초 구성의 `Pack Together` 설명보다 `FirebaseResourceHosting.md`의 최신 배포 설정을 따른다.
+
+## 최초 구성 (2026-09-14)
+
 2026-09-14 기준. `Assets/Assets/Atlases/`에 UI 아틀라스 17개, 원본 이미지 161개를 등록했다.
 기존 `CardIcons.spriteatlas`의 키워드·시너지 31개는 별도로 유지한다.
 

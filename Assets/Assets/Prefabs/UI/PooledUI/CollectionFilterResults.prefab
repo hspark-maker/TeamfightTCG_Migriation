@@ -1124,15 +1124,15 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\uc870\uac74\uc5d0 \ub9de\ub294 \uce74\ub4dc\uac00 \uc5c6\uc2b5\ub2c8\ub2e4."
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: ae2f56c08291ad54aa1415dc014d7bff, type: 2}
-  m_sharedMaterial: {fileID: 2100000, guid: 4df79f0af78a4a4c922373f821ec203e, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: c0b73c43f06a5464d81a2afad64b40a4, type: 2}
+  m_sharedMaterial: {fileID: 2100000, guid: aaa0edfaf09b471c8165d7d9be3b1d89, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4293054151
-  m_fontColor: {r: 0.96, g: 0.94, b: 0.88, a: 1}
+    rgba: 4278190080
+  m_fontColor: {r: 0, g: 0, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:

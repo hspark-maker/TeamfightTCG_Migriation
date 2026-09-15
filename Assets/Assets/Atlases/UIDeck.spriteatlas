@@ -77,31 +77,63 @@ SpriteAtlas:
     - {fileID: 2800000, guid: 1d56ef4214ec67241932baa9a25efca0, type: 3}
     - {fileID: 2800000, guid: d99ce70f5c404794a8926a67577ecae8, type: 3}
     - {fileID: 2800000, guid: a92e1bbc597af614cb434ea46514b67c, type: 3}
+    - {fileID: 2800000, guid: 951188758f7345feaf5ec11ecc5f598b, type: 3}
+    - {fileID: 2800000, guid: db2d843a02deb44829e640e698983441, type: 3}
+    - {fileID: 2800000, guid: c75fde6c7cc1847fcbe1fac91002ce1f, type: 3}
+    - {fileID: 2800000, guid: 67be1702b02ade642a06e09df8ba56a8, type: 3}
+    - {fileID: 2800000, guid: ab2bad6c9c0b2194f921a15c6034a603, type: 3}
+    - {fileID: 2800000, guid: ffb1acaf90a17024986416f97fa34f06, type: 3}
+    - {fileID: 2800000, guid: 6381dcfdc1e1dbc4d8da4deb3600f5d3, type: 3}
+    - {fileID: 2800000, guid: 418b2f8abdebd4ff2af5eb3ec88664ce, type: 3}
     bindAsDefault: 1
     isAtlasV2: 0
     cachedData: {fileID: 0}
     packedSpriteRenderDataKeys:
     - bc8b0e815b2c2754786f7865c9e0aed8: 21300000
+    - 67be1702b02ade642a06e09df8ba56a8: 21300000
     - 1d56ef4214ec67241932baa9a25efca0: 21300000
     - 10b2a445968c63346a3481b6b685e50b: 21300000
+    - 951188758f7345feaf5ec11ecc5f598b: 21300000
     - 31502a37a92b1284796b5527f4e48ee4: 21300000
+    - db2d843a02deb44829e640e698983441: 21300000
+    - 418b2f8abdebd4ff2af5eb3ec88664ce: 21300000
+    - ab2bad6c9c0b2194f921a15c6034a603: 21300000
+    - c75fde6c7cc1847fcbe1fac91002ce1f: 21300000
     - a92e1bbc597af614cb434ea46514b67c: 21300000
+    - 6381dcfdc1e1dbc4d8da4deb3600f5d3: 21300000
     - d99ce70f5c404794a8926a67577ecae8: 21300000
+    - ffb1acaf90a17024986416f97fa34f06: 21300000
   m_MasterAtlas: {fileID: 0}
   m_PackedSprites:
   - {fileID: 21300000, guid: bc8b0e815b2c2754786f7865c9e0aed8, type: 3}
+  - {fileID: 21300000, guid: 67be1702b02ade642a06e09df8ba56a8, type: 3}
   - {fileID: 21300000, guid: 1d56ef4214ec67241932baa9a25efca0, type: 3}
   - {fileID: 21300000, guid: 10b2a445968c63346a3481b6b685e50b, type: 3}
+  - {fileID: 21300000, guid: 951188758f7345feaf5ec11ecc5f598b, type: 3}
   - {fileID: 21300000, guid: 31502a37a92b1284796b5527f4e48ee4, type: 3}
+  - {fileID: 21300000, guid: db2d843a02deb44829e640e698983441, type: 3}
+  - {fileID: 21300000, guid: 418b2f8abdebd4ff2af5eb3ec88664ce, type: 3}
+  - {fileID: 21300000, guid: ab2bad6c9c0b2194f921a15c6034a603, type: 3}
+  - {fileID: 21300000, guid: c75fde6c7cc1847fcbe1fac91002ce1f, type: 3}
   - {fileID: 21300000, guid: a92e1bbc597af614cb434ea46514b67c, type: 3}
+  - {fileID: 21300000, guid: 6381dcfdc1e1dbc4d8da4deb3600f5d3, type: 3}
   - {fileID: 21300000, guid: d99ce70f5c404794a8926a67577ecae8, type: 3}
+  - {fileID: 21300000, guid: ffb1acaf90a17024986416f97fa34f06, type: 3}
   m_PackedSpriteNamesToIndex:
   - Add_Bar
+  - DeckImg
   - red_button_bar
   - Collection_Icon
+  - PictoIcon_Filter
   - bottom_Bar
+  - PictoIcon_Mark_Minus
+  - PictoIcon_Search
+  - DeckImg2
+  - Gradient_Panel01
   - Sword_Icon
+  - DeckImg4
   - Ribbon_Bar_02
+  - DeckImg3
   m_RenderDataMap: {}
   m_Tag: UIDeck
   m_IsVariant: 0

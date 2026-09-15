@@ -86,54 +86,78 @@ SpriteAtlas:
     - {fileID: 2800000, guid: 10748223fa7174c42b4f16c60bcd01df, type: 3}
     - {fileID: 2800000, guid: 983333f0c8e55c041ad4a4c69f5161dd, type: 3}
     - {fileID: 2800000, guid: e1935aeee845e68409b74f5dff08537c, type: 3}
+    - {fileID: 2800000, guid: 92113b14e95d8e04f841875a6f63bd99, type: 3}
+    - {fileID: 2800000, guid: 0ed559115642b6e4b9b30a8ff1a9da01, type: 3}
+    - {fileID: 2800000, guid: c003b44ac60c37b4eaa158b58ff4315a, type: 3}
+    - {fileID: 2800000, guid: 55dc3e0097eaacc4cb84940ff96d3759, type: 3}
+    - {fileID: 2800000, guid: f578e5420bb94ee4097ef9527e0a2257, type: 3}
+    - {fileID: 2800000, guid: 65558925ecdfd44d99cfc88a60dde233, type: 3}
     bindAsDefault: 1
     isAtlasV2: 0
     cachedData: {fileID: 0}
     packedSpriteRenderDataKeys:
+    - 55dc3e0097eaacc4cb84940ff96d3759: 21300000
     - af73eb90fac67ae418f545a75dbdb5da: 21300000
     - ec32dda0e9217af4f873ae9dd22b7c2c: 21300000
     - 983333f0c8e55c041ad4a4c69f5161dd: 21300000
+    - 0ed559115642b6e4b9b30a8ff1a9da01: 21300000
+    - f578e5420bb94ee4097ef9527e0a2257: 21300000
     - 10748223fa7174c42b4f16c60bcd01df: 21300000
+    - 92113b14e95d8e04f841875a6f63bd99: 21300000
     - 8e8682b4561fce04a8b2bb1bbb754733: 21300000
     - 150d90c4f26fdaf4eb1cdd9f02c14ebf: 21300000
+    - 65558925ecdfd44d99cfc88a60dde233: 21300000
     - 64572555a6f997e47976dff7f14278da: 21300000
     - c39fa21612d9d254db7ad8eda34dca8d: 21300000
     - 4e4881a89ff54d241beb9c01e64674c6: 21300000
     - 49380209e5f9e574b8e8492ea79a2bfe: 21300000
     - 2d79f2a96ab6a88419f3713ee35a43ff: 21300000
+    - c003b44ac60c37b4eaa158b58ff4315a: 21300000
     - 0560dcfb4d8cf2d4b921295a8050cd08: 21300000
     - 9334ec7ebdadefc4fa6d9f385f2b96c7: 21300000
     - e1935aeee845e68409b74f5dff08537c: 21300000
     - 6070a78fad0615b48b17acde5e137223: 21300000
   m_MasterAtlas: {fileID: 0}
   m_PackedSprites:
+  - {fileID: 21300000, guid: 55dc3e0097eaacc4cb84940ff96d3759, type: 3}
   - {fileID: 21300000, guid: af73eb90fac67ae418f545a75dbdb5da, type: 3}
   - {fileID: 21300000, guid: ec32dda0e9217af4f873ae9dd22b7c2c, type: 3}
   - {fileID: 21300000, guid: 983333f0c8e55c041ad4a4c69f5161dd, type: 3}
+  - {fileID: 21300000, guid: 0ed559115642b6e4b9b30a8ff1a9da01, type: 3}
+  - {fileID: 21300000, guid: f578e5420bb94ee4097ef9527e0a2257, type: 3}
   - {fileID: 21300000, guid: 10748223fa7174c42b4f16c60bcd01df, type: 3}
+  - {fileID: 21300000, guid: 92113b14e95d8e04f841875a6f63bd99, type: 3}
   - {fileID: 21300000, guid: 8e8682b4561fce04a8b2bb1bbb754733, type: 3}
   - {fileID: 21300000, guid: 150d90c4f26fdaf4eb1cdd9f02c14ebf, type: 3}
+  - {fileID: 21300000, guid: 65558925ecdfd44d99cfc88a60dde233, type: 3}
   - {fileID: 21300000, guid: 64572555a6f997e47976dff7f14278da, type: 3}
   - {fileID: 21300000, guid: c39fa21612d9d254db7ad8eda34dca8d, type: 3}
   - {fileID: 21300000, guid: 4e4881a89ff54d241beb9c01e64674c6, type: 3}
   - {fileID: 21300000, guid: 49380209e5f9e574b8e8492ea79a2bfe, type: 3}
   - {fileID: 21300000, guid: 2d79f2a96ab6a88419f3713ee35a43ff, type: 3}
+  - {fileID: 21300000, guid: c003b44ac60c37b4eaa158b58ff4315a, type: 3}
   - {fileID: 21300000, guid: 0560dcfb4d8cf2d4b921295a8050cd08, type: 3}
   - {fileID: 21300000, guid: 9334ec7ebdadefc4fa6d9f385f2b96c7, type: 3}
   - {fileID: 21300000, guid: e1935aeee845e68409b74f5dff08537c, type: 3}
   - {fileID: 21300000, guid: 6070a78fad0615b48b17acde5e137223, type: 3}
   m_PackedSpriteNamesToIndex:
+  - Pass_Panel_03
   - battle_Pass_Banner
   - Battle_Pass_Premium_Crown
   - battle_Pass_Premium_Panel
+  - Gauge_Bar_03
+  - Pass_Repeat_Panel
   - Battle_Pass_premium_Lock
+  - Battle_Pass_premium_Star
   - Battle_Pass_All_Reward_Panel
   - Battle_Pass_Free_Reward
+  - PictoIcon_Clock_2
   - Battle_Pass_Level_Complete
   - Battle_Pass_Level
   - battle_Pass_Panel_01
   - battle_Pass_free_Panel
   - Battle_Pass_Premium
+  - Pass_Panel_02
   - Battle_Pass_Gague_Bar
   - Battle_Pass_Panel_Frame
   - Battle_Pass_Premium_Reward
