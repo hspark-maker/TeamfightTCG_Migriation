@@ -167,6 +167,8 @@ public class CardEnhanceRitualView : CardGrowthRitualView, IUIInitializable
         this.embers.Release();
     }
 
+    public bool IsGrowthFlashPlaying => this.m_growthFlash != null && this.m_growthFlash.IsActive();
+
     /// <summary>일반 강화의 능력치 반영 피드백. 무대·조작은 그대로 두고 카드 표면만 짧게 빛낸다.</summary>
     public void FlashGrowth()
     {

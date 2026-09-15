@@ -280,6 +280,8 @@ public class CardVisualView : MonoBehaviour
         }
     }
 
+    public bool IsGrowthFlashPlaying => this.m_growthFlash != null && this.m_growthFlash.IsActive();
+
     /// <summary>새 Lv·HP가 드러나는 한 박을 강조한다(강화 결과 공개용). 값은 손대지 않는다 —
     /// 호출부가 이 프레임에 이미 새 값을 찍어 둔 상태로 부른다.</summary>
     // 색과 배율을 한 파형 위에 얹는다: 축을 나누면 따로 놀고, 잘렸을 때 한쪽만 물든 채 굳는다.
