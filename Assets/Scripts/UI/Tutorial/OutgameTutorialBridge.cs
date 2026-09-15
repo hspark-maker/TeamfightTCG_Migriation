@@ -66,6 +66,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     bool m_awaitingUnlockFx;
     Tween m_enhanceResultClose;
     bool m_waitingEnhanceRequest;
+    float m_synergyDeckOpenDeadline;
 
     // 개봉 오버레이가 떠 있는 동안은 로비 안내를 억제한다 — 예전에 개봉 "씬"이 이 플래그로 하던 일과 같다.
     bool SuppressGuideUI => suppressGuideUI || PackOpenOverlay.IsOpen;
@@ -197,6 +198,8 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (!TryGetCursorStep(out var t_step)) return;
 
         m_step = t_step;
+        if (m_step.Completion == EOutgameTutorialCompletion.SynergyDeckEditor)
+            m_synergyDeckOpenDeadline = Time.unscaledTime + 5f;
 
         PresentStep();
     }
@@ -209,6 +212,19 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         if (m_step == null) return;
         if (m_enhancing || m_awaitingUnlockFx) return;
+
+        if (m_step.Completion == EOutgameTutorialCompletion.SynergyDeckEditor)
+        {
+            if (SynergyBattleGuide.IsEditorOpen) OnGateSatisfied();
+            return;
+        }
+
+        if (m_step.Completion == EOutgameTutorialCompletion.SynergyDeck)
+        {
+            if (SynergyBattleGuide.IsDeckReady) { OnGateSatisfied(); return; }
+            OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowBanner(this, OutgameTutorialGuide.MessageOf(m_step));
+            return;
+        }
 
         if (m_step.Completion == EOutgameTutorialCompletion.UnlockIntro)
         {
@@ -294,7 +310,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         }
 
         if (m_step.Completion == EOutgameTutorialCompletion.Enhance
-            && OutgameTutorialRunner.GuidedTrigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
+            && OutgameTutorialGuide.IsEnhanceIntroduction
             && !OutgameTutorialGuide.CanContinueEnhance())
         {
             OnUnlockIntroCancelled();
@@ -831,6 +847,26 @@ public class OutgameTutorialBridge : MonoBehaviour
             CloseGate();
             return;
         }
+        if (m_step.Completion == EOutgameTutorialCompletion.SynergyDeckEditor)
+        {
+            if (SynergyBattleGuide.IsEditorOpen) OnGateSatisfied();
+            else if (Time.unscaledTime >= m_synergyDeckOpenDeadline)
+            {
+                OutgameTutorialRunner.AbortGuided(EOutgameTutorialTrigger.SynergyBattleIntroduction);
+                CloseGate();
+            }
+            return;
+        }
+        if (m_step.Completion == EOutgameTutorialCompletion.SynergyDeck)
+        {
+            if (!SynergyBattleGuide.IsEditorOpen)
+            {
+                OutgameTutorialRunner.AbortGuided(EOutgameTutorialTrigger.SynergyBattleIntroduction);
+                CloseGate();
+            }
+            else if (SynergyBattleGuide.IsDeckReady) OnGateSatisfied();
+            return;
+        }
         if (m_step.Completion == EOutgameTutorialCompletion.Enhance && !m_enhancing && !m_awaitingUnlockFx)
         {
             if (CardDetailOverlayView.IsRitualPlaying)
@@ -848,7 +884,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         }
         if (m_step.Completion == EOutgameTutorialCompletion.ContentUnlockIntro) TryPresentContentIntro();
         if (m_step.Completion == EOutgameTutorialCompletion.Enhance && !m_enhancing && !m_awaitingUnlockFx
-            && OutgameTutorialRunner.GuidedTrigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
+            && OutgameTutorialGuide.IsEnhanceIntroduction
             && !OutgameTutorialGuide.CanContinueEnhance()) OnUnlockIntroCancelled();
     }
 

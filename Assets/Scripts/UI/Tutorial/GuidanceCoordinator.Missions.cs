@@ -14,6 +14,9 @@ public sealed partial class GuidanceCoordinator
     int m_flowSelection;
     float m_flowNavigationDeadline;
 
+    PooledUIBase MissionFlowSurface => m_flow?.tutorial == EOutgameTutorialTrigger.SynergyBattleIntroduction
+        ? DeckEditController.OpenEditor : null;
+
     static bool HasPendingMissionFlow => s_instance != null
         && (s_instance.m_flow != null || s_instance.FindMissionFlow() != null);
 
@@ -94,7 +97,7 @@ public sealed partial class GuidanceCoordinator
                 || Time.unscaledTime > m_flowNavigationDeadline) CancelMissionFlow(true);
             return true;
         }
-        if (StageBusyForGuided || OutgameTutorialRunner.IsGuidedRunning || HasBlockingPopup()) return true;
+        if (StageBusyForGuided || OutgameTutorialRunner.IsGuidedRunning || HasBlockingPopup(MissionFlowSurface)) return true;
         var t_intros = PendingIntros(m_flow);
         if (t_intros.Count > 0)
         {
@@ -126,7 +129,7 @@ public sealed partial class GuidanceCoordinator
         }
         if (!m_flowArrived)
         {
-            if (!SafeToPresent()) return true;
+            if (!SafeToPresent(_except: MissionFlowSurface)) return true;
             NavigateFlow(m_flow.destination, true);
             return true;
         }
@@ -162,6 +165,8 @@ public sealed partial class GuidanceCoordinator
     static bool StartGuide(EOutgameTutorialTrigger _trigger)
     {
         if (!OutgameTutorialRunner.HasPending(_trigger)) return false;
+        if (_trigger == EOutgameTutorialTrigger.SynergyGrowthIntroduction)
+            OutgameTutorialGuide.PrepareSynergyGrowth();
         if (_trigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
             && (!OutgameTutorialRunner.TryGetGuidedChapter(_trigger, out _, out var t_chapter)
                 || !OutgameTutorialGuide.PrepareEnhanceCard(t_chapter))) return false;

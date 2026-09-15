@@ -123,6 +123,7 @@ public class AlbumTabController : LobbyTabPanel
     public override void OnLeave()
     {
         OutgameTutorialRunner.AbortGuided(EOutgameTutorialTrigger.CollectionTabFirstEnter);
+        OutgameTutorialRunner.AbortGuided(EOutgameTutorialTrigger.SynergyGrowthIntroduction);
     }
 
     // 탭이 켜진 그 프레임엔 그리드 cellSize가 아직 없다 — 양보 후 강제 갱신해야 세션이 슬롯 rect를 실측할 수 있다.
@@ -282,7 +283,7 @@ public class AlbumTabController : LobbyTabPanel
     void OpenTheme(AlbumTheme _theme)
     {
         int t_page = 0;
-        if (OutgameTutorialRunner.GuidedTrigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
+        if (OutgameTutorialGuide.IsEnhanceIntroduction
             && OutgameTutorialGuide.TryGetAnchorCard(out int t_card))
         {
             for (int t_i = 0; t_i < _theme.Pages.Count; t_i++)

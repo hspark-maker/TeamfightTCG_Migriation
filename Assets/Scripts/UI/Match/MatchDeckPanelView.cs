@@ -107,11 +107,11 @@ public class MatchDeckPanelView : MonoBehaviour, IUIInitializable
         if (!AdventureRun.IsActive) return;
 
         int t_nodeIndex = AdventureProgress.IndexOf(AdventureRun.NodeId);
-        if (!AdventureProgress.TryGetNode(t_nodeIndex, out AdventureNodeDef t_node)) return;
+        if (!AdventureProgress.TryGetNode(t_nodeIndex, out _)) return;
         int t_chapterIndex = AdventureProgress.ChapterIndexOfNode(t_nodeIndex);
         if (!AdventureProgress.TryGetChapter(t_chapterIndex, out AdventureChapterDef t_chapter)) return;
 
-        titleText.text = $"{t_chapter.title} : {t_node.displayName}";
+        titleText.text = t_chapter.title;
     }
 
     // 지정 저장 슬롯의 덱을 MySection 6칸에 그린다.

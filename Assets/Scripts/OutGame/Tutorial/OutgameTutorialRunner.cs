@@ -141,6 +141,15 @@ public static class OutgameTutorialRunner
 
         bool t_isLast = !TryGetChapterRaw(s_guidedChapter, out var t_chapter) || s_guidedStep + 1 >= t_chapter.StepCount;
 
+        if (OutgameTutorialGuide.ShouldSkipGrowthStep(t_step)
+            || (GuidedTrigger == EOutgameTutorialTrigger.SynergyBattleIntroduction && SynergyBattleGuide.IsDeckReady
+                && t_step.Action == EOutgameTutorialAction.Message
+                && (t_step.Anchor == EOutgameTutorialAnchor.DeckCollectionArea || t_step.Anchor == EOutgameTutorialAnchor.DeckSlotArea)))
+        {
+            NotifyGuidedStepSatisfied();
+            return EOutgameTutorialStepResult.Advanced;
+        }
+
         return TutorialStepExecutor.Enter(t_step,
             new OutgameTutorialStepContext(s_guidedChapter, s_guidedStep, s_guidedChapter, s_guidedStep + 1, t_isLast,
                                            GuidedProgressSink.Instance));

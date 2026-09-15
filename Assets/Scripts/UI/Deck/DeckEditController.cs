@@ -163,6 +163,17 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
 
     public bool IsOpen => m_mode != EDeckEditMode.None;
 
+    /// <summary>현재 열린 편집 화면. 상태 조회는 풀 인스턴스를 새로 요청하지 않는다.</summary>
+    public static DeckEditController OpenEditor => s_open != null && s_open.IsOpen ? s_open : null;
+
+    /// <summary>현재 편성 중인 카드 목록.</summary>
+    public IReadOnlyList<int> WorkingCards => m_working;
+
+    /// <summary>현재 편성이 유효한 저장 슬롯과 같은 상태인지.</summary>
+    public bool IsSavedComplete => IsOpen && !IsDirty
+        && m_slotIndex >= 0 && m_slotIndex < DeckSaveManager.SLOT_COUNT
+        && DeckSaveManager.IsSlotValid(m_slotIndex);
+
     /// <summary>호스트 계층에 직접 놓인 인스턴스인가. 호스트가 자기 배선 실수를 잡는 데 쓴다.</summary>
     public bool IsHostEmbedded => hostEmbedded;
 
@@ -467,6 +478,8 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
     {
         CardFilterPopup.CloseFor(this);
         if (s_open == this) s_open = null;
+        if (synergyStrip != null)
+            TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.DeckSynergyStrip, synergyStrip.transform as RectTransform);
 
         m_mode      = EDeckEditMode.None;
         m_slotIndex = -1;
@@ -580,6 +593,9 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
         else Debug.LogError($"[DeckEditController] dragController is unwired ({name}) — drag-to-move does not work (click placement only).");
 
         s_open = this;
+
+        if (synergyStrip != null)
+            TutorialAnchorRegistry.Register(EOutgameTutorialAnchor.DeckSynergyStrip, synergyStrip.transform as RectTransform, null);
 
         RefreshAll();
         RebuildDeckStrip();

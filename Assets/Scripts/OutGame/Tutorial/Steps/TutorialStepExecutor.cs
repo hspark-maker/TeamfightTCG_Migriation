@@ -24,6 +24,7 @@ public static class TutorialStepExecutor
             case EOutgameTutorialAction.WaitClick:
             case EOutgameTutorialAction.Message:
             case EOutgameTutorialAction.WaitUnlockIntro:
+            case EOutgameTutorialAction.WaitSynergyDeck:
             case EOutgameTutorialAction.ContentUnlockIntro:
             case EOutgameTutorialAction.WaitPurchase:
             case EOutgameTutorialAction.WaitPackOpen:
@@ -39,6 +40,9 @@ public static class TutorialStepExecutor
             case EOutgameTutorialAction.EnterFirstRank:
                 return EOutgameTutorialStepResult.Gated;
 
+            case EOutgameTutorialAction.OpenSynergyDeck:
+                if (!SynergyBattleGuide.TryOpenEditor()) return Fail(_step, _context, "Synergy deck editor is unavailable.");
+                return EOutgameTutorialStepResult.Gated;
             case EOutgameTutorialAction.CloseCardDetail: return EnterCloseCardDetail(_context);
             case EOutgameTutorialAction.CloseAlbumPage: return EnterCloseAlbumPage(_context);
             case EOutgameTutorialAction.CloseDeckEdit: return EnterCloseDeckEdit(_context);

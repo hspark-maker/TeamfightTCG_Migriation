@@ -115,6 +115,8 @@ public readonly struct TutorialActionMeta
         new(A.CloseDeckEdit,        C.Auto,             F.None, _beatSlot: EBeatSlot.Post),
         new(A.ContentUnlockIntro,  C.ContentUnlockIntro, F.ContentIntros),
         new(A.WaitUnlockIntro, C.UnlockIntro, F.GuideMessage | F.MessagePlacement),
+        new(A.OpenSynergyDeck, C.SynergyDeckEditor, F.FailurePolicy),
+        new(A.WaitSynergyDeck, C.SynergyDeck, F.GuideMessage),
     };
 
     // 이 구조의 조용한 실패 두 가지를 초기화 때 한 번 소리내어 잡는다.

@@ -597,6 +597,14 @@ MonoBehaviour:
       tutorial: 6
       contentIntros: 03000000
       destination: 0
+    - missionId: guide.05
+      tutorial: 18
+      contentIntros:
+      destination: 0
+    - missionId: guide.16
+      tutorial: 19
+      contentIntros:
+      destination: 4
     guideChapters:
     - label: "\uCE74\uB4DC \uAC15\uD654"
       trigger: 2
@@ -1057,7 +1065,7 @@ MonoBehaviour:
         deckName: 
         onFailure: 0
         contentIntros: 
-      - stepId: 52
+      - stepId: 81
         action: 6
         anchor: 13
         spotlight: 0
@@ -1081,4 +1089,468 @@ MonoBehaviour:
         deckName: 
         onFailure: 0
         contentIntros: 
-  nextStepId: 62
+    - label: "시너지 입문 · 성장"
+      trigger: 18
+      prerequisite: 14
+      stepDefs:
+      - stepId: 62
+        action: 1
+        anchor: 0
+        spotlight: 0
+        guideMessage: "카드에는 함께 편성했을 때 힘을 내는 시너지가 있어요. 같은 시너지를 가진 카드를 모아 보세요."
+        messageAtBottom: 0
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 1
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+      - stepId: 63
+        action: 1
+        anchor: 0
+        spotlight: 0
+        guideMessage: "{growthStatus}\n키워드는 카드 고유의 능력이고, 시너지는 같은 시너지 카드가 함께 만드는 효과예요."
+        messageAtBottom: 0
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 1
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+      - stepId: 64
+        action: 0
+        anchor: 18
+        spotlight: 0
+        guideMessage: "보유 카드를 성장시켜 볼까요?"
+        messageAtBottom: 1
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 1
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+      - stepId: 65
+        action: 0
+        anchor: 19
+        spotlight: 0
+        guideMessage: "성장시킬 카드가 있는 테마를 열어 보세요."
+        messageAtBottom: 1
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 1
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+      - stepId: 66
+        action: 0
+        anchor: 20
+        spotlight: 0
+        guideMessage: "카드를 눌러 성장 화면을 열어 보세요."
+        messageAtBottom: 1
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 1
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+      - stepId: 67
+        action: 11
+        anchor: 21
+        spotlight: 0
+        guideMessage: "강화 버튼을 눌러 샤드를 넣어 보세요.\n{enhanceCost}"
+        messageAtBottom: 1
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 0
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 1
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+      - stepId: 68
+        action: 25
+        anchor: 0
+        spotlight: 0
+        guideMessage: "새로 해금된 능력을 확인해 보세요."
+        messageAtBottom: 0
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 0
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+      - stepId: 69
+        action: 1
+        anchor: 0
+        spotlight: 0
+        guideMessage: "키워드는 카드마다 가진 고유 능력이에요. 카드 상세의 키워드 설명을 누르면 효과를 다시 확인할 수 있어요."
+        messageAtBottom: 0
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 1
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+      - stepId: 70
+        action: 12
+        anchor: 0
+        spotlight: 0
+        guideMessage: ""
+        messageAtBottom: 0
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 0
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+      - stepId: 71
+        action: 20
+        anchor: 0
+        spotlight: 0
+        guideMessage: ""
+        messageAtBottom: 0
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 0
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+      - stepId: 72
+        action: 1
+        anchor: 0
+        spotlight: 0
+        guideMessage: "2성 카드는 시너지에 참여할 수 있어요.\n이번 목표를 마치고 별토리·솜구름몽·포슬램도 2성으로 키워 같은 시너지 덱을 만들어 보세요."
+        messageAtBottom: 0
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 1
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+    - label: "시너지 입문 · 실전"
+      trigger: 19
+      prerequisite: 4
+      stepDefs:
+      - stepId: 73
+        action: 1
+        anchor: 0
+        spotlight: 0
+        guideMessage: "성장한 카드를 함께 편성해 시너지 덱을 만들어 봅시다."
+        messageAtBottom: 0
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 1
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+      - stepId: 74
+        action: 26
+        anchor: 0
+        spotlight: 0
+        guideMessage: ""
+        messageAtBottom: 0
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 0
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+      - stepId: 75
+        action: 1
+        anchor: 8
+        spotlight: 0
+        guideMessage: "카드의 시너지 표시를 살펴보세요. 같은 시너지 카드를 한 덱에 모으면 함께 힘을 낼 수 있어요."
+        messageAtBottom: 1
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 1
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+      - stepId: 76
+        action: 1
+        anchor: 9
+        spotlight: 0
+        guideMessage: "시너지에 참여하려면 카드가 2성 이상이어야 해요.\n{synergyName} 시너지는 {synergyCount}장부터 활성화돼요."
+        messageAtBottom: 1
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 1
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+      - stepId: 77
+        action: 27
+        anchor: 0
+        spotlight: 0
+        guideMessage: "2성 이상인 같은 시너지 카드를 필요한 수만큼 편성하고 덱을 저장하세요.\n{synergyName}: {synergyCount}장 필요. 부족하면 성장한 뒤 미션 이동 버튼으로 안내를 다시 열 수 있어요."
+        messageAtBottom: 0
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 0
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+      - stepId: 78
+        action: 1
+        anchor: 33
+        spotlight: 0
+        guideMessage: "시너지 표시가 활성화됐어요! 표시를 눌러 효과를 확인할 수 있어요.\n이 덱으로 전투를 끝내면 실전 미션을 달성해요."
+        messageAtBottom: 1
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 1
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+      - stepId: 79
+        action: 23
+        anchor: 0
+        spotlight: 0
+        guideMessage: ""
+        messageAtBottom: 0
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 0
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+      - stepId: 80
+        action: 1
+        anchor: 0
+        spotlight: 0
+        guideMessage: "이제 랭크나 모험에서 이 덱으로 전투를 한 번 끝내 보세요.\n승패와 관계없이 인정돼요. 미션 이동 버튼으로 전투 화면에 갈 수 있어요."
+        messageAtBottom: 0
+        unlocks:
+        unlocksAll: 0
+        locks:
+        useDim: 1
+        packId:
+        packPriceLabel:
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle:
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds:
+        showDeckGate: 0
+        deckName:
+        onFailure: 1
+        contentIntros:
+  nextStepId: 82

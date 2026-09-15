@@ -35,4 +35,5 @@ public enum EOutgameTutorialAnchor
     KeywordGrowthPanel         = 30, // 키워드 강화 패널 본체(Root/Panel). 누를 대상이 아니라 "함께 밝힐 영역"으로만 쓴다
     CardDetailKeywordDescription = 31,
     CardDetailCardView           = 32,
+    DeckSynergyStrip             = 33,
 }

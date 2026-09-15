@@ -8,6 +8,7 @@ internal static class GuideMissionTrack
     internal const string EVENT_BRONZE2_REACHED = "Guide.Bronze2Reached";
     internal const string EVENT_ENHANCE_COMPLETED = "Guide.EnhanceCompleted";
     internal const string EVENT_EVOLVE_COMPLETED = "Guide.EvolveCompleted";
+    internal const string EVENT_SYNERGY_BATTLE = "Guide.CompleteSynergyBattle";
     internal const string EVENT_STARTER_CARDS_STAR1 = "Guide.StarterCardsAtStar1";
     internal const string EVENT_STARTER_CARDS_STAR2 = "Guide.StarterCardsAtStar2";
     internal const string EVENT_DECK_SAVED = "Guide.DeckSaved6";
@@ -113,6 +114,15 @@ internal static class GuideMissionTrack
 
     internal static GuideRoute RouteOf(MissionDefinition _definition)
     {
+        if (_definition?.Event == EVENT_SYNERGY_BATTLE)
+        {
+            int t_slot = DeckSaveManager.SelectedSlot;
+            if (t_slot < 0 || t_slot >= DeckSaveManager.SLOT_COUNT || !DeckSaveManager.IsSlotValid(t_slot))
+                return new GuideRoute(ERouteKind.DeckEditor);
+            foreach (var t_synergy in DeckSynergyEligibility.Resolve(DeckSaveManager.GetSlot(t_slot)))
+                if (t_synergy.IsActive) return new GuideRoute(ERouteKind.Match);
+            return new GuideRoute(ERouteKind.DeckEditor);
+        }
         string t_event = _definition?.Event ?? string.Empty;
         switch (t_event)
         {
