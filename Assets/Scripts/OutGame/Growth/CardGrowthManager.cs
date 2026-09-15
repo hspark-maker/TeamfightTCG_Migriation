@@ -108,8 +108,10 @@ public static partial class CardGrowthManager
         int t_level = LevelOf(_id);
         int t_required = ShardRequiredOf(_id);
         if (t_required <= 0) return GrowthOf(_id);
+        if (OutgameTutorialGuide.HasFreeCardEnhance(_id) && OutgameTutorialGuide.CanUseFreeSynergyGrowth(_id))
+            return PreviewGrowthAtLevel(_id, GrowthRules.FirstEvolutionLevel);
         int t_progress = ShardProgressOf(_id) + 1;
-        if (t_progress >= t_required || OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitEnhance))
+        if (t_progress >= t_required || OutgameTutorialGuide.HasFreeCardEnhance(_id))
             return PreviewGrowthAtLevel(_id, t_level + 1);
         return Snapshot(_id, t_level, true, LimitBreakOf(_id), t_progress);
     }
@@ -118,8 +120,11 @@ public static partial class CardGrowthManager
     public static bool TryGetEvolutionStep(int _cardId, out GrowthStep _step)
     {
         _step = default;
-        if (_cardId <= 0 || !GrowthRules.TryGetStep(_cardId, LevelOf(_cardId) + 1, out GrowthStep t_full)) return false;
-        bool t_free = OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitEnhance);
+        if (_cardId <= 0) return false;
+        bool t_free = OutgameTutorialGuide.HasFreeCardEnhance(_cardId);
+        int t_targetLevel = t_free && OutgameTutorialGuide.CanUseFreeSynergyGrowth(_cardId)
+            ? GrowthRules.FirstEvolutionLevel : LevelOf(_cardId) + 1;
+        if (!GrowthRules.TryGetStep(_cardId, t_targetLevel, out GrowthStep t_full)) return false;
         long t_remaining = t_free || t_full.Cost == 0 ? 0 : ShardRequiredOf(_cardId) - ShardProgressOf(_cardId);
         int t_gain = PreviewGrowthAtLevel(_cardId, t_full.Level).HpBonus - GrowthOf(_cardId).HpBonus;
         _step = new GrowthStep(t_full.Level, t_gain, t_full.Currency, t_remaining, 1f);
@@ -173,21 +178,50 @@ public static partial class CardGrowthManager
         if (t_precheck != EEnhanceOutcome.Success) return new EnhanceResult(t_precheck, LevelOf(t_id));
 
         // 무료 한 방의 조건은 클라 안내가 쥐고 있어 요청에 실어 보낸다 — 실제로 먹였는지는 응답이 답한다.
-        bool t_freeShot = OutgameTutorialGuide.HasFreeShot(EOutgameTutorialAction.WaitEnhance);
+        bool t_freeShot = OutgameTutorialGuide.HasFreeCardEnhance(t_id);
+        bool t_synergyIntroduction = t_freeShot && OutgameTutorialGuide.CanUseFreeSynergyGrowth(t_id);
 
         int t_amount = ResolveEnhanceAmount(_amount, ShardRequiredOf(t_id) - ShardProgressOf(t_id),
             t_step.Cost == 0 ? long.MaxValue : CurrencyManager.GetBalance(t_step.Currency));
         if (t_amount <= 0) return new EnhanceResult(EEnhanceOutcome.NotReady, LevelOf(t_id));
 
+#if UNITY_EDITOR
+        if (OnboardingPlayTest.IsActive)
+        {
+            CardGrowthEntry t_entry = Entry(t_id);
+            int t_applied = t_freeShot ? ShardRequiredOf(t_id) - ShardProgressOf(t_id) : t_amount;
+            int t_progress = ShardProgressOf(t_id) + t_applied;
+            if (t_synergyIntroduction)
+            {
+                for (int t_stageLevel = LevelOf(t_id) + 1; t_stageLevel < GrowthRules.FirstEvolutionLevel; t_stageLevel++)
+                    t_applied += GrowthRules.ShardRequiredAt(t_stageLevel);
+                t_entry.Level = GrowthRules.FirstEvolutionLevel;
+                t_entry.ShardProgress = 0;
+            }
+            else if (t_progress >= ShardRequiredOf(t_id))
+            {
+                t_entry.Level = LevelOf(t_id) + 1;
+                t_entry.ShardProgress = 0;
+            }
+            else t_entry.ShardProgress = t_progress;
+            OnboardingPlayTest.Spend(t_step.Currency, t_step.Cost * t_amount);
+            FlushToData();
+            if (t_freeShot) OutgameTutorialGuide.ConsumeFreeShot();
+            OnGrowthChanged?.Invoke();
+            return new EnhanceResult(EEnhanceOutcome.Success, LevelOf(t_id), t_applied);
+        }
+#endif
+
         // 첫 await 이전이어야 유저가 누른 프레임에 잔액이 줄어든다. 걷는 쪽은 InvokeAsync 가 전담한다.
         CurrencyPendingTicket t_pending = CurrencyPendingTicket.Hold(t_step.Currency, -t_step.Cost * t_amount);
 
-        EnhanceCommandResult t_command = await EnhanceCommand.EnhanceCardAsync(t_id, t_freeShot, t_pending, t_amount);
+        EnhanceCommandResult t_command = await EnhanceCommand.EnhanceCardAsync(t_id, t_freeShot, t_pending, t_amount,
+            t_synergyIntroduction);
 
         // 결제 전에 막힌 결말은 값이 하나도 안 바뀌었다 — 통지 없이 물러난다(화면이 스스로 되돌린다).
         if (!t_command.Settled)
         {
-            await RefreshFreeShotMarkIfRejectedAsync(t_freeShot, t_command);
+            if (!t_synergyIntroduction) await RefreshFreeShotMarkIfRejectedAsync(t_freeShot, t_command);
             return new EnhanceResult(t_command.Outcome, LevelOf(t_id));
         }
 

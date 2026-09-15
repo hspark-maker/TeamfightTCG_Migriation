@@ -114,7 +114,7 @@ int,string,string,int,string,string,long,string
 165,Pass,S1:10,2,PackChoice,UnlockedThemePack,1,시즌 1 무료 트랙 레벨 10; 팩 지급 구현 대기
 166,Guide,guide.02,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
 167,Guide,guide.03,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
-168,Guide,guide.04,1,Currency,Shard,40,계정당 1회 가이드 지급 구현 대기
+168,Guide,guide.16,1,Currency,Shard,40,guide.04 보상을 신규 실전 미션으로 이전; 과거 guide.04 수령 여부와 무관하게 guide.16 계정당 1회 지급
 169,Guide,guide.06,1,Currency,Gold,50,계정당 1회 가이드 지급 구현 대기
 170,Guide,guide.07,1,Currency,Shard,30,계정당 1회 가이드 지급 구현 대기
 171,Guide,guide.07,2,Card,9,1,계정당 1회 가이드 지급 구현 대기

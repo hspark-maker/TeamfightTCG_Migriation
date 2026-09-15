@@ -65,6 +65,7 @@ public static class GuideMissionFlowValidation
                 errors.Add($"{label}: enabled guide mission '{mission}' missing in Mission_sheet.csv.");
             if (flow.tutorial != EOutgameTutorialTrigger.None)
             {
+                if (mission.Length == 0) errors.Add($"{label}: a guided chapter requires an active mission ID.");
                 if (!tutorials.Add(flow.tutorial)) errors.Add($"{label}: duplicate tutorial {flow.tutorial}.");
                 int matches = 0;
                 if (data.Chapters != null)

@@ -1,40 +1,82 @@
+using System;
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 public sealed partial class GuidanceCoordinator
 {
-    readonly HashSet<GuideMissionFlow> m_deferredFlows = new HashSet<GuideMissionFlow>();
     GuideMissionFlow m_flow;
-    LobbyTabController m_flowShell;
-    bool m_flowNavigating;
-    bool m_flowArrived;
     bool m_flowStarted;
+    bool m_flowPreparing;
+    bool m_flowLocked;
+    bool m_flowDeferred;
+    bool m_retryRequested;
+    bool m_applicationPaused;
     int m_flowVersion;
     int m_flowSession;
-    int m_flowSelection;
-    float m_flowNavigationDeadline;
+    int m_internalNavigation;
+    string m_lastFlowFailure;
+    CancellationTokenSource m_flowCancellation;
+
+    public static bool IsInputLocked => s_instance != null && s_instance.m_flowLocked;
+    public static bool IsRestoring => s_instance != null && s_instance.m_flowPreparing;
+    public static bool IsInternalNavigation => s_instance != null && s_instance.m_internalNavigation > 0;
+    public static bool IsCurrentTabAnchor(EOutgameTutorialAnchor _anchor)
+        => s_instance != null && s_instance.m_shell != null && s_instance.m_shell.IsCurrentAnchorSelected(_anchor);
 
     static bool HasPendingMissionFlow => s_instance != null
         && (s_instance.m_flow != null || s_instance.FindMissionFlow() != null);
 
-    /// <summary>현재 미션 안내를 명시적으로 재개한다.</summary>
-    public static void RequestCurrentMission()
+    /// <summary>현재 안내가 허용한 사용자 조작만 통과시킨다.</summary>
+    public static bool AllowsUserAction(EOutgameTutorialAnchor _anchor)
+        => !IsInputLocked || IsInternalNavigation
+            || (!IsRestoring && (OutgameTutorialGateUI.Instance == null || !OutgameTutorialGateUI.Instance.IsTransitionOnly)
+                && _anchor != EOutgameTutorialAnchor.None
+                && OutgameTutorialGuide.TryGetCurrentStep(out var t_step) && t_step.Anchor == _anchor);
+
+    /// <summary>조정기와 스텝 실행기가 수행하는 화면 이동의 수명이다.</summary>
+    public static IDisposable InternalNavigation() => new NavigationScope(s_instance);
+
+    sealed class NavigationScope : IDisposable
     {
-        if (s_instance == null) return;
-        var t_flows = OutgameTutorialRunner.Data?.guide.guideFlows;
-        if (t_flows == null) return;
-        foreach (var t_flow in t_flows)
+        GuidanceCoordinator m_owner;
+        public NavigationScope(GuidanceCoordinator _owner)
         {
-            if (t_flow == null || !GuideMissionFlows.IsEligible(t_flow)) continue;
-            s_instance.m_deferredFlows.Remove(t_flow);
-            OutgameTutorialRunner.ResumeDeferred(t_flow.tutorial);
+            m_owner = _owner;
+            if (m_owner != null) m_owner.m_internalNavigation++;
+        }
+        public void Dispose()
+        {
+            if (m_owner != null) m_owner.m_internalNavigation--;
+            m_owner = null;
         }
     }
 
-    /// <summary>미션 이동을 해금·온보딩 흐름으로 인계한다.</summary>
+    /// <summary>미완료 안내를 보존하고 일반 이동을 되돌린다.</summary>
+    public static void DeferCurrentGuide(string _reason)
+    {
+        if (s_instance == null) return;
+        s_instance.CancelMissionFlow(true);
+        s_instance.ShowFlowFailure(_reason);
+    }
+
+    public static void RequestCurrentMission()
+    {
+        if (s_instance == null) return;
+        s_instance.m_retryRequested = true;
+        s_instance.m_lastFlowFailure = null;
+        foreach (var t_flow in GuideMissionFlows.All)
+            if (t_flow != null && (GuideMissionFlows.IsEligible(t_flow) || GuideResume.IsFor(t_flow.tutorial)))
+                OutgameTutorialRunner.ResumeDeferred(t_flow.tutorial);
+    }
+
     public static bool TryRequestMission(string _missionId)
     {
         if (s_instance == null || !GuideMissionProgress.IsCurrent(_missionId)) return false;
+        if (IsInputLocked) return true;
+        if (GuideResume.HasPending) { RequestCurrentMission(); return true; }
+        if (_missionId == MATCH_MISSION_ID) return s_instance.RequestMatchMission();
         foreach (var t_flow in GuideMissionFlows.All)
         {
             if (t_flow == null || t_flow.missionId != _missionId) continue;
@@ -46,11 +88,15 @@ public sealed partial class GuidanceCoordinator
 
     GuideMissionFlow FindMissionFlow()
     {
-        var t_flows = OutgameTutorialRunner.Data?.guide.guideFlows;
-        if (t_flows == null) return null;
-        foreach (var t_flow in t_flows)
+        if (GuideResume.HasPending)
         {
-            if (t_flow == null || m_deferredFlows.Contains(t_flow) || !GuideMissionFlows.IsEligible(t_flow)) continue;
+            foreach (var t_flow in GuideMissionFlows.All)
+                if (t_flow != null && GuideResume.IsFor(t_flow.tutorial)) return t_flow;
+            GuideResume.Clear();
+        }
+        foreach (var t_flow in GuideMissionFlows.All)
+        {
+            if (t_flow == null || !GuideMissionFlows.IsEligible(t_flow)) continue;
             if (PendingIntros(t_flow).Count > 0 || OutgameTutorialRunner.HasPending(t_flow.tutorial)) return t_flow;
         }
         return null;
@@ -70,117 +116,187 @@ public sealed partial class GuidanceCoordinator
         if (m_flowSession != ContentUnlockManager.SessionVersion)
         {
             CancelMissionFlow(false);
-            m_deferredFlows.Clear();
+            m_flowDeferred = false;
             m_flowSession = ContentUnlockManager.SessionVersion;
         }
-        if (m_flow != null && !GuideMissionFlows.IsEligible(m_flow)) CancelMissionFlow(true);
-        if (m_flow == null)
-        {
-            if (OutgameTutorialRunner.IsRunning || OutgameTutorialRunner.IsGuidedRunning) return false;
-            m_flow = FindMissionFlow();
-            if (m_flow == null) return false;
-        }
+        if (m_applicationPaused || m_flowPreparing) return m_flow != null;
         if (m_flowStarted)
         {
             if (OutgameTutorialRunner.IsGuidedRunning) return true;
-            CancelMissionFlow(!OutgameTutorialProgress.IsTriggerDone(m_flow.tutorial));
+            if (OutgameTutorialProgress.IsTriggerDone(m_flow.tutorial)) CompleteFlowAsync(m_flowVersion).Forget();
+            else CancelMissionFlow(true);
             return true;
         }
-        if (m_flowNavigating)
-        {
-            if (HasBlockingPopup()) m_flowNavigationDeadline = Time.unscaledTime + 5f;
-            if (m_flowShell == null || m_flowShell.SelectionRequestVersion != m_flowSelection
-                || Time.unscaledTime > m_flowNavigationDeadline) CancelMissionFlow(true);
-            return true;
-        }
-        if (StageBusyForGuided || OutgameTutorialRunner.IsGuidedRunning || HasBlockingPopup()) return true;
-        var t_intros = PendingIntros(m_flow);
-        if (t_intros.Count > 0)
-        {
-            if (!SafeToPresent()) return true;
-            if (AdventureMapOpen) return true;
-            if (!ContentUnlockPresentation.IsReady)
-            {
-                NavigateFlow(EOutgameFeature.LobbyMatchTab, false);
-                return true;
-            }
-            if (t_intros.Count > 1) t_intros.RemoveRange(1, t_intros.Count - 1);
-            int t_version = m_flowVersion;
-            ContentUnlockPresentation.TryPresent(t_intros, () =>
-            {
-                if (m_flow == null || t_version != m_flowVersion) return;
-                foreach (var t_intro in t_intros) ContentUnlockManager.MarkPresented(ContentUnlockIntroDef.KeyOf(t_intro));
-            }, () => { if (t_version == m_flowVersion) CancelMissionFlow(true); });
-            return true;
-        }
-        if (m_flow.tutorial == EOutgameTutorialTrigger.None)
-        {
-            if (!m_flowArrived) NavigateFlow(m_flow.destination, true);
-            else CancelMissionFlow(false);
-            return true;
-        }
-        if (!OutgameTutorialRunner.HasPending(m_flow.tutorial))
-        {
-            CancelMissionFlow(false);
-            return true;
-        }
-        if (!m_flowArrived)
-        {
-            if (!SafeToPresent()) return true;
-            NavigateFlow(m_flow.destination, true);
-            return true;
-        }
-        m_flowStarted = StartGuide(m_flow.tutorial);
-        if (!m_flowStarted) CancelMissionFlow(true);
+        if (m_flowDeferred && !m_retryRequested) return false;
+        if (OutgameTutorialRunner.IsRunning || OutgameTutorialRunner.IsGuidedRunning) return false;
+        var t_flow = FindMissionFlow();
+        if (t_flow == null) return false;
+        PooledUIBase t_surface = t_flow.tutorial == EOutgameTutorialTrigger.SynergyBattleIntroduction
+            ? DeckEditController.OpenEditor : null;
+        if (StageBusyForGuided || !SafeToPresent(_except: t_surface)) return false;
+        m_retryRequested = false;
+        m_flowDeferred = false;
+        m_flow = t_flow;
+        m_flowLocked = true;
+        m_flowPreparing = true;
+        int t_version = ++m_flowVersion;
+        m_flowCancellation = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
+        BeginFlowAsync(t_version, m_flowCancellation.Token).Forget();
         return true;
     }
 
-    void NavigateFlow(EOutgameFeature _destination, bool _forTutorial)
+    async UniTask BeginFlowAsync(int _version, CancellationToken _ct)
     {
-        if (_destination == EOutgameFeature.None) { m_flowArrived = true; return; }
-        if (m_flowShell == null) m_flowShell = GetComponent<LobbyTabController>();
-        if (m_flowShell == null) { CancelMissionFlow(true); return; }
-        int t_version = m_flowVersion;
-        m_flowNavigating = true;
-        m_flowNavigationDeadline = Time.unscaledTime + 5f;
-        bool t_accepted = m_flowShell.TrySelectFeature(
-            _destination == EOutgameFeature.Adventure ? EOutgameFeature.LobbyMatchTab : _destination,
-            _onArrived: () =>
+        try
+        {
+            ShowTransition();
+            var t_flow = m_flow;
+            if (t_flow.tutorial != EOutgameTutorialTrigger.None) GuideResume.Begin(t_flow);
+            if (!await GuideResume.SaveConfirmedAsync(_ct)) throw new InvalidOperationException("안내 진행을 저장하지 못했습니다.");
+            EnsureFlow(_version, _ct);
+            var t_intros = PendingIntros(t_flow);
+            if (t_intros.Count > 0)
             {
-                if (m_flow == null || t_version != m_flowVersion) return;
-                m_flowNavigating = false;
-                if (!GuideMissionFlows.IsEligible(m_flow)) { CancelMissionFlow(true); return; }
-                if (_destination == EOutgameFeature.Adventure
-                    && (m_launcher == null || !m_launcher.TryOpenAdventureMapAt(-1)))
-                { CancelMissionFlow(true); return; }
-                m_flowArrived = _forTutorial;
-            });
-        m_flowSelection = m_flowShell.SelectionRequestVersion;
-        if (!t_accepted) CancelMissionFlow(true);
+                if (!ContentUnlockPresentation.IsReady) await SelectFlowTabAsync(EOutgameFeature.LobbyMatchTab, _ct);
+                foreach (var t_intro in t_intros)
+                {
+                    EnsureFlow(_version, _ct);
+                    ClearTransition();
+                    var t_done = new UniTaskCompletionSource<bool>();
+                    if (!ContentUnlockPresentation.TryPresent(new[] { t_intro },
+                            () => t_done.TrySetResult(true), () => t_done.TrySetResult(false)))
+                        throw new InvalidOperationException("해금 안내 화면을 준비하지 못했습니다.");
+                    if (!await t_done.Task.AttachExternalCancellation(_ct))
+                        throw new InvalidOperationException("해금 안내가 중단되었습니다.");
+                    EnsureFlow(_version, _ct);
+                    ShowTransition();
+                    ContentUnlockManager.MarkPresented(ContentUnlockIntroDef.KeyOf(t_intro));
+                }
+            }
+            if (GuideResume.IsFor(t_flow.tutorial)) GuideResume.Record.IntroductionSeen = true;
+            DataSaveManager.Save();
+            if (!await GuideResume.SaveConfirmedAsync(_ct)) throw new InvalidOperationException("해금 안내 결과를 저장하지 못했습니다.");
+            EnsureFlow(_version, _ct);
+            if (t_flow.tutorial == EOutgameTutorialTrigger.None) { CancelMissionFlow(false); return; }
+            if (!PrepareFlowTarget(t_flow))
+                throw new InvalidOperationException("강화 가능한 카드나 샤드가 부족합니다. 준비되면 안내를 이어갑니다.");
+            if (t_flow.tutorial == EOutgameTutorialTrigger.CollectionTabFirstEnter
+                || t_flow.tutorial == EOutgameTutorialTrigger.SynergyGrowthIntroduction)
+                GuideResume.SetTarget(OutgameTutorialGuide.TargetCardId, OutgameTutorialGuide.TargetLevel);
+            await RestoreFlowSurfaceAsync(t_flow, _ct);
+            EnsureFlow(_version, _ct);
+            if (!await GuideResume.SaveConfirmedAsync(_ct)) throw new InvalidOperationException("안내 재개 위치를 저장하지 못했습니다.");
+            EnsureFlow(_version, _ct);
+            m_flowPreparing = false;
+            ClearTransition();
+            OutgameTutorialRunner.ResumeDeferred(t_flow.tutorial);
+            using (InternalNavigation()) OutgameTutorialRunner.Fire(t_flow.tutorial);
+            m_flowStarted = OutgameTutorialRunner.IsGuidedRunning;
+            if (!m_flowStarted)
+            {
+                if (OutgameTutorialProgress.IsTriggerDone(t_flow.tutorial)) await CompleteFlowAsync(_version);
+                else throw new InvalidOperationException("온보딩을 시작하지 못했습니다.");
+            }
+            m_lastFlowFailure = null;
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception t_exception)
+        {
+            if (_version == m_flowVersion) DeferCurrentGuide(t_exception.Message);
+        }
     }
 
-    static bool StartGuide(EOutgameTutorialTrigger _trigger)
+    static bool PrepareFlowTarget(GuideMissionFlow _flow)
     {
-        if (!OutgameTutorialRunner.HasPending(_trigger)) return false;
-        if (_trigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
-            && (!OutgameTutorialRunner.TryGetGuidedChapter(_trigger, out _, out var t_chapter)
-                || !OutgameTutorialGuide.PrepareEnhanceCard(t_chapter))) return false;
-        OutgameTutorialRunner.Fire(_trigger);
-        return OutgameTutorialRunner.IsGuidedRunning;
+        if (_flow.tutorial != EOutgameTutorialTrigger.CollectionTabFirstEnter
+            && _flow.tutorial != EOutgameTutorialTrigger.SynergyGrowthIntroduction) return true;
+        if (GuideResume.Record != null && (GuideResume.Record.CardId > 0 || GuideResume.Record.GoalReached))
+        {
+            if (OutgameTutorialGuide.RestoreResumeCard())
+            {
+                if (_flow.tutorial == EOutgameTutorialTrigger.CollectionTabFirstEnter
+                    && !OutgameTutorialGuide.IsGrowthGoalReached
+                    && OutgameTutorialRunner.TryGetGuidedChapter(_flow.tutorial, out _, out var t_savedChapter))
+                    OutgameTutorialGuide.PrepareEnhanceCard(t_savedChapter);
+                return OutgameTutorialGuide.IsGrowthGoalReached || OutgameTutorialGuide.CanContinueEnhance();
+            }
+            GuideResume.SetTarget(0, 0);
+        }
+        if (_flow.tutorial == EOutgameTutorialTrigger.SynergyGrowthIntroduction)
+        {
+            OutgameTutorialGuide.PrepareSynergyGrowth();
+            return OutgameTutorialGuide.IsGrowthGoalReached || OutgameTutorialGuide.CanContinueEnhance();
+        }
+        return OutgameTutorialRunner.TryGetGuidedChapter(_flow.tutorial, out _, out var t_chapter)
+            && OutgameTutorialGuide.PrepareEnhanceCard(t_chapter);
     }
+
+    async UniTask CompleteFlowAsync(int _version)
+    {
+        m_flowPreparing = true;
+        ShowTransition();
+        try
+        {
+            if (!await GuideResume.SaveConfirmedAsync(m_flowCancellation.Token))
+                throw new InvalidOperationException("안내 완료 기록을 저장하지 못했습니다.");
+            if (_version == m_flowVersion) CancelMissionFlow(false);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception t_exception)
+        {
+            if (_version == m_flowVersion) DeferCurrentGuide(t_exception.Message);
+        }
+    }
+
+    void EnsureFlow(int _version, CancellationToken _ct)
+    {
+        _ct.ThrowIfCancellationRequested();
+        if (_version != m_flowVersion || m_flow == null) throw new OperationCanceledException(_ct);
+    }
+
+    void ShowTransition() => OutgameTutorialBridge.EnsureGateForGuidance()?.ShowTransitionGate(this);
+    void ClearTransition() => OutgameTutorialGateUI.Instance?.Clear(this);
 
     void CancelMissionFlow(bool _defer)
     {
-        var t_flow = m_flow;
+        bool t_ownedAdventure = m_flow != null && m_flow.tutorial == EOutgameTutorialTrigger.AdventureUnlocked;
+        bool t_ownedGrowth = m_flow != null && (m_flow.tutorial == EOutgameTutorialTrigger.CollectionTabFirstEnter
+            || m_flow.tutorial == EOutgameTutorialTrigger.SynergyGrowthIntroduction);
         m_flowVersion++;
+        m_flowCancellation?.Cancel();
+        m_flowCancellation?.Dispose();
+        m_flowCancellation = null;
         m_flow = null;
-        m_flowNavigating = false;
-        m_flowArrived = false;
+        m_flowPreparing = false;
         m_flowStarted = false;
-        if (t_flow == null) return;
-        if (_defer) m_deferredFlows.Add(t_flow);
-        if (OutgameTutorialRunner.IsGuidedRunning && OutgameTutorialRunner.GuidedTrigger == t_flow.tutorial)
-            OutgameTutorialRunner.AbortGuided(t_flow.tutorial);
-        ContentUnlockPresentation.CancelCurrent();
+        m_flowLocked = false;
+        m_flowDeferred = _defer;
+        m_retryRequested = false;
+        ClearTransition();
+        using (InternalNavigation())
+        {
+            OutgameTutorialRunner.AbortGuided();
+            ContentUnlockPresentation.CancelCurrent();
+            if (t_ownedAdventure && _defer) m_launcher?.CancelGuidedAdventureEntry();
+            if (t_ownedGrowth && _defer)
+            {
+                CardDetailOverlayView.Close();
+                AlbumPageOverlayView.CloseOpen();
+            }
+        }
+    }
+
+    void ShowFlowFailure(string _reason)
+    {
+        if (string.IsNullOrEmpty(_reason) || m_lastFlowFailure == _reason) return;
+        m_lastFlowFailure = _reason;
+        Debug.LogWarning($"[GuidanceCoordinator] {_reason}");
+        UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
+        {
+            titleText = _reason,
+            yesText = "재시도",
+            yesAction = RequestCurrentMission,
+            noText = "나중에",
+        });
     }
 }

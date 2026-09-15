@@ -34,6 +34,9 @@ public class LobbyMatchLauncher : MonoBehaviour
     // 게이트가 열려 있는 동안 PlayBtn 재클릭을 막는다 — 두 번째 진입이 셸의 선택 상태를 덮고,
     // Confirm 한 번에 두 await가 동시에 깨어 LoadScene이 두 번 돈다.
     bool m_running;
+    CancellationTokenSource m_entryCancellation;
+    bool m_adventureEntry;
+    int m_entryVersion;
 
     public bool IsRunning => m_running;
     public bool IsAdventureMapOpen => adventurePanel != null && adventurePanel.IsOpen;
@@ -396,10 +399,26 @@ public class LobbyMatchLauncher : MonoBehaviour
         ShowEntryBlocked("상대가 매칭을 취소했거나 연결이 끊겼습니다.\n다시 매칭해 주세요.");
     }
 
+    /// <summary>중단한 모험 안내의 대치·덱 선택 대기를 끝내 재개할 로비를 되돌린다.</summary>
+    public void CancelGuidedAdventureEntry()
+    {
+        if (!m_adventureEntry || m_entryCancellation == null) return;
+        var t_cancellation = m_entryCancellation;
+        int t_version = ++m_entryVersion;
+        t_cancellation.Cancel();
+        if (t_version != m_entryVersion) return;
+        m_deckShell?.Close();
+        m_matchShell?.Close();
+    }
+
     // 진입 체인이 "전투 시작"으로 닫히면 그때 씬을 로드한다. 포기면 각 화면이 스스로 닫고 로비가 그대로 남는다.
     async UniTaskVoid RunEntryAsync(MatchOpponent? _preset = null)
     {
-        var t_ct = this.GetCancellationTokenOnDestroy();
+        var t_cancellation = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
+        var t_ct = t_cancellation.Token;
+        int t_version = ++m_entryVersion;
+        m_entryCancellation = t_cancellation;
+        m_adventureEntry = _preset.HasValue && AdventureRun.IsActive;
 
         // 전투로 닫히지 않은 모든 끝(포기·취소·예외)에서 모험 플래그를 끊는다. 그 경로엔 씬 전환이 없어
         // TurnRunner.Cleanup이 영영 돌지 않는다 — 남겨 두면 다음 일반 전투의 AI 레벨이 정점 레벨로 굳고
@@ -411,18 +430,25 @@ public class LobbyMatchLauncher : MonoBehaviour
         {
             t_confirmed = await RunEntryChainAsync(t_ct, _preset);
         }
+        catch (System.OperationCanceledException) when (t_ct.IsCancellationRequested) { }
         finally
         {
-            m_running = false;
-            if (!t_confirmed)
+            if (ReferenceEquals(m_entryCancellation, t_cancellation))
             {
-                AdventureRun.End();
-                MissionCutInView.SetMatchEntry(false);
+                m_entryCancellation = null;
+                m_adventureEntry = false;
+                m_running = false;
+                if (!t_confirmed || t_ct.IsCancellationRequested || t_version != m_entryVersion)
+                {
+                    AdventureRun.End();
+                    MissionCutInView.SetMatchEntry(false);
+                }
             }
+            t_cancellation.Dispose();
         }
 
         // 씬이 내려가며 취소된 경우 — 파괴 중인 오브젝트를 건드리지 않는다.
-        if (t_ct.IsCancellationRequested) return;
+        if (t_ct.IsCancellationRequested || t_version != m_entryVersion) return;
 
         if (t_confirmed) EnterBattle();
     }
@@ -643,17 +669,12 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure)) return;
 
         adventurePanel?.Open();
-        // 복귀 재오픈(HandleAdventureReturn)은 이 자리를 거치지 않는다 — 안내가 전투 복귀 연출 위에 겹치지 않는 이유다.
-        if (AdventureUnlock.GuideTrigger == EOutgameTutorialTrigger.AdventureMapFirstOpen)
-            GuidanceCoordinator.TryFire(EOutgameTutorialTrigger.AdventureMapFirstOpen,
-                () => this != null && this.IsAdventureMapOpen);
     }
 
     // 정점 전투 복귀 — 떠났던 화면(배틀 탭 + 맵)을 되돌린다. 승패 무관하게 맵으로 온다.
     // 보상 팝업은 여기서 열지 않는다(서버 낙인이 선 뒤에 따로 온다) — 맵은 이미 미수령 상태를 그리고 있다.
     void HandleAdventureReturn(string _nodeId, bool _won)
     {
-        // 탭 트리거는 끈다 — 탭 진입 튜토리얼이 방금 세운 맵을 덮으면 복귀가 무의미해진다.
         if (matchPanel != null) lobbyTabController?.Select(matchPanel, false);
 
         adventurePanel?.Open();

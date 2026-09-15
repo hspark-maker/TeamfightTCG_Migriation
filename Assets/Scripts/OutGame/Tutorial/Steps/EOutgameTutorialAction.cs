@@ -30,4 +30,6 @@ public enum EOutgameTutorialAction
     CloseDeckEdit   = 23,   // 입력 없이 덱 편집을 닫아 로비 표면을 드러낸다(CloseCardDetail의 덱 편집 판)
     ContentUnlockIntro = 24,
     WaitUnlockIntro = 25, // 해금 데모 중 문구를 표시하고 최종 확인까지 기다린다
+    OpenSynergyDeck = 26,
+    WaitSynergyDeck = 27,
 }

@@ -80,7 +80,6 @@ public class GuideMissionPanel : ContentsPooledUI
 
         this.SetContentsVisible(true);
         this.Rebuild();
-        GuidanceCoordinator.RequestMissionIntroduction(() => this != null && this.isShow);
 
         // 초기화 요청을 공유하고, 상태·기간·저장 버전이 유효하면 최근 조회를 재사용한다.
         MissionCommands.RefreshAsync().Forget();

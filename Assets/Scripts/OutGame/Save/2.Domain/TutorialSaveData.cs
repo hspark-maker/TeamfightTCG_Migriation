@@ -33,4 +33,19 @@ public class TutorialSaveData
     // 같은 판의 adventureIntroStarted/Deferred/StepId는 지웠다 — 문서에 남아 있어도 UnknownPropertyHandling.Ignore가 버린다.
     [FirestoreProperty("adventureIntroCompleted")] public bool AdventureIntroCompleted { get; set; }
     [FirestoreProperty("synergyIntroduction")] public SynergyIntroductionSaveData SynergyIntroduction { get; set; } = new SynergyIntroductionSaveData();
+    [FirestoreProperty("guideResume")] public GuideResumeSaveData GuideResume { get; set; }
+}
+
+/// <summary>완료하지 못한 안내의 재개 지점과 작업 대상.</summary>
+[FirestoreData(UnknownPropertyHandling = UnknownPropertyHandling.Ignore)]
+public sealed class GuideResumeSaveData
+{
+    [FirestoreProperty("version")] public int Version { get; set; } = 1;
+    [FirestoreProperty("trigger")] public string Trigger { get; set; }
+    [FirestoreProperty("missionId")] public string MissionId { get; set; }
+    [FirestoreProperty("stepId")] public int StepId { get; set; }
+    [FirestoreProperty("cardId")] public int CardId { get; set; }
+    [FirestoreProperty("targetLevel")] public int TargetLevel { get; set; }
+    [FirestoreProperty("goalReached")] public bool GoalReached { get; set; }
+    [FirestoreProperty("introductionSeen")] public bool IntroductionSeen { get; set; }
 }

@@ -94,7 +94,13 @@ public static class OutgameTutorialProgress
         if (t_slot.CompletedTriggers == null) t_slot.CompletedTriggers = new List<string>();
 
         string t_key = _trigger.ToString();
-        if (t_slot.CompletedTriggers.Contains(t_key)) return;
+        bool t_hadResume = t_slot.GuideResume?.Trigger == t_key;
+        if (t_hadResume) t_slot.GuideResume = null;
+        if (t_slot.CompletedTriggers.Contains(t_key))
+        {
+            if (t_hadResume) Save();
+            return;
+        }
 
         t_slot.CompletedTriggers.Add(t_key);
         Save();
@@ -104,6 +110,7 @@ public static class OutgameTutorialProgress
     public static void ClearTriggersForDebug()
     {
         var t_slot = Slot;
+        t_slot.GuideResume = null;
         if (t_slot.CompletedTriggers == null) t_slot.CompletedTriggers = new List<string>();
         else                                  t_slot.CompletedTriggers.Clear();
 
@@ -123,6 +130,7 @@ public static class OutgameTutorialProgress
         t_slot.ChapterStepIndex = _step;
         t_slot.StepId           = OutgameTutorialRunner.StepIdAt(_chapter, _step);
         t_slot.OutgameCompleted = false;
+        t_slot.GuideResume = null;
         ContentUnlockManager.ResetForDebug();
         Save();
 

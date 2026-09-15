@@ -112,6 +112,12 @@ public static class TutorialValidator
             bool t_guided  = t_chapter != null && t_chapter.IsGuided;
 
             if (t_chapter != null) ValidateChapterKind(t_chapter, t_c, t_triggers, t_issues);
+            if (t_guided && (_data.guide.guideFlows == null
+                || !_data.guide.guideFlows.Exists(_flow => _flow != null
+                    && !string.IsNullOrEmpty(_flow.missionId) && _flow.tutorial == t_chapter.Trigger)))
+                t_issues.Add(new TutorialIssue(ETutorialIssueLevel.Info, t_c, 0, 0, "미션 미연결",
+                    "연결된 가이드 미션이 없어 이 챕터는 실행하지 않습니다.",
+                    "실행하려면 가이드 미션 흐름에 미션 ID와 챕터 식별자를 연결하세요."));
 
             // (8) 스텝이 없는 챕터. 진행이 막히지는 않는다 — OutgameTutorialRunner.TryGetNext가 빈 챕터를 건너뛰고,
             //     좌표가 서더라도 CloseOrWarnOnMissingStep이 다음 좌표로 정정해 Advanced를 준다(런타임 판정도 Warning이다).
@@ -263,7 +269,7 @@ public static class TutorialValidator
         if (_chapter.Prerequisite == EOutgameFeature.None
          && t_trigger != EOutgameTutorialTrigger.ContentUnlocksAvailable)
             _issues.Add(new TutorialIssue(ETutorialIssueLevel.Info, _index, 0, 0, "선행 기능 없음",
-                                          "prerequisite가 None이라 졸업 직후부터 알림 점이 뜹니다.",
+                                          "prerequisite가 None이라 연결된 미션 활성화 외에 선행 기능을 검사하지 않습니다.",
                                           "안내가 가리키는 화면을 여는 기능을 선행 기능으로 두면 잠긴 동안 점이 숨습니다."));
     }
 

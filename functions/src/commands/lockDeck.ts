@@ -18,6 +18,9 @@ import {LimitBreakCurve, parseLimitBreakCurve} from "../growth/limitBreakTable";
 import {expectedMatchId} from "../matchResult";
 import {HEX_16, HEX_32, HEX_64, objectRecord, safeInteger} from "../match/payloadGuards";
 import {readSpecRows} from "../specs/specBlobReader";
+import {readMissionCatalog} from "../missions/missionSpec";
+import {missionsRef, readMissions} from "../missions/missionStore";
+import {qualifiesGuideSynergyBattle} from "../missions/guideSynergyBattle";
 
 const MAX_LOCK_DECK_PAYLOAD_CARDS = 64;
 const LOCK_TTL_MS = 60 * 60 * 1000;
@@ -132,7 +135,7 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
   // 한계돌파 곡선의 진실원도 표다 — 검증기가 순수 모듈이라 여기서 읽어 주입한다.
   // 두 표를 나란히 읽는다: 직렬로 두면 캐시 미스마다 왕복이 하나씩 더 붙는다.
   const enhanceRuleRows = shapeError != null ? Promise.resolve([]) : readSpecRows(data.env, "CardEnhanceRule");
-  const [specRows, limitBreakCurve, enhanceSteps] = await Promise.all([
+  const [specRows, limitBreakCurve, enhanceSteps, missionCatalog, synergyTiers] = await Promise.all([
     (async (): Promise<Record<string, unknown>[]> => {
       if (shapeError != null) return [];
       try {
@@ -192,6 +195,8 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
       for (let level = 2; level <= rule.maxLevel; level++) steps.set(level, cardEnhanceStep(rule, overrides, level));
       return steps;
     })(),
+    shapeError != null ? Promise.resolve([]) : readMissionCatalog(data.env),
+    shapeError != null ? Promise.resolve([]) : readSpecRows(data.env, "SynergyTierDef"),
   ]);
   const specs = new Map();
   for (const row of specRows) {
@@ -361,6 +366,9 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
       return rejectLock(validation.code, validation.cardId);
     }
 
+    const missionSnapshot = await tx.get(missionsRef(db, data.env, uid));
+    const guideSynergyBattleEligible = qualifiesGuideSynergyBattle(
+      readMissions(missionSnapshot), missionCatalog, data.cardSnapshots, specRows, synergyTiers);
     const now = Timestamp.now();
     const revision = safeInteger(saveSnapshot.get("revision")) ?? 0;
     const nextApprovals = {
@@ -377,6 +385,7 @@ export const lockDeck = onCall({enforceAppCheck: false}, async (request) => {
         myNonce: data.myNonce,
         opponentNonce: data.opponentNonce,
         cardSnapshots: data.cardSnapshots,
+        guideSynergyBattleEligible,
         saveRevision: revision,
         approvedAt: now,
       },

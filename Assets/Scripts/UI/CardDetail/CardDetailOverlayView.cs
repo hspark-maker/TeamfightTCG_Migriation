@@ -488,6 +488,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         if (SkipPlayingFx()) return;
 
         if (_e.pointerPressRaycast.gameObject != viewContents) return;
+        if (!GuidanceCoordinator.CanCloseCardDetail) return;
 
         Hide();
     }
@@ -561,6 +562,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     // 그 방향의 다음 "유효" 카드로 한 칸. 목록 끝에서는 반대편 끝으로 이어진다(순환).
     void Step(int _dir)
     {
+        if (!GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.None)) return;
         if (_dir == 0) return;
 
         // 연출 중에 카드가 바뀌면 무대에 선 카드와 결과가 어긋난다.
@@ -738,6 +740,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     // 다시 그리는 것은 cardView.Bind 하나 — Apply를 통째로 돌리면 값이 그대로인 칩까지 Destroy + Instantiate 된다.
     void ToggleArtOnly()
     {
+        if (!GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.None)) return;
         if (this.m_ritualPlaying) return;   // 연출이 화면을 덮은 동안 카드를 다시 그리면 담금질 자세가 풀린다
 
         this.m_artOnly = !this.m_artOnly;
@@ -1043,6 +1046,8 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     string ShardProgressLabel(int _card, bool _hasStep)
     {
         if (!_hasStep) return NoValue;
+        if (OutgameTutorialGuide.HasFreeCardEnhance(_card) && OutgameTutorialGuide.CanUseFreeSynergyGrowth(_card))
+            return "한 번에 2성 달성";
         int t_progress = CardGrowthManager.ShardProgressOf(_card);
         int t_required = CardGrowthManager.ShardRequiredOf(_card);
         return $"{t_progress:N0}/{t_required:N0}";
@@ -1224,6 +1229,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
 
     void OnEnhancePressed()
     {
+        if (!GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.CardDetailEnhanceButton)) return;
         // 결과를 읽는 중이면 이 버튼이 곧 "한 번 더"다 — 손이 이미 가 있는 하단 바 버튼을 그대로 쓴다.
         if (this.resultPanel != null && this.resultPanel.IsOpen)
         {
@@ -1245,12 +1251,14 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     }
 
     bool CanFeedShard(int _card)
-        => IsViewVisible && !this.m_readOnly && _card > 0 && OwnershipManager.IsOwned(_card)
+        => GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.CardDetailEnhanceButton)
+            && IsViewVisible && !this.m_readOnly && _card > 0 && OwnershipManager.IsOwned(_card)
             && OutgameFeatureLock.IsUnlocked(EOutgameFeature.CardEnhance)
             && CardGrowthManager.Precheck(_card) == EEnhanceOutcome.Success;
 
     void BeginEnhance(int _card, int _amount)
     {
+        if (!GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.CardDetailEnhanceButton)) return;
         if (this.m_enhanceRequestPending || !CanFeedShard(_card)) return;
         int t_count = Mathf.Min(_amount, ShardAmountMax(_card));
         if (t_count <= 0) return;
