@@ -305,6 +305,13 @@ MonoBehaviour:
   animator: {fileID: -1295038493996436774}
   contents: {fileID: 1593290789050609309}
   isShow: 0
+  transition:
+    panel: {fileID: 0}
+    openDuration: 0.25
+    closeDuration: 0.15
+    openFromScale: 0.9
+    closeToScale: 0.9
+  dimAlpha: 0.72
   iconImage: {fileID: 3204699513890155701}
   nameText: {fileID: 3204699513971943730}
   explainText: {fileID: 3204699515746464546}

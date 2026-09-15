@@ -21,6 +21,8 @@ public abstract class ContentsPooledUI : PooledUIBase, IUIInitializationRoot
     PopupTransition m_contentsTransition;
     public bool IsUIInitialized { get; private set; }
     public int VisibilityVersion { get; private set; }
+    public bool IsViewVisible => contents != null && contents.activeInHierarchy;
+    public bool IsViewTransitioning => UsePopupTransition && transition.IsPlaying;
 
     // 기존 팝업의 표시 방식을 유지한다. 즉시 개폐·자체 딤을 쓰는 뷰는 해당 기능만 제외한다.
     protected virtual bool UsePopupTransition => true;

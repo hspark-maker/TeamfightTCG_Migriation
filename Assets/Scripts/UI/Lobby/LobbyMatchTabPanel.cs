@@ -84,7 +84,9 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         m_unlockPresentation.Bind(
             missionButton != null ? missionButton.GetComponent<FeatureLockView>() : null,
             adventureButton != null ? adventureButton.GetComponent<FeatureLockView>() : null,
-            rouletteButton != null ? rouletteButton.GetComponent<FeatureLockView>() : null);
+            rouletteButton != null ? rouletteButton.GetComponent<FeatureLockView>() : null,
+            playButton != null ? playButton.GetComponent<FeatureLockView>() : null,
+            guideMissionButton != null ? guideMissionButton.GetComponent<FeatureLockView>() : null);
 
         // 탭이 꺼져 있는 동안에도 신호를 받아야 한다 — 놓치면 다른 탭에 있던 사이 끝난 연출을 영영 못 따라간다.
         OutgameFeatureLock.OnChanged += ApplyFeatureLocks;

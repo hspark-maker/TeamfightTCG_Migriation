@@ -24,6 +24,11 @@ public static class GuidanceIntegrationValidation
                 Debug.LogError($"[GuidanceIntegrationValidation] {issue.Coord}: {issue.Message}");
             }
         Require(errors == 0, "Tutorial authoring has blocking errors.");
+        Require(GuideOnboardingDataAuthoring.HasEnhanceUnlockStep(sequence) && !string.IsNullOrWhiteSpace(sequence.guide.synergyIntroductionMessage),
+            "Guide onboarding explanation messages are missing.");
+        Require(GuideMissionPreparation.CardIds.Count == 3 && GuideMissionPreparation.CardIds[0] == 3
+            && GuideMissionPreparation.CardIds[1] == 4 && GuideMissionPreparation.CardIds[2] == 1,
+            "Caretaker preparation must retain the existing guide targets.");
         var settings = new JsonSerializerSettings
         {
             ContractResolver = new DefaultContractResolver { NamingStrategy = new CamelCaseNamingStrategy() },
@@ -33,18 +38,28 @@ public static class GuidanceIntegrationValidation
         {
             ChapterIndex = 2, ChapterStepIndex = 12, StepId = 38,
             AdventureFlowVersion = 2, AdventureUnlocked = true,
-            CompletedTriggers = new System.Collections.Generic.List<string> { "KeywordGrowthFirstOpen", "AdventureMapFirstOpen" },
+            CompletedTriggers = new System.Collections.Generic.List<string>
+            {
+                "KeywordGrowthFirstOpen", "AdventureMapFirstOpen", "CollectionTabFirstEnter",
+                "GuideMissionIntroduction", "KeywordIntroduction", "SynergyIntroduction",
+                "CaretakerPreparation", "CaretakerReady", "CaretakerActivation",
+            },
             SynergyIntroduction = new SynergyIntroductionSaveData { DeckSlot = 2, SynergyId = "Caretaker" },
         };
         string json = JsonConvert.SerializeObject(original, settings);
         var fields = JObject.Parse(json);
         Require((int)fields["synergyIntroduction"]["deckSlot"] == 2, "Synergy target wire key missing.");
-        Require(fields["completedTriggers"] is JArray t_triggers && t_triggers.Count == 2, "Completed trigger wire key missing.");
+        Require(fields["completedTriggers"] is JArray t_triggers && t_triggers.Count == original.CompletedTriggers.Count,
+            "Completed trigger wire key missing.");
         var restored = JsonConvert.DeserializeObject<TutorialSaveData>(json, settings);
         Require(restored.AdventureFlowVersion == 2 && restored.AdventureUnlocked
             && restored.CompletedTriggers.Contains("AdventureMapFirstOpen")
             && restored.SynergyIntroduction.SynergyId == "Caretaker",
             "Guidance state did not survive snapshot round trip.");
+        foreach (string trigger in original.CompletedTriggers)
+            Require(restored.CompletedTriggers.Contains(trigger), "Guidance completion lost: " + trigger);
+        Require(restored.StepId == 38 && restored.ChapterIndex == 2 && restored.ChapterStepIndex == 12,
+            "New explanation keys must not alter existing tutorial coordinates.");
         var legacy = JsonConvert.DeserializeObject<TutorialSaveData>("{\"outgameCompleted\":true}", settings);
         Require(legacy.SynergyIntroduction != null && legacy.SynergyIntroduction.DeckSlot == -1,
             "Missing legacy fields must retain migration defaults.");

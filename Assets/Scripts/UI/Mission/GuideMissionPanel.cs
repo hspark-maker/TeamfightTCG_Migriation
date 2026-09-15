@@ -69,6 +69,7 @@ public class GuideMissionPanel : ContentsPooledUI
     Action<string> m_navigateHandler;
     MissionDefinition m_completionDefinition;
     GuideMissionList m_list;
+    Canvas m_introductionCanvas;
 
     const string PERIOD_GUIDE = "guide";
 
@@ -79,6 +80,7 @@ public class GuideMissionPanel : ContentsPooledUI
 
         this.SetContentsVisible(true);
         this.Rebuild();
+        GuidanceCoordinator.RequestMissionIntroduction(() => this != null && this.isShow);
 
         // 초기화 요청을 공유하고, 상태·기간·저장 버전이 유효하면 최근 조회를 재사용한다.
         MissionCommands.RefreshAsync().Forget();
@@ -104,11 +106,27 @@ public class GuideMissionPanel : ContentsPooledUI
     protected override void OnViewShown()
     {
         MissionManager.OnChanged += this.HandleMissionsChanged;
+        OwnershipManager.OnOwnershipChanged += this.RefreshRows;
+        CardGrowthManager.OnGrowthChanged += this.RefreshRows;
+        OutgameTutorialRunner.OnGuidedChanged += this.RefreshIntroductionLayer;
     }
 
     protected override void OnViewHidden()
     {
         MissionManager.OnChanged -= this.HandleMissionsChanged;
+        OwnershipManager.OnOwnershipChanged -= this.RefreshRows;
+        CardGrowthManager.OnGrowthChanged -= this.RefreshRows;
+        OutgameTutorialRunner.OnGuidedChanged -= this.RefreshIntroductionLayer;
+        UiSortingOrder.DropNested(m_introductionCanvas);
+        OutgameTutorialRunner.AbortGuided(EOutgameTutorialTrigger.GuideMissionIntroduction);
+    }
+
+    void RefreshIntroductionLayer()
+    {
+        // 풀(400)이 안내 게이트(350)를 덮으므로 이 소개 동안만 패널을 아래에 둔다.
+        if (isShow && OutgameTutorialRunner.GuidedTrigger == EOutgameTutorialTrigger.GuideMissionIntroduction)
+            m_introductionCanvas = UiSortingOrder.LiftNested(contents, UiSortingOrder.PooledOverlay);
+        else UiSortingOrder.DropNested(m_introductionCanvas);
     }
 
     void HandleMissionsChanged()

@@ -91,6 +91,9 @@ public class MissionRowView : MonoBehaviour, IUIInitializable
     bool m_initialized;
     EMissionRowEmphasis m_emphasis;
     System.Action m_onGo;
+    TMP_Text m_preparationText;
+    bool m_preparationExpanded;
+    float m_rowHeight;
 
     readonly Vector3[] m_fillCorners = new Vector3[4];
     readonly Vector3[] m_textCorners = new Vector3[4];
@@ -102,6 +105,7 @@ public class MissionRowView : MonoBehaviour, IUIInitializable
     public void InitializeUI()
     {
         if (this.m_initialized) return;
+        if (transform is RectTransform t_row) m_rowHeight = t_row.sizeDelta.y;
         if (this.rewardIcon != null) this.m_authoredRewardIcon = this.rewardIcon.sprite;
         if (this.claimButton != null)
         {
@@ -139,7 +143,7 @@ public class MissionRowView : MonoBehaviour, IUIInitializable
         this.m_hasBound = true;
         this.m_definition = _definition;
 
-        if (this.titleText != null) this.titleText.text = (_definition?.Period == "guide" ? "가이드 · " : "") + (_definition?.Title ?? string.Empty);
+        if (this.titleText != null) this.titleText.text = _definition?.Title ?? string.Empty;
         if (this.descriptionText != null) this.descriptionText.text = _definition?.Description ?? string.Empty;
         if (this.rewardText != null) this.rewardText.text = BuildRewardText(_definition);
         this.ApplyRewardVisual(_definition);
@@ -169,6 +173,7 @@ public class MissionRowView : MonoBehaviour, IUIInitializable
     internal void Refresh()
     {
         if (this.m_definition == null) return;
+        RefreshPreparation();
         this.ApplyEmphasis(MissionManager.IsComplete(this.m_definition));
 
         bool t_complete = MissionManager.IsComplete(this.m_definition);
@@ -217,6 +222,48 @@ public class MissionRowView : MonoBehaviour, IUIInitializable
             this.progressFill.rectTransform.anchorMax = new Vector2(t_ratio, 1f);
             this.progressFill.gameObject.SetActive(t_ratio > 0f);
         }
+    }
+
+    void RefreshPreparation()
+    {
+        bool t_preparation = m_definition.Event == GuideMissionTrack.EVENT_STARTER_CARDS_STAR2;
+        if (t_preparation && m_preparationText == null && titleText != null)
+        {
+            m_preparationText = Instantiate(titleText, transform);
+            m_preparationText.name = "CaretakerPreparation";
+            m_preparationText.fontSize = 25f;
+            m_preparationText.enableAutoSizing = false;
+            m_preparationText.alignment = TextAlignmentOptions.TopLeft;
+            m_preparationText.raycastTarget = false;
+            RectTransform t_text = m_preparationText.rectTransform;
+            t_text.anchorMin = new Vector2(0, 0);
+            t_text.anchorMax = new Vector2(1, 0);
+            t_text.pivot = new Vector2(0.5f, 0);
+            t_text.anchoredPosition = new Vector2(0, 12);
+            t_text.sizeDelta = new Vector2(-48, 105);
+        }
+        if (m_preparationText != null) m_preparationText.gameObject.SetActive(t_preparation);
+        if (m_preparationExpanded != t_preparation)
+        {
+            float t_delta = t_preparation ? 126f : -126f;
+            foreach (RectTransform t_child in transform)
+                if ((m_preparationText == null || t_child != m_preparationText.rectTransform)
+                    && t_child.anchorMin.y == t_child.anchorMax.y)
+                    t_child.anchoredPosition += Vector2.up * t_delta * (1f - t_child.anchorMin.y);
+            m_preparationExpanded = t_preparation;
+            if (transform is RectTransform t_row) t_row.sizeDelta = new Vector2(t_row.sizeDelta.x, m_rowHeight + (t_preparation ? 126f : 0));
+            LayoutElement t_layout = GetComponent<LayoutElement>();
+            if (t_layout != null) t_layout.preferredHeight = m_rowHeight + (t_preparation ? 126f : 0);
+        }
+        if (!t_preparation || m_preparationText == null) return;
+        s_text.Clear();
+        foreach (int t_card in GuideMissionPreparation.CardIds)
+        {
+            if (s_text.Length > 0) s_text.Append('\n');
+            string t_name = CardCatalog.TryGetSpec(t_card, out CardSpec t_spec) ? t_spec.DisplayName : t_card.ToString();
+            s_text.Append(t_name).Append(" · ").Append(GuideMissionPreparation.StatusTextOf(t_card));
+        }
+        m_preparationText.text = s_text.ToString();
     }
 
     void LateUpdate()

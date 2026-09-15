@@ -85,6 +85,11 @@ public sealed class LobbyTabBarView : MonoBehaviour, IUIInitializable
             ? t_view.transform as RectTransform
             : null;
 
+    /// <summary>탭 버튼에 배선된 잠금 표현을 제공한다.</summary>
+    public FeatureLockView GetFeatureLock(int index)
+        => TryGetView(index, out TabButtonView view) && view.Button != null
+            ? view.Button.GetComponent<FeatureLockView>() : null;
+
     public RectTransform GetVisualAnchor(int _index)
         => focus != null && m_previousIndex == _index
             ? focus

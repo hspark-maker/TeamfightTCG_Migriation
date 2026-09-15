@@ -9,10 +9,7 @@ public class OutgameTutorialChapter
     [Tooltip("기획의 'N편'과 맞추는 이름. 표시·로그용일 뿐이다 — 세이브가 붙잡는 것은 스텝의 stepId이고, 챕터·스텝 인덱스는 런타임 커서다")]
     [SerializeField] string label;
 
-    [Tooltip("강제 = 첫 시작 시퀀스(세이브 좌표·기능 잠금). 자율 = 졸업 뒤 트리거로 깨어나는 안내.\n"
-           + "자율 챕터 규약: 로비 안에서 시작해 로비 안에서 끝난다 · locks/unlocks를 쓰지 않는다 · 진행은 메모리에만 남아 화면을 떠나면 다음에 처음부터 · 완주해야 낙인이 찍힌다.\n"
-           + "자율 챕터는 강제 챕터 뒤에만 올 수 있다(앞에 끼우면 뒤의 강제 챕터가 잘린다)")]
-    [SerializeField] EOutgameTutorialChapterKind kind;
+    [NonSerialized] EOutgameTutorialChapterKind kind;
 
     [Tooltip("자율 챕터를 깨우는 사건. 완주 낙인의 식별자이기도 하다 — 바꾸면 이미 완주한 계정이 이 챕터를 다시 본다. 강제 챕터는 읽지 않는다")]
     [SerializeField] EOutgameTutorialTrigger trigger;
@@ -35,6 +32,8 @@ public class OutgameTutorialChapter
     public EOutgameFeature Prerequisite => IsGuided ? prerequisite : EOutgameFeature.None;
 
     public int StepCount => stepDefs != null ? stepDefs.Count : 0;
+
+    internal void SetKind(EOutgameTutorialChapterKind _kind) => kind = _kind;
 
 #if UNITY_EDITOR
     // 저작 도구 전용 — 런타임은 읽기만 한다(TryGetStep/StepCount). 편집 규칙은 TutorialSequenceEditOps에 있다.

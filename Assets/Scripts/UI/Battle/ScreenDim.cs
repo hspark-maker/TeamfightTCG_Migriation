@@ -14,7 +14,7 @@ public class ScreenDim : MonoBehaviour
 {
     const int LAYER_COUNT = 2;
 
-    sealed class Request
+    internal sealed class Request
     {
         public object owner;
         public float alpha;
@@ -22,6 +22,59 @@ public class ScreenDim : MonoBehaviour
         public bool hasHole;
         public Rect hole;
         public float fade;
+        public bool managed;
+        public int sortingOrder;
+        public Color color = Color.black;
+    }
+
+    /// <summary>오버레이가 요청하는 암막의 표시 설정.</summary>
+    public readonly struct Options
+    {
+        public readonly float Alpha;
+        public readonly Color Color;
+        public readonly bool Block;
+        public readonly float Fade;
+        public readonly int SortingOrder;
+
+        public Options(float alpha, Color color, bool block, float fade, int sortingOrder)
+        {
+            Alpha = Mathf.Clamp01(alpha);
+            Color = new Color(color.r, color.g, color.b, 1f);
+            Block = block;
+            Fade = Mathf.Max(0f, fade);
+            SortingOrder = sortingOrder;
+        }
+    }
+
+    /// <summary>한 번의 표시 요청. 이전 표시의 핸들은 새 표시를 해제하지 못한다.</summary>
+    public sealed class Handle
+    {
+        readonly ScreenDim _screen;
+        readonly Request _request;
+
+        internal Handle(ScreenDim screen, Request request)
+        {
+            _screen = screen;
+            _request = request;
+        }
+
+        public void Release(float duration = 0f)
+        {
+            if (_screen != null) _screen.Release(_request, Mathf.Max(0f, duration));
+        }
+
+        public void SetColor(Color color)
+        {
+            if (_screen != null) _screen.SetRequestColor(_request, color);
+        }
+
+        /// <summary>강제 비활성화 시 자기 요청의 남은 퇴장까지 즉시 취소한다.</summary>
+        public void Cancel()
+        {
+            if (_screen == null) return;
+            _screen.Release(_request, 0f);
+            if (ReferenceEquals(_screen._releasingRequest, _request)) _screen.ApplyHidden();
+        }
     }
 
     [SerializeField] EDimLayer layer = EDimLayer.Full;
@@ -31,9 +84,13 @@ public class ScreenDim : MonoBehaviour
     [SerializeField] RectTransform holeBottom;
     [SerializeField] RectTransform holeLeft;
     [SerializeField] RectTransform holeRight;
+    [SerializeField] Canvas sortingCanvas;
 
     static readonly ScreenDim[] s_instances = new ScreenDim[LAYER_COUNT];
     readonly List<Request> requests = new List<Request>();
+    bool _pendingRelease;
+    float _releaseDuration;
+    Request _releasingRequest;
 
     public static bool IsAvailable => Get(EDimLayer.Full) != null;
 
@@ -44,6 +101,31 @@ public class ScreenDim : MonoBehaviour
     }
 
     public static bool IsAvailableAt(EDimLayer _layer) => Get(_layer) != null;
+
+    /// <summary>로비의 공통 Full 딤을 요청한다.</summary>
+    public static Handle Acquire(object owner, Options options)
+    {
+        ScreenDim screen = Get(EDimLayer.Full);
+        if (screen == null || screen.sortingCanvas == null)
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.LogError("[ScreenDim] Overlay requires a Full dim with an authored sorting Canvas.");
+#endif
+            return null;
+        }
+        if (owner == null) return null;
+        screen.PruneDestroyedOwners();
+        screen.RemoveOwner(owner);
+        var request = new Request
+        {
+            owner = owner, alpha = options.Alpha, color = options.Color,
+            block = options.Block, fade = options.Fade,
+            managed = true, sortingOrder = options.SortingOrder
+        };
+        screen.requests.Add(request);
+        screen.ApplyTop(false, true);
+        return new Handle(screen, request);
+    }
 
     void Awake()
     {
@@ -63,9 +145,57 @@ public class ScreenDim : MonoBehaviour
 
     void OnDestroy()
     {
+        this.canvasGroup.DOKill();
+        this.full.DOKill();
         if (Get(this.layer) != this) return;
         this.requests.Clear();
         s_instances[(int)this.layer] = null;
+    }
+
+    void OnDisable()
+    {
+        this.requests.Clear();
+        ApplyHidden();
+    }
+
+    void LateUpdate()
+    {
+        if (!_pendingRelease) return;
+        _pendingRelease = false;
+        if (this.requests.Count != 0) return;
+        this.canvasGroup.DOFade(0f, _releaseDuration).SetLink(gameObject)
+            .OnComplete(() => { if (this.requests.Count == 0) ApplyHidden(); });
+    }
+
+    void Release(Request request, float duration)
+    {
+        int index = this.requests.IndexOf(request);
+        if (index < 0) return;
+        bool top = index == this.requests.Count - 1;
+        this.requests.RemoveAt(index);
+        if (!top) return;
+        PruneDestroyedOwners();
+        if (this.requests.Count > 0)
+        {
+            ApplyTop(false, true);
+            return;
+        }
+        if (duration <= 0f) { ApplyHidden(); return; }
+        this.canvasGroup.DOKill();
+        this.full.DOKill();
+        // 같은 프레임의 다음 화면 요청이 들어오기 전에 알파를 낮추지 않는다.
+        _pendingRelease = true;
+        _releaseDuration = duration;
+        _releasingRequest = request;
+    }
+
+    void SetRequestColor(Request request, Color color)
+    {
+        if (!this.requests.Contains(request)) return;
+        request.color = new Color(color.r, color.g, color.b, 1f);
+        if (!ReferenceEquals(request, this.requests[this.requests.Count - 1])) return;
+        this.full.DOKill();
+        this.full.color = request.color;
     }
 
     public static void Show(object _owner, float _alpha = 0.62f, bool _block = true, float _fade = 0f,
@@ -116,6 +246,8 @@ public class ScreenDim : MonoBehaviour
 
     void Remove(object _owner)
     {
+        // 다른 화면의 중복 Hide가 마지막 오버레이의 퇴장 페이드를 자르면 안 된다.
+        if (!this.requests.Exists(request => ReferenceEquals(request.owner, _owner))) return;
         object t_previousTop = this.requests.Count > 0 ? this.requests[this.requests.Count - 1].owner : null;
         RemoveOwner(_owner);
         PruneDestroyedOwners();
@@ -135,10 +267,22 @@ public class ScreenDim : MonoBehaviour
             if (this.requests[i].owner is Object t_owner && t_owner == null) this.requests.RemoveAt(i);
     }
 
-    void ApplyTop(bool _fadeFromHidden)
+    void ApplyTop(bool _fadeFromHidden, bool continuous = false)
     {
         Request t_request = this.requests[this.requests.Count - 1];
+        _pendingRelease = false;
+        _releasingRequest = null;
         this.canvasGroup.DOKill();
+        this.full.DOKill();
+        if (sortingCanvas != null)
+        {
+            if (t_request.managed)
+            {
+                sortingCanvas.overrideSorting = true;
+                UiSortingOrder.Stamp(sortingCanvas, t_request.sortingOrder);
+            }
+            else UiSortingOrder.DropNested(sortingCanvas);
+        }
         this.canvasGroup.blocksRaycasts = t_request.block;
         this.canvasGroup.interactable = false;
 
@@ -153,12 +297,23 @@ public class ScreenDim : MonoBehaviour
             this.full.gameObject.SetActive(true);
         }
 
-        if (_fadeFromHidden && t_request.fade > 0f)
+        if (continuous && t_request.managed && t_request.fade > 0f)
         {
+            if (this.canvasGroup.alpha <= 0f) this.full.color = t_request.color;
+            else this.full.DOColor(t_request.color, t_request.fade).SetLink(gameObject);
+            this.canvasGroup.DOFade(t_request.alpha, t_request.fade).SetLink(gameObject);
+        }
+        else if (_fadeFromHidden && t_request.fade > 0f)
+        {
+            this.full.color = t_request.color;
             this.canvasGroup.alpha = 0f;
             this.canvasGroup.DOFade(t_request.alpha, t_request.fade).SetLink(gameObject);
         }
-        else this.canvasGroup.alpha = t_request.alpha;
+        else
+        {
+            this.full.color = t_request.color;
+            this.canvasGroup.alpha = t_request.alpha;
+        }
     }
 
     void ApplyHole(Rect _screenRect)
@@ -188,7 +343,12 @@ public class ScreenDim : MonoBehaviour
 
     void ApplyHidden()
     {
+        _pendingRelease = false;
+        _releasingRequest = null;
         this.canvasGroup.DOKill();
+        this.full.DOKill();
+        this.full.color = Color.black;
+        if (sortingCanvas != null) UiSortingOrder.DropNested(sortingCanvas);
         this.canvasGroup.alpha = 0f;
         this.canvasGroup.interactable = false;
         this.canvasGroup.blocksRaycasts = false;

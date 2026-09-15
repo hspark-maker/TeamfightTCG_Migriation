@@ -14,8 +14,8 @@ public class UnlockIntroOverlay : PooledOverlay<UnlockIntroOverlay>
 
     [Tooltip("행이 깔리는 노드. 자식은 UnlockIntroRow를 단 노드여야 하고, 런타임 Instantiate는 없다.")]
     [SerializeField] Transform rowRoot;
-
     [Header("연출")]
+    [SerializeField] OverlayDim dim = new OverlayDim();
 
     [Tooltip("첫 행이 들어오기까지의 뜸. 딤이 깔리는 동안은 아직 읽을 것이 없다.")]
     [SerializeField] float rowDelay = 0.12f;
@@ -33,7 +33,16 @@ public class UnlockIntroOverlay : PooledOverlay<UnlockIntroOverlay>
     Sequence m_intro;
 
     // 한 번 쓰면 비워 연타를 막는다.
-    Action m_onClose;
+    Action<bool> m_onFinished;
+    bool m_showingGuidance;
+    IReadOnlyList<UnlockIntro> m_intros;
+    int m_introIndex;
+    int m_card;
+    string m_guideMessage;
+
+    /// <summary>해금 인트로의 개념 배너가 표시 중인가.</summary>
+    public static bool IsGuidanceShowing => IsOpen && UIPoolManager.instance != null
+        && UIPoolManager.instance.TryGetUI<UnlockIntroOverlay>(out var t_overlay) && t_overlay.m_showingGuidance;
 
     CanvasGroup m_confirmGroup;
 
@@ -52,88 +61,104 @@ public class UnlockIntroOverlay : PooledOverlay<UnlockIntroOverlay>
     public static bool TryGet(out UnlockIntroOverlay _overlay)
         => TryGetOrCreate(out _overlay);
 
-    /// <summary>_intros를 세우고 [확인]을 기다린다(_onClose는 걷힌 뒤 한 번, 빈 목록이면 곧바로 온다).</summary>
-    public void Show(IReadOnlyList<UnlockIntro> _intros, int _card, Action _onClose)
+    /// <summary>효과와 데모를 재생한다. 확인은 true, 중단은 false를 한 번 돌려준다.</summary>
+    public void Show(IReadOnlyList<UnlockIntro> _intros, int _card, Action<bool> _onFinished, string _guideMessage = null)
     {
+        if (IsOpen || m_onFinished != null) Cancel();
         InitializeUI();
-        // 시퀀스에 중첩된 트윈은 대상의 DOKill이 잡지 못해 새 안무와 같은 노드를 함께 민다.
-        KillIntro();
-        EndDemo();
-
-        this.m_shownRows = BuildRows(_intros);
-
-        if (this.m_shownRows == 0)
+        if (_intros == null || _intros.Count == 0)
         {
-            this.m_onClose = null;
-
-            // 앞 표시가 떠 있는 채로 빈 목록이 오면 그 화면이 그대로 남는다 — 첫 표시에서는
-            // ConsumeOpen()이 거짓이라 통지가 나가지 않아 종전과 같다.
-            NotifyClosed(ConsumeOpen());
-            SetVisible(false);
-
-            _onClose?.Invoke();
+            _onFinished?.Invoke(false);
             return;
         }
 
-        this.m_onClose = _onClose;
-
-        if (this.confirmButton != null)
+        m_onFinished = _onFinished;
+        m_intros = _intros;
+        m_introIndex = 0;
+        m_card = _card;
+        m_guideMessage = _guideMessage;
+        if (confirmButton != null)
         {
-            this.confirmButton.onClick.RemoveAllListeners();   // 재표시마다 중복 등록 방지
-            this.confirmButton.onClick.AddListener(OnConfirmClicked);
+            confirmButton.onClick.RemoveAllListeners();
+            confirmButton.onClick.AddListener(OnConfirmClicked);
         }
-
         MarkOpen();
         SetVisible(true);
-
-        // 다 서기 전에 눌러 닫히면 무엇이 열렸는지 못 본다.
-        SetInputEnabled(false);
-
-        BeginDemo(_intros, _card);
-
-        this.m_intro = BuildIntro();
-        this.m_intro.Play();
+        RenderIntro();
     }
 
-    // 잠금을 푸는 곳이 등장 안무뿐이라, Show를 거치지 않고 뜨면 [확인]이 잠긴 모달로 남는다.
-    protected override void OnViewShown()
+    void RenderIntro()
     {
-        SetInputEnabled(true);
+        KillIntro();
+        EndDemo();
+        ClearGuidance();
+        if (rowRoot != null) rowRoot.gameObject.SetActive(true);
+        var t_intros = new[] { m_intros[m_introIndex] };
+        m_shownRows = BuildRows(t_intros);
+        if (m_shownRows == 0) { Finish(false); return; }
+        SetInputEnabled(false);
+        BeginDemo(t_intros, m_card);
+        m_intro = BuildIntro();
+        m_intro.Play();
+        m_showingGuidance = t_intros[0].IsSynergy && !string.IsNullOrEmpty(m_guideMessage);
+        if (m_showingGuidance)
+            OutgameTutorialGateUI.Ensure().ShowBanner(this, m_guideMessage);
     }
+
+    /// <summary>소유 화면이 떠나면 완료 처리 없이 안내를 닫는다.</summary>
+    public void Cancel() => Finish(false);
+
+    protected override void OnViewShown() => SetInputEnabled(true);
 
     protected override void OnViewHidden()
     {
-        this.transition.HandleDisabled(ResolveTarget());
+        var t_callback = m_onFinished;
+        m_onFinished = null;
+        m_intros = null;
+        m_guideMessage = null;
+        ClearGuidance();
+        dim.Clear();
+        transition.HandleDisabled(ResolveTarget());
         KillIntro();
         EndDemo();
         ResetChoreography();
-
-        // 닫기를 거치지 않고 꺼지는 경로(부모 비활성·씬 언로드)에서 이 플래그가 남으면 영영 열린 것으로 읽힌다.
         ClearOpen();
+        t_callback?.Invoke(false);
     }
 
     void OnConfirmClicked()
     {
-        // 콜백 유무로 연타를 막으면 뒤처리가 없는 호출부에서 [확인]이 아무 일도 안 하는 모달이 된다.
-        if (!IsOpen) return;
+        if (!IsOpen || (confirmButton != null && !confirmButton.interactable)) return;
+        if (m_intros != null && m_introIndex + 1 < m_intros.Count)
+        {
+            m_introIndex++;
+            RenderIntro();
+            return;
+        }
+        Finish(true);
+    }
 
-        // 정리 도중 다시 들어와도 두 번 흐르지 않게 먼저 비운다.
-        var t_callback = this.m_onClose;
-        this.m_onClose = null;
-
+    void Finish(bool _confirmed)
+    {
+        var t_callback = m_onFinished;
+        m_onFinished = null;
+        m_intros = null;
+        m_guideMessage = null;
+        bool t_open = ConsumeOpen();
+        ClearGuidance();
         SetInputEnabled(false);
-
-        bool t_wasOpen = ConsumeOpen();
-
         KillIntro();
         EndDemo();
         SetVisible(false);
         ResetChoreography();
+        NotifyClosed(t_open);
+        t_callback?.Invoke(_confirmed);
+    }
 
-        NotifyClosed(t_wasOpen);
-
-        // 받는 쪽이 이 화면의 상태를 다시 물어볼 수 있어야 해서 정리가 끝난 뒤에 넘긴다.
-        t_callback?.Invoke();
+    void ClearGuidance()
+    {
+        if (m_showingGuidance) OutgameTutorialGateUI.Instance?.Clear(this);
+        m_showingGuidance = false;
     }
 
     // 프리팹에 미리 깔린 행을 꺼내 쓰고 남는 것은 끈다. 돌려주는 값은 실제로 세운 수.
@@ -304,6 +329,8 @@ public class UnlockIntroOverlay : PooledOverlay<UnlockIntroOverlay>
 
     void SetVisible(bool _visible)
     {
+        if (_visible) this.dim.Show(this, UiSortingOrder.IntroDim, this.transition.OpenDuration);
+        else this.dim.Hide(this.transition.CloseDuration);
         SetContentsVisible(_visible, this.transition);
     }
 

@@ -11,6 +11,8 @@ public static class OutgameTutorialGuide
     // 플래그가 아니라 스텝 참조인 이유: 무료를 저작하는 스텝이 여럿이라(카드 강화·키워드 강화)
     // 하나로 묶으면 앞 스텝이 쓴 한 방 때문에 뒤 스텝의 저작이 조용히 무시된다.
     static TutorialStepDef s_freeSpentStep;
+    static int s_enhanceCard;
+    static bool s_enhanceFree;
 
     /// <summary>서버 소진 표식이 바뀌었다. 안내가 서 있는 스텝을 다시 판정시키는 자리다(브리지가 구독한다).</summary>
     // 중계인 이유: 구독자가 클라우드 창구를 직접 참조하지 않게 이 창구 하나로 묶는다.
@@ -28,10 +30,47 @@ public static class OutgameTutorialGuide
     /// 저작이 비었으면 false — 그때는 화면이 스스로 고른다(안내가 멈추지 않게).</summary>
     public static bool TryGetAnchorCard(out int _cardId)
     {
-        _cardId = TryGetCurrentStep(out var t_step) ? t_step.AnchorCardId : 0;
+        _cardId = OutgameTutorialRunner.GuidedTrigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
+            ? s_enhanceCard : TryGetCurrentStep(out var t_step) ? t_step.AnchorCardId : 0;
 
         return _cardId > 0;
     }
+
+    /// <summary>강화 안내의 대상 카드를 세션 시작 시 고정한다.</summary>
+    public static bool PrepareEnhanceCard(OutgameTutorialChapter _chapter)
+    {
+        s_enhanceCard = 0;
+        s_enhanceFree = false;
+        for (int t_i = 0; t_i < _chapter.StepCount; t_i++)
+            if (_chapter.TryGetStep(t_i, out var t_step) && t_step.Action == EOutgameTutorialAction.WaitEnhance)
+                s_enhanceFree = t_step.FreeOfCharge && t_step != s_freeSpentStep
+                    && !IsFreeShotSpentOnServer(t_step.Action);
+
+        string t_event = GuideMissionTrack.Current?.Event;
+        bool t_starters = t_event == GuideMissionTrack.EVENT_STARTER_CARDS_STAR1
+            || t_event == GuideMissionTrack.EVENT_STARTER_CARDS_STAR2
+            || t_event == GuideMissionTrack.EVENT_CARETAKER_CARDS_STAR1;
+        if (t_starters)
+            foreach (int t_card in new[] { 1, 3, 4 })
+                if (GuideMissionTrack.StarOf(t_card) < (t_event == GuideMissionTrack.EVENT_STARTER_CARDS_STAR2 ? 2 : 1)
+                    && CanGuideEnhance(t_card)) { s_enhanceCard = t_card; return true; }
+        int t_growth = GuideMissionTrack.PickGrowthCard(GuideMissionTrack.Current);
+        if (CanGuideEnhance(t_growth)) { s_enhanceCard = t_growth; return true; }
+        foreach (int t_card in CardCatalog.AllIds)
+            if (CanGuideEnhance(t_card) && (s_enhanceCard == 0 || t_card < s_enhanceCard)) s_enhanceCard = t_card;
+        return s_enhanceCard > 0;
+    }
+
+    /// <summary>세션 대상 카드가 여전히 강화 가능한가.</summary>
+    public static bool CanContinueEnhance() => CanGuideEnhance(s_enhanceCard);
+
+    /// <summary>강화 안내 종료 시 세션 대상을 걷는다.</summary>
+    public static void ClearEnhanceCard() { s_enhanceCard = 0; s_enhanceFree = false; }
+
+    /// <summary>강화 문구의 비용 설명을 현재 무료 자격으로 해석한다.</summary>
+    public static string MessageOf(TutorialStepDef _step)
+        => (_step?.GuideMessage ?? string.Empty).Replace("{enhanceCost}",
+            HasFreeShot(EOutgameTutorialAction.WaitEnhance) ? "이번 강화는 무료예요." : "샤드를 사용해 카드를 성장시켜요.");
 
     /// <summary>지금 이 한 방을 안내가 대신 내주는가 = 저작이 무료라고 말한 스텝에 서 있고, 그 스텝이 아직 안 썼다.
     /// 무엇이 무료인지는 코드가 아니라 스텝의 freeOfCharge가 정한다.
@@ -86,4 +125,20 @@ public static class OutgameTutorialGuide
     public static bool TryGetCurrentStep(out TutorialStepDef _step)
         => OutgameTutorialRunner.TryGetGuidedStep(out _step)
         || OutgameTutorialRunner.TryGetCurrentStep(out _step);
+    static bool CanGuideEnhance(int _cardId)
+    {
+        if (_cardId <= 0 || !CardGrowthManager.IsReady || !OwnershipManager.IsOwned(_cardId)
+            || !CardGrowthManager.TryGetNextStep(_cardId, out var t_step)) return false;
+        bool t_inAlbum = false;
+        foreach (var t_theme in CardAlbum.Themes)
+        {
+            if (t_theme.IsLocked) continue;
+            foreach (int t_card in t_theme.CardIds)
+                if (t_card == _cardId) { t_inAlbum = true; break; }
+            if (t_inAlbum) break;
+        }
+        return t_inAlbum && ((s_enhanceFree && !IsFreeShotSpentOnServer(EOutgameTutorialAction.WaitEnhance))
+            || CurrencyManager.CanAfford(t_step.Currency, t_step.Cost));
+    }
+
 }

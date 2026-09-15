@@ -36,13 +36,19 @@ public static class UiSortingOrder
     /// <summary>획득 결과 오버레이(CardRewardOverlay·CardSetRewardOverlay·PackRewardOverlay.prefab).</summary>
     public const int Reward = 120;
 
-    /// <summary>개봉·보상 위에서 여는 카드 상세. 로비에서 열 때는 <see cref="CardDetail"/> 층에 있고,
+    /// <summary>획득 결과 오버레이 바로 아래의 공통 암막.</summary>
+    public const int RewardDim = Reward - 1;
+
+    /// <summary>개봉·보상 위에서 여는 카드 상세. 로비에서 열 때는 로비 캔버스 안(<see cref="Lobby"/>)에 그대로 있고,    /// <summary>개봉·보상 위에서 여는 카드 상세. 로비에서 열 때는 <see cref="CardDetail"/> 층에 있고,
     /// 다른 화면 위에서 열 때만 이 층으로 올라탄다(CardDetailOverlayView.LiftAbove).</summary>
     public const int CardDetailLifted = 130;
 
     /// <summary>전면에서 개념을 가르치는 안내(UnlockIntroOverlay.prefab)와 승급 연출(RankPromoteOverlay.prefab).
     /// 상세를 무대로 쓰는 층이라 <see cref="CardDetailLifted"/>보다 반드시 위다.</summary>
     public const int Intro = 150;
+
+    /// <summary>해금 안내 바로 아래, 승격된 카드 상세 위의 공통 암막.</summary>
+    public const int IntroDim = Intro - 1;
 
     /// <summary>전투 튜토리얼 안내(TutorialOverlay.prefab).</summary>
     public const int BattleTutorial = 200;

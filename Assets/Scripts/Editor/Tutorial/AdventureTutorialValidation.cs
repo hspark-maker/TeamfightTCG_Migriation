@@ -16,11 +16,11 @@ public static class AdventureTutorialValidation
         Require(data != null, "Tutorial data is missing");
 
         OutgameTutorialChapter chapter = null;
-        for (int i = 0; i < data.chapters.Count; i++)
-            if (data.chapters[i] != null && data.chapters[i].Trigger == EOutgameTutorialTrigger.AdventureUnlocked) chapter = data.chapters[i];
+        for (int i = 0; i < data.Chapters.Count; i++)
+            if (data.Chapters[i] != null && data.Chapters[i].Trigger == EOutgameTutorialTrigger.AdventureUnlocked) chapter = data.Chapters[i];
         if (chapter == null)
-            for (int i = 0; i < data.chapters.Count; i++)
-                if (data.chapters[i] != null && data.chapters[i].Trigger == EOutgameTutorialTrigger.AdventureMapFirstOpen) chapter = data.chapters[i];
+            for (int i = 0; i < data.Chapters.Count; i++)
+                if (data.Chapters[i] != null && data.Chapters[i].Trigger == EOutgameTutorialTrigger.AdventureMapFirstOpen) chapter = data.Chapters[i];
         Require(chapter != null && chapter.IsGuided, "Adventure introduction chapter (guided, AdventureUnlocked or AdventureMapFirstOpen) is missing");
         const int oldChapter = 5;
 

@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>가이드 미션 "이동" 버튼의 목적지 실행. 잠금·준비 실패는 조용히 무시한다 — 가이드는 부가 기능이다.
-/// 도착 화면에 안내를 붙이지 않는다: 카드 소지가 전제인 안내는 소지 여부에 따라 성립하지 않는다.</summary>
+/// 강화 안내는 도착 뒤 실제 강화 가능한 보유 카드를 고른다.</summary>
 internal static class GuideMissionNavigator
 {
     internal static bool CanGo(MissionDefinition _definition)
@@ -9,6 +9,7 @@ internal static class GuideMissionNavigator
 
     internal static void Go(MissionDefinition _definition)
     {
+        if (_definition != null && GuidanceCoordinator.TryRequestMission(_definition.Id)) return;
         GuideMissionTrack.GuideRoute t_route = GuideMissionTrack.RouteOf(_definition);
         switch (t_route.Kind)
         {
@@ -29,10 +30,13 @@ internal static class GuideMissionNavigator
         DeckTabController t_tab = t_shell != null ? t_shell.GetComponentInChildren<DeckTabController>(true) : null;
         if (t_tab == null) return;
 
-        t_shell.Select(t_tab, false);
-        int t_slot = DeckSaveManager.SelectedSlot;
-        if (DeckSaveManager.IsSlotValid(t_slot)) t_tab.OpenEditor(t_slot);
-        else t_tab.OpenNewDeckEditor();
+        t_shell.TrySelectFeature(EOutgameFeature.LobbyDeckTab, _onArrived: () =>
+        {
+            int t_slot = DeckSaveManager.SelectedSlot;
+            if (DeckSaveManager.IsSlotValid(t_slot)) t_tab.OpenEditor(t_slot);
+            else t_tab.OpenNewDeckEditor();
+            SynergyIntroduction.RequestRelevantAction();
+        });
     }
 
     static void GoAdventure(string _nodeId)
@@ -48,7 +52,7 @@ internal static class GuideMissionNavigator
         LobbyTabController t_shell = FindShell();
         AlbumTabController t_tab = t_shell != null ? t_shell.GetComponentInChildren<AlbumTabController>(true) : null;
         if (t_tab == null) return;
-        t_shell.Select(t_tab, false);
+        t_shell.TrySelectFeature(EOutgameFeature.LobbyCollectionTab);
     }
 
     static void GoCardGrowth(MissionDefinition _definition)

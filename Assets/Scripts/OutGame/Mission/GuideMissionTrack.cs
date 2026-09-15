@@ -57,16 +57,7 @@ internal static class GuideMissionTrack
         => _definition != null && _definition.Period == PERIOD;
 
     /// <summary>미수령 가이드 중 순서가 가장 빠른 것. 전부 받았으면 null.</summary>
-    internal static MissionDefinition Current
-    {
-        get
-        {
-            IReadOnlyList<MissionDefinition> t_definitions = MissionManager.Definitions;
-            for (int i = 0; i < t_definitions.Count; i++)
-                if (IsGuide(t_definitions[i]) && !MissionManager.IsClaimed(t_definitions[i].Id)) return t_definitions[i];
-            return null;
-        }
-    }
+    internal static MissionDefinition Current => GuideMissionProgress.Current;
 
     /// <summary>주어진 미션 바로 다음 순서의 가이드. 마지막이면 null.</summary>
     internal static MissionDefinition NextOf(MissionDefinition _definition)

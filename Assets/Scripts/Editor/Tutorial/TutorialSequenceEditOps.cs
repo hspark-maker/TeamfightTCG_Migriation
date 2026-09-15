@@ -45,7 +45,7 @@ public static class TutorialSequenceEditOps
         // 손으로 필드를 베끼지 않는다 — InsertArrayElementAtIndex가 i번을 i+1로 통째로 복제한다(참조·리스트 포함).
         // 손복제는 필드가 늘어날 때 조용히 누락된다.
         var t_so   = new SerializedObject(_data);
-        var t_list = t_so.FindProperty("chapters").GetArrayElementAtIndex(_chapter).FindPropertyRelative("stepDefs");
+        var t_list = TutorialChapterProperties.GetChapter(t_so, _chapter).FindPropertyRelative("stepDefs");
         t_list.InsertArrayElementAtIndex(_index);
         t_so.ApplyModifiedPropertiesWithoutUndo();   // 되돌리기는 위 스냅샷 하나로 충분하다
 
@@ -134,13 +134,17 @@ public static class TutorialSequenceEditOps
     // ───────── 온보딩 챕터 ─────────
 
     /// <summary>빈 챕터를 그 자리에 끼운다(더미 스텝은 넣지 않는다 — 검증기가 "빈 챕터"로 잡아 준다)</summary>
-    public static bool AddChapter(OutgameTutorialData _data, int _index)
+    public static bool AddChapter(OutgameTutorialData _data, int _index,
+        EOutgameTutorialChapterKind _kind = EOutgameTutorialChapterKind.Forced)
     {
-        if (!TryGetChapters(_data, out var t_chapters)) return false;
-        if (_index < 0 || _index > t_chapters.Count)    return false;
+        if (_data == null) return false;
+        var t_chapters = GetChapterGroup(_data, _kind);
+        int t_localIndex = _kind == EOutgameTutorialChapterKind.Forced
+            ? _index : _index - _data.FtueChapterCount;
+        if (t_chapters == null || t_localIndex < 0 || t_localIndex > t_chapters.Count) return false;
 
         Undo.RegisterCompleteObjectUndo(_data, "튜토리얼 챕터 추가");
-        t_chapters.Insert(_index, new OutgameTutorialChapter());
+        t_chapters.Insert(t_localIndex, new OutgameTutorialChapter { EditorKind = _kind });
 
         CancelRewindForStructureChange($"챕터 추가({_index})");
         MarkDirty(_data);
@@ -167,7 +171,8 @@ public static class TutorialSequenceEditOps
         if (!EditorUtility.DisplayDialog("챕터 삭제", t_body, "삭제", "취소")) return false;
 
         Undo.RegisterCompleteObjectUndo(_data, "튜토리얼 챕터 삭제");
-        t_chapters.RemoveAt(_index);   // 지웠다고 카운터를 내리지 않는다(지운 번호 재사용 금지)
+        TryGetChapterGroup(_data, _index, out var t_group, out int t_localIndex);
+        t_group.RemoveAt(t_localIndex);
 
         CancelRewindForStructureChange($"챕터 삭제({_index} · 스텝 {t_count}개)");
         MarkDirty(_data);
@@ -181,16 +186,17 @@ public static class TutorialSequenceEditOps
         if (_index < 0 || _index >= t_chapters.Count)   return false;
         if (_delta == 0)                                return false;
 
-        // 시퀀스 양 끝을 넘어가면 막는다 — 창이 이 판정으로 버튼을 비활성으로 그린다
         int t_target = _index + _delta;
-        if (t_target < 0 || t_target >= t_chapters.Count) return false;
+        if (!TryGetChapterGroup(_data, _index, out var t_group, out int t_localIndex)
+            || !TryGetChapterGroup(_data, t_target, out var t_targetGroup, out int t_targetLocalIndex)
+            || t_group != t_targetGroup) return false;
 
         Undo.RegisterCompleteObjectUndo(_data, "튜토리얼 챕터 순서 변경");
 
         // 번호는 건드리지 않는다 — 챕터가 통째로 자리를 옮겨도 세이브는 stepId로 자기 스텝을 다시 찾는다
         var t_chapter = t_chapters[_index];
-        t_chapters.RemoveAt(_index);
-        t_chapters.Insert(t_target, t_chapter);
+        t_group.RemoveAt(t_localIndex);
+        t_group.Insert(t_targetLocalIndex, t_chapter);
 
         CancelRewindForStructureChange($"챕터 이동({_index} → {t_target})");
         MarkDirty(_data);
@@ -226,7 +232,13 @@ public static class TutorialSequenceEditOps
         var t_chapter = t_chapters[_index];
         if (t_chapter == null || t_chapter.EditorKind == _kind) return false;
 
-        Undo.RecordObject(_data, "튜토리얼 챕터 성격 변경");
+        var t_targetGroup = GetChapterGroup(_data, _kind);
+        if (t_targetGroup == null
+            || !TryGetChapterGroup(_data, _index, out var t_group, out int t_localIndex)) return false;
+
+        Undo.RegisterCompleteObjectUndo(_data, "튜토리얼 챕터 성격 변경");
+        t_group.RemoveAt(t_localIndex);
+        t_targetGroup.Add(t_chapter);
         t_chapter.EditorKind = _kind;
 
         CancelRewindForStructureChange($"챕터 성격 변경({_index} → {_kind})");
@@ -269,10 +281,32 @@ public static class TutorialSequenceEditOps
 
     // ───────── 내부 ─────────
 
-    static bool TryGetChapters(OutgameTutorialData _data, out List<OutgameTutorialChapter> _chapters)
+    static bool TryGetChapters(OutgameTutorialData _data, out IReadOnlyList<OutgameTutorialChapter> _chapters)
     {
-        _chapters = _data != null ? _data.chapters : null;
+        _chapters = _data != null ? _data.Chapters : null;
         return _chapters != null;
+    }
+
+    static List<OutgameTutorialChapter> GetChapterGroup(OutgameTutorialData _data, EOutgameTutorialChapterKind _kind)
+    {
+        return _kind switch
+        {
+            EOutgameTutorialChapterKind.Forced => _data.ftueChapters,
+            EOutgameTutorialChapterKind.Guided => _data.guide.guideChapters,
+            _ => null,
+        };
+    }
+
+    static bool TryGetChapterGroup(OutgameTutorialData _data, int _index,
+        out List<OutgameTutorialChapter> _chapters, out int _localIndex)
+    {
+        _chapters = null;
+        _localIndex = -1;
+        if (_data == null || _index < 0 || _index >= _data.Chapters.Count) return false;
+        bool t_ftue = _index < _data.FtueChapterCount;
+        _chapters = t_ftue ? _data.ftueChapters : _data.guide.guideChapters;
+        _localIndex = t_ftue ? _index : _index - _data.FtueChapterCount;
+        return true;
     }
 
     static bool TryGetSteps(OutgameTutorialData _data, int _chapter, out List<TutorialStepDef> _steps)
@@ -303,6 +337,7 @@ public static class TutorialSequenceEditOps
 
     static void MarkDirty(UnityEngine.Object _data)
     {
+        if (_data is OutgameTutorialData t_tutorial) t_tutorial.NormalizeChapterKinds();
         EditorUtility.SetDirty(_data);
         AssetDatabase.SaveAssetIfDirty(_data);
     }

@@ -40,8 +40,12 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
 
     int m_currentIndex = -1;
     int m_swipeVersion;
+    int m_selectionRequest;
 
     public int SwipeVersion => m_swipeVersion;
+
+    /// <summary>이탈 확인 대기를 포함한 최신 화면 이동 요청.</summary>
+    public int SelectionRequestVersion => m_selectionRequest;
 
     public bool CanSwipe => isActiveAndEnabled && m_currentIndex >= 0
         && (dragController == null || !dragController.IsDragging)
@@ -156,6 +160,8 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
     void OnDisable()
     {
         m_swipeVersion++;
+        m_selectionRequest++;
+        m_pendingArrive = null;
         FlushPendingStart();
         FinishPendingSlide();
     }
@@ -181,7 +187,7 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
     void HandleTabSelected(int _index) => Select(_index);
 
     /// <summary>미션 등 외부 진입도 저작된 탭과 잠금 정책을 따라 선택한다.</summary>
-    public bool TrySelectFeature(EOutgameFeature _feature, Action _beforeSelect = null, Action _afterSelect = null)
+    public bool TrySelectFeature(EOutgameFeature _feature, Action _beforeSelect = null, Action _afterSelect = null, Action _onArrived = null)
     {
         if (!isActiveAndEnabled || _feature == EOutgameFeature.None) return false;
         int t_index = tabs.FindIndex(_tab => _tab.panel != null &&
@@ -189,7 +195,7 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
                 ? _tab.panel is LobbyMatchTabPanel : _tab.unlockFeature == _feature));
         if (t_index < 0 || !OutgameFeatureLock.IsUnlocked(tabs[t_index].unlockFeature)) return false;
 
-        SelectInternal(t_index, true, _beforeSelect, _afterSelect);
+        SelectInternal(t_index, true, _beforeSelect, _afterSelect, _onArrived);
         return true;
     }
 
@@ -202,19 +208,25 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
     public void Select(int _index, bool _fireTrigger = true)
         => SelectInternal(_index, _fireTrigger, null, null);
 
-    void SelectInternal(int _index, bool _fireTrigger, Action _beforeSelect, Action _afterSelect)
+    void SelectInternal(int _index, bool _fireTrigger, Action _beforeSelect, Action _afterSelect, Action _onArrived = null)
     {
         InitializeUI();
         if (_index < 0 || _index >= tabs.Count) return;
         if (_fireTrigger &&
             !OutgameFeatureLock.IsUnlocked(tabs[_index].unlockFeature))
             return;
+        int t_request = ++m_selectionRequest;
         if (_index == m_currentIndex)
         {
             _beforeSelect?.Invoke();
             // 출발을 기다리는 중이면 손대지 않는다 — 여기서 알약을 먼저 보내면 콘텐츠와 박자가 갈라진다.
             if (m_pendingStart == null) tabBar?.SetSelected(_index);
             _afterSelect?.Invoke();
+            if (m_pendingArrive != null) m_pendingArrive += () =>
+            {
+                if (t_request == m_selectionRequest && isActiveAndEnabled) _onArrived?.Invoke();
+            };
+            else _onArrived?.Invoke();
             return;
         }
 
@@ -222,25 +234,26 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
         if (t_current == null)
         {
             _beforeSelect?.Invoke();
-            CommitSelection(_index, _fireTrigger);
+            CommitSelection(_index, _fireTrigger, _onArrived);
             _afterSelect?.Invoke();
             return;
         }
 
         t_current.RequestLeave(() =>
         {
-            if (this == null) return;
+            if (this == null || !isActiveAndEnabled || t_request != m_selectionRequest) return;
             _beforeSelect?.Invoke();
-            CommitSelection(_index, _fireTrigger);
+            CommitSelection(_index, _fireTrigger, _onArrived);
             _afterSelect?.Invoke();
         });
     }
 
     /// <summary>탭을 실제로 갈아 끼운다. 슬라이드도 여기서만 시작한다 —
     /// 앞선 RequestLeave가 취소되면 전환 자체가 무산되기 때문이다.</summary>
-    void CommitSelection(int _index, bool _fireTrigger)
+    void CommitSelection(int _index, bool _fireTrigger, Action _onArrived)
     {
         m_swipeVersion++;
+        m_pendingArrive = null;
         // 순서를 지켜야 한다. 앞의 것이 밀린 출발을 세우고, 뒤의 것이 그 트윈을 강제 완결시킨다.
         FlushPendingStart();
         FinishPendingSlide();
@@ -281,9 +294,11 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
 
         // 화면 좌표를 재는 일은 패널이 제자리에 선 뒤로 미룬다 — 도중에 재면 화면 밖을 짚는다.
         int t_entryVersion = m_swipeVersion;
+        int t_arrivalRequest = m_selectionRequest;
         m_pendingArrive = () =>
         {
             t_next?.OnSettled();
+            if (t_arrivalRequest == m_selectionRequest) _onArrived?.Invoke();
             if (_fireTrigger) GuidanceCoordinator.TryFire(tabs[_index].tutorialTrigger,
                 () => this != null && isActiveAndEnabled && m_currentIndex == _index && m_swipeVersion == t_entryVersion);
         };

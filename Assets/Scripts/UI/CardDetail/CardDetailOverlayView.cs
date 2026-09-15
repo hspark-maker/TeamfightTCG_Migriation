@@ -157,6 +157,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
 
     /// <summary>해금 연출의 마지막 축까지 끝났다 — 중간에 잘린 경로(탭 스킵·카드 전환·창 닫힘)도 같이 쏜다.</summary>
     public static event Action OnAnyUnlockFxFinished;
+    public static event Action OnUnlockIntroCancelled;
 
     /// <summary>떠 있는 강화 결과판을 밖에서 걷는다(튜토리얼 자동 복귀). 떠 있지 않으면 아무 일도 없다.</summary>
     public static void CloseEnhanceResult()
@@ -171,6 +172,45 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
 
     /// <summary>지금 해금 연출이 도는 중인가.</summary>
     public static bool IsUnlockFxPlaying => s_instance != null && s_instance.m_unlockFxPlaying;
+    public static bool IsRitualPlaying => s_instance != null && (s_instance.m_ritualPlaying || s_instance.m_enhanceRequestPending);
+
+    /// <summary>강화가 이미 성립한 계정도 아직 확인하지 않은 해금 설명을 볼 수 있다.</summary>
+    public static bool TryShowPendingIntroduction(Action<bool> _onFinished)
+    {
+        if (!IsOpen || IsUnlockFxPlaying || IsRitualPlaying) return false;
+        int t_card = s_instance.CardAt(s_instance.m_index);
+        var t_intros = s_instance.CollectIntros(t_card, CardVisualRules.InfoKeywords(t_card),
+            OwnershipManager.IsOwned(t_card) && SynergyUnlocked(t_card));
+        if (!UnlockIntroduction.HasPending(t_card, t_intros)) return false;
+        return s_instance.ShowIntroduction(t_intros, _onFinished);
+    }
+
+    public static bool HasPendingIntroductionForOwnedCard() => FindPendingIntroductionCard() > 0;
+
+    /// <summary>관련 미션으로 돌아온 계정의 미확인 해금 설명을 연다.</summary>
+    public static bool TryOpenPendingIntroduction()
+    {
+        if (IsRitualPlaying || IsUnlockFxPlaying || UnlockIntroOverlay.IsOpen) return false;
+        int t_card = FindPendingIntroductionCard();
+        if (t_card <= 0) return false;
+        Open(t_card);
+        return TryShowPendingIntroduction(null);
+    }
+
+    static int FindPendingIntroductionCard()
+    {
+        if (!CardCatalog.IsReady || !CardGrowthManager.IsReady) return 0;
+        CardDetailOverlayView t_view = Resolve();
+        if (t_view == null) return 0;
+        int t_candidate = 0;
+        foreach (int t_card in CardCatalog.AllIds)
+        {
+            if (!OwnershipManager.IsOwned(t_card)) continue;
+            var t_intros = t_view.CollectIntros(t_card, CardVisualRules.InfoKeywords(t_card), SynergyUnlocked(t_card));
+            if (UnlockIntroduction.HasPending(t_card, t_intros) && (t_candidate == 0 || t_card < t_candidate)) t_candidate = t_card;
+        }
+        return t_candidate;
+    }
 
     static CardDetailOverlayView s_instance;
     protected override int SortingOrder => UiSortingOrder.CardDetail;
@@ -242,6 +282,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
 
     // 이 구간의 탭은 닫기가 아니라 스킵이다 — 손이 스쳐 창이 사라지면 방금 열린 것을 다시 볼 자리가 없다.
     bool m_unlockFxPlaying;
+    bool m_introOwned;
 
     /// <summary>풀에서 _card의 상세를 띄운다(넘길 이웃이 없는 1장짜리 목록).</summary>
     public static void Open(int _card)
@@ -508,6 +549,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     /// <summary>해금 연출의 지금 박을 최종 상태로 끌어당긴다 — 탭 한 번이 한 박씩 넘긴다.</summary>
     void SkipUnlockFx()
     {
+        if (m_introOwned) return;
         // 자물쇠 판이 아직 도는 중. 두 줄이 함께 열렸으면 둘 다 당긴다(한 쪽만 남으면 박자가 갈린다).
         bool t_lock  = SkipSectionUnlock(this.keywordSectionLock);
              t_lock |= SkipSectionUnlock(this.synergySectionLock);
@@ -521,7 +563,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
              t_reveal |= this.synergySectionReveal != null && this.synergySectionReveal.RequestSkip();
 
         // 당길 것이 없었다 = 흐름은 끝났는데 플래그만 남은 자리다 — 여기서 내려야 다음 탭에 창이 닫힌다.
-        if (!t_reveal) SetUnlockFxPlaying(false);
+        if (!t_reveal && !m_introOwned) SetUnlockFxPlaying(false);
     }
 
     // 걷히는 중인 판을 지금 끝낸다. 돌고 있지 않으면 false — 부른 쪽은 "이 박은 이미 지났다"로 읽는다.
@@ -883,7 +925,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         { ShowBottomBar(); EndUnlockFxAfter(t_reveal); return; }
 
         // 카드를 함께 넘긴다 — 안내 안의 데모 무대가 이 카드를 공격자로 세운다.
-        t_overlay.Show(t_intros, t_card, () => { ShowBottomBar(); SetUnlockFxPlaying(false); });
+        if (!ShowIntroduction(t_intros, null)) { ShowBottomBar(); SetUnlockFxPlaying(false); }
     }
 
     /// <summary>이번에 열린 개념들(순서는 화면 순서 — 키워드 줄이 위, 시너지 줄이 아래). 없으면 null.</summary>
@@ -963,6 +1005,8 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         this.m_pendingSynergyUnlockFx  = false;
 
         // 잘린 안무는 끝 콜백이 오지 않는다 — 여기서 내리지 않으면 탭이 영영 닫기로 돌아오지 않는다.
+        if (m_introOwned && UnlockIntroOverlay.TryGet(out var t_overlay)) t_overlay.Cancel();
+        else if (m_unlockFxPlaying) OnUnlockIntroCancelled?.Invoke();
         SetUnlockFxPlaying(false);
     }
 
@@ -1783,7 +1827,29 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         if (!UnlockIntroOverlay.TryGet(out UnlockIntroOverlay t_overlay)) return;
 
         // 카드를 함께 넘긴다 — 안내 안의 데모 무대가 이 카드를 공격자로 세운다.
-        t_overlay.Show(_intros, CardAt(this.m_index), null);
+        ShowIntroduction(_intros, null);
+    }
+
+    bool ShowIntroduction(IReadOnlyList<UnlockIntro> _intros, Action<bool> _onFinished)
+    {
+        int t_card = CardAt(m_index);
+        int t_version = m_viewVersion;
+        m_introOwned = true;
+        SetUnlockFxPlaying(true);
+        bool t_started = UnlockIntroduction.TryShow(t_card, _intros, _confirmed =>
+        {
+            m_introOwned = false;
+            if (!_confirmed) OnUnlockIntroCancelled?.Invoke();
+            if (this != null && t_version == m_viewVersion) ShowBottomBar();
+            SetUnlockFxPlaying(false);
+            _onFinished?.Invoke(_confirmed);
+        });
+        if (!t_started)
+        {
+            m_introOwned = false;
+            SetUnlockFxPlaying(false);
+        }
+        return t_started;
     }
 
     // 칩은 런타임에 만들지 않는다 — 깔아 두는 쪽은 Tools/UI/도감 상세창 칩 박기다.

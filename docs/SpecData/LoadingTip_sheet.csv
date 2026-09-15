@@ -1,4 +1,5 @@
-﻿id,text,enabled
+﻿팁 고유 번호,팁 문구,노출 여부(1=노출)
+id,text,enabled
 int,string,int
 1,귀여움은 세상을 정복할 수 있어요!,1
 2,원거리 공격은 반격을 받지 않아요.,1

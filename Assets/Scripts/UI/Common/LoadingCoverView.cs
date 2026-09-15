@@ -31,6 +31,8 @@ public class LoadingCoverView : MonoBehaviour
     [Tooltip("진행도 슬라이더. 미배선이면 표시 없이 대기만 한다(min/max 무관하게 정규값으로 쓴다).")]
     [SerializeField] Slider progressBar;
     [SerializeField] TMP_Text statusText;
+    [Tooltip("전투 복귀 팁. 유효한 시트 문구가 없으면 저작 문구를 유지한다.")]
+    [SerializeField] TMP_Text _tipText;
 
     // 복구 문구를 statusText로 못 쓰는 이유: statusText가 진행바(Slider) 하위라 진행바를 끄는 순간 같이 사라진다.
     [Tooltip("초기화 실패 시 띄우는 안내·재시도·종료 묶음. 진행바 바깥에 둔다(진행바를 끄면 그 하위는 전부 안 보인다).")]
@@ -133,6 +135,8 @@ public class LoadingCoverView : MonoBehaviour
 
         t_view.m_beforeLoad = _onBeforeLoad;
         t_view.m_waitForBattleResult = _fromBattle && _scene == LobbyScene;
+        if (t_view.m_waitForBattleResult && t_view._tipText != null)
+            t_view._tipText.text = BattleReturnTips.Next(t_view._tipText.text);
 
         // Instantiate는 Awake를 그 자리에서 돌리지만 Start는 프레임 끝에 온다 — 이 대입이 모드 분기보다 먼저다.
         t_view.m_targetScene = _scene;

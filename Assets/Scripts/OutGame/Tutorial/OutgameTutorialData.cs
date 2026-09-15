@@ -1,23 +1,26 @@
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 // 아웃게임 첫시작 튜토리얼의 챕터 시퀀스(에디터 저작, SO)
 [CreateAssetMenu(fileName = "OutgameTutorial", menuName = "Card Battle/Outgame Tutorial")]
-public class OutgameTutorialData : ScriptableObject
+public class OutgameTutorialData : ScriptableObject, ISerializationCallbackReceiver
 {
-    [Header("콘텐츠 해금 조건")]
-    [Tooltip("조건은 모두 AND로 평가한다. 스텝 실행과 독립적이며, 한번 해금한 콘텐츠는 조건을 올려도 다시 잠기지 않는다.")]
-    public List<ContentUnlockDef> contentUnlocks = new List<ContentUnlockDef>();
+    [Header("FTUE — 첫 시작 순차 진행")]
+    [Tooltip("계정의 첫 시작에 순서대로 진행한다. 진행 위치는 기존 스텝 ID로 저장한다.")]
+    public List<OutgameTutorialChapter> ftueChapters = new List<OutgameTutorialChapter>();
 
-    [Header("콘텐츠 해금 소개")]
-    [Tooltip("소개 화면의 이름·설명·아이콘. 실제 이용 자격과 해금 조건은 위 목록에서 정한다.")]
-    public List<ContentUnlockIntroDef> contentIntros = new List<ContentUnlockIntroDef>();
+    [Header("가이드 미션 · 안내")]
+    [Tooltip("미션 연결과 콘텐츠 안내 순서. 실제 해금 조건은 ContentUnlockConfig 에셋에서 저작한다.")]
+    public GuideTutorialData guide = new GuideTutorialData();
 
-    [Header("챕터 시퀀스 (순서 = 진행 순서, 세이브가 붙잡는 것은 스텝의 stepId)")]
-    [Tooltip("챕터 하나 = 기획의 '튜토리얼 N편'.\n"
-           + "행을 복제하면 stepId까지 복제되므로, 복제한 뒤에는 우클릭 메뉴 [스텝 ID 부여]를 다시 돌려라 "
-           + "— 겹친 번호를 걷어 새로 매긴다. 그러지 않으면 두 행이 같은 스텝으로 보인다")]
-    public List<OutgameTutorialChapter> chapters = new List<OutgameTutorialChapter>();
+    ChapterCollection m_chapters;
+
+    public int FtueChapterCount => ftueChapters?.Count ?? 0;
+
+    /// <summary>기존 저장 좌표와 검증기가 사용하는 FTUE·가이드 순서의 읽기 전용 뷰.</summary>
+    public IReadOnlyList<OutgameTutorialChapter> Chapters => m_chapters ??= new ChapterCollection(this);
 
     // 다음에 내줄 번호. 단조 증가만 하고 지운 번호를 재사용하지 않는다 —
     // 재사용하면 삭제된 스텝에 서 있던 세이브가 "삭제 경고" 없이 무관한 새 스텝으로 조용히 옮겨간다.
@@ -25,19 +28,17 @@ public class OutgameTutorialData : ScriptableObject
     // 하필 가장 큰 번호의 스텝을 지운 뒤였다면 그 번호가 재발급된다(위의 조용한 이동이 그때 난다).
     [SerializeField, HideInInspector] int nextStepId = 1;
 
-    /// <summary>소개 스텝이 참조하는 콘텐츠 표현을 찾는다.</summary>
-    public bool TryGetContentIntro(EContentUnlockIntro _content, out ContentUnlockIntroDef _intro)
+    /// <summary>챕터 성격은 소속 목록에서 결정한다.</summary>
+    public void NormalizeChapterKinds()
     {
-        if (contentIntros != null)
-            foreach (ContentUnlockIntroDef t_intro in contentIntros)
-                if (t_intro != null && t_intro.content == _content)
-                {
-                    _intro = t_intro;
-                    return true;
-                }
-        _intro = null;
-        return false;
+        if (ftueChapters != null)
+            foreach (var t_chapter in ftueChapters) t_chapter?.SetKind(EOutgameTutorialChapterKind.Forced);
+        if (guide.guideChapters != null)
+            foreach (var t_chapter in guide.guideChapters) t_chapter?.SetKind(EOutgameTutorialChapterKind.Guided);
     }
+
+    public void OnBeforeSerialize() => NormalizeChapterKinds();
+    public void OnAfterDeserialize() => NormalizeChapterKinds();
 
 #if UNITY_EDITOR
     /// <summary>저작 도구 전용 — 런타임은 읽기만 한다. 다음 번호를 한 개 떼어 준다(떼면 카운터가 올라간다).
@@ -59,9 +60,9 @@ public class OutgameTutorialData : ScriptableObject
 
         // 1패스 — 살아 있는 번호를 먼저 전부 모은다. 한 번에 훑으면서 나눠 주면 아직 안 본 뒤쪽 번호를
         // 새 칸에 내주게 되고, 그러면 그 뒤가 전부 한 칸씩 밀린다(이 도구가 막으려던 바로 그 사고다).
-        for (int t_c = 0; t_c < chapters.Count; t_c++)
+        for (int t_c = 0; t_c < Chapters.Count; t_c++)
         {
-            var t_chapter = chapters[t_c];
+            var t_chapter = Chapters[t_c];
             if (t_chapter == null) continue;
 
             for (int t_s = 0; t_s < t_chapter.StepCount; t_s++)
@@ -116,4 +117,41 @@ public class OutgameTutorialData : ScriptableObject
         if (t_freed.Count > 0) Debug.LogWarning($"[OutgameTutorialData] Re-numbered {t_freed.Count} slot(s) whose ids collided — {string.Join(", ", t_freed)}. This is normal for duplicated rows.", this);
     }
 #endif
+
+    void OnValidate() => NormalizeChapterKinds();
+
+    sealed class ChapterCollection : IReadOnlyList<OutgameTutorialChapter>
+    {
+        readonly OutgameTutorialData m_owner;
+        public int Count => m_owner.FtueChapterCount + (m_owner.guide.guideChapters?.Count ?? 0);
+        public OutgameTutorialChapter this[int _index] => _index < m_owner.FtueChapterCount
+            ? m_owner.ftueChapters[_index] : m_owner.guide.guideChapters[_index - m_owner.FtueChapterCount];
+
+        public ChapterCollection(OutgameTutorialData _owner) => m_owner = _owner;
+
+        public IEnumerator<OutgameTutorialChapter> GetEnumerator()
+        {
+            for (int t_i = 0; t_i < Count; t_i++) yield return this[t_i];
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+}
+
+/// <summary>FTUE 이후 가이드 안내·미션 연결 저작의 소유자.</summary>
+[Serializable]
+public sealed class GuideTutorialData
+{
+    [Header("성장·가이드 미션 설명")]
+    [Tooltip("첫 시너지 해금 인트로 재생 중 튜토리얼 배너에 표시한다.")]
+    [TextArea(2, 5)] public string synergyIntroductionMessage;
+
+    [Header("FTUE 이후 가이드 흐름")]
+    [Tooltip("미션별 해금 소개 → 화면 이동 → 자율 챕터. 같은 콘텐츠와 자율 챕터는 한 흐름에만 연결한다.")]
+    public List<GuideMissionFlow> guideFlows = new List<GuideMissionFlow>();
+
+    [Header("가이드 — FTUE 이후 콘텐츠 안내")]
+    [Tooltip("미션 흐름이나 콘텐츠 진입에서 시작한다. FTUE 순서에는 포함하지 않으며, 안내별 완료를 기록한다.")]
+    public List<OutgameTutorialChapter> guideChapters = new List<OutgameTutorialChapter>();
+
 }
