@@ -83,6 +83,7 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
 
     void Update()
     {
+        if (AdvanceMatchMission()) return;
         if (!GameInitialization.IsReady || Time.unscaledTime < m_nextEvaluation) return;
         m_nextEvaluation = Time.unscaledTime + 0.25f;
         if (!m_initialized)
@@ -95,6 +96,7 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
 
     void OnDisable()
     {
+        CancelMatchMission();
         CancelMissionFlow(false);
         if (s_instance == this) s_instance = null;
     }
