@@ -11,6 +11,8 @@ using UnityEngine.UI;
 // 스텝 타입도 보지 않는다 — 어떤 신호를 기다릴지는 스텝의 Completion 하나로 갈린다.
 public class OutgameTutorialBridge : MonoBehaviour
 {
+    static OutgameTutorialBridge s_instance;
+
     [Tooltip("튜토리얼 스텝 시퀀스 SO. 모든 씬의 브리지에 같은 에셋을 배선한다(주입은 멱등).")]
     [SerializeField] OutgameTutorialData data;
 
@@ -18,6 +20,11 @@ public class OutgameTutorialBridge : MonoBehaviour
     [SerializeField] OutgameTutorialGateUI gatePrefab;
 
     internal OutgameTutorialGateUI GatePrefabForDebug => gatePrefab;
+
+    internal static OutgameTutorialGateUI EnsureGateForGuidance()
+        => OutgameTutorialGateUI.Instance != null ? OutgameTutorialGateUI.Instance
+            : s_instance != null && s_instance.gatePrefab != null
+                ? OutgameTutorialGateUI.Ensure(s_instance.gatePrefab) : null;
 
     [Tooltip("이 씬에서는 딤·배너를 띄우지 않는다. 스텝 완료 감지와 진행도 커밋은 그대로 — 화면 자체 안내(개봉 스와이프 문구 등)가 역할을 대신한다. 개봉 오버레이가 떠 있는 동안은 이 값과 무관하게 자동 억제된다.")]
     [SerializeField] bool suppressGuideUI;
@@ -88,6 +95,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     // (둘 다 DefaultExecutionOrder가 없다) 그러면 OnGuidedActivated를 통째로 놓쳐 게이트가 영영 안 뜬다.
     void Awake()
     {
+        s_instance = this;
         OutgameTutorialRunner.EnsureData(data);
         Subscribe();
     }
@@ -101,6 +109,7 @@ public class OutgameTutorialBridge : MonoBehaviour
 
     void OnDestroy()
     {
+        if (s_instance == this) s_instance = null;
         if (s_rankEntryOwner == this) s_rankEntryOwner = null;
         ServerWaitOverlay.Release(this);
         // static 이벤트에 죽은 씬 오브젝트가 남으면 다음 씬에서 오발화한다.

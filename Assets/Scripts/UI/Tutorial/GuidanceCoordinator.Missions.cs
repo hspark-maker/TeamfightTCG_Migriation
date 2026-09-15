@@ -35,6 +35,7 @@ public sealed partial class GuidanceCoordinator
     public static bool TryRequestMission(string _missionId)
     {
         if (s_instance == null || !GuideMissionProgress.IsCurrent(_missionId)) return false;
+        if (_missionId == MATCH_MISSION_ID) return s_instance.RequestMatchMission();
         foreach (var t_flow in GuideMissionFlows.All)
         {
             if (t_flow == null || t_flow.missionId != _missionId) continue;
