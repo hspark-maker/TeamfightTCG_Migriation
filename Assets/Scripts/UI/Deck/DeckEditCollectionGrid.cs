@@ -53,6 +53,9 @@ public class DeckEditCollectionGrid : MonoBehaviour
 
     // 걸려 있는 검색어(없으면 null). Build가 목록을 다시 만들어도 이 값은 살아남아 재적용된다.
     string m_filter;
+    CardListFilter m_cardFilter = new CardListFilter();
+    bool m_filterPending;
+    bool m_resetFilterScroll;
 
     // 튜토리얼이 지목한 카드. 검색어가 무엇이든 이 카드만은 목록에서 숨기지 않는다.
     int m_anchorCard;
@@ -156,26 +159,48 @@ public class DeckEditCollectionGrid : MonoBehaviour
         if (t_next == m_filter) return;
 
         m_filter = t_next;
+        m_resetFilterScroll = true;
         ApplyFilter();
+    }
 
-        if (scrollRect != null) scrollRect.verticalNormalizedPosition = 1f;
+    public void SetCardFilter(CardListFilter _filter)
+    {
+        m_cardFilter = _filter?.Clone() ?? new CardListFilter();
+        m_resetFilterScroll = true;
+        ApplyFilter();
     }
 
     // 이름 검색은 빈 슬롯 배치를 갱신하고 화면에 들어온 슬롯만 카드 타일을 확보한다.
     void ApplyFilter()
     {
+        // 누른 타일의 위치와 수명은 포인터가 해제될 때까지 유지한다.
+        if (HasPressedTile())
+        {
+            m_filterPending = true;
+            return;
+        }
+        m_filterPending = false;
         int t_visible = 0;
         for (int t_i = 0; t_i < m_entryCount; t_i++)
         {
             Entry t_entry = m_entries[t_i];
-            t_entry.Visible = m_filter == null || t_entry.Card == m_anchorCard || t_entry.Name.Contains(m_filter);
+            t_entry.Visible = t_entry.Card == m_anchorCard
+                || ((m_filter == null || t_entry.Name.Contains(m_filter)) && m_cardFilter.Matches(t_entry.Card));
             t_entry.Slot.gameObject.SetActive(t_entry.Visible);
             if (t_entry.Visible) t_visible++;
         }
 
         if (emptyHint     != null) emptyHint.SetActive(t_visible == 0);
-        if (emptyHintText != null) emptyHintText.text = m_filter == null ? emptyOwnedMessage : emptySearchMessage;
+        if (emptyHintText != null) emptyHintText.text = m_cardFilter.IsActive
+            ? "필터 조건에 맞는 카드가 없습니다.\n조건을 변경하거나 초기화해 주세요."
+            : m_filter == null ? emptyOwnedMessage : emptySearchMessage;
         if (content != null) LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+        if (m_resetFilterScroll && scrollRect != null)
+        {
+            scrollRect.StopMovement();
+            scrollRect.verticalNormalizedPosition = 1f;
+        }
+        m_resetFilterScroll = false;
         m_dirty = true;
         RefreshVisible();
     }
@@ -189,6 +214,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
             ApplyTutorialAnchor(t_anchor);
             if (t_anchor > 0) EnsureVisible(t_anchor);
         }
+        if (m_filterPending && !HasPressedTile()) ApplyFilter();
         if (m_entryCount == 0 || content == null) return;
         if (m_dirty || m_lastPosition != content.anchoredPosition || m_lastViewportSize != ListArea.rect.size || m_lastCellSize != CellSize)
             RefreshVisible();
@@ -370,7 +396,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
         if (m_anchorCard != _card)
         {
             m_anchorCard = _card;
-            if (m_filter != null) ApplyFilter();
+            if (m_filter != null || m_cardFilter.IsActive) ApplyFilter();
         }
 
         Entry t_entry = FindEntry(_card);
@@ -441,6 +467,8 @@ public class DeckEditCollectionGrid : MonoBehaviour
         m_entryCount = 0;
         m_anchorCard = 0;
         m_buildPending = false;
+        m_filterPending = false;
+        m_resetFilterScroll = false;
         m_deck = null;
         m_synergy = null;
         m_pickedCard = 0;

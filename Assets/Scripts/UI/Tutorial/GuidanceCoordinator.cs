@@ -75,6 +75,7 @@ public sealed class GuidanceCoordinator : MonoBehaviour
 
     static bool StageBusyForGuided
         => SynergyIntroduction.IsActive || ContentUnlockPresentation.IsPlaying || OutgameTutorialGateUI.IsShowing
+        || CardFilterPopup.IsOpen || CollectionFilterResults.IsOpen
         || CurtainView.IsBusy || LoadingCoverView.IsCovering
         || !GameInitialization.IsReady
         || (SceneTransitionVideo.Instance != null && SceneTransitionVideo.Instance.IsPlaying)
