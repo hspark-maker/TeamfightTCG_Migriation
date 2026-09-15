@@ -1,0 +1,111 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: RemoteFonts
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: RemoteFonts
+  m_GUID: 05585ec88435d9c44a18be899edf6346
+  m_SerializeEntries:
+  - m_GUID: 0f9e80439b7b4ed42a6e1cb7d7793c48
+    m_Address: SharedFonts/Fonts/MalgunGothic_OutlinfFont.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 15f03620ce5f5614a9d2dcbd74b8988e
+    m_Address: SharedFonts/Fonts/ONE Mobile POP OTF SDF.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 24b4aa79c7c8fee41b59a42f8ae762ec
+    m_Address: SharedFonts/Fonts/Jalnan2 SDF 1.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2f3a855c7541ab8458f21d2838602cb2
+    m_Address: SharedFonts/Fonts/uK4mTd9JFejCoAXNZyXHV6glsI/Jalnan2/Jalnan2TTF.ttf
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3948bbab3c9894d4281fd5b5ffaf9e91
+    m_Address: SharedFonts/Fonts/uK4mTd9JFejCoAXNZyXHV6glsI/Jalnan2/Jalnan2.otf
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4df79f0af78a4a4c922373f821ec203e
+    m_Address: SharedFonts/Fonts/uK4mTd9JFejCoAXNZyXHV6glsI/Jalnan2/Jalnan2TTF SDF
+      - No Outline.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4ee8aa1608275426f9ba280153dbc997
+    m_Address: SharedFonts/Assets/Images/_Vendor/LayerLab/GUI-VerticalCasual/ResourcesData/Fonts/LilitaOneRegularSDF_Num_Outline_Stage
+      Atlas.png
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5f58c05479cb14f588efcdfcbdab347c
+    m_Address: SharedFonts/PurchasedAssets/Layer Lab/GUI Pro-SimpleCasual/ResourcesData/Fonts/Rubik-Medium
+      SDF.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 69d7666fe0de20b4ebb5db256bf6b3d4
+    m_Address: SharedFonts/Fonts/ONE Mobile POP OTF SDF 1.mat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8a4b4ced6dd278549afb39ce34248ca5
+    m_Address: SharedFonts/Fonts/ONE Mobile POP/ONE Mobile POP OTF.otf
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ae2f56c08291ad54aa1415dc014d7bff
+    m_Address: SharedFonts/Fonts/uK4mTd9JFejCoAXNZyXHV6glsI/Jalnan2/Jalnan2TTF SDF_outline.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c0b73c43f06a5464d81a2afad64b40a4
+    m_Address: SharedFonts/Fonts/Jalnan2 SDF.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dc2cc93475f76427c86a8262bee36b88
+    m_Address: SharedFonts/PurchasedAssets/Layer Lab/GUI Pro-SimpleCasual/ResourcesData/Fonts/Quicksand-Bold
+      SDF.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e89eaa4e3b4de402f90d7aba0deeeb96
+    m_Address: SharedFonts/PurchasedAssets/Layer Lab/GUI-VerticalCasual/ResourcesData/Fonts/LilitaOneRegularSDF_Num_Outline_Stage.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 886280ed4ce95ea4fa7b0c1bf828dbdc, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 60d4cfb9c8eb4ee4eb7e09f348b1e28d, type: 2}
+    - {fileID: 11400000, guid: 7ea5cd3308952d24f9f8edc73c5920db, type: 2}
