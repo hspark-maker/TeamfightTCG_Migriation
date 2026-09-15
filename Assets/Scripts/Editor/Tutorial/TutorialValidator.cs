@@ -90,35 +90,26 @@ public static class TutorialValidator
     }
 
     /// <summary>온보딩 시퀀스 점검. 좌표 순서로 돌려준다(심각도 정렬은 창이 한다).</summary>
-    public static List<TutorialIssue> Validate(OutgameTutorialData _data)
+    public static List<TutorialIssue> Validate(OutgameTutorialData _data, ContentUnlockData _unlocks = null)
     {
         var t_issues = new List<TutorialIssue>();
-        if (_data == null || _data.chapters == null) return t_issues;
+        if (_data == null || _data.Chapters == null) return t_issues;
 
-        if (!ContentUnlockConfig.TryValidate(_data.contentUnlocks, out string t_unlockError))
+        _unlocks = _unlocks != null ? _unlocks : ContentUnlockAuthoring.Data;
+        if (!ContentUnlockConfig.TryValidate(_unlocks != null ? _unlocks.contentUnlocks : null, out string t_unlockError))
             t_issues.Add(new TutorialIssue(ETutorialIssueLevel.Error, 0, 0, 0, "ContentUnlock",
                 t_unlockError, "SO 최상위 콘텐츠 해금 조건을 수정하세요."));
 
-        ValidateContentIntroDefinitions(_data, t_issues);
+        ValidateContentIntroDefinitions(_unlocks, t_issues);
 
         var t_state    = TutorialSequenceState.Build(_data);
         var t_ids      = new Dictionary<int, string>();
         var t_triggers = new Dictionary<EOutgameTutorialTrigger, int>();
 
-        bool t_seenGuided = false;
-
-        for (int t_c = 0; t_c < _data.chapters.Count; t_c++)
+        for (int t_c = 0; t_c < _data.Chapters.Count; t_c++)
         {
-            var  t_chapter = _data.chapters[t_c];
+            var  t_chapter = _data.Chapters[t_c];
             bool t_guided  = t_chapter != null && t_chapter.IsGuided;
-
-            // (19) 자율 챕터 뒤에 선 강제 챕터. 런타임은 선두의 연속 강제 챕터까지만 강제 커서로 읽으므로
-            //      이 챕터는 조용히 잘린다 — 졸업이 앞당겨지고 그 안의 지급·해금이 영영 돌지 않는다.
-            if (t_guided) t_seenGuided = true;
-            else if (t_seenGuided)
-                t_issues.Add(new TutorialIssue(ETutorialIssueLevel.Error, t_c, 0, 0, "자율 뒤의 강제 챕터",
-                                               "자율 챕터 뒤에 강제 챕터가 있습니다 — 러너가 이 챕터를 강제 시퀀스로 읽지 않아 통째로 건너뜁니다.",
-                                               "강제 챕터를 자율 챕터 앞으로 옮기거나, 이 챕터를 자율로 바꾸세요."));
 
             if (t_chapter != null) ValidateChapterKind(t_chapter, t_c, t_triggers, t_issues);
 
@@ -161,7 +152,7 @@ public static class TutorialValidator
                 }
 
                 ValidateStep(t_def, t_c, t_s, !t_guided, t_issues);
-                ValidateContentIntroStep(_data, t_def, t_c, t_s, t_issues);
+                ValidateContentIntroStep(_unlocks, t_def, t_c, t_s, t_issues);
             }
         }
 
@@ -170,9 +161,9 @@ public static class TutorialValidator
 
     // ── 챕터 성격 규칙 ──────────────────────────────────────────────────────
 
-    static void ValidateContentIntroDefinitions(OutgameTutorialData _data, List<TutorialIssue> _issues)
+    static void ValidateContentIntroDefinitions(ContentUnlockData _data, List<TutorialIssue> _issues)
     {
-        if (_data.contentIntros == null) return;
+        if (_data == null || _data.contentIntros == null) return;
 
         var t_seen = new HashSet<EContentUnlockIntro>();
         for (int t_i = 0; t_i < _data.contentIntros.Count; t_i++)
@@ -187,6 +178,9 @@ public static class TutorialValidator
             else if (string.IsNullOrWhiteSpace(t_intro.contentName)
                   || string.IsNullOrWhiteSpace(t_intro.description) || t_intro.icon == null)
                 t_error = $"{t_intro.content} 해금 소개의 이름·본문·아이콘 중 빠진 값이 있습니다.";
+            else if (t_intro.content == EContentUnlockIntro.Mission
+                  && (string.IsNullOrWhiteSpace(t_intro.guideMissionName) || t_intro.guideMissionIcon == null))
+                t_error = "미션 해금 소개의 가이드 미션 이름·아이콘 중 빠진 값이 있습니다.";
 
             if (t_error != null)
                 _issues.Add(new TutorialIssue(ETutorialIssueLevel.Error, 0, 0, 0, "해금 소개 정의",
@@ -194,7 +188,7 @@ public static class TutorialValidator
         }
     }
 
-    static void ValidateContentIntroStep(OutgameTutorialData _data, TutorialStepDef _def,
+    static void ValidateContentIntroStep(ContentUnlockData _data, TutorialStepDef _def,
                                         int _chapter, int _index, List<TutorialIssue> _issues)
     {
         if (_def.Action != EOutgameTutorialAction.ContentUnlockIntro) return;
@@ -216,7 +210,7 @@ public static class TutorialValidator
                 t_error = "해금 소개 대상에 None 또는 유효하지 않은 콘텐츠가 있습니다.";
             else if (!t_seen.Add(t_content))
                 t_error = $"해금 소개 대상 {t_content}가 중복입니다.";
-            else if (!_data.TryGetContentIntro(t_content, out _))
+            else if (_data == null || !_data.TryGetContentIntro(t_content, out _))
                 t_error = $"{t_content} 해금 소개 정의가 없습니다.";
 
             if (t_error != null)

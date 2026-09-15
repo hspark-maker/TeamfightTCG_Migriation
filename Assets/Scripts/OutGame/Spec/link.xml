@@ -26,5 +26,6 @@
     <type fullname="AdventureChapter" preserve="fields"/>
     <type fullname="PassSeason" preserve="fields"/>
     <type fullname="PassLevel" preserve="fields"/>
+    <type fullname="LoadingTip" preserve="fields"/>
   </assembly>
 </linker>

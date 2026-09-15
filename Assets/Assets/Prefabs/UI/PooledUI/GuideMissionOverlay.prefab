@@ -1730,6 +1730,11 @@ MonoBehaviour:
   claimedMark: {fileID: 0}
   disabledAlpha: 0.5
   claimGroup: {fileID: 0}
+  navigateButton: {fileID: 0}
+  goButton: {fileID: 0}
+  rowGroup: {fileID: 0}
+  currentMark: {fileID: 0}
+  lockedAlpha: 0.55
 --- !u!1 &8300000000000000036
 GameObject:
   m_ObjectHideFlags: 0

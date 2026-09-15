@@ -9,6 +9,7 @@ public enum EContentUnlockIntro
     Mission = 2,
     Adventure = 3,
     Roulette = 4,
+    CardEnhance = 5,
 }
 
 /// <summary>공통 해금 소개의 이름·설명·아이콘 저작.</summary>
@@ -19,6 +20,9 @@ public sealed class ContentUnlockIntroDef
     public string contentName;
     [TextArea] public string description;
     public Sprite icon;
+    [Tooltip("미션 소개에 함께 표시할 가이드 미션 이름과 아이콘.")]
+    public string guideMissionName;
+    public Sprite guideMissionIcon;
 
     /// <summary>소개에 대응하는 실제 콘텐츠 해금 키. 랭크전 진입은 기존 온보딩이 담당한다.</summary>
     public static string KeyOf(EContentUnlockIntro _content) => _content switch
@@ -26,6 +30,7 @@ public sealed class ContentUnlockIntroDef
         EContentUnlockIntro.Mission => ContentUnlockManager.MISSION,
         EContentUnlockIntro.Adventure => ContentUnlockManager.ADVENTURE,
         EContentUnlockIntro.Roulette => ContentUnlockManager.ROULETTE,
+        EContentUnlockIntro.CardEnhance => ContentUnlockManager.CARD_ENHANCE,
         _ => null,
     };
 }

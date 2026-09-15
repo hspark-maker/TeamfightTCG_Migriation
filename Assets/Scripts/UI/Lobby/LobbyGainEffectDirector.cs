@@ -59,6 +59,8 @@ public class LobbyGainEffectDirector : MonoBehaviour
     // 도착 강조를 받을 자리. 목적지와 갈라 두는 이유는 탭 버튼에 자물쇠 배지 같은 런타임 자식이 붙어
     // 자식 순서로 짚으면 그쪽이 대신 튀기 때문이다(잠금이 풀린 뒤에는 꺼진 배지가 남아 아무것도 안 튄다).
     RectTransform m_collectionPunch;
+    FeatureLockView _collectionUnlock;
+    FeatureLockView _packUnlock;
 
     // 이번 재생분 식별자. 앞 연출을 강제 마무리(Complete)하면 그 시퀀스의 완료 콜백도 함께 터지는데,
     // 그것을 이번 재생의 종료로 오인하면 기다리던 안내가 카드가 날기도 전에 다음으로 넘어간다.
@@ -78,6 +80,29 @@ public class LobbyGainEffectDirector : MonoBehaviour
     /// 통지가 영영 오지 않으므로, 있기만 한 것으로는 부족하다.</summary>
     public static bool Exists => s_instance != null && s_instance.isActiveAndEnabled;
     public static bool Playing => Exists && s_instance.m_runId != s_instance.m_finishedRunId;
+
+    /// <summary>실제 해금될 보상 탭의 잠금 표현을 도착까지 유지한다.</summary>
+    public static void HoldRewardUnlock(bool pack)
+    {
+        CancelRewardUnlock(pack);
+        if (!Exists || s_instance.tabBar == null) return;
+        var owner = s_instance;
+        var view = owner.tabBar.GetFeatureLock(pack ? owner.packTabIndex : owner.collectionTabIndex);
+        if (view == null || (!view.IsLocked && !view.IsUnlocking)) return;
+        view.HoldUnlockPresentation();
+        if (pack) owner._packUnlock = view;
+        else owner._collectionUnlock = view;
+    }
+
+    /// <summary>중단된 보상 탭을 현재 잠금 상태로 복원한다.</summary>
+    public static void CancelRewardUnlock(bool pack)
+    {
+        if (s_instance == null) return;
+        var view = pack ? s_instance._packUnlock : s_instance._collectionUnlock;
+        if (pack) s_instance._packUnlock = null;
+        else s_instance._collectionUnlock = null;
+        if (view != null) view.CancelPresentation();
+    }
 
     /// <summary>씬을 다시 열지 않고 지금 실린 캐리어를 재생한다. 로비에 머문 채 지급하는 쪽이 쓴다
     /// (Start·오버레이 닫힘은 이미 지나갔으므로 그 둘로는 닿지 않는다).
@@ -109,7 +134,9 @@ public class LobbyGainEffectDirector : MonoBehaviour
     {
         if (!Exists) return false;
 
-        return s_instance.PlayPack(_art, _origin);
+        bool played = s_instance.PlayPack(_art, _origin);
+        if (!played) CancelRewardUnlock(true);
+        return played;
     }
 
     /// <summary>연출이 끝나기를 기다리지 않고 지금 놓아준다 — 흡수와 다음 안내를 나란히 세우는 저작이 쓴다.
@@ -137,6 +164,8 @@ public class LobbyGainEffectDirector : MonoBehaviour
 
     void OnDisable()
     {
+        CancelRewardUnlock(false);
+        CancelRewardUnlock(true);
         // static 이벤트에 죽은 씬 오브젝트가 남으면 다음 씬에서 오발화한다.
         PackOpenOverlay.OnClosed -= OnPackOpenClosed;
         BattleRewardHandoff.OnGainAdded -= OnBattleRewardArrived;
@@ -249,7 +278,11 @@ public class LobbyGainEffectDirector : MonoBehaviour
         // 재화만 온 경우까지 Clear하면 돌고 있는 세션의 위장을 벗긴다 — 이번에 건 위장이 있을 때만 되돌린다.
         // OnComplete는 하나뿐이라 삽입 세션 시작과 완료 통지를 한 콜백에 담는다.
         if (t_cardStaged) m_master.OnComplete(() => { StartInsertSession(); NotifyFinished(_run, _silent); });
-        else if (t_cardCount > 0) CancelInsertSession();
+        else if (t_cardCount > 0)
+        {
+            CancelInsertSession();
+            CancelRewardUnlock(false);
+        }
 
         // 붙일 단계가 없으면(배선 탐색 실패) 빈 시퀀스를 남기지 않는다.
         if (!t_gainStaged && !t_cardStaged)
@@ -360,13 +393,27 @@ public class LobbyGainEffectDirector : MonoBehaviour
         var t_flight = EnsureCardFlight();
         t_flight.Configure(_origin != null ? _origin : m_collectionTarget, m_collectionTarget);
 
-        _master.Insert(0f, t_flight.BuildFlight(_cards, (_arrived, _total) => OnCardArrived()));
+        _master.Insert(0f, t_flight.BuildFlight(_cards, (_arrived, _total) => OnCardArrived(_arrived == _total)));
         return true;
     }
 
-    void OnCardArrived()
+    void OnCardArrived(bool last)
     {
-        UiPunch.Play(m_collectionPunch, this.tabPunch);
+        if (last) PlayRewardUnlock(false, m_collectionPunch);
+        else UiPunch.Play(m_collectionPunch, this.tabPunch);
+    }
+
+    void PlayRewardUnlock(bool pack, Transform punch)
+    {
+        var view = pack ? _packUnlock : _collectionUnlock;
+        if (pack) _packUnlock = null;
+        else _collectionUnlock = null;
+        if (view != null)
+        {
+            if (!view.IsLocked && view.PresentUnlock(null)) return;
+            view.CancelPresentation();
+        }
+        UiPunch.Play(punch, this.tabPunch);
     }
 
     // 팩 한 장짜리 비행. 카드 쪽과 달리 캐리어도 삽입 세션도 없다 — 만들고, 날리고, 지운다.
@@ -406,7 +453,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
                 return (RectTransform)t_flyer.transform;
             },
             _despawn: _rt => { if (_rt != null) _rt.gameObject.SetActive(false); },
-            _onArrived: (_arrived, _total) => UiPunch.Play(t_punch, this.tabPunch));
+            _onArrived: (_arrived, _total) => PlayRewardUnlock(true, t_punch));
 
         t_seq.SetLink(gameObject);
         t_seq.OnComplete(() =>

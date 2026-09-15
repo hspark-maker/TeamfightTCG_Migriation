@@ -17,6 +17,7 @@ public sealed class RuntimeContentCatalog : ScriptableObject
     public DeckImageCatalog deckImageCatalog;
     public RouletteConfig rouletteConfig;
     public OutgameTutorialData tutorialData;
+    public ContentUnlockData contentUnlockData;
     public KeywordIconConfig keywordIconConfig;
     public CardFrameConfig cardFrameConfig;
 
@@ -26,7 +27,7 @@ public sealed class RuntimeContentCatalog : ScriptableObject
             synergyRegistry == null || albumConfig == null || currencyLook == null ||
             adventureConfig == null || profileConfig == null || emoteCatalog == null ||
             deckImageCatalog == null || rouletteConfig == null || tutorialData == null ||
-            keywordIconConfig == null || cardFrameConfig == null)
+            keywordIconConfig == null || cardFrameConfig == null || contentUnlockData == null)
             throw new InvalidOperationException("RuntimeContentCatalog has missing authored references.");
     }
 }

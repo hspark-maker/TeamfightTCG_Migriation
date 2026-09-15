@@ -3525,6 +3525,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MatchDeckPanelView
   shell: {fileID: 0}
+  titleText: {fileID: 3211684539092292157}
   mySlots:
   - {fileID: 2787078513010376488}
   - {fileID: 848709567544293440}

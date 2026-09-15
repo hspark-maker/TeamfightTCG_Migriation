@@ -171,6 +171,7 @@ MonoBehaviour:
   initializeOnStart: 0
   progressBar: {fileID: 0}
   statusText: {fileID: 0}
+  _tipText: {fileID: 8861208313930641663}
   recoveryPanel: {fileID: 401894368553325121}
   recoveryText: {fileID: 2138776694632452108}
   retryButton: {fileID: 5764358577848001203}

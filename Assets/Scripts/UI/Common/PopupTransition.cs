@@ -34,6 +34,9 @@ public class PopupTransition
     // 진행 중 등장·퇴장 시퀀스.
     Sequence m_seq;
 
+    /// <summary>등장·퇴장 연출이 아직 끝나지 않았는가.</summary>
+    public bool IsPlaying => m_seq != null && m_seq.IsActive() && !m_seq.IsComplete();
+
     // 퇴장 진행 중 표식. 완료 콜백이 오기 전에 잘리면 대상이 켜진 채 남으므로 HandleDisabled가 이걸 보고 마무리한다.
     bool m_closing;
 

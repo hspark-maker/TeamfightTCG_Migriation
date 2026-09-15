@@ -10,7 +10,13 @@ public enum EOutgameTutorialTrigger
     AdventureUnlocked,       // 모험 해금 후 로비에서 소개 챕터를 시작한다
     RankDivisionFirstUp,      // 랭크 단계가 처음 오른 순간(브1 → 브2) — 제자리 상승 연출이 끝난 뒤에 깨운다
     RankGradeFirstUp,         // 랭크 등급이 처음 갈린 순간(브론즈 → 실버) — 승급 오버레이·보상까지 걷힌 뒤에 깨운다
-    ContentUnlocksAvailable = 9, // 미션·룰렛 해금 소개
+    ContentUnlocksAvailable = 9, // 미션·룰렛·카드 강화 해금 소개
     GuideCaretakerEnhanceArrived = 10, // 폐기(가이드 도착 코치마크) — 카드 소지가 전제라 성립하지 않아 저작·발화처 0. 값만 남긴다
     GuideAceEnhanceArrived = 11,       // 폐기(가이드 도착 코치마크) — 위와 같음
+    GuideMissionIntroduction = 12,
+    KeywordIntroduction = 13, // 폐기 — 카드 강화 스텝으로 이관. 기존 저장값만 보존한다
+    SynergyIntroduction = 14,
+    CaretakerPreparation = 15, // 폐기 — 기존 저장값만 보존한다
+    CaretakerReady = 16, // 폐기 — 기존 저장값만 보존한다
+    CaretakerActivation = 17,
 }

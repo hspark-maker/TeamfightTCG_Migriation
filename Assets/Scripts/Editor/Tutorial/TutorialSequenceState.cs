@@ -78,7 +78,7 @@ public sealed class TutorialSequenceState
     public static TutorialSequenceState Build(OutgameTutorialData _data)
     {
         var t_result = new TutorialSequenceState();
-        if (_data == null || _data.chapters == null) return t_result;
+        if (_data == null || _data.Chapters == null) return t_result;
 
         // 전역 폴백의 판단 근거. unlocksAll은 세지 않는다 — OutgameFeatureLock.HasAnyAuthoredUnlock이 unlocks만 본다.
         bool t_hasAuthored = HasAnyAuthoredUnlock(_data);
@@ -90,9 +90,9 @@ public sealed class TutorialSequenceState
         // 그 뒤의 자율 챕터는 졸업 뒤에만 서므로 "전부 열림·잠금 없음" 스냅샷 하나로 본다 — 런타임의 s_all = !running과 같다.
         bool t_guidedZone = false;
 
-        for (int t_c = 0; t_c < _data.chapters.Count; t_c++)
+        for (int t_c = 0; t_c < _data.Chapters.Count; t_c++)
         {
-            var t_chapter = _data.chapters[t_c];
+            var t_chapter = _data.Chapters[t_c];
             if (t_chapter == null) continue;
 
             if (t_chapter.IsGuided) t_guidedZone = true;
@@ -104,7 +104,7 @@ public sealed class TutorialSequenceState
                 if (t_guidedZone)
                 {
                     t_result.m_states[(t_c, t_s)] = new StepState(true, new HashSet<EOutgameFeature>(t_unlocked), null,
-                                                               true, t_chapter.Prerequisite, _data.contentUnlocks);
+                                                               true, t_chapter.Prerequisite, ContentUnlockAuthoring.Data?.contentUnlocks);
                     continue;
                 }
 
@@ -120,7 +120,7 @@ public sealed class TutorialSequenceState
 
                 t_result.m_states[(t_c, t_s)] =
                     new StepState(t_allHere, new HashSet<EOutgameFeature>(t_unlocked), t_locked, false,
-                                  EOutgameFeature.None, _data.contentUnlocks);
+                                  EOutgameFeature.None, ContentUnlockAuthoring.Data?.contentUnlocks);
             }
         }
 
@@ -142,9 +142,9 @@ public sealed class TutorialSequenceState
     // 강제 챕터만 본다 — 런타임 EnumerateUpTo도 강제 경계 안에서만 돈다
     static bool HasAnyAuthoredUnlock(OutgameTutorialData _data)
     {
-        for (int t_c = 0; t_c < _data.chapters.Count; t_c++)
+        for (int t_c = 0; t_c < _data.Chapters.Count; t_c++)
         {
-            var t_chapter = _data.chapters[t_c];
+            var t_chapter = _data.Chapters[t_c];
             if (t_chapter == null) continue;
             if (t_chapter.IsGuided) break;
 

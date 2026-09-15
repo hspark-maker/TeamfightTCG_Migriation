@@ -24,5 +24,6 @@ MonoBehaviour:
   deckImageCatalog: {fileID: 11400000, guid: 20a3ae6097a4cb440ad35c4621cec66e, type: 2}
   rouletteConfig: {fileID: 11400000, guid: c79a047159501ef46a7e47fcabb63abf, type: 2}
   tutorialData: {fileID: 11400000, guid: f8c1956156735bb4e8266fa5abf76d0c, type: 2}
+  contentUnlockData: {fileID: 11400000, guid: 1e1be2bef9712811f618230dfaf88480, type: 2}
   keywordIconConfig: {fileID: 11400000, guid: 2e0475eb8d64d1449916d99de758135a, type: 2}
   cardFrameConfig: {fileID: 11400000, guid: ed4cd9df9407f0a4e97ba1a9c52f5890, type: 2}

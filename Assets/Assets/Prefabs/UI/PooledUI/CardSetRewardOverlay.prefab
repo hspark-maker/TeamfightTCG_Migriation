@@ -273,6 +273,11 @@ MonoBehaviour:
     closeDuration: 0.15
     openFromScale: 0.92
     closeToScale: 0.94
+  dim:
+    alpha: 0.92
+    color: {r: 0, g: 0, b: 0, a: 1}
+    darkColor: {r: 0.02, g: 0.02, b: 0.05, a: 1}
+    brightColor: {r: 0.3, g: 0.28, b: 0.45, a: 1}
   claimDelay: 0.8
   claimFadeDuration: 0.16
   viewContents: {fileID: 8909000000000000001}
@@ -692,7 +697,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_Color: {r: 0, g: 0, b: 0, a: 0}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1

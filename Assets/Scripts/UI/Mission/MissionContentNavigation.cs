@@ -16,6 +16,12 @@ internal static class MissionContentNavigation
         EOutgameFeature t_destination = DestinationOf(_definition);
         if (t_destination == EOutgameFeature.None) return false;
 
+        if (GuidanceCoordinator.TryRequestMission(_definition.Id))
+        {
+            _beforeNavigate?.Invoke();
+            return true;
+        }
+
         if (t_destination == EOutgameFeature.Adventure)
         {
             var t_launcher = UnityEngine.Object.FindFirstObjectByType<LobbyMatchLauncher>();
@@ -23,7 +29,10 @@ internal static class MissionContentNavigation
         }
 
         var t_shell = UnityEngine.Object.FindFirstObjectByType<LobbyTabController>();
-        return t_shell != null && t_shell.TrySelectFeature(t_destination, _beforeNavigate);
+        return t_shell != null && t_shell.TrySelectFeature(t_destination, _beforeNavigate, _onArrived: () =>
+        {
+            if (t_destination == EOutgameFeature.LobbyDeckTab) SynergyIntroduction.RequestRelevantAction();
+        });
     }
 
     static EOutgameFeature DestinationOf(MissionDefinition _definition)

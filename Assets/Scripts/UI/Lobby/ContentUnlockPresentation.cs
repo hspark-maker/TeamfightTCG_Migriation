@@ -7,6 +7,8 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
 {
     static ContentUnlockPresentation s_instance;
     FeatureLockView[] m_views;
+    FeatureLockView _rankedButton;
+    FeatureLockView _guideMissionButton;
     ContentUnlockIntroView m_intro;
     List<ContentUnlockIntroDef> m_intros;
     int m_introIndex;
@@ -16,15 +18,20 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
     bool m_playing;
     bool m_pendingIntro;
     int m_sessionVersion;
+    readonly List<PendingUnlock> _arrivals = new List<PendingUnlock>();
+    readonly List<FeatureLockView> _heldViews = new List<FeatureLockView>();
 
     public static bool IsPlaying => s_instance != null && s_instance.m_playing;
     public static bool IsReady => s_instance != null && s_instance.m_visible && s_instance.isActiveAndEnabled;
 
     /// <summary>콘텐츠별 대표 버튼을 연결한다. 버튼이 없어도 소개 화면은 표시한다.</summary>
-    public void Bind(FeatureLockView _mission, FeatureLockView _adventure, FeatureLockView _roulette)
+    public void Bind(FeatureLockView _mission, FeatureLockView _adventure, FeatureLockView _roulette,
+        FeatureLockView rankedButton, FeatureLockView guideMissionButton)
     {
         s_instance = this;
         m_views = new[] { _mission, _adventure, _roulette };
+        _rankedButton = rankedButton;
+        _guideMissionButton = guideMissionButton;
     }
 
     public void SetVisible(bool _visible)
@@ -34,16 +41,23 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
     }
 
     /// <summary>현재 스텝의 소개를 시작한다. 무대 준비 전에는 소비하지 않고 기다린다.</summary>
-    public static bool TryPresent(OutgameTutorialData _data, TutorialStepDef _step,
+    public static bool TryPresent(TutorialStepDef _step,
+        Action _onConfirmed, Action _onCancelled)
+        => TryPresent(_step?.ContentIntros, _onConfirmed, _onCancelled);
+
+    /// <summary>가이드 흐름이 요청한 해금 소개를 재생한다.</summary>
+    public static bool TryPresent(IReadOnlyList<EContentUnlockIntro> _contents,
         Action _onConfirmed, Action _onCancelled)
     {
         if (!IsReady || IsPlaying || !GuidanceCoordinator.CanRunContentIntro) return false;
-        if (_data == null || _step.ContentIntros == null || _step.ContentIntros.Count == 0) return false;
+        if (ContentUnlockConfig.Data == null || _contents == null || _contents.Count == 0) return false;
         var t_intros = new List<ContentUnlockIntroDef>();
-        foreach (EContentUnlockIntro t_content in _step.ContentIntros)
+        foreach (EContentUnlockIntro t_content in _contents)
         {
-            if (!_data.TryGetContentIntro(t_content, out var t_intro)
+            if (!ContentUnlockConfig.Data.TryGetContentIntro(t_content, out var t_intro)
                 || string.IsNullOrWhiteSpace(t_intro.contentName) || t_intro.icon == null) return false;
+            if (t_content == EContentUnlockIntro.Mission && (t_intro.guideMissionIcon == null
+                || string.IsNullOrWhiteSpace(t_intro.guideMissionName))) return false;
             string t_key = ContentUnlockIntroDef.KeyOf(t_content);
             if (t_key != null && !ContentUnlockManager.IsUnlocked(t_key)) return false;
             t_intros.Add(t_intro);
@@ -57,6 +71,12 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
         t_owner.m_cancelled = _onCancelled;
         t_owner.m_sessionVersion = ContentUnlockManager.SessionVersion;
         t_owner.m_playing = true;
+        foreach (var intro in t_intros)
+        {
+            var button = t_owner.FindButton(intro.content);
+            t_owner.HoldButton(button);
+            if (intro.content == EContentUnlockIntro.Mission) t_owner.HoldButton(t_owner._guideMissionButton);
+        }
         t_owner.ShowCurrent();
         return true;
     }
@@ -65,9 +85,21 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
     {
         m_pendingIntro = false;
         ContentUnlockIntroDef t_intro = m_intros[m_introIndex];
-        m_intro.Show(t_intro.contentName + " 오픈 !", t_intro.description,
-            new[] { t_intro.icon }, Finish, Cancel);
-        PlayButton(ContentUnlockIntroDef.KeyOf(t_intro.content));
+        var button = FindButton(t_intro.content);
+        if (t_intro.content == EContentUnlockIntro.Mission)
+        {
+            var buttons = new[] { button, _guideMissionButton };
+            m_intro.ShowTogether(t_intro.contentName + " / " + t_intro.guideMissionName,
+                t_intro.description, new[] { t_intro.icon, t_intro.guideMissionIcon },
+                new[] { t_intro.contentName, t_intro.guideMissionName },
+                new[] { button != null ? button.UnlockTarget : null,
+                    _guideMissionButton != null ? _guideMissionButton.UnlockTarget : null },
+                Finish, Cancel, (index, done) => PlayButton(buttons[index], done));
+            return;
+        }
+        m_intro.Show(t_intro.contentName , t_intro.description,
+            new[] { t_intro.icon }, Finish, Cancel, button != null ? button.UnlockTarget : null,
+            done => PlayButton(button, done));
     }
 
     public static void CancelCurrent()
@@ -80,15 +112,45 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
         if (m_playing && (m_sessionVersion != ContentUnlockManager.SessionVersion
             || !m_visible || !GuidanceCoordinator.CanRunContentIntro)) Cancel();
         if (m_playing && m_pendingIntro) ShowCurrent();
+        for (int i = _arrivals.Count - 1; i >= 0; i--)
+        {
+            var arrival = _arrivals[i];
+            if (arrival.View == null || !arrival.View.isActiveAndEnabled || !arrival.View.IsPresenting)
+                CompleteArrival(arrival);
+        }
     }
 
-    void PlayButton(string _key)
+    FeatureLockView FindButton(EContentUnlockIntro content)
     {
-        if (_key == null || m_views == null) return;
+        if (content == EContentUnlockIntro.Ranked)
+            return _rankedButton != null && _rankedButton.isActiveAndEnabled ? _rankedButton : null;
+        string _key = ContentUnlockIntroDef.KeyOf(content);
+        if (_key == null || m_views == null) return null;
         foreach (FeatureLockView t_view in m_views)
             if (t_view != null && t_view.isActiveAndEnabled && !t_view.IsLocked
                 && ContentUnlockManager.TryGetKey(t_view.Feature, out string t_key) && t_key == _key)
-                t_view.PresentUnlock(null);
+                return t_view;
+        return null;
+    }
+
+    void PlayButton(FeatureLockView button, Action done)
+    {
+        var arrival = new PendingUnlock { View = button, Complete = done };
+        _arrivals.Add(arrival);
+        if (button == null || !button.PresentUnlock(() => CompleteArrival(arrival))) CompleteArrival(arrival);
+    }
+
+    void CompleteArrival(PendingUnlock arrival)
+    {
+        if (!_arrivals.Remove(arrival)) return;
+        arrival.Complete?.Invoke();
+    }
+
+    void HoldButton(FeatureLockView button)
+    {
+        if (button == null || _heldViews.Contains(button)) return;
+        _heldViews.Add(button);
+        button.HoldUnlockPresentation();
     }
 
     void Finish()
@@ -123,6 +185,7 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
 
     void Clear()
     {
+        _arrivals.Clear();
         m_playing = false;
         m_pendingIntro = false;
         m_intro = null;
@@ -130,9 +193,9 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
         m_introIndex = 0;
         m_confirmed = null;
         m_cancelled = null;
-        if (m_views != null)
-            foreach (FeatureLockView t_view in m_views)
-                if (t_view != null && t_view.IsPresenting) t_view.CancelPresentation();
+        foreach (FeatureLockView view in _heldViews)
+            if (view != null) view.CancelPresentation();
+        _heldViews.Clear();
     }
 
     void OnDisable()
@@ -149,4 +212,10 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetRuntimeState() => s_instance = null;
+
+    sealed class PendingUnlock
+    {
+        public FeatureLockView View;
+        public Action Complete;
+    }
 }

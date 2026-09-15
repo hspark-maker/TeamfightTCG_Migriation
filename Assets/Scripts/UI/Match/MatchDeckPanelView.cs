@@ -15,6 +15,7 @@ using UnityEngine.UI;
 public class MatchDeckPanelView : MonoBehaviour, IUIInitializable
 {
     [SerializeField] MatchDeckShell   shell;
+    [SerializeField] TMP_Text         titleText;
     [SerializeField] CardVisualView[] mySlots;      // 6칸. MySlot_N 자신이 아니라 자식 MySlot_N/CardUIView를 물린다
     [SerializeField] CardVisualView[] enemySlots;   // 6칸. 같은 규약 — EnemySlot_N/CardUIView를 물린다
     [SerializeField] TMP_Text         myPowerText;      // MyInfoBar/PowerBadge/PowerText
@@ -92,9 +93,25 @@ public class MatchDeckPanelView : MonoBehaviour, IUIInitializable
     public void Render(int _slotIndex)
     {
         InitializeUI();
+        RenderTitle();
         // 한쪽이 미배선이어도 다른 쪽은 그려야 한다 → 여기서 조기 반환하지 않고 각 렌더러가 알아서 건너뛴다.
         RenderMySlots(_slotIndex);
         RenderEnemySlots();
+    }
+
+    void RenderTitle()
+    {
+        if (titleText == null) return;
+
+        titleText.text = "모험";
+        if (!AdventureRun.IsActive) return;
+
+        int t_nodeIndex = AdventureProgress.IndexOf(AdventureRun.NodeId);
+        if (!AdventureProgress.TryGetNode(t_nodeIndex, out AdventureNodeDef t_node)) return;
+        int t_chapterIndex = AdventureProgress.ChapterIndexOfNode(t_nodeIndex);
+        if (!AdventureProgress.TryGetChapter(t_chapterIndex, out AdventureChapterDef t_chapter)) return;
+
+        titleText.text = $"{t_chapter.title} : {t_node.displayName}";
     }
 
     // 지정 저장 슬롯의 덱을 MySection 6칸에 그린다.

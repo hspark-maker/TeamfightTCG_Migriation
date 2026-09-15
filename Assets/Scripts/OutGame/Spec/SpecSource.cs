@@ -85,6 +85,13 @@ public static class SpecSource
     // 초기화에서 1회. 지연 로드도 되지만 첫 조회 프레임에 복호화·파싱이 걸리지 않게 미리 당긴다.
     public static void Init() => EnsureLoaded();
 
+    /// <summary>필수 표 해시가 같은 검증된 스냅샷의 선택 표만 세션에 반영한다.</summary>
+    internal static void AdoptOptionalSnapshot(SpecDataManager _manager, string _fingerprint)
+    {
+        s_manager = _manager;
+        s_fingerprint = _fingerprint;
+    }
+
     /// <summary>카드 표 데이터를 순수 <see cref="CardSpec"/> 값으로 변환한다.
     /// 표는 Card 하나다 — 테스트 프로필도 같은 표를 읽고, 테스트 전용 카드는
     /// 표 안의 <see cref="ECardChannel"/> 열로 갈린다(<c>CardCatalog.SetSource</c>의 includeTestCards).</summary>
@@ -354,16 +361,8 @@ public static class SpecSource
     {
         _fingerprint = null;
         _error = null;
-        var t_tables = new System.Collections.Generic.List<SpecTablePayload>();
-        foreach (string t_tableName in SpecPayloadCodec.TableNames)
-        {
-            if (!SpecPayloadCodec.TryBuildLocalTable(_manager, t_tableName, out SpecTablePayload t_table, out string t_tableError))
-            {
-                _error = $"table={t_tableName}: {t_tableError}";
-                return false;
-            }
-            t_tables.Add(t_table);
-        }
+        if (!SpecPayloadCodec.TryBuildSnapshotTables(_manager, out List<SpecTablePayload> t_tables, out _error))
+            return false;
         _fingerprint = SpecPayloadCodec.CombinedHash(_envId, t_tables);
         return true;
     }

@@ -30,7 +30,7 @@ public class LobbyEntryAlertDot : AlertDotView
                            && OutgameFeatureLock.IsUnlocked(EOutgameFeature.KeywordGrowth);
 
                 case EAlertDotTarget.Adventure:
-                    return AdventureProgress.HasAnyWaiting
+                    return AdventureProgress.HasAnyClaimable
                            && OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure);
 
                 case EAlertDotTarget.Mission:
@@ -76,7 +76,6 @@ public class LobbyEntryAlertDot : AlertDotView
                 OutgameFeatureLock.OnChanged += _handler;
                 break;
 
-            // 등급이 올라 챕터 잠금이 풀리는 것도 점이 켜지는 사건이다.
             case EAlertDotTarget.Adventure:
                 AdventureProgress.OnChanged += _handler;
                 RankManager.OnChanged += _handler;

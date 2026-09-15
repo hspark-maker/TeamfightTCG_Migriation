@@ -8,6 +8,7 @@ public static class ContentUnlockManager
     public const string MISSION = "Mission";
     public const string ADVENTURE = "Adventure";
     public const string ROULETTE = "Roulette";
+    public const string CARD_ENHANCE = "CardEnhance";
 
     static readonly HashSet<string> s_presented = new HashSet<string>(StringComparer.Ordinal);
     static Func<bool> s_canPersist;
@@ -36,6 +37,7 @@ public static class ContentUnlockManager
             EOutgameFeature.Mission => MISSION,
             EOutgameFeature.Adventure => ADVENTURE,
             EOutgameFeature.Roulette => ROULETTE,
+            EOutgameFeature.CardEnhance => CARD_ENHANCE,
             _ => null,
         };
         return _key != null;
@@ -65,6 +67,7 @@ public static class ContentUnlockManager
         s_initialized = true;
         RankManager.OnChanged += RequestRefresh;
         AccountLevelManager.OnChanged += RequestRefresh;
+        MissionManager.OnChanged += RequestRefresh;
         OutgameTutorialRunner.OnGuidedChanged += RequestRefresh;
         DataSaveManager.OnSaved += HandleSaved;
         RequestRefresh();
@@ -144,6 +147,7 @@ public static class ContentUnlockManager
         SessionVersion++;
         RankManager.OnChanged -= RequestRefresh;
         AccountLevelManager.OnChanged -= RequestRefresh;
+        MissionManager.OnChanged -= RequestRefresh;
         OutgameTutorialRunner.OnGuidedChanged -= RequestRefresh;
         DataSaveManager.OnSaved -= HandleSaved;
         s_initialized = false;
@@ -163,7 +167,8 @@ public static class ContentUnlockManager
                 { t_requiredTier = t_tier.Index; break; }
         return ContentUnlockRules.Evaluate(_rule, OutgameTutorialProgress.IsCompleted,
             RankManager.IsConfigured, RankManager.IsRanked, RankManager.BestTierIndex, t_requiredTier,
-            AccountLevelManager.IsConfigured, AccountLevelManager.Level);
+            AccountLevelManager.IsConfigured, AccountLevelManager.Level,
+            GuideMissionProgress.IsReady, GuideMissionProgress.HasReached(_rule.GuideMissionId));
     }
 
     static void HandleSaved(ESaveUploadTiming _timing) => RequestRefresh();

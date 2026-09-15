@@ -8,6 +8,7 @@ public enum EContentUnlockRequirement
     Ftue = 2,
     Rank = 4,
     AccountLevel = 8,
+    GuideMission = 16,
 }
 
 /// <summary>콘텐츠 접근 가능 여부와 아직 충족하지 못한 조건.</summary>
@@ -23,9 +24,15 @@ public readonly struct ContentUnlockEvaluation
 public static class ContentUnlockRules
 {
     public static ContentUnlockEvaluation Evaluate(ContentUnlockRule _rule, bool _ftueCompleted,
-        bool _rankReady, bool _isRanked, int _bestTier, int _requiredTier, bool _levelReady, int _level)
+        bool _rankReady, bool _isRanked, int _bestTier, int _requiredTier, bool _levelReady, int _level,
+        bool _missionReady = false, bool _missionReached = false)
     {
         EContentUnlockRequirement t_missing = EContentUnlockRequirement.None;
+        if (!string.IsNullOrEmpty(_rule.GuideMissionId))
+        {
+            if (!_missionReady) t_missing |= EContentUnlockRequirement.Data;
+            else if (!_missionReached) t_missing |= EContentUnlockRequirement.GuideMission;
+        }
         if (_rule.RequireFtue && !_ftueCompleted) t_missing |= EContentUnlockRequirement.Ftue;
         if (_rule.RequireRank)
         {
