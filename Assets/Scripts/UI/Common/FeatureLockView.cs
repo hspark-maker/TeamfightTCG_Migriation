@@ -50,6 +50,9 @@ public class FeatureLockView : MonoBehaviour
     /// <summary>명시적으로 시작한 해금 연출이 살아 있는가.</summary>
     public bool IsPresenting => m_explicitPresentation && m_unlockFx != null && m_unlockFx.IsActive();
 
+    /// <summary>자동 해금 효과가 아직 재생 중인가.</summary>
+    public bool IsUnlocking => m_unlockFx != null && m_unlockFx.IsActive();
+
     /// <summary>지금 이 UI가 잠겨 있는가. 튜토리얼 게이트가 "왜 타깃이 안 눌리는지"를 진단할 때 읽는다.</summary>
     public bool IsLocked => feature != EOutgameFeature.None && !OutgameFeatureLock.IsUnlocked(feature);
 

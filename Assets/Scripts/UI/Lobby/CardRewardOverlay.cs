@@ -136,6 +136,7 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
     public void Show(string _title, int _cardId, Action _onAcquire)
     {
         InitializeUI();
+        LobbyGainEffectDirector.HoldRewardUnlock(false);
         this.m_onAcquire = _onAcquire;
 
         // 직전 표시의 안무를 걷는다 — 시퀀스에 중첩된 트윈은 대상의 DOKill이 잡지 못해 새 안무와 같은 노드를 함께 민다.
@@ -173,6 +174,7 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
     // 오버레이는 자기 자신이 토글 대상이라 OnDisable이 정상 동작한다 — 잘린 퇴장 마무리를 여기서 위임한다.
     protected override void OnViewHidden()
     {
+        if (IsOpen) LobbyGainEffectDirector.CancelRewardUnlock(false);
         this.dim.Clear();
         this.transition.HandleDisabled(this.ResolveTarget());
         this.KillChoreo();

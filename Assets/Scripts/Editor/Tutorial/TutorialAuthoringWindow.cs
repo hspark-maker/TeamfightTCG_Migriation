@@ -38,6 +38,8 @@ public class TutorialAuthoringWindow : EditorWindow
     [SerializeField] bool  structureEdit;
     [SerializeField] bool  issuesOnly;
     [SerializeField] bool  showSettings;
+    [SerializeField] bool showGuideSettings;
+    [SerializeField] bool guideMode;
     [SerializeField] float listWidth = 300f;
 
     int dataAssetCount;
@@ -133,7 +135,7 @@ public class TutorialAuthoringWindow : EditorWindow
     // 편집으로 좌표가 줄어들면 선택이 허공을 가리킨다.
     void ClampSelection()
     {
-        if (this.selectedOuter >= OuterCount())                     { this.selectedOuter = -1; this.selectedStep = -1; }
+        if (this.selectedOuter >= OuterCount() || (this.selectedOuter >= 0 && !IsVisibleChapter(this.selectedOuter)))                     { this.selectedOuter = -1; this.selectedStep = -1; }
         else if (this.selectedOuter >= 0
               && this.selectedStep >= StepCountOf(this.selectedOuter)) this.selectedStep = -1;
 
@@ -147,7 +149,7 @@ public class TutorialAuthoringWindow : EditorWindow
 
         for (int t_o = 0; t_o < t_outers; t_o++)
         {
-            if (StepCountOf(t_o) == 0) continue;
+            if (!IsVisibleChapter(t_o) || StepCountOf(t_o) == 0) continue;
 
             this.selectedOuter = t_o;
             this.selectedStep  = 0;
@@ -220,7 +222,9 @@ public class TutorialAuthoringWindow : EditorWindow
         this.serialized?.Update();
 
         DrawToolbar();
+        DrawModeTabs();
         DrawSettings();
+        DrawGuideSettings();
 
         EditorGUILayout.BeginHorizontal();
         DrawListPane();
@@ -257,9 +261,33 @@ public class TutorialAuthoringWindow : EditorWindow
 
         GUILayout.Label(VerdictLabel(), this.errorCount > 0 ? ErrorStyle : EditorStyles.miniLabel);
 
-        this.showSettings = GUILayout.Toggle(this.showSettings, "설정", EditorStyles.toolbarButton, GUILayout.Width(42));
+        this.showSettings = GUILayout.Toggle(this.showSettings, "공통 설정", EditorStyles.toolbarButton, GUILayout.Width(70));
 
         EditorGUILayout.EndHorizontal();
+    }
+
+    void DrawModeTabs()
+    {
+        int t_mode = GUILayout.Toolbar(this.guideMode ? 1 : 0, new[] { "FTUE · 첫 실행", "가이드 · 미션 온보딩" });
+        if ((t_mode == 1) == this.guideMode) return;
+        this.guideMode = t_mode == 1;
+        this.selectedOuter = -1;
+        this.selectedStep = -1;
+        this.listScroll = Vector2.zero;
+        this.detailScroll = Vector2.zero;
+        SelectFirstStep();
+        GUI.FocusControl(null);
+    }
+
+    void DrawGuideSettings()
+    {
+        if (!this.guideMode || this.serialized == null) return;
+        this.showGuideSettings = EditorGUILayout.Foldout(this.showGuideSettings, "가이드 미션 · 안내", true);
+        if (!this.showGuideSettings) return;
+        EditorGUILayout.PropertyField(this.serialized.FindProperty("guide.guideFlows"), new GUIContent("가이드 미션 해금·온보딩"), true);
+        EditorGUILayout.PropertyField(this.serialized.FindProperty("guide.synergyIntroductionMessage"), new GUIContent("첫 시너지 해금 설명"), true);
+        if (GUILayout.Button("콘텐츠 해금 설정 열기"))
+            Selection.activeObject = ContentUnlockAuthoring.Data;
     }
 
     string VerdictLabel()
@@ -289,16 +317,6 @@ public class TutorialAuthoringWindow : EditorWindow
             EditorGUILayout.HelpBox($"같은 타입의 SO가 여러 벌이다({this.dataAssetCount}) — 초기화가 실제로 재생하는 에셋을 직접 지정할 것.",
                                     MessageType.Warning);
 
-        if (this.serialized != null)
-        {
-            EditorGUILayout.PropertyField(this.serialized.FindProperty("contentUnlocks"),
-                new GUIContent("콘텐츠 해금 조건"), true);
-            EditorGUILayout.PropertyField(this.serialized.FindProperty("contentIntros"),
-                new GUIContent("콘텐츠 해금 소개"), true);
-            EditorGUILayout.PropertyField(this.serialized.FindProperty("synergyIntroductionMessage"),
-                new GUIContent("첫 시너지 해금 설명"), true);
-        }
-
         EditorGUILayout.Space(2);
     }
 
@@ -308,18 +326,17 @@ public class TutorialAuthoringWindow : EditorWindow
     {
         EditorGUILayout.BeginVertical(GUILayout.Width(this.listWidth));
 
-        int t_outers = OuterCount();
-        if (t_outers == 0)
+        if (VisibleEnd() == VisibleStart())
         {
             EditorGUILayout.LabelField("저작된 편이 없다", EditorStyles.miniLabel);
         }
 
         this.listScroll = EditorGUILayout.BeginScrollView(this.listScroll, GUILayout.Width(this.listWidth));
 
-        for (int t_o = 0; t_o < t_outers; t_o++) DrawOuterGroup(t_o);
+        for (int t_o = VisibleStart(); t_o < VisibleEnd(); t_o++) DrawOuterGroup(t_o);
 
-        if (this.structureEdit && GUILayout.Button("+ 편 추가", EditorStyles.miniButton))
-            Defer(() => TutorialSequenceEditOps.AddChapter(this.data, t_outers));
+        if (this.structureEdit && GUILayout.Button(this.guideMode ? "+ 가이드 챕터 추가" : "+ FTUE 챕터 추가", EditorStyles.miniButton))
+            Defer(() => TutorialSequenceEditOps.AddChapter(this.data, VisibleEnd(), VisibleKind()));
 
         EditorGUILayout.EndScrollView();
         EditorGUILayout.EndVertical();
@@ -538,8 +555,7 @@ public class TutorialAuthoringWindow : EditorWindow
             string t_edited = EditorGUILayout.DelayedTextField("편 이름", t_label);
             if (t_edited != t_label) Defer(() => TutorialSequenceEditOps.SetChapterLabel(this.data, _chapter, t_edited));
 
-            var t_kind = (EOutgameTutorialChapterKind)EditorGUILayout.EnumPopup("성격", t_chapter.Kind);
-            if (t_kind != t_chapter.Kind) Defer(() => TutorialSequenceEditOps.SetChapterKind(this.data, _chapter, t_kind));
+            EditorGUILayout.LabelField("성격", t_chapter.IsGuided ? "가이드 · 미션 온보딩" : "FTUE · 첫 실행");
 
             if (t_chapter.IsGuided)
             {
@@ -556,7 +572,7 @@ public class TutorialAuthoringWindow : EditorWindow
         }
 
         if (t_chapter.IsGuided)
-            EditorGUILayout.HelpBox("자율 챕터 — 졸업 뒤 발화 키가 깨운다. 진행은 메모리에만 남고(화면을 떠나면 다음에 처음부터), 완주해야 낙인이 찍힌다. "
+            EditorGUILayout.HelpBox("가이드 챕터 — FTUE 이후 미션 흐름이나 연결된 발화 조건으로 시작한다. 진행은 메모리에만 남고(화면을 떠나면 다음에 처음부터), 완주해야 낙인이 찍힌다. "
                                   + "locks/unlocks는 읽히지 않는다.", MessageType.None);
 
         if (!this.structureEdit) return;
@@ -564,16 +580,16 @@ public class TutorialAuthoringWindow : EditorWindow
         EditorGUILayout.Space(4);
         EditorGUILayout.BeginHorizontal();
 
-        using (new EditorGUI.DisabledScope(_chapter == 0))
+        using (new EditorGUI.DisabledScope(_chapter <= VisibleStart()))
             if (GUILayout.Button("▲ 앞으로", EditorStyles.miniButtonLeft))
                 Defer(() => TutorialSequenceEditOps.MoveChapter(this.data, _chapter, -1));
 
-        using (new EditorGUI.DisabledScope(_chapter >= OuterCount() - 1))
+        using (new EditorGUI.DisabledScope(_chapter >= VisibleEnd() - 1))
             if (GUILayout.Button("▼ 뒤로", EditorStyles.miniButtonMid))
                 Defer(() => TutorialSequenceEditOps.MoveChapter(this.data, _chapter, +1));
 
         if (GUILayout.Button("아래에 편 추가", EditorStyles.miniButtonMid))
-            Defer(() => TutorialSequenceEditOps.AddChapter(this.data, _chapter + 1));
+            Defer(() => TutorialSequenceEditOps.AddChapter(this.data, _chapter + 1, VisibleKind()));
 
         if (GUILayout.Button("편 삭제", EditorStyles.miniButtonRight))
             Defer(() => TutorialSequenceEditOps.DeleteChapter(this.data, _chapter));
@@ -793,13 +809,13 @@ public class TutorialAuthoringWindow : EditorWindow
     void ShowChapterMoveMenu(int _chapter, int _step)
     {
         var t_menu  = new GenericMenu();
-        int t_count = OuterCount();
 
-        for (int t_c = 0; t_c < t_count; t_c++)
+        for (int t_c = VisibleStart(); t_c < VisibleEnd(); t_c++)
         {
             int    t_target = t_c;
             string t_label  = LabelOf(t_c);
-            var    t_text   = new GUIContent(string.IsNullOrEmpty(t_label) ? $"{t_c + 1}편" : $"{t_c + 1}편 — {t_label}");
+            int t_number = t_c - VisibleStart() + 1;
+            var t_text = new GUIContent(string.IsNullOrEmpty(t_label) ? $"{t_number}편" : $"{t_number}편 — {t_label}");
 
             if (t_c == _chapter) t_menu.AddDisabledItem(t_text);
             else                 t_menu.AddItem(t_text, false,
@@ -851,7 +867,12 @@ public class TutorialAuthoringWindow : EditorWindow
 
     // ── 조회 ────────────────────────────────────────────────────────────────
 
-    int OuterCount() => this.data != null && this.data.chapters != null ? this.data.chapters.Count : 0;
+    int VisibleStart() => this.guideMode && this.data != null ? this.data.FtueChapterCount : 0;
+    int VisibleEnd() => this.guideMode ? OuterCount() : (this.data != null ? this.data.FtueChapterCount : 0);
+    bool IsVisibleChapter(int _chapter) => _chapter >= VisibleStart() && _chapter < VisibleEnd();
+    EOutgameTutorialChapterKind VisibleKind() => this.guideMode ? EOutgameTutorialChapterKind.Guided : EOutgameTutorialChapterKind.Forced;
+
+    int OuterCount() => this.data != null && this.data.Chapters != null ? this.data.Chapters.Count : 0;
 
     int StepCountOf(int _outer) => TryGetChapter(_outer, out var t_chapter) ? t_chapter.StepCount : 0;
 
@@ -861,10 +882,11 @@ public class TutorialAuthoringWindow : EditorWindow
     string OuterHeadLabel(int _outer, int _steps)
     {
         string t_label = LabelOf(_outer);
-        string t_head  = string.IsNullOrEmpty(t_label) ? $"{_outer + 1}편" : $"{_outer + 1}편 — {t_label}";
+        int t_number = _outer - (IsGuidedChapter(_outer) ? this.data.FtueChapterCount : 0) + 1;
+        string t_head = string.IsNullOrEmpty(t_label) ? $"{t_number}편" : $"{t_number}편 — {t_label}";
 
         if (TryGetChapter(_outer, out var t_chapter) && t_chapter.IsGuided)
-            t_head += $"  [자율 · {t_chapter.Trigger}]";
+            t_head += $"  [가이드 · {t_chapter.Trigger}]";
 
         return $"{t_head}  ({_steps})";
     }
@@ -902,10 +924,8 @@ public class TutorialAuthoringWindow : EditorWindow
     {
         if (this.serialized == null) return null;
 
-        var t_outerList = this.serialized.FindProperty("chapters");
-        if (t_outerList == null || _outer < 0 || _outer >= t_outerList.arraySize) return null;
-
-        var t_steps = t_outerList.GetArrayElementAtIndex(_outer).FindPropertyRelative("stepDefs");
+        var t_chapter = TutorialChapterProperties.GetChapter(this.serialized, _outer);
+        var t_steps = t_chapter?.FindPropertyRelative("stepDefs");
         if (t_steps == null || _step < 0 || _step >= t_steps.arraySize) return null;
 
         return t_steps.GetArrayElementAtIndex(_step);
@@ -917,10 +937,10 @@ public class TutorialAuthoringWindow : EditorWindow
     bool TryGetChapter(int _chapter, out OutgameTutorialChapter _result)
     {
         _result = null;
-        if (this.data == null || this.data.chapters == null)      return false;
-        if (_chapter < 0 || _chapter >= this.data.chapters.Count) return false;
+        if (this.data == null || this.data.Chapters == null)      return false;
+        if (_chapter < 0 || _chapter >= this.data.Chapters.Count) return false;
 
-        _result = this.data.chapters[_chapter];
+        _result = this.data.Chapters[_chapter];
         return _result != null;
     }
 

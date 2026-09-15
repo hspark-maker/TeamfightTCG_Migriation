@@ -17,29 +17,21 @@ public static class ContentUnlockIntroValidation
         var data = AssetDatabase.LoadAssetAtPath<OutgameTutorialData>(
             "Assets/SO/TutorialConfig/Outgame/OutgameTutorial.asset");
         Require(data != null, "Tutorial asset missing.");
-        Require(ContentUnlockConfig.TryValidate(data.contentUnlocks, out var unlockError), unlockError);
-        Require(ContentUnlockManager.TryGetKey(EOutgameFeature.CardEnhance, out var enhanceKey)
-            && ContentUnlockConfig.TryGet(data.contentUnlocks, enhanceKey, out var enhanceRule)
-            && enhanceRule.RequireFtue && !enhanceRule.RequireRank && enhanceRule.MinAccountLevel == 0,
-            "Card enhancement must require only FTUE completion.");
-        ContentUnlockConfig.TryGet(data.contentUnlocks, ContentUnlockManager.CARD_ENHANCE, out var rule);
-        Require(ContentUnlockRules.Evaluate(rule, false, false, false, -1, -1, false, 0).Missing
-            == EContentUnlockRequirement.Ftue, "Card enhancement opened before FTUE completion.");
-        Require(ContentUnlockRules.Evaluate(rule, true, false, false, -1, -1, false, 0).IsUnlocked,
-            "Card enhancement must open after FTUE without rank or account-level data.");
+        Require(ContentUnlockConfig.TryValidate(ContentUnlockAuthoring.Data.contentUnlocks, out var unlockError), unlockError);
+        var flowErrors = GuideMissionFlowValidation.Validate(data);
+        Require(flowErrors.Count == 0, string.Join("\n", flowErrors));
         Require(ContentUnlockIntroDef.KeyOf(EContentUnlockIntro.CardEnhance) == ContentUnlockManager.CARD_ENHANCE,
             "Card enhancement intro must commit the matching presentation key.");
         var ids = new HashSet<int>();
         int forced = 0;
-        int intros = 0;
-        foreach (var chapter in data.chapters)
+        int rankIntros = 0;
+        foreach (var chapter in data.Chapters)
         {
             if (!chapter.IsGuided) forced++;
             for (int i = 0; i < chapter.StepCount; i++)
             {
                 Require(chapter.TryGetStep(i, out var step) && ids.Add(step.StepId), "Duplicate step ID.");
                 if (step.Action != EOutgameTutorialAction.ContentUnlockIntro) continue;
-                intros++;
                 Require(step.Completion == EOutgameTutorialCompletion.ContentUnlockIntro && !step.LeavesScene,
                     "Unlock intro must wait for its own confirmation without leaving the scene.");
                 var sink = new CountingSink();
@@ -48,44 +40,37 @@ public static class ContentUnlockIntroValidation
                     && sink.Writes == 0,
                     "Entering an intro must not commit or launch content.");
                 foreach (var content in step.ContentIntros)
-                    Require(data.TryGetContentIntro(content, out var entry) && entry.icon != null,
+                    Require(ContentUnlockAuthoring.Data.TryGetContentIntro(content, out var entry) && entry.icon != null,
                         "Missing intro definition/icon.");
                 if (step.ContentIntros[0] == EContentUnlockIntro.Ranked)
                 {
+                    rankIntros++;
                     Require(i > 0 && chapter.TryGetStep(i - 1, out var previous)
                         && previous.Action == EOutgameTutorialAction.EnterFirstRank, "Rank entry must precede its intro.");
                     Require(chapter.TryGetStep(i + 1, out var next)
                         && next.Action == EOutgameTutorialAction.BattleEntry, "Rank intro must preserve battle entry.");
                 }
-                if (step.ContentIntros[0] == EContentUnlockIntro.Adventure)
-                    Require(chapter.TryGetStep(i + 1, out var next)
-                        && next.Action == EOutgameTutorialAction.WaitClick, "Adventure button guide must remain a separate step.");
-                if (chapter.Trigger == EOutgameTutorialTrigger.ContentUnlocksAvailable)
-                    Require(chapter.StepCount == 1 && step.ContentIntros.Count == 3
-                        && step.ContentIntros[0] == EContentUnlockIntro.Mission
-                        && step.ContentIntros[1] == EContentUnlockIntro.Roulette
-                        && step.ContentIntros[2] == EContentUnlockIntro.CardEnhance, "Mission/roulette/card enhancement must be queued in authored order.");
             }
         }
-        Require(forced == 4 && intros == 3, "Forced boundary or intro placement changed.");
+        Require(forced == 4 && rankIntros == 1, "Forced boundary or rank intro placement changed.");
         Require(ContentUnlockIntroDef.KeyOf(EContentUnlockIntro.Ranked) == null,
             "Rank presentation must not impersonate a content access key.");
 
-        var clone = UnityEngine.Object.Instantiate(data);
+        var clone = UnityEngine.Object.Instantiate(ContentUnlockAuthoring.Data);
         try
         {
-            Require(!HasIntroError(clone), "Valid intro authoring rejected.");
+            Require(!HasIntroError(data, clone), "Valid intro authoring rejected.");
             clone.contentIntros[0].icon = null;
-            Require(HasIntroError(clone), "Missing icon not rejected.");
-            clone.contentIntros[0].icon = data.contentIntros[0].icon;
+            Require(HasIntroError(data, clone), "Missing icon not rejected.");
+            clone.contentIntros[0].icon = ContentUnlockAuthoring.Data.contentIntros[0].icon;
             clone.contentIntros.Add(clone.contentIntros[0]);
-            Require(HasIntroError(clone), "Duplicate definition not rejected.");
+            Require(HasIntroError(data, clone), "Duplicate definition not rejected.");
             clone.contentIntros.RemoveAt(clone.contentIntros.Count - 1);
             clone.contentIntros.Clear();
-            Require(HasIntroError(clone), "Missing definition not rejected.");
+            Require(HasIntroError(data, clone), "Missing definition not rejected.");
         }
         finally { UnityEngine.Object.DestroyImmediate(clone); }
-        Debug.Log("[ContentUnlockIntroValidation] PASS: gating without commit, rank/adventure ordering, sequential intro queue, IDs, invalid authoring.");
+        Debug.Log("[ContentUnlockIntroValidation] PASS: gating without commit, rank ordering, mission flows, IDs, invalid authoring.");
     }
 
     /// <summary>사용자의 열린 씬을 유지한 채 소개 뷰의 확인·취소와 등장 입력을 검사한다.</summary>
@@ -132,10 +117,10 @@ public static class ContentUnlockIntroValidation
             var message = (TMPro.TMP_Text)serialized.FindProperty("_messageText").objectReferenceValue;
             var data = AssetDatabase.LoadAssetAtPath<OutgameTutorialData>(
                 "Assets/SO/TutorialConfig/Outgame/OutgameTutorial.asset");
-            Require(data.TryGetContentIntro(EContentUnlockIntro.Mission, out var mission)
-                && data.TryGetContentIntro(EContentUnlockIntro.Roulette, out _), "Missing grouped definitions.");
-            data.TryGetContentIntro(EContentUnlockIntro.Roulette, out var roulette);
-            Require(data.TryGetContentIntro(EContentUnlockIntro.CardEnhance, out var enhance),
+            Require(ContentUnlockAuthoring.Data.TryGetContentIntro(EContentUnlockIntro.Mission, out var mission)
+                && ContentUnlockAuthoring.Data.TryGetContentIntro(EContentUnlockIntro.Roulette, out _), "Missing grouped definitions.");
+            ContentUnlockAuthoring.Data.TryGetContentIntro(EContentUnlockIntro.Roulette, out var roulette);
+            Require(ContentUnlockAuthoring.Data.TryGetContentIntro(EContentUnlockIntro.CardEnhance, out var enhance),
                 "Missing card enhancement definition.");
             var icons = new[] { mission.icon };
             int confirmations = 0;
@@ -383,9 +368,9 @@ public static class ContentUnlockIntroValidation
         }
     }
 
-    static bool HasIntroError(OutgameTutorialData data)
+    static bool HasIntroError(OutgameTutorialData data, ContentUnlockData unlocks)
     {
-        foreach (var issue in TutorialValidator.Validate(data))
+        foreach (var issue in TutorialValidator.Validate(data, unlocks))
             if (issue.Level == ETutorialIssueLevel.Error && issue.Rule.StartsWith("해금 소개")) return true;
         return false;
     }

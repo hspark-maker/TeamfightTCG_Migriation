@@ -13,9 +13,9 @@ public static class GuideOnboardingDataAuthoring
     {
         var t_data = AssetDatabase.LoadAssetAtPath<OutgameTutorialData>(PATH);
         Undo.RecordObject(t_data, "Author guide onboarding");
-        if (string.IsNullOrWhiteSpace(t_data.synergyIntroductionMessage))
-            t_data.synergyIntroductionMessage = "시너지가 해금됐어요!\n같은 시너지가 해금된 카드를 필요한 수만큼\n같은 덱에 편성하면 시너지 효과가 활성화돼요.";
-        int t_chapterIndex = t_data.chapters.FindIndex(_chapter => _chapter.Trigger == EOutgameTutorialTrigger.GuideMissionIntroduction);
+        if (string.IsNullOrWhiteSpace(t_data.guide.synergyIntroductionMessage))
+            t_data.guide.synergyIntroductionMessage = "시너지가 해금됐어요!\n같은 시너지가 해금된 카드를 필요한 수만큼\n같은 덱에 편성하면 시너지 효과가 활성화돼요.";
+        int t_chapterIndex = t_data.guide.guideChapters.FindIndex(_chapter => _chapter.Trigger == EOutgameTutorialTrigger.GuideMissionIntroduction);
         if (t_chapterIndex < 0)
         {
             var t_chapter = new OutgameTutorialChapter();
@@ -24,10 +24,10 @@ public static class GuideOnboardingDataAuthoring
             t_chapter.EditorTrigger = EOutgameTutorialTrigger.GuideMissionIntroduction;
             t_chapter.EditorPrerequisite = EOutgameFeature.Mission;
             t_chapter.EditorSteps.Add(new TutorialStepDef());
-            t_data.chapters.Add(t_chapter);
-            t_chapterIndex = t_data.chapters.Count - 1;
+            t_data.guide.guideChapters.Add(t_chapter);
+            t_chapterIndex = t_data.Chapters.Count - 1;
             var t_serialized = new SerializedObject(t_data);
-            var t_step = t_serialized.FindProperty("chapters").GetArrayElementAtIndex(t_chapterIndex)
+            var t_step = TutorialChapterProperties.GetChapter(t_serialized, t_chapterIndex)
                 .FindPropertyRelative("stepDefs").GetArrayElementAtIndex(0);
             t_step.FindPropertyRelative("action").intValue = (int)EOutgameTutorialAction.Message;
             t_step.FindPropertyRelative("guideMessage").stringValue = "가이드 미션이 다음 목표를 알려줘요.\n현재 목표와 보상을 확인하고 [이동]을 눌러 시작해 보세요.\n목표를 달성하면 직접 보상을 받을 수 있어요.";
@@ -35,10 +35,9 @@ public static class GuideOnboardingDataAuthoring
             t_serialized.ApplyModifiedPropertiesWithoutUndo();
         }
         var t_so = new SerializedObject(t_data);
-        var t_chapters = t_so.FindProperty("chapters");
-        for (int t_c = 0; t_c < t_chapters.arraySize; t_c++)
+        for (int t_c = 0; t_c < t_data.Chapters.Count; t_c++)
         {
-            var t_steps = t_chapters.GetArrayElementAtIndex(t_c).FindPropertyRelative("stepDefs");
+            var t_steps = TutorialChapterProperties.GetChapter(t_so, t_c).FindPropertyRelative("stepDefs");
             for (int t_s = 0; t_s < t_steps.arraySize; t_s++)
             {
                 var t_step = t_steps.GetArrayElementAtIndex(t_s);
@@ -50,6 +49,7 @@ public static class GuideOnboardingDataAuthoring
             }
         }
         t_so.ApplyModifiedPropertiesWithoutUndo();
+        t_data.NormalizeChapterKinds();
         t_data.AssignMissingStepIds();
         EditorUtility.SetDirty(t_data);
         AssetDatabase.SaveAssetIfDirty(t_data);
@@ -61,9 +61,9 @@ public static class GuideOnboardingDataAuthoring
     {
         var t_data = AssetDatabase.LoadAssetAtPath<OutgameTutorialData>(PATH);
         Require(HasEnhanceUnlockStep(t_data), "Enhance unlock explanation step missing");
-        Require(!string.IsNullOrWhiteSpace(t_data.synergyIntroductionMessage), "Synergy authoring missing");
+        Require(!string.IsNullOrWhiteSpace(t_data.guide.synergyIntroductionMessage), "Synergy authoring missing");
         var t_ids = new HashSet<int>();
-        foreach (var t_chapter in t_data.chapters)
+        foreach (var t_chapter in t_data.Chapters)
             for (int t_i = 0; t_i < t_chapter.StepCount; t_i++)
             {
                 t_chapter.TryGetStep(t_i, out var t_step);
@@ -84,7 +84,7 @@ public static class GuideOnboardingDataAuthoring
 
     public static bool HasEnhanceUnlockStep(OutgameTutorialData _data)
     {
-        foreach (var t_chapter in _data.chapters)
+        foreach (var t_chapter in _data.Chapters)
         {
             if (t_chapter.Trigger != EOutgameTutorialTrigger.CollectionTabFirstEnter) continue;
             for (int t_i = 0; t_i < t_chapter.StepCount; t_i++)

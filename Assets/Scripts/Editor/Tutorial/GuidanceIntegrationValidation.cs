@@ -24,7 +24,7 @@ public static class GuidanceIntegrationValidation
                 Debug.LogError($"[GuidanceIntegrationValidation] {issue.Coord}: {issue.Message}");
             }
         Require(errors == 0, "Tutorial authoring has blocking errors.");
-        Require(GuideOnboardingDataAuthoring.HasEnhanceUnlockStep(sequence) && !string.IsNullOrWhiteSpace(sequence.synergyIntroductionMessage),
+        Require(GuideOnboardingDataAuthoring.HasEnhanceUnlockStep(sequence) && !string.IsNullOrWhiteSpace(sequence.guide.synergyIntroductionMessage),
             "Guide onboarding explanation messages are missing.");
         Require(GuideMissionPreparation.CardIds.Count == 3 && GuideMissionPreparation.CardIds[0] == 3
             && GuideMissionPreparation.CardIds[1] == 4 && GuideMissionPreparation.CardIds[2] == 1,

@@ -67,6 +67,7 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
     public void Show(string _title, IReadOnlyList<int> _cards, Action _onClaim)
     {
         InitializeUI();
+        LobbyGainEffectDirector.HoldRewardUnlock(false);
         this.m_continueGrantedPage = false;
         this.m_onClaim = _onClaim;
         this.KillIntro();
@@ -127,6 +128,7 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
         Show(t_title, System.Array.Empty<int>(), () => {
             if (t_next < _cards.Count) ShowGrantedPage(_cards, t_next);
         });
+        LobbyGainEffectDirector.CancelRewardUnlock(false);
         this.m_continueGrantedPage = t_next < _cards.Count;
         this.m_drawn.Clear();
         for (int i = _offset; i < t_next; i++) this.m_drawn.Add(_cards[i]);
@@ -143,6 +145,7 @@ public class CardSetRewardOverlay : SingletonOverlay<CardSetRewardOverlay>
     // 오버레이는 자기 자신이 토글 대상이라 OnDisable이 정상 동작한다 — 잘린 퇴장 마무리를 여기서 위임한다.
     protected override void OnViewHidden()
     {
+        if (IsOpen) LobbyGainEffectDirector.CancelRewardUnlock(false);
         this.dim.Clear();
         this.transition.HandleDisabled(this.ResolveTarget());
         this.KillIntro();

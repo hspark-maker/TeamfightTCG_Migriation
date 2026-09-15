@@ -67,6 +67,7 @@ public static class ContentUnlockManager
         s_initialized = true;
         RankManager.OnChanged += RequestRefresh;
         AccountLevelManager.OnChanged += RequestRefresh;
+        MissionManager.OnChanged += RequestRefresh;
         OutgameTutorialRunner.OnGuidedChanged += RequestRefresh;
         DataSaveManager.OnSaved += HandleSaved;
         RequestRefresh();
@@ -146,6 +147,7 @@ public static class ContentUnlockManager
         SessionVersion++;
         RankManager.OnChanged -= RequestRefresh;
         AccountLevelManager.OnChanged -= RequestRefresh;
+        MissionManager.OnChanged -= RequestRefresh;
         OutgameTutorialRunner.OnGuidedChanged -= RequestRefresh;
         DataSaveManager.OnSaved -= HandleSaved;
         s_initialized = false;
@@ -165,7 +167,8 @@ public static class ContentUnlockManager
                 { t_requiredTier = t_tier.Index; break; }
         return ContentUnlockRules.Evaluate(_rule, OutgameTutorialProgress.IsCompleted,
             RankManager.IsConfigured, RankManager.IsRanked, RankManager.BestTierIndex, t_requiredTier,
-            AccountLevelManager.IsConfigured, AccountLevelManager.Level);
+            AccountLevelManager.IsConfigured, AccountLevelManager.Level,
+            GuideMissionProgress.IsReady, GuideMissionProgress.HasReached(_rule.GuideMissionId));
     }
 
     static void HandleSaved(ESaveUploadTiming _timing) => RequestRefresh();

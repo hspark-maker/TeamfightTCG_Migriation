@@ -44,6 +44,9 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
 
     public int SwipeVersion => m_swipeVersion;
 
+    /// <summary>이탈 확인 대기를 포함한 최신 화면 이동 요청.</summary>
+    public int SelectionRequestVersion => m_selectionRequest;
+
     public bool CanSwipe => isActiveAndEnabled && m_currentIndex >= 0
         && (dragController == null || !dragController.IsDragging)
         && m_pendingStart == null && m_startSlides == null

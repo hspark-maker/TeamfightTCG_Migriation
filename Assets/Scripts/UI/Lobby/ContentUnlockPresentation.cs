@@ -41,15 +41,20 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
     }
 
     /// <summary>현재 스텝의 소개를 시작한다. 무대 준비 전에는 소비하지 않고 기다린다.</summary>
-    public static bool TryPresent(OutgameTutorialData _data, TutorialStepDef _step,
+    public static bool TryPresent(TutorialStepDef _step,
+        Action _onConfirmed, Action _onCancelled)
+        => TryPresent(_step?.ContentIntros, _onConfirmed, _onCancelled);
+
+    /// <summary>가이드 흐름이 요청한 해금 소개를 재생한다.</summary>
+    public static bool TryPresent(IReadOnlyList<EContentUnlockIntro> _contents,
         Action _onConfirmed, Action _onCancelled)
     {
         if (!IsReady || IsPlaying || !GuidanceCoordinator.CanRunContentIntro) return false;
-        if (_data == null || _step.ContentIntros == null || _step.ContentIntros.Count == 0) return false;
+        if (ContentUnlockConfig.Data == null || _contents == null || _contents.Count == 0) return false;
         var t_intros = new List<ContentUnlockIntroDef>();
-        foreach (EContentUnlockIntro t_content in _step.ContentIntros)
+        foreach (EContentUnlockIntro t_content in _contents)
         {
-            if (!_data.TryGetContentIntro(t_content, out var t_intro)
+            if (!ContentUnlockConfig.Data.TryGetContentIntro(t_content, out var t_intro)
                 || string.IsNullOrWhiteSpace(t_intro.contentName) || t_intro.icon == null) return false;
             if (t_content == EContentUnlockIntro.Mission && (t_intro.guideMissionIcon == null
                 || string.IsNullOrWhiteSpace(t_intro.guideMissionName))) return false;

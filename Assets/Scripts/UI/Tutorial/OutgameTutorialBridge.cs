@@ -719,7 +719,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         var t_data = OutgameTutorialRunner.Data;
         if (t_data == null) return false;
-        foreach (var t_chapter in t_data.chapters)
+        foreach (var t_chapter in t_data.Chapters)
             for (int t_i = 0; t_i + 1 < t_chapter.StepCount; t_i++)
                 if (t_chapter.TryGetStep(t_i, out var t_step) && t_step == m_step
                     && t_chapter.TryGetStep(t_i + 1, out var t_next))
@@ -864,7 +864,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         int t_version = m_contentIntroVersion;
         bool t_guided = GuidedCursor;
         var t_trigger = OutgameTutorialRunner.GuidedTrigger;
-        m_contentIntroStarted = ContentUnlockPresentation.TryPresent(data, t_step, () =>
+        m_contentIntroStarted = ContentUnlockPresentation.TryPresent(t_step, () =>
         {
             if (!IsCurrentContentIntro(t_step, t_version)) return;
             m_contentIntroStarted = false;

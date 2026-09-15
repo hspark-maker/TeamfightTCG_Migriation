@@ -21,6 +21,11 @@ public sealed class OutgameConfigStep : MainInitializer
 
     public override UniTask Initialize(InitializationContext _context)
     {
+        if (!ContentUnlockConfig.TrySetSource(RuntimeContentCache.Config.contentUnlockData, out string t_unlockError))
+        {
+            FailToRecovery(_context, new System.InvalidOperationException(t_unlockError));
+            return UniTask.CompletedTask;
+        }
         // 앨범 구조는 여기서 즉시 조립된다 — 스펙시트(AlbumThemeInfo·AlbumEntry)를 읽으므로 SpecSource 뒤에 서야 한다.
         CardAlbum.SetSource(albumConfig);
         CurrencyLook.SetActive(currencyLook);

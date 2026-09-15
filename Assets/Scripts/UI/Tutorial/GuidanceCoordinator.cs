@@ -3,18 +3,17 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>후속 안내만 조정한다. 기존 온보딩은 이 조정기의 상태를 기다리지 않는다.</summary>
-public sealed class GuidanceCoordinator : MonoBehaviour
+public sealed partial class GuidanceCoordinator : MonoBehaviour
 {
     static GuidanceCoordinator s_instance;
     LobbyMatchLauncher m_launcher;
     bool m_initialized;
     float m_nextEvaluation;
     static bool s_missionIntroRequested;
-    Func<bool> m_pendingOwnedIntroduction;
     readonly Dictionary<EOutgameTutorialTrigger, Func<bool>> m_pendingGuides = new Dictionary<EOutgameTutorialTrigger, Func<bool>>();
 
     public static bool CanPresent => !ContentUnlockPresentation.IsPlaying
-        && !OutgameTutorialRunner.TryGetPendingContentIntro(out _) && CanPresentContentUnlock;
+        && !HasPendingMissionFlow && CanPresentContentUnlock;
 
     /// <summary>해금 연출 자체를 제외한 로비 무대 준비 상태.</summary>
     public static bool CanPresentContentUnlock => s_instance != null && s_instance.SafeToPresent()
@@ -41,21 +40,6 @@ public sealed class GuidanceCoordinator : MonoBehaviour
         if (owner.GetComponent<GuidanceCoordinator>() == null) owner.AddComponent<GuidanceCoordinator>();
     }
 
-    /// <summary>명시한 미션 이동에서 첫 강화 안내만 다시 요청한다.</summary>
-    public static void RequestMissionEnhance(LobbyTabController _shell)
-    {
-        if (_shell == null) return;
-        int t_version = _shell.SwipeVersion;
-        OutgameTutorialRunner.ResumeDeferred(EOutgameTutorialTrigger.CollectionTabFirstEnter);
-        TryFire(EOutgameTutorialTrigger.CollectionTabFirstEnter,
-            () => _shell != null && _shell.isActiveAndEnabled && _shell.SwipeVersion == t_version);
-        if (s_instance != null && !OutgameTutorialRunner.IsGuidedRunning
-            && !s_instance.m_pendingGuides.ContainsKey(EOutgameTutorialTrigger.CollectionTabFirstEnter)
-            && CardDetailOverlayView.HasPendingIntroductionForOwnedCard())
-            s_instance.m_pendingOwnedIntroduction = () => _shell != null && _shell.isActiveAndEnabled
-                && _shell.SwipeVersion == t_version;
-    }
-
     /// <summary>기존 계정은 미션을 직접 열었을 때 소개를 요청한다.</summary>
     public static void RequestMissionIntroduction(Func<bool> _isCurrent = null)
     {
@@ -69,11 +53,11 @@ public sealed class GuidanceCoordinator : MonoBehaviour
     /// 오버레이가 열려 있는 것은 바쁨이 아니다: 키워드 패널·모험 맵처럼 트리거 자체가 연 화면 위에서 시작하는 안내가 있다.</summary>
     public static void TryFire(EOutgameTutorialTrigger _trigger, Func<bool> _isCurrent = null)
     {
-        if (_trigger == EOutgameTutorialTrigger.None) return;
+        if (_trigger == EOutgameTutorialTrigger.None || GuideMissionFlows.TryGet(_trigger, out _)) return;
         if (_isCurrent != null && !_isCurrent()) return;
         if (!OutgameTutorialRunner.HasPending(_trigger)) return;
 
-        if (StageBusyForGuided || HasEarlierContentIntro(_trigger)
+        if (StageBusyForGuided || HasPendingMissionFlow
             || HasBlockingPopup(_trigger) || OutgameTutorialRunner.IsGuidedRunning)
         {
             if (s_instance != null) s_instance.m_pendingGuides[_trigger] = _isCurrent;
@@ -81,7 +65,7 @@ public sealed class GuidanceCoordinator : MonoBehaviour
         }
 
         if (s_instance != null) s_instance.m_pendingGuides.Remove(_trigger);
-        OutgameTutorialRunner.Fire(_trigger);
+        StartGuide(_trigger);
     }
 
     void ResumePendingGuide()
@@ -93,27 +77,14 @@ public sealed class GuidanceCoordinator : MonoBehaviour
                 this.m_pendingGuides.Remove(t_request.Key);
                 return;
             }
-            if (StageBusyForGuided || HasEarlierContentIntro(t_request.Key)
+            if (StageBusyForGuided || HasPendingMissionFlow
                 || HasBlockingPopup(t_request.Key) || OutgameTutorialRunner.IsGuidedRunning) return;
 
             // Fire의 이벤트가 다른 안내를 요청할 수 있으므로 먼저 제거한다.
             this.m_pendingGuides.Remove(t_request.Key);
-            OutgameTutorialRunner.Fire(t_request.Key);
-            if (t_request.Key == EOutgameTutorialTrigger.CollectionTabFirstEnter && !OutgameTutorialRunner.IsGuidedRunning
-                && CardDetailOverlayView.HasPendingIntroductionForOwnedCard())
-                m_pendingOwnedIntroduction = t_request.Value ?? (() => true);
+            StartGuide(t_request.Key);
             return;
         }
-    }
-
-    void ResumeOwnedIntroduction()
-    {
-        if (m_pendingOwnedIntroduction == null) return;
-        if (!m_pendingOwnedIntroduction()) { m_pendingOwnedIntroduction = null; return; }
-        if (StageBusyForGuided || HasEarlierContentIntro() || HasBlockingPopup()
-            || OutgameTutorialRunner.IsGuidedRunning || CardDetailOverlayView.IsOpen) return;
-        m_pendingOwnedIntroduction = null;
-        CardDetailOverlayView.TryOpenPendingIntroduction();
     }
 
     static bool StageBusyForGuided
@@ -149,9 +120,6 @@ public sealed class GuidanceCoordinator : MonoBehaviour
         && !SynergyIntroduction.IsActive && UIPoolManager.instance != null
         && !HasBlockingPopup();
 
-    static bool HasEarlierContentIntro(EOutgameTutorialTrigger _trigger = EOutgameTutorialTrigger.None)
-        => OutgameTutorialRunner.TryGetPendingContentIntro(out var t_pending) && t_pending != _trigger;
-
     static bool HasBlockingPopup(EOutgameTutorialTrigger _trigger = EOutgameTutorialTrigger.None)
     {
         Type t_target = _trigger == EOutgameTutorialTrigger.GuideMissionIntroduction ? typeof(GuideMissionPanel)
@@ -178,15 +146,8 @@ public sealed class GuidanceCoordinator : MonoBehaviour
             SynergyIntroduction.Reevaluate();
             ContentUnlockManager.RequestRefresh();
         }
-        // 아직 재생을 시작하지 않은 해금 소개도 후속 온보딩보다 먼저 처리한다.
-        if (OutgameTutorialRunner.TryGetPendingContentIntro(out var t_trigger))
-        {
-            if (!AdventureMapOpen && ContentUnlockPresentation.IsReady && CanPresentContentUnlock)
-                TryFire(t_trigger);
-            return;
-        }
+        if (AdvanceMissionFlow()) return;
         this.ResumePendingGuide();
-        this.ResumeOwnedIntroduction();
         if (!CanPresent) return;
         if (OutgameTutorialRunner.IsRunning) return;
         if (s_missionIntroRequested && OutgameTutorialProgress.IsTriggerDone(EOutgameTutorialTrigger.GuideMissionIntroduction))
@@ -202,8 +163,8 @@ public sealed class GuidanceCoordinator : MonoBehaviour
 
     void OnDisable()
     {
+        CancelMissionFlow(false);
         this.m_pendingGuides.Clear();
-        this.m_pendingOwnedIntroduction = null;
         SynergyIntroduction.CancelPresentation();
         if (s_instance == this) s_instance = null;
     }

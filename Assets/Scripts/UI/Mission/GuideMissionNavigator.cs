@@ -9,6 +9,7 @@ internal static class GuideMissionNavigator
 
     internal static void Go(MissionDefinition _definition)
     {
+        if (_definition != null && GuidanceCoordinator.TryRequestMission(_definition.Id)) return;
         GuideMissionTrack.GuideRoute t_route = GuideMissionTrack.RouteOf(_definition);
         switch (t_route.Kind)
         {
@@ -51,7 +52,7 @@ internal static class GuideMissionNavigator
         LobbyTabController t_shell = FindShell();
         AlbumTabController t_tab = t_shell != null ? t_shell.GetComponentInChildren<AlbumTabController>(true) : null;
         if (t_tab == null) return;
-        t_shell.TrySelectFeature(EOutgameFeature.LobbyCollectionTab, _onArrived: () => GuidanceCoordinator.RequestMissionEnhance(t_shell));
+        t_shell.TrySelectFeature(EOutgameFeature.LobbyCollectionTab);
     }
 
     static void GoCardGrowth(MissionDefinition _definition)

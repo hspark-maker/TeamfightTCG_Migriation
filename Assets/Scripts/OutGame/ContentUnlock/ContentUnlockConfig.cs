@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>튜토리얼 SO에서 저작하는 콘텐츠별 AND 조건.</summary>
+/// <summary>콘텐츠 해금 SO에서 저작하는 콘텐츠별 AND 조건.</summary>
 [Serializable]
 public sealed class ContentUnlockDef
 {
@@ -18,6 +18,8 @@ public sealed class ContentUnlockDef
     public int minRankDivision;
     [Tooltip("최소 계정 레벨. 0이면 계정 레벨 조건을 사용하지 않는다.")]
     public int minAccountLevel;
+    [Tooltip("필요한 가이드 미션 도달 ID. 비워 두면 미션 진행을 요구하지 않는다. 다른 해금 조건과 AND로 평가한다.")]
+    public string guideMissionId;
 }
 
 /// <summary>저작값에서 복사한 콘텐츠 해금 조건.</summary>
@@ -29,6 +31,7 @@ public readonly struct ContentUnlockRule
     public ERankGrade MinRankGrade { get; }
     public int MinRankDivision { get; }
     public int MinAccountLevel { get; }
+    public string GuideMissionId { get; }
 
     public ContentUnlockRule(ContentUnlockDef _row)
     {
@@ -39,6 +42,7 @@ public readonly struct ContentUnlockRule
         MinRankGrade = _row.minRankGrade;
         MinRankDivision = _row.minRankDivision;
         MinAccountLevel = _row.minAccountLevel;
+        GuideMissionId = _row.guideMissionId;
     }
 }
 
@@ -48,16 +52,20 @@ public static class ContentUnlockConfig
     static readonly string[] s_requiredKeys = { "Mission", "Adventure", "Roulette", "CardEnhance" };
     static IReadOnlyList<ContentUnlockRule> s_rules = Array.Empty<ContentUnlockRule>();
     public static bool IsReady { get; private set; }
+    public static ContentUnlockData Data { get; private set; }
     public static IReadOnlyList<ContentUnlockRule> Rules => s_rules;
 
-    public static bool TrySetSource(IReadOnlyList<ContentUnlockDef> _rows, out string _error)
+    public static bool TrySetSource(ContentUnlockData _data, out string _error)
     {
         IsReady = false;
+        Data = null;
         s_rules = Array.Empty<ContentUnlockRule>();
-        if (!TryValidate(_rows, out _error)) return false;
+        var t_rows = _data != null ? _data.contentUnlocks : null;
+        if (!TryValidate(t_rows, out _error)) return false;
         var t_rules = new List<ContentUnlockRule>();
-        foreach (ContentUnlockDef t_row in _rows) t_rules.Add(new ContentUnlockRule(t_row));
+        foreach (ContentUnlockDef t_row in t_rows) t_rules.Add(new ContentUnlockRule(t_row));
         s_rules = t_rules.AsReadOnly();
+        Data = _data;
         IsReady = true;
         return true;
     }
@@ -97,6 +105,8 @@ public static class ContentUnlockConfig
                 || t_row.minRankDivision < 1 || t_row.minRankDivision > RankConfig.DivisionsPerGrade)
                 return Fail($"{t_key}: 잘못된 랭크 조건입니다.", out _error);
             if (t_row.minAccountLevel < 0) return Fail($"{t_key}: 계정 레벨은 0 이상이어야 합니다.", out _error);
+            if (t_key == ContentUnlockManager.MISSION && !string.IsNullOrEmpty(t_row.guideMissionId))
+                return Fail("미션 콘텐츠는 가이드 미션 도달을 요구할 수 없습니다.", out _error);
         }
         foreach (string t_key in s_requiredKeys)
             if (!t_keys.Contains(t_key)) return Fail($"필수 콘텐츠 누락: {t_key}", out _error);
@@ -135,6 +145,7 @@ public static class ContentUnlockConfig
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics()
     {
+        Data = null;
         IsReady = false;
         s_rules = Array.Empty<ContentUnlockRule>();
     }

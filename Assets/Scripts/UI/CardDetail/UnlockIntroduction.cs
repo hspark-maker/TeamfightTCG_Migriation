@@ -20,7 +20,7 @@ public static class UnlockIntroduction
     {
         OutgameTutorialData t_data = OutgameTutorialRunner.Data;
         if (_intros == null || _intros.Count == 0 || !UnlockIntroOverlay.TryGet(out var t_overlay)) return false;
-        string t_message = HasPending(_card, _intros) ? t_data.synergyIntroductionMessage : null;
+        string t_message = HasPending(_card, _intros) ? t_data.guide.synergyIntroductionMessage : null;
         bool t_first = !string.IsNullOrEmpty(t_message);
         t_overlay.Show(_intros, _card, _confirmed =>
         {

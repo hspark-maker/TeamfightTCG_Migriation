@@ -7,8 +7,7 @@ public static class OutgameTutorialRunner
 {
     static OutgameTutorialData s_data;
 
-    // 시퀀스 앞쪽에 연속으로 선 강제 챕터 수. 세이브 좌표·기능 잠금·졸업 판정은 전부 이 경계 안에서만 돈다 —
-    // 그 뒤의 자율 챕터를 강제 커서가 읽으면 졸업 센티널 좌표가 자율 스텝을 재생한다.
+    // FTUE 목록의 크기가 졸업 경계다. 가이드는 이 좌표 뒤에서 실행한다.
     static int s_forcedCount;
 
     // 자율 세션(메모리 커서). 세이브에는 완주 시점에 트리거 키 하나만 남는다 — 앱을 껐다 켜면 처음부터.
@@ -44,7 +43,7 @@ public static class OutgameTutorialRunner
     static bool IsGuidedOpen => OutgameTutorialProgress.IsCompleted;
 
     // 저작된 챕터("N편") 총수 — 강제·자율을 다 센다(미주입·빈 시퀀스는 0). 강제 커서의 범위는 ForcedChapterCount다
-    public static int ChapterCount => s_data != null && s_data.chapters != null ? s_data.chapters.Count : 0;
+    public static int ChapterCount => s_data != null && s_data.Chapters != null ? s_data.Chapters.Count : 0;
 
     // 강제 시퀀스의 챕터 수 = 졸업 센티널 좌표의 챕터 인덱스
     public static int ForcedChapterCount => s_forcedCount;
@@ -85,6 +84,7 @@ public static class OutgameTutorialRunner
     public static bool HasPending(EOutgameTutorialTrigger _trigger)
     {
         if (_trigger == EOutgameTutorialTrigger.None) return false;
+        if (GuideMissionFlows.TryGet(_trigger, out var t_flow) && !GuideMissionFlows.IsEligible(t_flow)) return false;
         if (!IsGuidedOpen) return false;
         if (OutgameTutorialProgress.IsTriggerDone(_trigger)) return false;
         if (_trigger == EOutgameTutorialTrigger.AdventureUnlocked
@@ -104,8 +104,6 @@ public static class OutgameTutorialRunner
         if (!HasPending(_trigger)) return;
 
         TryGetGuidedChapter(_trigger, out int t_chapterIndex, out var t_chapter);
-        if (_trigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
-            && !OutgameTutorialGuide.PrepareEnhanceCard(t_chapter)) return;
         s_guidedChapter = t_chapterIndex;
         s_guidedStep = 0;
 
@@ -130,31 +128,6 @@ public static class OutgameTutorialRunner
 
     public static bool IsGuidedAction(EOutgameTutorialAction _action)
         => TryGetGuidedStep(out var t_step) && t_step.Action == _action;
-
-    /// <summary>해금 소개로 시작하는 자율 챕터 중 지금 보여줄 사건을 찾는다.</summary>
-    public static bool TryGetPendingContentIntro(out EOutgameTutorialTrigger _trigger)
-    {
-        _trigger = EOutgameTutorialTrigger.None;
-        if (IsGuidedRunning || !IsGuidedOpen) return false;
-        for (int t_i = ForcedChapterCount; t_i < ChapterCount; t_i++)
-        {
-            if (!TryGetChapterRaw(t_i, out var t_chapter) || !HasPending(t_chapter.Trigger)
-                || !t_chapter.TryGetStep(0, out var t_step)
-                || t_step.Action != EOutgameTutorialAction.ContentUnlockIntro) continue;
-            bool t_ready = t_step.ContentIntros != null && t_step.ContentIntros.Count > 0;
-            if (!t_ready) continue;
-            foreach (EContentUnlockIntro t_content in t_step.ContentIntros)
-            {
-                string t_key = ContentUnlockIntroDef.KeyOf(t_content);
-                t_ready &= t_key != null && ContentUnlockManager.IsUnlocked(t_key);
-            }
-            // 소개 확인 뒤 중단된 후속 안내도 완주 낙인 전까지 다시 시작할 수 있어야 한다.
-            if (!t_ready) continue;
-            _trigger = t_chapter.Trigger;
-            return true;
-        }
-        return false;
-    }
 
     // 자율 스텝 진입 — 결말은 반환값이 말한다(EnterCurrentStep과 같은 규약)
     public static EOutgameTutorialStepResult EnterGuidedStep()
@@ -244,8 +217,9 @@ public static class OutgameTutorialRunner
             return;
         }
 
+        _data.NormalizeChapterKinds();
         s_data = _data;
-        s_forcedCount = CountForcedPrefix();
+        s_forcedCount = _data.FtueChapterCount;
         WarnOnMisauthoredChapters();
     }
 
@@ -269,13 +243,6 @@ public static class OutgameTutorialRunner
         }
 
         return false;
-    }
-
-    static int CountForcedPrefix()
-    {
-        int t_count = 0;
-        while (TryGetChapterRaw(t_count, out var t_chapter) && !t_chapter.IsGuided) t_count++;
-        return t_count;
     }
 
     /// <summary>초기화가 1회 부르는 재개 정정(EnsureData 이후). 대본 전투가 연 화면(덱 게이트) 안의 좌표에 서 있는데
@@ -577,10 +544,10 @@ public static class OutgameTutorialRunner
     static bool TryGetChapterRaw(int _index, out OutgameTutorialChapter _chapter)
     {
         _chapter = null;
-        if (s_data == null || s_data.chapters == null) return false;
-        if (_index < 0 || _index >= s_data.chapters.Count) return false;
+        if (s_data == null || s_data.Chapters == null) return false;
+        if (_index < 0 || _index >= s_data.Chapters.Count) return false;
 
-        _chapter = s_data.chapters[_index];
+        _chapter = s_data.Chapters[_index];
         return _chapter != null;
     }
 

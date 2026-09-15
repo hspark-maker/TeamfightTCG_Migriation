@@ -91,6 +91,7 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
     public void Show(string _title, string _packId, Action _onClosed)
     {
         InitializeUI();
+        LobbyGainEffectDirector.HoldRewardUnlock(true);
         this.m_onClosed = _onClosed;
         this.KillIntro();
 
@@ -145,6 +146,7 @@ public class PackRewardOverlay : SingletonOverlay<PackRewardOverlay>
     // 오버레이는 자기 자신이 토글 대상이라 OnDisable이 정상 동작한다 — 잘린 퇴장 마무리를 여기서 위임한다.
     protected override void OnViewHidden()
     {
+        if (IsOpen) LobbyGainEffectDirector.CancelRewardUnlock(true);
         this.dim.Clear();
         this.transition.HandleDisabled(this.ResolveTarget());
         this.KillIntro();
