@@ -113,6 +113,7 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
         if (m_initialized) return;
         m_initialized = true;
         GuidanceCoordinator.Install(gameObject);
+        AttendanceLobbyController.Install(gameObject);
         if (tabBar != null) tabBar.Selected += HandleTabSelected;
 
         // 로비 버튼 전체에 공통 클릭음을 한 번에 건다. 꺼져 있는 탭 패널까지 훑으므로 여기 한 번으로 끝난다.

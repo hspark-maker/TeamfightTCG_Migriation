@@ -1,13 +1,12 @@
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 // 확률 고지 목록의 한 줄. 배선 안 된 필드는 조용히 건너뛴다(아이콘 없는 간소 행도 그대로 쓰게).
 public class PackOddsRow : MonoBehaviour
 {
     [SerializeField] TextMeshProUGUI cardNameText;
     [SerializeField] TextMeshProUGUI rateText;
-    [SerializeField] Image cardImage;
+    [SerializeField] CardVisualView cardVisual;
 
     public void Bind(PackOddsEntry _entry)
     {
@@ -19,9 +18,7 @@ public class PackOddsRow : MonoBehaviour
         if (this.rateText != null)
             this.rateText.text = PackOdds.FormatRate(_entry.Rate);
 
-        if (this.cardImage != null)
-        {
-            CardArtBinding.Bind(this.cardImage, CardVisualRules.CardArtAddress(t_card));
-        }
+        if (this.cardVisual != null)
+            this.cardVisual.Bind(t_card, true);
     }
 }

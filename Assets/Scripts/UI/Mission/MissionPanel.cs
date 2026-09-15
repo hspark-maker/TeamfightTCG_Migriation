@@ -20,8 +20,12 @@ using UnityEngine.UI;
 /// </summary>
 public class MissionPanel : ContentsPooledUI
 {
-    // 풀 계약. 표시 데이터는 MissionManager 에서 스스로 당기므로 UIData 가 필요 없다.
-    public override void Initialization(UIData _data) => this.InitializeUI();
+    // 미션 내용은 MissionManager에서 읽고, 진입 데이터는 처음 열 탭만 지정한다.
+    public override void Initialization(UIData _data)
+    {
+        this.InitializeUI();
+        this.data = _data;
+    }
 
     public override void Show() => this.Open();
 
@@ -94,6 +98,7 @@ public class MissionPanel : ContentsPooledUI
 
     readonly List<MissionRowView> m_dailyRows = new List<MissionRowView>();
     readonly List<MissionRowView> m_weeklyRows = new List<MissionRowView>();
+    readonly List<MissionDefinition> m_sortedDefinitions = new List<MissionDefinition>();
 
     // 행 목록은 최대 사용량만큼 보관한다. 빈 안내에는 현재 활성 행 수를 쓴다.
     int m_dailyRowCount;
@@ -114,7 +119,7 @@ public class MissionPanel : ContentsPooledUI
     {
         if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission)) return;
 
-        this.m_weeklyTab = false;
+        this.m_weeklyTab = this.data is MissionPanelData t_data && t_data.WeeklyTab;
         this.SetContentsVisible(true);
         this.Rebuild();
 
@@ -257,6 +262,7 @@ public class MissionPanel : ContentsPooledUI
         int t_count = 0;
         this.m_claimHandler ??= this.HandleClaim;
         this.m_navigateHandler ??= this.HandleNavigate;
+        this.m_sortedDefinitions.Clear();
         IReadOnlyList<MissionDefinition> t_definitions = MissionManager.Definitions;
         for (int i = 0; i < t_definitions.Count; i++)
         {
@@ -264,7 +270,13 @@ public class MissionPanel : ContentsPooledUI
             // 가이드 미션은 전용 화면(GuideMissionPanel)이 그린다 — 여기서는 정확히 해당 주기만.
             if (!string.Equals(t_definition.Period, _period, StringComparison.Ordinal)) continue;
             if (ReferenceEquals(t_definition, this.m_completionDefinition)) continue;
+            this.m_sortedDefinitions.Add(t_definition);
+        }
+        this.m_sortedDefinitions.Sort(CompareDisplayOrder);
 
+        for (int i = 0; i < this.m_sortedDefinitions.Count; i++)
+        {
+            MissionDefinition t_definition = this.m_sortedDefinitions[i];
             if (t_count == _rows.Count) _rows.Add(null);
             MissionRowView t_row = _rows[t_count];
             if (t_row == null) _rows[t_count] = t_row = Instantiate(_rowPrefab, _content);
@@ -278,6 +290,34 @@ public class MissionPanel : ContentsPooledUI
             if (_rows[i] != null && _rows[i].gameObject.activeSelf) _rows[i].gameObject.SetActive(false);
         if (_emptyNotice != null) _emptyNotice.SetActive(t_count == 0);
         return t_count;
+    }
+
+    static int CompareDisplayOrder(MissionDefinition _left, MissionDefinition _right)
+    {
+        // 완료·미수령 → 진행 중(완료율 내림차순) → 수령 완료. 동률은 기존 저작 순서.
+        bool t_leftClaimed = MissionManager.IsClaimed(_left.Id);
+        bool t_rightClaimed = MissionManager.IsClaimed(_right.Id);
+        int t_claimed = t_leftClaimed.CompareTo(t_rightClaimed);
+        if (t_claimed != 0) return t_claimed;
+
+        if (!t_leftClaimed)
+        {
+            bool t_leftComplete = MissionManager.IsComplete(_left);
+            bool t_rightComplete = MissionManager.IsComplete(_right);
+            int t_complete = t_rightComplete.CompareTo(t_leftComplete);
+            if (t_complete != 0) return t_complete;
+
+            if (!t_leftComplete)
+            {
+                double t_leftRate = (double)MissionManager.ProgressOf(_left) / _left.Target;
+                double t_rightRate = (double)MissionManager.ProgressOf(_right) / _right.Target;
+                int t_rate = t_rightRate.CompareTo(t_leftRate);
+                if (t_rate != 0) return t_rate;
+            }
+        }
+
+        int t_order = _left.SortOrder.CompareTo(_right.SortOrder);
+        return t_order != 0 ? t_order : string.CompareOrdinal(_left.Id, _right.Id);
     }
 
     /// <summary>받을 수 있는 미션이 하나라도 있을 때만 모두 받기를 살린다.
@@ -462,4 +502,9 @@ public class MissionPanel : ContentsPooledUI
             ? $"{(int)t_span.TotalDays}일 {t_span.Hours}시간 남음"
             : $"{(int)t_span.TotalHours}시간 {t_span.Minutes}분 남음";
     }
+}
+
+public sealed class MissionPanelData : UIData
+{
+    public bool WeeklyTab;
 }

@@ -158,3 +158,10 @@ int,string,string,int,string,string,long,string
 209,Album,p:Theme_Nature/P3,1,Currency,Energy,10,자연 테마 P3 페이지 완성
 210,Album,p:Theme_Nature/P4,1,Currency,Energy,10,자연 테마 P4 페이지 완성
 211,Album,p:Theme_Nature/P5,1,Currency,Energy,10,자연 테마 P5 페이지 완성
+212,Attendance,day_1,1,Currency,Gold,110,7일 누적 출석 1일차
+213,Attendance,day_2,1,Currency,Shard,30,7일 누적 출석 2일차
+214,Attendance,day_3,1,Currency,Energy,10,7일 누적 출석 3일차
+215,Attendance,day_4,1,Currency,Gold,220,7일 누적 출석 4일차
+216,Attendance,day_5,1,Currency,Shard,60,7일 누적 출석 5일차
+217,Attendance,day_6,1,Currency,Diamond,10,7일 누적 출석 6일차
+218,Attendance,day_7,1,Pack,NormalPack_TEST,1,7일 누적 출석 7일차 일반 팩

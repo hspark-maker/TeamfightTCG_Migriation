@@ -40,6 +40,17 @@ Editor의 Use Asset Database 모드는 HTTP 다운로드를 하지 않는다. �
 
 ## 다운로드 동작
 
+`CardArt`와 `RemoteUI`는 `Pack Separately`로 빌드한다. 카드·팩 이미지는 등록 항목별,
+UI는 등록된 프리팹·아틀라스·설정 자산별 번들을 만든다. 캐시가 있으면 콘텐츠 업데이트에서
+변경되거나 새로 추가된 번들만 받는다. UI 전체를 한 번들로 다시 받지 않는다.
+단, 아틀라스 안의 이미지 하나를 수정해도 해당 아틀라스 번들은 전체 다운로드한다.
+공유 의존성 변경으로 관련 번들도 바뀔 수 있으므로 원본 파일 하나와 다운로드 번들 하나가 항상 일치하지는 않는다.
+
+`RemoteUI`의 `Pack Together` → `Pack Separately` 전환은 새 앱 버전의 전체 리소스 빌드·배포와
+그에 맞는 앱 빌드로 새 기준을 만든다. 이전 묶음 설정으로 출시한 상태 파일에 이번 그룹 설정 변경을
+그대로 적용해 콘텐츠 업데이트하지 않는다. 새 기준으로 출시한 뒤의 리소스 수정부터
+`Update a Previous Build`를 사용한다. 이번 설정 변경만으로 기존 Hosting 산출물이 갱신되지는 않는다.
+
 시작 UI가 원격 통신을 기다리지 않도록 자동 카탈로그 업데이트를 끄고,
 로그인·스펙 동기화 이후 비동기로 카탈로그를 확인·갱신한다. 이어 Cards·Packs·RemoteUI
 라벨 번들의 미캐시 용량을 중복 없이 합산하고 다운로드한다.
@@ -74,6 +85,24 @@ Editor의 Use Asset Database 모드는 HTTP 다운로드를 하지 않는다. �
 - 해당 카탈로그 JSON·해시를 기존 리소스와 함께 추가 배포했다. 기존 APK는 재빌드 없이 앱 재실행으로 다시 확인할 수 있다.
 - 프로젝트의 `BuildAddressablesWithPlayerBuild`를 `DoNotBuildWithPlayer`로 저장했다. 이후 리소스 전체 빌드 → Hosting 배포 → 앱 빌드 순서에서 앱 빌드가 새 카탈로그를 생성하지 않는다.
 - 배포 후 174개 파일 HTTPS 응답 검사와 14개 다운로드 SHA-256 대조 통과. 검증 기록: `Build/ResourceDeploymentChecks/1789374520098.json`.
+
+## 카드 일러스트 단독 패치 (2026-09-15)
+
+- 대상: `Image_Card_Campbean_Stage1` (`Assets/Assets/Images/Cards/Stage1/Image_Card_Campbean_Stage1.png`).
+  내장 imagegen으로 목 장식·불꽃 문양 천의 붉은색을 청록색으로 변경했다. 원본과 생성 프롬프트는 아래 작업 기록에 보관한다.
+- `0.0.0/Android`의 기존 카탈로그 7개에 카드 번들 하나만 교체해 `bm-cardbattle-assets` Hosting 배포 완료.
+  새 번들은 `cardart_assets_image_card_campbean_stage1_a9fa04b207b055e0c3e643157c2d824c.bundle`, 521,424 bytes다.
+  기존 번들 캐시가 있는 앱의 추가 리소스는 이 번들 약 509 KiB와 갱신 카탈로그·해시다.
+- 현재 소스에는 이전 배포 이후 UI 수정이 있으므로 표준 `BuildContentUpdate` 결과를 격리 빌드한 뒤,
+  기존 공개 카탈로그에서 해당 leaf 번들의 URL·request options만 선택 반영했다. 키·타입·provider·의존성과
+  다른 모든 번들 참조는 유지했다. UI 개별 번들 설정은 이번 배포에 포함하지 않았다.
+- 새 번들은 해당 GUID 자산 1개, 의존성 0개. Unity에서 CRC 검사와 기존 내부 주소의 Sprite 로드 성공.
+  카탈로그 7개 전체 의미 비교, 기존 공개 파일 보존 검사, CDN manifest 186개 일치 및 변경 파일 15개
+  실제 다운로드 SHA-256 대조 완료. 연결된 Android 기기가 없어 앱 재실행 화면 검증은 미실행이다.
+- 원본·출시 카탈로그 백업·격리 빌드·패치 스크립트·검증: `Build/CardIllustrationPatch-20260915/`.
+  `patch-report.json`, `bundle-layout-proof.json`, `verification.txt`, `cdn-verification.json`을 보존한다.
+  이 선택 패치는 격리 빌드 전체와 다른 카탈로그이므로 격리 빌드를 다음 출시 기준으로 간주하지 않는다.
+  다음 새 앱 릴리스에서 전체 빌드·상태 파일을 새로 확정한다. `SpecData.bytes` SHA-256은 변경 없음.
 
 ## 확인 명령
 

@@ -681,12 +681,6 @@ MonoBehaviour:
     m_SerializedLabels:
     - Cards
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: e5e13fef52632004e9c760769cf60a1e
-    m_Address: SpecialPack
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - Packs
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e821ae558fb22b445b015b57690ed6c6
     m_Address: Image_Card_Magmole_Stage2
     m_ReadOnly: 0

@@ -59,7 +59,7 @@ public readonly struct TutorialAnchorMeta
 
         // 4  PackOpenOverlay.prefab:3668(key: 4), GameObject 이름 AcquireButton. 이 오브젝트에 붙는 잠금 없음
         //    (PackAcquireController가 EOutgameFeature를 쓰는 곳은 retryButton 하나뿐 — PackAcquireController.cs:257)
-        new(A.PackAcquireButton,          F.None,               "팩 개봉 오버레이",       "Assets/Assets/Prefabs/UI/LobbyUI/PackUI/PackOpenOverlay.prefab"),
+        new(A.PackAcquireButton,          F.None,               "팩 개봉 오버레이",       "Assets/Assets/Prefabs/UI/PooledUI/PackOpenOverlay.prefab"),
 
         // 5  LobbyCanvas.prefab:1941(tutorialAnchor: 5) / :1943(unlockFeature: 4 = LobbyDeckTab)
         new(A.LobbyDeckTab,               F.LobbyDeckTab,       "로비/탭바",            "UI/Lobby/LobbyTabBarView.cs:67"),

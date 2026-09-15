@@ -666,7 +666,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
     // ── 대기 API ───────────────────────────────────────────────────────────
 
     /// <summary>상대 공격 RPC 올 때까지 대기.</summary>
-    public async UniTask<(bool received, int attackerSlot, int defenderSlot, bool cunningSwap)> WaitForOpponentAttack()
+    public async UniTask<(bool received, int attackerSlot, int defenderSlot, bool cunningSwap)> WaitForOpponentAttack(bool _showThinkTimer = true)
     {
         if (this.attackWaitForced)
         {
@@ -685,23 +685,37 @@ public class MultiplayerTurnRunner : MonoBehaviour
         this.attackTcs = t_tcs;
         this.waitingForAttackRpc = true;
 
-        int t_completed = await UniTask.WhenAny(WaitForAttackSignal(t_tcs.Task), WaitForAttackDeadline());
-        bool t_received = t_completed == 0
-                       && !this.attackWaitForced
-                       && !this.destroyCt.IsCancellationRequested;
-        if (t_completed == 1 && !this.destroyCt.IsCancellationRequested)
-            Debug.LogError($"[Net] Waiting for the opponent's attack exceeded {NetTimeouts.TurnActionSec}s.");
-
-        if (ReferenceEquals(this.attackTcs, t_tcs))
+        // 상대 입력 대기만 표시한다. 시간 초과 공격은 상대 클라이언트가 결정하므로
+        // 표시가 0이 되어도 RPC 대기 상한이나 전투 결과를 이 타이머로 바꾸지 않는다.
+        using var t_timerCt = CancellationTokenSource.CreateLinkedTokenSource(this.destroyCt);
+        UniTask t_timer = _showThinkTimer
+            ? TurnThinkTimer.WaitForEnemy(float.PositiveInfinity, GameTiming.Battle.TurnThinkTime, t_timerCt.Token)
+            : UniTask.CompletedTask;
+        try
         {
-            this.waitingForAttackRpc = false;
-            this.attackTcs = null;
-        }
-        this.attackWaitForced = false;
-        if (!t_received) return (false, 0, 0, false);
+            int t_completed = await UniTask.WhenAny(WaitForAttackSignal(t_tcs.Task), WaitForAttackDeadline());
+            bool t_received = t_completed == 0
+                           && !this.attackWaitForced
+                           && !this.destroyCt.IsCancellationRequested;
+            if (t_completed == 1 && !this.destroyCt.IsCancellationRequested)
+                Debug.LogError($"[Net] Waiting for the opponent's attack exceeded {NetTimeouts.TurnActionSec}s.");
 
-        var t_attack = await t_tcs.Task;
-        return (true, t_attack.attackerSlot, t_attack.defenderSlot, t_attack.cunningSwap);
+            if (ReferenceEquals(this.attackTcs, t_tcs))
+            {
+                this.waitingForAttackRpc = false;
+                this.attackTcs = null;
+            }
+            this.attackWaitForced = false;
+            if (!t_received) return (false, 0, 0, false);
+
+            var t_attack = await t_tcs.Task;
+            return (true, t_attack.attackerSlot, t_attack.defenderSlot, t_attack.cunningSwap);
+        }
+        finally
+        {
+            t_timerCt.Cancel();
+            await t_timer.SuppressCancellationThrow();
+        }
     }
 
     async UniTask WaitForAttackDeadline()

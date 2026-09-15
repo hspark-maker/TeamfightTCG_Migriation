@@ -132,34 +132,40 @@ public static class AttackSequence
         // 박치기·원거리·무쌍·시네마가 각자 정렬을 챙기지 않아도 된다(빠뜨림 = 카드가 이웃 뒤로 숨음).
         _attacker?.SetAttackRaised(true);
 
+        // 회복 수치/HP 표기는 즉시 처리하고, 카드에 붙는 파티클만 슬롯 복귀 뒤로 미룬다.
+        _attacker?.BeginHealEffectDeferral();
+        _defender?.BeginHealEffectDeferral();
+        _splashView?.BeginHealEffectDeferral();
+        bool t_completed = false;
+
         try
         {
             if (t_special)
             {
                 await PlayCinema(_attacker, _defender, _events, _splashView, _afterHit);
-                return;
             }
-
             // 원거리(Ranged)는 붙지 않는다 — 제자리에서 투사체를 쏘고, 투사체가 닿는 시점에 히트.
-            if (IsRangedAttack(_attacker))
+            else if (IsRangedAttack(_attacker))
             {
                 await PlayRanged(_attacker, _defender, _splashView, _events, _afterHit);
-                return;
             }
-
             // 무쌍은 광역 대상이 실제로 있을 때만 전용 연출로 간다.
-            if (IsPeerlessAttack(_attacker) && _splashView != null)
+            else if (IsPeerlessAttack(_attacker) && _splashView != null)
             {
                 await PlayPeerless(_attacker, _defender, _splashView, _events, _afterHit);
-                return;
             }
-
-            await PlayNormal(_attacker, _defender, _splashView, _events, _afterHit);
+            else
+                await PlayNormal(_attacker, _defender, _splashView, _events, _afterHit);
+            t_completed = true;
         }
         finally
         {
             _attacker?.SetAttackRaised(false);
             if (t_approach) BattleFinisher.EndApproach();
+            // 취소/예외로 복귀가 끝나지 않은 경우에는 예약한 파티클을 버린다.
+            _attacker?.EndHealEffectDeferral(t_completed);
+            _defender?.EndHealEffectDeferral(t_completed);
+            _splashView?.EndHealEffectDeferral(t_completed);
         }
     }
 
@@ -1090,7 +1096,9 @@ public static class AttackSequence
                 ? _attacker.PlayDeathAnim()
                 : UniTask.CompletedTask;
 
-            await UniTask.WhenAll(t_victimDeaths, t_attackerDeath);
+            // 불사는 Death 대신 Revive 이벤트를 남긴다. 부활 연출도 이 단계에서 끝까지 기다린다.
+            UniTask t_revives = PlayRevives(_events, _attacker, _defender, _splashView);
+            await UniTask.WhenAll(t_victimDeaths, t_attackerDeath, t_revives);
 
             // ── [6] 처치 ── 쓰러진 뒤에 **때린 쪽** 그림을 낸다(처형 발동, 표식 처치 보상 배너).
             // ⑤와 겹치면 누가 죽었는지와 누가 무엇을 얻었는지가 한 덩어리로 뭉갠다.
@@ -1111,6 +1119,24 @@ public static class AttackSequence
     /// <summary>맞은 쪽 사망 연출. 주 대상 → 스플래시 **순차** — 같은 편 카드가 한 프레임에 같이 터지면
     /// 두 죽음이 한 덩어리로 뭉쳐 몇 장이 죽었는지 안 읽힌다. 공격자 사망은 이 체인 밖에서 병렬로 돈다.
     /// 처치 음성은 하나라도 죽었으면 체인 끝에 한 번(죽은 장수만큼 겹쳐 울리지 않게).</summary>
+    static async UniTask PlayRevives(IReadOnlyList<BattleEvent> _events,
+        CardView _attacker, CardView _defender, CardView _splashView)
+    {
+        if (_events == null) return;
+        List<UniTask> t_revives = null;
+        for (int i = 0; i < _events.Count; i++)
+        {
+            BattleEvent t_event = _events[i];
+            if (t_event.Kind != BattleEventKind.Revive) continue;
+            CardView t_view = EventView(_events, t_event, _attacker, _defender, _splashView)
+                ?? BattleBoardView.GetView(t_event.OwnerIndex, t_event.SlotIndex);
+            if (t_view == null || t_view.BoundCard == null) continue;
+            t_revives ??= new List<UniTask>();
+            t_revives.Add(ImmortalVfx.PlayRevive(t_view.BoundCard));
+        }
+        if (t_revives != null) await UniTask.WhenAll(t_revives);
+    }
+
     static async UniTask PlayVictimDeaths(CardView _attacker, CardView _defender, CardView _splashView,
         bool _defenderKilled, bool _splashKilled)
     {

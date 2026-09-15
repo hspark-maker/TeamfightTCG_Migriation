@@ -8,11 +8,11 @@ using TMPro;
 
 // 보상 수령 팝업. 표시와 확인 콜백만 담당하고 지급은 호출자가 자기 매니저에 위임한다 —
 // 그래서 랭크 티어든 앨범 완성이든 출처를 알 필요가 없다(제목 + RewardLine 목록이면 뜬다).
-// 씬에 직접 저작되므로 PooledUIBase가 아니라 SetActive 토글로 동작한다.
+// PooledUI 프리팹을 UIPoolManager에서 생성·재사용한다.
 //
 // ⚠ 어느 탭에도 속하지 않는 공용 1개다. 랭크 오버레이 밑에 두면 그 오버레이를 켜야만 뜨므로,
 //   앨범 수령에서 랭크 보상 목록이 뒤에 같이 켜진다 — 반드시 두 오버레이의 형제로 선다.
-public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
+public class RewardClaimPopup : PooledOverlay<RewardClaimPopup>
 {
     [Tooltip("켜고 끌 대상. 미배선이면 자기 gameObject를 토글한다.")]
 
@@ -26,7 +26,6 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
     [SerializeField] Button dimButton;
 
     [Header("연출")]
-    [SerializeField] PopupTransition transition = new PopupTransition();
 
     [Tooltip("등장·퇴장 안무. 아무것도 배선하지 않으면 이 축을 통째로 건너뛰고 예전처럼 페이드만 남는다.")]
     [SerializeField] RewardRevealFx reveal = new RewardRevealFx();
@@ -73,11 +72,10 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
     protected override int SortingOrder => UiSortingOrder.RewardClaim;
 
     /// <summary>
-    /// 씬의 공용 팝업을 얻는다. 평소 꺼져 있는 노드라 비활성까지 뒤진다 —
-    /// 자가 설치는 하지 않는다(저작된 빛·리본·버튼이 있어 코드로 세울 수 있는 물건이 아니다).
+    /// 풀에서 저작된 공용 팝업을 얻는다. 데이터는 Show에서 채운다.
     /// </summary>
     public static bool TryGet(out RewardClaimPopup _popup)
-        => TryGetExisting(out _popup);
+        => TryGetOrCreate(out _popup);
 
     public int RewardSlotCount => this.rewardSlots?.Length ?? 0;
 
@@ -157,7 +155,7 @@ public class RewardClaimPopup : SingletonOverlay<RewardClaimPopup>
         this.m_intro.SetLink(this.gameObject).Play();
     }
 
-    public void Hide()
+    public override void Hide()
     {
         bool t_wasOpen = ConsumeOpen();
         this.m_showVersion++;

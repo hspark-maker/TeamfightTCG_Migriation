@@ -168,6 +168,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8cd3cb7e29b1dab4e9307850b549ce9b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LoadingCoverView
+  initializeOnStart: 0
   progressBar: {fileID: 0}
   statusText: {fileID: 0}
   _tipText: {fileID: 8861208313930641663}

@@ -10,11 +10,12 @@ using UnityEngine;
 //
 // 제어 루트는 유지하고 Contents만 여닫는다. 숨겨진 자식의 고정 배선은 소유자가 먼저 준비한다.
 [DisallowMultipleComponent]
-public class PackOpenOverlay : ContentsUIBehaviour
+public class PackOpenOverlay : PooledOverlay
 {
+    protected override int SortingOrder => UiSortingOrder.PackOpen;
     static PackOpenOverlay s_instance;
 
-    /// <summary>씬에 배치된 개봉 오버레이. 꺼져 있어도 찾아낸다(없으면 null).</summary>
+    /// <summary>풀에서 생성·재사용하는 개봉 오버레이.</summary>
     public static PackOpenOverlay Instance => Resolve();
 
     /// <summary>개봉 화면이 떠 있는가. 로비 쪽 안내·입력을 억제할 때 본다.</summary>
@@ -36,7 +37,7 @@ public class PackOpenOverlay : ContentsUIBehaviour
         PackOpenOverlay t_overlay = Resolve();
         if (t_overlay == null)
         {
-            Debug.LogWarning("[PackOpenOverlay] No instance — the reveal screen cannot be opened (check the lobby scene placement).");
+            Debug.LogWarning("[PackOpenOverlay] Cannot open the reveal screen — check UIPoolManager and the UIPrefab address.");
             return false;
         }
 
@@ -60,12 +61,14 @@ public class PackOpenOverlay : ContentsUIBehaviour
         OnClosed?.Invoke();
     }
 
-    // 씬에 배치된 인스턴스를 비활성 포함으로 찾아 캐시한다. 씬이 바뀌면 참조가 죽으므로 자연히 재탐색된다.
+    public override void Hide() => Close();
+
+    // 생성과 씬 종료 정리는 풀이 맡는다. 같은 씬에서는 동일 인스턴스를 재사용한다.
     static PackOpenOverlay Resolve()
     {
         if (s_instance != null) return s_instance;
 
-        s_instance = FindFirstObjectByType<PackOpenOverlay>(FindObjectsInactive.Include);
+        s_instance = UIPoolManager.Instance?.GetOrCreateUI<PackOpenOverlay>();
 
         return s_instance;
     }
@@ -89,7 +92,7 @@ public class PackOpenOverlay : ContentsUIBehaviour
         if (!IsOpen) return;
 
         // 씬이 내려가는 중이면 신호를 쏘지 않는다 — 구독자도 함께 파괴되는 중이다(뒷정리는 OnDestroy가 맡는다).
-        if (!gameObject.scene.isLoaded) return;
+        if (IsSourceSceneUnloading || !gameObject.scene.isLoaded) return;
 
         IsOpen = false;
         if (this.view != null) this.view.ResetSession();

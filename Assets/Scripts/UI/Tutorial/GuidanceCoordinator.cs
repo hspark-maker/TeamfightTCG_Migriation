@@ -7,6 +7,7 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
 {
     static GuidanceCoordinator s_instance;
     LobbyMatchLauncher m_launcher;
+    LobbyTabController m_shell;
     bool m_initialized;
     float m_nextEvaluation;
     static bool s_missionIntroRequested;
@@ -34,6 +35,13 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
     }
 
     static void OnSequenceCompleted() => s_missionIntroRequested = true;
+
+    /// <summary>로비 탭 종류와 무관하게 다른 화면·연출이 없을 때 알림에서 화면 이동을 허용한다.</summary>
+    public static bool CanNavigateFromLobby(PooledUIBase _notification)
+        => s_instance != null && s_instance.m_shell != null && s_instance.m_shell.CanSwipe
+        && s_instance.m_shell.CurrentPanel != null && s_instance.m_shell.CurrentPanel.IsViewVisible
+        && !s_instance.AdventureMapOpen && !ContentUnlockPresentation.IsPlaying
+        && !OutgameTutorialRunner.IsRunning && s_instance.SafeToPresent(false, _notification);
 
     public static void Install(GameObject owner)
     {
@@ -103,6 +111,7 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
     {
         s_instance = this;
         m_launcher = FindFirstObjectByType<LobbyMatchLauncher>();
+        m_shell = GetComponent<LobbyTabController>();
     }
 
     bool HasPriorityActivity => !GameInitialization.IsReady || !isActiveAndEnabled
@@ -115,17 +124,18 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
         || CardRewardOverlay.IsOpen || CardSetRewardOverlay.IsOpen || PackRewardOverlay.IsOpen
         || OutgameTutorialGateUI.IsShowing || UnlockIntroOverlay.IsOpen;
 
-    bool SafeToPresent(bool _contentIntro = false)
+    bool SafeToPresent(bool _contentIntro = false, PooledUIBase _except = null)
         => !HasPriorityActivity && (_contentIntro || !OutgameTutorialRunner.IsGuidedRunning)
         && !SynergyIntroduction.IsActive && UIPoolManager.instance != null
-        && !HasBlockingPopup();
+        && !HasBlockingPopup(_except: _except);
 
-    static bool HasBlockingPopup(EOutgameTutorialTrigger _trigger = EOutgameTutorialTrigger.None)
+    static bool HasBlockingPopup(EOutgameTutorialTrigger _trigger = EOutgameTutorialTrigger.None,
+        PooledUIBase _except = null)
     {
         Type t_target = _trigger == EOutgameTutorialTrigger.GuideMissionIntroduction ? typeof(GuideMissionPanel)
             : _trigger == EOutgameTutorialTrigger.KeywordGrowthFirstOpen ? typeof(KeywordGrowthPanel) : null;
         return UIPoolManager.instance != null
-            && UIPoolManager.instance.HasVisibleUIExcept(ignoreMissionCutIn: true, exceptType: t_target);
+            && UIPoolManager.instance.HasVisibleUIExcept(_except, ignoreMissionCutIn: true, exceptType: t_target);
     }
 
     void Update()

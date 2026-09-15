@@ -43,12 +43,16 @@ public sealed class BattleLoop
         Func<bool> _forcedEnd,
         Action<int> _afterTurnResolved,
         Action _beforeContinue,
-        Action<int> _turnCountChanged)
+        Action<int> _turnCountChanged,
+        Func<int, bool> _beforeTurn = null)
     {
         if (_executeTurn == null) throw new ArgumentNullException(nameof(_executeTurn));
 
         while (true)
         {
+            // 항복 로그는 재생기에서도 다음 턴의 시작 훅보다 먼저 처리한다.
+            if (_forcedEnd != null && _forcedEnd()) return EBattleLoopEnd.Forced;
+            if (_beforeTurn != null && _beforeTurn(currentOwner)) return EBattleLoopEnd.Forced;
             BattleField t_field = FieldOf(currentOwner);
             await BeginTurn(t_field);
             if (_forcedEnd != null && _forcedEnd()) return EBattleLoopEnd.Forced;

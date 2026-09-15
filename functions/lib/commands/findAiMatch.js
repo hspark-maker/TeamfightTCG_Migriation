@@ -40,6 +40,7 @@ const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
 const node_crypto_1 = require("node:crypto");
 const firebaseApp_1 = require("../firebaseApp");
+const generateNickname_1 = require("../profile/generateNickname");
 const aiDeckDraw_1 = require("../matchmaking/aiDeckDraw");
 const rankAiEncounter_1 = require("../matchmaking/rankAiEncounter");
 const deckValidation_1 = require("../deckValidation");
@@ -150,6 +151,7 @@ function storedResponse(raw, data) {
         rulesetVersion: raw.rulesetVersion,
         deck,
         cardLevel: aiDeck.cardLevel,
+        ...(typeof aiDeck.nickname === "string" ? { nickname: aiDeck.nickname } : {}),
         ...(snapshots == null ? {} : growthResponse(aiDeck.cardGrowth, snapshots)),
         playerBoardOrder,
         enemyBoardOrder,
@@ -284,7 +286,7 @@ exports.findAiMatch = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
             if (draw === null)
                 throw new Error("AIDeck spec has no usable row");
             logger.info("legacy AI deck selected", { uid, env: data.env, tierIndex, deckId: draw.deckId });
-            return { revision: 0, deck: draw.deck, cardLevel: draw.cardLevel };
+            return { revision: 0, deck: draw.deck, cardLevel: draw.cardLevel, nickname: (0, generateNickname_1.generateNickname)() };
         }
         const authoredData = data;
         if (matchRef == null || matchId == null)
@@ -337,6 +339,8 @@ exports.findAiMatch = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
         if (draw === null)
             throw new Error("AIDeck spec has no usable row");
         const selectedDraw = draw;
+        // 신규 계정과 같은 규칙으로 발급하고, 매치에 저장해 재요청에도 같은 이름을 반환한다.
+        const nickname = (0, generateNickname_1.generateNickname)();
         const seedHex = (0, node_crypto_1.randomBytes)(8).toString("hex");
         const playerBoardOrder = shuffle(authoredData.playerDeck);
         const enemyBoardOrder = shuffle(draw.deck);
@@ -372,6 +376,7 @@ exports.findAiMatch = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
                 playerDeckCardIds: [...authoredData.playerDeck].sort((a, b) => a - b),
                 aiDeck: {
                     deckId: selectedDraw.deckId,
+                    nickname,
                     cardIds: selectedDraw.deck,
                     cardLevel: selectedDraw.cardLevel,
                     ...(authoredData.aiGrowthVersion === 1 ? { cardGrowth, snapshots } : {}),
@@ -394,6 +399,7 @@ exports.findAiMatch = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
                 rulesetVersion: matchPairing_1.SERVER_RULESET_VERSION,
                 deck: selectedDraw.deck,
                 cardLevel: selectedDraw.cardLevel,
+                nickname,
                 ...(authoredData.aiGrowthVersion === 1 ? growthResponse(cardGrowth, snapshots) : {}),
                 playerBoardOrder,
                 enemyBoardOrder,

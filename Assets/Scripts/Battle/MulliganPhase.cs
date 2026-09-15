@@ -109,7 +109,7 @@ public static class MulliganPhase
     /// 정상 턴 입력(TurnState.InputAllowed / 드래그-공격)과 무관하게 직접 raycast로 받는다 —
     /// 이 시점엔 아직 어떤 턴도 시작 전이라 CardView 입력 경로가 닫혀 있음.</summary>
     static async UniTask<int> WaitPlayerSelect(BattleField _field, TurnContext _ctx, CancellationToken _ct,
-                                                float _timeoutSec = 0f)
+                                                float _timeoutSec = NetTimeouts.MulliganPickSec)
     {
         // 대상 강조: 나머지 암전 + 후공 슬롯 카드만 밝게+하이라이트.
         var t_targets = new List<CardView>();
@@ -136,9 +136,12 @@ public static class MulliganPhase
         if (t_focusView != null) t_ui?.SetFocusHole(t_focusView.ScreenBounds());
 
         int t_chosen = -1;
-        float t_deadline = _timeoutSec > 0f
-            ? Time.realtimeSinceStartup + _timeoutSec
-            : float.PositiveInfinity;
+        // 같은 타이머가 표시와 자동 스킵 시점을 소유한다. 턴 입력은 아직 닫혀 있으므로
+        // InputAllowed를 감시하는 Watch 대신 입력 상태와 무관한 카운트다운을 사용한다.
+        using var t_timerCt = CancellationTokenSource.CreateLinkedTokenSource(_ct);
+        UniTask t_timer = _timeoutSec > 0f
+            ? TurnThinkTimer.WaitForEnemy(_timeoutSec, _timeoutSec, t_timerCt.Token)
+            : UniTask.CompletedTask;
         try
         {
             while (true)
@@ -147,9 +150,9 @@ public static class MulliganPhase
                 bool t_cancelled = await UniTask.Yield(PlayerLoopTiming.Update, _ct).SuppressCancellationThrow();
                 if (t_cancelled) { t_chosen = -1; break; }
                 if (DeckConfig.IsMultiplayer && DeckConfig.AiTakeover) break;
-                if (Time.realtimeSinceStartup >= t_deadline)
+                if (_timeoutSec > 0f && t_timer.Status == UniTaskStatus.Succeeded)
                 {
-                    Debug.Log($"[Net] The mulligan choice exceeded {_timeoutSec}s and is auto-skipped.");
+                    Debug.Log($"[Mulligan] The choice exceeded {_timeoutSec}s and is auto-skipped.");
                     break;
                 }
 
@@ -177,6 +180,8 @@ public static class MulliganPhase
         }
         finally
         {
+            t_timerCt.Cancel();
+            await t_timer.SuppressCancellationThrow();
             t_ui?.Hide();
             foreach (CardView t_cv in t_targets)
                 if (t_cv != null) t_cv.SetHighlight(false);
@@ -190,14 +195,21 @@ public static class MulliganPhase
     {
         MulliganOverlayUI t_ui = _ctx?.mulliganOverlay;
         t_ui?.Show("상대가 카드를 교환하고 있습니다.", _showSkip: false);
+        using var t_timerCt = CancellationTokenSource.CreateLinkedTokenSource(_ct);
+        UniTask t_timer = UniTask.CompletedTask;
         try
         {
             if (_ct.IsCancellationRequested || NetworkGameController.Instance == null)
                 return (false, -1);
-            return await NetworkGameController.Instance.WaitForOpponentMulliganChoice();
+            var t_choice = NetworkGameController.Instance.WaitForOpponentMulliganChoice();
+            if (t_choice.Status == UniTaskStatus.Pending)
+                t_timer = TurnThinkTimer.WaitForEnemy(float.PositiveInfinity, NetTimeouts.MulliganPickSec, t_timerCt.Token);
+            return await t_choice;
         }
         finally
         {
+            t_timerCt.Cancel();
+            await t_timer.SuppressCancellationThrow();
             t_ui?.Hide();
         }
     }
@@ -216,6 +228,8 @@ public static class MulliganPhase
 
         MulliganOverlayUI t_ui = _ctx?.mulliganOverlay;
         t_ui?.Show("상대가 카드를 교환합니다", _showSkip: false);   // 구멍 없음 — 고를 게 없으니 전체를 덮지 않는다
+        using var t_timerCt = CancellationTokenSource.CreateLinkedTokenSource(_ct);
+        UniTask t_timer = TurnThinkTimer.WaitForEnemy(float.PositiveInfinity, NetTimeouts.MulliganPickSec, t_timerCt.Token);
         try
         {
             await UniTask.Delay((int)(GameTiming.Battle.MulliganNoticeHold * 1000), cancellationToken: _ct)
@@ -223,6 +237,8 @@ public static class MulliganPhase
         }
         finally
         {
+            t_timerCt.Cancel();
+            await t_timer.SuppressCancellationThrow();
             t_ui?.Hide();
             if (t_target != null) t_target.SetHighlight(false);
             CardView.RestoreAllFades();

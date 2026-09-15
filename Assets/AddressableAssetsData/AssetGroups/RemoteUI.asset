@@ -15,6 +15,20 @@ MonoBehaviour:
   m_GroupName: RemoteUI
   m_GUID: c993a00f3241b5846818633e56411b36
   m_SerializeEntries:
+  - m_GUID: 1d1367fb4b947b84e92369f7fc324787
+    m_Address: PackOpenOverlay
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d13625a8928721c4d8c58190b4816059
+    m_Address: CardDetailOverlayView
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 02aab46ebb075e94b8f1d49d31c05343
     m_Address: Atlases/UISharedButtons
     m_ReadOnly: 0
@@ -420,6 +434,13 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a6b490a5a78a4b4a94efa42a069973ee
+    m_Address: AttendancePanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 886280ed4ce95ea4fa7b0c1bf828dbdc, type: 2}

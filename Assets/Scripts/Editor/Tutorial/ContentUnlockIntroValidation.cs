@@ -98,7 +98,7 @@ public static class ContentUnlockIntroValidation
             dimSerialized.ApplyModifiedPropertiesWithoutUndo();
             ScreenDimValidation.InvokeLifecycle(screenDim, "Awake");
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
-                "Assets/Assets/Prefabs/UI/OverlayUI/ContentUnlockIntroView.prefab");
+                "Assets/Assets/Prefabs/UI/PooledUI/ContentUnlockIntroView.prefab");
             Require(prefab != null, "Intro prefab missing.");
             Require(prefab.GetComponent<Canvas>() != null && prefab.transform.Find("Contents/SafeArea/Stage") != null,
                 "Onboarding overlay requires its own canvas and SafeArea/Stage.");

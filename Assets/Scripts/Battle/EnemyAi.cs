@@ -11,7 +11,7 @@ using UnityEngine;
 ///      2계층 — 1계층이 비면, 체력 30% 이상인 나머지 카드
 ///      3계층 — 전원 빈사(30% 미만)면 전체. 가중치를 뒤집어 **체력이 낮을수록** 먼저 나간다
 ///              (죽어 슬롯을 비우면 새 카드가 보충돼 보드가 회전한다).
-///  · 타깃  : 유효 타깃 중 실효 체력이 낮은 카드 우선. 키워드 보유 시 체력 점수를 절반으로 본다.
+///  · 타깃  : 유효 타깃 중 실효 체력이 낮은 카드 우선. 일반 키워드는 체력 점수 1/2, 원거리·힐러는 1/4.
 ///
 /// 이 게임에서 공격력은 곧 현재 체력이다(<see cref="CardInstance.AttackDamage"/>) — 체력 가중치는
 /// 생존력이자 화력 가중치다. 키워드 종류와 관계없이 현재 활성화된 키워드 카드를 우선한다.
@@ -155,9 +155,14 @@ public static class EnemyAi
     public static int EffectiveHp(CardInstance _card)
         => _card == null ? int.MaxValue : _card.hp + _card.bonusHp;
 
-    // 키워드 카드의 체력 점수를 절반으로 보는 비교를 정수로 보존한다(일반 카드 쪽에 2배).
+    // 분수 없이 비교한다: 일반 4, 기타 키워드 2, 원거리·힐러 1.
+    // 원거리와 힐러를 함께 가져도 중첩하지 않고, 현재 활성화된 키워드만 반영한다.
     static long TargetPriority(CardInstance _card)
-        => (long)EffectiveHp(_card) * (HasActiveKeyword(_card) ? 1 : KeywordWeightMultiplier);
+    {
+        int multiplier = _card.HasKeyword(CardKeyword.Ranged) || _card.HasKeyword(CardKeyword.Healer)
+            ? 1 : HasActiveKeyword(_card) ? 2 : 4;
+        return (long)EffectiveHp(_card) * multiplier;
+    }
 
     /// <summary>타깃 1장을 고른다: 키워드 보정 체력 점수 최소 → 동점이면 슬롯 오름차순. 랜덤 미소비.
     /// 후보 목록은 반드시 <see cref="BattleField.GetValidTargets"/> 결과여야 한다

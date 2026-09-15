@@ -1704,7 +1704,7 @@ RectTransform:
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 1
+  m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1897980666721121672}
   m_Father: {fileID: 2554395646794217074}
@@ -2398,7 +2398,7 @@ RectTransform:
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 1
+  m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 6021778109275238213}
   m_Father: {fileID: 2554395646794217074}
@@ -2656,7 +2656,7 @@ RectTransform:
   m_Father: {fileID: 6250664301426549845}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 0.95328945}
+  m_AnchorMax: {x: 1, y: 0.96282893}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -3031,7 +3031,7 @@ RectTransform:
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 1
+  m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 8200000000000000007}
   m_Father: {fileID: 2554395646794217074}
@@ -3511,7 +3511,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 20}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!114 &8200000000000000023
 MonoBehaviour:
@@ -3640,13 +3640,6 @@ MonoBehaviour:
   animator: {fileID: 0}
   contents: {fileID: 4417267710255892007}
   isShow: 0
-  transition:
-    panel: {fileID: 3704156646405889341}
-    openDuration: 0.25
-    closeDuration: 0.15
-    openFromScale: 0.9
-    closeToScale: 0.9
-  dimAlpha: 0.72
   previewView: {fileID: 5722275058208758946}
   nicknameInput: {fileID: 8045250170939352425}
   pencilButton: {fileID: 7695495955472873439}
@@ -3671,6 +3664,13 @@ MonoBehaviour:
   saveButton: {fileID: 3653371320676364425}
   closeButton: {fileID: 6199729180128797118}
   dimButton: {fileID: 5125164748410017817}
+  transition:
+    panel: {fileID: 3704156646405889341}
+    openDuration: 0.25
+    closeDuration: 0.15
+    openFromScale: 0.9
+    closeToScale: 0.9
+  dimAlpha: 0.85
 --- !u!1 &9062519795303003447
 GameObject:
   m_ObjectHideFlags: 0
@@ -3889,7 +3889,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchorMin.x
@@ -3897,15 +3897,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 280
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 280
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_LocalPosition.x
@@ -3937,11 +3937,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 200
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -410
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -3958,10 +3958,6 @@ PrefabInstance:
     - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_Name
       value: EmoteItemCell (3)
-      objectReference: {fileID: 0}
-    - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -3995,7 +3991,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchorMin.x
@@ -4003,15 +3999,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 280
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 280
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_LocalPosition.x
@@ -4043,11 +4039,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 470
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -140
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -4064,10 +4060,6 @@ PrefabInstance:
     - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_Name
       value: EmoteItemCell (1)
-      objectReference: {fileID: 0}
-    - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -4162,7 +4154,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchorMin.x
@@ -4170,15 +4162,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 280
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 280
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_LocalPosition.x
@@ -4210,11 +4202,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 740
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -410
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -4231,10 +4223,6 @@ PrefabInstance:
     - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_Name
       value: EmoteItemCell (5)
-      objectReference: {fileID: 0}
-    - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -4268,7 +4256,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchorMin.x
@@ -4276,15 +4264,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 280
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 280
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_LocalPosition.x
@@ -4316,11 +4304,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 740
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -140
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -4337,10 +4325,6 @@ PrefabInstance:
     - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_Name
       value: EmoteItemCell (2)
-      objectReference: {fileID: 0}
-    - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -4374,7 +4358,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchorMin.x
@@ -4382,15 +4366,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 280
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 280
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_LocalPosition.x
@@ -4422,11 +4406,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 470
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -410
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -4443,10 +4427,6 @@ PrefabInstance:
     - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_Name
       value: EmoteItemCell (4)
-      objectReference: {fileID: 0}
-    - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -4480,7 +4460,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchorMin.x
@@ -4488,15 +4468,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 280
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 280
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_LocalPosition.x
@@ -4528,11 +4508,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 200
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -140
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2463584180129961257, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -4549,10 +4529,6 @@ PrefabInstance:
     - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
       propertyPath: m_Name
       value: EmoteItemCell
-      objectReference: {fileID: 0}
-    - target: {fileID: 3631443927566594155, guid: c2bd833eedcc496db5eea3d919c9674e, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

@@ -6,15 +6,14 @@ using TMPro;
 
 // 카드 한 장을 크게 세워 보여주고 [획득]으로 받게 하는 보상 오버레이.
 // 표시와 확인 콜백만 담당하고 지급은 호출자가 한다 — 그래서 출처(튜토리얼 보너스든 그 밖이든)를 알 필요가 없다.
-// 씬에 저작하지 않고 Addressables 타입 색인에서 얻어 독립 Canvas로 세운다 — 로비 캔버스에 중첩하면
-// 그 프리팹을 저장할 때마다 다른 탭의 저작이 함께 흔들린다.
+// Shared presentation is instantiated and reused by UIPoolManager.
 //
 // ⚠ 딤을 눌러 닫히지 않는다. 받아야 넘어가는 자리에 쓰는 물건이라 나가는 문은 [획득] 하나뿐이다.
 //
 // 안무는 두 박자다 — 화면이 준다(딤 → 제목 → 카드가 내려꽂힌다) → 내가 받는다([획득] → 카드가 도감으로 간다).
 // 조각들이 한 덩어리로 페이드인하면 카드가 꽂히기도 전에 답을 다 보여주게 되므로,
 // 등장은 조각마다 자기 박자로 들어오고 충격은 꽂히는 한 프레임에 전부 몰아넣는다.
-public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
+public class CardRewardOverlay : PooledOverlay<CardRewardOverlay>
 {
     [Tooltip("켜고 끌 대상. 미배선이면 자기 gameObject를 토글한다.")]
 
@@ -33,7 +32,6 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
     [SerializeField] RectTransform glowRoot;
 
     [Header("연출")]
-    [SerializeField] PopupTransition transition = new PopupTransition();
 
     [Tooltip("공통 딤의 농도·색과 카드 착지 순간의 색상 펄스.")]
     [SerializeField] OverlayDim dim = new OverlayDim();
@@ -125,11 +123,9 @@ public class CardRewardOverlay : SingletonOverlay<CardRewardOverlay>
     /// "방금 본 그 카드가 도감으로 갔다"가 한 줄로 이어진다.</summary>
     public RectTransform CardAnchor => this.cardSlot;
 
-    /// <summary>보상 오버레이를 얻는다. 씬에 저작해 두지 않고 Addressables 타입 색인에서 세운다 —
-    /// 로비 캔버스에 중첩하면 그 프리팹을 저장할 때마다 다른 탭의 저작이 함께 흔들린다(LoadingCover와 같은 이유).
-    /// 평소 꺼져 있는 노드라 이미 선 것을 찾을 때는 비활성까지 뒤진다.</summary>
+    /// <summary>Gets the authored presentation from the shared UI pool.</summary>
     public static bool TryGet(out CardRewardOverlay _overlay)
-        => TryGetOrCreate(RuntimeOverlayPrefabs.Get<CardRewardOverlay>, out _overlay);
+        => TryGetOrCreate(out _overlay);
 
     /// <summary>카드 한 장을 띄운다. _onAcquire는 [획득]을 누른 <b>즉시</b> 불린다 —
     /// 그때 지급하고, 이어지는 획득 연출도 그쪽이 튼다(화면은 그 연출과 겹쳐 걷힌다).</summary>

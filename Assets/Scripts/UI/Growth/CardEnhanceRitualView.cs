@@ -104,6 +104,7 @@ public class CardEnhanceRitualView : CardGrowthRitualView, IUIInitializable
 
     Vector2 m_baseAnchored;                 // cardStage의 authoring 자리. 중간값을 기준으로 잡으면 반복할수록 밀린다
     bool    m_baseCaptured;
+    Tween   m_growthFlash;
 
     protected override bool  HasStage       => this.cardStage != null;
     protected override float ReturnDuration => this.returnDuration;
@@ -161,8 +162,43 @@ public class CardEnhanceRitualView : CardGrowthRitualView, IUIInitializable
 
     void OnDestroy()
     {
+        StopGrowthFlash();
         this.shading.Release();
         this.embers.Release();
+    }
+
+    public bool IsGrowthFlashPlaying => this.m_growthFlash != null && this.m_growthFlash.IsActive();
+
+    /// <summary>일반 강화의 능력치 반영 피드백. 무대·조작은 그대로 두고 카드 표면만 짧게 빛낸다.</summary>
+    public void FlashGrowth()
+    {
+        if (IsPlaying || !isActiveAndEnabled) return;
+
+        StopGrowthFlash();
+        InitializeUI();
+        this.shading.Attach();
+        this.shading.Neutralize();
+        this.shading.BlindColor = this.shading.WhiteHot;
+        if (this.shading.HasGleam) this.shading.BeginGleam();
+
+        this.m_growthFlash = DOVirtual.Float(0f, 1f, 0.5f, _progress =>
+        {
+            float t_wave = Mathf.Sin(_progress * Mathf.PI);
+            this.shading.Heat = 0.65f * t_wave;
+            this.shading.Blind = 0.2f * t_wave;
+            this.shading.Gleam = _progress;
+        }).SetEase(Ease.Linear).SetLink(gameObject).OnKill(() =>
+        {
+            this.m_growthFlash = null;
+            this.shading.Neutralize();
+            this.shading.Detach();
+        });
+    }
+
+    public void StopGrowthFlash()
+    {
+        this.m_growthFlash?.Kill();
+        this.m_growthFlash = null;
     }
 
     // ── 구간 ─────────────────────────────────────────────
@@ -448,6 +484,7 @@ public class CardEnhanceRitualView : CardGrowthRitualView, IUIInitializable
     // 다음 연출이 중간값(압축·열·회색)에서 출발하지 않게 원복. 캡처 전이면 건드릴 것도 없다.
     protected override void OnRestoreVisual()
     {
+        StopGrowthFlash();
         if (!this.m_baseCaptured) return;
 
         if (this.cardStage != null)

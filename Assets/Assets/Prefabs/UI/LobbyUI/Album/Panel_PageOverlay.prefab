@@ -1,5 +1,19 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &8999150000000000101
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6077258009078144595}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e6a6fa1b57ada134eb7acbb86043d45f, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ScreenFillRect
+  offset: {x: 0, y: 0}
+  overscan: 1
 --- !u!1 &512109285879519335
 GameObject:
   m_ObjectHideFlags: 0
@@ -1149,7 +1163,6 @@ MonoBehaviour:
   dragReturnDuration: 0.16
   rewindStepScale: 0.3
   frontSortingOrder: 100
-  frontDimOverflow: 1000
   transition:
     panel: {fileID: 6483501150855271555}
     openDuration: 0.25
@@ -1817,6 +1830,7 @@ GameObject:
   - component: {fileID: 2861205707775571880}
   - component: {fileID: 3627543912355596888}
   - component: {fileID: 3357805823623825714}
+  - component: {fileID: 8999150000000000101}
   m_Layer: 0
   m_Name: Dim
   m_TagString: Untagged

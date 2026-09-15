@@ -1135,7 +1135,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 0.6745098}
+  m_Color: {r: 0, g: 0, b: 0, a: 0.85}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -6162,18 +6162,6 @@ PrefabInstance:
     - target: {fileID: 261259409356302717, guid: c553cdc570e70c340b7a8a7e75394bf4, type: 3}
       propertyPath: m_text
       value: "\uC5F0\uACB0 \uCD94\uAC00"
-      objectReference: {fileID: 0}
-    - target: {fileID: 261259409356302717, guid: c553cdc570e70c340b7a8a7e75394bf4, type: 3}
-      propertyPath: m_fontColor.b
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 261259409356302717, guid: c553cdc570e70c340b7a8a7e75394bf4, type: 3}
-      propertyPath: m_fontColor.g
-      value: 0.09019608
-      objectReference: {fileID: 0}
-    - target: {fileID: 261259409356302717, guid: c553cdc570e70c340b7a8a7e75394bf4, type: 3}
-      propertyPath: m_fontColor.r
-      value: 0.23529412
       objectReference: {fileID: 0}
     - target: {fileID: 261259409356302717, guid: c553cdc570e70c340b7a8a7e75394bf4, type: 3}
       propertyPath: m_fontColor32.rgba

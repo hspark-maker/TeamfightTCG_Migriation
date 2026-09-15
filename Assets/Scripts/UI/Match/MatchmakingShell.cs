@@ -104,6 +104,7 @@ public class MatchmakingShell : ContentsUIBehaviour
     // 유저 취소용. 씬 파괴 토큰과 링크해 두어 어느 쪽이 끊겨도 매치메이커까지 전달된다.
     CancellationTokenSource m_cts;
     CancellationTokenSource m_dotsCts;
+    bool m_cancelAllowed;
 
     bool m_running;
     bool m_wired;
@@ -711,6 +712,10 @@ public class MatchmakingShell : ContentsUIBehaviour
 
     public void Cancel()
     {
+        // 버튼을 거치지 않거나 이미 전달된 클릭도 매칭 확정 뒤에는 취소할 수 없다.
+        if (!m_running || !m_cancelAllowed) return;
+
+        SetCancelInteractable(false);
         m_cts?.Cancel();
     }
 
@@ -800,6 +805,7 @@ public class MatchmakingShell : ContentsUIBehaviour
 
     void SetCancelInteractable(bool _on)
     {
+        m_cancelAllowed = _on;
         if (cancelButton != null) cancelButton.interactable = _on;
     }
 

@@ -126,7 +126,7 @@ public sealed class ShardAbsorbEffect : MonoBehaviour
             t_icon = t_object.GetComponent<Image>();
             t_icon.raycastTarget = false;
             t_icon.preserveAspect = true;
-            t_icon.rectTransform.sizeDelta = new Vector2(36f, 36f);
+            t_icon.rectTransform.sizeDelta = new Vector2(90f, 90f);
             m_icons[index] = t_icon;
         }
 

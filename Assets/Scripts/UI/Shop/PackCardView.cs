@@ -903,9 +903,9 @@ public class PackCardView : MonoBehaviour
 
         // 문구는 카드 한가운데에 앉는다 — 흐려진 카드가 비운 자리를 그대로 받는다.
         // (프리팹 자리는 카드 밖 아래라, 카드가 사라지는 동안 시선이 빈 곳을 본다.)
-        // 배율은 프리팹 값 그대로. 반복이 건드리는 축은 알파 둘뿐이다.
+        // 작은 결과 카드에서도 문구를 읽을 수 있게 칩만 키운다. 낱장 배율은 HideRefundBadge가 복원한다.
         t_tr.localPosition = CardCenterIn(t_tr.parent);
-        t_tr.localScale = m_refundRestScale;
+        t_tr.localScale = m_refundRestScale * 1.5f;
 
         // 카드보다 뒤에 그려지면 반투명 카드에 문구가 묻힌다. 원래 순서는 HideRefundBadge가 되돌린다.
         t_tr.SetAsLastSibling();

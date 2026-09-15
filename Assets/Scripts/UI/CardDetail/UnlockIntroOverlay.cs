@@ -6,7 +6,7 @@ using UnityEngine.UI;
 
 // 해금된 개념(키워드·시너지)을 전면에서 한 장으로 가르치고 [확인]을 기다리는 오버레이.
 // 딤을 눌러서는 닫히지 않고, 행의 등장은 자리 대신 배율로 준다(레이아웃 그룹이 자리를 되돌린다).
-public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
+public class UnlockIntroOverlay : PooledOverlay<UnlockIntroOverlay>
 {
     [Tooltip("켜고 끌 대상. 미배선이면 자기 gameObject를 토글한다.")]
 
@@ -15,7 +15,6 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
     [Tooltip("행이 깔리는 노드. 자식은 UnlockIntroRow를 단 노드여야 하고, 런타임 Instantiate는 없다.")]
     [SerializeField] Transform rowRoot;
     [Header("연출")]
-    [SerializeField] PopupTransition transition = new PopupTransition();
     [SerializeField] OverlayDim dim = new OverlayDim();
 
     [Tooltip("첫 행이 들어오기까지의 뜸. 딤이 깔리는 동안은 아직 읽을 것이 없다.")]
@@ -42,7 +41,8 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
     string m_guideMessage;
 
     /// <summary>해금 인트로의 개념 배너가 표시 중인가.</summary>
-    public static bool IsGuidanceShowing => IsOpen && TryGetExisting(out var t_overlay) && t_overlay.m_showingGuidance;
+    public static bool IsGuidanceShowing => IsOpen && UIPoolManager.instance != null
+        && UIPoolManager.instance.TryGetUI<UnlockIntroOverlay>(out var t_overlay) && t_overlay.m_showingGuidance;
 
     CanvasGroup m_confirmGroup;
 
@@ -59,7 +59,7 @@ public class UnlockIntroOverlay : SingletonOverlay<UnlockIntroOverlay>
 
     /// <summary>안내 오버레이를 얻는다(평소 꺼져 있는 노드라 비활성까지 뒤진다).</summary>
     public static bool TryGet(out UnlockIntroOverlay _overlay)
-        => TryGetOrCreate(RuntimeOverlayPrefabs.Get<UnlockIntroOverlay>, out _overlay);
+        => TryGetOrCreate(out _overlay);
 
     /// <summary>효과와 데모를 재생한다. 확인은 true, 중단은 false를 한 번 돌려준다.</summary>
     public void Show(IReadOnlyList<UnlockIntro> _intros, int _card, Action<bool> _onFinished, string _guideMessage = null)

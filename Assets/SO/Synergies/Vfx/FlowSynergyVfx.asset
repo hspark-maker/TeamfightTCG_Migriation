@@ -20,6 +20,7 @@ MonoBehaviour:
     initialRotation: {x: -110.862, y: 0, z: 0}
     lifetime: 2
     sortingOrder: 20
+    preserveRendererSorting: 1
     scale: 0
     alignToDirection: 0
     skipOnCounter: 0

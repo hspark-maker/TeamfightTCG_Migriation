@@ -12,13 +12,20 @@ public static class GuideOnboardingPresentationValidation
     public static void Run()
     {
         Require(!EditorApplication.isPlaying && !UnlockIntroOverlay.IsOpen && !ScreenDim.IsAvailable
-            && OutgameTutorialGateUI.Instance == null, "Close active UI and stop play mode before validation.");
+            && OutgameTutorialGateUI.Instance == null && UIPoolManager.instance == null,
+            "Close active UI and stop play mode before validation.");
         var t_scene = EditorSceneManager.NewPreviewScene();
         ScreenDim t_dim = null;
         UnlockIntroOverlay t_overlay = null;
         OutgameTutorialGateUI t_gate = null;
+        UIPoolManager t_pool = null;
         try
         {
+            var t_poolRoot = new GameObject("GuideValidationPool", typeof(RectTransform), typeof(Canvas));
+            UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(t_poolRoot, t_scene);
+            t_pool = t_poolRoot.AddComponent<UIPoolManager>();
+            // PreviewScene은 Awake를 호출하지 않아 영속 씬으로 이동하지 않고 등록만 재현한다.
+            UIPoolManager.instance = t_pool;
             var t_gatePrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Assets/Prefabs/UI/Tutorial/OutgameTutorialGate.prefab");
             var t_gateRoot = (GameObject)PrefabUtility.InstantiatePrefab(t_gatePrefab, t_scene);
             t_gate = t_gateRoot.GetComponent<OutgameTutorialGateUI>();
@@ -30,11 +37,13 @@ public static class GuideOnboardingPresentationValidation
             t_dimSo.FindProperty("sortingCanvas").objectReferenceValue = t_dimRoot.AddComponent<Canvas>();
             t_dimSo.ApplyModifiedPropertiesWithoutUndo();
             typeof(ScreenDim).GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(t_dim, null);
-            var t_prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Assets/Prefabs/UI/OverlayUI/UnlockIntroOverlay.prefab");
+            var t_prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Assets/Prefabs/UI/PooledUI/UnlockIntroOverlay.prefab");
             var t_root = (GameObject)PrefabUtility.InstantiatePrefab(t_prefab, t_scene);
+            t_root.transform.SetParent(t_poolRoot.transform, false);
             t_overlay = t_root.GetComponent<UnlockIntroOverlay>();
-            typeof(SingletonOverlay<UnlockIntroOverlay>).GetMethod("Adopt", BindingFlags.Static | BindingFlags.NonPublic)
-                .Invoke(null, new object[] { t_overlay });
+            t_overlay.InitializeUI();
+            UiSortingOrder.LiftNested(t_root, UiSortingOrder.Intro);
+            t_pool.RegisterUI(t_overlay);
             var t_serialized = new SerializedObject(t_overlay);
             var t_button = (Button)t_serialized.FindProperty("confirmButton").objectReferenceValue;
             Require(t_button != null && t_serialized.FindProperty("rowRoot").objectReferenceValue != null, "Intro controls are not authored.");
@@ -58,11 +67,11 @@ public static class GuideOnboardingPresentationValidation
             Require(t_confirmed == 1 && t_cancelled == 1, "Cancellation must be distinct and idempotent.");
             Require(!OutgameTutorialGateUI.IsShowing, "Cancelled intro left guidance visible.");
             t_overlay.Show(t_intros, 0, t_result, "비활성 안내 검증");
-            typeof(ContentsUIBehaviour).GetMethod("NotifyContentsVisibility", BindingFlags.Instance | BindingFlags.NonPublic)
+            typeof(ContentsPooledUI).GetMethod("NotifyContentsVisibility", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(t_overlay, new object[] { true });
             t_root.SetActive(false);
             // EditMode는 MonoBehaviour 수명 콜백을 보내지 않으므로 실제 OnDisable 경로를 직접 호출한다.
-            typeof(ContentsUIBehaviour).GetMethod("OnDisable", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(t_overlay, null);
+            typeof(ContentsPooledUI).GetMethod("OnDisable", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(t_overlay, null);
             Require(t_confirmed == 1 && t_cancelled == 2 && !UnlockIntroOverlay.IsOpen, "Parent deactivation must cancel without completion.");
             ValidateMissionRow(t_scene);
             Require(!OutgameTutorialGateUI.IsShowing, "Disabled intro left guidance visible.");
@@ -83,9 +92,11 @@ public static class GuideOnboardingPresentationValidation
         finally
         {
             if (t_overlay != null) t_overlay.Cancel();
+            if (t_pool != null && t_overlay != null) t_pool.UnregisterUI(t_overlay);
             if (t_gate != null) typeof(OutgameTutorialGateUI).GetMethod("OnDestroy", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(t_gate, null);
             if (t_dim != null) typeof(ScreenDim).GetMethod("OnDestroy", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(t_dim, null);
             EditorSceneManager.ClosePreviewScene(t_scene);
+            if (UIPoolManager.instance == t_pool) UIPoolManager.instance = null;
         }
     }
 

@@ -122,9 +122,15 @@ public class SafeAreaFitter : MonoBehaviour, IUIInitializable
 
     void RefreshSuppression()
     {
-        SafeAreaFitter t_ancestor = transform.parent != null
-            ? transform.parent.GetComponentInParent<SafeAreaFitter>(true)
-            : null;
+        SafeAreaFitter t_ancestor = null;
+        for (Transform t_parent = transform.parent; t_parent != null; t_parent = t_parent.parent)
+        {
+            // 화면 전체로 되돌린 경계 안에서는 안전 영역을 새로 적용해야 한다.
+            // MatchDeckRoot처럼 로비 제어 루트 밑에 둔 전면 화면도 내부 노치 여백을 유지한다.
+            if (t_parent.GetComponent<ScreenFillRect>() != null) break;
+            t_ancestor = t_parent.GetComponent<SafeAreaFitter>();
+            if (t_ancestor != null) break;
+        }
         bool t_suppressed = t_ancestor != null;
         bool t_changed = t_suppressed != this.suppressedByAncestor;
         this.suppressedByAncestor = t_suppressed;

@@ -11074,14 +11074,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 3669285587999233025}
     m_Modifications:
-    - target: {fileID: 1067475977121768592, guid: b4a14d060f73b854ba7d661086907523, type: 3}
-      propertyPath: m_SortingLayer
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 5264701721478214008, guid: b4a14d060f73b854ba7d661086907523, type: 3}
-      propertyPath: m_SortingLayer
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 5748432713024055984, guid: b4a14d060f73b854ba7d661086907523, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -11117,10 +11109,6 @@ PrefabInstance:
     - target: {fileID: 6515223848412843459, guid: b4a14d060f73b854ba7d661086907523, type: 3}
       propertyPath: m_Name
       value: VictoryBanner
-      objectReference: {fileID: 0}
-    - target: {fileID: 6969283276385830747, guid: b4a14d060f73b854ba7d661086907523, type: 3}
-      propertyPath: m_ConstrainProportionsScale
-      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

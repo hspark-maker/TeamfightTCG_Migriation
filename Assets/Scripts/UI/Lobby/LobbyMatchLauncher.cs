@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -11,7 +11,7 @@ using UnityEngine.SceneManagement;
 /// 그 화면(MatchDeckShell)이 싣는다. 배틀 씬은 확정된 값을 읽기만 한다.
 public class LobbyMatchLauncher : MonoBehaviour
 {
-    [SerializeField] LobbyOverlayHost overlayHost;
+    [SerializeField] MatchDeckShell matchDeckShell;
 
     [Header("매칭 연출")]
     [SerializeField] OpponentProfilePool profilePool;
@@ -40,36 +40,24 @@ public class LobbyMatchLauncher : MonoBehaviour
 
     IMatchmaker      m_matchmaker;
     MatchmakingShell m_matchShell;
-    LobbyOverlayHost m_overlayHost;
+    MatchDeckShell m_deckShell;
 
     GameObject m_matchShellPrefab;
 
-    /// <summary>
-    /// 오버레이 호스트. **인스펙터가 프리팹 에셋을 물고 있으면 쓰지 않는다.**
-    ///
-    /// 에셋을 물면 화면에 없는 원본을 조작하게 된다 — 매치 덱 화면이 열리지 않고, 에디터에서는 그 조작이
-    /// 프리팹 파일에 그대로 기록된다(자식을 지우는 순간 "Destroying assets is not permitted"로 터진다).
-    /// 프리팹 에셋은 씬에 속하지 않으므로 gameObject.scene.IsValid()로 구분할 수 있다.
-    /// </summary>
-    LobbyOverlayHost OverlayHost
+    /// <summary>Uses the authored child screen; prefab assets must never be opened as scene instances.</summary>
+    MatchDeckShell DeckShell
     {
         get
         {
-            if (m_overlayHost != null) return m_overlayHost;
-
-            if (overlayHost != null && overlayHost.gameObject.scene.IsValid())
-                return m_overlayHost = overlayHost;
-
-            if (overlayHost != null)
-                Debug.LogError(
-                    "[LobbyMatchLauncher] overlayHost points at a prefab asset — rewire it to the scene instance. "
-                  + "This run falls back to searching the hierarchy.", this);
-
-            return m_overlayHost = transform.root.GetComponentInChildren<LobbyOverlayHost>(true);
+            if (m_deckShell != null) return m_deckShell;
+            if (matchDeckShell != null && matchDeckShell.gameObject.scene.IsValid())
+                return m_deckShell = matchDeckShell;
+            if (matchDeckShell != null)
+                Debug.LogError("[LobbyMatchLauncher] matchDeckShell points at a prefab asset; assign the child instance.", this);
+            return m_deckShell = GetComponentInChildren<MatchDeckShell>(true);
         }
     }
 
-    MatchDeckShell DeckShell => OverlayHost != null ? OverlayHost.MatchDeckShell : null;
 
     // 실 상대를 먼저 찾고, 못 만나면 안쪽 AI 매칭으로 내려간다. 멀티/싱글 판정은 이 결과가 소유한다 —
     // 여기서 갈리는 것이 DeckConfig.IsMultiplayer 이고, 씬 로드·랭크 정산·보상 경로가 전부 그 값을 따른다.
@@ -81,7 +69,7 @@ public class LobbyMatchLauncher : MonoBehaviour
     // 런타임 계산값으로 굳어(anchorMax) 관계없는 좌표가 함께 커밋되기 때문이다.
     //
     // 부모는 SafeArea가 아니라 로비 캔버스 자신이다. 셸은 로비를 전부 덮는 전면 화면이라 안전 영역 안으로
-    // 들어갈 이유가 없고(덱 화면 LobbyOverlayHost도 같은 자리에 있다), 무엇보다 전투로 넘어갈 때
+    // 들어갈 이유가 없고(덱 화면도 ScreenFillRect로 같은 화면 크기를 유지한다), 무엇보다 전투로 넘어갈 때
     // 부모에서 떨어져 나가는데 그때 SafeArea rect → 화면 전체 rect로 바뀌면 노치 기기에서
     // 프로필과 배너가 그 프레임에 점프한다. 두 자리의 rect가 같아야 이관이 티나지 않는다.
     MatchmakingShell MatchShell

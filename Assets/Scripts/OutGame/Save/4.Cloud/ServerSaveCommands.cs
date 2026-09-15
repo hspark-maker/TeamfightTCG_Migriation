@@ -21,6 +21,7 @@ internal static class ServerSaveCommands
         s_service = _service;
         ContentUnlockManager.ResetSession();
         MissionCommands.ResetSession();
+        AttendanceCommands.ResetSession();
         RankLeaderboardCommands.ResetSession();
     }
 

@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>온보딩 보상 무대와 같은 순서로 콘텐츠 해금을 소개한다.</summary>
-public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntroView>
+public sealed class ContentUnlockIntroView : PooledOverlay<ContentUnlockIntroView>
 {
     [SerializeField] TMP_Text _headingText;
     [SerializeField] TMP_Text _messageText;
@@ -24,7 +24,6 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
     [SerializeField] Ease _fadeEase = Ease.OutCubic;
     [SerializeField, Min(0f)] float _flightDuration = 0.4f;
     [SerializeField] Ease _flightEase = Ease.OutCubic;
-    [SerializeField] PopupTransition transition = new PopupTransition();
     [SerializeField] OverlayDim dim = new OverlayDim();
     [SerializeField] EOutgameSound _introSound = EOutgameSound.PopupOpen;
 
@@ -71,7 +70,7 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
 
     /// <summary>등록된 온보딩 해금 소개 프리팹을 얻는다.</summary>
     public static bool TryGet(out ContentUnlockIntroView view)
-        => TryGetOrCreate(RuntimeOverlayPrefabs.Get<ContentUnlockIntroView>, out view);
+        => TryGetOrCreate(out view);
 
     /// <summary>제목·콘텐츠·확인을 순서대로 드러낸다.</summary>
     public void Show(string title, string body, IReadOnlyList<Sprite> icons,
@@ -120,6 +119,8 @@ public sealed class ContentUnlockIntroView : SingletonOverlay<ContentUnlockIntro
 
     /// <summary>스텝 취소는 완료 통지 없이 즉시 무대를 걷는다.</summary>
     public void Close() => Finish(false);
+
+    public override void Hide() => Close();
 
     void CaptureHome()
     {

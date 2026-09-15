@@ -153,9 +153,17 @@ public static class ScreenDimValidation
 
     static void ValidatePrefabs()
     {
-        var host = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Assets/Prefabs/UI/LobbyUI/LobbyOverlayHost.prefab");
-        var full = host.transform.Find("ScreenDim_Full");
-        var data = new SerializedObject(full.GetComponent<ScreenDim>());
+        var host = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Assets/Prefabs/UI/LobbyUI/LobbyCanvas.prefab");
+        Require(host != null, "Lobby canvas prefab missing.");
+        ScreenDim full = null;
+        foreach (var candidate in host.GetComponentsInChildren<ScreenDim>(true))
+        {
+            if (new SerializedObject(candidate).FindProperty("layer").enumValueIndex != (int)EDimLayer.Full) continue;
+            Require(full == null, "Lobby must author exactly one Full dim.");
+            full = candidate;
+        }
+        Require(full != null, "Lobby Full dim missing.");
+        var data = new SerializedObject(full);
         Require(data.FindProperty("layer").enumValueIndex == 0
             && data.FindProperty("sortingCanvas").objectReferenceValue == full.GetComponent<Canvas>()
             && full.GetComponent<Canvas>() != null && full.GetComponent<GraphicRaycaster>() != null,
@@ -164,11 +172,14 @@ public static class ScreenDimValidation
             "ContentUnlockIntroView", "UnlockIntroOverlay" };
         foreach (string name in names)
         {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/Assets/Prefabs/UI/OverlayUI/{name}.prefab");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/Assets/Prefabs/UI/PooledUI/{name}.prefab");
+            Require(prefab != null, name + " pooled prefab missing.");
             var dim = prefab.transform.Find("Contents/PopupDim").GetComponent<Image>();
             Require(dim.color.a == 0f && dim.enabled && dim.raycastTarget && dim.GetComponent<Button>() == null,
                 name + " must keep a transparent non-confirming input blocker.");
-            var view = prefab.GetComponent<SingletonOverlayBase>();
+            var view = prefab.GetComponent<PooledOverlay>();
+            Require(view != null && view.contents != null && view.contents.transform.parent == view.transform,
+                name + " must author a direct Contents child for pooled initialization.");
             var settings = new SerializedObject(view).FindProperty("dim");
             Require(settings != null && Near(settings.FindPropertyRelative("alpha").floatValue, 0.72f),
                 name + " must preserve authored dim opacity.");
