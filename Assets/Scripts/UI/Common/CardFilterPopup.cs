@@ -248,7 +248,7 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
             bool selected = option.IsSelected();
             option.Button.targetGraphic.color = selected ? selectedColor : unselectedColor;
             option.Label.color = selected ? selectedTextColor : unselectedTextColor;
-            option.Label.text = selected ? "✓ " + option.Caption : option.Caption;
+            option.Label.text = option.Caption;
         }
         int count = 0;
         foreach (int card in CardCatalog.AllIds)

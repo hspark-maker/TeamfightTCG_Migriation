@@ -44,8 +44,6 @@ public static class SafeAreaInstaller
         new("Assets/Assets/Prefabs/UI/PooledUI/KeywordGrowthOverlay.prefab", "Contents", "Panel"),
         new("Assets/Assets/Prefabs/UI/PooledUI/SettingUI.prefab", "Contents", "Panel"),
         new("Assets/Assets/Prefabs/UI/PooledUI/PackOddsPopup.prefab", "Contents", "Panel"),
-        new("Assets/Assets/Prefabs/UI/LobbyUI/Tabs/Tab_Deck/DeckEditPanel.prefab", "",
-            "Title", "BackButton", "DeckArea", "CollectionArea", "ButtonBar", "SaveButton", "PlayButton"),
     };
 
     // 이름이 여기 포함되면 건너뛴다(전체 화면 연출용 캔버스).

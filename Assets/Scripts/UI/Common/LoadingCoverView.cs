@@ -466,12 +466,13 @@ public class LoadingCoverView : MonoBehaviour
 
         try
         {
+            if (m_waitForBattleResult && statusText != null)
+                statusText.text = "전투 결과를 확인하고 있습니다...";
             if (_animateProgress) yield return CoFillBar(() => t_op.Progress);
 
             // 연출 시간 상한으로 서버 검증을 건너뛰지 않는다. 씬 활성화·전투 정리보다 먼저 기다린다.
             if (m_waitForBattleResult)
             {
-                if (statusText != null) statusText.text = "전투 결과를 확인하고 있습니다...";
                 yield return MatchResultSubmission.WaitForBattleResultAsync().ToCoroutine();
             }
 
