@@ -67,7 +67,7 @@ public class MultiplayerOpponentTurn : TurnBase
             else
             {
                 var t_attack = t_runner != null
-                    ? await t_runner.WaitForOpponentAttack()
+                    ? await t_runner.WaitForOpponentAttack(_showThinkTimer: !t_ruleBackstopOff)
                     : (false, 0, 0, false);
                 (t_received, t_attackerSlot, t_defenderSlot, t_cunningSwap) = t_attack;
             }
