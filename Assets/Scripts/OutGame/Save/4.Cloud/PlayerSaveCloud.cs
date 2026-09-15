@@ -154,7 +154,10 @@ static class PlayerSaveCloud
 
     /// <summary>전투 입장에 필요한 세이브만 확정한다. 업로드 봉인 중의 조기 반환을 성공으로 보지 않고,
     /// 대기 중 추가된 변경분까지 올린다. 결과 제출·보상함 회수는 시작하지 않는다.</summary>
-    internal static async UniTask<bool> FlushForBattleEntryAsync(CancellationToken _ct)
+    internal static UniTask<bool> FlushForBattleEntryAsync(CancellationToken _ct) => FlushConfirmedAsync(_ct);
+
+    /// <summary>현재 변경분이 서버에 저장됐는지 확인한다. 서버 명령의 업로드 봉인 해제도 기다린다.</summary>
+    internal static async UniTask<bool> FlushConfirmedAsync(CancellationToken _ct)
     {
         int t_generation = s_generation;
         while (true)

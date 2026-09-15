@@ -15,8 +15,25 @@ public static class OutgameTutorialGuide
     static bool s_enhanceFree;
     static bool s_growthAlreadyReached;
 
+    public static int TargetCardId => s_enhanceCard;
+    public static int TargetLevel => GuideResume.Record?.TargetLevel > 0 && GuideResume.Record.CardId == s_enhanceCard
+        ? GuideResume.Record.TargetLevel : s_enhanceCard > 0 ? CardGrowthManager.LevelOf(s_enhanceCard) + 1 : 0;
+    static EOutgameTutorialTrigger GrowthTrigger => GuideResume.HasPending
+        ? GuideResume.Trigger : OutgameTutorialRunner.GuidedTrigger;
+    public static bool IsGrowthGoalReached => GuideResume.Record?.GoalReached == true
+        || (GrowthTrigger == EOutgameTutorialTrigger.SynergyGrowthIntroduction
+            ? s_growthAlreadyReached || (s_enhanceCard > 0 && GuideMissionTrack.StarOf(s_enhanceCard) >= 2)
+            : GrowthTrigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
+                && (TutorialGrantsCloud.EnhanceCardSpent || (s_enhanceCard > 0
+                    && GuideResume.Record?.TargetLevel > 0
+                    && CardGrowthManager.LevelOf(s_enhanceCard) >= GuideResume.Record.TargetLevel)));
+
     public static bool IsEnhanceIntroduction => OutgameTutorialRunner.GuidedTrigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
         || OutgameTutorialRunner.GuidedTrigger == EOutgameTutorialTrigger.SynergyGrowthIntroduction;
+
+    public static bool NeedsMoreSynergyGrowth
+        => OutgameTutorialRunner.GuidedTrigger == EOutgameTutorialTrigger.SynergyGrowthIntroduction
+            && !IsGrowthGoalReached && s_enhanceCard > 0 && GuideMissionTrack.StarOf(s_enhanceCard) < 2;
 
     /// <summary>서버 소진 표식이 바뀌었다. 안내가 서 있는 스텝을 다시 판정시키는 자리다(브리지가 구독한다).</summary>
     // 중계인 이유: 구독자가 클라우드 창구를 직접 참조하지 않게 이 창구 하나로 묶는다.
@@ -49,7 +66,15 @@ public static class OutgameTutorialGuide
             if (_chapter.TryGetStep(t_i, out var t_step) && t_step.Action == EOutgameTutorialAction.WaitEnhance)
                 s_enhanceFree = t_step.FreeOfCharge && t_step != s_freeSpentStep
                     && !IsFreeShotSpentOnServer(t_step.Action);
-
+        if (GuideResume.IsFor(_chapter.Trigger) && RestoreResumeCard()) return true;
+        if (_chapter.Trigger == EOutgameTutorialTrigger.CollectionTabFirstEnter && TutorialGrantsCloud.EnhanceCardSpent)
+        {
+            GuideResume.MarkGoalReached();
+            foreach (int t_card in CardCatalog.AllIds)
+                if (CanExplainEnhance(t_card)
+                    && (s_enhanceCard == 0 || t_card < s_enhanceCard)) s_enhanceCard = t_card;
+            return true;
+        }
         string t_event = GuideMissionTrack.Current?.Event;
         bool t_starters = t_event == GuideMissionTrack.EVENT_STARTER_CARDS_STAR1
             || t_event == GuideMissionTrack.EVENT_STARTER_CARDS_STAR2
@@ -69,6 +94,11 @@ public static class OutgameTutorialGuide
     public static void PrepareSynergyGrowth()
     {
         ClearEnhanceCard();
+        if (GuideResume.IsFor(EOutgameTutorialTrigger.SynergyGrowthIntroduction) && RestoreResumeCard())
+        {
+            s_growthAlreadyReached = IsGrowthGoalReached;
+            return;
+        }
         foreach (int t_card in CardCatalog.AllIds)
         {
             if (!OwnershipManager.IsOwned(t_card)) continue;
@@ -78,19 +108,50 @@ public static class OutgameTutorialGuide
                 || (GuideMissionTrack.StarOf(t_card) == GuideMissionTrack.StarOf(s_enhanceCard) && t_card < s_enhanceCard))
                 s_enhanceCard = t_card;
         }
+        if (s_growthAlreadyReached)
+        {
+            foreach (int t_card in CardCatalog.AllIds)
+                if (OwnershipManager.IsOwned(t_card) && CanShowGrowthCard(t_card) && GuideMissionTrack.StarOf(t_card) >= 2)
+                { s_enhanceCard = t_card; break; }
+            GuideResume.MarkGoalReached();
+        }
+    }
+
+    /// <summary>저장 대상을 복원한다. 이미 달성한 작업은 추가 비용을 요구하지 않는다.</summary>
+    public static bool RestoreResumeCard()
+    {
+        var t_record = GuideResume.Record;
+        if (t_record == null) return false;
+        s_enhanceCard = t_record.CardId;
+        if (IsGrowthGoalReached)
+        {
+            GuideResume.MarkGoalReached();
+            if (!OwnershipManager.IsOwned(s_enhanceCard) || !CanShowGrowthCard(s_enhanceCard)
+                || (GrowthTrigger == EOutgameTutorialTrigger.CollectionTabFirstEnter && !CanExplainEnhance(s_enhanceCard)))
+                s_enhanceCard = 0;
+            if (s_enhanceCard == 0)
+                foreach (int t_card in CardCatalog.AllIds)
+                    if (OwnershipManager.IsOwned(t_card) && CanShowGrowthCard(t_card)
+                        && (GrowthTrigger != EOutgameTutorialTrigger.CollectionTabFirstEnter || CanExplainEnhance(t_card)))
+                    { s_enhanceCard = t_card; break; }
+            s_growthAlreadyReached = GuideResume.Trigger == EOutgameTutorialTrigger.SynergyGrowthIntroduction;
+            return true;
+        }
+        if (s_enhanceCard > 0 && OwnershipManager.IsOwned(s_enhanceCard) && CanShowGrowthCard(s_enhanceCard)) return true;
+        s_enhanceCard = 0;
+        return false;
     }
 
     public static bool ShouldSkipGrowthStep(TutorialStepDef _step)
     {
         if (OutgameTutorialRunner.GuidedTrigger != EOutgameTutorialTrigger.SynergyGrowthIntroduction
             || !s_growthAlreadyReached) return false;
-        return _step.Action == EOutgameTutorialAction.WaitClick
-            || _step.Action == EOutgameTutorialAction.WaitEnhance
+        return _step.Action == EOutgameTutorialAction.WaitEnhance
             || _step.Action == EOutgameTutorialAction.WaitUnlockIntro;
     }
 
     /// <summary>세션 대상 카드가 여전히 강화 가능한가.</summary>
-    public static bool CanContinueEnhance() => CanGuideEnhance(s_enhanceCard);
+    public static bool CanContinueEnhance() => IsGrowthGoalReached || CanGuideEnhance(s_enhanceCard);
 
     /// <summary>강화 안내 종료 시 세션 대상을 걷는다.</summary>
     public static void ClearEnhanceCard() { s_enhanceCard = 0; s_enhanceFree = false; s_growthAlreadyReached = false; }
@@ -163,6 +224,9 @@ public static class OutgameTutorialGuide
         return CanShowGrowthCard(_cardId) && ((s_enhanceFree && !IsFreeShotSpentOnServer(EOutgameTutorialAction.WaitEnhance))
             || CurrencyManager.CanAfford(t_step.Currency, t_step.Cost));
     }
+
+    static bool CanExplainEnhance(int _cardId) => _cardId > 0 && OwnershipManager.IsOwned(_cardId)
+        && CanShowGrowthCard(_cardId) && CardVisualRules.InfoKeywords(_cardId) != CardKeyword.None;
 
     static bool CanShowGrowthCard(int _cardId)
     {

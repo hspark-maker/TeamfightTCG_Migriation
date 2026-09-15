@@ -1189,7 +1189,11 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
         return false;
     }
 
-    void OnBackClicked() => RequestLeave(ExitEditor);
+    void OnBackClicked()
+    {
+        if (!GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.DeckEditBackButton)) return;
+        RequestLeave(ExitEditor);
+    }
 
     // 전투 시작. 나가기와 같은 판정을 거친다 — 전투가 소비하는 것은 세이브라, 저장하지 않은 편성분을
     // 안고 시작하면 화면에 그린 덱과 실제 출전 덱이 갈린다(RequestLeave가 저장·미완성 확인을 맡는다).
@@ -1198,6 +1202,7 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
     // 다시 열면 m_request가 갈리고, 그때 허가가 떨어지면 엉뚱한 호스트의 전투가 시작된다.
     void OnPlayClicked()
     {
+        if (!GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.MatchDeckBattleButton)) return;
         Action t_onPlay = this.m_request?.onPlay;
         if (t_onPlay == null) return;
 

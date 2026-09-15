@@ -54,7 +54,7 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
         && m_pendingArrive == null && m_leaving == null
         // 미완주 상태라도 전체 해금된 로비는 자유 조작을 허용한다.
         && (!OutgameTutorialRunner.IsRunning || OutgameFeatureLock.IsFtueFreeNavigation)
-        && !OutgameTutorialRunner.IsGuidedRunning;
+        && !OutgameTutorialRunner.IsGuidedRunning && !GuidanceCoordinator.IsInputLocked;
 
     /// <summary>Moves one adjacent tab through the same policy as a tab button.</summary>
     public void TrySwipe(int _direction)
@@ -99,6 +99,11 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
         // 로비 캔버스의 정렬로 되돌린다. 켜 둔 채 두면 탭바가 다른 탭에서도 풀 오버레이 위에 남는다.
         if (m_liftedTabBar != null) m_liftedTabBar.overrideSorting = false;
     }
+
+    /// <summary>현재 화면이 이미 해당 탭인지 확인한다.</summary>
+    public bool IsCurrentAnchorSelected(EOutgameTutorialAnchor _anchor)
+        => m_currentIndex >= 0 && m_currentIndex < tabs.Count
+            && tabs[m_currentIndex].tutorialAnchor == _anchor && _anchor != EOutgameTutorialAnchor.None;
 
     public LobbyTabPanel CurrentPanel
         => m_currentIndex >= 0 && m_currentIndex < tabs.Count
@@ -213,6 +218,7 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
     {
         InitializeUI();
         if (_index < 0 || _index >= tabs.Count) return;
+        if (m_currentIndex >= 0 && !GuidanceCoordinator.AllowsUserAction(tabs[_index].tutorialAnchor)) return;
         if (_fireTrigger &&
             !OutgameFeatureLock.IsUnlocked(tabs[_index].unlockFeature))
             return;
@@ -240,9 +246,11 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
             return;
         }
 
+        bool t_internal = GuidanceCoordinator.IsInternalNavigation;
         t_current.RequestLeave(() =>
         {
             if (this == null || !isActiveAndEnabled || t_request != m_selectionRequest) return;
+            if (!t_internal && !GuidanceCoordinator.AllowsUserAction(tabs[_index].tutorialAnchor)) return;
             _beforeSelect?.Invoke();
             CommitSelection(_index, _fireTrigger, _onArrived);
             _afterSelect?.Invoke();

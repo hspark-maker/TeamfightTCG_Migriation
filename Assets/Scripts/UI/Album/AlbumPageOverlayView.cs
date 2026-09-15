@@ -229,13 +229,14 @@ public class AlbumPageOverlayView : ContentsUIBehaviour
     /// <summary>닫기 요청. 잠금은 색이 아니라 여기서 막는다 — 넘김 도중 눌러도 아무 일이 없다.</summary>
     void HandleCloseRequest()
     {
-        if (IsLocked) return;
+        if (IsLocked || !GuidanceCoordinator.CanCloseAlbum) return;
         Close();
     }
 
     /// <summary>페이지 스테퍼 요청. 스와이프와 같은 잠금 규칙을 탄다.</summary>
     void HandleStepRequest(int _dir)
     {
+        if (!GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.None)) return;
         if (IsLocked || m_flipping || m_dragging) return;
         pageFlip.ClearTouchAnchor();
         Step(_dir);
@@ -554,6 +555,7 @@ public class AlbumPageOverlayView : ContentsUIBehaviour
     /// (오래 끌다 방향을 되짚는 손짓 등) 두 장이 넘어가지 않는다 — 무장은 새 손가락이 내려앉을 때만 선다.</summary>
     void HandleSwipe(int _dir)
     {
+        if (!GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.None)) return;
         if (!m_dragArmed) return;
         m_dragArmed = false;   // 이 손짓은 여기서 소진된다
 
@@ -573,6 +575,7 @@ public class AlbumPageOverlayView : ContentsUIBehaviour
     /// <summary>새 손가락이 내려앉았다 — 여기서만 무장한다.</summary>
     void HandleDragBegin()
     {
+        if (!GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.None)) return;
         m_dragArmed = !m_flipping && !IsLocked;
         if (m_dragArmed && swipeDetector != null)
             pageFlip.SetTouchAnchor(swipeDetector.BeginPosition);

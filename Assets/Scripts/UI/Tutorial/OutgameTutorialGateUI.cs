@@ -11,8 +11,7 @@ using UnityEngine.UI;
 //
 // 불변식 3개:
 //  (1) 딤 표시 == 타깃 승격 == 포인터 표시. 뒤집는 곳은 RefreshVisibility 하나뿐이다.
-//      단 스텝이 딤을 끄면(TutorialStepDef.UseDim=false) 딤·승격이 처음부터 빠지고 포인터만 남는다
-//      — 그 스텝의 차단은 기능 잠금(OutgameFeatureLock)이 대신 맡는다.
+//      가이드 흐름이 잠긴 동안은 UseDim=false여도 투명 차단과 타깃 승격을 유지한다.
 //  (2) 딤이 걸린 채 누를 수 있는 것이 하나도 없는 상태를 만들지 않는다.
 //  (3) 무대는 하나뿐이고 주인은 마지막에 건 쪽이다. 남의 무대는 걷지 않는다(m_owner·OwnedBy).
 //      튜토리얼 브리지와 콘텐츠 안내가 이 인스턴스를 공유하므로,
@@ -123,6 +122,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
     bool          m_blockWarned;       // 누를 수 없는 타깃 경고 1회(매 프레임 스팸 방지)
     bool          m_confirmMode;       // 메시지 모드(딤 탭으로 완료. 승격·손가락 없음)
     bool          m_atBottom;          // 문구의 홈이 화면 중앙이 아니라 하단인가(무대 가운데를 비워야 하는 스텝)
+    bool          m_transitionOnly;
+    bool          m_blockOtherInput;
     bool          m_dim = true;        // 딤으로 타깃 외 입력을 막는가. 끄면 승격도 하지 않는다(가릴 것이 없다)
     Button        m_blockerButton;     // 딤 탭 수신용. Awake에서 1회 확보하고 리스너만 모드별로 붙였다 뗀다
     Color         m_dimColor = Color.black;   // 프리팹에 저작된 딤 색(판을 끌 때 알파 0으로 내렸다가 되돌린다)
@@ -225,10 +226,30 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         if (_onSatisfied != null) m_targetButton.onClick.AddListener(OnTargetClicked);
 
-        SetBlocker(_dim, _dim);
+        m_blockOtherInput = _dim || GuidanceCoordinator.IsInputLocked;
+        SetBlocker(_dim, m_blockOtherInput);
         SetMessage(_message);
         RefreshVisibility();   // 첫 프레임 깜빡임 방지(LateUpdate 이전에 1회)
     }
+
+    /// <summary>Blocks input without a message while the guidance surface is changing.</summary>
+    public void ShowTransitionGate(MonoBehaviour _owner)
+    {
+        Release();
+        m_owner = _owner;
+        m_target = null;
+        m_targetCanvas = null;
+        m_onSatisfied = null;
+        m_armed = false;
+        m_transitionOnly = true;
+        SetBlocker(false, true);
+        SetPointerActive(false);
+        SetMessage(null);
+        m_gateRoot.SetActive(true);
+    }
+
+    /// <summary>Whether the gate is waiting for its next guidance surface.</summary>
+    public bool IsTransitionOnly => m_transitionOnly && IsShowing;
 
     /// <summary>딤 없이 안내 문구만 띄운다. 걸 타깃이 아예 없거나(개봉 대기처럼 클릭이 아닌 신호로 끝나는 스텝),
     /// 타깃에 Button이 없어 ShowGate가 거부하는 경우용.
@@ -392,8 +413,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
         bool t_clickable = m_confirmMode || m_targetButton == null || m_targetButton.IsInteractable();
         bool t_visible   = t_active && t_clickable;
 
-        // 딤이 꺼진 스텝은 승격도 하지 않는다 — 승격은 딤 위로 끌어올리려는 장치인데 가릴 딤이 없다.
-        if (t_visible && m_dim) Promote();
+        // 투명 차단막도 타깃보다 아래에 있어야 안내 대상만 입력을 받는다.
+        if (t_visible && (m_dim || m_blockOtherInput)) Promote();
         else                    Demote();
 
         if (m_gateRoot.activeSelf != t_visible) m_gateRoot.SetActive(t_visible);
@@ -858,6 +879,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
         if (m_blockerButton != null) m_blockerButton.onClick.RemoveListener(OnBlockerClicked);
         m_confirmMode = false;
         m_atBottom    = false;  // 자리 저작도 스텝의 것이다 — 남기면 다음 문구가 이유 없이 아래에 선다.
+        m_transitionOnly = false;
+        m_blockOtherInput = false;
         m_dim         = true;   // 딤 없는 스텝이 그 다음 모드로 새지 않게. 이 값은 두 Show*가 저작대로 덮는다.
     }
 
