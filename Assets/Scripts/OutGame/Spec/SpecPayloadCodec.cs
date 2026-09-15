@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -30,6 +30,8 @@ public static class SpecPayloadCodec
         "PassSeason", "PassLevel",
     };
 
+    public static readonly string[] OptionalTableNames = { "LoadingTip" };
+
     /// <summary>
     /// 매니저에 있지만 <b>일부러</b> 클라로 동기화하지 않는 표. 아래 경고에서 제외한다.
     ///
@@ -52,8 +54,30 @@ public static class SpecPayloadCodec
         get
         {
             foreach (string t_table in TableNames) yield return t_table;
+            foreach (string t_table in OptionalTableNames) yield return t_table;
             foreach (string t_table in ServerOnlyTableNames) yield return t_table;
         }
+    }
+
+    public static bool IsOptionalTable(string _table)
+        => Array.IndexOf(OptionalTableNames, _table) >= 0;
+
+    /// <summary>필수 표와 실제 행이 있는 선택 표를 같은 순서로 묶는다.</summary>
+    public static bool TryBuildSnapshotTables(object _manager, out List<SpecTablePayload> _tables, out string _error)
+    {
+        _tables = new List<SpecTablePayload>();
+        _error = null;
+        foreach (string t_name in TableNames)
+        {
+            if (!TryBuildLocalTable(_manager, t_name, out SpecTablePayload t_table, out _error)) return false;
+            _tables.Add(t_table);
+        }
+        foreach (string t_name in OptionalTableNames)
+        {
+            if (TryBuildLocalTable(_manager, t_name, out SpecTablePayload t_table, out _))
+                _tables.Add(t_table);
+        }
+        return true;
     }
 
     /// <summary>
@@ -73,6 +97,7 @@ public static class SpecPayloadCodec
         if (_manager == null) return;
 
         var t_covered = new HashSet<string>(TableNames, StringComparer.Ordinal);
+        foreach (string t_optional in OptionalTableNames) t_covered.Add(t_optional);
         foreach (string t_skip in ServerOnlyTableNames) t_covered.Add(t_skip);
         foreach (string t_skip in RetiredTableNames) t_covered.Add(t_skip);
 
@@ -338,6 +363,7 @@ public static class SpecPayloadCodec
         "PassSeason" => typeof(PassSeason), "PassLevel" => typeof(PassLevel),
         "Mission" => typeof(Mission),
         "RankAiEncounter" => typeof(RankAiEncounterRow),
+        "LoadingTip" => typeof(LoadingTip),
         _ => null,
     };
 

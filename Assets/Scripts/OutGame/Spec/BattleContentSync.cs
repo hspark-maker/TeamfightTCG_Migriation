@@ -26,6 +26,7 @@ public sealed class ContentUpdateRequiredException : Exception
 public static class BattleContentSync
 {
     static readonly TimeSpan CheckTtl = TimeSpan.FromSeconds(60);
+    const int OptionalTableWaitMilliseconds = 1000;
 
     /// <summary>시간 초과로 놓아준 조회를 "아직 도는 중"으로 인정하는 상한. 이걸 넘기면 버려진 것으로 본다.</summary>
     static readonly TimeSpan LateTaskGrace = TimeSpan.FromSeconds(30);
@@ -76,6 +77,7 @@ public static class BattleContentSync
         // 대조 결과를 콘솔에서 그대로 읽을 수 있어야 한다 — 모든 출구가 Verdict를 거쳐 한 줄씩 남긴다.
         var t_watch = System.Diagnostics.Stopwatch.StartNew();
         string t_mode = _multiplayer ? "멀티" : "싱글";
+        bool t_optionalOnly = false;
 
         EBattleContentGateResult Verdict(EBattleContentGateResult _result, string _reason)
         {
@@ -87,6 +89,13 @@ public static class BattleContentSync
 
         EBattleContentGateResult Fallback(string _reason)
             => Verdict(_multiplayer ? EBattleContentGateResult.Blocked : EBattleContentGateResult.OfflineAllowed, _reason);
+
+        EBattleContentGateResult KeepCurrentSnapshot(string _reason)
+        {
+            s_lastLocalFingerprint = SpecSource.Fingerprint;
+            s_lastCheckUtc = DateTime.UtcNow;
+            return Verdict(EBattleContentGateResult.Current, _reason);
+        }
 
         if (!s_initialized) return Fallback("Firebase 모듈 미초기화");
         if (IsLateTaskBlocking(out string t_lateReason)) return Fallback(t_lateReason);
@@ -107,14 +116,10 @@ public static class BattleContentSync
             }
             else
             {
-                foreach (string t_tableName in SpecPayloadCodec.TableNames)
+                if (!SpecPayloadCodec.TryBuildSnapshotTables(SpecSource.Manager, out t_localTables, out string t_localError))
                 {
-                    if (!SpecPayloadCodec.TryBuildLocalTable(SpecSource.Manager, t_tableName, out SpecTablePayload t_table, out string t_error))
-                    {
-                        Debug.LogError($"[BattleContent] Local snapshot creation failed table={t_tableName}: {t_error}");
-                        return Verdict(EBattleContentGateResult.Blocked, $"로컬 표 '{t_tableName}' 생성 실패");
-                    }
-                    t_localTables.Add(t_table);
+                    Debug.LogError($"[BattleContent] Local snapshot creation failed: {t_localError}");
+                    return Verdict(EBattleContentGateResult.Blocked, "로컬 필수 표 생성 실패");
                 }
             }
             string t_localFingerprint = SpecPayloadCodec.CombinedHash(t_envId, t_localTables);
@@ -158,19 +163,27 @@ public static class BattleContentSync
             Debug.Log($"[BattleContent] Server content={t_remote.VersionText} source={(t_remote.FromIndex ? "index" : "legacy-meta")}");
 
             int t_mismatch = 0;
+            int t_requiredMismatch = 0;
             var t_compare = new StringBuilder();
             foreach (SpecTablePayload t_table in t_localTables)
             {
                 bool t_found = t_remoteHashes.TryGetValue(t_table.Table, out string t_remoteHash);
                 bool t_match = t_found && string.Equals(t_table.PayloadHash, t_remoteHash, StringComparison.Ordinal);
-                if (!t_match) t_mismatch++;
+                if (!t_match)
+                {
+                    t_mismatch++;
+                    if (!SpecPayloadCodec.IsOptionalTable(t_table.Table)) t_requiredMismatch++;
+                }
                 string t_remoteText = t_found ? t_remoteHash : "(없음)";
                 t_compare.Append($"\n  {t_table.Table,-16} 로컬={t_table.PayloadHash} 서버={t_remoteText,-16} {(t_match ? "일치" : "불일치")}");
             }
+            foreach (string t_name in SpecPayloadCodec.OptionalTableNames)
+                if (t_remoteHashes.ContainsKey(t_name) && !t_localTables.Any(t => t.Table == t_name)) t_mismatch++;
             Debug.Log($"[BattleContent] Snapshot cross-check env={t_envId} mismatches {t_mismatch}/{t_localTables.Count}{t_compare}");
 
             // 로컬이 아예 없으면 대조할 것도 없다 — 불일치 0으로 읽혀 "서버와 동일" 로 빠지면 스펙 없이 진행된다.
             if (t_noLocalSnapshot) t_mismatch = SpecPayloadCodec.TableNames.Length;
+            t_optionalOnly = !t_noLocalSnapshot && t_requiredMismatch == 0;
 
             if (t_mismatch == 0)
             {
@@ -186,6 +199,12 @@ public static class BattleContentSync
             Task<string> t_downloadTask = DownloadSnapshotAsync(t_envId, t_remote, t_localTables);
             if (await Task.WhenAny(t_downloadTask, Task.Delay(FirebaseTimeouts.TransactionMilliseconds, _ct)) != t_downloadTask)
             {
+                _ct.ThrowIfCancellationRequested();
+                if (t_optionalOnly)
+                {
+                    _ = t_downloadTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
+                    return KeepCurrentSnapshot("팁 동기화 시간 초과 — 기존 스냅샷 유지");
+                }
                 TrackLate(t_downloadTask);
                 return Verdict(EBattleContentGateResult.Blocked,
                                $"스냅샷 다운로드 {FirebaseTimeouts.TransactionMilliseconds}ms 초과");
@@ -194,17 +213,16 @@ public static class BattleContentSync
             var t_manager = new SpecDataManager();
             if (!t_manager.Load(t_payload)) throw new InvalidOperationException("Downloaded SpecData manager validation failed.");
 
-            var t_tables = new List<SpecTablePayload>();
-            foreach (string t_tableName in SpecPayloadCodec.TableNames)
-            {
-                if (!SpecPayloadCodec.TryBuildLocalTable(t_manager, t_tableName, out SpecTablePayload t_table, out string t_error))
-                    throw new InvalidOperationException(t_error);
-                t_tables.Add(t_table);
-            }
+            if (!SpecPayloadCodec.TryBuildSnapshotTables(t_manager, out List<SpecTablePayload> t_tables, out string t_error))
+                throw new InvalidOperationException(t_error);
             string t_fingerprint = SpecPayloadCodec.CombinedHash(t_envId, t_tables);
             if (!SpecSnapshotCache.TrySave(
                     t_envId, t_payload, t_fingerprint, t_remote.Major, t_remote.Minor, out string t_cacheError))
+            {
+                if (t_optionalOnly)
+                    return KeepCurrentSnapshot("팁 캐시 저장 실패 — 기존 스냅샷 유지");
                 throw new IOException("Spec cache write failed: " + t_cacheError);
+            }
 
             ContentUpdateNotice.RecordIfUpdated(
                 t_hadPreviousVersion, t_previousVersion,
@@ -212,6 +230,11 @@ public static class BattleContentSync
 
             s_adoptedFingerprint = t_fingerprint;
             Debug.Log($"[BattleContent] Cache swap done fingerprint {t_localFingerprint} -> {t_fingerprint} ({t_payload.Length:N0} chars)");
+            if (t_optionalOnly)
+            {
+                SpecSource.AdoptOptionalSnapshot(t_manager, t_fingerprint);
+                return KeepCurrentSnapshot("팁만 갱신 — 재시작 없이 전투 진입");
+            }
             return Verdict(EBattleContentGateResult.UpdatedRestartRequired, "새 스냅샷 캐시 완료 — 재시작 후 적용");
         }
         catch (ContentUpdateRequiredException t_exception)
@@ -222,6 +245,7 @@ public static class BattleContentSync
         catch (Exception t_exception)
         {
             Debug.LogWarning($"[BattleContent] Server comparison failed: {t_exception.GetBaseException().Message}");
+            if (t_optionalOnly) return KeepCurrentSnapshot("팁 동기화 실패 — 기존 스냅샷 유지");
             return Fallback($"서버 대조 실패: {t_exception.GetBaseException().Message}");
         }
     }
@@ -274,8 +298,9 @@ public static class BattleContentSync
         // 로컬 기준으로 뽑으면 받을 표가 0개가 되고, 아래 조립에서 "missing after download" 로 터진다.
         var t_byTable = new Dictionary<string, SpecTablePayload>(StringComparer.Ordinal);
         var t_stale = new List<string>();
-        foreach (string t_name in SpecPayloadCodec.TableNames)
+        foreach (string t_name in SpecPayloadCodec.TableNames.Concat(SpecPayloadCodec.OptionalTableNames))
         {
+            if (SpecPayloadCodec.IsOptionalTable(t_name) && !_beforeHashes.ContainsKey(t_name)) continue;
             if (t_localByTable.TryGetValue(t_name, out SpecTablePayload t_local) &&
                 _beforeHashes.TryGetValue(t_name, out string t_remoteHash) &&
                 string.Equals(t_local.PayloadHash, t_remoteHash, StringComparison.Ordinal))
@@ -285,13 +310,14 @@ public static class BattleContentSync
         }
 
         Task<SpecTablePayload>[] t_tasks = t_stale
-            .Select(t => FetchTableAsync(
+            .Select(t => FetchSnapshotTableAsync(
                 _envId, t,
                 _beforeHashes.TryGetValue(t, out string t_hash) ? t_hash : null,
                 _before.BlobPaths.TryGetValue(t, out string t_path) ? t_path : null))
             .ToArray();
         SpecTablePayload[] t_fetched = await Task.WhenAll(t_tasks);
-        foreach (SpecTablePayload t_table in t_fetched) t_byTable[t_table.Table] = t_table;
+        foreach (SpecTablePayload t_table in t_fetched)
+            if (t_table != null) t_byTable[t_table.Table] = t_table;
 
         RemoteSpecVector t_after = await FetchRemoteVectorAsync(_envId);
         Dictionary<string, string> t_afterHashes = t_after.Hashes;
@@ -301,19 +327,21 @@ public static class BattleContentSync
                                    !string.Equals(t.Value, t_hash, StringComparison.Ordinal)))
             throw new InvalidOperationException("Remote spec changed during download. Retry the battle entry.");
 
-        var t_tables = new SpecTablePayload[SpecPayloadCodec.TableNames.Length];
-        for (int i = 0; i < SpecPayloadCodec.TableNames.Length; i++)
+        var t_tables = new List<SpecTablePayload>();
+        foreach (string t_name in SpecPayloadCodec.TableNames)
         {
-            string t_name = SpecPayloadCodec.TableNames[i];
-            if (!t_byTable.TryGetValue(t_name, out t_tables[i]))
+            if (!t_byTable.TryGetValue(t_name, out SpecTablePayload t_table))
                 throw new InvalidOperationException($"Spec table '{t_name}' missing after download.");
+            t_tables.Add(t_table);
         }
+        foreach (string t_name in SpecPayloadCodec.OptionalTableNames)
+            if (t_byTable.TryGetValue(t_name, out SpecTablePayload t_table)) t_tables.Add(t_table);
 
         var t_log = new StringBuilder();
         foreach (SpecTablePayload t_table in t_tables)
             t_log.Append($"\n  {t_table.Table,-16} rows={t_table.Rows.Count,-5} hash={t_table.PayloadHash} " +
                          $"{(t_stale.Contains(t_table.Table) ? "수신" : "로컬재사용")}");
-        Debug.Log($"[BattleContent] Snapshot composed env={_envId} received {t_stale.Count}/{t_tables.Length} table(s){t_log}");
+        Debug.Log($"[BattleContent] Snapshot composed env={_envId} received {t_stale.Count}/{t_tables.Count} table(s){t_log}");
 
         return SpecPayloadCodec.BuildManagerJson(t_tables);
     }
@@ -330,6 +358,12 @@ public static class BattleContentSync
             throw new InvalidOperationException($"Remote spec index is missing for env '{_envId}'.");
 
         IDictionary<string, object> t_fields = t_index.ToDictionary();
+        return ReadRemoteVector(t_fields);
+    }
+
+    static RemoteSpecVector ReadRemoteVector(IDictionary<string, object> _fields)
+    {
+        IDictionary<string, object> t_fields = _fields;
         if (!TryInteger(t_fields, "major", out long t_majorValue) ||
             t_majorValue < int.MinValue || t_majorValue > int.MaxValue)
             throw new InvalidOperationException("Remote spec index major is missing or invalid.");
@@ -356,16 +390,23 @@ public static class BattleContentSync
 
         var t_hashes = new Dictionary<string, string>(StringComparer.Ordinal);
         var t_blobPaths = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (string t_table in SpecPayloadCodec.TableNames)
+        foreach (string t_table in SpecPayloadCodec.TableNames.Concat(SpecPayloadCodec.OptionalTableNames))
         {
+            bool t_optional = SpecPayloadCodec.IsOptionalTable(t_table);
             if (!t_tables.TryGetValue(t_table, out object t_entryValue) ||
                 !(t_entryValue is IDictionary<string, object> t_entry) ||
                 !t_entry.TryGetValue("payloadHash", out object t_hashValue) ||
                 !(t_hashValue is string t_hash) || string.IsNullOrEmpty(t_hash))
+            {
+                if (t_optional) continue;
                 throw new InvalidOperationException($"Remote spec index entry '{t_table}' is missing or invalid.");
+            }
             if (!t_entry.TryGetValue("blobPath", out object t_pathValue) ||
                 !(t_pathValue is string t_blobPath) || string.IsNullOrEmpty(t_blobPath))
+            {
+                if (t_optional) continue;
                 throw new InvalidOperationException($"Remote spec index blob path '{t_table}' is missing or invalid.");
+            }
             t_hashes.Add(t_table, t_hash);
             t_blobPaths.Add(t_table, t_blobPath);
         }
@@ -429,6 +470,35 @@ public static class BattleContentSync
 
     /// <summary>표 하나를 블롭 문서 한 번으로 받는다. <c>rows/</c> 서브컬렉션은 콘솔 열람용 미러라 런타임은 읽지 않는다
     /// — 읽으면 read가 행 수에 비례한다. 블롭은 메타와 같은 commit에 실리므로 행 개수 경합 재시도가 필요 없다.</summary>
+    static async Task<SpecTablePayload> FetchSnapshotTableAsync(
+        string _envId, string _table, string _expectedHash, string _publishedPath)
+    {
+        if (!SpecPayloadCodec.IsOptionalTable(_table))
+            return await FetchTableAsync(_envId, _table, _expectedHash, _publishedPath);
+
+        return await WaitForOptionalTableAsync(_table, FetchTableAsync(_envId, _table, _expectedHash, _publishedPath));
+    }
+
+    static async Task<SpecTablePayload> WaitForOptionalTableAsync(string _table, Task<SpecTablePayload> _fetch)
+    {
+        try
+        {
+            // 팁 조회의 지연이 필수 콘텐츠 다운로드 예산을 소진하면 부팅까지 막힌다.
+            if (await Task.WhenAny(_fetch, Task.Delay(OptionalTableWaitMilliseconds)) != _fetch)
+            {
+                _ = _fetch.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
+                Debug.LogWarning($"[BattleContent] Optional table '{_table}' timed out; using the default tip.");
+                return null;
+            }
+            return await _fetch;
+        }
+        catch (Exception t_exception)
+        {
+            Debug.LogWarning($"[BattleContent] Optional table '{_table}' skipped: {t_exception.GetBaseException().Message}");
+            return null;
+        }
+    }
+
     static async Task<SpecTablePayload> FetchTableAsync(
         string _envId, string _table, string _expectedHash, string _publishedPath)
     {

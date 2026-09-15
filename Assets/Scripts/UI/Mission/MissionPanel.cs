@@ -78,6 +78,9 @@ public class MissionPanel : ContentsPooledUI
     [Tooltip("선택되지 않은 탭 배경에 적용할 옅은 회색.")]
     [SerializeField] Color unselectedTabColor = new Color(0.85f, 0.85f, 0.85f, 1f);
 
+    [Tooltip("선택된 탭 전체의 확대 배율. 비선택 탭은 1배로 표시한다.")]
+    [SerializeField] float selectedTabScale = 1.1f;
+
     [Header("버튼")]
     [SerializeField] Button closeButton;
 
@@ -218,6 +221,10 @@ public class MissionPanel : ContentsPooledUI
         if (this.completionRow != null)
             this.completionRow.gameObject.SetActive(this.m_completionDefinition != null);
         if (this.dailyTabButton == null || this.weeklyTabButton == null) return;
+
+        Vector3 t_selectedScale = new Vector3(this.selectedTabScale, this.selectedTabScale, 1f);
+        this.dailyTabButton.transform.localScale = this.m_weeklyTab ? Vector3.one : t_selectedScale;
+        this.weeklyTabButton.transform.localScale = this.m_weeklyTab ? t_selectedScale : Vector3.one;
 
         GameObject t_daily = this.dailyListRoot != null ? this.dailyListRoot : this.dailyContent != null ? this.dailyContent.gameObject : null;
         GameObject t_weekly = this.weeklyListRoot != null ? this.weeklyListRoot : this.weeklyContent != null ? this.weeklyContent.gameObject : null;

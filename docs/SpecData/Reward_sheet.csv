@@ -71,7 +71,7 @@ int,string,string,int,string,string,long,string
 119,Adventure,node_10,2,Currency,Shard,70,
 120,Adventure,node_12,1,Currency,Shard,40,
 121,Adventure,chapter_02,2,Currency,Diamond,15,
-122,Adventure,chapter_02,3,Pack,SpecialPack,1,팩 지급 구현 대기
+122,Adventure,chapter_02,3,Pack,NormalPack_TEST,1,팩 지급 구현 대기
 123,Adventure,node_13,2,Currency,Shard,50,
 124,Adventure,node_15,2,Currency,Shard,50,
 125,Adventure,node_16,2,Currency,Shard,80,
@@ -85,7 +85,7 @@ int,string,string,int,string,string,long,string
 133,Adventure,chapter_04,2,Currency,Diamond,30,
 134,Adventure,chapter_04,3,Pack,HuntingBrandPack,2,팩 지급 구현 대기
 135,Rank,3,3,Pack,NormalPack_TEST,1,브론즈 4 팩 지급 구현 대기
-136,Rank,7,3,Pack,SpecialPack,1,실버 4 팩 지급 구현 대기
+136,Rank,7,3,Pack,NormalPack_TEST,1,실버 4 팩 지급 구현 대기
 137,Rank,11,3,Pack,GiantsGardenPack,1,골드 4 팩 지급 구현 대기
 138,Rank,15,3,Pack,HuntingBrandPack,2,플래티넘 4 팩 지급 구현 대기
 139,Rank,19,3,Pack,ImmortalLegacyPack,3,다이아몬드 4 팩 지급 구현 대기
@@ -106,7 +106,7 @@ int,string,string,int,string,string,long,string
 155,Pass,S1:3,2,Currency,RouletteTicket,2,시즌 1 무료 트랙 레벨 3
 156,Pass,S1:4,1,Currency,Diamond,10,시즌 1 무료 트랙 레벨 4
 158,Pass,S1:5,1,Currency,Shard,80,시즌 1 무료 트랙 레벨 5
-159,Pass,S1:5,2,Pack,SpecialPack,1,시즌 1 무료 트랙 레벨 5; 팩 지급 구현 대기
+159,Pass,S1:5,2,Pack,NormalPack_TEST,1,시즌 1 무료 트랙 레벨 5; 팩 지급 구현 대기
 160,Pass,S1:6,2,Currency,RouletteTicket,2,시즌 1 무료 트랙 레벨 6
 161,Pass,S1:8,1,Currency,Diamond,20,시즌 1 무료 트랙 레벨 8
 163,Pass,S1:9,1,Currency,Shard,120,시즌 1 무료 트랙 레벨 9
@@ -142,7 +142,7 @@ int,string,string,int,string,string,long,string
 193,Pass,S1:premium:3,2,Currency,RouletteTicket,4,시즌 1 프리미엄 트랙 레벨 3
 194,Pass,S1:premium:4,1,Currency,Diamond,20,시즌 1 프리미엄 트랙 레벨 4
 195,Pass,S1:premium:5,1,Currency,Shard,160,시즌 1 프리미엄 트랙 레벨 5
-196,Pass,S1:premium:5,2,Pack,SpecialPack,2,시즌 1 프리미엄 트랙 레벨 5
+196,Pass,S1:premium:5,2,Pack,NormalPack_TEST,2,시즌 1 프리미엄 트랙 레벨 5
 197,Pass,S1:premium:6,1,Currency,Gold,600,시즌 1 프리미엄 트랙 레벨 6
 198,Pass,S1:premium:6,2,Currency,RouletteTicket,4,시즌 1 프리미엄 트랙 레벨 6
 199,Pass,S1:premium:7,1,Currency,Shard,200,시즌 1 프리미엄 트랙 레벨 7

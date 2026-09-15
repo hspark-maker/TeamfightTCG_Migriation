@@ -501,3 +501,15 @@ public partial class RankAiEncounter
     /// 강조 에이스 슬롯(0=없음·1~6)
     public int highlightSlot;
 }
+
+[GeneratorSpecData]
+public partial class LoadingTip
+{
+    /// 팁 고유 번호
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 팁 문구
+    public string text;
+    /// 노출 여부(1=노출)
+    public int enabled;
+}

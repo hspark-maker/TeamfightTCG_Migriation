@@ -144,6 +144,7 @@ public static partial class SpecFirestoreUploader
             t_names.Add(t_pair.Key);
 
         if (!t_names.Contains(SpecLocalTables.CsvOnlyTableName)) t_names.Add(SpecLocalTables.CsvOnlyTableName);
+        if (!t_names.Contains(LoadingTipAuthoring.TABLE_NAME)) t_names.Add(LoadingTipAuthoring.TABLE_NAME);
 
         t_names.Sort(StringComparer.Ordinal);
         return t_names;
@@ -549,6 +550,11 @@ public static partial class SpecFirestoreUploader
     {
         _snapshot = null;
         _error = null;
+        if (_table == LoadingTipAuthoring.TABLE_NAME)
+        {
+            if (!LoadingTipAuthoring.TryLoad(out List<LoadingTip> t_tips, out _error)) return false;
+            return TryBuildSnapshotFrom(t_tips, _table, out _snapshot, out _error);
+        }
         if (_table == SpecLocalTables.CsvOnlyTableName)
         {
             if (!SpecLocalTables.TryLoadRankAiEncounter(out List<RankAiEncounterRow> t_rows, out _error)) return false;

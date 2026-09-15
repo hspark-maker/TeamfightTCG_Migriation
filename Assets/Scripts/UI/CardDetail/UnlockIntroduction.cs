@@ -45,7 +45,7 @@ public static class UnlockIntroduction
                         playDemo: t_page.kind == EGuideOnboardingPage.Demo));
                 }
             }
-            if (!t_hasEffect) t_pages.Add(new UnlockIntroPage(t_intro.Name, t_intro.Body, new[] { t_intro }, playDemo: true));
+            if (!t_hasEffect) t_pages.Add(new UnlockIntroPage(t_intro.Name, string.Empty, new[] { t_intro }, playDemo: true));
             if (t_first && t_authored.Count > 0) t_marks.Add(t_key);
         }
         t_overlay.ShowPages(t_pages, _card, _confirmed =>
