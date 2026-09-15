@@ -145,6 +145,8 @@ public readonly struct TutorialAnchorMeta
         // 30 UI/Growth/KeywordGrowthPanel.cs의 ApplyPanelAnchor(패널이 열려 있는 동안만). 누를 대상이 아니라
         //    "함께 밝힐 영역" 전용이라 Button 없이 등록된다. 잠금 없음
         new(A.KeywordGrowthPanel,         F.None,               "키워드 강화 패널",       "UI/Growth/KeywordGrowthPanel.cs"),
+        new(A.CardDetailKeywordDescription, F.None,             "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/CardDetailOverlay.prefab"),
+        new(A.CardDetailCardView,         F.None,               "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/CardDetailOverlay.prefab"),
     };
 
     // 이 구조의 조용한 실패 두 가지를 이 창을 처음 열 때 소리내어 잡는다(에디터 어셈블리라 초기화가 아니다).

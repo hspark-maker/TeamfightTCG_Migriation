@@ -643,17 +643,12 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure)) return;
 
         adventurePanel?.Open();
-        // 복귀 재오픈(HandleAdventureReturn)은 이 자리를 거치지 않는다 — 안내가 전투 복귀 연출 위에 겹치지 않는 이유다.
-        if (AdventureUnlock.GuideTrigger == EOutgameTutorialTrigger.AdventureMapFirstOpen)
-            GuidanceCoordinator.TryFire(EOutgameTutorialTrigger.AdventureMapFirstOpen,
-                () => this != null && this.IsAdventureMapOpen);
     }
 
     // 정점 전투 복귀 — 떠났던 화면(배틀 탭 + 맵)을 되돌린다. 승패 무관하게 맵으로 온다.
     // 보상 팝업은 여기서 열지 않는다(서버 낙인이 선 뒤에 따로 온다) — 맵은 이미 미수령 상태를 그리고 있다.
     void HandleAdventureReturn(string _nodeId, bool _won)
     {
-        // 탭 트리거는 끈다 — 탭 진입 튜토리얼이 방금 세운 맵을 덮으면 복귀가 무의미해진다.
         if (matchPanel != null) lobbyTabController?.Select(matchPanel, false);
 
         adventurePanel?.Open();
