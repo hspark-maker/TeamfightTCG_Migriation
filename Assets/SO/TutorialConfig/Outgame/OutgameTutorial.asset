@@ -584,10 +584,6 @@ MonoBehaviour:
       onFailure: 0
       contentIntros:
   guide:
-    synergyIntroductionMessage: "\uC2DC\uB108\uC9C0\uAC00 \uD574\uAE08\uB410\uC5B4\uC694!\n\uAC19\uC740
-      \uC2DC\uB108\uC9C0\uAC00 \uD574\uAE08\uB41C \uCE74\uB4DC\uB97C \uD544\uC694\uD55C
-      \uC218\uB9CC\uD07C\n\uAC19\uC740 \uB371\uC5D0 \uD3B8\uC131\uD558\uBA74 \uC2DC\uB108\uC9C0
-      \uD6A8\uACFC\uAC00 \uD65C\uC131\uD654\uB3FC\uC694."
     guideFlows:
     - missionId:
       tutorial: 0

@@ -61,7 +61,6 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
     {
         OutgameTutorialRunner.ResumeDeferred(EOutgameTutorialTrigger.GuideMissionIntroduction);
         TryFire(EOutgameTutorialTrigger.GuideMissionIntroduction, _isCurrent);
-        SynergyIntroduction.RequestRelevantAction();
     }
 
     /// <summary>자율 안내 발화의 유일한 창구. 러너는 규칙(열림·낙인·미루기·선행 기능)만 보고, 무대가 비었는지는 여기서 본다.
@@ -104,7 +103,7 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
     }
 
     static bool StageBusyForGuided
-        => SynergyIntroduction.IsActive || ContentUnlockPresentation.IsPlaying || OutgameTutorialGateUI.IsShowing
+        => ContentUnlockPresentation.IsPlaying || OutgameTutorialGateUI.IsShowing
         || UnlockIntroOverlay.IsOpen
         || CardDetailOverlayView.IsRitualPlaying || CardDetailOverlayView.IsUnlockFxPlaying
         || RankPromoteOverlay.IsOpen || RewardClaimPopup.IsOpen || AdventureRewardFlow.IsClaiming
@@ -134,7 +133,7 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
 
     bool SafeToPresent(bool _contentIntro = false, PooledUIBase _except = null)
         => !HasPriorityActivity && (_contentIntro || !OutgameTutorialRunner.IsGuidedRunning)
-        && !SynergyIntroduction.IsActive && UIPoolManager.instance != null
+        && UIPoolManager.instance != null
         && !HasBlockingPopup(_except: _except);
 
     static bool HasBlockingPopup(EOutgameTutorialTrigger _trigger = EOutgameTutorialTrigger.None,
@@ -148,20 +147,11 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
 
     void Update()
     {
-        if (SynergyIntroduction.IsActive)
-        {
-            if (!GameInitialization.IsReady || CurtainView.IsBusy || LoadingCoverView.IsCovering
-                || (m_launcher != null && m_launcher.IsRunning) || OutgameTutorialRunner.IsRunning
-                || OutgameTutorialRunner.IsGuidedRunning)
-                SynergyIntroduction.CancelPresentation();
-            return;
-        }
         if (!GameInitialization.IsReady || Time.unscaledTime < m_nextEvaluation) return;
         m_nextEvaluation = Time.unscaledTime + 0.25f;
         if (!m_initialized)
         {
             m_initialized = true;
-            SynergyIntroduction.Reevaluate();
             ContentUnlockManager.RequestRefresh();
         }
         if (AdvanceMissionFlow()) return;
@@ -176,14 +166,12 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
             TryFire(EOutgameTutorialTrigger.GuideMissionIntroduction);
             if (OutgameTutorialRunner.IsGuidedRunning) return;
         }
-        if (SynergyIntroduction.HasPending) SynergyIntroduction.TryBegin();
     }
 
     void OnDisable()
     {
         CancelMissionFlow(false);
         this.m_pendingGuides.Clear();
-        SynergyIntroduction.CancelPresentation();
         if (s_instance == this) s_instance = null;
     }
 

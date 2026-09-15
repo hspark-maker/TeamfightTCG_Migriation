@@ -35,7 +35,6 @@ internal static class GuideMissionNavigator
             int t_slot = DeckSaveManager.SelectedSlot;
             if (DeckSaveManager.IsSlotValid(t_slot)) t_tab.OpenEditor(t_slot);
             else t_tab.OpenNewDeckEditor();
-            SynergyIntroduction.RequestRelevantAction();
         });
     }
 

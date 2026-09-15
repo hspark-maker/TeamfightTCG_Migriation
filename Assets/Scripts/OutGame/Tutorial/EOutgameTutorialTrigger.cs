@@ -15,8 +15,8 @@ public enum EOutgameTutorialTrigger
     GuideAceEnhanceArrived = 11,       // 폐기(가이드 도착 코치마크) — 위와 같음
     GuideMissionIntroduction = 12,
     KeywordIntroduction = 13, // 폐기 — 카드 강화 스텝으로 이관. 기존 저장값만 보존한다
-    SynergyIntroduction = 14,
+    SynergyIntroduction = 14, // 폐기 — 기존 저장값만 보존한다
     CaretakerPreparation = 15, // 폐기 — 기존 저장값만 보존한다
     CaretakerReady = 16, // 폐기 — 기존 저장값만 보존한다
-    CaretakerActivation = 17,
+    CaretakerActivation = 17, // 폐기 — 기존 저장값만 보존한다
 }

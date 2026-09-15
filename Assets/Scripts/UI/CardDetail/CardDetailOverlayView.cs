@@ -174,44 +174,6 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     public static bool IsUnlockFxPlaying => s_instance != null && s_instance.m_unlockFxPlaying;
     public static bool IsRitualPlaying => s_instance != null && (s_instance.m_ritualPlaying || s_instance.m_enhanceRequestPending);
 
-    /// <summary>강화가 이미 성립한 계정도 아직 확인하지 않은 해금 설명을 볼 수 있다.</summary>
-    public static bool TryShowPendingIntroduction(Action<bool> _onFinished)
-    {
-        if (!IsOpen || IsUnlockFxPlaying || IsRitualPlaying) return false;
-        int t_card = s_instance.CardAt(s_instance.m_index);
-        var t_intros = s_instance.CollectIntros(t_card, CardVisualRules.InfoKeywords(t_card),
-            OwnershipManager.IsOwned(t_card) && SynergyUnlocked(t_card));
-        if (!UnlockIntroduction.HasPending(t_card, t_intros)) return false;
-        return s_instance.ShowIntroduction(t_intros, _onFinished);
-    }
-
-    public static bool HasPendingIntroductionForOwnedCard() => FindPendingIntroductionCard() > 0;
-
-    /// <summary>관련 미션으로 돌아온 계정의 미확인 해금 설명을 연다.</summary>
-    public static bool TryOpenPendingIntroduction()
-    {
-        if (IsRitualPlaying || IsUnlockFxPlaying || UnlockIntroOverlay.IsOpen) return false;
-        int t_card = FindPendingIntroductionCard();
-        if (t_card <= 0) return false;
-        Open(t_card);
-        return TryShowPendingIntroduction(null);
-    }
-
-    static int FindPendingIntroductionCard()
-    {
-        if (!CardCatalog.IsReady || !CardGrowthManager.IsReady) return 0;
-        CardDetailOverlayView t_view = Resolve();
-        if (t_view == null) return 0;
-        int t_candidate = 0;
-        foreach (int t_card in CardCatalog.AllIds)
-        {
-            if (!OwnershipManager.IsOwned(t_card)) continue;
-            var t_intros = t_view.CollectIntros(t_card, CardVisualRules.InfoKeywords(t_card), SynergyUnlocked(t_card));
-            if (UnlockIntroduction.HasPending(t_card, t_intros) && (t_candidate == 0 || t_card < t_candidate)) t_candidate = t_card;
-        }
-        return t_candidate;
-    }
-
     static CardDetailOverlayView s_instance;
     protected override int SortingOrder => UiSortingOrder.CardDetail;
     public override bool UsesSafeArea => true;
@@ -1832,11 +1794,12 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
 
     bool ShowIntroduction(IReadOnlyList<UnlockIntro> _intros, Action<bool> _onFinished)
     {
+        if (_intros == null || _intros.Count == 0 || !UnlockIntroOverlay.TryGet(out var t_overlay)) return false;
         int t_card = CardAt(m_index);
         int t_version = m_viewVersion;
         m_introOwned = true;
         SetUnlockFxPlaying(true);
-        bool t_started = UnlockIntroduction.TryShow(t_card, _intros, _confirmed =>
+        t_overlay.Show(_intros, t_card, _confirmed =>
         {
             m_introOwned = false;
             if (!_confirmed) OnUnlockIntroCancelled?.Invoke();
@@ -1844,12 +1807,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
             SetUnlockFxPlaying(false);
             _onFinished?.Invoke(_confirmed);
         });
-        if (!t_started)
-        {
-            m_introOwned = false;
-            SetUnlockFxPlaying(false);
-        }
-        return t_started;
+        return true;
     }
 
     // 칩은 런타임에 만들지 않는다 — 깔아 두는 쪽은 Tools/UI/도감 상세창 칩 박기다.

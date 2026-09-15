@@ -204,7 +204,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_step.Completion == EOutgameTutorialCompletion.UnlockIntro)
         {
             if (!CardDetailOverlayView.IsUnlockFxPlaying) { OnGateSatisfied(); return; }
-            if (!SuppressGuideUI && !UnlockIntroOverlay.IsGuidanceShowing)
+            if (!SuppressGuideUI)
                 OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowBanner(this,
                     OutgameTutorialGuide.MessageOf(m_step), m_step.MessageAtBottom);
             return;
@@ -280,20 +280,6 @@ public class OutgameTutorialBridge : MonoBehaviour
         // 미달성이면 잘라내지 않고 흘려보낸다 — 이 스텝의 딤을 세우는 것은 아래 TryOpenGate 하나뿐이다.
         if (m_step.FreeOfCharge && IsFreeShotSpent(m_step.Completion))
         {
-            if (m_step.Completion == EOutgameTutorialCompletion.Enhance && m_step.WaitUnlockIntro)
-            {
-                var t_step = m_step;
-                m_awaitingUnlockFx = true;
-                if (CardDetailOverlayView.TryShowPendingIntroduction(t_completed =>
-                {
-                    if (m_step != t_step || !m_awaitingUnlockFx) return;
-                    m_awaitingUnlockFx = false;
-                    if (t_completed) OnGateSatisfied();
-                    else OnUnlockIntroCancelled();
-                })) return;
-                if (m_step != t_step) return;
-                m_awaitingUnlockFx = false;
-            }
             OnGateSatisfied();
             return;
         }

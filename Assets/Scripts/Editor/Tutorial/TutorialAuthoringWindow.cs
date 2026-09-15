@@ -285,7 +285,6 @@ public class TutorialAuthoringWindow : EditorWindow
         this.showGuideSettings = EditorGUILayout.Foldout(this.showGuideSettings, "가이드 미션 · 안내", true);
         if (!this.showGuideSettings) return;
         EditorGUILayout.PropertyField(this.serialized.FindProperty("guide.guideFlows"), new GUIContent("가이드 미션 해금·온보딩"), true);
-        EditorGUILayout.PropertyField(this.serialized.FindProperty("guide.synergyIntroductionMessage"), new GUIContent("첫 시너지 해금 설명"), true);
         if (GUILayout.Button("콘텐츠 해금 설정 열기"))
             Selection.activeObject = ContentUnlockAuthoring.Data;
     }

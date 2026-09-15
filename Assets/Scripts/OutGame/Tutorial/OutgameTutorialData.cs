@@ -142,10 +142,6 @@ public class OutgameTutorialData : ScriptableObject, ISerializationCallbackRecei
 [Serializable]
 public sealed class GuideTutorialData
 {
-    [Header("성장·가이드 미션 설명")]
-    [Tooltip("첫 시너지 해금 인트로 재생 중 튜토리얼 배너에 표시한다.")]
-    [TextArea(2, 5)] public string synergyIntroductionMessage;
-
     [Header("FTUE 이후 가이드 흐름")]
     [Tooltip("미션별 해금 소개 → 화면 이동 → 자율 챕터. 같은 콘텐츠와 자율 챕터는 한 흐름에만 연결한다.")]
     public List<GuideMissionFlow> guideFlows = new List<GuideMissionFlow>();

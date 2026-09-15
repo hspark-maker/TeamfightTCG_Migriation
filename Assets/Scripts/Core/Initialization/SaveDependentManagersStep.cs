@@ -88,7 +88,6 @@ public sealed class SaveDependentManagersStep : MainInitializer
             KeywordGrowthManager.Init();
             CardGrowthManager.Init();
             DeckSaveManager.LoadFromSave();
-            SynergyIntroduction.ResetSession();
             StarterDeck.GrantIfNoDeck(starterDeckPackId);
             OutgameTutorialRunner.ResolveProgressAnchor();
             OutgameTutorialRunner.RewindToPendingBattleEntry();

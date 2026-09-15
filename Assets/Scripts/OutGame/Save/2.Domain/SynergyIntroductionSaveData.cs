@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Firebase.Firestore;
 
+// 삭제된 시너지 소개의 기존 저장 데이터 호환용. 런타임 안내에서는 사용하지 않는다.
 [FirestoreData(UnknownPropertyHandling = UnknownPropertyHandling.Ignore)]
 public sealed class SynergyIntroductionSaveData
 {

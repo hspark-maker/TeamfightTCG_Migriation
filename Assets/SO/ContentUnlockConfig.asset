@@ -14,39 +14,39 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ContentUnlockData
   contentUnlocks:
   - feature: 14
+    requireFtue: 1
+    requireRank: 0
+    minRankGrade: 0
+    minRankDivision: 0
+    minAccountLevel: 0
     guideMissionId: guide.01
-    requireFtue: 1
-    requireRank: 0
-    minRankGrade: 0
-    minRankDivision: 0
-    minAccountLevel: 0
   - feature: 17
-    guideMissionId:
     requireFtue: 1
     requireRank: 0
     minRankGrade: 0
     minRankDivision: 0
     minAccountLevel: 0
+    guideMissionId: 
   - feature: 18
-    guideMissionId:
     requireFtue: 1
     requireRank: 0
     minRankGrade: 0
     minRankDivision: 0
     minAccountLevel: 0
+    guideMissionId: 
   - feature: 16
-    guideMissionId: guide.03
     requireFtue: 1
     requireRank: 0
     minRankGrade: 0
     minRankDivision: 0
     minAccountLevel: 0
+    guideMissionId: guide.03
   contentIntros:
   - content: 1
     contentName: "\uB7AD\uD06C\uC804"
     description: "\uB2E4\uB978 \uC720\uC800\uB4E4\uACFC \uACBD\uC7C1\uD558\uC138\uC694!"
     icon: {fileID: 21300000, guid: dc3329f3c0eecb24ca41103d72245414, type: 3}
-    guideMissionName:
+    guideMissionName: 
     guideMissionIcon: {fileID: 0}
   - content: 2
     contentName: "\uC77C\uC77C\uBBF8\uC158"
@@ -60,19 +60,19 @@ MonoBehaviour:
     description: "\uC790\uC2E0\uB9CC\uC758 \uB371\uC73C\uB85C \uC801\uB4E4\uC744
       \uBB3C\uB9AC\uCE58\uC138\uC694!"
     icon: {fileID: 21300000, guid: 95938dc48c63e07499dc095027d6ec80, type: 3}
-    guideMissionName:
+    guideMissionName: 
     guideMissionIcon: {fileID: 0}
   - content: 4
     contentName: "\uB8F0\uB81B"
     description: "\uD589\uC6B4\uC774 \uB2F9\uC2E0\uC744 \uAE30\uB2E4\uB9AC\uACE0
       \uC788\uC2B5\uB2C8\uB2E4!"
     icon: {fileID: 21300000, guid: 15da4c3a76d10d345b9e6491bd862f1a, type: 3}
-    guideMissionName:
+    guideMissionName: 
     guideMissionIcon: {fileID: 0}
   - content: 5
     contentName: "\uCE74\uB4DC \uAC15\uD654"
     description: "\uCE74\uB4DC\uB97C \uC131\uC7A5\uC2DC\uCF1C \uC0C8\uB85C\uC6B4
       \uB2A5\uB825\uC744 \uD574\uAE08\uD558\uC138\uC694!"
-    icon: {fileID: 21300000, guid: 5799dc3b60777e74cb56f4787cd3ded7, type: 3}
-    guideMissionName:
+    icon: {fileID: 21300000, guid: d17a1993bef97fb45b67062758945f71, type: 3}
+    guideMissionName: 
     guideMissionIcon: {fileID: 0}
