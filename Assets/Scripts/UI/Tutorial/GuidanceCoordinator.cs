@@ -20,9 +20,17 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
     public static bool CanPresentContentUnlock => s_instance != null && s_instance.SafeToPresent()
         && !OutgameTutorialRunner.IsRunning;
 
-    /// <summary>해금 소개 스텝 자신의 커서는 무대 점유로 세지 않는다.</summary>
-    public static bool CanRunContentIntro => s_instance != null && s_instance.SafeToPresent(true)
-        && !s_instance.AdventureMapOpen;
+    /// <summary>해금 소개 스텝과 소개 화면 자신은 무대 점유로 세지 않는다.</summary>
+    public static bool CanRunContentIntro
+    {
+        get
+        {
+            if (s_instance == null || s_instance.AdventureMapOpen) return false;
+            ContentUnlockIntroView intro = null;
+            if (UIPoolManager.instance != null) UIPoolManager.instance.TryGetUI(out intro);
+            return s_instance.SafeToPresent(true, intro);
+        }
+    }
 
     bool AdventureMapOpen => m_launcher != null && m_launcher.IsAdventureMapOpen;
 
