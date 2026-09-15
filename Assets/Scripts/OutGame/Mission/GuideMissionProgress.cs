@@ -60,6 +60,7 @@ public static class GuideMissionProgressValidation
     /// <summary>현재 미션과 영구 해금에 쓰는 도달 판정의 회귀를 검사한다.</summary>
     public static void Run()
     {
+        ValidateFlowActivation();
         var t_definitions = new List<MissionDefinition>
         {
             new MissionDefinition { Id = "daily.test", Period = "daily", SortOrder = 0 },
@@ -96,6 +97,43 @@ public static class GuideMissionProgressValidation
         Require(!GuideMissionProgress.HasReached(t_definitions, t_claimed.Contains, "missing")
             && !GuideMissionProgress.HasReached(t_definitions, t_claimed.Contains, "daily.test"),
             "Unknown or non-guide missions cannot unlock guide content.");
+    }
+
+    static void ValidateFlowActivation()
+    {
+        var t_enhance = new GuideMissionFlow
+        {
+            missionId = "guide.01", tutorial = EOutgameTutorialTrigger.CollectionTabFirstEnter,
+        };
+        var t_adventure = new GuideMissionFlow
+        {
+            missionId = "guide.03", tutorial = EOutgameTutorialTrigger.AdventureUnlocked,
+        };
+        var t_graduation = new GuideMissionFlow();
+        var t_flows = new List<GuideMissionFlow> { null, t_graduation, t_enhance, t_adventure };
+        Require(GuideMissionFlows.TryGet(t_flows, t_enhance.tutorial, out var t_found)
+            && ReferenceEquals(t_found, t_enhance), "Enhance chapter must resolve its mission flow.");
+        Require(!GuideMissionFlows.TryGet(t_flows, EOutgameTutorialTrigger.KeywordGrowthFirstOpen, out _)
+            && !GuideMissionFlows.TryGet(t_flows, EOutgameTutorialTrigger.None, out _)
+            && !GuideMissionFlows.TryGet(null, t_enhance.tutorial, out _),
+            "Unlinked chapters and unavailable flow data must not start tutorials.");
+        t_graduation.tutorial = EOutgameTutorialTrigger.KeywordGrowthFirstOpen;
+        Require(!GuideMissionFlows.TryGet(t_flows, t_graduation.tutorial, out _),
+            "Graduation without a mission ID must not activate a chapter.");
+        Require(!GuideMissionFlows.IsEligible(t_enhance, false, "guide.01")
+            && !GuideMissionFlows.IsEligible(t_graduation, false, null), "FTUE must finish first.");
+        Require(GuideMissionFlows.IsEligible(t_graduation, true, null)
+            && !GuideMissionFlows.IsEligible(t_enhance, true, null),
+            "Graduation introductions may run before mission data, mission tutorials may not.");
+        Require(GuideMissionFlows.IsEligible(t_enhance, true, "guide.01")
+            && !GuideMissionFlows.IsEligible(t_adventure, true, "guide.01"),
+            "Only the active mission may start onboarding.");
+        Require(!GuideMissionFlows.IsEligible(t_enhance, true, "guide.03")
+            && GuideMissionFlows.IsEligible(t_adventure, true, "guide.03"),
+            "Claim progression must activate the next flow without replaying past missions.");
+        Require(!GuideMissionFlows.IsEligible(t_adventure, true, null)
+            && !GuideMissionFlows.IsEligible(null, true, "guide.03"),
+            "Completed missions and missing flows must not activate onboarding.");
     }
 
     static void Require(bool _condition, string _message)

@@ -33,4 +33,6 @@ public enum EOutgameTutorialAnchor
     MatchDeckEnemyPowerBadge   = 28, // 매치 덱 화면의 상대 덱 파워 배지
     DeckEditSaveButton         = 29, // 덱 편집 우하단의 저장 버튼. 로비 덱 편집에만 있다 — 매치 화면은 이탈 확인 팝업으로 저장한다
     KeywordGrowthPanel         = 30, // 키워드 강화 패널 본체(Root/Panel). 누를 대상이 아니라 "함께 밝힐 영역"으로만 쓴다
+    CardDetailKeywordDescription = 31,
+    CardDetailCardView           = 32,
 }

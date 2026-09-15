@@ -338,7 +338,6 @@ public class LobbyGainEffectDirector : MonoBehaviour
             return;
         }
 
-        // _fireTrigger는 반드시 false — true면 도감 탭 첫 진입 튜토리얼이 발화해 딤이 삽입 세션을 덮는다.
         if (this.lobbyTabController != null) this.lobbyTabController.Select(t_album, false);
 
         // 탭을 못 켰으면 세션이 설 자리가 없다 — 위장을 남기면 그 카드가 도감에서 영영 빈 칸이다.

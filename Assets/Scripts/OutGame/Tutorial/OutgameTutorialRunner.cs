@@ -84,7 +84,7 @@ public static class OutgameTutorialRunner
     public static bool HasPending(EOutgameTutorialTrigger _trigger)
     {
         if (_trigger == EOutgameTutorialTrigger.None) return false;
-        if (GuideMissionFlows.TryGet(_trigger, out var t_flow) && !GuideMissionFlows.IsEligible(t_flow)) return false;
+        if (!GuideMissionFlows.TryGet(_trigger, out var t_flow) || !GuideMissionFlows.IsEligible(t_flow)) return false;
         if (!IsGuidedOpen) return false;
         if (OutgameTutorialProgress.IsTriggerDone(_trigger)) return false;
         if (_trigger == EOutgameTutorialTrigger.AdventureUnlocked
@@ -95,7 +95,7 @@ public static class OutgameTutorialRunner
         return OutgameFeatureLock.IsUnlocked(t_chapter.Prerequisite);
     }
 
-    /// <summary>자율 안내 발화. 무대가 비었는지는 묻지 않는다 — 그 판정은 UI를 아는 GuidanceCoordinator.TryFire 몫이다.
+    /// <summary>활성 미션에 연결된 자율 안내 발화. 무대와 해금 연출 순서는 GuidanceCoordinator가 조정한다.
     /// 아래 무시 조건은 전부 정상 경로라 경고하지 않는다.</summary>
     public static void Fire(EOutgameTutorialTrigger _trigger)
     {

@@ -115,8 +115,7 @@ public sealed partial class GuidanceCoordinator
         }
         if (m_flow.tutorial == EOutgameTutorialTrigger.None)
         {
-            if (!m_flowArrived) NavigateFlow(m_flow.destination, true);
-            else CancelMissionFlow(false);
+            CancelMissionFlow(false);
             return true;
         }
         if (!OutgameTutorialRunner.HasPending(m_flow.tutorial))
