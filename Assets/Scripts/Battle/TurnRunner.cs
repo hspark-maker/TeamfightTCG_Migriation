@@ -8,6 +8,8 @@ using UnityEngine;
 
 public class TurnRunner : MonoBehaviour
 {
+    const int AiSurrenderChancePercent = 50;
+
     public static int TurnCount { get; private set; } = 1;
 
     [SerializeField] BattleField playerField;
@@ -107,6 +109,9 @@ public class TurnRunner : MonoBehaviour
             || (DeckConfig.IsMultiplayer && !DeckConfig.AiTakeover)) return false;
         if (this.enemyField == null || this.enemyField.OwnerIndex != _owner
             || !EnemyAiSurrender.ShouldSurrender(this.enemyField.State, this.playerField?.State)) return false;
+
+        // 조건을 만족한 AI 턴 시작에 한 번만 추첨한다. 공용 전투 RNG는 소비하지 않는다.
+        if (MatchRandom.AiRange(100) >= AiSurrenderChancePercent) return false;
 
         // AI 인수 뒤 동결된 로그는 RecordSurrender도 기존 계약대로 기록하지 않는다.
         BattleCommandLog.RecordSurrender(_owner);

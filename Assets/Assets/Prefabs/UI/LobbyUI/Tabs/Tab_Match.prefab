@@ -2907,10 +2907,6 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
-    - target: {fileID: 7029225288191911819, guid: 062606a612d3c455291a417a3a1cae7d, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: -0.40000153
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -3005,10 +3001,6 @@ PrefabInstance:
     - target: {fileID: 4440091932380886371, guid: 062606a612d3c455291a417a3a1cae7d, type: 3}
       propertyPath: m_ConstrainProportionsScale
       value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7029225288191911819, guid: 062606a612d3c455291a417a3a1cae7d, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: -0.40000153
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -3239,10 +3231,6 @@ PrefabInstance:
     - target: {fileID: 4440091932380886371, guid: 062606a612d3c455291a417a3a1cae7d, type: 3}
       propertyPath: m_ConstrainProportionsScale
       value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7029225288191911819, guid: 062606a612d3c455291a417a3a1cae7d, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: -0.40000153
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -3932,7 +3920,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\ucd9c\uc11d"
+  m_text: "\uCD9C\uC11D"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: ae2f56c08291ad54aa1415dc014d7bff, type: 2}
   m_sharedMaterial: {fileID: 8963205223541517340, guid: ae2f56c08291ad54aa1415dc014d7bff, type: 2}

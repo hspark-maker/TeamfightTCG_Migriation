@@ -85,8 +85,11 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
            + "튜토리얼이 카드를 지목하는 동안에는 잠긴다 — 안내 대상이 걸러지면 진행이 멈춘다.")]
     [SerializeField] TMP_InputField searchInput;
 
-    [Tooltip("검색창 옆 필터 버튼. 열어 줄 화면이 아직 없어 눌리지 않는 상태로 저작한다(리스너 없음).")]
+    [Tooltip("등급·키워드·시너지 필터. 이름 검색과 함께 적용한다.")]
     [SerializeField] Button filterButton;
+    CardListFilter m_cardFilter = new CardListFilter();
+    TMP_Text m_filterLabel;
+    string m_filterLabelDefault;
 
     [Header("버튼")]
     [SerializeField] Button unequipAllButton;
@@ -244,8 +247,13 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
             searchInput.onValueChanged.AddListener(OnSearchChanged);
         }
 
-        // TODO: 필터 화면(칩 줄)이 생기면 여기에 리스너를 붙이고 잠금을 푼다.
-        if (filterButton != null) filterButton.interactable = false;
+        if (filterButton != null)
+        {
+            filterButton.onClick.RemoveAllListeners();
+            filterButton.onClick.AddListener(OnFilterClicked);
+            m_filterLabel = filterButton.GetComponentInChildren<TMP_Text>(true);
+            if (m_filterLabel != null) m_filterLabelDefault = m_filterLabel.text;
+        }
 
         // 시너지 아이콘 롱프레스 → 그 시너지를 가진 카드만 강조. 어떤 카드가 대상인지는 편성/컬렉션을 아는 여기서 정한다.
         if (synergyStrip != null) synergyStrip.onFocusChanged = ApplySynergyFocus;
@@ -457,6 +465,7 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
 
     public void Close()
     {
+        CardFilterPopup.CloseFor(this);
         if (s_open == this) s_open = null;
 
         m_mode      = EDeckEditMode.None;
@@ -479,6 +488,7 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
     protected override void OnViewShown()
     {
         OwnershipManager.OnOwnershipChanged += OnOwnershipChanged;
+        CardGrowthManager.OnGrowthChanged += OnOwnershipChanged;
 
         // 편집 화면이 열린 채 자동 편성이 해금될 수 있다 — 유저 조작으로만 도는 RefreshAll로는 그 순간을 못 잡아
         // 버튼이 잠긴 채 굳는다(잠김 룩은 풀리는데 버튼은 안 풀리는 어긋남까지 생긴다).
@@ -512,6 +522,7 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
     protected override void OnViewHidden()
     {
         OwnershipManager.OnOwnershipChanged -= OnOwnershipChanged;
+        CardGrowthManager.OnGrowthChanged -= OnOwnershipChanged;
         OutgameFeatureLock.OnChanged -= OnFeatureLockChanged;
         ClearSession();
     }
@@ -592,14 +603,42 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
     // 검색어가 바뀌면 목록을 다시 만들지 않고 표시만 거른다 — 그리드가 타일 이름을 캐시하고 있다.
     void OnSearchChanged(string _value)
     {
+        if (m_holdout > 0) return;
         if (this.collectionGrid != null) this.collectionGrid.SetNameFilter(_value);
+    }
+
+    void OnFilterClicked()
+    {
+        if (!IsOpen || m_holdout > 0 || (dragController != null && dragController.IsDragging)) return;
+        if (searchInput != null) searchInput.DeactivateInputField();
+        CardFilterPopup.Open(m_cardFilter, false, searchInput != null ? searchInput.text : null, _filter =>
+        {
+            if (!IsOpen || m_holdout > 0) return;
+            CancelSlotPick();
+            m_cardFilter = _filter.Clone();
+            if (collectionGrid != null) collectionGrid.SetCardFilter(m_cardFilter);
+            RefreshFilterButton();
+        }, this);
+    }
+
+    void RefreshFilterButton()
+    {
+        if (filterButton != null) filterButton.interactable = IsOpen && m_holdout <= 0;
+        if (m_filterLabel == null) return;
+        int t_count = m_cardFilter.Grades.Count + m_cardFilter.Keywords.Count + m_cardFilter.SynergyIds.Count
+            + (m_cardFilter.IncludeLockedAbilities ? 1 : 0);
+        m_filterLabel.text = t_count > 0 ? $"{m_filterLabelDefault} ({t_count})" : m_filterLabelDefault;
     }
 
     // 입력창과 필터를 함께 비운다. 한쪽만 비우면 입력창은 빈데 목록만 걸러진 채로 남는다.
     void ClearSearch()
     {
+        CardFilterPopup.CloseFor(this);
+        m_cardFilter.Clear();
         if (this.searchInput    != null) this.searchInput.SetTextWithoutNotify(string.Empty);
         if (this.collectionGrid != null) this.collectionGrid.SetNameFilter(null);
+        if (this.collectionGrid != null) this.collectionGrid.SetCardFilter(m_cardFilter);
+        RefreshFilterButton();
     }
 
     // 하단 바에서 다른 덱을 골랐다. 이탈 판정은 뒤로가기와 같은 창구를 탄다 —
@@ -1078,6 +1117,7 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
         // 지목된 카드가 검색에 걸러지면 안내가 가리킬 대상이 사라진다 — 홀드아웃이 살아 있는 동안은 잠근다.
         // 홀드아웃은 여러 경로에서 풀리므로(끼우기·덱 갈아타기) 판정을 여기 한 곳으로 모은다.
         if (searchInput != null) searchInput.interactable = m_holdout <= 0;
+        RefreshFilterButton();
 
         RefreshSaveButton();
 

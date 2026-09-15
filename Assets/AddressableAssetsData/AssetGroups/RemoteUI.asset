@@ -442,6 +442,20 @@ MonoBehaviour:
     - RemoteUI
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5bdad5e7213243de9e59f1666819c287
+    m_Address: CardFilterPopup
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 16c4ec9f0841455f97055344726ce82c
+    m_Address: CollectionFilterResults
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 886280ed4ce95ea4fa7b0c1bf828dbdc, type: 2}
   m_SchemaSet:

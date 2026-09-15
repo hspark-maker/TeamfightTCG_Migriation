@@ -49,13 +49,16 @@ const emptyState = () => ({dailyKey: period.daily, weeklyKey: period.weekly, pro
 const tests = [];
 const test = (name, run) => tests.push({name, run});
 
-test("CSV: 15 missions, sequential IDs, order, events, targets and rewards", () => {
-  assert.deepEqual(guide.map((m) => m.id), Array.from({length: 15}, (_, i) => "guide." + String(i + 1).padStart(2, "0")));
+test("CSV: stable mission IDs, challenge before growth, events, targets and rewards", () => {
+  assert.deepEqual(guide.map((m) => m.id).sort(), Array.from({length: 15}, (_, i) => "guide." + String(i + 1).padStart(2, "0")));
   assert.deepEqual(guide.map((m) => m.sortOrder), Array.from({length: 15}, (_, i) => i + 1));
-  assert.deepEqual(guide.slice(0, 6).map((m) => [m.event, m.target]), [
+  assert.deepEqual(guide.slice(0, 7).map((m) => [m.event, m.target]), [
     ["Guide.EnhanceCompleted", 1], ["Guide.Bronze2Reached", 1], ["Guide.AdventureNode01", 1],
-    ["Guide.StarterCardsAtStar1", 3], ["Guide.EvolveCompleted", 1], ["Guide.StarterCardsAtStar2", 3],
+    ["Guide.AdventureNode02", 1], ["Guide.StarterCardsAtStar1", 3],
+    ["Guide.EvolveCompleted", 1], ["Guide.StarterCardsAtStar2", 3],
   ]);
+  assert.ok(guide.find((m) => m.id === "guide.11").sortOrder <
+    guide.find((m) => m.id === "guide.10").sortOrder);
   for (const mission of guide) {
     assert.equal(mission.passExp, 0);
     const reward = resolveRewards(rewards, "Guide", mission.id);
@@ -66,6 +69,23 @@ test("CSV: 15 missions, sequential IDs, order, events, targets and rewards", () 
     assert.deepEqual(resolveRewards(rewards, "Guide", id).gains, [{currency: "Shard", amount: 10}]);
   assert.deepEqual(resolveRewards(rewards, "Guide", "guide.04").gains, [{currency: "Shard", amount: 40}]);
   assert.deepEqual(resolveRewards(rewards, "Guide", "guide.06").gains, [{currency: "Gold", amount: 50}]);
+});
+
+test("challenge clears can be claimed without completing the following growth mission", () => {
+  for (const [challengeId, growthId, nodeId] of [
+    ["guide.07", "guide.04", "node_02"], ["guide.11", "guide.10", "node_04"],
+  ]) {
+    const state = emptyState();
+    const challenge = guide.find((mission) => mission.id === challengeId);
+    for (const prior of guide.filter((mission) => mission.sortOrder < challenge.sortOrder))
+      state.claimed[prior.id] = true;
+    state.progress = evaluate({adventure: {clearedNodeIds: [nodeId]}});
+    assert.equal(judgeMissionClaim(challengeId, state, catalog).allow, true);
+    assert.equal(judgeMissionClaim(growthId, state, catalog).reason, "NotEligible");
+    commitMissionClaim({set() {}}, {ref: {}, state, period}, challengeId, 0, 0);
+    assert.equal(judgeMissionClaim(challengeId, state, catalog).reason, "AlreadyClaimed");
+    assert.equal(judgeMissionClaim(growthId, state, catalog).reason, "NotEligible");
+  }
 });
 
 test("rank: missing/bronze 1 fail; bronze 2/higher pass; maximum persists after downgrade", () => {
@@ -142,13 +162,13 @@ test("old counters never migrate to replacement conditions; previous maximum and
 test("locked completion is retained; new rewards once; existing claimed missions do not repay", () => {
   const state = emptyState();
   state.progress = evaluate({...save([1, 3, 4], {1: entry(2), 3: entry(2), 4: entry(2)}),
-    adventure: {clearedNodeIds: ["node_01"]}}, {}, {bestTierIndex: 1});
+    adventure: {clearedNodeIds: ["node_01", "node_02"]}}, {}, {bestTierIndex: 1});
   state.claimed["guide.02"] = true;
   assert.equal(judgeMissionClaim("guide.06", state, catalog).reason, "NotEligible");
   const paid = [];
   const transaction = {set: () => {}};
   const bump = {ref: {}, state, period};
-  for (const mission of guide.slice(0, 6)) {
+  for (const mission of guide.slice(0, 7)) {
     const verdict = judgeMissionClaim(mission.id, state, catalog);
     if (mission.id === "guide.02") { assert.equal(verdict.reason, "AlreadyClaimed"); continue; }
     assert.equal(verdict.allow, true, mission.id);
@@ -246,7 +266,12 @@ test("callables: rank read before writes, live-state claims, rejection does not 
       adventure: {clearedNodeIds: ["node_01"]}});
     await assert.rejects(claimMission(request("guide.05")), (error) => error.details?.reason === "NotEligible");
     assert.equal(writes.length, 0);
-    for (const id of ["guide.03", "guide.04", "guide.05"]) await claimMission(request(id));
+    await claimMission(request("guide.03"));
+    await assert.rejects(claimMission(request("guide.04")), (error) => error.details?.reason === "NotEligible");
+    // Existing player already received the node 2 item reward before the order changed.
+    const missionDoc = docs.get(root + "missions/current");
+    missionDoc.claimed["guide.07"] = true;
+    for (const id of ["guide.04", "guide.05"]) await claimMission(request(id));
     assert.equal(wallet.balances.Shard, 80);
     await assert.rejects(claimMission(request("guide.05")), (error) => error.details?.reason === "AlreadyClaimed");
     assert.equal(wallet.balances.Shard, 80);

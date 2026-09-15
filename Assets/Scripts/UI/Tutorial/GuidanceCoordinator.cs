@@ -104,6 +104,7 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
 
     static bool StageBusyForGuided
         => ContentUnlockPresentation.IsPlaying || OutgameTutorialGateUI.IsShowing
+        || CardFilterPopup.IsOpen || CollectionFilterResults.IsOpen
         || UnlockIntroOverlay.IsOpen
         || CardDetailOverlayView.IsRitualPlaying || CardDetailOverlayView.IsUnlockFxPlaying
         || RankPromoteOverlay.IsOpen || RewardClaimPopup.IsOpen || AdventureRewardFlow.IsClaiming

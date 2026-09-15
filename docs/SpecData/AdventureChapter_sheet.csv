@@ -1,9 +1,9 @@
 ﻿id,chapterId,nodeId,order,prevNodeId,requiredPoints,aiDeckId,aiCardLevel
 int,string,string,int,string,long,string,int
 1,chapter_01,node_01,0,,0,deck_01,1
-2,chapter_01,node_02,1,node_01,0,deck_02,1
+2,chapter_01,node_02,1,node_01,0,deck_02,2
 3,chapter_01,node_03,2,node_02,0,deck_03,1
-4,chapter_01,node_04,3,node_03,0,deck_04,2
+4,chapter_01,node_04,3,node_03,0,deck_04,3
 5,chapter_01,node_05,4,node_04,0,deck_05,2
 6,chapter_01,node_06,5,node_05,0,deck_06,2
 7,chapter_02,node_07,0,node_06,260,deck_07,2

@@ -27,6 +27,9 @@ public static class UiSortingOrder
     /// <summary>풀에서 여는 기본 카드 상세. 로비 위, 카드팩 개봉 아래에 둔다.</summary>
     public const int CardDetail = 50;
 
+    /// <summary>도감 필터 결과 목록. 카드 상세가 이 목록 위에서 열린다.</summary>
+    public const int CollectionResults = 40;
+
     /// <summary>카드팩 개봉 화면(PackOpenOverlay.prefab).</summary>
     public const int PackOpen = 100;
 
@@ -76,6 +79,9 @@ public static class UiSortingOrder
     /// 전투로 넘어가는 순간에는 이 화면이 곧 커튼이 되어 <see cref="Curtain"/>으로 승격한다(MatchSceneCarrier).
     /// 그때 배틀 씬의 어떤 캔버스보다도 위여야 하는데, 이 층(320) 자체로도 이미 그 조건을 만족한다.</summary>
     public const int Matchmaking = 320;
+
+    /// <summary>덱·도감이 공유하는 카드 필터 팝업. 튜토리얼 게이트 아래에 둔다.</summary>
+    public const int CardFilter = 340;
 
     /// <summary>덱 편집의 드래그 고스트(DragLayer). 끌고 있는 카드는 손가락을 따라다니므로 무엇에도 가리면 안 된다 —
     /// 특히 편집 화면이 <see cref="PooledOverlay"/>로 내려앉은 뒤에는 튜토리얼 게이트 딤(<see cref="TutorialGate"/>)
