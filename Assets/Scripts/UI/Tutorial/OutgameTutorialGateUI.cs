@@ -149,6 +149,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
         public bool   PrevOverrideSorting;
         public int    PrevSortingOrder;
         public int    PrevSortingLayerID;
+        public GameObject Background;
+        public bool PrevBackgroundActive;
     }
 
     /// <summary>게이트 UI를 1회 생성. 이미 있으면 재사용.
@@ -567,6 +569,13 @@ public class OutgameTutorialGateUI : MonoBehaviour
         var t_root = m_targetCanvas != null ? m_targetCanvas.rootCanvas : null;
 
         var t_promotion = new Promotion { Canvas = _go.GetComponent<Canvas>() };
+        var t_anchor = _go.GetComponent<TutorialAnchor>();
+        t_promotion.Background = m_dim && t_anchor != null ? t_anchor.SpotlightBackground : null;
+        if (t_promotion.Background != null)
+        {
+            t_promotion.PrevBackgroundActive = t_promotion.Background.activeSelf;
+            t_promotion.Background.SetActive(true);
+        }
         t_promotion.AddedCanvas = t_promotion.Canvas == null;
 
         if (t_promotion.AddedCanvas)
@@ -619,6 +628,9 @@ public class OutgameTutorialGateUI : MonoBehaviour
         for (int t_i = 0; t_i < m_promotions.Count; t_i++)
         {
             var t_promotion = m_promotions[t_i];
+
+            if (t_promotion.Background != null)
+                t_promotion.Background.SetActive(t_promotion.PrevBackgroundActive);
 
             // 내려 둔 레이캐스터는 Canvas가 죽었더라도 되돌린다 — 그 컴포넌트는 남아 있을 수 있다.
             if (t_promotion.MutedRaycaster != null) t_promotion.MutedRaycaster.enabled = true;
