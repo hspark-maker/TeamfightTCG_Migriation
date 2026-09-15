@@ -207,7 +207,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     ShardAbsorbEffect m_shardAbsorb;
     bool m_enhanceRequestPending;
     int m_viewVersion;
-    int m_shardAmount = 1;
+    int m_shardAmount = 10;
     int m_shardAmountCard;
     int m_shardAmountMax;
 
@@ -1056,7 +1056,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         if (t_cardChanged)
         {
             this.m_shardAmountCard = _card;
-            this.m_shardAmount = 1;
+            this.m_shardAmount = 10;
         }
         // 요청 중에는 예약 잔액 통지로 방금 선택한 수량이 바뀌지 않게 한다.
         if (!this.m_enhanceRequestPending || t_cardChanged || _afterResult)
@@ -1071,8 +1071,9 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
 
     static int StepShardAmount(int _amount, bool _increase, int _max)
     {
-        int t_next = _increase ? _amount + (_amount < 10 ? 1 : 10)
-            : _amount <= 10 ? _amount - 1 : ((_amount - 1) / 10) * 10;
+        int t_next = _increase
+            ? (_amount < 5 ? _amount + 1 : _amount < 10 ? 10 : _amount + 10)
+            : (_amount <= 5 ? _amount - 1 : _amount <= 10 ? 5 : ((_amount - 1) / 10) * 10);
         return Mathf.Clamp(t_next, 1, Mathf.Max(1, _max));
     }
 
