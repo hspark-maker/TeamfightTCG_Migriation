@@ -86,7 +86,11 @@ public static class GuideOnboardingDataAuthoring
             if (t_chapter.Trigger != EOutgameTutorialTrigger.CollectionTabFirstEnter) continue;
             for (int t_i = 0; t_i < t_chapter.StepCount; t_i++)
             {
-                if (t_chapter.TryGetStep(t_i, out var t_step) && t_step.Action == EOutgameTutorialAction.WaitUnlockIntro && !string.IsNullOrEmpty(t_step.GuideMessage)) return true;
+                if (!t_chapter.TryGetStep(t_i, out var t_step)) continue;
+                if (t_step.Action == EOutgameTutorialAction.WaitUnlockIntro && !string.IsNullOrEmpty(t_step.GuideMessage)) return true;
+                if (t_step.Action == EOutgameTutorialAction.WaitEnhance && t_step.WaitUnlockIntro
+                    && t_chapter.TryGetStep(t_i + 1, out var t_next)
+                    && t_next.Action == EOutgameTutorialAction.Message && !string.IsNullOrEmpty(t_next.GuideMessage)) return true;
             }
         }
         return false;

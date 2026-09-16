@@ -45,6 +45,7 @@ const eventNames_1 = require("../analytics/eventNames");
 const analyticsEvent_1 = require("../observability/analyticsEvent");
 const missionStore_1 = require("../missions/missionStore");
 const guideProgress_1 = require("../missions/guideProgress");
+const guideSynergyBattle_1 = require("../missions/guideSynergyBattle");
 const period_1 = require("../missions/period");
 const matchResult_1 = require("../matchResult");
 const payout_1 = require("../payout");
@@ -660,6 +661,7 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
             const outcome = settleOutcomes[i];
             const owner = ownerIndexByUid?.[entries[i].uid] ?? (solo ? 0 : -1);
             const bump = missionBumps[i];
+            (0, guideSynergyBattle_1.completeGuideSynergyBattle)(bump.state, approvals?.[entries[i].uid]);
             const increments = [
                 { event: eventNames_1.EVENTS.battleCompleted.missionKey, amount: 1 },
             ];

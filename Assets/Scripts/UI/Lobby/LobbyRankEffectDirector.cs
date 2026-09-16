@@ -40,10 +40,6 @@ public class LobbyRankEffectDirector : MonoBehaviour
     // 커버 아래에서 미리 세워 둔 티어 변화 연출(승급·강등, 재생 대기 중). 조립하는 순간 표시가 과거로 되돌아간다.
     Sequence m_tierChange;
 
-    // 이번 랭크 상승이 깨울 트리거 안내(None이면 없다). 갈래는 PlayPromote가 정하지만 발화는 미룬다 —
-    // 안내가 설 자리는 연출도 보상 목록도 다 걷힌 뒤라, 무대가 비는 시점을 아는 것은 PlayWhenReady의 finally뿐이다.
-    EOutgameTutorialTrigger m_promoteTrigger;
-
     static LobbyRankEffectDirector s_instance;
 
     // 이번 씬의 랭크 연출이 이미 끝났는가. 이벤트만으로는 늦게 온 쪽이 신호를 놓친다 —
@@ -124,12 +120,6 @@ public class LobbyRankEffectDirector : MonoBehaviour
             // 래치를 먼저 세운다 — 이 알림을 받아 표시를 다시 그리는 쪽이 Playing을 곧바로 되물을 수 있어야 한다.
             s_finished = true;
             OnAnyFinished?.Invoke();
-
-            // 자율 안내는 이 통지 "뒤"에 깨운다 — 미룬 졸업을 확정하는 것이
-            // 이 신호를 받은 온보딩 브리지라, 앞서 발화하면 문이 닫힌 채라 Fire가 조용히 거절된다.
-            var t_trigger = this.m_promoteTrigger;
-            this.m_promoteTrigger = EOutgameTutorialTrigger.None;
-            GuidanceCoordinator.TryFire(t_trigger);
         }
     }
 
@@ -193,16 +183,12 @@ public class LobbyRankEffectDirector : MonoBehaviour
         }
 
         // 갈래는 여기서 한 번만 이름을 얻는다 — 단계 상승은 오버레이를 안 쓰므로 EPromoteKind 자체가 필요 없다.
-        // 트리거 안내도 같은 갈래를 따른다. 첫 진입만 깨우지 않는다 — 그 사건은 온보딩이 통째로 쥐고 있다.
         if (t_divisionUp)
         {
-            this.m_promoteTrigger = EOutgameTutorialTrigger.RankDivisionFirstUp;
             yield return this.PlayDivisionUpInPlace();
         }
         else
         {
-            if (!t_firstEntry) this.m_promoteTrigger = EOutgameTutorialTrigger.RankGradeFirstUp;
-
             yield return this.PlayPromoteOverlay(t_from, t_tier,
                                                  t_firstEntry ? EPromoteKind.FirstEntry : EPromoteKind.GradeUp,
                                                  t_firstEntry);

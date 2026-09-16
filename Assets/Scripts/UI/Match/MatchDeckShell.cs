@@ -97,6 +97,7 @@ public class MatchDeckShell : ContentsUIBehaviour
     // 매칭에서 이 화면으로 넘어오는 길은 그렇게 이어 놓고 나가는 길만 하드컷이면 흐름이 끝에서 끊긴다.
     public void Confirm()
     {
+        if (!GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.MatchDeckBattleButton)) return;
         // 한 박이 도는 동안 다시 눌리면 안무가 두 벌 겹치고 게이트가 두 번 열린다.
         if (m_launching) return;
 
@@ -130,6 +131,7 @@ public class MatchDeckShell : ContentsUIBehaviour
     // 전투 포기. 실제로 어디로 돌아갈지는 호스트가 정한다(셸은 씬을 모른다).
     public void Cancel()
     {
+        if (!GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.None)) return;
         OutgameTutorialRunner.AbortGuided(AdventureUnlock.GuideTrigger);   // 화면 이탈 = 이번 세션 미루기
         m_gate = EGate.Cancelled;
     }

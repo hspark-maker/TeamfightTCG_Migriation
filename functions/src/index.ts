@@ -18,7 +18,7 @@ export {verifyMatchTicket} from "./commands/verifyMatchTicket";
 export {submitMatchResult} from "./commands/submitMatchResult";
 export {aggregateReplayDaily} from "./commands/aggregateReplayDaily";
 export {claimPayout} from "./commands/claimPayout";
-export {enhanceCard} from "./commands/enhanceCard";
+export {enhanceCard, enhanceSynergyIntroduction} from "./commands/enhanceCard";
 export {enhanceKeyword} from "./commands/enhanceKeyword";
 export {claimBattleReward} from "./commands/claimBattleReward";
 export {grantTutorialCards} from "./commands/grantTutorialCards";

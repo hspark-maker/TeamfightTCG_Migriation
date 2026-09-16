@@ -13,6 +13,7 @@ import {EVENTS} from "../analytics/eventNames";
 import {recordEvent} from "../observability/analyticsEvent";
 import {commitMissionBumps, missionBumpFromSnapshot, missionsRef} from "../missions/missionStore";
 import {evaluateGuideRankProgress} from "../missions/guideProgress";
+import {completeGuideSynergyBattle} from "../missions/guideSynergyBattle";
 import {missionPeriod} from "../missions/period";
 import {
   decideMatch,
@@ -697,6 +698,7 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
       const outcome = settleOutcomes[i];
       const owner = ownerIndexByUid?.[entries[i].uid] ?? (solo ? 0 : -1);
       const bump = missionBumps[i];
+      completeGuideSynergyBattle(bump.state, approvals?.[entries[i].uid]);
       const increments: {event: string; amount: number}[] = [
         {event: EVENTS.battleCompleted.missionKey, amount: 1},
       ];

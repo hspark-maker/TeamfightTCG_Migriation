@@ -21,7 +21,7 @@ public static class TutorialChapterSeparationValidation
             "Content unlock authoring must belong to the guide axis.");
         Require(t_serialized.FindProperty("ftueChapters") != null
             && t_serialized.FindProperty("guide.guideChapters") != null, "Separate chapter storage missing.");
-        Require(t_data.FtueChapterCount == 4 && t_data.guide.guideChapters.Count == 3,
+        Require(t_data.FtueChapterCount == 4 && t_data.guide.guideChapters.Count == 5,
             "Existing FTUE boundary or guide chapter count changed.");
         var t_ids = new HashSet<int>();
         for (int t_i = 0; t_i < t_data.Chapters.Count; t_i++)

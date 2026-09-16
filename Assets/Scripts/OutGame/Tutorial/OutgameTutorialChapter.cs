@@ -11,7 +11,7 @@ public class OutgameTutorialChapter
 
     [NonSerialized] EOutgameTutorialChapterKind kind;
 
-    [Tooltip("자율 챕터를 깨우는 사건. 완주 낙인의 식별자이기도 하다 — 바꾸면 이미 완주한 계정이 이 챕터를 다시 본다. 강제 챕터는 읽지 않는다")]
+    [Tooltip("미션 흐름이 참조하는 자율 챕터 식별자. 미연결 챕터는 실행하지 않는다. 완주 기록에 이름이 저장되므로 변경하지 않는다. 강제 챕터는 읽지 않는다")]
     [SerializeField] EOutgameTutorialTrigger trigger;
 
     [Tooltip("자율 챕터가 서려면 열려 있어야 하는 기능. 잠겨 있는 동안은 발화하지 않고 알림 점도 뜨지 않는다. None이면 조건 없음")]

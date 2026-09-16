@@ -558,7 +558,7 @@ public class TutorialAuthoringWindow : EditorWindow
 
             if (t_chapter.IsGuided)
             {
-                var t_trigger = (EOutgameTutorialTrigger)EditorGUILayout.EnumPopup("발화 키", t_chapter.Trigger);
+                var t_trigger = (EOutgameTutorialTrigger)EditorGUILayout.EnumPopup("챕터 식별자", t_chapter.Trigger);
                 if (t_trigger != t_chapter.Trigger)
                 {
                     Defer(() => TutorialSequenceEditOps.SetChapterTrigger(this.data, _chapter, t_trigger));
@@ -571,8 +571,8 @@ public class TutorialAuthoringWindow : EditorWindow
         }
 
         if (t_chapter.IsGuided)
-            EditorGUILayout.HelpBox("가이드 챕터 — FTUE 이후 미션 흐름이나 연결된 발화 조건으로 시작한다. 진행은 메모리에만 남고(화면을 떠나면 다음에 처음부터), 완주해야 낙인이 찍힌다. "
-                                  + "locks/unlocks는 읽히지 않는다.", MessageType.None);
+            EditorGUILayout.HelpBox("가이드 챕터 — FTUE 이후 연결된 가이드 미션이 활성화되면 해금 연출을 마치고 시작한다. 미연결 챕터는 실행하지 않는다. "
+                                  + "진행은 메모리에만 남고, 완주해야 완료 기록이 저장된다.", MessageType.None);
 
         if (!this.structureEdit) return;
 
