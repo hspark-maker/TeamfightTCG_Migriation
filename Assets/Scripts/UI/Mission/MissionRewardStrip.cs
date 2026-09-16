@@ -10,6 +10,7 @@ public sealed class MissionRewardStrip : MonoBehaviour, IUIInitializable
     sealed class Slot
     {
         public GameObject root;
+        public Image background;
         public Image icon;
         public TMP_Text label;
         public TMP_Text amount;
@@ -22,6 +23,8 @@ public sealed class MissionRewardStrip : MonoBehaviour, IUIInitializable
     [SerializeField] Sprite passExpIcon;
     [SerializeField] RectTransform detailsRoot;
     [SerializeField] Slot detailsItem;
+    [Tooltip("행과 툴팁에서 공유하는 보상 종류별 배경색 설정.")]
+    [SerializeField] MissionRewardColors backgroundColors;
 
     readonly List<Entry> m_entries = new List<Entry>();
     readonly List<Slot> m_detailsItems = new List<Slot>();
@@ -32,8 +35,9 @@ public sealed class MissionRewardStrip : MonoBehaviour, IUIInitializable
         public readonly string Label;
         public readonly long Amount;
         public readonly Sprite Icon;
-        public Entry(string _label, long _amount, Sprite _icon)
-        { Label = _label; Amount = _amount; Icon = _icon; }
+        public readonly Color Background;
+        public Entry(string _label, long _amount, Sprite _icon, Color _background)
+        { Label = _label; Amount = _amount; Icon = _icon; Background = _background; }
     }
 
     public void InitializeUI()
@@ -59,18 +63,22 @@ public sealed class MissionRewardStrip : MonoBehaviour, IUIInitializable
                 if (t_gain == null || t_gain.Amount <= 0) continue;
                 bool t_known = CurrencyCode.TryParse(t_gain.Currency, out var t_type);
                 this.m_entries.Add(new Entry(t_known ? CurrencyLook.NameOf(t_type) : t_gain.Currency,
-                    t_gain.Amount, t_known ? CurrencyLook.IconOf(t_type) : null));
+                    t_gain.Amount, t_known ? CurrencyLook.IconOf(t_type) : null,
+                    this.backgroundColors != null && t_known ? this.backgroundColors.Currency(t_type) : FallbackColor));
             }
         if ((_reward?.AccountExp ?? 0) > 0)
-            this.m_entries.Add(new Entry("경험치", _reward.AccountExp, this.accountExpIcon));
+            this.m_entries.Add(new Entry("경험치", _reward.AccountExp, this.accountExpIcon,
+                this.backgroundColors != null ? this.backgroundColors.AccountExp : FallbackColor));
         if ((_reward?.PassExp ?? 0) > 0)
-            this.m_entries.Add(new Entry("패스 경험치", _reward.PassExp, this.passExpIcon));
+            this.m_entries.Add(new Entry("패스 경험치", _reward.PassExp, this.passExpIcon,
+                this.backgroundColors != null ? this.backgroundColors.PassExp : FallbackColor));
         if (_reward?.Items != null)
             foreach (var t_item in _reward.Items)
             {
                 if (t_item == null || t_item.Amount <= 0) continue;
                 this.m_entries.Add(new Entry(RewardItemDisplay.NameOf(t_item.RewardType, t_item.RewardId),
-                    t_item.Amount, t_item.RewardType == "Pack" ? PackSpec.Art(t_item.RewardId) : null));
+                    t_item.Amount, t_item.RewardType == "Pack" ? PackSpec.Art(t_item.RewardId) : null,
+                    this.backgroundColors != null ? this.backgroundColors.Item(t_item.RewardType) : FallbackColor));
             }
 
         int t_visible = Mathf.Min(3, this.slots?.Length ?? 0);
@@ -109,6 +117,7 @@ public sealed class MissionRewardStrip : MonoBehaviour, IUIInitializable
                 this.m_detailsItems.Add(new Slot
                 {
                     root = t_root,
+                    background = t_root.GetComponent<Image>(),
                     icon = t_root.transform.Find("Icon").GetComponent<Image>(),
                     label = t_root.transform.Find("Label").GetComponent<TMP_Text>(),
                     amount = t_root.transform.Find("Amount").GetComponent<TMP_Text>(),
@@ -127,11 +136,14 @@ public sealed class MissionRewardStrip : MonoBehaviour, IUIInitializable
 
     static void BindSlot(Slot _slot, Entry _entry)
     {
+        if (_slot.background != null) _slot.background.color = _entry.Background;
         _slot.icon.sprite = _entry.Icon;
         _slot.icon.enabled = _entry.Icon != null;
         _slot.label.text = _entry.Label;
         _slot.amount.text = $"+{_entry.Amount:N0}";
     }
+
+    Color FallbackColor => this.backgroundColors != null ? this.backgroundColors.Fallback : new Color32(255, 247, 226, 255);
 
     void HideDetails()
     {

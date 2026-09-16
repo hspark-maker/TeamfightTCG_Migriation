@@ -1719,6 +1719,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   firstFrame: {fileID: 2800000, guid: f1724f38730b48bf8906effcc24c85cc, type: 3}
+  verticalZoom: 1.1
 --- !u!1001 &1709698086
 PrefabInstance:
   m_ObjectHideFlags: 0

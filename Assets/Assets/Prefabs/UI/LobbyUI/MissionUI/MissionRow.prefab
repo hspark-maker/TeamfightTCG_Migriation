@@ -2912,14 +2912,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MissionRewardStrip
   slots:
   - root: {fileID: 9194999315175605322}
+    background: {fileID: 85127847149645369}
     icon: {fileID: 7669727757434498028}
     label: {fileID: 1255448764441787714}
     amount: {fileID: 7423666173681207532}
   - root: {fileID: 8403241231004955403}
+    background: {fileID: 8998008520402829835}
     icon: {fileID: 8068801319103087959}
     label: {fileID: 5455577080188347532}
     amount: {fileID: 668561929379091014}
   - root: {fileID: 9005364389371344267}
+    background: {fileID: 5488427989120632137}
     icon: {fileID: 7920516177869357832}
     label: {fileID: 7530868714702919514}
     amount: {fileID: 314045987679431845}
@@ -2930,9 +2933,11 @@ MonoBehaviour:
   detailsRoot: {fileID: 3250251530149743738}
   detailsItem:
     root: {fileID: 8491072061951908314}
+    background: {fileID: 885790010}
     icon: {fileID: 3610433385442289265}
     label: {fileID: 6965107913982611344}
     amount: {fileID: 8031148170959804082}
+  backgroundColors: {fileID: 11400000, guid: b478ccc62a84487ab57144c165e524c3, type: 2}
 --- !u!1 &6757513301753357048
 GameObject:
   m_ObjectHideFlags: 0
@@ -4478,7 +4483,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 0.985, b: 0.92, a: 0.85}
+  m_Color: {r: 1.00000000, g: 0.89803922, b: 0.78039216, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -4862,6 +4867,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5980574346606582442}
+  - component: {fileID: 885790011}
+  - component: {fileID: 885790010}
   m_Layer: 0
   m_Name: RewardTemplate
   m_TagString: Untagged
@@ -5226,7 +5233,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 0.985, b: 0.92, a: 0.85}
+  m_Color: {r: 0.92941176, g: 0.88235294, b: 1.00000000, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -5767,7 +5774,45 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 0.985, b: 0.92, a: 0.85}
+  m_Color: {r: 1.00000000, g: 0.94117647, b: 0.76078431, a: 1}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 7acb177bf8a929a4395bce39f148765b, type: 3}
+  m_Type: 1
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 5.2
+--- !u!222 &885790011
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8491072061951908314}
+  m_CullTransparentMesh: 1
+--- !u!114 &885790010
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8491072061951908314}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 1.00000000, g: 0.96862745, b: 0.88627451, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1

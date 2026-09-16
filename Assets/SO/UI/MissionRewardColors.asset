@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c643bdb6961437abc412598a39f14c4, type: 3}
+  m_Name: MissionRewardColors
+  m_EditorClassIdentifier: Assembly-CSharp::MissionRewardColors
+  gold: {r: 1.00000000, g: 0.94117647, b: 0.76078431, a: 1}
+  diamond: {r: 0.88235294, g: 0.90196078, b: 1.00000000, a: 1}
+  energy: {r: 0.87058824, g: 0.94901961, b: 0.79215686, a: 1}
+  shard: {r: 0.85490196, g: 0.94117647, b: 1.00000000, a: 1}
+  rouletteTicket: {r: 1.00000000, g: 0.87058824, b: 0.85490196, a: 1}
+  accountExp: {r: 1.00000000, g: 0.89803922, b: 0.78039216, a: 1}
+  passExp: {r: 0.92941176, g: 0.88235294, b: 1.00000000, a: 1}
+  card: {r: 0.87450980, g: 0.93725490, b: 0.90196078, a: 1}
+  pack: {r: 0.96470588, g: 0.87058824, b: 0.91372549, a: 1}
+  packChoice: {r: 0.94117647, g: 0.87450980, b: 1.00000000, a: 1}
+  fallback: {r: 1.00000000, g: 0.96862745, b: 0.88627451, a: 1}

@@ -14,10 +14,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   bgm: {fileID: 0}
   bgmVolume: 0.5
-  uiClickClips: []
-  hitClips: []
-  deathClips: []
-  dealCardClips: []
-  turnChangeClips: []
-  cinemaEnterClips: []
-  sfxVolume: 1
+  uiClickClips:
+  - {fileID: 8300000, guid: 3b7a828a646174088aa48ee1db9c439c, type: 3}
+  hitClips:
+  - {fileID: 8300000, guid: a549c84e3eee2b743ac03ef26ab4e5f8, type: 3}
+  - {fileID: 8300000, guid: 1939c027bda6826418c1578c4c43746b, type: 3}
+  deathClips:
+  - {fileID: 8300000, guid: 522695d86095b6b489ff1545dff74d9c, type: 3}
+  - {fileID: 8300000, guid: 7764c23c700d49b498f0466cac823963, type: 3}
+  dealCardClips:
+  - {fileID: 8300000, guid: 2388c8cbeae623d4bacd723e2b0d2e17, type: 3}
+  - {fileID: 8300000, guid: ed906fa8eaeff64488645ea3a72f129d, type: 3}
+  turnChangeClips:
+  - {fileID: 8300000, guid: 0055582bcea4a5e46a7edbfb29993193, type: 3}
+  cinemaEnterClips:
+  - {fileID: 8300000, guid: 2ca3e7ab0f586cc4698cc8d67b0d1acc, type: 3}
+  sfxVolume: 0.85

@@ -2,12 +2,14 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Video;
 
-/// <summary>로딩 배경 영상을 무음 반복 재생하고, 비율을 유지해 화면 전체를 채운다.</summary>
+/// <summary>로딩 배경 영상을 무음 반복 재생하고, 좌우 전체를 유지하며 세로로 확대해 상하를 자른다.</summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(RawImage), typeof(VideoPlayer))]
 public sealed class LoadingVideoBackground : MonoBehaviour
 {
     [SerializeField] Texture2D firstFrame;
+    [SerializeField, Min(1f), Tooltip("화면에 맞춘 영상의 세로 확대 배율. 1이면 전체 표시, 1보다 크면 위아래를 동일하게 자른다.")]
+    float verticalZoom = 1.1f;
 
     RawImage image;
     VideoPlayer player;
@@ -61,15 +63,9 @@ public sealed class LoadingVideoBackground : MonoBehaviour
     {
         if (this.image == null || this.image.texture == null) return;
 
-        Rect t_rect = this.image.rectTransform.rect;
-        if (t_rect.width <= 0f || t_rect.height <= 0f) return;
-
-        float t_sourceAspect = (float)this.image.texture.width / this.image.texture.height;
-        float t_targetAspect = t_rect.width / t_rect.height;
-        // 긴 쪽의 가장자리만 잘라 여백이나 영상 왜곡 없이 덮는다.
-        float t_width = Mathf.Min(1f, t_targetAspect / t_sourceAspect);
-        float t_height = Mathf.Min(1f, t_sourceAspect / t_targetAspect);
-        this.image.uvRect = new Rect((1f - t_width) * 0.5f, (1f - t_height) * 0.5f, t_width, t_height);
+        // 가로 UV는 전부 사용하고, 세로만 중앙을 기준으로 확대한다. 원본 종횡비는 유지하지 않는다.
+        float t_height = 1f / Mathf.Max(1f, this.verticalZoom);
+        this.image.uvRect = new Rect(0f, (1f - t_height) * 0.5f, 1f, t_height);
     }
 
     void OnError(VideoPlayer _player, string _message)
