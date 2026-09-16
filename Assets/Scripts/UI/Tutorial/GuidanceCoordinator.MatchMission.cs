@@ -14,9 +14,11 @@ public sealed partial class GuidanceCoordinator
     float m_matchDeadline;
     Button m_matchButton;
 
+    bool CanRequestMatchMission() => CanGuideMatchMission() && m_shell != null && isActiveAndEnabled;
+
     bool RequestMatchMission()
     {
-        if (!CanGuideMatchMission() || m_shell == null || !isActiveAndEnabled) return false;
+        if (!CanRequestMatchMission()) return false;
         if (m_matchRequested) return true;
 
         m_matchRequested = true;

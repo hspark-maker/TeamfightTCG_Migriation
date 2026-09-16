@@ -73,6 +73,17 @@ public readonly struct TutorialActionMeta
 
     public bool Uses(F _field) => (Fields & _field) != 0;
 
+    public bool RequiresEntryConfirmation => GrantsPackPool || Action == A.DeckGrant
+        || Action == A.CardGrant || Action == A.CardSetGrant || Action == A.AutoPurchase
+        || Action == A.AutoBattle || Action == A.BattleEntry || Action == A.BattleStart;
+
+    public bool RequiresCompletionConfirmation => RequiresEntryConfirmation || LeavesScene
+        || Action == A.WaitEnhance || Action == A.WaitKeywordEnhance
+        || Action == A.WaitDeckSave || Action == A.WaitSynergyDeck || Action == A.EnterFirstRank;
+
+    public bool HasExecutionContract => (int)Action >= 0 && (int)Action < s_table.Length
+        && s_table[(int)Action].Action == Action;
+
     /// <summary>액션의 메타. 테이블에 없는 값은 "아무 필드도 안 쓰는 자동 스텝"으로 본다(진행은 막지 않는다).
     /// 여기 닿는 것은 아래 static 생성자가 이미 오류로 잡은 뒤다.</summary>
     public static TutorialActionMeta Of(EOutgameTutorialAction _action)

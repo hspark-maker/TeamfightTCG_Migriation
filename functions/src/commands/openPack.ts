@@ -1,3 +1,4 @@
+import {onboardingReceipt} from "../save/onboardingOperation";
 import {measuredCallable} from "../observability/requestMetrics";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
@@ -134,7 +135,7 @@ export const openPack = onCall(measuredCallable("openPack", async (request) => {
   // 경계에 걸린 호출이 어느 기간에 실릴지가 재실행 운에 달린다.
   const period = missionPeriod(Date.now());
 
-  const result = await mutateSave(env, uid, "openPack", {kind: "client", txId},
+  const result = await mutateSave(env, uid, "openPack", {kind: "client", txId, ...onboardingReceipt(request.data, "openPack")},
     async (current, transaction, wallet): Promise<SaveMutation> => {
       // 독립 문서는 함께 읽고, 미션·지갑 쓰기 전에 모두 확보한다.
       const missionReference = missionsRef(db, env, uid);

@@ -38,7 +38,7 @@ public static class ContentUnlockSeparationValidation
             t_row.guideMissionId = null;
             Require(Evaluate(new ContentUnlockRule(t_row), true, 5, false, false).IsUnlocked,
                 "Content without a mission condition must not depend on mission availability.");
-            Require(t_copy.TryGetContentIntro(EContentUnlockIntro.Mission, out var t_intro) && t_intro.icon != null,
+            Require(t_copy.TryGetContentIntro(EContentUnlockIntro.Mission, out var t_intro) && t_intro.TryValidate(out _),
                 "Content presentation must resolve without tutorial data.");
         }
         finally { UnityEngine.Object.DestroyImmediate(t_copy); }

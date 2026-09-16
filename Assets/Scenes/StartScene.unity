@@ -259,6 +259,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: LoadingCover
       objectReference: {fileID: 0}
+    - target: {fileID: 4378495238760489521, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6074598872349822445, guid: 0a18332cb151de94d9dfe1d7166fd77e, type: 3}
       propertyPath: m_Pivot.x
       value: 0
@@ -456,11 +460,6 @@ MonoBehaviour:
   m_PointerBehavior: 0
   m_CursorLockBehavior: 0
   m_ScrollDeltaPerTick: 6
---- !u!224 &2114838479 stripped
-RectTransform:
-  m_CorrespondingSourceObject: {fileID: 8380210619043447819, guid: 305070bab040f1f4fb22ac7a6cf04f80, type: 3}
-  m_PrefabInstance: {fileID: 1601318123}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

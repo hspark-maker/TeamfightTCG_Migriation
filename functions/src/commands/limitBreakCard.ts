@@ -1,3 +1,4 @@
+import {onboardingReceipt} from "../save/onboardingOperation";
 import {measuredCallable} from "../observability/requestMetrics";
 import {FieldValue} from "firebase-admin/firestore";
 import {randomUUID} from "node:crypto";
@@ -120,7 +121,7 @@ export const limitBreakCard = onCall(measuredCallable("limitBreakCard", async (r
   // 기간은 여기서 한 번만 잰다 — 콜백은 재실행되므로 그 안에서 재면 경계에 걸린 호출이 흔들린다.
   const period = missionPeriod(Date.now());
 
-  const result = await mutateSave(env, uid, "limitBreakCard", {kind: "client", txId},
+  const result = await mutateSave(env, uid, "limitBreakCard", {kind: "client", txId, ...onboardingReceipt(request.data, "limitBreakCard")},
     async (current, transaction): Promise<SaveMutation> => {
       // 미션 읽기가 콜백의 첫 줄이다 — 아래 쓰기보다 반드시 앞이어야 한다(Firestore 트랜잭션 규칙).
       const missions = await beginMissionBump(transaction, db, env, uid, period, current);

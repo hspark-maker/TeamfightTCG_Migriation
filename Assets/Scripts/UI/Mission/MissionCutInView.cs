@@ -177,6 +177,7 @@ public sealed class MissionCutInView : ContentsPooledUI
         }
         if (m_hasCurrent && !HasActiveTween) Finish("InvalidTween");
         if (m_hasCurrent && !MissionProgressNotifications.IsCurrent(m_current)) Finish("InvalidNotification");
+        if (m_hasCurrent && MissionProgressNotifications.IsPresentedByTracker(m_current)) Finish("GuidePreviewVisible");
         if (!CanShow)
         {
             canvasGroup.alpha = 0f;

@@ -283,7 +283,7 @@ public class GuideMissionPanel : ContentsPooledUI
         if (t_result != null)
         {
             if ((t_result.Cards?.Count ?? 0) > 0) this.Close();
-            MissionPanel.ShowClaimedRewards(new[] { t_result });
+            MissionPanel.ShowClaimedRewards(new[] { t_result }, _showCardsIndividually: true);
         }
     }
 }

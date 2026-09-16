@@ -181,7 +181,7 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
   env: string,
   uid: string,
   source: string,
-  receipt: ReceiptKey,
+  receipt: ReceiptKey & {onboarding?: string},
   mutate: (
     current: DocumentData,
     transaction: Transaction,
@@ -192,11 +192,12 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
 ): Promise<TResponse> {
   const reference = saveDocument(env, uid);
   const walletReference = walletRef(db, env, uid);
+  const operationReference = reference.parent.parent!.collection("onboardingOperations").doc(receipt.txId);
 
   return withCountedTransaction(source, async (transaction) => {
     // 독립 문서를 한 번에 읽되, 검증은 기존 save → wallet → receipt 순서를 지킨다.
-    const [snapshot, walletSnapshot, receiptSnapshot] = await transaction.getAll(
-      reference, walletReference, receiptRef(walletReference, receipt.txId));
+    const [snapshot, walletSnapshot, receiptSnapshot, operationSnapshot] = await transaction.getAll(
+      reference, walletReference, receiptRef(walletReference, receipt.txId), operationReference);
     if (!snapshot.exists) {
       throw new HttpsError(
         "failed-precondition",
@@ -217,9 +218,29 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
     // 잃는 것이 없다. 안 세우면 지갑을 쓰는 명령이 전부 실패해 계정이 굳는다.
     const creatingWallet = !walletSnapshot.exists;
 
+    // TTL 영수증이 지워져도 완료한 온보딩 명령은 다시 실행하지 않는다.
+    if (operationSnapshot.exists) {
+      const operation = operationSnapshot.data()!;
+      if (operation.command !== source || operation.fingerprint !== receipt.onboarding) {
+        rejectDomain("TxIdReused", "Onboarding txId was used with different arguments.",
+          {uid, env, source, txId: receipt.txId});
+      }
+      try {
+        return replayCached(JSON.parse(operation.cachedJson), current,
+          Number(current.revision ?? 0)) as unknown as TResponse;
+      } catch {
+        throw new HttpsError("failed-precondition",
+          "OnboardingRecoveryRequired: Query getOnboardingOperation before retrying.");
+      }
+    }
+
     // 영수증 재생은 콜백 전에 판정한다. 콜백의 추가 읽기·쓰기는 히트 시 실행하지 않는다.
     const lookup = readReceipt(receiptSnapshot);
     if (lookup.hit) {
+      if (receipt.onboarding !== undefined) {
+        rejectDomain("TxIdReused", "A legacy receipt cannot become an onboarding operation.",
+          {uid, env, source, txId: receipt.txId});
+      }
       if (lookup.source !== source) {
         // 같은 txId 를 다른 명령이 재사용했다. 첫 명령의 응답을 다른 명령에 돌려주면
         // 클라가 엉뚱한 결과를 채택하므로, 집행하지 않고 거절한다.
@@ -271,6 +292,12 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
 
     // 영수증에 실리는 것은 응답 그대로가 아니라 슬롯 값을 뷘 캐시본이다(근거는 receiptCache).
     const cached = cacheableResponse(response, outcome.slots);
+    if (receipt.onboarding !== undefined) {
+      transaction.create(operationReference, {
+        version: 1, command: source, fingerprint: receipt.onboarding,
+        cachedJson: JSON.stringify(cached), createdAt: FieldValue.serverTimestamp(),
+      });
+    }
 
     if (creatingWallet) {
       // set 이 아니라 create 다 — 이 트랜잭션 밖에서 ensureWallet 이 먼저 지갑을 세웠으면

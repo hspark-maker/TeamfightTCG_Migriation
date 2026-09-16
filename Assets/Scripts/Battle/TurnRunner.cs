@@ -182,6 +182,7 @@ public class TurnRunner : MonoBehaviour
 
         if (_reason.GrantsReward())
             CaptureResult(_won, _reason);
+        TutorialConfig.NotifyBattleFinished();
         BattleGoldenRecorder.Finish(_won, _reason == EMatchEndReason.Draw);
         ShowResult(_won, _reason.PlaysBeat(), _reason == EMatchEndReason.Surrender).Forget();
     }

@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.enhanceSynergyIntroduction = exports.enhanceCard = void 0;
+const onboardingOperation_1 = require("../save/onboardingOperation");
 const requestMetrics_1 = require("../observability/requestMetrics");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
@@ -126,7 +127,7 @@ function createEnhanceCard(synergyIntroduction) {
         const txId = (0, receiptId_1.clientReceiptId)(request.data?.txId, (0, node_crypto_1.randomUUID)());
         // 기간은 여기서 한 번만 잰다 — 콜백은 재실행되므로 그 안에서 재면 경계에 걸린 호출이 흔들린다.
         const period = (0, period_1.missionPeriod)(Date.now());
-        const result = await (0, saveDocument_1.mutateSave)(env, uid, command, { kind: "client", txId }, async (current, transaction, wallet) => {
+        const result = await (0, saveDocument_1.mutateSave)(env, uid, command, { kind: "client", txId, ...(0, onboardingOperation_1.onboardingReceipt)(request.data, command) }, async (current, transaction, wallet) => {
             // 미션 읽기가 콜백의 첫 줄이다. 아래 grants 읽기와는 둘 다 읽기라 순서를 다투지 않지만,
             // 미션 **쓰기**는 그 grants 읽기보다 뒤여야 해서 콜백 맨 끝으로 갈라 두었다.
             const missions = await (0, missionStore_1.beginMissionBump)(transaction, firebaseApp_1.db, env, uid, period, current);

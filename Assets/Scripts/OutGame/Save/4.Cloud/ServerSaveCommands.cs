@@ -15,6 +15,24 @@ internal static class ServerSaveCommands
     static UniTaskCompletionSource s_inFlight;
     internal static bool IsInFlight => s_inFlight != null;
 
+    /// <summary>다른 명령과 직렬화하여 온보딩의 유실 응답을 복구한다.</summary>
+    internal static async UniTask RecoverOnboardingAsync()
+    {
+        if (!OnboardingCommands.HasPending) return;
+        PlayerSaveCloud.CommandSession t_session = PlayerSaveCloud.CaptureCommandSession();
+        while (s_inFlight != null)
+        {
+            await s_inFlight.Task;
+            PlayerSaveCloud.RequireCommandSession(t_session);
+        }
+        if (!OnboardingCommands.HasPending) return;
+        ICallableService t_service = RequireService("getOnboardingOperation");
+        var t_gate = new UniTaskCompletionSource();
+        s_inFlight = t_gate;
+        try { await OnboardingCommands.RecoverUnderGateAsync(t_service); }
+        finally { s_inFlight = null; t_gate.TrySetResult(); }
+    }
+
     /// <summary>Firebase 모듈이 서비스를 꽂는다(해제 시 null).</summary>
     internal static void SetService(ICallableService _service)
     {
@@ -48,6 +66,7 @@ internal static class ServerSaveCommands
         where TResponse : ServerCommandResult
     {
         ICallableService t_service = RequireService(_commandName);
+        PlayerSaveCloud.CommandSession t_session = PlayerSaveCloud.CaptureCommandSession();
 
         // 게이트를 잡기 **전**에 짓는다 — s_inFlight를 세운 뒤 여기서 던지면 finally가 없어 게이트가
         // 영영 안 풀리고, 이후 모든 명령이 예외도 없이 무한 대기한다.
@@ -63,7 +82,10 @@ internal static class ServerSaveCommands
         // 아래 재시도의 영수증 재생도 이 직렬화에 기댄다: 두 시도 사이에 다른 세이브 쓰기가 끼면
         // 서버가 revision 어긋남을 보고 failed-precondition으로 세션을 되돌린다.
         while (s_inFlight != null)
+        {
             await s_inFlight.Task;
+            PlayerSaveCloud.RequireCommandSession(t_session);
+        }
 
 #if UNITY_EDITOR
         RequirePlayTestInactive(_commandName);
@@ -75,11 +97,52 @@ internal static class ServerSaveCommands
 
         UniTaskCompletionSource t_gate = new UniTaskCompletionSource();
         s_inFlight = t_gate;
-
-        await PlayerSaveCloud.SuspendUploadsAsync();
+        OnboardingCommandSaveData t_record = null;
+        bool t_suspended = false;
         try
         {
-            TResponse t_result = await SendAsync<TResponse>(t_service, _commandName, t_payload);
+            if (OnboardingCommands.HasPending)
+            {
+                await OnboardingCommands.RecoverUnderGateAsync(t_service);
+                PlayerSaveCloud.RequireCommandSession(t_session);
+            }
+            if (OnboardingCommands.Tracks(_commandName))
+            {
+                t_payload.Remove(TX_ID_FIELD);
+                t_record = await OnboardingCommands.PrepareAsync(_commandName, t_payload);
+                PlayerSaveCloud.RequireCommandSession(t_session);
+                if (t_record.Completed)
+                {
+                    TResponse t_replayed = OnboardingCommands.ReadResult<TResponse>(t_record);
+                    OnboardingCommands.Consume(t_record);
+                    return t_replayed;
+                }
+                t_payload[TX_ID_FIELD] = t_record.TxId;
+                t_payload["onboarding"] = true;
+            }
+            else if (OnboardingCommands.HasPending)
+                throw new InvalidOperationException("Recover the pending onboarding action before another command.");
+            await PlayerSaveCloud.SuspendUploadsAsync();
+            t_suspended = true;
+            PlayerSaveCloud.RequireCommandSession(t_session);
+            TResponse t_result;
+            try
+            {
+                t_result = await SendAsync<TResponse>(t_service, _commandName, t_payload, t_session);
+                PlayerSaveCloud.RequireCommandSession(t_session);
+            }
+            catch (Exception t_error) when (t_record != null &&
+                t_error.GetBaseException().Message.Contains("OnboardingRecoveryRequired"))
+            {
+                PlayerSaveCloud.RequireCommandSession(t_session);
+                await OnboardingCommands.RecoverUnderGateAsync(t_service);
+                PlayerSaveCloud.RequireCommandSession(t_session);
+                if (!t_record.Completed) throw;
+                _pending?.Settle();
+                TResponse t_recovered = OnboardingCommands.ReadResult<TResponse>(t_record);
+                OnboardingCommands.Consume(t_record);
+                return t_recovered;
+            }
             if (t_result == null)
                 throw new InvalidOperationException($"Server command '{_commandName}' returned nothing.");
 
@@ -107,6 +170,8 @@ internal static class ServerSaveCommands
             if (t_result.Revision > 0)
                 PlayerSaveCloud.AdoptServerResult(t_result.Revision, t_result.UpdatedSlots);
 
+            OnboardingCommands.Complete(t_record, t_result);
+            OnboardingCommands.Consume(t_record);
             return t_result;
         }
         catch (ServerAdoptionException)
@@ -116,16 +181,22 @@ internal static class ServerSaveCommands
         }
         catch (Exception t_exception)
         {
+            PlayerSaveCloud.RequireCommandSession(t_session);
             // 거절은 세션이 아니라 이 호출의 결과다 — 전용 타입으로 갈아 던져야 호출부가 catch(Exception) 한 줄로
             // 삼키는 게 눈에 보인다. 표면을 지는 주체가 호출한 도메인이라는 계약의 집행 지점.
             if (PlayerSaveCloud.ReportServerCommandFailure(t_exception) == ECloudFailureKind.Rejected)
+            {
+                OnboardingCommands.Reject(t_record);
                 throw new ServerCommandRejectedException(_commandName, t_exception);
+            }
+
+            if (t_record != null && t_suspended) OnboardingCommands.HoldUploads();
 
             throw;
         }
         finally
         {
-            PlayerSaveCloud.ResumeUploads();
+            if (t_suspended && PlayerSaveCloud.IsCommandSessionCurrent(t_session)) PlayerSaveCloud.ResumeUploads();
             s_inFlight = null;
             t_gate.TrySetResult();
             ContentUnlockManager.FlushPending();
@@ -165,7 +236,8 @@ internal static class ServerSaveCommands
     // 대가는 봉인 시간이다: 한 시도가 CallableMilliseconds(15초)에 더해 재인증 1회를 쓸 수 있어
     // 최악이면 유저가 1분 가까이 응답을 기다린다. 그래도 재시도를 없애는 쪽이 이중 과금이라 받는다.
     static async UniTask<TResponse> SendAsync<TResponse>(
-        ICallableService _service, string _commandName, Dictionary<string, object> _payload)
+        ICallableService _service, string _commandName, Dictionary<string, object> _payload,
+        PlayerSaveCloud.CommandSession _session)
         where TResponse : class
     {
         try
@@ -174,6 +246,7 @@ internal static class ServerSaveCommands
         }
         catch (Exception t_exception) when (CloudFailureClassifier.IsLostResponse(t_exception))
         {
+            PlayerSaveCloud.RequireCommandSession(_session);
             // 여기서 PlayerSaveCloud에 실패를 알리지 않는다 — 알리면 상태가 Offline으로 넘어가고
             // 실패 카운터가 올라, 곧 성공할 재시도가 장애 흔적을 남긴다.
             Debug.LogWarning(

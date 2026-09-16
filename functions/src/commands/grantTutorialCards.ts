@@ -1,3 +1,4 @@
+import {onboardingReceipt} from "../save/onboardingOperation";
 import {randomUUID} from "node:crypto";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
@@ -99,7 +100,7 @@ export const grantTutorialCards = onCall(async (request) => {
   // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
   const txId = clientReceiptId(request.data?.txId, randomUUID());
 
-  const result = await mutateSave(env, uid, "grantTutorialCards", {kind: "client", txId},
+  const result = await mutateSave(env, uid, "grantTutorialCards", {kind: "client", txId, ...onboardingReceipt(request.data, "grantTutorialCards")},
     async (current, transaction): Promise<SaveMutation> => {
       // 읽기는 반드시 트랜잭션 안이다 — 동시 호출 둘이 같은 "미지급"을 보면 낙인이 어긋난다(enhanceCard 와 같은 규약).
       const grantsReference = grantsRef(db, env, uid);

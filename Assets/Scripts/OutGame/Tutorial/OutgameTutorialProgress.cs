@@ -73,6 +73,7 @@ public static class OutgameTutorialProgress
         if (t_slot.OutgameCompleted) return;
 
         t_slot.OutgameCompleted = true;
+        GuideMissionHintHistory.Arm();
         Save();
     }
 
@@ -130,6 +131,7 @@ public static class OutgameTutorialProgress
         t_slot.ChapterStepIndex = _step;
         t_slot.StepId           = OutgameTutorialRunner.StepIdAt(_chapter, _step);
         t_slot.OutgameCompleted = false;
+        GuideMissionHintHistory.Clear();
         t_slot.GuideResume = null;
         ContentUnlockManager.ResetForDebug();
         Save();
@@ -140,8 +142,7 @@ public static class OutgameTutorialProgress
         OutgameFeatureLock.ClearStall();
     }
 
-    // 초기화를 거듭해도 좌표가 그대로면 그 스텝은 스스로 풀릴 수 없는 것이다 — 안내는 멈추더라도 게임은 열어 준다.
-    // 진입 실패는 브리지가 그 자리에서 잡고, 여기는 신호를 영영 못 받는 대기형 정지(앵커 미등록 등)를 잡는다.
+    // 재실행 횟수는 진단용이다. 정상 대기·망 장애만으로 필수 온보딩을 우회하지 않는다.
     static void DetectStall()
     {
         var t_slot = Slot;
@@ -163,7 +164,6 @@ public static class OutgameTutorialProgress
         if (t_slot.SameCoordInitCount < STALL_INIT_COUNT) return;
 
         Debug.LogWarning($"[OutgameTutorialProgress] Initialization #{t_slot.SameCoordInitCount + 1} at position "
-                       + $"{t_slot.ChapterIndex}-{t_slot.ChapterStepIndex} — treating progress as stuck and releasing the feature lock.");
-        OutgameFeatureLock.NotifyStalled();
+                       + $"{t_slot.ChapterIndex}-{t_slot.ChapterStepIndex} — retaining the checkpoint for recovery.");
     }
 }

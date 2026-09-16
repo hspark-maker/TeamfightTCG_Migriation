@@ -28,7 +28,7 @@ public enum EPromoteKind
 // 등급 승급은 암전 → 정적 → 꽂힘 → 충격 → 여운의 순서이고, 정적(silence)이 이 안무의 절반이다.
 // 어두운 화면에 아무것도 없는 그 빈 박이 다음 프레임을 만든다.
 //
-// 판때기는 전부 프리팹 저작이고 코드는 알파·배율·회전만 민다(RankPromoStandby·CardEvolveRays와 같은 규약).
+// 판때기는 전부 프리팹 저작이고 코드는 알파·배율·회전만 민다(CardEvolveRays와 같은 규약).
 // Shared presentation is instantiated and reused by UIPoolManager.
 public class RankPromoteOverlay : PooledOverlay<RankPromoteOverlay>
 {
@@ -54,7 +54,7 @@ public class RankPromoteOverlay : PooledOverlay<RankPromoteOverlay>
 
     [Tooltip("배지 뒤에서 뻗는 광선 판들. 비면 광선 축을 통째로 건너뛴다.\n" +
              "\n" +
-             "저작 규약 세 가지 (어기면 광선으로 안 읽힌다 — RankPromoStandby와 같다):\n" +
+             "저작 규약 세 가지 (어기면 광선으로 안 읽힌다):\n" +
              "  · 피벗은 (0.5, 0) — 뿌리가 배지 중심이고 거기서 바깥으로 뻗는다.\n" +
              "  · 폭은 길이의 0.12 안팎. 0.2를 넘기면 광선이 아니라 꽃잎이 된다.\n" +
              "  · 각도를 등간격으로 두지 말 것 — 나란하면 바람개비로 읽힌다.\n" +
@@ -96,10 +96,6 @@ public class RankPromoteOverlay : PooledOverlay<RankPromoteOverlay>
 
     [Tooltip("첫 진입(언랭크 → 첫 티어)에 세우는 문구.")]
     [SerializeField] string titleFirstEntry = "랭크 배정";
-
-    [Tooltip("배지를 눌러 지금 등급을 다시 볼 때(열람) 세우는 문구. 사건이 아니라 상태를 보는 자리라\n" +
-             "승급·배정 문구를 그대로 쓰면 방금 오른 것으로 읽힌다.")]
-    [SerializeField] string titleBrowse = "현재 랭크";
 
     [Header("연출")]
 
@@ -262,10 +258,8 @@ public class RankPromoteOverlay : PooledOverlay<RankPromoteOverlay>
     /// _onCovered는 암전이 완전히 덮인 프레임에 정확히 한 번 온다 — 로비 표시를 갈아끼우는 자리다
     /// (PackPurchaseImpact.Play의 덮임 통지와 같은 규약). 건너뛰기로 안무가 잘려도 반드시 한 번은 온다.
     /// _onClose는 걷힌 뒤 정확히 한 번 온다.
-    /// _browse는 사건이 아니라 지금 상태를 다시 보는 자리(배지 열람)라는 표식이다 — 제목만 갈리고 안무는 같다.
     /// 안무 도중이라도 탭 한 번이면 최종 상태로 점프한 뒤 닫힌다 — 두 번 봐야 하는 화면이 아니다.</summary>
-    public void Show(RankTier _from, RankTier _to, EPromoteKind _kind, Action _onCovered, Action _onClose,
-                     bool _browse = false)
+    public void Show(RankTier _from, RankTier _to, EPromoteKind _kind, Action _onCovered, Action _onClose)
     {
         InitializeUI();
         // 직전 표시의 안무를 걷는다 — 시퀀스에 중첩된 트윈은 대상의 DOKill이 잡지 못해 새 안무와 같은 노드를 함께 민다.
@@ -287,7 +281,7 @@ public class RankPromoteOverlay : PooledOverlay<RankPromoteOverlay>
 
         // 티어명은 **옛 이름으로 서 있다가** 한 박에 갈린다(굴리지 않고 드러낸다).
         if (this.tierNameText != null) this.tierNameText.text = this.m_fromName;
-        if (this.titleText != null) this.titleText.text = TitleOf(_kind, _browse);
+        if (this.titleText != null) this.titleText.text = TitleOf(_kind);
         if (this.gradeNameText != null) this.gradeNameText.text = _to.Grade.ToString().ToUpperInvariant();
 
         this.m_toGrade = _to.Grade;
@@ -591,7 +585,7 @@ public class RankPromoteOverlay : PooledOverlay<RankPromoteOverlay>
         _seq.InsertCallback(_at, () => t_group.SetActive(true));
     }
 
-    // 씨앗 길이에서 저작 길이까지 뻗으며 과다 노출됐다가 저작 알파로 정착한다(RankPromoStandby와 같은 문법).
+    // 씨앗 길이에서 저작 길이까지 뻗으며 과다 노출됐다가 저작 알파로 정착한다.
     void StageRays(Sequence _seq, float _at)
     {
         if (this.rays == null || this.m_rayScales == null) return;
@@ -862,11 +856,9 @@ public class RankPromoteOverlay : PooledOverlay<RankPromoteOverlay>
     }
 
     // 갈래별 문구. 비어 있으면 프리팹 저작 문구를 그대로 둔다 — 빈 문자열로 지우면 화면에서 제목이 사라진다.
-    string TitleOf(EPromoteKind _kind, bool _browse)
+    string TitleOf(EPromoteKind _kind)
     {
-        string t_title = _browse
-                             ? this.titleBrowse
-                             : _kind == EPromoteKind.GradeUp ? this.titleGradeUp : this.titleFirstEntry;
+        string t_title = _kind == EPromoteKind.GradeUp ? this.titleGradeUp : this.titleFirstEntry;
 
         if (!string.IsNullOrEmpty(t_title)) return t_title;
 

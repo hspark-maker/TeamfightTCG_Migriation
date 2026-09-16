@@ -1,5 +1,7 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using System;
+using System.Threading;
 using UnityEngine;
 
 // 스텝 행 하나를 실행하는 단일 창구
@@ -12,6 +14,51 @@ public static class TutorialStepExecutor
     const string DefaultRewardTitle  = "첫 승리 보너스";
     const string DefaultCardSetTitle = "기본 카드 세트";
     const string DefaultPackNoticeTitle = "무료 카드팩 도착";
+
+    // 스텝 진입 — 무엇을 하고 끝났는지는 반환값이 말한다(호출자가 좌표 델타로 되짚지 않게)
+    public static async UniTask<EOutgameTutorialStepResult> ExecuteAsync(TutorialStepDef _step,
+        OutgameTutorialStepContext _context, CancellationToken _ct)
+    {
+        if (_step == null) return EOutgameTutorialStepResult.Failed;
+        _ct.ThrowIfCancellationRequested();
+        var t_meta = TutorialActionMeta.Of(_step.Action);
+        if (!t_meta.HasExecutionContract) throw new InvalidOperationException("지원하지 않는 온보딩 행동입니다.");
+        if (_step.Action == EOutgameTutorialAction.DeckGrant
+            || _step.Action == EOutgameTutorialAction.CardGrant
+            || _step.Action == EOutgameTutorialAction.CardSetGrant)
+        {
+            var t_granted = await TutorialGrantCommand.GrantAsync(GrantPackIdOf(_step, Where(_context)));
+            _ct.ThrowIfCancellationRequested();
+            if (t_granted == null) throw new InvalidOperationException("카드 지급을 확인하지 못했습니다.");
+        }
+        if (_step.Action == EOutgameTutorialAction.AutoPurchase)
+            return await PurchaseAndOpenAsync(_step, _context, _ct);
+        if (_step.Scenario != null && (_step.Action == EOutgameTutorialAction.AutoBattle
+            || _step.Action == EOutgameTutorialAction.BattleEntry))
+            OutgameTutorialRunner.MarkPendingBattle(_step.StepId);
+        if (t_meta.RequiresEntryConfirmation && !await GuideResume.SaveConfirmedAsync(_ct))
+            throw new InvalidOperationException("온보딩 진입 상태를 저장하지 못했습니다.");
+        _ct.ThrowIfCancellationRequested();
+        if (_step.Action == EOutgameTutorialAction.AutoBattle)
+        {
+            _context.CommitAdvance();
+            if (!await GuideResume.SaveConfirmedAsync(_ct))
+            {
+                _context.Rollback();
+                throw new InvalidOperationException("전투 진입 위치를 저장하지 못했습니다.");
+            }
+            _ct.ThrowIfCancellationRequested();
+            TutorialConfig.Begin(_step.Scenario, _step.ShowDeckGate);
+            LoadingCoverView.LoadScene(BattleScene);
+            return EOutgameTutorialStepResult.Advanced;
+        }
+        EOutgameTutorialStepResult t_result;
+        using (GuidanceCoordinator.InternalNavigation()) t_result = Enter(_step, _context);
+        if (_step.Action == EOutgameTutorialAction.DeckGrant && t_result == EOutgameTutorialStepResult.Advanced
+            && !await GuideResume.SaveConfirmedAsync(_ct))
+            throw new InvalidOperationException("지급된 덱의 진행을 저장하지 못했습니다.");
+        return t_result;
+    }
 
     // 스텝 진입 — 무엇을 하고 끝났는지는 반환값이 말한다(호출자가 좌표 델타로 되짚지 않게)
     public static EOutgameTutorialStepResult Enter(TutorialStepDef _step, OutgameTutorialStepContext _context)
@@ -47,19 +94,17 @@ public static class TutorialStepExecutor
             case EOutgameTutorialAction.CloseAlbumPage: return EnterCloseAlbumPage(_context);
             case EOutgameTutorialAction.CloseDeckEdit: return EnterCloseDeckEdit(_context);
             case EOutgameTutorialAction.BattleEntry:  return EnterBattleEntry(_step, _context);
-            case EOutgameTutorialAction.AutoBattle:   return EnterAutoBattle(_step, _context);
-            case EOutgameTutorialAction.AutoPurchase: return EnterAutoPurchase(_step, _context);
+            case EOutgameTutorialAction.AutoBattle:
+            case EOutgameTutorialAction.AutoPurchase:
+                throw new InvalidOperationException("Use ExecuteAsync for this action.");
+
             case EOutgameTutorialAction.DeckGrant:    return EnterDeckGrant(_step, _context);
             case EOutgameTutorialAction.CardGrant:    return EnterCardGrant(_step, _context);
             case EOutgameTutorialAction.CardSetGrant: return EnterCardSetGrant(_step, _context);
             case EOutgameTutorialAction.PackNotice:   return EnterPackNotice(_step, _context);
         }
 
-        // 저작 실수라 정책을 물을 자리가 아니다 — 시퀀스가 이 칸에 걸리지 않게 넘긴다.
-        Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} unknown action ({(int)_step.Action}) — skipping.");
-        _context.CommitAdvance();
-        _context.CompleteIfLast();
-        return EOutgameTutorialStepResult.Advanced;
+        throw new InvalidOperationException($"Unsupported onboarding action: {_step.Action}");
     }
 
     /// <summary>실패 분기의 단일 창구 — 결말은 코드가 아니라 저작(onFailure)이 정한다.
@@ -129,95 +174,35 @@ public static class TutorialStepExecutor
         return EOutgameTutorialStepResult.Gated;
     }
 
-    static EOutgameTutorialStepResult EnterAutoBattle(TutorialStepDef _step, OutgameTutorialStepContext _context)
+    static async UniTask<EOutgameTutorialStepResult> PurchaseAndOpenAsync(TutorialStepDef _step,
+        OutgameTutorialStepContext _context, CancellationToken _ct)
     {
+        if (PackOpenOverlay.Instance == null) throw new InvalidOperationException("개봉 화면을 준비하지 못했습니다.");
+        var t_opened = await PackPurchaseFlow.PurchaseAsync(_step.PackId, typeof(TutorialStepExecutor),
+            _callerOwnsWaiting: LoadingCoverView.OwnsLobbyPreparation);
+        _ct.ThrowIfCancellationRequested();
+        if (t_opened == null) throw new InvalidOperationException("카드팩 구매 결과를 확인하지 못했습니다.");
+        PackHandoff.Set(t_opened, _step.PackId, null, false);
+        if (!PackOpenOverlay.TryOpen()) throw new InvalidOperationException("구매는 완료됐지만 개봉 화면을 열지 못했습니다.");
         _context.CommitAdvance();
         _context.CompleteIfLast();
-
-        if (_step.Scenario == null)
-            Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} AutoBattle has no scenario wired — entering a normal battle.");
-
-        TutorialConfig.Begin(_step.Scenario, _step.ShowDeckGate);
-        LoadingCoverView.LoadScene(BattleScene);
+        if (!await GuideResume.SaveConfirmedAsync(_ct)) throw new InvalidOperationException("구매 진행을 저장하지 못했습니다.");
         return EOutgameTutorialStepResult.Advanced;
-    }
-
-    static EOutgameTutorialStepResult EnterAutoPurchase(TutorialStepDef _step, OutgameTutorialStepContext _context)
-    {
-        if (PackOpenOverlay.Instance == null)
-            return Fail(_step, _context, "개봉 오버레이 미배치(로비 씬 배선 확인)");
-
-        // 결제는 서버 왕복이라 이 동기 상태머신이 결과를 기다릴 수 없다 — 살 수 있는지만 먼저 묻고
-        // 그 답으로 저작된 실패 정책을 태운다(여기까지가 되돌릴 수 있는 마지막 지점).
-        var t_precheck = CardPackOpener.Precheck(_step.PackId);
-        if (t_precheck != EPackOpenResult.Success)
-            return Fail(_step, _context, $"자동 구매 실패(pack={PackIdOf(_step)}, result={t_precheck})");
-
-        _context.CommitAdvance();
-        _context.CompleteIfLast();
-
-        PurchaseAndOpenAsync(_step.PackId, Where(_context)).Forget();
-
-        return EOutgameTutorialStepResult.Advanced;
-    }
-
-    // 자동 구매의 서버 왕복. 좌표는 이미 전진한 뒤라 되돌릴 수 없다.
-    // 대기 표시와 거절 안내는 PackPurchaseFlow가 맡는다 — 이 자리는 결과로 개봉을 열지 말지만 가른다.
-    // ⚠ 서버 왕복이 실패하면 좌표는 개봉 신호를 기다리는 칸에 남는다 — 되돌릴 수 없으므로 그 자리에서 문을 연다.
-    static async UniTaskVoid PurchaseAndOpenAsync(string _packId, string _where)
-    {
-        string t_packId = !string.IsNullOrEmpty(_packId) ? _packId : "null";
-
-        // 대기 표시의 임자로 쓸 인스턴스가 없는 static 경로다 — 타입 자체를 안정된 키로 넘긴다.
-        var t_opened = await PackPurchaseFlow.PurchaseAsync(_packId, typeof(TutorialStepExecutor));
-        if (t_opened == null)
-        {
-            // 안내는 PackPurchaseFlow가 이미 띄웠다 — 좌표는 이미 전진해 되돌리지 못한다.
-            Debug.LogError($"[TutorialStepExecutor] {_where} auto-purchase round trip failed (pack={t_packId}) — it already moved forward and cannot be rolled back.");
-
-            // 되감을 구매 스텝이 없는 갈래라, 오지 않을 개봉 신호를 기다리는 칸에 갇혀 스스로 풀 수 없다.
-            // 망 오류 한 번에 초기화 3회(SameCoordInitCount)를 거듭하게 두지 않으려고 여기서 문을 연다(멱등).
-            OutgameFeatureLock.NotifyStalled();
-            return;
-        }
-
-        PackHandoff.Set(t_opened, _packId, null, false);
-
-        // 열지 못해도 결제는 이미 나갔다 — 연출만 생략하고 전진한다(실패 정책을 묻는 자리가 아니다).
-        if (!PackOpenOverlay.TryOpen())
-            Debug.LogWarning($"[TutorialStepExecutor] {_where} failed to open the reveal overlay (pack={t_packId}) — the purchase stands, only the reveal presentation is skipped.");
     }
 
     static EOutgameTutorialStepResult EnterDeckGrant(TutorialStepDef _step, OutgameTutorialStepContext _context)
     {
-        _context.CommitAdvance();
-
-        // ⚠ 이 스텝은 앵커가 없어 되돌리면(Halt) 이 초기화에서 다시 세울 신호가 없다 —
-        //   덱은 유저가 직접 만들 수 있으니 저작은 Skip으로 두는 편이 낫다.
         if (_step.Scenario == null || !DeckSaveManager.TryBuildDeck(_step.Scenario.PlayerDeckIds, out List<int> t_cards))
-            return Fail(_step, _context, $"시나리오 미배선 또는 덱이 {DeckSaveManager.DECK_SIZE}장을 이루지 못함");
-
+            throw new InvalidOperationException("지급 덱의 카드 구성이 올바르지 않습니다.");
+        if (!DeckSaveManager.TryFindSlot(t_cards, out int t_index)
+            && !DeckSaveManager.TryInsertFront(t_cards, _step.DeckName, DeckImages.PickRandomKey(), out t_index))
+            throw new InvalidOperationException("지급 덱을 저장할 공간이 없습니다.");
+        DeckSaveManager.TrySelectSlot(t_index);
+        _context.CommitAdvance();
         _context.CompleteIfLast();
-
-        // 삽입이 왕복보다 앞선다 — ServerSaveCommands.InvokeAsync 안에서 시작되는 업로드 봉인 밖에서 저장을 끝내
-        // 채택이 세우는 업로드 기준선과 경합하지 않고, 바로 다음 스텝(전투 진입)의 덱 게이트가 빈 슬롯을 보지 않는다.
-        // 그 사이 덱 카드가 잠시 미소유일 수 있으나 덱 저장은 클라 권한이고 lockDeck 재검증은 멀티 진입에만 걸린다(튜토 전투는 싱글).
-        // 지급한 덱을 대표로 세운다 — TryInsertFront가 앞칸에 끼우며 대표 좌표를 옛 덱 쪽으로 밀어 두므로,
-        // 세우지 않으면 덱 탭이 엉뚱한 덱을 열고 뒤따르는 카드 장착 스텝이 영구 대기한다.
-        if (DeckSaveManager.TryFindSlot(t_cards, out int t_index) ||
-            DeckSaveManager.TryInsertFront(t_cards, _step.DeckName, DeckImages.PickRandomKey(), out t_index))
-            DeckSaveManager.TrySelectSlot(t_index);
-        else
-            Debug.LogWarning($"[TutorialStepExecutor] {Where(_context)} deck insertion failed — the list is full or the save is not loaded (check the DeckSaveManager log).");
-
-        RequestGrant(GrantPackIdOf(_step, Where(_context)));
-
         return EOutgameTutorialStepResult.Advanced;
     }
 
-    // 보상 카드를 오버레이로 보여 주고 유저가 [획득]을 눌러야 지급되는 자리.
-    // 진입에 성공하면 완료를 넘기지 않는다(EnterFirstRank와 같은 이유: 뒤이을 안내의 딤이 카드 비행을 덮는다) —
-    // 완료는 획득 뒤에 이어지는 로비 획득 연출이 끝나는 신호가 확정한다.
     static EOutgameTutorialStepResult EnterCardGrant(TutorialStepDef _step, OutgameTutorialStepContext _context)
     {
         if (_step.CardId <= 0)
@@ -234,16 +219,13 @@ public static class TutorialStepExecutor
         var t_origin = t_overlay.CardAnchor;
         bool t_parallel = _step.ParallelGain;
         string t_packId = GrantPackIdOf(_step, Where(_context));
-        t_overlay.Show(TitleOf(_step, DefaultRewardTitle), t_card, () => AcquireCard(t_packId, t_card, t_origin, t_parallel));
+        t_overlay.Show(TitleOf(_step, DefaultRewardTitle), t_card, () => AcquireCard(t_card, t_origin, t_parallel));
         return EOutgameTutorialStepResult.Gated;
     }
 
-    // [획득]이 눌린 순간. 지급을 서버에 맡기고 로비 획득 연출에 넘긴다(카드가 도감 탭으로 날아간다).
     // 화면이 뜬 뒤 클릭까지는 시간 제한이 없어, 진입 때 확인한 디렉터가 그 사이 사라질 수 있다.
-    static bool AcquireCard(string _packId, int _cardId, RectTransform _origin, bool _parallel)
+    static bool AcquireCard( int _cardId, RectTransform _origin, bool _parallel)
     {
-        // 연출은 왕복을 기다리지 않는다 — [획득]의 반응성을 네트워크에 묶지 않는다(소유는 응답 채택이 뒤따라 맞춘다).
-        RequestGrant(_packId);
 
         CardPackRewardHandoff.Set(CurrencyGain.None, new List<int> { _cardId });
         if (LobbyGainEffectDirector.PlayNow(_origin))
@@ -259,16 +241,13 @@ public static class TutorialStepExecutor
         // 기다리는 스텝을 놓아준다. 이 신호가 없으면 올 리 없는 연출을 기다리며 영영 멈춘다.
         LobbyGainEffectDirector.NotifySkipped();
 
-        Debug.LogWarning("[TutorialStepExecutor] Could not play the gain presentation, so the card flight is skipped (the grant request was still sent).");
+        Debug.LogWarning("[TutorialStepExecutor] Could not play the gain presentation, so the card flight is skipped (the grant is confirmed).");
         return false;
     }
 
-    // 화면을 세우지 못한 경로의 마무리. 지급을 요청해 두고 결말은 저작에 맡긴다.
-    // 서버 이관 후 "화면을 못 세워도 소유는 준다"는 보장은 best-effort 로 격하됐다(왕복이 실패하면 안 들어온다).
     static EOutgameTutorialStepResult FailAfterGrant(TutorialStepDef _step, OutgameTutorialStepContext _context, string _reason)
     {
         // 무엇을 주는지는 서버가 팩 ID로 정한다 — 저작 카드 ID가 아니라 팩 배선 여부가 요청을 보낼 수 있는지의 기준이다.
-        RequestGrant(GrantPackIdOf(_step, Where(_context)));
 
         return Fail(_step, _context, _reason);
     }
@@ -289,15 +268,12 @@ public static class TutorialStepExecutor
         var t_origin = t_overlay.CardAnchor;
         bool t_parallel = _step.ParallelGain;
         string t_packId = GrantPackIdOf(_step, Where(_context));
-        t_overlay.Show(TitleOf(_step, DefaultCardSetTitle), t_cards, () => AcquireCards(t_packId, t_cards, t_origin, t_parallel));
+        t_overlay.Show(TitleOf(_step, DefaultCardSetTitle), t_cards, () => AcquireCards(t_cards, t_origin, t_parallel));
         return EOutgameTutorialStepResult.Gated;
     }
 
-    // [받기]가 눌린 순간. 지급을 서버에 맡기고 로비 획득 연출에 넘긴다(카드들이 도감 탭으로 날아간다).
-    static void AcquireCards(string _packId, IReadOnlyList<int> _cards, RectTransform _origin, bool _parallel)
+    static void AcquireCards( IReadOnlyList<int> _cards, RectTransform _origin, bool _parallel)
     {
-        // 연출은 왕복을 기다리지 않는다 — [받기]의 반응성을 네트워크에 묶지 않는다(소유는 응답 채택이 뒤따라 맞춘다).
-        RequestGrant(_packId);
 
         CardPackRewardHandoff.Set(CurrencyGain.None, _cards);
         if (LobbyGainEffectDirector.PlayNow(_origin))
@@ -356,10 +332,8 @@ public static class TutorialStepExecutor
         Debug.LogWarning("[TutorialStepExecutor] Could not play the pack flight, so it is skipped (the guide keeps going).");
     }
 
-    // FailAfterGrant와 같은 규약 — 소유 보장은 서버 이관 후 best-effort 다.
     static EOutgameTutorialStepResult FailAfterSetGrant(TutorialStepDef _step, OutgameTutorialStepContext _context, string _reason)
     {
-        RequestGrant(GrantPackIdOf(_step, Where(_context)));
 
         return Fail(_step, _context, _reason);
     }
@@ -387,9 +361,4 @@ public static class TutorialStepExecutor
         return t_packId;
     }
 
-    // 결손은 GrantPackIdOf가 이미 알렸다 — 여기서는 보낼 키가 없는 요청만 조용히 접는다.
-    static void RequestGrant(string _packId)
-    {
-        if (!string.IsNullOrEmpty(_packId)) TutorialGrantCommand.GrantAsync(_packId).Forget();
-    }
 }

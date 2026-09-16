@@ -54,6 +54,9 @@ public sealed class ContentUnlockIntroView : PooledOverlay<ContentUnlockIntroVie
     Vector2 _confirmHome;
     Vector3 _iconScale;
     Vector3 _glowScale;
+    Vector2[] _iconSizes;
+    Vector2[] _namePositions;
+    Vector2[] _nameSizes;
     CanvasGroup _headingGroup;
     CanvasGroup _messageGroup;
     CanvasGroup _bodyGroup;
@@ -107,6 +110,7 @@ public sealed class ContentUnlockIntroView : PooledOverlay<ContentUnlockIntroVie
                 if (showName) _iconNames[i].text = names[i];
             }
         }
+        FitIconRow(icons != null ? icons.Count : 0);
         _confirmButton.onClick.RemoveListener(Confirm);
         _confirmButton.onClick.AddListener(Confirm);
         MarkOpen();
@@ -126,6 +130,18 @@ public sealed class ContentUnlockIntroView : PooledOverlay<ContentUnlockIntroVie
     {
         if (_captured) return;
         _captured = true;
+        _iconSizes = new Vector2[_icons.Length];
+        for (int i = 0; i < _icons.Length; i++)
+            if (_icons[i] != null) _iconSizes[i] = _icons[i].rectTransform.sizeDelta;
+        int nameCount = _iconNames != null ? _iconNames.Length : 0;
+        _namePositions = new Vector2[nameCount];
+        _nameSizes = new Vector2[nameCount];
+        for (int i = 0; i < nameCount; i++)
+        {
+            if (_iconNames[i] == null) continue;
+            _namePositions[i] = _iconNames[i].rectTransform.anchoredPosition;
+            _nameSizes[i] = _iconNames[i].rectTransform.sizeDelta;
+        }
         _headingHome = _headingText.rectTransform.anchoredPosition;
         _stageHome = _contentRoot.anchoredPosition;
         _iconHome = iconRoot.anchoredPosition;
@@ -188,6 +204,31 @@ public sealed class ContentUnlockIntroView : PooledOverlay<ContentUnlockIntroVie
         _intro.Insert(confirmAt, confirmRect.DOAnchorPos(_confirmHome, confirmDuration).SetEase(Ease.OutCubic));
         _intro.OnComplete(() => _confirmButton.interactable = true);
         _intro.Play();
+    }
+
+    void FitIconRow(int count)
+    {
+        var layout = iconRoot.GetComponent<HorizontalLayoutGroup>();
+        float spacing = layout != null ? layout.spacing : 0f;
+        float available = iconRoot.rect.width - (layout != null ? layout.padding.horizontal : 0);
+        float width = count > 2 ? Mathf.Max(0f, (available - spacing * (count - 1)) / count) : 0f;
+        for (int i = 0; i < _icons.Length; i++)
+        {
+            if (_icons[i] == null) continue;
+            Vector2 size = _iconSizes[i];
+            if (count > 2 && size.x > width) size *= width / size.x;
+            _icons[i].rectTransform.sizeDelta = size;
+            if (_iconNames == null || i >= _iconNames.Length || _iconNames[i] == null) continue;
+            Vector2 position = _namePositions[i];
+            Vector2 nameSize = _nameSizes[i];
+            if (count > 2)
+            {
+                position.x = (i - (count - 1) * 0.5f) * (width + spacing);
+                nameSize.x = width;
+            }
+            _iconNames[i].rectTransform.anchoredPosition = position;
+            _iconNames[i].rectTransform.sizeDelta = nameSize;
+        }
     }
 
     void Confirm()
