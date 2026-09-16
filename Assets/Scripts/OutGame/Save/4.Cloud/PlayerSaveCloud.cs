@@ -163,6 +163,7 @@ static class PlayerSaveCloud
         while (true)
         {
             _ct.ThrowIfCancellationRequested();
+            if (OnboardingCommands.UploadsHeld) return false;
             if (t_generation != s_generation || !s_initialized || !s_uploadApproved || !CanRunServerCommand)
                 return false;
 
@@ -254,6 +255,84 @@ static class PlayerSaveCloud
         }
     }
 
+    internal readonly struct CommandSession
+    {
+        internal readonly int Generation;
+        internal readonly string UserId;
+        internal readonly string EnvId;
+
+        internal CommandSession(int _generation, string _userId, string _envId)
+        {
+            Generation = _generation;
+            UserId = _userId;
+            EnvId = _envId;
+        }
+    }
+
+    /// <summary>명령 시작 시 계정·환경·세션 세대를 고정한다.</summary>
+    internal static CommandSession CaptureCommandSession()
+    {
+        var t_session = new CommandSession(s_generation, s_activeUserId, s_envId);
+        RequireCommandSession(t_session);
+        return t_session;
+    }
+
+    internal static bool IsCommandSessionCurrent(CommandSession _session)
+        => s_initialized && _session.Generation == s_generation && _session.UserId == s_activeUserId &&
+            !string.IsNullOrEmpty(_session.UserId) && _session.UserId == FirebaseAuthService.Instance.UserId &&
+            FirebaseAuthService.Instance.IsCurrentUserActive && _session.EnvId == s_envId;
+
+    /// <summary>비동기 경계를 지난 명령이 현재 쓰기 가능한 같은 계정인지 확인한다.</summary>
+    internal static void RequireCommandSession(CommandSession _session)
+    {
+        if (!IsCommandSessionCurrent(_session))
+            throw new ServerAdoptionException("The save session changed during onboarding recovery.");
+        if (!s_uploadApproved || !CanRunServerCommand)
+            throw new ServerAdoptionException($"Onboarding recovery is not allowed while the save cloud is {State}.");
+    }
+
+    /// <summary>재전송 전에 원격 세션 충돌을 검사한다. 검사만으로 Ready 상태를 복구하지 않는다.</summary>
+    internal static void ValidateOnboardingSnapshot(OnboardingCurrentSnapshot _snapshot, CommandSession _session)
+    {
+        RequireCommandSession(_session);
+        if (_snapshot?.Save == null)
+            throw new ServerAdoptionException("The onboarding recovery snapshot is missing.");
+        long t_revision = _snapshot.Save.Value<long>("revision");
+        if (_snapshot.Save.Value<long>("schemaVersion") != UserSaveData.VERSION || t_revision < Revision)
+            throw new ServerAdoptionException("The onboarding recovery snapshot is incompatible.");
+        if (t_revision > Revision && _snapshot.Save.Value<string>("deviceId") != PlayerSaveDocument.DeviceId())
+        {
+            BlockSession(ECloudBlockReason.RemoteAhead, "Another device changed the save during onboarding recovery.");
+            throw new ServerAdoptionException("Another device changed the save during onboarding recovery.");
+        }
+    }
+
+    /// <summary>온보딩 처리 기록과 같은 트랜잭션에서 읽은 최신 스냅샷을 채택한다.</summary>
+    internal static void AdoptOnboardingSnapshot(OnboardingCurrentSnapshot _snapshot, CommandSession _session)
+    {
+        ValidateOnboardingSnapshot(_snapshot, _session);
+        long t_revision = _snapshot.Save.Value<long>("revision");
+
+        ServerSlotPatch t_slots = CallablePayload.ToResponse<ServerSlotPatch>(_snapshot.Save);
+        // 이 명령들은 덱·로컬 진행도를 쓰지 않는다. 화면에서 편집 중인 데이터와 런타임 캐시를 보존한다.
+        t_slots.Deck = null;
+        t_slots.Rank = null;
+        t_slots.AlbumReward = null;
+        t_slots.Adventure = null;
+        if (t_slots.Tutorial?.SynergyIntroduction != null)
+            DataSaveManager.Data.Tutorial.SynergyIntroduction = t_slots.Tutorial.SynergyIntroduction;
+        t_slots.Tutorial = null;
+        DataSaveManager.AdoptServerSlots(t_slots);
+        Revision = t_revision;
+        if (_snapshot.Wallet != null) WalletCloud.Adopt(_snapshot.Wallet);
+        if (_snapshot.Missions != null) MissionManager.Adopt(_snapshot.Missions);
+        LastError = string.Empty;
+        SetUploadFailures(0);
+        SetState(EPlayerSaveCloudState.Ready);
+        // 유지한 로컬 진행도는 최신 revision 위에 다시 저장해 복구 결과와 합친다.
+        MarkUploadPending();
+    }
+
     /// <summary>서버 호출이 끝났다 — 봉인을 풀고 밀린 변경분이 있으면 업로드를 예약한다.</summary>
     internal static void ResumeUploads()
     {
@@ -328,6 +407,7 @@ static class PlayerSaveCloud
 
     internal static void Shutdown()
     {
+        OnboardingCommands.ResetSession();
         DataSaveManager.OnSaved -= MarkDirty;
         FirebaseAuthService.Instance.OnStateChanged -= HandleAuthStateChanged;
 
@@ -908,6 +988,7 @@ static class PlayerSaveCloud
 
     static async UniTask UploadAsync(int _generation, bool _isImmediate)
     {
+        if (OnboardingCommands.UploadsHeld) return;
 #if UNITY_EDITOR
         if (OnboardingPlayTest.IsActive || OnboardingPlayTest.IsPreparing) return;
 #endif

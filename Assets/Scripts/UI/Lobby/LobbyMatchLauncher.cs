@@ -262,6 +262,22 @@ public class LobbyMatchLauncher : MonoBehaviour
         m_running = true;
         MissionCutInView.SetMatchEntry(true);
 
+        try
+        {
+            if (!await OutgameTutorialRunner.ConfirmBattleDepartureAsync(this.GetCancellationTokenOnDestroy()))
+            {
+                ShowEntryBlocked("전투 진입 상태를 저장하지 못했습니다.\n네트워크 연결을 확인한 뒤 다시 시도해 주세요.");
+                return;
+            }
+        }
+        catch (System.OperationCanceledException) { return; }
+        catch (System.Exception t_error)
+        {
+            Debug.LogException(t_error);
+            if (this != null) ShowEntryBlocked("전투 진입 상태를 확인하지 못했습니다.\n다시 시도해 주세요.");
+            return;
+        }
+
         EBattleContentGateResult t_result = await BattleContentSync.CheckBeforeBattleAsync(
             DeckConfig.IsMultiplayer, this.GetCancellationTokenOnDestroy());
         if (this == null) return;

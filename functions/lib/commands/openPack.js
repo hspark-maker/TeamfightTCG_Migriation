@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.openPack = void 0;
+const onboardingOperation_1 = require("../save/onboardingOperation");
 const requestMetrics_1 = require("../observability/requestMetrics");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
@@ -132,7 +133,7 @@ exports.openPack = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)("o
     // 기간은 여기서 **한 번만** 잰다 — 트랜잭션 콜백은 재실행되므로 그 안에서 재면
     // 경계에 걸린 호출이 어느 기간에 실릴지가 재실행 운에 달린다.
     const period = (0, period_1.missionPeriod)(Date.now());
-    const result = await (0, saveDocument_1.mutateSave)(env, uid, "openPack", { kind: "client", txId }, async (current, transaction, wallet) => {
+    const result = await (0, saveDocument_1.mutateSave)(env, uid, "openPack", { kind: "client", txId, ...(0, onboardingOperation_1.onboardingReceipt)(request.data, "openPack") }, async (current, transaction, wallet) => {
         // 독립 문서는 함께 읽고, 미션·지갑 쓰기 전에 모두 확보한다.
         const missionReference = (0, missionStore_1.missionsRef)(firebaseApp_1.db, env, uid);
         const [missionSnapshot, rankSnapshot] = await transaction.getAll(missionReference, (0, rankStore_1.rankRef)(firebaseApp_1.db, env, uid));

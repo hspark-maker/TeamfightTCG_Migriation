@@ -7,16 +7,35 @@ using UnityEngine;
 public sealed partial class GuidanceCoordinator
 {
     int m_pauseVersion;
-    public static bool CanCloseCardDetail => !IsInputLocked || IsInternalNavigation
+    public static bool CanCloseCardDetail => IsInternalNavigation || (!OnboardingSession.IsBusy && !IsInputLocked)
         || (CanAcceptGuideReturn && OutgameTutorialGuide.TryGetCurrentStep(out var t_step)
             && (t_step.Completion == EOutgameTutorialCompletion.CardDetailReturn
                 || t_step.Completion == EOutgameTutorialCompletion.LobbyReturn));
-    public static bool CanCloseAlbum => !IsInputLocked || IsInternalNavigation
+    public static bool CanCloseAlbum => IsInternalNavigation || (!OnboardingSession.IsBusy && !IsInputLocked)
         || (CanAcceptGuideReturn && OutgameTutorialGuide.TryGetCurrentStep(out var t_step)
             && t_step.Completion == EOutgameTutorialCompletion.LobbyReturn);
 
-    static bool CanAcceptGuideReturn => !IsRestoring
+    static bool CanAcceptGuideReturn => !IsRestoring && !OnboardingSession.IsBusy
         && (OutgameTutorialGateUI.Instance == null || !OutgameTutorialGateUI.Instance.IsTransitionOnly);
+
+    /// <summary>현재 안내의 화면만 한 번 복구한다. 실패 처리는 호출자가 맡는다.</summary>
+    public static async UniTask<bool> TryRestoreCurrentSurfaceAsync(CancellationToken _ct)
+    {
+        var t_owner = s_instance;
+        if (t_owner == null || t_owner.m_flow == null || t_owner.m_flowPreparing) return false;
+        int t_version = t_owner.m_flowVersion;
+        t_owner.m_flowPreparing = true;
+        try
+        {
+            await t_owner.RestoreFlowSurfaceAsync(t_owner.m_flow, _ct);
+            t_owner.EnsureFlow(t_version, _ct);
+            return true;
+        }
+        finally
+        {
+            if (t_owner != null && t_owner.m_flowVersion == t_version) t_owner.m_flowPreparing = false;
+        }
+    }
 
     async UniTask SelectFlowTabAsync(EOutgameFeature _feature, CancellationToken _ct)
     {
@@ -115,7 +134,8 @@ public sealed partial class GuidanceCoordinator
             {
                 if (!(m_shell.CurrentPanel is DeckTabController t_deck))
                     throw new InvalidOperationException("덱 화면을 찾을 수 없습니다.");
-                using (InternalNavigation()) t_deck.OpenEditor(DeckSaveManager.SelectedSlot);
+                if (DeckEditController.OpenEditor == null)
+                    using (InternalNavigation()) t_deck.OpenEditor(DeckSaveManager.SelectedSlot);
             }
         }
         else if (_flow.destination != EOutgameFeature.None)
@@ -149,7 +169,7 @@ public sealed partial class GuidanceCoordinator
         {
             m_pauseVersion++;
             m_applicationPaused = true;
-            if (m_flow != null) CancelMissionFlow(true);
+            if (m_flow != null) CancelMissionFlow(true, false);
             return;
         }
         if (!m_applicationPaused) return;
@@ -169,27 +189,23 @@ public sealed partial class GuidanceCoordinator
             m_flowLocked = true;
             m_flowPreparing = true;
             ShowTransition();
-            using (InternalNavigation())
-            {
-                CardDetailOverlayView.Close();
-                AlbumPageOverlayView.CloseOpen();
-            }
-            float t_deadline = Time.realtimeSinceStartup + 5f;
             while (ServerSaveCommands.IsInFlight)
             {
                 if (_version != m_pauseVersion) return;
-                if (Time.realtimeSinceStartup >= t_deadline)
-                    throw new InvalidOperationException("강화 결과를 확인하지 못했습니다. 연결 복구 후 다시 시도해 주세요.");
                 await UniTask.Yield(t_ct);
             }
-            using (var t_refresh = CancellationTokenSource.CreateLinkedTokenSource(t_ct))
-            {
-                using var t_timer = t_refresh.CancelAfterSlim(TimeSpan.FromSeconds(5));
-                try { await OutgameTutorialGuide.RefreshFreeShotSpentAsync().AttachExternalCancellation(t_refresh.Token); }
-                catch (OperationCanceledException) when (!t_ct.IsCancellationRequested)
-                { throw new InvalidOperationException("강화 결과 확인이 지연되고 있습니다. 연결 복구 후 다시 시도해 주세요."); }
-            }
+            await OnboardingCommands.RecoverPendingAsync(t_ct);
+            await OutgameTutorialGuide.RefreshFreeShotSpentAsync().AttachExternalCancellation(t_ct);
             if (_version != m_pauseVersion) return;
+            if (GuideResume.IsFor(EOutgameTutorialTrigger.CollectionTabFirstEnter)
+                || GuideResume.IsFor(EOutgameTutorialTrigger.SynergyGrowthIntroduction))
+            {
+                using (InternalNavigation())
+                {
+                    CardDetailOverlayView.Close();
+                    AlbumPageOverlayView.CloseOpen();
+                }
+            }
             RequestCurrentMission();
         }
         catch (OperationCanceledException) { }

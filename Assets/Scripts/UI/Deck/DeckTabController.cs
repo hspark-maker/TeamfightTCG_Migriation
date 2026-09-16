@@ -43,6 +43,7 @@ public class DeckTabController : LobbyTabPanel
 
     // 마지막으로 편집하던 저장 슬롯. 탭을 다시 열었을 때 보던 덱이 그대로 뜨게 한다(없으면 -1).
     int m_lastSlot = -1;
+    DeckEditController.Draft m_guideDraft;
 
     /// <summary>로비가 넘긴 서비스를 받아둔다. 편집 화면은 열 때 세워지므로 여기서 전달하지 못한다.</summary>
     public override void Initialize(LobbyTabServices _services)
@@ -55,9 +56,6 @@ public class DeckTabController : LobbyTabPanel
     protected override void OnViewShown()
     {
         base.OnViewShown();
-        // 편집 중 탭이 꺼졌다 켜지면 이전 편집분은 무저장 폐기된다.
-        // 편집은 DeckEditController의 메모리 사본에서만 일어나고 세이브는 손대지 않으므로
-        // 손실은 "이번 편집분"뿐이고 기존 덱은 온전하다 — 그래서 확인 팝업 없이 다시 열어도 안전하다.
         // 오버라이드 한 줄이라 Revert 한 번에 꺼진다 — 꺼지면 풀에 등록돼 매치 화면이 이것을 빌려 간다.
         if (this.editor != null && !this.editor.IsHostEmbedded)
             Debug.LogError("[DeckTabController] This editor is placed inside a tab but hostEmbedded is off — "
@@ -270,7 +268,7 @@ public class DeckTabController : LobbyTabPanel
         {
             HideEditor();
             _proceed();
-        });
+        }, true);
     }
 
     // 이 탭이 열 덱을 정한다: 마지막으로 보던 덱 → 출전 중인 대표 덱 → 첫 유효 덱 → 하나도 없으면 신규 생성.
@@ -311,12 +309,17 @@ public class DeckTabController : LobbyTabPanel
         {
             this.editor.Initialization(_data);
             this.editor.Show();
+            this.editor.RestoreDraft(m_guideDraft);
+            m_guideDraft = null;
             m_editing = true;
 
             return;
         }
 
-        if (DeckEditController.OpenPooled(_data) == null) return;
+        var t_editor = DeckEditController.OpenPooled(_data);
+        if (t_editor == null) return;
+        t_editor.RestoreDraft(m_guideDraft);
+        m_guideDraft = null;
 
         m_editing = true;
 
@@ -339,6 +342,9 @@ public class DeckTabController : LobbyTabPanel
         // 그 갈아탄 덱이 곧 출전 덱이므로 대표 좌표도 여기서 함께 따라간다.
         DeckEditController t_editor = Editor;
         if (t_editor == null) return;
+
+        m_guideDraft = GuideResume.IsFor(EOutgameTutorialTrigger.SynergyBattleIntroduction)
+            ? t_editor.CaptureDraft() : null;
 
         if (t_editor.CurrentSlot >= 0)
         {

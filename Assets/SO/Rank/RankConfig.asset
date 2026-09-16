@@ -14,8 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RankConfig
   winPoints: 10
   losePoints: 10
-  unrankedDisplayName: Unranked
-  unrankedBadge: {fileID: 21300000, guid: 3fab8619b568843a1a5766e0df6d5300, type: 3}
   grades:
   - grade: 0
     displayName: Bronze

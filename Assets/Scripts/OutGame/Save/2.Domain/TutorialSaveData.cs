@@ -5,6 +5,8 @@ using Firebase.Firestore;
 [FirestoreData(UnknownPropertyHandling = UnknownPropertyHandling.Ignore)]
 public class TutorialSaveData
 {
+    [FirestoreProperty("execution")] public OnboardingExecutionSaveData Execution { get; set; }
+    [FirestoreProperty("onboardingCommand")] public OnboardingCommandSaveData OnboardingCommand { get; set; }
     // 완료 여부 — 진행 좌표보다 항상 우선
     [FirestoreProperty("outgameCompleted")] public bool OutgameCompleted { get; set; }
 
@@ -34,6 +36,20 @@ public class TutorialSaveData
     [FirestoreProperty("adventureIntroCompleted")] public bool AdventureIntroCompleted { get; set; }
     [FirestoreProperty("synergyIntroduction")] public SynergyIntroductionSaveData SynergyIntroduction { get; set; } = new SynergyIntroductionSaveData();
     [FirestoreProperty("guideResume")] public GuideResumeSaveData GuideResume { get; set; }
+}
+
+/// <summary>응답 유실 후 같은 온보딩 명령을 복구할 실행 기록.</summary>
+[FirestoreData(UnknownPropertyHandling = UnknownPropertyHandling.Ignore)]
+public sealed class OnboardingCommandSaveData
+{
+    [FirestoreProperty("version")] public int Version { get; set; } = 1;
+    [FirestoreProperty("stepId")] public int StepId { get; set; }
+    [FirestoreProperty("command")] public string Command { get; set; }
+    [FirestoreProperty("txId")] public string TxId { get; set; }
+    [FirestoreProperty("argumentsJson")] public string ArgumentsJson { get; set; }
+    [FirestoreProperty("resultJson")] public string ResultJson { get; set; }
+    [FirestoreProperty("completed")] public bool Completed { get; set; }
+    [FirestoreProperty("consumed")] public bool Consumed { get; set; }
 }
 
 /// <summary>완료하지 못한 안내의 재개 지점과 작업 대상.</summary>

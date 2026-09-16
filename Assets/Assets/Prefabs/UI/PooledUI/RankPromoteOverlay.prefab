@@ -15110,7 +15110,6 @@ MonoBehaviour:
   - {fileID: 1374811933046138795}
   titleGradeUp: "\uC2B9\uAE09\uC804 \uC2B9\uB9AC!"
   titleFirstEntry: "\uB7AD\uD06C \uBC30\uC815"
-  titleBrowse: "\uD604\uC7AC \uB7AD\uD06C"
   transition:
     panel: {fileID: 0}
     openDuration: 0.08

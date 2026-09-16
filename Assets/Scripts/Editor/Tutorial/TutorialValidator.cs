@@ -181,12 +181,10 @@ public static class TutorialValidator
                 t_error = $"해금 소개 정의 {t_i}의 콘텐츠가 비어 있거나 유효하지 않습니다.";
             else if (!t_seen.Add(t_intro.content))
                 t_error = $"{t_intro.content} 해금 소개 정의가 중복입니다.";
-            else if (string.IsNullOrWhiteSpace(t_intro.contentName)
-                  || string.IsNullOrWhiteSpace(t_intro.description) || t_intro.icon == null)
-                t_error = $"{t_intro.content} 해금 소개의 이름·본문·아이콘 중 빠진 값이 있습니다.";
-            else if (t_intro.content == EContentUnlockIntro.Mission
-                  && (string.IsNullOrWhiteSpace(t_intro.guideMissionName) || t_intro.guideMissionIcon == null))
-                t_error = "미션 해금 소개의 가이드 미션 이름·아이콘 중 빠진 값이 있습니다.";
+            else if (string.IsNullOrWhiteSpace(t_intro.description))
+                t_error = $"{t_intro.content} 해금 소개의 본문이 비어 있습니다.";
+            else if (!t_intro.TryValidate(out var t_itemError))
+                t_error = $"{t_intro.content}: {t_itemError}";
 
             if (t_error != null)
                 _issues.Add(new TutorialIssue(ETutorialIssueLevel.Error, 0, 0, 0, "해금 소개 정의",
@@ -424,6 +422,11 @@ public static class TutorialValidator
     static void ValidateStep(TutorialStepDef _def, int _chapter, int _index, bool _forced, List<TutorialIssue> _issues)
     {
         var t_action = _def.Action;
+
+        if (!TutorialActionMeta.Of(t_action).HasExecutionContract)
+            Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "실행 계약 없음",
+                $"{t_action}의 실행·완료 계약이 없습니다.",
+                "TutorialActionMeta와 TutorialStepExecutor에 행동을 등록하세요.");
 
         // (5) Halt는 좌표를 되돌려 재시도를 노리는 정책인데, 앵커도 완료 신호도 없으면 되돌려 봐야 다시 세울 수단이 없다.
         //     되돌린 좌표가 강제는 세이브에 남아 다음 초기화를 노릴 수라도 있지만, 자율은 메모리 전용이라 그 기회조차 없다.

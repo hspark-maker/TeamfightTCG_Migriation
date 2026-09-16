@@ -35,6 +35,10 @@ public sealed partial class GuidanceCoordinator
                 && _anchor != EOutgameTutorialAnchor.None
                 && OutgameTutorialGuide.TryGetCurrentStep(out var t_step) && t_step.Anchor == _anchor);
 
+    /// <summary>안내가 허용한 이동만 통과시킨다.</summary>
+    public static bool AllowsUserNavigation(EOutgameTutorialAnchor _anchor)
+        => IsInternalNavigation || (!OnboardingSession.IsBusy && AllowsUserAction(_anchor));
+
     /// <summary>조정기와 스텝 실행기가 수행하는 화면 이동의 수명이다.</summary>
     public static IDisposable InternalNavigation() => new NavigationScope(s_instance);
 
@@ -151,8 +155,9 @@ public sealed partial class GuidanceCoordinator
         {
             ShowTransition();
             var t_flow = m_flow;
+            await OnboardingCommands.RecoverPendingAsync(_ct);
+            EnsureFlow(_version, _ct);
             if (t_flow.tutorial != EOutgameTutorialTrigger.None) GuideResume.Begin(t_flow);
-            if (!await GuideResume.SaveConfirmedAsync(_ct)) throw new InvalidOperationException("안내 진행을 저장하지 못했습니다.");
             EnsureFlow(_version, _ct);
             var t_intros = PendingIntros(t_flow);
             if (t_intros.Count > 0)
@@ -175,7 +180,6 @@ public sealed partial class GuidanceCoordinator
             }
             if (GuideResume.IsFor(t_flow.tutorial)) GuideResume.Record.IntroductionSeen = true;
             DataSaveManager.Save();
-            if (!await GuideResume.SaveConfirmedAsync(_ct)) throw new InvalidOperationException("해금 안내 결과를 저장하지 못했습니다.");
             EnsureFlow(_version, _ct);
             if (t_flow.tutorial == EOutgameTutorialTrigger.None) { CancelMissionFlow(false); return; }
             if (!PrepareFlowTarget(t_flow))
@@ -185,7 +189,6 @@ public sealed partial class GuidanceCoordinator
                 GuideResume.SetTarget(OutgameTutorialGuide.TargetCardId, OutgameTutorialGuide.TargetLevel);
             await RestoreFlowSurfaceAsync(t_flow, _ct);
             EnsureFlow(_version, _ct);
-            if (!await GuideResume.SaveConfirmedAsync(_ct)) throw new InvalidOperationException("안내 재개 위치를 저장하지 못했습니다.");
             EnsureFlow(_version, _ct);
             m_flowPreparing = false;
             ClearTransition();
@@ -257,8 +260,10 @@ public sealed partial class GuidanceCoordinator
     void ShowTransition() => OutgameTutorialBridge.EnsureGateForGuidance()?.ShowTransitionGate(this);
     void ClearTransition() => OutgameTutorialGateUI.Instance?.Clear(this);
 
-    void CancelMissionFlow(bool _defer)
+    void CancelMissionFlow(bool _defer, bool _closeSurface = true)
     {
+        bool t_ownedGuidance = m_flow != null || OutgameTutorialRunner.IsGuidedRunning;
+        var t_trigger = m_flow != null ? m_flow.tutorial : OutgameTutorialRunner.GuidedTrigger;
         bool t_ownedAdventure = m_flow != null && m_flow.tutorial == EOutgameTutorialTrigger.AdventureUnlocked;
         bool t_ownedGrowth = m_flow != null && (m_flow.tutorial == EOutgameTutorialTrigger.CollectionTabFirstEnter
             || m_flow.tutorial == EOutgameTutorialTrigger.SynergyGrowthIntroduction);
@@ -275,10 +280,11 @@ public sealed partial class GuidanceCoordinator
         ClearTransition();
         using (InternalNavigation())
         {
-            OutgameTutorialRunner.AbortGuided();
+            if (t_ownedGuidance) OnboardingSession.Suspend();
+            OutgameTutorialRunner.AbortGuided(_defer ? t_trigger : EOutgameTutorialTrigger.None);
             ContentUnlockPresentation.CancelCurrent();
-            if (t_ownedAdventure && _defer) m_launcher?.CancelGuidedAdventureEntry();
-            if (t_ownedGrowth && _defer)
+            if (t_ownedAdventure && _defer && _closeSurface) m_launcher?.CancelGuidedAdventureEntry();
+            if (t_ownedGrowth && _defer && _closeSurface)
             {
                 CardDetailOverlayView.Close();
                 AlbumPageOverlayView.CloseOpen();
@@ -296,7 +302,17 @@ public sealed partial class GuidanceCoordinator
             titleText = _reason,
             yesText = "재시도",
             yesAction = RequestCurrentMission,
-            noText = "나중에",
+            noText = "종료",
+            noAction = QuitAfterFlowFailure,
         });
     }
+    static void QuitAfterFlowFailure()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
 }

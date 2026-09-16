@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.enhanceKeyword = void 0;
+const onboardingOperation_1 = require("../save/onboardingOperation");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
 const node_crypto_1 = require("node:crypto");
@@ -100,7 +101,7 @@ exports.enhanceKeyword = (0, https_1.onCall)(async (request) => {
     let replayed = true;
     // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
     const txId = (0, receiptId_1.clientReceiptId)(request.data?.txId, (0, node_crypto_1.randomUUID)());
-    const result = await (0, saveDocument_1.mutateSave)(env, uid, "enhanceKeyword", { kind: "client", txId }, async (current, transaction, wallet) => {
+    const result = await (0, saveDocument_1.mutateSave)(env, uid, "enhanceKeyword", { kind: "client", txId, ...(0, onboardingOperation_1.onboardingReceipt)(request.data, "enhanceKeyword") }, async (current, transaction, wallet) => {
         const levels = (0, keywordGrowth_1.readKeywordLevels)(current.keywordGrowth);
         const currentLevel = (0, keywordGrowth_1.levelOfKeyword)(levels, keyword);
         const step = (0, enhanceRules_1.keywordEnhanceStep)(rule, currentLevel);

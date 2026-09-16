@@ -44,7 +44,9 @@ public static class CardPackOpener
     /// <summary>팩 구매·개봉을 서버에 요청한다. 응답 채택으로 재화·소유·성장 슬롯이 갈아끼워진다.</summary>
     public static async UniTask<OpenedPack> PurchaseAsync(string _packId)
     {
-        EPackOpenResult t_precheck = Precheck(_packId);
+        bool t_replaying = OnboardingCommands.HasReplay("openPack",
+            new { env = ContentProfileConfig.Active.CloudEnvId, packId = _packId });
+        EPackOpenResult t_precheck = t_replaying ? EPackOpenResult.Success : Precheck(_packId);
         if (t_precheck != EPackOpenResult.Success) return OpenedPack.CreateFailure(t_precheck);
 
         // 클라만 SO 폴백을 볼 수 있다 — 시트에 없는 팩은 서버가 아예 모르는 팩이라 반드시 거절된다.
@@ -52,7 +54,8 @@ public static class CardPackOpener
             Debug.LogError($"[CardPackOpener] '{_packId}' is not in the CardPack table.");
 
         // 첫 await 이전이어야 유저가 누른 프레임에 잔액이 줄어든다. 걷는 쪽은 InvokeAsync 가 전담한다.
-        CurrencyPendingTicket t_pending = CurrencyPendingTicket.Hold(PackSpec.PriceType(_packId), -PackSpec.Price(_packId));
+        CurrencyPendingTicket t_pending = t_replaying ? null
+            : CurrencyPendingTicket.Hold(PackSpec.PriceType(_packId), -PackSpec.Price(_packId));
 
         try
         {
@@ -102,6 +105,15 @@ public static class CardPackOpener
 
         Debug.LogWarning($"[CardPackOpener] Could not read the openPack rejection reason — '{_rejected.Reason}'");
         return EPackOpenResult.SpendFailed;
+    }
+
+    /// <summary>확정된 추첨 결과만 개봉 화면으로 변환한다. 구매·지급·차감은 하지 않는다.</summary>
+    internal static bool TryRestorePresentation(OpenPackResult _result, out OpenedPack _opened)
+    {
+        _opened = default;
+        if (_result?.Cards == null || _result.Cards.Count == 0) return false;
+        _opened = BuildOpenedPack(_result);
+        return _opened.Success && _opened.Cards.Count > 0;
     }
 
     static OpenedPack BuildOpenedPack(OpenPackResult _result)

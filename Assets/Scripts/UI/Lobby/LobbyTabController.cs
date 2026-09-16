@@ -48,6 +48,7 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
     /// <summary>이탈 확인 대기를 포함한 최신 화면 이동 요청.</summary>
     public int SelectionRequestVersion => m_selectionRequest;
 
+
     public bool CanSwipe => isActiveAndEnabled && m_currentIndex >= 0
         && (dragController == null || !dragController.IsDragging)
         && m_pendingStart == null && m_startSlides == null
@@ -218,7 +219,7 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
     {
         InitializeUI();
         if (_index < 0 || _index >= tabs.Count) return;
-        if (m_currentIndex >= 0 && !GuidanceCoordinator.AllowsUserAction(tabs[_index].tutorialAnchor)) return;
+        if (m_currentIndex >= 0 && !GuidanceCoordinator.AllowsUserNavigation(tabs[_index].tutorialAnchor)) return;
         if (_fireTrigger &&
             !OutgameFeatureLock.IsUnlocked(tabs[_index].unlockFeature))
             return;
@@ -250,7 +251,7 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
         t_current.RequestLeave(() =>
         {
             if (this == null || !isActiveAndEnabled || t_request != m_selectionRequest) return;
-            if (!t_internal && !GuidanceCoordinator.AllowsUserAction(tabs[_index].tutorialAnchor)) return;
+            if (!t_internal && !GuidanceCoordinator.AllowsUserNavigation(tabs[_index].tutorialAnchor)) return;
             _beforeSelect?.Invoke();
             CommitSelection(_index, _fireTrigger, _onArrived);
             _afterSelect?.Invoke();

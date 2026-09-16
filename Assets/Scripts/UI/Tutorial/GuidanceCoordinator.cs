@@ -40,6 +40,11 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
         && !s_instance.AdventureMapOpen && !ContentUnlockPresentation.IsPlaying
         && !OutgameTutorialRunner.IsRunning && s_instance.SafeToPresent(false, _notification);
 
+    /// <summary>매치 탭이 제자리에 있고 로비 진입 조건을 만족할 때 화면 이동을 허용한다.</summary>
+    public static bool CanNavigateFromMatchTab(PooledUIBase _notification)
+        => CanNavigateFromLobby(_notification)
+        && s_instance.m_shell.IsCurrentAnchorSelected(EOutgameTutorialAnchor.LobbyMatchTab);
+
     public static void Install(GameObject owner)
     {
         if (owner.GetComponent<GuidanceCoordinator>() == null) owner.AddComponent<GuidanceCoordinator>();

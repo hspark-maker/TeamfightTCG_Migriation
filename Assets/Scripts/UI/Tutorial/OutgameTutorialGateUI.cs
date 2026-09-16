@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 아웃게임 튜토리얼 강제 게이트 UI(스텝·세이브·앵커를 모르는 순수 표시 컴포넌트).
-// 전체화면 딤 1장이 입력을 전부 흡수하고, 타깃만 중첩 Canvas로 딤 위에 승격해 선명하게 보이고 눌리게 한다.
+// 전체화면 딤 위로 타깃을 승격한다. 안내가 허용한 타깃만 입력받는다.
 // 완료 판정은 타깃 버튼 onClick 구독으로만 — 기존 리스너 무접촉이라 원래 동작이 그대로 실행된다.
 //
 // 불변식 3개:
@@ -144,9 +144,10 @@ public class OutgameTutorialGateUI : MonoBehaviour
     struct Promotion
     {
         public Canvas Canvas;
-        public bool   AddedCanvas;
-        public bool   AddedRaycaster;
-        public GraphicRaycaster MutedRaycaster;   // 읽을 영역에 이미 저작돼 있던 레이캐스터(승격 동안만 내렸다가 되돌린다)
+        public bool   PrevCanvasEnabled;
+        public GraphicRaycaster Raycaster;
+        public bool PrevRaycasterEnabled;
+        public AdditionalCanvasShaderChannels PrevShaderChannels;
         public bool   PrevOverrideSorting;
         public int    PrevSortingOrder;
         public int    PrevSortingLayerID;
@@ -232,7 +233,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         RefreshVisibility();   // 첫 프레임 깜빡임 방지(LateUpdate 이전에 1회)
     }
 
-    /// <summary>Blocks input without a message while the guidance surface is changing.</summary>
+    /// <summary>화면 준비 중임을 표시하고 입력을 보관한다.</summary>
     public void ShowTransitionGate(MonoBehaviour _owner)
     {
         Release();
@@ -546,7 +547,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
         if (m_spotlight != null && m_spotlight != m_target) PromoteRegion(m_spotlight, true);
     }
 
-    // 영역 하나를 딤 위로 올린다. _readOnly면 그 안의 카드만(없으면 영역째) 올리고 레이캐스터를 붙이지 않는다.
+    // 읽기 전용 영역은 카드만(없으면 영역째) 승격하고 입력을 끈다.
     void PromoteRegion(RectTransform _region, bool _readOnly)
     {
         CollectHighlights(_region, _readOnly);
@@ -587,7 +588,15 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
     void PromoteOne(GameObject _go, bool _clickable)
     {
-        var t_root = m_targetCanvas != null ? m_targetCanvas.rootCanvas : null;
+        for (int t_i = 0; t_i < m_promotions.Count; t_i++)
+        {
+            var t_existing = m_promotions[t_i];
+            if (t_existing.Canvas == null || t_existing.Canvas.gameObject != _go) continue;
+            if (_clickable && t_existing.Raycaster != null) t_existing.Raycaster.enabled = true;
+            return;
+        }
+        var t_source = _go.GetComponentInParent<Canvas>();
+        var t_root = t_source != null ? t_source.rootCanvas : m_gateCanvas;
 
         var t_promotion = new Promotion { Canvas = _go.GetComponent<Canvas>() };
         var t_anchor = _go.GetComponent<TutorialAnchor>();
@@ -597,19 +606,14 @@ public class OutgameTutorialGateUI : MonoBehaviour
             t_promotion.PrevBackgroundActive = t_promotion.Background.activeSelf;
             t_promotion.Background.SetActive(true);
         }
-        t_promotion.AddedCanvas = t_promotion.Canvas == null;
-
-        if (t_promotion.AddedCanvas)
-        {
-            t_promotion.Canvas = _go.AddComponent<Canvas>();
-        }
-        else
-        {
-            // 저작된 Canvas는 지우지 않는다 — 원래 정렬값만 백업해 두고 복원한다.
-            t_promotion.PrevOverrideSorting = t_promotion.Canvas.overrideSorting;
-            t_promotion.PrevSortingOrder    = t_promotion.Canvas.sortingOrder;
-            t_promotion.PrevSortingLayerID  = t_promotion.Canvas.sortingLayerID;
-        }
+        // 지연 삭제와 같은 프레임 재승격이 충돌하지 않도록 대상 수명 동안 재사용한다.
+        if (t_promotion.Canvas == null) t_promotion.Canvas = _go.AddComponent<Canvas>();
+        t_promotion.PrevCanvasEnabled = t_promotion.Canvas.enabled;
+        t_promotion.PrevOverrideSorting = t_promotion.Canvas.overrideSorting;
+        t_promotion.PrevSortingOrder = t_promotion.Canvas.sortingOrder;
+        t_promotion.PrevSortingLayerID = t_promotion.Canvas.sortingLayerID;
+        t_promotion.PrevShaderChannels = t_promotion.Canvas.additionalShaderChannels;
+        t_promotion.Canvas.enabled = true;
 
         t_promotion.Canvas.overrideSorting = true;
         t_promotion.Canvas.sortingOrder    = TargetOrder;
@@ -622,20 +626,14 @@ public class OutgameTutorialGateUI : MonoBehaviour
             t_promotion.Canvas.additionalShaderChannels = t_root.additionalShaderChannels;
         }
 
-        // 읽을 영역(메시지 모드의 하이라이트·클릭 스텝의 스포트라이트)에는 레이캐스터를 두지 않는다 —
-        // 있으면 그 영역이 탭을 삼켜, 메시지 모드는 완료가 막히고 클릭 스텝은 눌러야 할 곳이 둘로 늘어난다.
-        // 중첩 Canvas에 레이캐스터가 없으면 그 아래 그래픽은 레이캐스트에서 빠져 탭이 딤까지 내려간다(보이기만 한다).
+        // 읽기 전용 승격은 입력을 꺼서 딤의 완료 탭을 가로채지 않는다.
         var t_raycaster = _go.GetComponent<GraphicRaycaster>();
 
-        t_promotion.AddedRaycaster = _clickable && t_raycaster == null;
-        if (t_promotion.AddedRaycaster) _go.AddComponent<GraphicRaycaster>();
-
-        // 저작된 레이캐스터가 남아 있으면 승격(351)과 합쳐져 딤(350) 위에서 입력을 받는다 — 그 동안만 내린다.
-        else if (!_clickable && t_raycaster != null && t_raycaster.enabled)
-        {
-            t_promotion.MutedRaycaster = t_raycaster;
-            t_raycaster.enabled        = false;
-        }
+        // 중첩 Canvas를 유지하면 복원 후에도 이 영역의 입력을 받을 레이캐스터가 필요하다.
+        if (t_raycaster == null) t_raycaster = _go.AddComponent<GraphicRaycaster>();
+        t_promotion.Raycaster = t_raycaster;
+        t_promotion.PrevRaycasterEnabled = t_raycaster.enabled;
+        t_raycaster.enabled = _clickable;
 
         m_promotions.Add(t_promotion);
     }
@@ -643,42 +641,24 @@ public class OutgameTutorialGateUI : MonoBehaviour
     // 승격 해제. 타깃이 비활성이거나 파괴된 뒤에도 안전해야 한다(탭 버튼은 클릭 즉시 SetActive(false)된다).
     void Demote()
     {
-        if (!m_promoted) return;
         m_promoted = false;
 
         for (int t_i = 0; t_i < m_promotions.Count; t_i++)
-        {
-            var t_promotion = m_promotions[t_i];
-
-            if (t_promotion.Background != null)
-                t_promotion.Background.SetActive(t_promotion.PrevBackgroundActive);
-
-            // 내려 둔 레이캐스터는 Canvas가 죽었더라도 되돌린다 — 그 컴포넌트는 남아 있을 수 있다.
-            if (t_promotion.MutedRaycaster != null) t_promotion.MutedRaycaster.enabled = true;
-
-            if (t_promotion.Canvas == null) continue;   // 대상이 이미 파괴됨
-
-            // 파괴 순서 고정: GraphicRaycaster가 Canvas를 RequireComponent하므로 Canvas를 먼저 지우면
-            // 조용히 실패해 둘 다 남는다.
-            if (t_promotion.AddedRaycaster)
-            {
-                var t_raycaster = t_promotion.Canvas.GetComponent<GraphicRaycaster>();
-                if (t_raycaster != null) Destroy(t_raycaster);
-            }
-
-            if (t_promotion.AddedCanvas)
-            {
-                Destroy(t_promotion.Canvas);
-            }
-            else
-            {
-                t_promotion.Canvas.overrideSorting = t_promotion.PrevOverrideSorting;
-                t_promotion.Canvas.sortingOrder    = t_promotion.PrevSortingOrder;
-                t_promotion.Canvas.sortingLayerID  = t_promotion.PrevSortingLayerID;
-            }
-        }
-
+            RestorePromotion(m_promotions[t_i]);
         m_promotions.Clear();
+    }
+
+    static void RestorePromotion(Promotion _promotion)
+    {
+        if (_promotion.Background != null) _promotion.Background.SetActive(_promotion.PrevBackgroundActive);
+        if (_promotion.Raycaster != null) _promotion.Raycaster.enabled = _promotion.PrevRaycasterEnabled;
+        if (_promotion.Canvas == null) return;
+        _promotion.Canvas.overrideSorting = true;
+        _promotion.Canvas.sortingOrder = _promotion.PrevSortingOrder;
+        _promotion.Canvas.sortingLayerID = _promotion.PrevSortingLayerID;
+        _promotion.Canvas.additionalShaderChannels = _promotion.PrevShaderChannels;
+        _promotion.Canvas.overrideSorting = _promotion.PrevOverrideSorting;
+        _promotion.Canvas.enabled = _promotion.PrevCanvasEnabled;
     }
 
     // ── 표시 토글 ────────────────────────────────────────────────────────────

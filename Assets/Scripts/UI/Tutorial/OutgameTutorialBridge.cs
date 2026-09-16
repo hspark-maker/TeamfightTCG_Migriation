@@ -41,9 +41,15 @@ public class OutgameTutorialBridge : MonoBehaviour
     bool m_subscribed;
     bool m_contentIntroStarted;
     int m_stepVersion;
-    bool m_checkpointPending;
-    bool m_checkpointReady;
+    CancellationToken m_stepToken;
+    bool m_completing;
+    bool m_returnPreparing;
+    Exception m_returnFailure;
+    readonly object m_entryWait = new object();
+    readonly object m_completionWait = new object();
     float m_anchorMissingSince = -1f;
+    int m_anchorRestoreStepId;
+    bool m_restoringSurface;
     int m_contentIntroVersion;
 
     static OutgameTutorialBridge s_rankEntryOwner;
@@ -84,8 +90,8 @@ public class OutgameTutorialBridge : MonoBehaviour
 
     static bool TryGetCursorStep(out TutorialStepDef _step) => OutgameTutorialGuide.TryGetCurrentStep(out _step);
 
-    static EOutgameTutorialStepResult EnterCursorStep()
-        => GuidedCursor ? OutgameTutorialRunner.EnterGuidedStep() : OutgameTutorialRunner.EnterCurrentStep();
+    static UniTask<EOutgameTutorialStepResult> EnterCursorStepAsync(CancellationToken _ct)
+        => GuidedCursor ? OutgameTutorialRunner.EnterGuidedStepAsync(_ct) : OutgameTutorialRunner.EnterCurrentStepAsync(_ct);
 
     static void SatisfyCursorStep()
     {
@@ -110,7 +116,30 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         // 씬 재진입 재개. 자율 발화 자체는 OnGuidedActivated가 잡으므로 여기서는 이미 도는 커서만 이어받는다.
         // 초기화 로딩 완료는 LoadingScene이 보장하고 넘겨준다 — 여기서 대기할 것이 없다.
-        if (CursorRunning) ApplyCurrentStep();
+        if (CursorRunning && !LoadingCoverView.OwnsLobbyPreparation) ApplyCurrentStep();
+    }
+
+    /// <summary>복귀 커버 아래 첫 스텝의 서버 확정과 화면 준비를 끝낸다. 사용자 입력·연출 종료는 기다리지 않는다.</summary>
+    public static async UniTask PrepareLobbyReturnAsync(CancellationToken _ct)
+    {
+        await OnboardingCommands.RecoverPendingAsync(_ct);
+        if (!CursorRunning) return;
+        var t_owner = s_instance;
+        if (t_owner == null) throw new InvalidOperationException("로비 안내 화면을 찾지 못했습니다.");
+        t_owner.m_returnPreparing = true;
+        t_owner.m_returnFailure = null;
+        t_owner.m_rankFailed = false;
+        try
+        {
+            t_owner.ApplyCurrentStep();
+            await UniTask.WaitUntil(() => t_owner == null ||
+                (!t_owner.m_applying && !t_owner.m_completing && !t_owner.m_rankPreparing), cancellationToken: _ct);
+            if (t_owner == null) throw new OperationCanceledException(_ct);
+            if (t_owner.m_returnFailure != null) throw t_owner.m_returnFailure;
+            if (CursorRunning && t_owner.m_step == null)
+                throw new InvalidOperationException("로비 안내 준비가 중단되었습니다.");
+        }
+        finally { if (t_owner != null) t_owner.m_returnPreparing = false; }
     }
 
     void OnDestroy()
@@ -118,8 +147,11 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (s_instance == this) s_instance = null;
         if (s_rankEntryOwner == this) s_rankEntryOwner = null;
         ServerWaitOverlay.Release(this);
+        ServerWaitOverlay.Release(m_entryWait);
+        ServerWaitOverlay.Release(m_completionWait);
         // static 이벤트에 죽은 씬 오브젝트가 남으면 다음 씬에서 오발화한다.
         Unsubscribe();
+        OnboardingSession.Suspend();
         CloseGate();
 
         // 자율 안내는 로비 안에서 시작해 로비 안에서 끝난다 — 씬을 떠나면 낙인 없이 끊고, 다음에 알림 점이 다시 부른다.
@@ -130,98 +162,133 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 그 시점엔 이미 다음 스텝으로 커밋된 뒤라 버리면 개봉 대기 스텝이 영영 적용되지 않는다.
     void ApplyCurrentStep()
     {
-        if (GuidanceCoordinator.IsRestoring) return;
-        if (!CursorRunning) return;   // 강제도 자율도 서 있지 않으면 걸 게이트가 없다
-
+        if (LoadingCoverView.OwnsLobbyPreparation && !m_returnPreparing) return;
+        if (GuidanceCoordinator.IsRestoring || !CursorRunning) return;
+        if (m_completing) return;
         if (m_applying) { m_pendingApply = true; return; }
+        ApplyCurrentStepAsync().Forget();
+    }
 
+    async UniTask ApplyCurrentStepAsync()
+    {
         m_applying = true;
         try
         {
-            // 상한: 스텝이 서로를 무한히 재진입시키는 저작 실수로 에디터가 멎지 않게.
-            for (int t_i = 0; t_i < 8; t_i++)
+            for (int t_i = 0; t_i < 64 && CursorRunning; t_i++)
             {
                 m_pendingApply = false;
-                ApplyStepOnce();
-                if (!m_pendingApply) return;
+                CloseGate();
+                OutgameFeatureLock.Refresh();
+                TryGetCursorStep(out var t_entering);
+                m_stepToken = OnboardingSession.Begin(t_entering, this.GetCancellationTokenOnDestroy());
+                int t_version = OnboardingSession.Version;
+                bool t_wait = t_entering != null && TutorialActionMeta.Of(t_entering.Action).RequiresEntryConfirmation
+                    || OnboardingCommands.HasPending || DataSaveManager.Data.Tutorial?.Execution?.Phase == "Confirming";
+                if (t_wait && !m_returnPreparing) ServerWaitOverlay.Hold(m_entryWait);
+                EOutgameTutorialStepResult t_result;
+                try
+                {
+                    if (DataSaveManager.Data.Tutorial?.Execution?.Phase == "Confirming"
+                        && !await GuideResume.SaveConfirmedAsync(m_stepToken))
+                        throw new InvalidOperationException("진행 위치를 저장하지 못했습니다.");
+                    t_result = t_entering == null ? await EnterCursorStepAsync(m_stepToken)
+                        : await OnboardingSession.ExecuteAsync(t_entering, EnterCursorStepAsync, m_stepToken);
+                }
+                finally { ServerWaitOverlay.Release(m_entryWait); }
+                if (this == null || !OnboardingSession.IsCurrent(t_version, t_entering?.StepId ?? 0)) return;
+                if (t_result == EOutgameTutorialStepResult.Failed)
+                    throw new InvalidOperationException("안내 화면을 준비하지 못했습니다.");
+                if (t_result == EOutgameTutorialStepResult.Advanced)
+                {
+                    if (t_entering != null && t_entering.LeavesScene) return;
+                    continue;
+                }
+                if (!TryGetCursorStep(out m_step)) return;
+                if (m_step.Completion == EOutgameTutorialCompletion.SynergyDeckEditor)
+                    m_synergyDeckOpenDeadline = Time.unscaledTime + 5f;
+                PresentStep();
+                return;
             }
-
-            Debug.LogWarning("[OutgameTutorialBridge] Step entry keeps re-entering, so it is aborted — check the step authoring.");
+            if (CursorRunning) throw new InvalidOperationException("온보딩 자동 진행이 반복됩니다.");
         }
+        catch (OperationCanceledException) { }
+        catch (Exception t_error) { ShowStepFailure(t_error); }
         finally
         {
-            m_applying     = false;
-            m_pendingApply = false;
+            m_applying = false;
+            if (m_pendingApply && this != null && CursorRunning && !GuidanceCoordinator.IsRestoring)
+            {
+                m_pendingApply = false;
+                ApplyCurrentStep();
+            }
         }
     }
 
-    // 현재 스텝 1회 진입. 게이트가 필요하면 앵커를 찾아 건다(없으면 등록 대기).
-    void ApplyStepOnce()
+    void ShowStepFailure(Exception _error)
     {
-        // 이전 스텝의 딤·배너를 먼저 내린다 — 새 타깃이 아직 등장 전이면(개봉 연출 중의 획득 버튼 등)
-        // 옛 안내가 화면에 남는다.
+        if (this == null) return;
+        ServerWaitOverlay.Release(this);
+        OnboardingSession.SetPhase(EOnboardingPhase.Failed);
+        Debug.LogWarning($"[Onboarding] step={OnboardingSession.CurrentStepId} phase=Failed reason={_error.GetBaseException().Message}");
         CloseGate();
-
-        // 해금은 좌표에서 파생되므로 좌표가 움직인 뒤 한 번 반영해야 잠금 UI가 따라온다.
-        // 스텝 적용의 단일 창구라 자동 스텝이 스스로 커밋하는 경로까지 여기서 함께 잡힌다
-        // (Runner.OnStepChanged는 NotifyStepSatisfied에서만 발화해 그 경로를 놓친다).
-        OutgameFeatureLock.Refresh();
-
-        // 진입 "전" 스텝과 좌표. 자동 스텝은 Enter 안에서 좌표를 커밋하므로 진입 뒤에는 다음 칸이 보인다.
-        TryGetCursorStep(out var t_entering);
-        bool   t_guided = GuidedCursor;
-        string t_at     = CursorCoord;
-
-        EOutgameTutorialStepResult t_result;
-        using (GuidanceCoordinator.InternalNavigation()) t_result = EnterCursorStep();
-
-        // 씬에 남는 자동 스텝은 여기서 끊으면 다음 스텝이 무관한 외부 신호(개봉 닫힘 등)를 기다리게 된다.
-        // 그 자리 의존을 없애려고 같은 루프에서 다음 칸을 이어 진입시킨다(상한 8회가 폭주를 막는다).
-        if (t_result == EOutgameTutorialStepResult.Advanced)
+        if (m_returnPreparing)
         {
-            if (CursorRunning && t_entering != null && !t_entering.LeavesScene) m_pendingApply = true;
+            m_returnFailure = _error;
+            m_pendingApply = false;
             return;
         }
-
-        // 좌표가 그대로라 이 씬에서 이 스텝을 다시 세울 방법이 없다 — 위 CloseGate가 m_step을 비워 앵커 등록 통지도
-        // 못 깨운다. 강제는 진행이 여기서 멈추므로 기능 잠금만이라도 걷어 유저가 게임을 이어갈 수 있게 하고,
-        // 자율은 낙인 없이 이번 세션만 접는다(다음에 알림 점이 다시 부른다).
-        if (t_result == EOutgameTutorialStepResult.Failed)
+        if (GuidedCursor)
         {
-            if (t_guided)
-            {
-                Debug.LogWarning($"[OutgameTutorialBridge] Guided step {t_at} failed to enter — deferring it for this session.");
-                GuidanceCoordinator.DeferCurrentGuide("가이드 화면을 준비하지 못했습니다.");
-            }
-            else if (OutgameTutorialRunner.IsRunning)
-            {
-                Debug.LogWarning($"[OutgameTutorialBridge] Progress stops because entering step {t_at} failed — releasing the feature lock.");
-                OutgameFeatureLock.NotifyStalled();
-            }
-
+            GuidanceCoordinator.DeferCurrentGuide("안내를 이어가지 못했습니다. 다시 시도해 주세요.");
             return;
         }
-
-        if (!TryGetCursorStep(out var t_step)) return;
-
-        m_step = t_step;
-        if (m_step.Completion == EOutgameTutorialCompletion.SynergyDeckEditor)
-            m_synergyDeckOpenDeadline = Time.unscaledTime + 5f;
-
-        PresentStep();
+        UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
+        {
+            titleText = "진행 결과를 확인하지 못했습니다. 다시 시도해 주세요.",
+            yesText = "재시도", yesAction = () => RetryStepAsync().Forget(),
+            noText = "종료", noAction = QuitOnboarding,
+        });
     }
 
-    // 현재 스텝의 표시를 세운다 — 진입(EnterCursorStep)과 갈라 둔다. 스텝을 다시 진입시키지 않고 표시만 세우는
-    // 재진입 창구다(자동 스텝이 좌표를 두 번 커밋하는 사고를 막는다).
-    // 이미 만족된 완료 조건을 여기서 다시 판정하는 것도 같은 이유다 — 서버 소진 표식처럼 뒤늦게 뒤집히는 상태는
-    // 신호로 다시 오지 않으므로, 상태를 되물어야 진행이 되살아난다.
+    async UniTask RetryStepAsync()
+    {
+        await UniTask.Yield(this.GetCancellationTokenOnDestroy());
+        m_anchorRestoreStepId = 0;
+        ApplyCurrentStep();
+    }
+
+    static void QuitOnboarding()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
     void PresentStep()
     {
         if (m_step == null) return;
         if (m_enhancing || m_awaitingUnlockFx || GuidanceCoordinator.IsRestoring) return;
-        if (GuidedCursor && !m_checkpointReady)
+        if (!PackOpenOverlay.IsOpen && (m_step.Completion == EOutgameTutorialCompletion.PackOpen
+            || m_step.Anchor == EOutgameTutorialAnchor.PackAcquireButton))
         {
-            if (!m_checkpointPending) ConfirmCheckpointAsync().Forget();
+            if (OnboardingCommands.TryRestorePackPresentation(out var t_pack, out string t_packId))
+            {
+                PackHandoff.Set(t_pack, t_packId, null, false);
+                if (!PackOpenOverlay.TryOpen())
+                    ShowStepFailure(new InvalidOperationException("구매한 카드팩 화면을 복원하지 못했습니다."));
+                return;
+            }
+            // 구버전 세이브에는 개봉 결과가 없다. 이미 지난 구매를 재실행하지 않고 연출만 생략한다.
+            Debug.LogWarning($"[Onboarding] step={m_step.StepId}: saved pack presentation is unavailable; continuing without a new purchase.");
+            OnGateSatisfied();
+            return;
+        }
+        if (m_step.Completion == EOutgameTutorialCompletion.DeckSave
+            && DeckEditController.OpenEditor != null && DeckEditController.OpenEditor.IsSavedComplete)
+        {
+            OnGateSatisfied();
             return;
         }
         if (m_step.Completion == EOutgameTutorialCompletion.Click
@@ -369,7 +436,6 @@ public class OutgameTutorialBridge : MonoBehaviour
     void TryOpenGate()
     {
         if (m_step == null || m_step.Anchor == EOutgameTutorialAnchor.None || GuidanceCoordinator.IsRestoring) return;
-        if (GuidedCursor && !m_checkpointReady) return;
         if (!TutorialAnchorRegistry.TryGet(m_step.Anchor, out var t_rect, out var t_button))
         {
             if (GuidedCursor && GuideResume.Record?.GoalReached == true
@@ -579,7 +645,7 @@ public class OutgameTutorialBridge : MonoBehaviour
             OutgameTutorialRunner.IsRunning && t_chapter == OutgameTutorialProgress.ChapterIndex &&
             t_index == OutgameTutorialProgress.StepIndex &&
             OutgameTutorialRunner.TryGetCurrentStep(out var t_current) && t_current == t_step;
-        ServerWaitOverlay.Hold(this);
+        if (!m_returnPreparing) ServerWaitOverlay.Hold(this);
         try
         {
             await PlayerSaveCloud.FlushAsync().AttachExternalCancellation(t_token);
@@ -624,6 +690,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (t_token.IsCancellationRequested) return;
         if (t_failure != null)
         {
+            if (m_returnPreparing) { m_returnFailure = t_failure; return; }
             Debug.LogWarning($"[Tutorial] First rank confirmation failed: {t_failure.GetBaseException().Message}");
             UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
             {
@@ -791,7 +858,11 @@ public class OutgameTutorialBridge : MonoBehaviour
     }
 
     // 자율 안내 발화 통지. 탭 전환 도중에 켜지므로 이 씬이 그대로 이어받는다.
-    void OnGuidedActivated() => ApplyCurrentStep();
+    void OnGuidedActivated()
+    {
+        m_anchorRestoreStepId = 0;
+        ApplyCurrentStep();
+    }
 
     // 구매 성공 신호. 서버 응답이 성립한 뒤에 오고 곧바로 개봉 오버레이가 열리므로
     // 커밋만 하고, 다음 스텝은 OnPackOverlayOpened가 재개한다.
@@ -799,8 +870,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Purchase) return;
 
-        SatisfyCursorStep();
-        CloseGate();
+        OnGateSatisfied();
     }
 
     // 개봉 오버레이 열림/닫힘. 씬이 바뀌지 않으므로 재개해 줄 새 브리지가 없다 — 이 브리지가 직접 이어간다.
@@ -812,47 +882,49 @@ public class OutgameTutorialBridge : MonoBehaviour
         ApplyCurrentStep();
     }
 
-    void OnPackOverlayOpened() => ApplyCurrentStep();
+    void OnPackOverlayOpened() { if (!m_completing) ApplyCurrentStep(); }
 
     void OnPackOverlayClosed() => ApplyCurrentStep();
 
     // 완료 → 커밋 후 다음 스텝을 같은 씬에서 이어간다(씬을 떠나는 스텝이면 다음 씬 브리지가 재개).
     void OnGateSatisfied()
     {
-        if (m_step == null || GuidanceCoordinator.IsRestoring
+        if (LoadingCoverView.OwnsLobbyPreparation && !m_returnPreparing) return;
+        if (m_step == null || m_completing || GuidanceCoordinator.IsRestoring
+            || !OnboardingSession.CanAcceptCompletion
             || !TryGetCursorStep(out var t_current) || t_current != m_step) return;
-        bool t_leftScene = m_step != null && m_step.LeavesScene;
-
-        SatisfyCursorStep();
-
-        // 완료로 닫히는 경로는 ApplyCurrentStep까지 가지 않는다(커서가 서지 않아 조기 반환) —
-        // 완주 순간 전 기능이 열리는 것을 반영할 곳이 여기뿐이다.
-        OutgameFeatureLock.Refresh();
-
-        if (!CursorRunning) { CloseGate(); return; }
-
-        // 방금 누른 버튼이 이미 LoadScene을 걸었을 수 있다 — 여기서 다음 스텝까지 진입시키면
-        // 그쪽 LoadScene이 뒤에 실행돼 목적지가 뒤집히거나(자동 스텝), 곧 사라질 게이트가 한 프레임 깜빡인다(전투 진입).
-        // 방금 완료된 스텝이 씬을 떠났으면 다음 브리지가 재개한다. 자동 스텝이라도 제자리에 남는 것
-        // (개봉 오버레이)은 이 브리지가 직접 이어가야 한다.
-        //
-        // 다음 스텝을 미리 끊는 것은 "진입만으로" 씬을 떠나는 자동 스텝뿐이다 — 클릭을 기다리는 스텝은
-        // LeavesScene이어도 게이트를 걸어 줘야 한다(전투 시작 버튼). 안 걸면 씬이 그대로라 재개해 줄
-        // 브리지가 없고, CloseGate가 m_step을 비워 앵커 등록 통지로도 깨어나지 못한다 = 영구 정지.
-        if (t_leftScene
-            || (TryGetCursorStep(out var t_next)
-                && t_next.LeavesScene
-                && t_next.Completion == EOutgameTutorialCompletion.Auto))
-        {
-            CloseGate();
-            return;
-        }
-
-        ApplyCurrentStep();
+        CompleteStepAsync(m_step).Forget();
     }
 
-    // 안내 표시만 접는다 — 스텝은 그대로 서 있고, TryOpenGate로 언제든 다시 세울 수 있다.
-    // CloseGate와 갈라 둔다: 그쪽은 m_step까지 비워 완료 신호를 받을 주체가 사라진다.
+    async UniTask CompleteStepAsync(TutorialStepDef _step)
+    {
+        m_completing = true;
+        bool t_continue = false;
+        bool t_wait = OnboardingSession.RequiresCompletionConfirmation(_step);
+        if (t_wait && !m_returnPreparing) ServerWaitOverlay.Hold(m_completionWait);
+        try
+        {
+            bool t_done = await OnboardingSession.CompleteAsync(_step, SatisfyCursorStep, m_stepToken);
+            if (!t_done || this == null) return;
+            ServerWaitOverlay.Release(m_completionWait);
+            OutgameFeatureLock.Refresh();
+            if (!CursorRunning || _step.LeavesScene) { CloseGate(); return; }
+            t_continue = true;
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception t_error)
+        {
+            ServerWaitOverlay.Release(m_completionWait);
+            ShowStepFailure(t_error);
+        }
+        finally
+        {
+            ServerWaitOverlay.Release(m_completionWait);
+            m_completing = false;
+        }
+        if (t_continue) ApplyCurrentStep();
+    }
+
     void HideGuide()
     {
         DetachSilent();
@@ -862,8 +934,6 @@ public class OutgameTutorialBridge : MonoBehaviour
     void CloseGate()
     {
         m_stepVersion++;
-        m_checkpointPending = false;
-        m_checkpointReady = false;
         m_anchorMissingSince = -1f;
         m_enhanceResultClose?.Kill();
         m_enhanceResultClose = null;
@@ -890,7 +960,8 @@ public class OutgameTutorialBridge : MonoBehaviour
 
     void Update()
     {
-        if (m_step == null || GuidanceCoordinator.IsRestoring) return;
+        if (LoadingCoverView.OwnsLobbyPreparation && !m_returnPreparing) return;
+        if (m_step == null || m_completing || m_restoringSurface || GuidanceCoordinator.IsRestoring) return;
         if (!TryGetCursorStep(out var t_current) || !ReferenceEquals(t_current, m_step))
         {
             CloseGate();
@@ -931,7 +1002,7 @@ public class OutgameTutorialBridge : MonoBehaviour
                 return;
             }
         }
-        if (GuidedCursor && m_checkpointReady && !m_enhancing && !m_awaitingUnlockFx
+        if (!m_enhancing && !m_awaitingUnlockFx
             && !CardDetailOverlayView.IsRitualPlaying && !CardDetailOverlayView.IsUnlockFxPlaying
             && !UnlockIntroOverlay.IsOpen && !SuppressGuideUI && m_step.Anchor != EOutgameTutorialAnchor.None
             && !(GuideResume.Record?.GoalReached == true && OutgameTutorialGuide.TargetCardId == 0
@@ -941,7 +1012,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         {
             bool t_available = TutorialAnchorRegistry.TryGet(m_step.Anchor, out var t_rect, out var t_button)
                 && t_rect != null && t_rect.gameObject.activeInHierarchy
-                && (m_step.Completion == EOutgameTutorialCompletion.Confirm
+                && (m_step.Completion != EOutgameTutorialCompletion.Click
                     || t_button == null || t_button.IsInteractable());
             if (t_available)
             {
@@ -955,8 +1026,7 @@ public class OutgameTutorialBridge : MonoBehaviour
             }
             else if (Time.unscaledTime - m_anchorMissingSince >= 5f)
             {
-                GuidanceCoordinator.DeferCurrentGuide("안내 대상을 찾지 못했습니다. 다시 시도해 주세요.");
-                CloseGate();
+                RestoreMissingSurfaceAsync(m_step).Forget();
                 return;
             }
         }
@@ -964,6 +1034,47 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_step.Completion == EOutgameTutorialCompletion.Enhance && !m_enhancing && !m_awaitingUnlockFx
             && OutgameTutorialGuide.IsEnhanceIntroduction
             && !OutgameTutorialGuide.CanContinueEnhance()) OnUnlockIntroCancelled();
+    }
+
+    async UniTask RestoreMissingSurfaceAsync(TutorialStepDef _step)
+    {
+        m_restoringSurface = true;
+        int t_version = OnboardingSession.Version;
+        try
+        {
+            if (m_anchorRestoreStepId == _step.StepId)
+                throw new InvalidOperationException("안내 대상을 찾지 못했습니다. 다시 시도해 주세요.");
+            m_anchorRestoreStepId = _step.StepId;
+            if (GuidedCursor) await GuidanceCoordinator.TryRestoreCurrentSurfaceAsync(m_stepToken);
+            else if (TryRestoreForcedSurface()) return;
+            m_stepToken.ThrowIfCancellationRequested();
+            if (!OnboardingSession.IsCurrent(t_version, _step.StepId)) return;
+            m_anchorMissingSince = Time.unscaledTime;
+            PresentStep();
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception t_error) { ShowStepFailure(t_error); }
+        finally { m_restoringSurface = false; }
+    }
+
+    bool TryRestoreForcedSurface()
+    {
+        int t_chapter = OutgameTutorialProgress.ChapterIndex;
+        for (int t_i = OutgameTutorialProgress.StepIndex - 1; t_i >= 0; t_i--)
+        {
+            if (!OutgameTutorialRunner.TryGetStepAt(t_chapter, t_i, out var t_step)) continue;
+            if (t_step.LeavesScene || t_step.Action == EOutgameTutorialAction.WaitPurchase
+                || t_step.Action == EOutgameTutorialAction.AutoPurchase) break;
+            if (t_step.Action != EOutgameTutorialAction.WaitClick) continue;
+            if (t_step.Anchor != EOutgameTutorialAnchor.LobbyDeckTab
+                && t_step.Anchor != EOutgameTutorialAnchor.LobbyPackTab
+                && t_step.Anchor != EOutgameTutorialAnchor.LobbyCollectionTab
+                && t_step.Anchor != EOutgameTutorialAnchor.LobbyMatchTab) continue;
+            OutgameTutorialProgress.CommitStep(t_chapter, t_i);
+            ApplyCurrentStep();
+            return true;
+        }
+        return false;
     }
 
     void TryPresentContentIntro()
@@ -999,34 +1110,6 @@ public class OutgameTutorialBridge : MonoBehaviour
         => this != null && isActiveAndEnabled && m_contentIntroVersion == _version
             && ReferenceEquals(m_step, _step) && TryGetCursorStep(out var t_current)
             && ReferenceEquals(t_current, _step);
-
-    async UniTask ConfirmCheckpointAsync()
-    {
-        m_checkpointPending = true;
-        int t_version = m_stepVersion;
-        var t_step = m_step;
-        OutgameTutorialGateUI.Ensure(gatePrefab).ShowTransitionGate(this);
-        bool t_saved = false;
-        using var t_timeout = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
-        using var t_timer = t_timeout.CancelAfterSlim(TimeSpan.FromSeconds(5));
-        try
-        {
-            t_saved = await GuideResume.SaveConfirmedAsync(t_timeout.Token);
-        }
-        catch (OperationCanceledException) { }
-        catch (Exception t_exception) { Debug.LogWarning($"[Tutorial] Checkpoint failed: {t_exception.Message}"); }
-        if (this == null || t_version != m_stepVersion || m_step != t_step || !GuidedCursor) return;
-        m_checkpointPending = false;
-        OutgameTutorialGateUI.Instance?.Clear(this);
-        if (!t_saved)
-        {
-            GuidanceCoordinator.DeferCurrentGuide("안내 진행을 저장하지 못했습니다. 연결을 확인해 주세요.");
-            CloseGate();
-            return;
-        }
-        m_checkpointReady = true;
-        PresentStep();
-    }
 
     void Subscribe()
     {

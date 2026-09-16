@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 아웃게임 첫시작 튜토리얼의 시퀀스 해석 static 코어(씬 오브젝트·UI를 모른다)
@@ -167,7 +169,7 @@ public static class OutgameTutorialRunner
     }
 
     // 자율 스텝 진입 — 결말은 반환값이 말한다(EnterCurrentStep과 같은 규약)
-    public static EOutgameTutorialStepResult EnterGuidedStep()
+    public static async UniTask<EOutgameTutorialStepResult> EnterGuidedStepAsync(CancellationToken _ct)
     {
         if (!TryGetGuidedStep(out var t_step))
         {
@@ -187,9 +189,9 @@ public static class OutgameTutorialRunner
             return EOutgameTutorialStepResult.Advanced;
         }
 
-        return TutorialStepExecutor.Enter(t_step,
+        return await TutorialStepExecutor.ExecuteAsync(t_step,
             new OutgameTutorialStepContext(s_guidedChapter, s_guidedStep, s_guidedChapter, s_guidedStep + 1, t_isLast,
-                                           GuidedProgressSink.Instance));
+                                           GuidedProgressSink.Instance), _ct);
     }
 
     // 자율 스텝 완료를 감지한 브리지가 호출 — 마지막이었으면 완주 낙인까지 찍는다
@@ -270,6 +272,8 @@ public static class OutgameTutorialRunner
 
         _data.NormalizeChapterKinds();
         s_data = _data;
+        TutorialConfig.BattleFinished -= NotifyScriptedBattleFinished;
+        TutorialConfig.BattleFinished += NotifyScriptedBattleFinished;
         s_forcedCount = _data.FtueChapterCount;
         WarnOnMisauthoredChapters();
     }
@@ -304,6 +308,18 @@ public static class OutgameTutorialRunner
     /// 스텝과 같은 챕터에 저작된다는 전제이고, 전투를 마친 좌표는 이미 다음 챕터라 루프가 돌지 않는다.</summary>
     public static void RewindToPendingBattleEntry()
     {
+        int t_pendingId = DataSaveManager.Data.Tutorial?.Execution?.BattleEntryStepId ?? 0;
+        if (!TutorialConfig.IsActive && t_pendingId > 0
+            && TryFindStepId(t_pendingId, out int t_pendingChapter, out int t_pendingStep)
+            && t_pendingChapter < ForcedChapterCount)
+        {
+            DataSaveManager.Data.Tutorial.OutgameCompleted = false;
+            OutgameTutorialProgress.CommitStep(t_pendingChapter, t_pendingStep);
+            OutgameTutorialProgress.ResetStallWatch();
+            OutgameFeatureLock.ClearStall();
+            OutgameFeatureLock.Refresh();
+            return;
+        }
         // 세션 내 진행은 건드리지 않는다 — 전제가 살아 있으면 되감을 이유가 없다.
         if (!IsRunning || TutorialConfig.IsActive) return;
 
@@ -445,7 +461,7 @@ public static class OutgameTutorialRunner
     }
 
     // 현재 스텝 진입 — 결말은 반환값이 말한다(Gated=게이트를 걸어야 함 / Advanced=좌표가 넘어감 / Failed=그 자리에 막힘)
-    public static EOutgameTutorialStepResult EnterCurrentStep()
+    public static async UniTask<EOutgameTutorialStepResult> EnterCurrentStepAsync(CancellationToken _ct)
     {
         if (!TryGetCurrentStep(out var t_step))
             return CloseOrWarnOnMissingStep();
@@ -455,9 +471,9 @@ public static class OutgameTutorialRunner
 
         bool t_hasNext = TryGetNext(t_chapter, t_index, out int t_nextChapter, out int t_nextStep);
 
-        return TutorialStepExecutor.Enter(t_step,
+        return await TutorialStepExecutor.ExecuteAsync(t_step,
             new OutgameTutorialStepContext(t_chapter, t_index, t_nextChapter, t_nextStep, !t_hasNext,
-                                           PersistentTutorialProgressSink.Instance));
+                                           PersistentTutorialProgressSink.Instance), _ct);
     }
 
     // 지금 서 있는 스텝이 _action인가. 화면이 튜토 좌표를 직접 해석하지 않게 하는 조회 창구
@@ -567,6 +583,33 @@ public static class OutgameTutorialRunner
             OnStepChanged?.Invoke();
             return;
         }
+    }
+
+    /// <summary>전투 결과가 나올 때까지 시작 지점을 보관한다.</summary>
+    public static void MarkPendingBattle(int _stepId)
+    {
+        var t_slot = DataSaveManager.Data.Tutorial;
+        var t_execution = t_slot.Execution ??= new OnboardingExecutionSaveData();
+        t_execution.BattleEntryStepId = _stepId;
+        OutgameTutorialProgress.Save();
+    }
+
+    /// <summary>버튼 리스너의 완료 저장이 끝난 뒤에만 씬을 떠난다.</summary>
+    public static async UniTask<bool> ConfirmBattleDepartureAsync(CancellationToken _ct)
+    {
+        if (!OnboardingSession.IsActive) return true;
+        await UniTask.NextFrame(cancellationToken: _ct);
+        await UniTask.WaitUntil(() => !OnboardingSession.IsBusy, cancellationToken: _ct);
+        if (OnboardingSession.Phase == EOnboardingPhase.Failed) return false;
+        return await GuideResume.SaveConfirmedAsync(_ct);
+    }
+
+    static void NotifyScriptedBattleFinished()
+    {
+        var t_execution = DataSaveManager.Data?.Tutorial?.Execution;
+        if (t_execution == null || t_execution.BattleEntryStepId == 0) return;
+        t_execution.BattleEntryStepId = 0;
+        OutgameTutorialProgress.Save();
     }
 
     // 시퀀스 처음부터 지정 좌표까지(그 칸 포함) 스텝을 순서대로 훑는다

@@ -9,6 +9,7 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
     FeatureLockView[] m_views;
     FeatureLockView _rankedButton;
     FeatureLockView _guideMissionButton;
+    FeatureLockView _attendanceButton;
     ContentUnlockIntroView m_intro;
     List<ContentUnlockIntroDef> m_intros;
     int m_introIndex;
@@ -26,12 +27,13 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
 
     /// <summary>콘텐츠별 대표 버튼을 연결한다. 버튼이 없어도 소개 화면은 표시한다.</summary>
     public void Bind(FeatureLockView _mission, FeatureLockView _adventure, FeatureLockView _roulette,
-        FeatureLockView rankedButton, FeatureLockView guideMissionButton)
+        FeatureLockView rankedButton, FeatureLockView guideMissionButton, FeatureLockView attendanceButton)
     {
         s_instance = this;
         m_views = new[] { _mission, _adventure, _roulette };
         _rankedButton = rankedButton;
         _guideMissionButton = guideMissionButton;
+        _attendanceButton = attendanceButton;
     }
 
     public void SetVisible(bool _visible)
@@ -55,9 +57,7 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
         foreach (EContentUnlockIntro t_content in _contents)
         {
             if (!ContentUnlockConfig.Data.TryGetContentIntro(t_content, out var t_intro)
-                || string.IsNullOrWhiteSpace(t_intro.contentName) || t_intro.icon == null) return false;
-            if (t_content == EContentUnlockIntro.Mission && (t_intro.guideMissionIcon == null
-                || string.IsNullOrWhiteSpace(t_intro.guideMissionName))) return false;
+                || !t_intro.TryValidate(out _)) return false;
             string t_key = ContentUnlockIntroDef.KeyOf(t_content);
             if (t_key != null && !ContentUnlockManager.IsUnlocked(t_key)) return false;
             t_intros.Add(t_intro);
@@ -72,11 +72,8 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
         t_owner.m_sessionVersion = ContentUnlockManager.SessionVersion;
         t_owner.m_playing = true;
         foreach (var intro in t_intros)
-        {
-            var button = t_owner.FindButton(intro.content);
-            t_owner.HoldButton(button);
-            if (intro.content == EContentUnlockIntro.Mission) t_owner.HoldButton(t_owner._guideMissionButton);
-        }
+            foreach (var item in intro.items)
+                t_owner.HoldButton(t_owner.FindButton(item.destination));
         t_owner.ShowCurrent();
         return true;
     }
@@ -85,21 +82,22 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
     {
         m_pendingIntro = false;
         ContentUnlockIntroDef t_intro = m_intros[m_introIndex];
-        var button = FindButton(t_intro.content);
-        if (t_intro.content == EContentUnlockIntro.Mission)
+        int count = t_intro.items.Length;
+        var names = new string[count];
+        var icons = new Sprite[count];
+        var buttons = new FeatureLockView[count];
+        var destinations = new RectTransform[count];
+        for (int i = 0; i < count; i++)
         {
-            var buttons = new[] { button, _guideMissionButton };
-            m_intro.ShowTogether(t_intro.contentName + " / " + t_intro.guideMissionName,
-                t_intro.description, new[] { t_intro.icon, t_intro.guideMissionIcon },
-                new[] { t_intro.contentName, t_intro.guideMissionName },
-                new[] { button != null ? button.UnlockTarget : null,
-                    _guideMissionButton != null ? _guideMissionButton.UnlockTarget : null },
-                Finish, Cancel, (index, done) => PlayButton(buttons[index], done));
-            return;
+            var item = t_intro.items[i];
+            names[i] = item.name;
+            icons[i] = item.icon;
+            buttons[i] = FindButton(item.destination);
+            destinations[i] = buttons[i] != null ? buttons[i].UnlockTarget : null;
         }
-        m_intro.Show(t_intro.contentName , t_intro.description,
-            new[] { t_intro.icon }, Finish, Cancel, button != null ? button.UnlockTarget : null,
-            done => PlayButton(button, done));
+        m_intro.ShowTogether(string.Join(" / ", names), t_intro.description, icons,
+            count > 1 ? names : null, destinations,
+            Finish, Cancel, (index, done) => PlayButton(buttons[index], done));
     }
 
     public static void CancelCurrent()
@@ -120,18 +118,26 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
         }
     }
 
-    FeatureLockView FindButton(EContentUnlockIntro content)
+    FeatureLockView FindButton(EContentUnlockDestination destination)
     {
-        if (content == EContentUnlockIntro.CardEnhance)
+        if (destination == EContentUnlockDestination.Collection)
         {
             if (!TutorialAnchorRegistry.TryGet(EOutgameTutorialAnchor.LobbyCollectionTab,
                 out _, out var collectionButton) || collectionButton == null) return null;
             var collectionView = collectionButton.GetComponent<FeatureLockView>();
             return collectionView != null && collectionView.isActiveAndEnabled ? collectionView : null;
         }
-        if (content == EContentUnlockIntro.Ranked)
+        if (destination == EContentUnlockDestination.Ranked)
             return _rankedButton != null && _rankedButton.isActiveAndEnabled ? _rankedButton : null;
-        string _key = ContentUnlockIntroDef.KeyOf(content);
+        if (destination == EContentUnlockDestination.GuideMission) return _guideMissionButton;
+        if (destination == EContentUnlockDestination.Attendance) return _attendanceButton;
+        string _key = destination switch
+        {
+            EContentUnlockDestination.DailyMission => ContentUnlockManager.MISSION,
+            EContentUnlockDestination.Adventure => ContentUnlockManager.ADVENTURE,
+            EContentUnlockDestination.Roulette => ContentUnlockManager.ROULETTE,
+            _ => null,
+        };
         if (_key == null || m_views == null) return null;
         foreach (FeatureLockView t_view in m_views)
             if (t_view != null && t_view.isActiveAndEnabled && !t_view.IsLocked

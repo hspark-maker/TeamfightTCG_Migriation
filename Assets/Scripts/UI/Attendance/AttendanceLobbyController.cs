@@ -39,8 +39,9 @@ public sealed class AttendanceLobbyController : MonoBehaviour
     }
 
     static bool CanOpenAutomatically() => AttendanceCommands.IsReady && AttendanceCommands.CanClaim
+        && OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission)
         && AttendanceCommands.PromptedDay != AttendanceCommands.State.DailyKey
-        && GuidanceCoordinator.CanPresent && GuidanceCoordinator.CanNavigateFromLobby(null);
+        && GuidanceCoordinator.CanPresent && GuidanceCoordinator.CanNavigateFromMatchTab(null);
 
     async UniTaskVoid OpenAutomatically()
     {
