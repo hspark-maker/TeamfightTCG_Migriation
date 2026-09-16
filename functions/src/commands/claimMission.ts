@@ -3,6 +3,7 @@ import {randomUUID} from "node:crypto";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {EVENTS} from "../analytics/eventNames";
+import {AccountExperience, grantAccountExperience, loadAccountProgression} from "../account/accountProgression";
 import {recordEvent} from "../observability/analyticsEvent";
 import {
   isKnownEnv,
@@ -94,8 +95,8 @@ function rejectMessage(
  * **`ClaimReward` 카운터를 올리지 않는다.** 올리면 미션 수령이 미션을 낳는 자기참조가 되고,
  * 일일 "보상 1회 수령" 미션을 그 수령 자체로 채울 수 있다.
  *
- * 지급은 지갑 문서로 나가고 세이브에는 아무 낙인도 남기지 않는다 — 미션 낙인은 미션 문서 소관이다.
- * 그래도 `mutateSave` 를 타는 이유는 영수증(재시도 중복 지급 차단)과 지갑 쓰기 배관이 거기 있어서다.
+ * 미션 낙인·계정 경험치·통과한 레벨 보상·지갑을 같은 트랜잭션으로 확정한다.
+ * `mutateSave` 영수증이 재시도의 중복 지급을 막는다.
  */
 export const claimMission = onCall(async (request) => {
   const uid = requireUid(request.auth);
@@ -110,7 +111,7 @@ export const claimMission = onCall(async (request) => {
   }
 
   // 스펙 읽기는 트랜잭션 밖에서 끝낸다. 재화 보상의 진실원은 Reward 표이고,
-  // MissionDef 는 조건·표시·passExp 만 소유한다.
+  // MissionDef 는 조건·표시·패스 경험치·계정 경험치를 소유한다.
   const [rawRewardRows, catalog, passSeasonRows] = await Promise.all([
     readSpecRows(env, "Reward"),
     readMissionCatalog(env),
@@ -129,6 +130,7 @@ export const claimMission = onCall(async (request) => {
   const rewardOwner = definition?.period === "guide" ? "Guide" : "Mission";
   const authored = judgeSpecRewardClaim(rewardRows, rewardOwner, missionId);
   const itemContext = authored.items.length ? await loadItemGrantContext(env, authored.items) : null;
+  const accountContext = (definition?.accountExp ?? 0) > 0 ? await loadAccountProgression(env, rewardRows) : null;
   let itemGrant: GrantedItems = {slots: {}, cards: [], currencies: []};
   let activePassSeason: PassSeasonDef | null = null;
   try {
@@ -147,7 +149,7 @@ export const claimMission = onCall(async (request) => {
   const period = missionPeriod(Date.now());
 
   // 콜백이 돌았는가 — 영수증 히트로 첫 응답을 되돌려준 호출은 집행 로그를 찍으면 거짓말이 된다.
-  let replayed = true;
+  let finalizedResponse: unknown;
   let progress = 0;
   let missionState: MissionResponse | undefined;
   // 콜백이 확정한 값. 객체 참조로 들고 있으면 TS 가 콜백 밖에서 null 로 좁혀 버리므로
@@ -157,6 +159,7 @@ export const claimMission = onCall(async (request) => {
   let missionTarget = 0;
   let grantedCurrencies: CurrencyGain[] = [];
   let grantedPassExp = 0;
+  let accountExperience: AccountExperience | undefined;
   let passProgress: PassProgressResponse | undefined;
 
   const result = await mutateSave(env, uid, "claimMission", {kind: "client", txId},
@@ -164,7 +167,7 @@ export const claimMission = onCall(async (request) => {
       // 읽기가 콜백의 첫 줄이고, 아래 쓰기보다 앞이다(Firestore 트랜잭션 규칙).
       // beginMissionBump 이 기간 리셋까지 반영하므로, 어제 진행도로 오늘 보상을 타는 경로가 없다.
       const missions = await beginMissionBump(transaction, db, env, uid, period, current);
-      const rankSnapshot = itemContext !== null || definition?.period === "guide" ?
+      const rankSnapshot = itemContext !== null || accountContext?.itemContext != null || definition?.period === "guide" ?
         await transaction.get(rankRef(db, env, uid)) : null;
       if (definition?.period === "guide") {
         missions.state.progress = evaluateGuideProgress(
@@ -191,10 +194,10 @@ export const claimMission = onCall(async (request) => {
         });
       }
       if (!rewardJudgement.allow) {
-        const passExpOnly = !rewardJudgement.specEmpty && mission.passExp > 0 &&
+        const experienceOnly = !rewardJudgement.specEmpty && (mission.passExp > 0 || mission.accountExp > 0) &&
           rewardJudgement.gains.length === 0 && rewardJudgement.items.length === 0 &&
           rewardJudgement.dropped.length === 0;
-        if (!passExpOnly) {
+        if (!experienceOnly) {
           // 사유를 뭉개지 않는다(claimReward 와 같은 정책) — 표를 통째로 못 읽은 것(NotEligible)과
           // 그 미션에만 보상이 없는 것(RewardNotFound)은 운영이 할 일이 다르다.
           // 전자는 배포/업로드 사고이고 후자는 저작 누락이다.
@@ -204,7 +207,7 @@ export const claimMission = onCall(async (request) => {
               `No reward is authored for Mission/${missionId}.`,
             {uid, env, missionId, specEmpty: rewardJudgement.specEmpty});
         }
-        if (pass === undefined) {
+        if (mission.accountExp === 0 && pass === undefined) {
           reject("NotEligible", "An active battle pass is required to claim this XP-only mission. Try again when the pass is available.",
             {uid, env, missionId});
         }
@@ -216,9 +219,21 @@ export const claimMission = onCall(async (request) => {
       itemGrant = itemContext === null ? {slots: {}, cards: [], currencies: []} :
         grantRewardItems(current, rewardJudgement.items, itemContext, rewardRows, "",
           Number(rankSnapshot?.data()?.points ?? (current.rank as {points?: number})?.points ?? 0));
+      if (accountContext !== null) {
+        const experienceGrant = grantAccountExperience({...current, ...itemGrant.slots}, mission.accountExp,
+          accountContext, Number(rankSnapshot?.data()?.points ?? (current.rank as {points?: number})?.points ?? 0));
+        accountExperience = experienceGrant.accountExperience;
+        itemGrant = {
+          slots: {...itemGrant.slots, ...experienceGrant.slots},
+          currencies: [...itemGrant.currencies, ...experienceGrant.currencies],
+          cards: [...itemGrant.cards, ...experienceGrant.cards],
+          packs: [...(itemGrant.packs ?? []), ...(experienceGrant.packs ?? [])],
+        };
+      }
       grantedCurrencies = [...rewardJudgement.gains, ...itemGrant.currencies];
       grantedPassExp = mission.passExp;
-      if (itemContext) applyGuideProgress(missions, current, itemGrant.slots, itemContext.cards, catalog);
+      const grantCards = itemContext?.cards ?? accountContext?.itemContext?.cards;
+      if (grantCards) applyGuideProgress(missions, current, itemGrant.slots, grantCards, catalog);
       applySnackGrowthProgress(missions, itemGrant.cards);
 
       // 낙인과 패스 경험치를 함께 찍는다 — 카운터는 깎지 않는다.
@@ -231,8 +246,7 @@ export const claimMission = onCall(async (request) => {
       }
       missionState = missionResponse(missions.state, period, catalog);
 
-      // 세이브 슬롯은 하나도 건드리지 않는다. mutateSave 가 revision 만 올리고,
-      // 그 쓰기가 영수증의 근거가 된다.
+      // 아이템 성장과 profile 경험치 슬롯을 함께 저장하고 같은 revision으로 채택한다.
       //
       // 줄 재화가 없으면 지갑을 아예 쓰지 않는다(claimReward 와 같은 정책) — 패스 경험치만 주는
       // 미션이 빈 지급으로 지갑 rev 만 올리면 클라가 달라진 것 없는 잔액을 채택한다.
@@ -245,19 +259,24 @@ export const claimMission = onCall(async (request) => {
       };
     },
     (adopted) => {
-      replayed = false;
-      return {
+      const response = {
         ...adopted,
         missionId,
         granted: grantedCurrencies,
         cards: itemGrant.cards,
         packs: itemGrant.packs ?? [],
         grantedPassExp,
+        grantedAccountExp: accountExperience?.grantedExp ?? 0,
+        accountExperience,
         missions: missionState,
         pass: passProgress,
       };
+      finalizedResponse = response;
+      return response;
     });
 
+  // An aborted attempt may have called finalize before a retry replays the other request's receipt.
+  const replayed = result !== finalizedResponse;
   if (replayed) {
     logger.info("receipt replay", {uid, env, source: "claimMission", txId, revision: result.revision});
   } else {

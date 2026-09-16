@@ -15,8 +15,7 @@ public static class AccountLevelManager
     // 현재 레벨(경험치의 순수 파생)
     public static int Level => AccountLevelSpec.ResolveLevel(Exp);
 
-    // 세이브를 캐시하지 않는다 — 서버가 profile 슬롯을 갈아끼울 때 ServerSlotRehydrator가 아직
-    // 이 축을 재수화하지 않으므로, 캐시를 두면 채택 뒤에도 화면이 옛 값에 굳는다(AdventureProgress와 같은 처방).
+    // 서버가 채택한 프로필을 직접 읽는다. 경험치 지급은 서버 명령에서만 확정한다.
     static ProfileSaveData Slot
     {
         get
@@ -43,79 +42,7 @@ public static class AccountLevelManager
         return new AccountLevelInfo(t_level, _exp, t_levelRequired, t_nextRequired, !t_hasNext);
     }
 
-    /// <summary>전투 1회 정산 + 즉시 저장. 승리는 winExp, 그 밖(패배·무승부)은 loseExp — 예외가 없다.</summary>
-    public static AccountLevelResult ApplyBattleResult(bool _won)
-    {
-        long t_before = Exp;
-        int t_prevLevel = AccountLevelSpec.ResolveLevel(t_before);
-
-        long t_gain = _won ? AccountLevelSpec.WinExp : AccountLevelSpec.LoseExp;
-        if (t_gain <= 0) return new AccountLevelResult(0, t_prevLevel, t_prevLevel);
-
-        // 만렙에 닿으면 더 쌓지 않는다 — 넘겨 두면 표를 늘렸을 때 잠자던 경험치가 한꺼번에 터진다.
-        long t_ceiling = MaxExp;
-        long t_after = t_ceiling > 0 ? Math.Min(t_before + t_gain, t_ceiling) : t_before + t_gain;
-
-        Slot.AccountExp = t_after;
-        Save();
-
-        return new AccountLevelResult(t_after - t_before, t_prevLevel, AccountLevelSpec.ResolveLevel(t_after));
-    }
-
-    /// <summary>경험치를 더한다(디버그 전용). 만렙 구간은 전승 1,000판대라 이 문 없이는 확인할 수 없다.</summary>
-    public static void AddExpForDebug(long _amount)
-    {
-        long t_ceiling = MaxExp;
-        long t_next = Math.Max(Slot.AccountExp + _amount, 0);
-
-        Slot.AccountExp = t_ceiling > 0 ? Math.Min(t_next, t_ceiling) : t_next;
-        Save();
-    }
-
-    /// <summary>만렙으로 민다(디버그 전용).</summary>
-    public static void FillToMaxForDebug()
-    {
-        long t_ceiling = MaxExp;
-        if (t_ceiling <= 0) return;
-
-        Slot.AccountExp = t_ceiling;
-        Save();
-    }
-
-    /// <summary>레벨 1로 되돌린다(디버그 전용).</summary>
-    public static void ResetForDebug()
-    {
-        Slot.AccountExp = 0;
-        Save();
-    }
-
-    // 만렙 진입 누적치 = 경험치의 천장. 곡선이 없으면 0(천장 없음으로 다룬다).
-    static long MaxExp
-        => AccountLevelSpec.TryGetRequiredExp(AccountLevelSpec.MaxLevel, out long t_max) ? t_max : 0;
-
-    static void Save()
-    {
-        DataSaveManager.Save();
-        OnChanged?.Invoke();
-    }
-}
-
-// 전투 1회 정산 결과
-public readonly struct AccountLevelResult
-{
-    // 천장에 걸리면 요청 획득량보다 작다
-    public readonly long Delta;
-    public readonly int PrevLevel;
-    public readonly int Level;
-
-    public bool IsLevelUp => this.Level > this.PrevLevel;
-
-    public AccountLevelResult(long _delta, int _prevLevel, int _level)
-    {
-        Delta     = _delta;
-        PrevLevel = _prevLevel;
-        Level     = _level;
-    }
+    internal static void NotifyRehydrated() => OnChanged?.Invoke();
 }
 
 // 화면이 그리는 레벨 스냅샷

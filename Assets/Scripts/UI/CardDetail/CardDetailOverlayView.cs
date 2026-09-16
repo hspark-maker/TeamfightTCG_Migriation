@@ -722,7 +722,8 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     // 안내가 강화를 열었다(또는 닫았다) — 잔액 변화와 같은 자리에서 다시 판정하면 된다.
     void OnFeatureLockChanged()
     {
-        if (this.m_ritualPlaying) return;
+        // 서버 응답의 해금 통지는 샤드 흡수·섬광보다 먼저 올 수 있다. 새 외형은 공개 콜백에서 반영한다.
+        if (this.m_ritualPlaying || this.m_enhanceRequestPending) return;
 
         int t_card = CardAt(this.m_index);
         if (t_card > 0) RefreshGrowth(t_card, OwnershipManager.IsOwned(t_card));
@@ -1710,6 +1711,33 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
                      IntroClick(_owned && this.m_shownSynergyOpen
                                 ? CollectIntros(_card, CardKeyword.None, true)
                                 : null));
+        FitSynergyDescription();
+    }
+
+    // 설명은 두 시너지의 줄바꿈까지 포함해 높이를 잰다. 프리팹의 상단 고정 칩 줄은 그대로 둔다.
+    void FitSynergyDescription()
+    {
+        if (this.synergySection == null || this.synergyDescText == null) return;
+
+        RectTransform t_desc = this.synergyDescText.rectTransform;
+        var t_section = (RectTransform)this.synergySection.transform;
+        float t_height = Mathf.Max(80f, Mathf.Ceil(this.synergyDescText.GetPreferredValues(
+            this.synergyDescText.text, t_desc.rect.width, Mathf.Infinity).y));
+        t_desc.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, t_height);
+        t_section.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, -t_desc.anchoredPosition.y + t_height);
+
+        // ContentSizeFitter에 실제 본문 끝을 전달해야 늘어난 설명까지 스크롤할 수 있다.
+        RectTransform t_content = this.detailScroll != null ? this.detailScroll.content : null;
+        if (t_content == null || !t_content.TryGetComponent(out LayoutElement t_layout)) return;
+
+        float t_bottom = 0f;
+        foreach (Transform t_child in t_content)
+        {
+            if (!t_child.gameObject.activeSelf || !(t_child is RectTransform t_rect)) continue;
+            t_bottom = Mathf.Max(t_bottom, -t_rect.anchoredPosition.y + t_rect.rect.height * t_rect.pivot.y);
+        }
+        t_layout.preferredHeight = t_bottom + 24f;
+        LayoutRebuilder.ForceRebuildLayoutImmediate(t_content);
     }
 
     /// <summary>이 목록을 여는 손잡이. 세울 것이 없으면 null — 그 자리는 눌리지 않는다.</summary>

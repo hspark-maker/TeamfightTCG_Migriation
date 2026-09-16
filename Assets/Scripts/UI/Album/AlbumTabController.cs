@@ -18,20 +18,6 @@ public class AlbumTabController : LobbyTabPanel
 
     [Header("오버레이")]
     [SerializeField] AlbumPageOverlayView pageOverlay;
-    [SerializeField] UnityEngine.UI.Button filterButton;
-
-    protected override void OnInitializeUI()
-    {
-        base.OnInitializeUI();
-        if (filterButton != null) filterButton.onClick.AddListener(OpenCardSearch);
-    }
-
-    void OpenCardSearch()
-    {
-        if (!IsViewVisible || m_insertPending || AlbumInsertSession.IsRunning
-            || (OutgameTutorialRunner.IsRunning && !OutgameFeatureLock.IsFtueFreeNavigation)) return;
-        CollectionFilterResults.Open(this);
-    }
 
     readonly List<AlbumThemeCellView> m_cells = new List<AlbumThemeCellView>();
     // m_cells와 인덱스 정합 — 저작이 바뀌어 다른 프리팹이 되면 그 칸만 다시 만든다
@@ -60,7 +46,7 @@ public class AlbumTabController : LobbyTabPanel
     public void TryBeginInsert()
     {
         if (!IsViewVisible || m_insertPending) return;
-        if (CollectionFilterResults.IsOpen) return;
+        if (CollectionFilterResults.IsOpen || CardFilterPopup.IsOpen) return;
         if (!AlbumInsertQueue.HasPending || AlbumInsertSession.IsRunning) return;
 
         // 안내 중에는 유저가 직접 테마를 열어야 한다 — 세션은 시작하면서 오버레이를 스스로 열기 때문에,
@@ -94,6 +80,7 @@ public class AlbumTabController : LobbyTabPanel
         AlbumInsertMask.OnChanged += Refresh;
         // 자율 안내가 시작·종료될 때 테마 칸 앵커를 다시 고른다 — 안 하면 탭 진입 때 고른 폴백 칸에 안내가 붙는다.
         OutgameTutorialRunner.OnGuidedChanged += Refresh;
+        CardFilterPopup.OnAnyClosed += TryBeginInsert;
         CollectionFilterResults.OnAnyClosed += TryBeginInsert;
 
         Refresh();
@@ -105,12 +92,13 @@ public class AlbumTabController : LobbyTabPanel
     protected override void OnViewHidden()
     {
         base.OnViewHidden();
-        CollectionFilterResults.CloseFor(this);
+        pageOverlay?.CloseCardSearch();
         StopAllCoroutines();
         OwnershipManager.OnOwnershipChanged -= Refresh;
         AlbumRewardManager.OnChanged -= Refresh;
         AlbumInsertMask.OnChanged -= Refresh;
         OutgameTutorialRunner.OnGuidedChanged -= Refresh;
+        CardFilterPopup.OnAnyClosed -= TryBeginInsert;
         CollectionFilterResults.OnAnyClosed -= TryBeginInsert;
 
         // 제어 루트는 살아 있으므로 시작 코루틴과 플래그를 직접 정리한다.
@@ -122,6 +110,7 @@ public class AlbumTabController : LobbyTabPanel
 
     public override void OnLeave()
     {
+        pageOverlay?.CloseCardSearch();
         OutgameTutorialRunner.AbortGuided(EOutgameTutorialTrigger.CollectionTabFirstEnter);
         OutgameTutorialRunner.AbortGuided(EOutgameTutorialTrigger.SynergyGrowthIntroduction);
     }
@@ -142,6 +131,8 @@ public class AlbumTabController : LobbyTabPanel
         Canvas.ForceUpdateCanvases();
 
         m_insertPending = false;
+        // 필터 적용은 팝업이 닫힌 콜백 뒤에 결과 본문을 연다. 같은 프레임에 예약된 삽입은 다음 기회로 미룬다.
+        if (!IsViewVisible || CollectionFilterResults.IsOpen || CardFilterPopup.IsOpen) yield break;
         _session.Begin();
     }
 

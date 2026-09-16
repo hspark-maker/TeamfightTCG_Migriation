@@ -86,6 +86,9 @@ public class TurnBannerUI : MonoBehaviour
         }
         if (this.whosTurnLabel != null)
         {
+            // 턴 라벨에 저작된 위쪽 오프셋을 제거하고, 축소된 항복 글자의 실제 높이로 중앙을 맞춘다.
+            this.whosTurnLabel.rectTransform.anchoredPosition = Vector2.zero;
+            this.whosTurnLabel.alignment = TextAlignmentOptions.Midline;
             // 긴 문구도 기존 배경 안에서 한 줄로 읽히게 한다.
             this.whosTurnLabel.fontSizeMax = this.whosTurnLabel.fontSize;
             this.whosTurnLabel.fontSizeMin = this.whosTurnLabel.fontSize * 0.4f;

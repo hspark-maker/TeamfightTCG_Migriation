@@ -24,6 +24,7 @@ internal static class ServerSlotRehydrator
         // 다른 슬롯과 달리 Init 계열이 아니라 통지뿐이다 — AdventureProgress 는 세이브를 직독하고
         // 캐시를 두지 않아, 채택이 끝난 시점에 값은 이미 새것이고 모르는 것은 화면뿐이다.
         if ((_slots & ESaveSlot.Adventure) != 0) AdventureProgress.NotifyRehydrated();
+        if ((_slots & ESaveSlot.Profile) != 0) AccountLevelManager.NotifyRehydrated();
         if ((_slots & (ESaveSlot.Profile | ESaveSlot.Tutorial | ESaveSlot.Rank)) != 0)
             ContentUnlockManager.NotifyRehydrated();
 

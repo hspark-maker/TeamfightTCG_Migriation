@@ -84,12 +84,16 @@ SpriteAtlas:
     - {fileID: 2800000, guid: f2e3b36e7e44645ad998225da0f0ed99, type: 3}
     - {fileID: 2800000, guid: cd82f03925dac4632b18be552d8d9d85, type: 3}
     - {fileID: 2800000, guid: be873e8d17c964d118e57d1851a761e1, type: 3}
+    - {fileID: 2800000, guid: 09422c0397b5c47769fb0f7f68614f3d, type: 3}
+    - {fileID: 2800000, guid: 3fd6349f9860c4deeb4939d8936f9261, type: 3}
+    - {fileID: 2800000, guid: 557dc35f0e12140efbbf6a6fff2edbf3, type: 3}
     bindAsDefault: 1
     isAtlasV2: 0
     cachedData: {fileID: 0}
     packedSpriteRenderDataKeys:
     - 190d88c1198bfed468f91463a7f6f6cf: 21300000
     - 00032503578262e44b4c73d1f884cd81: 21300000
+    - 09422c0397b5c47769fb0f7f68614f3d: 21300000
     - efb0879309abd38449efae22931fb381: 21300000
     - 222c40443a900434b9cf05c347b0103e: 21300000
     - 3237a1a45fb1e9d4f87c4ae7364ca5fc: 21300000
@@ -100,11 +104,14 @@ SpriteAtlas:
     - 9e9205fbdf2fefe4fb10b1eeb9cda22b: 21300000
     - be873e8d17c964d118e57d1851a761e1: 21300000
     - f2e3b36e7e44645ad998225da0f0ed99: 21300000
+    - 557dc35f0e12140efbbf6a6fff2edbf3: 21300000
     - 907ce29f21f022949991206a7677b268: 21300000
+    - 3fd6349f9860c4deeb4939d8936f9261: 21300000
   m_MasterAtlas: {fileID: 0}
   m_PackedSprites:
   - {fileID: 21300000, guid: 190d88c1198bfed468f91463a7f6f6cf, type: 3}
   - {fileID: 21300000, guid: 00032503578262e44b4c73d1f884cd81, type: 3}
+  - {fileID: 21300000, guid: 09422c0397b5c47769fb0f7f68614f3d, type: 3}
   - {fileID: 21300000, guid: efb0879309abd38449efae22931fb381, type: 3}
   - {fileID: 21300000, guid: 222c40443a900434b9cf05c347b0103e, type: 3}
   - {fileID: 21300000, guid: 3237a1a45fb1e9d4f87c4ae7364ca5fc, type: 3}
@@ -115,10 +122,13 @@ SpriteAtlas:
   - {fileID: 21300000, guid: 9e9205fbdf2fefe4fb10b1eeb9cda22b, type: 3}
   - {fileID: 21300000, guid: be873e8d17c964d118e57d1851a761e1, type: 3}
   - {fileID: 21300000, guid: f2e3b36e7e44645ad998225da0f0ed99, type: 3}
+  - {fileID: 21300000, guid: 557dc35f0e12140efbbf6a6fff2edbf3, type: 3}
   - {fileID: 21300000, guid: 907ce29f21f022949991206a7677b268, type: 3}
+  - {fileID: 21300000, guid: 3fd6349f9860c4deeb4939d8936f9261, type: 3}
   m_PackedSpriteNamesToIndex:
   - Time_Icon
   - Emote_Icon
+  - Switch_Single_Bg
   - Image_BattleTurn_Player
   - Attack_coin_Back
   - Attack_coin_Front
@@ -129,7 +139,9 @@ SpriteAtlas:
   - defeat
   - PictoIcon_Life
   - PictoIcon_Skull_1
+  - BorderFrame_Circle_168_Border
   - DeckPile
+  - BasicFrame_Circle_200
   m_RenderDataMap: {}
   m_Tag: UIBattle
   m_IsVariant: 0

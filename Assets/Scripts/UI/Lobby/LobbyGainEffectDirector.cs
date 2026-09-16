@@ -180,6 +180,18 @@ public class LobbyGainEffectDirector : MonoBehaviour
         Play();
     }
 
+    void Update()
+    {
+        // 풀 밖의 팩 개봉·매치 진입·랭크 연출도 기존 로비 무대 판정으로 기다린다.
+        if (!AccountRewardHandoff.HasPending || !GuidanceCoordinator.CanPresent ||
+            AlbumInsertSession.IsRunning || AlbumInsertQueue.HasPending)
+            return;
+        var t_pool = UIPoolManager.Instance;
+        if (t_pool == null || t_pool.HasVisibleUIExcept()) return;
+        if (!RewardClaimPopup.TryGet(out var t_popup) || t_popup.RewardSlotCount <= 0) return;
+        MissionPanel.ShowAccountExperienceRewards(AccountRewardHandoff.Consume());
+    }
+
     // 오버레이 개봉은 로비를 재로드하지 않는다 — 닫힘 신호가 Start를 대신하는 두 번째 진입점이다.
     void OnPackOpenClosed()
     {

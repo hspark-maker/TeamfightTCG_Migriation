@@ -28,7 +28,47 @@ public static class EnemyAiSurrenderValidation
         Check("invincible can survive", Field(1, Card(1, 2, CardKeyword.Invincible)), Field(0, Card(0, 10)), false, ref t_cases);
         Check("one safe target prevents surrender", Field(1, Card(1, 2)), Field(0, Card(0, 10), Card(0, 1)), false, ref t_cases);
         Check("taunt restricts safe target", Field(1, Card(1, 2)), Field(0, Card(0, 10, CardKeyword.Taunt), Card(0, 1)), true, ref t_cases);
-        Check("multiple survivors continue", Field(1, Card(1, 2), Card(1, 2)), Field(0, Card(0, 10)), false, ref t_cases);
+        Check("two cards cannot trade", Field(1, Card(1, 2), Card(1, 2)), Field(0, Card(0, 10)), true, ref t_cases);
+        Check("three cards cannot trade", Field(1, Card(1, 2), Card(1, 2), Card(1, 2)),
+            Field(0, Card(0, 20), Card(0, 20)), true, ref t_cases);
+        Check("combined damage can draw", Field(1, Card(1, 5), Card(1, 5)), Field(0, Card(0, 10)), false, ref t_cases);
+        Check("weakened counter can be survived", Field(1, Card(1, 4), Card(1, 4)), Field(0, Card(0, 10)), false, ref t_cases);
+        Check("weak target preserves a trade", Field(1, Card(1, 2), Card(1, 2)),
+            Field(0, Card(0, 20), Card(0, 1)), false, ref t_cases);
+        Check("healer can recover allies before acting", Field(1, Card(1, 2, CardKeyword.Healer), Card(1, 2)),
+            Field(0, Card(0, 20)), false, ref t_cases);
+        foreach (CardKeyword t_keyword in new[] { CardKeyword.Ranged, CardKeyword.Immortal, CardKeyword.Invincible })
+            Check("comeback keyword " + t_keyword, Field(1, Card(1, 2, t_keyword), Card(1, 2)),
+                Field(0, Card(0, 20)), false, ref t_cases);
+        Check("marked opponent allows repeated attacks", Field(1, Card(1, 2), Card(1, 2)),
+            Field(0, Card(0, 20, CardKeyword.Mark)), false, ref t_cases);
+        Check("taunt counter is weaker", Field(1, Card(1, 2), Card(1, 2)),
+            Field(0, Card(0, 10, CardKeyword.Taunt)), false, ref t_cases);
+        Check("peerless damage budget includes splash", Field(1, Card(1, 4, CardKeyword.Peerless), Card(1, 4)),
+            Field(0, Card(0, 10), Card(0, 10)), false, ref t_cases);
+        BattleFieldState t_recovery = Field(1, Card(1, 2), Card(1, 2));
+        t_recovery.GetSlot(0).hasShield = true;
+        Check("shield can save a card", t_recovery, Field(0, Card(0, 20)), false, ref t_cases);
+        t_recovery.GetSlot(0).hasShield = false;
+        t_recovery.GetSlot(0).bonusHp = 20;
+        Check("bonus health can save a card", t_recovery, Field(0, Card(0, 20)), false, ref t_cases);
+        t_recovery.GetSlot(0).bonusHp = 0;
+        t_recovery.GetSlot(0).synergyDmgReduction = 20;
+        Check("damage reduction can save a card", t_recovery, Field(0, Card(0, 20)), false, ref t_cases);
+        t_recovery = Field(1, Card(1, 2), Card(1, 2));
+        t_recovery.GetSlot(0).evolutionStage = CardInstance.EnhanceStage;
+        Check("enhanced followup included in budget", t_recovery, Field(0, Card(0, 10)), false, ref t_cases);
+        t_recovery = Field(0, Card(0, 20, CardKeyword.Cunning));
+        t_recovery.Enqueue(Card(0, 1));
+        Check("opponent can swap in a weak reserve", Field(1, Card(1, 2), Card(1, 2)), t_recovery, false, ref t_cases);
+        foreach (SynergyEffect t_effect in new SynergyEffect[] { new CaretakerSynergyEffect(), new PredatorSynergyEffect(),
+                     new TraceSynergyEffect(), new BrandSynergyEffect(), new LegacySynergyEffect(), new UnknownEffect() })
+        {
+            t_recovery = Field(1, Card(1, 2), Card(1, 2));
+            t_recovery.SetSynergy(new SynergyState(new[] { new ActiveSynergy { Tier = new SynergyTier { effects = new[] { t_effect } } } }));
+            Check("attrition excludes changing effect " + t_effect.GetType().Name, t_recovery,
+                Field(0, Card(0, 20)), false, ref t_cases);
+        }
         Check("last healer cannot heal itself", Field(1, Card(1, 2, CardKeyword.Healer)), Field(0, Card(0, 10)), true, ref t_cases);
         Check("peerless loses all splash outcomes", Field(1, Card(1, 2, CardKeyword.Peerless)),
             Field(0, Card(0, 10), Card(0, 10), Card(0, 10)), true, ref t_cases);
@@ -59,11 +99,19 @@ public static class EnemyAiSurrenderValidation
 
     static void Check(string _name, BattleFieldState _ai, BattleFieldState _opponent, bool _expected, ref int _cases)
     {
+        MatchRandom.SeedScoped(917);
+        int t_nextAiRoll = MatchRandom.AiRange(1000000);
+        MatchRandom.SeedScoped(917);
         ulong t_hash = BattleStateHash.Compute(_ai, _opponent);
         int t_draws = MatchRandom.DrawCount;
-        Require(EnemyAiSurrender.ShouldSurrender(_ai, _opponent) == _expected, _name);
+        using (var t_events = TeamfightTCG.BattleCore.BattleEventStream.BeginCapture())
+        {
+            Require(EnemyAiSurrender.ShouldSurrender(_ai, _opponent) == _expected, _name);
+            Require(t_events.Events.Count == 0, _name + ": battle events emitted");
+        }
         Require(BattleStateHash.Compute(_ai, _opponent) == t_hash, _name + ": board changed");
         Require(MatchRandom.DrawCount == t_draws, _name + ": RNG consumed");
+        Require(MatchRandom.AiRange(1000000) == t_nextAiRoll, _name + ": AI RNG consumed");
         _cases++;
     }
 

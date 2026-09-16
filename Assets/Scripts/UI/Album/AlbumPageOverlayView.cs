@@ -25,6 +25,12 @@ public class AlbumPageOverlayView : ContentsUIBehaviour
     [Tooltip("선택 — 지금 열어둔 테마 이름(CollectionTitle). 미배선이면 저작된 글자를 그대로 둔다.")]
     [SerializeField] TMP_Text titleLabel;
 
+    [Header("컬렉션 필터")]
+    [SerializeField] Button filterButton;
+    [SerializeField] CollectionFilterResults filterResultsPrefab;
+    [SerializeField] Transform filterResultsRoot;
+    CollectionFilterResults m_filterResults;
+
     [Tooltip("한 페이지가 늘 차지하는 칸 수(Grid_Slots는 3열 = 3x3이라 9). 저작 칸이 이보다 적으면 빈 칸으로 채워\n" +
              "페이지마다 격자가 들쭉날쭉해지지 않게 한다. 저작 칸이 더 많으면 그만큼 그대로 늘린다.")]
     [SerializeField] int pageSlotCount = 9;
@@ -111,7 +117,8 @@ public class AlbumPageOverlayView : ContentsUIBehaviour
         s_instance.Close();
     }
 
-    bool IsLocked => m_sessionLocked || m_flipLocked || m_dragReturning || m_rewinding;
+    bool IsFiltering => m_filterResults != null && m_filterResults.IsViewVisible;
+    bool IsLocked => m_sessionLocked || m_flipLocked || m_dragReturning || m_rewinding || IsFiltering;
 
     public int PageIndex => m_pageIndex;
 
@@ -134,6 +141,7 @@ public class AlbumPageOverlayView : ContentsUIBehaviour
         }
 
         CancelFlip();   // 잘린 넘김 자세를 안고 열리지 않게
+        CloseCardSearch();
 
         InitializeUI();
         bool t_wasActive = IsViewVisible;
@@ -147,9 +155,35 @@ public class AlbumPageOverlayView : ContentsUIBehaviour
 
     public void Close()
     {
+        CloseCardSearch();
         // 퇴장 연출과 나란히 돌려준다 — OnDisable을 기다리면 오버레이가 완전히 사라진 뒤에야 바가 돌아온다.
         LobbyShellBars.Show(this);
         SetContentsVisible(false, transition);
+    }
+
+    void OpenCardSearch()
+    {
+        if (!IsViewVisible || m_sessionLocked || m_flipLocked || m_dragReturning || m_rewinding
+            || m_flipping || m_dragging || AlbumInsertSession.IsRunning
+            || !GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.None)) return;
+        if (m_theme == null || filterResultsPrefab == null || filterResultsRoot == null) return;
+        if (m_filterResults == null)
+        {
+            m_filterResults = Instantiate(filterResultsPrefab, filterResultsRoot);
+            m_filterResults.Closed += RefreshFilterSurface;
+        }
+        m_filterResults.SetCollection(m_theme);
+        m_filterResults.EditFilter(this, RefreshFilterSurface);
+    }
+
+    public void CloseCardSearch() => m_filterResults?.Hide();
+
+    void RefreshFilterSurface()
+    {
+        // 결과는 같은 컬렉션의 카드 영역을 대체한다. 제목·보상·필터 버튼은 계속 사용한다.
+        if (slotRoot != null) slotRoot.gameObject.SetActive(!IsFiltering);
+        if (pageLabel != null) pageLabel.gameObject.SetActive(!IsFiltering);
+        ApplyInteractable();
     }
 
     // 삽입 카드를 꽂을 칸 — 슬롯은 RefreshPage가 만든 뒤에야 존재하고 레이아웃도 그 프레임 이후에 확정된다.
@@ -219,9 +253,11 @@ public class AlbumPageOverlayView : ContentsUIBehaviour
 
         if (dimButton != null) dimButton.interactable = !t_dimmed;
         if (closeButton != null) closeButton.interactable = !t_dimmed;
+        if (filterButton != null) filterButton.interactable = !m_sessionLocked && !m_flipLocked
+            && !m_dragReturning && !m_rewinding;
         if (swipeDetector != null) swipeDetector.Interactable = !IsLocked;
 
-        bool t_steppable = !t_dimmed && m_theme != null && m_theme.Pages.Count > 1;
+        bool t_steppable = !t_dimmed && !IsFiltering && m_theme != null && m_theme.Pages.Count > 1;
         if (prevButton != null) prevButton.interactable = t_steppable;
         if (nextButton != null) nextButton.interactable = t_steppable;
     }
@@ -229,7 +265,8 @@ public class AlbumPageOverlayView : ContentsUIBehaviour
     /// <summary>닫기 요청. 잠금은 색이 아니라 여기서 막는다 — 넘김 도중 눌러도 아무 일이 없다.</summary>
     void HandleCloseRequest()
     {
-        if (IsLocked || !GuidanceCoordinator.CanCloseAlbum) return;
+        if (m_sessionLocked || m_flipLocked || m_dragReturning || m_rewinding
+            || !GuidanceCoordinator.CanCloseAlbum) return;
         Close();
     }
 
@@ -256,6 +293,7 @@ public class AlbumPageOverlayView : ContentsUIBehaviour
         if (closeButton != null) closeButton.onClick.AddListener(HandleCloseRequest);
         if (prevButton != null) prevButton.onClick.AddListener(() => HandleStepRequest(-1));
         if (nextButton != null) nextButton.onClick.AddListener(() => HandleStepRequest(1));
+        if (filterButton != null) filterButton.onClick.AddListener(OpenCardSearch);
 
         // 회전 대상은 Panel_Page가 아니라 slotRoot(Grid_Slots)다 — 같은 사각형이면서 부모 레이아웃이
         // anchoredPosition을 안 덮어쓰는 유일한 노드라 축 보정이 되돌려지지 않는다
@@ -291,6 +329,7 @@ public class AlbumPageOverlayView : ContentsUIBehaviour
 
     protected override void OnViewHidden()
     {
+        CloseCardSearch();
         // 안전망 — 탭 전환·씬 이탈처럼 Close를 거치지 않는 경로로 꺼져도 셸은 돌아와야 한다.
         LobbyShellBars.Show(this);
 

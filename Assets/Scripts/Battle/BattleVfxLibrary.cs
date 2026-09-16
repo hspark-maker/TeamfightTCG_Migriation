@@ -7,7 +7,7 @@ using UnityEngine;
 public enum BattleVfxId
 {
     None             = 0,
-    HealerLaunch     = 1,   // 힐러 카드 아래에서 먼저 터지는 발동 이펙트
+    HealerLaunch     = 1,   // 힐러 카드 중앙에서 먼저 터지는 발동 이펙트
     HealerProjectile = 2,   // 힐러 → 아군으로 날아가는 투사체(수명은 호출부가 관리)
     HealerImpact     = 3,   // (사용 안 함) 도착 폭발은 HealerArrival(20)로 되살아났다 — 옛 에셋에 값이
                             // 남아 있을 수 있어 3은 재사용하지 않는다.

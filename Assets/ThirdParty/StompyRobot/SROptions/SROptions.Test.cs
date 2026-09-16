@@ -1,4 +1,5 @@
-﻿//#define ENABLE_TEST_SROPTIONS
+﻿#if UNITY_EDITOR || DEVELOPMENT_BUILD
+//#define ENABLE_TEST_SROPTIONS
 
 using System;
 using System.ComponentModel;
@@ -377,3 +378,5 @@ public partial class SROptions
 
 #endif
 }
+
+#endif

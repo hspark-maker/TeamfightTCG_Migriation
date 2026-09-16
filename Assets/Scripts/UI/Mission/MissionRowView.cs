@@ -45,10 +45,21 @@ public class MissionRowView : MonoBehaviour, IUIInitializable
     [SerializeField] Image secondRewardIcon;
     [SerializeField] TMP_Text secondRewardCountText;
 
+    [Tooltip("계정 경험치 보상 아이콘과 수량. 재화 보상과 별도로 표시한다.")]
+    [SerializeField] GameObject accountExpRoot;
+    [SerializeField] TMP_Text accountExpCountText;
+
+    [Tooltip("최대 3개 보상과 전체 보상 더보기. 배선되면 구형 대표 보상 표시를 대체한다.")]
+    [SerializeField] MissionRewardStrip rewardStrip;
+
     [SerializeField] Button claimButton;
     [Tooltip("미달성 미션 행 전체의 콘텐츠 이동 버튼.")]
     [SerializeField] Button navigateButton;
     [SerializeField] GameObject claimAlertDot;
+
+    [Header("달성 보상 강조")]
+    [SerializeField] Image rowBackground;
+    [SerializeField] Color claimableRowColor = new Color(0.8825388f, 1f, 0.8066038f, 1f);
 
     [Header("보상 수령 버튼 배경")]
     [SerializeField] Image claimBackground;
@@ -87,6 +98,7 @@ public class MissionRowView : MonoBehaviour, IUIInitializable
     System.Action<string> m_onClaim;
     System.Action<string> m_onNavigate;
     Sprite m_authoredRewardIcon;
+    Color m_authoredRowColor;
     bool m_hasBound;
     bool m_initialized;
     EMissionRowEmphasis m_emphasis;
@@ -107,6 +119,7 @@ public class MissionRowView : MonoBehaviour, IUIInitializable
         if (this.m_initialized) return;
         if (transform is RectTransform t_row) m_rowHeight = t_row.sizeDelta.y;
         if (this.rewardIcon != null) this.m_authoredRewardIcon = this.rewardIcon.sprite;
+        if (this.rowBackground != null) this.m_authoredRowColor = this.rowBackground.color;
         if (this.claimButton != null)
         {
             this.claimButton.onClick.RemoveAllListeners();
@@ -184,6 +197,8 @@ public class MissionRowView : MonoBehaviour, IUIInitializable
         if (this.claimAlertDot != null) this.claimAlertDot.SetActive(t_canClaim);
         // 요청 중 입력 잠금은 표시 상태와 분리해 배경이 미완료로 깜빡이지 않게 한다.
         bool t_rewardAvailable = t_complete && MissionManager.IsGuideUnlocked(this.m_definition);
+        if (this.rowBackground != null)
+            this.rowBackground.color = t_rewardAvailable && !t_claimed ? this.claimableRowColor : this.m_authoredRowColor;
 
         this.ApplyProgress(MissionManager.ProgressOf(this.m_definition), this.m_definition.Target, t_complete);
 
@@ -197,7 +212,7 @@ public class MissionRowView : MonoBehaviour, IUIInitializable
         }
 
         if (this.claimLabel != null)
-            this.claimLabel.text = t_claimed ? "완료됨" : t_rewardAvailable ? "받기" : t_canNavigate ? "이동" : "진행 중";
+            this.claimLabel.text = t_claimed ? "수령 완료" : t_rewardAvailable ? "보상 받기" : t_canNavigate ? "이동" : "진행 중";
 
         // 버튼은 끄지 않고 상호작용만 막는다 — 꺼 버리면 레이아웃이 흔들리고 "받은 줄"이 사라진 것처럼 보인다.
         if (this.claimButton != null) this.claimButton.interactable = t_canClaim || t_canNavigate;
@@ -339,10 +354,25 @@ public class MissionRowView : MonoBehaviour, IUIInitializable
         if (this.CanNavigate()) this.m_onNavigate.Invoke(this.m_definition.Id);
     }
 
-    /// <summary>대표 보상 하나를 아이콘·개수로 그린다. 재화면 아이콘을 갈아끼우고,
-    /// 아이템이면 저작 그림을 신뢰한다. 패스 경험치는 여기서도 문구에서도 그리지 않는다.</summary>
+    /// <summary>공통 스트립에 보상 전체를 전달한다. 미배선된 구형 저작본은 대표 보상 표시를 유지한다.</summary>
     void ApplyRewardVisual(MissionDefinition _definition)
     {
+        if (this.rewardStrip != null)
+        {
+            if (this.rewardIcon != null) this.rewardIcon.gameObject.SetActive(false);
+            if (this.rewardCountText != null) this.rewardCountText.gameObject.SetActive(false);
+            if (this.dualRewardRoot != null) this.dualRewardRoot.SetActive(false);
+            if (this.accountExpRoot != null) this.accountExpRoot.SetActive(false);
+            if (this.rewardText != null) this.rewardText.gameObject.SetActive(false);
+            this.rewardStrip.Bind(_definition?.Reward);
+            return;
+        }
+
+        long t_accountExp = _definition?.Reward?.AccountExp ?? 0;
+        if (this.accountExpRoot != null) this.accountExpRoot.SetActive(t_accountExp > 0);
+        if (this.accountExpCountText != null)
+            this.accountExpCountText.text = t_accountExp > 0 ? $"+{t_accountExp:N0}" : string.Empty;
+
         ClaimRewardGain t_gain = CurrencyAt(_definition, 0);
         ClaimRewardGain t_secondGain = CurrencyAt(_definition, 1);
         ClaimRewardItem t_item = t_gain == null ? FirstItem(_definition) : null;
@@ -416,6 +446,11 @@ public class MissionRowView : MonoBehaviour, IUIInitializable
             }
         }
         RewardItemDisplay.Append(s_text, _definition.Reward.Items);
+        if (_definition.Reward.AccountExp > 0)
+        {
+            if (s_text.Length > 0) s_text.Append("  ");
+            s_text.Append("계정 경험치 +").Append(_definition.Reward.AccountExp);
+        }
         if (s_text.Length == 0 && _definition.Reward.PassExp > 0)
             s_text.Append("패스 경험치 +").Append(_definition.Reward.PassExp);
         return s_text.ToString();

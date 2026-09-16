@@ -3103,7 +3103,7 @@ MonoBehaviour:
   m_text: BATTLE
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: ae2f56c08291ad54aa1415dc014d7bff, type: 2}
-  m_sharedMaterial: {fileID: 8963205223541517340, guid: ae2f56c08291ad54aa1415dc014d7bff, type: 2}
+  m_sharedMaterial: {fileID: 2100000, guid: 4df79f0af78a4a4c922373f821ec203e, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []

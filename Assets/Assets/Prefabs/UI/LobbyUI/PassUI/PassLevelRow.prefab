@@ -197,7 +197,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 0.89686525, b: 0.6367924, a: 1}
+  m_Color: {r: 0.3, g: 0.2, b: 0.08, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -977,7 +977,7 @@ GameObject:
   - component: {fileID: 2438721659978168082}
   - component: {fileID: 573603610200454706}
   m_Layer: 0
-  m_Name: Gauge_Bar_Fill (1)
+  m_Name: LevelProgressFill
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -997,7 +997,7 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 8300000010000000014}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
@@ -1834,7 +1834,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: -105}
-  m_SizeDelta: {x: 25.735, y: 210}
+  m_SizeDelta: {x: 25.735, y: 110}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &574444251841889244
 CanvasRenderer:

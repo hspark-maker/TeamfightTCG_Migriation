@@ -10,6 +10,39 @@ using UnityEngine;
 /// </summary>
 public static class PopupPlacer
 {
+    /// <summary>누르고 있는 버튼 위에 띄우고, 화면 모서리에서는 안전 영역 안으로 밀어넣는다.</summary>
+    public static void PlaceAboveAnchor(RectTransform _self, RectTransform _anchor,
+        float _gap, float _edgePadding = 16f)
+    {
+        if (_self == null || _anchor == null) return;
+        Canvas t_canvas = _self.GetComponentInParent<Canvas>();
+        if (t_canvas == null) return;
+        RectTransform t_canvasRect = (RectTransform)t_canvas.transform;
+        Camera t_camera = t_canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : t_canvas.worldCamera;
+        Rect t_bounds = SafeBounds(t_canvasRect, t_camera);
+        // 기기 시뮬레이터의 safeArea가 게임 뷰보다 커도 실제 캔버스를 벗어나지 않는다.
+        t_bounds = Rect.MinMaxRect(Mathf.Max(t_bounds.xMin, t_canvasRect.rect.xMin),
+            Mathf.Max(t_bounds.yMin, t_canvasRect.rect.yMin),
+            Mathf.Min(t_bounds.xMax, t_canvasRect.rect.xMax), Mathf.Min(t_bounds.yMax, t_canvasRect.rect.yMax));
+        Vector3 t_anchorTop = t_canvasRect.InverseTransformPoint(
+            _anchor.TransformPoint(new Vector3(_anchor.rect.center.x, _anchor.rect.yMax, 0f)));
+
+        _self.localScale = Vector3.one;
+        Vector3 t_half = t_canvasRect.InverseTransformVector(
+            _self.TransformVector(new Vector3(_self.rect.width, _self.rect.height, 0f) * 0.5f));
+        float t_scale = Mathf.Min(1f,
+            Mathf.Max(1f, t_bounds.width - _edgePadding * 2f) / (Mathf.Abs(t_half.x) * 2f),
+            Mathf.Max(1f, t_bounds.height - _edgePadding * 2f) / (Mathf.Abs(t_half.y) * 2f));
+        _self.localScale = Vector3.one * t_scale;
+        float t_halfW = Mathf.Abs(t_half.x) * t_scale;
+        float t_halfH = Mathf.Abs(t_half.y) * t_scale;
+        float t_x = Mathf.Clamp(t_anchorTop.x, t_bounds.xMin + _edgePadding + t_halfW,
+            t_bounds.xMax - _edgePadding - t_halfW);
+        float t_y = Mathf.Clamp(t_anchorTop.y + _gap + t_halfH,
+            t_bounds.yMin + _edgePadding + t_halfH, t_bounds.yMax - _edgePadding - t_halfH);
+        _self.position = t_canvasRect.TransformPoint(new Vector3(t_x, t_y, 0f));
+    }
+
     /// <summary>_self를 _anchor 오른쪽에 붙인다. 오른쪽이 캔버스를 넘치면 왼쪽으로 뒤집고,
     /// 그래도 넘치면 캔버스 안으로 클램프한다.</summary>
     /// <param name="_gap">앵커와 팝업 사이 여백(px).</param>

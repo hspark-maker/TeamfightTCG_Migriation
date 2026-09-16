@@ -21,6 +21,7 @@ export {claimPayout} from "./commands/claimPayout";
 export {enhanceCard, enhanceSynergyIntroduction} from "./commands/enhanceCard";
 export {enhanceKeyword} from "./commands/enhanceKeyword";
 export {claimBattleReward} from "./commands/claimBattleReward";
+export {claimBattleExperience} from "./commands/claimBattleExperience";
 export {grantTutorialCards} from "./commands/grantTutorialCards";
 export {reportAdventureWin} from "./commands/reportAdventureWin";
 export {limitBreakCard} from "./commands/limitBreakCard";

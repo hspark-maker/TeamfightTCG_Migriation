@@ -435,24 +435,23 @@ public static class OutgameDebugActions
     // 계정 경험치 더하기. 만렙 구간은 전승 1,000판대라 이 문 없이는 확인할 수 없다.
     public static void AddAccountExp(long _amount)
     {
-        AccountLevelManager.AddExpForDebug(_amount);
-        AccountLevelInfo t_info = AccountLevelManager.GetInfo();
-        Debug.Log($"[OutgameDebug] Account exp +{_amount} — Lv.{t_info.Level} ({t_info.ExpInLevel}/{t_info.ExpToNext})");
+        ReportAccountExpReadOnly();
     }
 
     // 만렙으로 밀기
     public static void FillAccountLevel()
     {
-        AccountLevelManager.FillToMaxForDebug();
-        Debug.Log($"[OutgameDebug] Account level maxed — Lv.{AccountLevelManager.Level}");
+        ReportAccountExpReadOnly();
     }
 
     // 레벨 1로 되돌리기
     public static void ResetAccountLevel()
     {
-        AccountLevelManager.ResetForDebug();
-        Debug.Log("[OutgameDebug] Account level reset — Lv.1");
+        ReportAccountExpReadOnly();
     }
+
+    static void ReportAccountExpReadOnly()
+        => Debug.LogWarning("[OutgameDebug] 계정 경험치는 서버에서 지급합니다. 미션 수령 또는 검증된 전투 결과로 확인하세요.");
 
     // 서버가 티어·최고 도달·랭킹 색인을 함께 확정한다. 로컬 점수를 먼저 바꾸지 않는다.
     public static void RaiseTier() => ChangeRankAsync("step", +1).Forget();

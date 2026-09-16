@@ -31,6 +31,15 @@ public static class TurnThinkTimer
     // 직전 턴 워처가 한 프레임 늦게 종료되어 새 턴의 표시를 끄지 않도록 소유자를 구분한다.
     static int s_generation;
 
+    /// <summary>종료 로딩에서 지난 판의 워처와 표시값을 함께 무효화한다.</summary>
+    public static void Reset()
+    {
+        ++s_generation;
+        Active = false;
+        Remaining = 0f;
+        Limit = 0f;
+    }
+
     /// <summary>AI 대기와 남은 시간 표시를 함께 진행한다. 표시 총량은 _displayLimitSec(플레이어와 같은
     /// TurnThinkTime)에서 내려가고, 실제 행동은 _actSec 경과 시점 — 남은 시간이 많이 남은 채 타이머가
     /// 꺼지므로 사람 상대가 일찍 공격한 화면과 구분되지 않는다. 표시 총량을 행동 시간으로 쓰면
@@ -42,13 +51,13 @@ public static class TurnThinkTimer
         Limit = _displayLimitSec;
         Remaining = _displayLimitSec;
         Active = true;
-        double t_start = Time.realtimeSinceStartupAsDouble;
+        double t_elapsed = 0;
 
         try
         {
             while (t_generation == s_generation)
             {
-                double t_elapsed = Time.realtimeSinceStartupAsDouble - t_start;
+                if (!TurnState.ReconnectPaused) t_elapsed += Time.unscaledDeltaTime;
                 if (t_elapsed >= _actSec) return;
                 Remaining = Mathf.Max(0f, (float)(_displayLimitSec - t_elapsed));
                 await UniTask.Yield(_ct);
@@ -81,6 +90,13 @@ public static class TurnThinkTimer
                 // false→true 엣지: 새 입력 창 시작 → 예산 리셋
                 if (t_allowed && !t_prevAllowed) t_elapsed = 0f;
                 t_prevAllowed = t_allowed;
+
+                if (TurnState.ReconnectPaused)
+                {
+                    if (t_allowed) Remaining = Mathf.Max(0f, _limitSec - t_elapsed);
+                    await UniTask.Yield(_ct);
+                    continue;
+                }
 
                 if (t_allowed)
                 {

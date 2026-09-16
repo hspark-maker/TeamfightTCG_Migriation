@@ -19,7 +19,9 @@ async function walk(dir, prefix = '') {
 }
 
 async function validate({ root = path.resolve(__dirname, '../ServerData'),
-                          origin = 'https://bm-cardbattle-assets.web.app', offline = false } = {}) {
+                          origin = 'https://bm-cardbattle-assets.web.app', offline = false,
+                          pruneToCatalog = '' } = {}) {
+  if (pruneToCatalog && offline) throw new Error('Pruning requires the deployed manifest check.');
   const files = await walk(root).catch(error => {
     if (error.code === 'ENOENT') throw new Error('ServerData가 없습니다. Unity에서 Build Firebase Resources를 먼저 실행하세요.');
     throw error;
@@ -39,32 +41,50 @@ async function validate({ root = path.resolve(__dirname, '../ServerData'),
     records[file] = { bytes: data.length, sha256: crypto.createHash('sha256').update(data).digest('hex') };
   }
 
+  const referenced = new Set();
   for (const file of catalogs) {
+    referenced.add(file);
+    referenced.add(file.replace(/\.json$/, '.hash'));
     if (!records[file.replace(/\.json$/, '.hash')]) throw new Error(`Missing catalog hash: ${file}`);
     const catalog = JSON.parse(await fs.readFile(path.join(root, file), 'utf8'));
     if (!Array.isArray(catalog.m_InternalIds)) throw new Error(`Invalid Addressables catalog: ${file}`);
     let remoteBundles = 0;
     for (const id of catalog.m_InternalIds) {
+      if (/^(?:(?:\.\/)?Library\/|[A-Za-z]:\/|file:|\/)/i.test(id.replace(/\\/g, '/')))
+        throw new Error(`Local editor path in Addressables catalog ${file}: ${id}`);
       if (!/^https?:\/\//.test(id)) continue;
       if (!id.startsWith(origin + '/')) throw new Error(`Unexpected remote URL: ${id}`);
       const resource = id.slice(origin.length + 1);
+      referenced.add(resource);
       if (!records[resource]) throw new Error(`Catalog references a missing resource: ${resource}`);
       if (resource.endsWith('.bundle')) remoteBundles++;
     }
     if (!remoteBundles) throw new Error(`Catalog has no Firebase bundles: ${file}`);
   }
+  if (pruneToCatalog && (catalogs.length !== 1 || catalogs[0] !== pruneToCatalog ||
+      files.some(file => !referenced.has(file))))
+    throw new Error('Pruning must contain exactly the selected catalog, hash and referenced resources.');
 
   if (!offline) {
     const response = await fetch(`${origin}/${manifestName}`, { signal: AbortSignal.timeout(30000) });
     if (response.ok) {
       const previous = await response.json();
       if (!previous.files || previous.version !== 1) throw new Error('Invalid deployed resource manifest.');
+      if (pruneToCatalog) {
+        for (const file of files) {
+          if (records[file].sha256 !== previous.files[file]?.sha256)
+            throw new Error(`Pruning must preserve deployed file bytes: ${file}`);
+        }
+      }
       for (const [file, record] of Object.entries(previous.files)) {
-        if (!records[file]) throw new Error(`기존 앱 파일을 복원한 뒤 배포하세요: ServerData/${file}`);
+        if (!records[file]) {
+          if (pruneToCatalog) continue;
+          throw new Error(`기존 앱 파일을 복원한 뒤 배포하세요: ServerData/${file}`);
+        }
         if (file.endsWith('.bundle') && records[file].sha256 !== record.sha256)
           throw new Error(`이미 배포한 번들의 내용이 변경되었습니다: ${file}`);
       }
-    } else if (response.status !== 404) {
+    } else if (pruneToCatalog || response.status !== 404) {
       throw new Error(`Deployed manifest check failed: HTTP ${response.status}`);
     }
   }
@@ -76,5 +96,6 @@ async function validate({ root = path.resolve(__dirname, '../ServerData'),
 
 module.exports = { validate };
 if (require.main === module)
-  validate({ offline: process.argv.includes('--offline') })
+  validate({ offline: process.argv.includes('--offline'),
+             pruneToCatalog: process.env.FIREBASE_RESOURCE_PRUNE_CATALOG || '' })
     .catch(error => { console.error(error.message); process.exitCode = 1; });

@@ -71,7 +71,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteUI
-    - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 1d1367fb4b947b84e92369f7fc324787
     m_Address: PackOpenOverlay

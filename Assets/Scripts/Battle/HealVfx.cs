@@ -5,7 +5,7 @@ using DG.Tweening;
 using UnityEngine;
 
 /// <summary>
-/// 힐러 회복 연출의 **순서**만 소유한다: 힐러 카드 아래 발동 이펙트 → 대상 수만큼 투사체 →
+/// 힐러 회복 연출의 **순서**만 소유한다: 힐러 카드 중앙 발동 이펙트 → 대상 수만큼 투사체 →
 /// 2차 베지어로 휘어 비행 → 도착 시 임팩트 + 카드 회복 연출("+N").
 ///
 /// 프리팹/배치 = BattleVfxLibrary, 시간 = BattleTimingConfig, 스폰·반납·정렬 = BattleVfx.
@@ -34,8 +34,8 @@ public static class HealVfx
             return;
         }
 
-        // 순서: 힐러 카드 아래에서 발동 이펙트가 먼저 터지고 → HealLaunchLead 뒤부터 투사체가 나간다.
-        BattleVfx.Play(BattleVfxId.HealerLaunch, _source.BottomCenter, _source.VfxSortingLayerId);
+        // 순서: 힐러 카드 중앙에서 발동 이펙트가 먼저 터지고 → HealLaunchLead 뒤부터 투사체가 나간다.
+        BattleVfx.Play(BattleVfxId.HealerLaunch, _source.transform.position, _source.VfxSortingLayerId);
 
         for (int i = 0; i < _targets.Count; i++)
             FlyOne(_source, _targets[i].view, _targets[i].card, _targets[i].amount, i).Forget();
@@ -74,7 +74,7 @@ public static class HealVfx
             if (_source == null || _source.BoundCard != t_expectedSource
                 || _target == null || _target.BoundCard != _expectedCard) return;
 
-            Vector3 t_start = _source.BottomCenter;
+            Vector3 t_start = _source.transform.position;
             Vector3 t_end   = _target.transform.position;
 
             t_proj = BattleVfx.Spawn(BattleVfxId.HealerProjectile, t_start, _source.VfxSortingLayerId);

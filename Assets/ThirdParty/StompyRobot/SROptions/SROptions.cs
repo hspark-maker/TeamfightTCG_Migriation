@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿#if UNITY_EDITOR || DEVELOPMENT_BUILD
+using System.ComponentModel;
 using SRF.Service;
 using UnityEngine;
 using UnityEngine.Scripting;
@@ -52,3 +53,5 @@ public partial class SROptions : INotifyPropertyChanged
         remove { InterfacePropertyChangedEventHandler -= value; }
     }
 }
+
+#endif

@@ -13,7 +13,7 @@ public static class SpecSheetsUploadValidation
 
     public static string Run()
     {
-        int t_checks = 0;
+        int t_checks = ValidateColumnCompatibility();
         void Check(bool _ok, string _message)
         {
             if (!_ok) throw new InvalidOperationException("Sheets upload validation: " + _message);
@@ -86,6 +86,16 @@ public static class SpecSheetsUploadValidation
         Reject(() => SpecSheetsUploader.Parse("unused", "Test", "id,value\nint,int\n1\n"), "unequal columns");
         // 실제 CSV는 읽기만 한다. 시트·bytes·CSV를 갱신하는 코드는 호출하지 않는다.
         var t_local = SpecSheetsUploader.ReadFiles(SpecSheetsUploader.GetCsvFiles());
+        foreach (string t_table in new[] { "Mission", "AccountLevel", "Reward" })
+        {
+            string t_csvText = System.IO.File.ReadAllText(System.IO.Path.Combine(SpecDocsCsvExporter.DocsDirectory, t_table + "_sheet.csv"));
+            Check(SpecFirestoreUploader.TryParseAccountCsv(t_table, t_csvText, out var t_accountRows, out var t_accountError),
+                $"{t_table} CSV publication: {t_accountError}");
+            Check(t_accountRows.Count > 0, $"{t_table} rows retained");
+            if (t_table == "Mission")
+                Check(!SpecFirestoreUploader.TryParseAccountCsv(t_table, t_csvText.Replace("accountExp", "missingExp"), out _, out _),
+                    "mission experience column is required for publication");
+        }
         Check(t_local.Count > 0, "local CSV parse");
         foreach (var t_table in t_local)
         {
@@ -96,6 +106,35 @@ public static class SpecSheetsUploadValidation
             Check(t_only.CanUpload, t_table.Title + " valid upload plan");
         }
         return $"Google Sheet 업로드 오프라인 검증 통과: {t_checks}항목 / 로컬 CSV {t_local.Count}개. 원격·산출물 변경 없음.";
+    }
+
+    public static int ValidateColumnCompatibility()
+    {
+        int t_checks = 0;
+        void Check(bool _ok, string _message)
+        {
+            if (!_ok) throw new InvalidOperationException("Column compatibility: " + _message);
+            t_checks++;
+        }
+        string[] t_old = { "id", "missionId", "passExp", "sortOrder" };
+        string[] t_new = { "id", "missionId", "passExp", "accountExp", "sortOrder" };
+        Check(SpecFirestoreUploader.IsCompatibleColumnChange("Mission", t_old, t_new), "server-only XP addition");
+        Check(SpecFirestoreUploader.IsCompatibleColumnChange("Mission", t_new, t_new), "repeat upload");
+        Check(SpecFirestoreUploader.IsCompatibleColumnChange("Reward", t_old, t_old), "unchanged client columns");
+        Check(!SpecFirestoreUploader.IsCompatibleColumnChange("Mission", t_new, t_old), "XP removal blocked");
+        Check(!SpecFirestoreUploader.IsCompatibleColumnChange("Mission", t_old,
+            new[] { "id", "missionId", "accountExp", "sortOrder" }), "existing column removal blocked");
+        Check(!SpecFirestoreUploader.IsCompatibleColumnChange("Mission", t_old,
+            new[] { "id", "missionId", "renamedExp", "accountExp", "sortOrder" }), "rename blocked");
+        Check(!SpecFirestoreUploader.IsCompatibleColumnChange("Mission", t_old,
+            new[] { "id", "passExp", "missionId", "accountExp", "sortOrder" }), "existing column reorder blocked");
+        Check(!SpecFirestoreUploader.IsCompatibleColumnChange("Mission", t_new,
+            t_new.Concat(new[] { "accountExp" }).ToArray()), "duplicate XP blocked");
+        Check(!SpecFirestoreUploader.IsCompatibleColumnChange("Mission", t_old,
+            t_new.Concat(new[] { "unknown" }).ToArray()), "unreviewed addition blocked");
+        foreach (string t_table in SpecPayloadCodec.TableNames.Concat(SpecPayloadCodec.OptionalTableNames).Concat(new[] { "RankAiEncounter" }))
+            Check(!SpecFirestoreUploader.IsCompatibleColumnChange(t_table, t_old, t_new), t_table + " contract protected");
+        return t_checks;
     }
 
     static JObject Remote(params string[][] _rows)

@@ -22,6 +22,7 @@ internal static class ServerSaveCommands
         ContentUnlockManager.ResetSession();
         MissionCommands.ResetSession();
         AttendanceCommands.ResetSession();
+        AccountRewardHandoff.ResetSession();
         RankLeaderboardCommands.ResetSession();
     }
 
@@ -106,6 +107,9 @@ internal static class ServerSaveCommands
             // 지갑만 쓴 명령을 RemoteAhead로 읽어 전 세션을 끊는다.
             if (t_result.Revision > 0)
                 PlayerSaveCloud.AdoptServerResult(t_result.Revision, t_result.UpdatedSlots);
+
+            if (t_result.AccountExperience != null)
+                t_result.AccountExperience.TotalExp = AccountLevelManager.Exp;
 
             return t_result;
         }

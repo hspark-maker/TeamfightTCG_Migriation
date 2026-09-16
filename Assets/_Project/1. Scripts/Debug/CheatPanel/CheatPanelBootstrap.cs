@@ -1,4 +1,4 @@
-#if !DISABLE_SRDEBUGGER
+#if !DISABLE_SRDEBUGGER && (UNITY_EDITOR || DEVELOPMENT_BUILD)
 using SRDebugger.UI.Tabs;
 using SRDebugger.Services;
 using SRF.Service;

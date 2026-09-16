@@ -80,6 +80,7 @@ export const getMissions = onCall(async (request) => {
         currencies: resolveRewards(rewardRows, mission.period === "guide" ? "Guide" : "Mission", mission.id).gains,
         items: resolveRewards(rewardRows, mission.period === "guide" ? "Guide" : "Mission", mission.id).items,
         passExp: mission.passExp,
+        accountExp: mission.accountExp,
       },
     })),
   };

@@ -228,7 +228,7 @@ MonoBehaviour:
     m_Top: 11
     m_Bottom: 9
   m_ChildAlignment: 4
-  m_Spacing: -20
+  m_Spacing: 56
   m_ChildForceExpandWidth: 0
   m_ChildForceExpandHeight: 0
   m_ChildControlWidth: 0
@@ -1026,7 +1026,7 @@ MonoBehaviour:
     m_Top: 11
     m_Bottom: 9
   m_ChildAlignment: 4
-  m_Spacing: -20
+  m_Spacing: 56
   m_ChildForceExpandWidth: 0
   m_ChildForceExpandHeight: 0
   m_ChildControlWidth: 0
@@ -4764,7 +4764,7 @@ MonoBehaviour:
   playerFieldView: {fileID: 282937760}
   enemyFieldView: {fileID: 1542130815}
   battleIntro: {fileID: 1572181725}
-  battleBGM: {fileID: 8300000, guid: e51d23e4836821d4ba5ce87ae87d45e0, type: 3}
+  battleBGM: {fileID: 0}
   tutorialOverlayPrefab: {fileID: 1373953528122502585, guid: 7e3565f15335afd45905a0d13c508ae8, type: 3}
   battleVfxLibrary: {fileID: 11400000, guid: 8b4aacde1cb67a54b8706abfa2954826, type: 2}
 --- !u!4 &1572181723

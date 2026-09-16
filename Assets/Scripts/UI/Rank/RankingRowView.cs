@@ -13,7 +13,10 @@ public class RankingRowView : MonoBehaviour, IUIInitializable
     [SerializeField] Image avatarImage;
     [SerializeField] Image crownImage;
     [SerializeField] Sprite[] crowns;
+    [SerializeField] Image backgroundImage;
+    [SerializeField] Color selfColor = new Color(0.8825388f, 1f, 0.8066038f, 1f);
     Sprite m_defaultAvatar;
+    Color m_defaultBackgroundColor;
     bool m_initialized;
 
     void Awake() => InitializeUI();
@@ -23,6 +26,7 @@ public class RankingRowView : MonoBehaviour, IUIInitializable
         if (m_initialized) return;
         m_initialized = true;
         if (avatarImage != null) m_defaultAvatar = avatarImage.sprite;
+        if (backgroundImage != null) m_defaultBackgroundColor = backgroundImage.color;
     }
 
     internal void Bind(RankLeaderboardEntry _entry)
@@ -48,6 +52,7 @@ public class RankingRowView : MonoBehaviour, IUIInitializable
     public void Bind(int _rank, string _nickname, string _tierName, Sprite _badge, long _points, bool _isSelf)
     {
         InitializeUI();
+        if (backgroundImage != null) backgroundImage.color = _isSelf ? selfColor : m_defaultBackgroundColor;
         if (rankText != null) rankText.text = _rank > 0 ? _rank.ToString() : "-";
         if (nicknameText != null)
         {

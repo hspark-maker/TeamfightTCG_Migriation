@@ -211,6 +211,8 @@ public partial class Mission
     public int guideActId;
     /// 가이드 막 이름
     public string guideActName;
+    /// 계정 경험치
+    public long accountExp;
 }
 
 [GeneratorSpecData]

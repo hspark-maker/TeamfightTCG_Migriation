@@ -1,5 +1,13 @@
 # UI 이미지 아틀라스
 
+## 전투 UI 누락 보완 (2026-09-16)
+
+- UI 관련 직렬화 파일 503개와 Unity의 RemoteUI 의존성을 대조했다. 전투 씬의 `Switch_Single_Bg`, `BasicFrame_Circle_200`, `BorderFrame_Circle_168_Border` 3개를 `UIBattle`에 추가했다. 덱 배경과 턴 타이머 채움·테두리이며 모두 기본 UI 재질을 사용한다.
+- 전체 19개 아틀라스 / 원본 307개. `UIBattle`은 Android 실제 패킹에서 16개 스프라이트, 2048×2048 한 페이지, ASTC 6×6을 유지한다. 새 원본의 크기·피벗·PPU·border·알파·mipmap·wrap·최대 크기는 보존했다.
+- RemoteUI의 미등록 Sprite 텍스처 93개는 기존 제외 64개와 별도 검토 대상인 대형 카드 프레임 29개다. 프로필 얼굴·마스크, 기동·로그인 UI, Texture2D 직접 참조, 배경·애니메이션 시트는 제외를 유지한다. 전투 턴 배너 2개도 원본 폭 2172라 해상도·페이지 구성 검토 대상으로 남긴다.
+- `Button01_85_Gray`는 삭제된 필드 `disabledPlate`의 직렬화 잔재로만 남아 있으며 Unity 실제 의존성에는 없어 추가하지 않았다.
+- 감사·메타데이터·패킹 기록: `Build/UiAtlasDeployment-20260916/`.
+
 ## 프로필 원형 마스크 회귀 수정 (2026-09-15)
 
 아래 추가 등록 중 아바타 사진 3개는 `UIProfile`에서 다시 제외했다. `ProfileAvatarMask.shader`는 얼굴과 마스크에 같은 UV를 사용하므로 **얼굴·판 모두 단독 텍스처**여야 한다. 마스크 판의 Texture2D 직접 참조만 검사하면 얼굴 아틀라스 등록으로 생기는 회귀를 놓친다.

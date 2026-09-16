@@ -16,6 +16,7 @@ MonoBehaviour:
   - chapterId: chapter_01
     title: "\uC81C1\uC7A5 \xB7 \uC548\uAC1C \uC232"
     tilePrefab: {fileID: 8869288645222550817, guid: 6bbd58836419ece4a8496d321a477357, type: 3}
+    battleBackground: {fileID: 21300000, guid: 3d9415bb4469d9a4e8d092c6e9176ef2, type: 3}
     nodes:
     - nodeId: node_01
       displayName: "\uC232\uC758 \uD30C\uC218\uAFBC"
@@ -63,6 +64,7 @@ MonoBehaviour:
   - chapterId: chapter_02
     title: "\uC81C2\uC7A5 \xB7 \uBB34\uB108\uC9C4 \uC131\uD130"
     tilePrefab: {fileID: 6468447428658967276, guid: f1351b2ef4a274a4f83cb6d9c6801545, type: 3}
+    battleBackground: {fileID: 21300000, guid: 92253b79cc0b5c748a5b8643d5a67ae9, type: 3}
     nodes:
     - nodeId: node_07
       displayName: "\uCC9C\uB465\uBC8C\uD310 \uAE30\uC218"
@@ -110,6 +112,7 @@ MonoBehaviour:
   - chapterId: chapter_03
     title: "\uC81C3\uC7A5 \xB7 \uC5BC\uC5B4\uBD99\uC740 \uC124\uC6D0"
     tilePrefab: {fileID: 668995502536726736, guid: 246083bed930b714c9d233dfe489ceba, type: 3}
+    battleBackground: {fileID: 21300000, guid: 3d94bf4bde69e18448726e4dffe92f1e, type: 3}
     nodes:
     - nodeId: node_13
       displayName: "\uC11C\uB9AC\uADF8\uB298 \uD30C\uC218"
@@ -157,6 +160,7 @@ MonoBehaviour:
   - chapterId: chapter_04
     title: "\uC81C4\uC7A5 \xB7 \uC7BF\uBD88\uC758 \uD654\uC0B0"
     tilePrefab: {fileID: 9106813324675404984, guid: 25c79d556422e184fb2a0f4db1f7dba4, type: 3}
+    battleBackground: {fileID: 21300000, guid: 82a019c1ff5aead4ca9b78b1d2a61681, type: 3}
     nodes:
     - nodeId: node_19
       displayName: "\uC7BF\uBC14\uB78C \uC18C\uC6A9\uB3CC\uC774"

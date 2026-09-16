@@ -1,4 +1,4 @@
-#if !DISABLE_SRDEBUGGER
+#if !DISABLE_SRDEBUGGER && (UNITY_EDITOR || DEVELOPMENT_BUILD)
 using UnityEngine;
 
 // F8은 에디터에서 SROptions+ 창, 플레이어에서 SRDebugger 옵션 탭으로 연결한다.

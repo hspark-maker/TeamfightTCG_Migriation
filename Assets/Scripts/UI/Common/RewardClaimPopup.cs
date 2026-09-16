@@ -22,6 +22,8 @@ public class RewardClaimPopup : PooledOverlay<RewardClaimPopup>
     [Tooltip("보상 칸(아이콘 + 수량). 저작한 보상이 칸 수보다 적으면 남는 칸은 꺼진다.")]
     [SerializeField] CurrencyRewardSlotView[] rewardSlots;
 
+    [SerializeField] AccountExperienceRewardView experienceReward = new AccountExperienceRewardView();
+
     [Tooltip("딤(팝업 배경). 등장 연출이 도는 동안 이 버튼을 잠가 오조작으로 닫히지 않게 한다.")]
     [SerializeField] Button dimButton;
 
@@ -96,7 +98,8 @@ public class RewardClaimPopup : PooledOverlay<RewardClaimPopup>
     /// </summary>
     public void Show(string _title, IReadOnlyList<RewardLine> _rewards, Func<UniTask<RewardClaimOutcome>> _onConfirm,
                      bool _claimOnDim = false, Action _onClosed = null,
-                     IReadOnlyList<CurrencyRewardSlotView> _gainSlotsAfterClose = null)
+                     IReadOnlyList<CurrencyRewardSlotView> _gainSlotsAfterClose = null,
+                     long _accountExp = 0, long _accountTotalExp = 0)
     {
         InitializeUI();
         this.m_showVersion++;
@@ -151,8 +154,15 @@ public class RewardClaimPopup : PooledOverlay<RewardClaimPopup>
         this.SetInputEnabled(false);
 
         this.m_intro = this.reveal.BuildIntro(this.rewardSlots, this.dimTint);
-        this.m_intro.InsertCallback(this.reveal.IntroDuration, () => this.SetInputEnabled(true));
-        this.m_intro.SetLink(this.gameObject).Play();
+        var t_experience = this.experienceReward.Build(_accountExp, _accountTotalExp, t_rewards.Count > 0);
+        float t_readyAt = this.reveal.IntroDuration;
+        if (t_experience != null)
+        {
+            t_readyAt += t_experience.Duration();
+            this.m_intro.Insert(this.reveal.IntroDuration, t_experience);
+        }
+        this.m_intro.InsertCallback(t_readyAt, () => this.SetInputEnabled(true));
+        this.m_intro.SetUpdate(true).SetLink(this.gameObject).Play();
     }
 
     public override void Hide()

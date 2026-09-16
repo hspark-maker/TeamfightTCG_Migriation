@@ -1,3 +1,5 @@
+using System.Collections;
+using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -41,15 +43,19 @@ public class ProfileSummaryView : MonoBehaviour
     [Tooltip("레벨 안 진행을 그리는 게이지. 구현체를 가리지 않는다(현재는 BarProgressGauge).")]
     [SerializeField] RankProgressGauge gauge;
 
-    [Tooltip("레벨이 오른 뒤 처음 열었을 때 게이지가 0에서 차오르는 시간.")]
+    [Tooltip("경험치가 증가할 때 레벨 한 구간을 채우는 시간.")]
     [SerializeField] float levelUpFillDuration = 0.25f;
 
-    [Tooltip("레벨이 오른 뒤 처음 열었을 때 레벨 수치가 튀는 세기.")]
+    [Tooltip("레벨 경계를 통과할 때 레벨 수치가 튀는 세기.")]
     [SerializeField] float levelUpPunch = UiPunch.DEFAULT_SCALE;
 
-    // 마지막으로 화면에 세운 레벨. 판을 다시 열어도 같은 레벨업을 두 번 축하하지 않게 세션 동안 든다
-    // (세이브가 아니다 — 앱을 다시 켜면 조용히 현재 레벨로 선다).
-    static int s_shownLevel;
+    // 숨겨진 동안의 보상은 보상 팝업이 보여 준다. 이 뷰는 열린 동안 도착한 증가만 연출한다.
+    bool m_hasShownExp;
+    long m_shownExp;
+    long m_targetExp;
+    string m_userId;
+    Coroutine m_expAnimation;
+    Tween m_levelPunch;
 
     /// <summary>지금 값으로 다시 그린다.</summary>
     public void Refresh()
@@ -76,29 +82,80 @@ public class ProfileSummaryView : MonoBehaviour
         if (!AccountLevelManager.IsConfigured) return;
 
         AccountLevelInfo t_info = AccountLevelManager.GetInfo();
-
-        if (this.levelText != null) this.levelText.text = string.Format(this.levelFormat, t_info.Level);
-        if (this.expText != null) this.expText.text = string.Format(this.expFormat, t_info.ExpInLevel, t_info.ExpToNext);
-
-        bool t_leveledUp = s_shownLevel > 0 && t_info.Level != s_shownLevel;
-        s_shownLevel = t_info.Level;
-
-        if (this.gauge == null) return;
-
-        if (!t_leveledUp)
+        string t_userId = FirebaseAuthService.Instance.UserId;
+        if (!this.m_hasShownExp || this.m_userId != t_userId || !PlayerSaveCloud.IsGateComplete ||
+            t_info.Exp < this.m_targetExp || !this.isActiveAndEnabled)
         {
-            this.gauge.SetRatio(t_info.LevelProgress);
+            this.StopLevelAnimation();
+            this.m_userId = t_userId;
+            this.m_hasShownExp = true;
+            this.m_shownExp = this.m_targetExp = t_info.Exp;
+            this.RenderLevel(t_info);
             return;
         }
 
-        // 오른 사실을 드러내는 자리다 — 새 레벨의 게이지가 0에서 차오르고 수치가 한 번 튄다.
-        this.gauge.SetRatio(0f);
-        this.gauge.TweenTo(t_info.LevelProgress, this.levelUpFillDuration);
-        if (this.levelText != null) UiPunch.Play(this.levelText.transform, this.levelUpPunch);
+        this.m_targetExp = t_info.Exp;
+        if (this.m_expAnimation == null && this.m_shownExp < this.m_targetExp)
+            this.m_expAnimation = this.StartCoroutine(this.AnimateExperience());
+    }
+
+    IEnumerator AnimateExperience()
+    {
+        // 첫 프레임을 넘긴 뒤 시작해 즉시 완료되는 경우에도 코루틴 핸들이 남지 않게 한다.
+        yield return null;
+        while (this.m_shownExp < this.m_targetExp)
+        {
+            AccountLevelInfo t_startInfo = AccountLevelManager.GetInfoAt(this.m_shownExp);
+            long t_startExp = this.m_shownExp;
+            long t_endExp = t_startInfo.IsMaxLevel
+                ? this.m_targetExp
+                : System.Math.Min(this.m_targetExp, t_startInfo.NextRequiredExp);
+            int t_remainingLevels = AccountLevelManager.GetInfoAt(this.m_targetExp).Level - t_startInfo.Level;
+            float t_duration = Mathf.Clamp(this.levelUpFillDuration, 0.01f, 1.2f) /
+                               Mathf.Max(1f, t_remainingLevels * 0.25f);
+            float t_elapsed = 0f;
+            while (t_elapsed < t_duration)
+            {
+                t_elapsed += Time.unscaledDeltaTime;
+                double t_ratio = Mathf.Clamp01(t_elapsed / t_duration);
+                t_ratio = 1d - (1d - t_ratio) * (1d - t_ratio);
+                this.m_shownExp = t_ratio >= 1d ? t_endExp
+                    : t_startExp + (long)((t_endExp - t_startExp) * t_ratio);
+                // 경계 프레임은 이전 레벨의 100%를 먼저 보여 준다.
+                this.RenderLevel(new AccountLevelInfo(t_startInfo.Level, this.m_shownExp,
+                    t_startInfo.LevelRequiredExp, t_startInfo.NextRequiredExp, t_startInfo.IsMaxLevel));
+                yield return null;
+            }
+
+            AccountLevelInfo t_current = AccountLevelManager.GetInfoAt(this.m_shownExp);
+            this.RenderLevel(t_current);
+            if (t_current.Level > t_startInfo.Level && this.levelText != null)
+                this.m_levelPunch = UiPunch.Play(this.levelText.transform, this.levelUpPunch)
+                    .SetUpdate(true).OnKill(() => this.m_levelPunch = null);
+        }
+        this.m_expAnimation = null;
+    }
+
+    void RenderLevel(AccountLevelInfo _info)
+    {
+        if (this.levelText != null) this.levelText.text = string.Format(this.levelFormat, _info.Level);
+        if (this.expText != null) this.expText.text = _info.IsMaxLevel
+            ? "MAX" : string.Format(this.expFormat, _info.ExpInLevel, _info.ExpToNext);
+        if (this.gauge != null) this.gauge.SetRatio(_info.LevelProgress);
+    }
+
+    void StopLevelAnimation()
+    {
+        if (this.m_expAnimation != null) this.StopCoroutine(this.m_expAnimation);
+        this.m_expAnimation = null;
+        this.m_levelPunch?.Kill(true);
+        this.m_levelPunch = null;
+        if (this.gauge != null) this.gauge.Stop();
     }
 
     void OnEnable()
     {
+        this.m_hasShownExp = false;
         ProfileManager.OnChanged      += this.Refresh;
         RankManager.OnChanged         += this.Refresh;
         AccountLevelManager.OnChanged += this.Refresh;
@@ -110,8 +167,7 @@ public class ProfileSummaryView : MonoBehaviour
         ProfileManager.OnChanged      -= this.Refresh;
         RankManager.OnChanged         -= this.Refresh;
         AccountLevelManager.OnChanged -= this.Refresh;
+        this.StopLevelAnimation();
+        this.m_hasShownExp = false;
     }
-
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() => s_shownLevel = 0;
 }

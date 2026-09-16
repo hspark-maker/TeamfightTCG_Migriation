@@ -21,6 +21,7 @@ export interface MissionDef {
   title: string;
   description: string;
   passExp: number;
+  accountExp: number;
   sortOrder: number;
   guideActId: number;
   guideActName: string;
@@ -71,6 +72,7 @@ export function parseMissionCatalog(
       title: String(row.title ?? ""),
       description: String(row.description ?? ""),
       passExp: integer(row.passExp),
+      accountExp: row.accountExp === undefined ? 0 : integer(row.accountExp),
       sortOrder: integer(row.sortOrder),
       guideActId: row.guideActId === undefined ? 0 : integer(row.guideActId),
       guideActName: String(row.guideActName ?? "").trim(),
@@ -143,6 +145,9 @@ export function missionCatalogIssues(
     }
     if (!Number.isSafeInteger(mission.passExp) || mission.passExp < 0) {
       issues.push(`Mission '${mission.id}' has an invalid passExp.`);
+    }
+    if (!Number.isSafeInteger(mission.accountExp) || mission.accountExp < 0) {
+      issues.push(`Mission '${mission.id}' has an invalid accountExp.`);
     }
     if (!Number.isSafeInteger(mission.sortOrder) || mission.sortOrder <= 0) {
       issues.push(`Mission '${mission.id}' has an invalid sortOrder.`);

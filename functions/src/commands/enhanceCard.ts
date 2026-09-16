@@ -7,6 +7,7 @@ import {db} from "../firebaseApp";
 import {EVENTS} from "../analytics/eventNames";
 import {recordEvent} from "../observability/analyticsEvent";
 import {
+  applyMissionIncrement,
   beginMissionBump,
   commitMissionBump,
   missionResponse,
@@ -213,6 +214,9 @@ function createEnhanceCard(synergyIntroduction: boolean) {
 
         // Count each accepted shard feed, including feeds below the evolution threshold.
         // All mission writes follow the optional tutorial-grant read.
+        if (step.currency === "Shard" && charged > 0) {
+          applyMissionIncrement(missions, "SpendShard", charged);
+        }
         commitMissionBump(transaction, missions, EVENTS.cardEnhanceResolved.missionKey,
           freeShotUsed ? 1 : appliedShards, FieldValue.serverTimestamp());
         missionState = missionResponse(missions.state, period, catalog);

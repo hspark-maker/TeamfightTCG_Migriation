@@ -8,7 +8,7 @@ using UnityEngine;
 
 public class TurnRunner : MonoBehaviour
 {
-    const int AiSurrenderChancePercent = 50;
+    const int AiSurrenderChanceStepPercent = 10;
 
     public static int TurnCount { get; private set; } = 1;
 
@@ -37,6 +37,7 @@ public class TurnRunner : MonoBehaviour
     BattleOutcome battleOutcome;
     bool aiTakeoverPending;
     bool aiTakeoverFillPending;
+    int aiSurrenderChancePercent;
     bool forcedEnd;      // 항복/디버그로 결과를 강제 확정했는가. 턴 루프를 다음 경계에서 끊는다.
     bool resultFinalized;// 결과 표시 경로에 진입했는가. 여운·팝업이 두 번 돌지 않게 하는 게이트.
     CurrencyGain lastReward; // CaptureResult에서 확정한 지급분. F-20 팝업 표시용(표시만, 재지급 없음).
@@ -107,15 +108,21 @@ public class TurnRunner : MonoBehaviour
     {
         if (this.resultFinalized || TutorialConfig.IsActive || IsMyTurn(_owner)
             || (DeckConfig.IsMultiplayer && !DeckConfig.AiTakeover)) return false;
-        if (this.enemyField == null || this.enemyField.OwnerIndex != _owner
-            || !EnemyAiSurrender.ShouldSurrender(this.enemyField.State, this.playerField?.State)) return false;
+        if (this.enemyField == null || this.enemyField.OwnerIndex != _owner) return false;
+        if (!EnemyAiSurrender.ShouldSurrender(this.enemyField.State, this.playerField?.State))
+        {
+            this.aiSurrenderChancePercent = 0;
+            return false;
+        }
 
-        // 조건을 만족한 AI 턴 시작에 한 번만 추첨한다. 공용 전투 RNG는 소비하지 않는다.
-        if (MatchRandom.AiRange(100) >= AiSurrenderChancePercent) return false;
+        // 첫 패배 판정은 10%, 연속되는 AI 턴마다 10%p 증가. 승산을 되찾으면 누적을 초기화한다.
+        this.aiSurrenderChancePercent = Math.Min(100, this.aiSurrenderChancePercent + AiSurrenderChanceStepPercent);
+        // AI 턴 시작에 한 번만 추첨한다. 플레이어 턴·공용 전투 RNG는 누적/추첨에 관여하지 않는다.
+        if (MatchRandom.AiRange(100) >= this.aiSurrenderChancePercent) return false;
 
         // AI 인수 뒤 동결된 로그는 RecordSurrender도 기존 계약대로 기록하지 않는다.
         BattleCommandLog.RecordSurrender(_owner);
-        Debug.Log("[EnemyAI] No surviving attack remains; the opponent surrenders.");
+        Debug.Log("[EnemyAI] No viable attack or remaining card trade; the opponent surrenders.");
         ForceEnd(true, EMatchEndReason.Surrender);
         return true;
     }
@@ -166,6 +173,7 @@ public class TurnRunner : MonoBehaviour
         this.resultFinalized = true;
 
         TurnState.BattleEnded = true;
+        NetworkSession.Instance?.Reconnect?.EndBattle();
         TurnState.InputAllowed = false;    // 결과 팝업 뒤에서 공격이 계속 나가지 않게
         this.battleEndCts.Cancel();
         if (_reason == EMatchEndReason.Surrender) ReleaseNetworkWaits();
@@ -374,6 +382,7 @@ public class TurnRunner : MonoBehaviour
         BattleCommandLog.Reset();
         BattleGoldenRecorder.Reset();
         TurnCount = 1;
+        this.aiSurrenderChancePercent = 0;
         SetTurnCountLabel();
         // 정상 경로의 시드 지점은 GameInitializer(덱 셔플이 MatchRandom을 소비하므로 필드 초기화 직전).
         // 여기 남은 건 StartBattle() 단독 호출 같은 우회 진입용 폴백 — 이미 시드됐으면 손대지 않는다.
@@ -447,6 +456,14 @@ public class TurnRunner : MonoBehaviour
 
         // 멀리건 RPC 상한이 무효 경기를 확정했거나 씬이 내려간 경우 턴 루프를 새로 시작하지 않는다.
         if (this.destroyCt.IsCancellationRequested || this.resultFinalized || this.forcedEnd) return;
+
+        if (DeckConfig.IsMultiplayer && !DeckConfig.AiTakeover && NetworkSession.Instance != null)
+        {
+            NetworkSession.Instance.Reconnect.BeginBattle();
+            await NetworkSession.Instance.Reconnect.CheckpointAsync(
+                this.playerField.State, this.enemyField.State, this.BattleEndToken);
+            if (this.resultFinalized || this.forcedEnd) return;
+        }
 
         // (4) 턴 루프(선공 배너 재생 완료 → 첫 턴 배너 스킵).
         RunBattleLoop(t_first, _skipFirstBanner: true).Forget();
@@ -591,26 +608,15 @@ public class TurnRunner : MonoBehaviour
     void HandlePlayerLeft(PlayerRef _p)
     {
         if (!DeckConfig.IsMultiplayer) return;
+        if (NetworkSession.Instance?.Reconnect?.Active == true) return;
         if (DeckConfig.AiTakeover || this.aiTakeoverPending || this.resultFinalized) return;
 
         TurnState.InputAllowed = false;
-        if (NetTimeouts.OpponentDropGraceSec <= 0f)
-        {
-            BeginAiTakeover();
-            return;
-        }
-
-        this.aiTakeoverPending = true;
-        BeginAiTakeoverAfterGrace().Forget();
+        BeginAiTakeover();
     }
 
-    async UniTaskVoid BeginAiTakeoverAfterGrace()
+    internal void HandleReconnectExpired()
     {
-        await UniTask.Delay(TimeSpan.FromSeconds(NetTimeouts.OpponentDropGraceSec),
-                            ignoreTimeScale: true,
-                            cancellationToken: this.destroyCt)
-                     .SuppressCancellationThrow();
-
         if (this.destroyCt.IsCancellationRequested || this.resultFinalized || DeckConfig.AiTakeover) return;
         BeginAiTakeover();
     }

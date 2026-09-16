@@ -1,4 +1,5 @@
-﻿using System;
+﻿#if UNITY_EDITOR || DEVELOPMENT_BUILD
+using System;
 
 public partial class SROptions
 {
@@ -62,3 +63,4 @@ public partial class SROptions
         }
     }
 }
+#endif

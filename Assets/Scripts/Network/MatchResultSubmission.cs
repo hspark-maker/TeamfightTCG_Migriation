@@ -63,6 +63,8 @@ static class MatchResultSubmission
         [NonSerialized] public bool rejected;
         [NonSerialized] public bool collected;
         [NonSerialized] public bool adventureWon;
+        [NonSerialized] public bool experienceCollected;
+        [NonSerialized] public bool payoutCollected;
     }
 
     [Serializable]
@@ -187,8 +189,8 @@ static class MatchResultSubmission
             while (t_generation == s_generation && !GameInitialization.IsTerminated &&
                    !t_item.rejected && !t_item.collected)
             {
+                RetryPending();
                 if (t_item.confirmed && string.IsNullOrEmpty(t_item.adventureNodeId)) await PayoutInbox.FlushAsync();
-                else RetryPending();
                 // 배속·일시 정지와 무관하게 확인한다. 전송 중이면 기존 요청을 기다리므로 중복 제출하지 않는다.
                 await UniTask.Delay(TimeSpan.FromSeconds(2), DelayType.Realtime);
             }
@@ -201,7 +203,9 @@ static class MatchResultSubmission
 
     internal static void NotifyPayoutCollected(string _matchId)
     {
-        if (s_battleSubmission?.matchId == _matchId) s_battleSubmission.collected = true;
+        if (s_battleSubmission?.matchId != _matchId) return;
+        s_battleSubmission.payoutCollected = true;
+        s_battleSubmission.collected = s_battleSubmission.experienceCollected;
     }
 
     static async UniTask SendPending()
@@ -238,6 +242,18 @@ static class MatchResultSubmission
                     if (t_generation != s_generation) return;
                     if (TryHandleResponse(t_response.Data, t_item, out bool t_complete) && t_complete)
                     {
+                        if (t_item.confirmed && !t_item.experienceCollected)
+                        {
+                            // 완료 큐를 내리기 전에 XP도 회수한다. 앱 종료·응답 유실은 같은 matchId로 복구한다.
+                            t_item.experienceCollected = await AccountExperienceCommands.ClaimBattleAsync(t_item.env, t_item.matchId);
+                            if (t_generation != s_generation) return;
+                            if (!t_item.experienceCollected)
+                            {
+                                t_item.attempts = Math.Min(t_item.attempts, MaxAttempts);
+                                continue;
+                            }
+                            if (t_item.payoutCollected) t_item.collected = true;
+                        }
                         if (t_item.confirmed && !string.IsNullOrEmpty(t_item.adventureNodeId))
                         {
                             // 모험은 랭크·골드 payout이 없다. 승리 낙인 응답까지 받아야 복귀 보상을 열 수 있다.

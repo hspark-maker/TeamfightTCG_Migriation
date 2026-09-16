@@ -5,6 +5,14 @@ public static class BattleCleanup
 {
     public static void Run()
     {
+        // 종료 로딩이 서버 정산을 기다린 뒤, 로비 활성화 직전에 호출한다.
+        // 결과/보상 handoff는 로비가 소비하므로 유지하고 경기의 실행 상태만 정리한다.
+        NetworkGameController.Instance?.ResetMatchState();
+        PreBattleMatchHandoff.Clear();
+        TurnThinkTimer.Reset();
+        BattleCameraFit.ClearExternalControl();
+        DeckPileUI.Cleanup();
+
         // 승패 여운이 남긴 전역 상태(배속·배경 블러·BGM 피치)부터 되돌린다. 트윈을 죽이는 것으로는 안 풀리고,
         // 블러와 피치는 씬·매니저 수명 밖에 있어 여기서 빠뜨리면 로비가 흐리거나 끌린 채로 뜬다.
         BattleResultBeat.Reset();
@@ -13,11 +21,12 @@ public static class BattleCleanup
         // 전투 BGM은 씬 전환 창구(LoadingCoverView.LoadScene)가 페이드로 뺀다 — 여기서 또 끊으면 하드컷이 페이드를 이긴다.
 
         DOTween.KillAll();
+        ImmortalVfx.Clear();
+        LegacyCrownVfx.Clear();   // 지속 표식을 반납한 다음 풀을 비운다.
         ParticlePooler.Flush();
         ObjectPooler.Flush<UnityEngine.GameObject>();
 
         CardView.Cleanup();
-        LegacyCrownVfx.Clear();   // 왕관은 카드·씬 수명 밖 월드 오브젝트다 — 참조를 놓지 않으면 다음 판까지 남는다
         BattleBoardOrder.Reset();        // 초기 배치 기록은 판마다 새로 잡는다
         BattlePresentationQueue.Clear();   // 접촉 프레임을 못 만난 표시가 다음 판으로 넘어가지 않게
         CardLandingPresentation.Clear();   // 착지를 못 만난 등장 표시도 같은 수명 — 다음 판 첫 등장에 딸려 나오지 않게

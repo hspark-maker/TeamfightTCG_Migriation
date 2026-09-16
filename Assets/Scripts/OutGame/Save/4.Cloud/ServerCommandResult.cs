@@ -17,6 +17,19 @@ internal class ServerCommandResult
 
     /// <summary>null이면 이 명령은 미션 진행도를 바꾸지 않았다.</summary>
     [JsonProperty("missions")] public MissionSnapshot Missions { get; set; }
+
+    [JsonProperty("accountExperience")] public AccountExperienceResult AccountExperience { get; set; }
+}
+
+internal sealed class AccountExperienceResult
+{
+    [JsonProperty("grantedExp")] public long GrantedExp { get; set; }
+    [JsonProperty("previousLevel")] public int PreviousLevel { get; set; }
+    [JsonProperty("level")] public int Level { get; set; }
+
+    [JsonIgnore] public bool IsLevelUp => Level > PreviousLevel;
+    // 응답 채택 시점의 누적치. 여러 미션을 연속 수령해도 각 보상의 시작·끝을 보존한다.
+    [JsonIgnore] public long? TotalExp { get; set; }
 }
 
 // 세이브를 쓰지 않는 진단용 callable(ping) 응답.

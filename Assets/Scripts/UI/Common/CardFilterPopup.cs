@@ -40,18 +40,20 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
     Action<CardListFilter> m_onApply;
     bool m_collectionMode;
     string m_query;
+    HashSet<int> m_cardScope;
     float m_y;
     int m_column;
 
     protected override int SortingOrder => UiSortingOrder.CardFilter;
 
     public static bool Open(CardListFilter current, bool collectionMode, string nameQuery,
-        Action<CardListFilter> onApply, UnityEngine.Object owner)
+        Action<CardListFilter> onApply, UnityEngine.Object owner, IEnumerable<int> cardScope = null)
     {
         if (owner == null || !TryGetOrCreate(out CardFilterPopup popup)) return false;
         if (s_openView != null) s_openView.Hide();
         popup.m_edit = current?.Clone() ?? new CardListFilter();
         popup.m_collectionMode = collectionMode;
+        popup.m_cardScope = cardScope != null ? new HashSet<int>(cardScope) : null;
         if (!collectionMode) popup.m_edit.Ownership = CardOwnershipFilter.All;
         popup.m_query = nameQuery;
         popup.m_owner = owner;
@@ -88,6 +90,7 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
         CardGrowthManager.OnGrowthChanged -= RefreshSelection;
         m_owner = null;
         m_onApply = null;
+        m_cardScope = null;
         if (s_openView == this) s_openView = null;
         NotifyClosed(ConsumeOpen());
     }
@@ -155,6 +158,7 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
         var synergies = new SortedDictionary<string, SynergyData>(StringComparer.Ordinal);
         foreach (CardSpec spec in CardCatalog.AllSpecs)
         {
+            if (m_cardScope != null && !m_cardScope.Contains(spec.Id)) continue;
             if (spec.Grade != ECardGrade.Unknown) grades.Add(spec.Grade);
             availableKeywords |= spec.Keywords;
             foreach (SynergyData synergy in CardCatalog.RequireSynergies(spec.Id))
@@ -253,6 +257,7 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
         int count = 0;
         foreach (int card in CardCatalog.AllIds)
         {
+            if (m_cardScope != null && !m_cardScope.Contains(card)) continue;
             if (!m_collectionMode && !OwnershipManager.IsOwned(card)) continue;
             if (m_edit.Matches(card, m_query)) count++;
         }

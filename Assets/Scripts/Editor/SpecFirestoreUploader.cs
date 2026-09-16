@@ -367,7 +367,7 @@ public static partial class SpecFirestoreUploader
             return null;
 
         if (t_metaExists && t_remoteSchemaVersion == SCHEMA_VERSION &&
-            t_remoteColumns.Length > 0 && !SameColumns(t_remoteColumns, _snapshot.Columns))
+            t_remoteColumns.Length > 0 && !IsCompatibleColumnChange(_table, t_remoteColumns, _snapshot.Columns))
         {
             _error = $"{_table} 컬럼 계약이 바뀌었지만 테이블 세대가 {ContentVersion.Major}로 그대로다. " +
                      "테이블 세대를 올리고 새 앱 빌드를 준비한 뒤 업로드할 것.";
@@ -550,6 +550,9 @@ public static partial class SpecFirestoreUploader
     {
         _snapshot = null;
         _error = null;
+        // 계정 성장 표는 CSV가 발행 원본이다. 새 경험치 열을 bytes 생성 없이 반영한다.
+        if (_table == "Mission" || _table == "AccountLevel" || _table == "Reward")
+            return TryBuildAccountCsvSnapshot(_table, out _snapshot, out _error);
         if (_table == LoadingTipAuthoring.TABLE_NAME)
         {
             if (!LoadingTipAuthoring.TryLoad(out List<LoadingTip> t_tips, out _error)) return false;
@@ -1002,6 +1005,24 @@ public static partial class SpecFirestoreUploader
         AppendJsonString(t_builder, _updateTime);
         t_builder.Append("}}]}");
         return t_builder.ToString();
+    }
+
+    // Mission은 getMissions 응답으로만 읽는다. accountExp 누락은 서버가 0으로 처리하므로
+    // 이 열의 추가만 앱 테이블 세대를 유지할 수 있다. 다른 계약 변경은 기존처럼 차단한다.
+    internal static bool IsCompatibleColumnChange(string _table, IReadOnlyList<string> _remote, IReadOnlyList<string> _local)
+    {
+        if (SameColumns(_remote, _local)) return true;
+        if (_table != "Mission" || Array.IndexOf(SpecPayloadCodec.ServerOnlyTableNames, _table) < 0 ||
+            _local.Count != _remote.Count + 1) return false;
+
+        var t_withoutExperience = new List<string>(_local.Count);
+        int t_added = 0;
+        foreach (string t_column in _local)
+        {
+            if (t_column == "accountExp") t_added++;
+            else t_withoutExperience.Add(t_column);
+        }
+        return t_added == 1 && SameColumns(_remote, t_withoutExperience);
     }
 
     static bool SameColumns(IReadOnlyList<string> _remote, IReadOnlyList<string> _local)

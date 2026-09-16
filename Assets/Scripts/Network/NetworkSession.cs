@@ -7,9 +7,9 @@ using UnityEngine;
 
 public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
 {
-    const string ProtocolSuffix = "-p3";
-    const string RankedLobbyBase = "RankedMatchP3";
-    const string RandomLobbyBase = "RandomMatchP3";
+    const string ProtocolSuffix = "-p4";
+    const string RankedLobbyBase = "RankedMatchP4";
+    const string RandomLobbyBase = "RandomMatchP4";
     const string CodeLobbyBase   = "CodeMatch";
 
     /// <summary>로비·세션 이름에 환경(live/test)을 박는다.
@@ -29,6 +29,7 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
     public string BattleSceneName = "BattleScene";
 
     public NetworkRunner Runner { get; private set; }
+    internal BattleReconnect Reconnect { get; private set; }
     public string PairingKey => this.Runner != null && this.Runner.SessionInfo.IsValid
         ? this.Runner.SessionInfo.Name
         : null;
@@ -54,6 +55,7 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
         if (Instance != null) { Destroy(gameObject); return; }
         Instance = this;
         DontDestroyOnLoad(gameObject);
+        Reconnect = gameObject.AddComponent<BattleReconnect>();
         if (GetComponent<NetworkGameController>() == null)
             gameObject.AddComponent<NetworkGameController>();
     }
@@ -73,6 +75,7 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
 
     void ShutdownRunnerImmediate()
     {
+        Reconnect?.Stop();
         NetworkRunner t_runner = this.Runner;
         this.Runner = null;
         if (t_runner == null) return;
@@ -224,22 +227,58 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
 
     public async UniTask Disconnect()
     {
+        Reconnect?.Stop();
         var t_target = this.Runner;
-        if (t_target != null)
-            await t_target.Shutdown();
-        // JoinOrCreateRoom이 새 Runner를 먼저 할당했으면 덮어쓰지 않음
-        if (this.Runner == t_target)
-            this.Runner = null;
+        // 종료 상한 뒤 다음 씬으로 넘어가도 이전 러너 콜백이 새 경기를 건드리지 않게
+        // await 전에 소유권과 목록을 놓는다. 종료 후에는 새 러너/목록을 쓰지 않는다.
+        this.Runner = null;
         this.rankedSessions.Clear();
         this.HasRankedSessionList = false;
+        if (t_target != null)
+            await t_target.Shutdown();
     }
 
     async UniTask ShutdownRunner()
     {
-        if (this.Runner == null) return;
-        await this.Runner.Shutdown();
+        var t_target = this.Runner;
         this.Runner = null;
+        if (t_target != null) await t_target.Shutdown();
     }
+
+    // Rejoin preserves the battle, owner index, command buffers and initialization handoff.
+    // A failed/expired attempt may never replace a newer runner or create an empty new match.
+    internal async UniTask<bool> RejoinExistingRoom(string room, Func<bool> stillWanted)
+    {
+        if (!stillWanted() || string.IsNullOrEmpty(room)) return false;
+        var old = Runner;
+        Runner = null;
+        if (old != null) ShutdownAsync(old).Forget();
+        CreateRunner();
+        var candidate = Runner;
+        var start = candidate.StartGame(new StartGameArgs
+        {
+            GameMode = GameMode.Shared,
+            SessionName = room,
+            PlayerCount = 2,
+            EnableClientSessionCreation = false,
+            IsVisible = false,
+            SceneManager = sceneManagerGo != null ? sceneManagerGo.GetComponent<NoRemoteSceneSyncManager>() : null,
+        });
+        while (!start.IsCompleted && stillWanted()) await UniTask.Yield();
+        if (!stillWanted())
+        {
+            if (Runner == candidate) Runner = null;
+            ShutdownAsync(candidate).Forget();
+            return false;
+        }
+        var result = await start;
+        if (result.Ok && Runner == candidate) return true;
+        if (Runner == candidate) Runner = null;
+        ShutdownAsync(candidate).Forget();
+        return false;
+    }
+
+    internal void SendBattleMessage(byte[] data) => Reconnect?.Send(data);
 
     void CreateRunner()
     {
@@ -285,11 +324,32 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
 
     // ── INetworkRunnerCallbacks ───────────────────────────────────────────
 
-    public void OnConnectedToServer(NetworkRunner _r)                          => OnConnected?.Invoke();
-    public void OnPlayerJoined(NetworkRunner _r, PlayerRef _p)                 => OnPlayerJoinedRoom?.Invoke(_p);
-    public void OnPlayerLeft(NetworkRunner _r, PlayerRef _p)                   => OnPlayerLeftRoom?.Invoke(_p);
-    public void OnDisconnectedFromServer(NetworkRunner _r, NetDisconnectReason _reason) => OnConnectionFailed?.Invoke(_reason.ToString());
-    public void OnConnectFailed(NetworkRunner _r, NetAddress _addr, NetConnectFailedReason _reason) => OnConnectionFailed?.Invoke(_reason.ToString());
+    public void OnConnectedToServer(NetworkRunner _r)
+    {
+        if (_r != null && _r == this.Runner) OnConnected?.Invoke();
+    }
+    public void OnPlayerJoined(NetworkRunner _r, PlayerRef _p)
+    {
+        if (_r == null || _r != this.Runner) return;
+        Reconnect?.PeerJoined(_p);
+        OnPlayerJoinedRoom?.Invoke(_p);
+    }
+    public void OnPlayerLeft(NetworkRunner _r, PlayerRef _p)
+    {
+        if (_r == null || _r != this.Runner) return;
+        Reconnect?.PeerLeft(_p);
+        OnPlayerLeftRoom?.Invoke(_p);
+    }
+    public void OnDisconnectedFromServer(NetworkRunner _r, NetDisconnectReason _reason)
+    {
+        if (_r == null || _r != this.Runner) return;
+        Reconnect?.ConnectionLost();
+        OnConnectionFailed?.Invoke(_reason.ToString());
+    }
+    public void OnConnectFailed(NetworkRunner _r, NetAddress _addr, NetConnectFailedReason _reason)
+    {
+        if (_r != null && _r == this.Runner) OnConnectionFailed?.Invoke(_reason.ToString());
+    }
 
     public void OnConnectRequest(NetworkRunner _r, NetworkRunnerCallbackArgs.ConnectRequest _req, byte[] _token) { }
     public void OnCustomAuthenticationResponse(NetworkRunner _r, Dictionary<string, object> _data) { }
@@ -300,18 +360,24 @@ public class NetworkSession : MonoBehaviour, INetworkRunnerCallbacks
     public void OnObjectExitAOI(NetworkRunner _r, NetworkObject _o, PlayerRef _p) { }
     public void OnReliableDataProgress(NetworkRunner _r, PlayerRef _p, ReliableKey _k, float _progress) { }
     public void OnReliableDataReceived(NetworkRunner _r, PlayerRef _p, ReliableKey _k, ReadOnlySpan<byte> _data)
-        => NetworkGameController.Instance?.HandleMessage(_p, _data.ToArray());
+    {
+        if (_r != null && _r == this.Runner)
+            Reconnect?.Receive(_p, _data.ToArray());
+    }
     public void OnSceneLoadDone(NetworkRunner _r) { }
     public void OnSceneLoadStart(NetworkRunner _r) { }
     public void OnSessionListUpdated(NetworkRunner _r, List<SessionInfo> _list)
     {
-        if (_r != this.Runner) return;
+        if (_r == null || _r != this.Runner) return;
         this.rankedSessions.Clear();
         if (_list != null) this.rankedSessions.AddRange(_list);
         this.HasRankedSessionList = true;
         this.OnRankedSessionListChanged?.Invoke();
     }
-    public void OnShutdown(NetworkRunner _r, ShutdownReason _reason) { }
+    public void OnShutdown(NetworkRunner _r, ShutdownReason _reason)
+    {
+        if (_r != null && _r == Runner) Reconnect?.ConnectionLost();
+    }
 #pragma warning disable CS0618 
     // SimulationMessagePtr는 Fusion에서 obsolete지만 INetworkRunnerCallbacks 구현상 시그니처 유지 필수
     public void OnUserSimulationMessage(NetworkRunner _r, SimulationMessagePtr _msg) { }

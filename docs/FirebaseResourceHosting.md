@@ -1,5 +1,59 @@
 # Firebase 리소스 배포
 
+빌드·카탈로그 수정·배포 전 [Addressables 오류와 재발 방지](AddressablesDeploymentPitfalls.md)를 읽는다. 아래 배포 이력의 초기 성공 기록에는 이후 기기에서 발견된 오류도 있으므로 최신 복구 기록을 함께 확인한다.
+
+## 개발 Hosting 정리 (2026-09-16)
+
+- 사용자 지시: 개발 단계에서는 미사용 리소스와 과거 릴리스를 누적 보존하지 않는다. 아래 과거 배포 이력의 전체 보존 방침보다 이 방침을 우선한다. 현재 앱이 사용하는 카탈로그와 의존성, 콘텐츠 업데이트 기준 상태 파일은 계속 보존한다.
+- 현재 앱의 `Library/com.unity.addressables/aa/Android/settings.json`이 지정한 `0.0.0/Android/catalog_2026.09.15.09.20.47.json`을 기준으로 정리했다. 파일명 시각이 더 늦은 카탈로그를 임의로 선택하지 않았다.
+- 공개 리소스 438개 / 767.9 MiB에서 251개 / 168.2 MiB로 축소했다(manifest 제외). 미참조 187개 / 599.7 MiB 제거. 남긴 파일은 카탈로그·해시 2개와 원격 의존 번들 249개다. 로컬 raytracing 번들의 RuntimePath 토큰은 그대로다.
+- 카탈로그를 재직렬화하거나 리소스를 재빌드하지 않았다. 남긴 파일 전부를 CDN에서 내려받아 기존 SHA-256·크기·CORS를 대조했다. 삭제한 카탈로그·번들 대표 경로는 HTTP 404 확인. 카탈로그 SHA-256: `6d9dea5ead7dca715eb0fa0c39a9afca8aa765d145833a0e7f85900a3f03727e`.
+- 정리 배포 버전 `879bf5c9bce202f6`만 FINALIZED로 남겼다. 이전 Hosting 버전 14개는 DELETE 후 DELETED 상태를 확인했다. live 채널 `retainedReleaseCount`는 999999에서 API 최소값 1로 낮췄다. Hosting API가 보고한 현 버전 크기는 160,739,517 bytes이며, 원본 리소스 합계와 집계 기준이 다르다. 콘솔 사용량 감소는 별도 반영될 수 있다.
+- 검사에 명시적 정리 모드를 추가했다. `FIREBASE_RESOURCE_PRUNE_CATALOG`에 유지할 카탈로그 상대 경로를 설정한 경우에만 이전 파일 누락을 허용한다. 이 모드는 해당 카탈로그·해시·참조 파일만 포함해야 하며, 남기는 모든 파일이 기존 CDN manifest와 같은 해시여야 한다. `--offline`과 동시 사용은 차단한다. 일반 배포의 기존 파일/immutable 번들 보호는 유지한다. 검사 테스트 15개 통과.
+- 작업 기록: `Build/HostingCleanup-20260916/`의 `plan.json`, `cdn-verification.json`, `cleanup-result.json`. 로컬에서 제외한 파일은 같은 폴더의 `removed-local/`로 옮겼으며 Hosting에는 올라가지 않는다.
+
+### 다음 개발 리소스 정리 절차
+
+1. 실제 지원 중인 앱의 카탈로그를 확인하고 원격 참조 파일 전체와 카탈로그·해시를 유지한다. 여러 앱을 동시에 지원해야 하면 단일 카탈로그 정리 모드를 사용하지 않는다.
+2. `ServerData`에서 나머지 파일을 제외한다. 배포 전 카탈로그·해시·참조 파일이 기존 CDN과 동일한지 확인한다.
+3. PowerShell에서 아래처럼 이번 명령에만 정리 모드를 적용한다. 새 콘텐츠 업데이트와 미사용 파일 정리는 별도 배포로 수행한다.
+
+```powershell
+$env:FIREBASE_RESOURCE_PRUNE_CATALOG = '0.0.0/Android/catalog_2026.09.15.09.20.47.json'
+try { firebase.cmd deploy --only hosting --project bm-cardbattle }
+finally { Remove-Item Env:FIREBASE_RESOURCE_PRUNE_CATALOG }
+```
+
+4. CDN의 남긴 파일을 검증한 뒤, 어떤 채널에서도 서비스하지 않는 과거 Hosting 버전만 삭제한다. 현재 버전과 다른 활성 preview 채널 버전은 삭제하지 않는다. 릴리스 보관 수 최소값은 1이다([Firebase 채널 API](https://firebase.google.com/docs/reference/hosting/rest/v1beta1/sites.channels)).
+
+## RuntimeContentCatalog 로드 오류 복구·실기기 통과 (2026-09-16)
+
+- PC 경로 복구 후 `Unable to load asset of type RuntimeContentCatalog`가 발생했다. 앞선 카탈로그 재직렬화가 의존성 순서도 바꿔 본체 번들이 26번째로 밀렸다. Addressables Provider는 첫 번들인 `monoscripts`에서 자산을 찾다가 실패했다. 같은 문제가 있는 자산은 63개였다.
+- 기존 검증에서 의존성 목록을 정렬해 비교한 것이 순서 변경을 숨겼다. 수동 검증도 본체 번들을 직접 골라 읽어 실제 Provider의 첫 번들 선택 규칙을 놓쳤다.
+- 원본 빌드의 Entry/Bucket/Key 데이터를 복원하고, URL 4개·캐시 해시 2개만 유지했다. 번들·APK 변경 없이 카탈로그·해시만 재배포했다. 복구 해시: `6a89913098c4ba6b1b5792524c34338a`.
+- 692개 위치·830개 키·256개 자산의 의존성 순서 보존을 독립 검증했다. 첫 번들 선택 방식으로 `RuntimeContentCatalog` 타입 로드와 필수 설정 참조 검사 통과. **재배포 후 사용자가 실제 기기에서 통과했다고 확인했다.**
+- 원인·검증 누락·재발 방지 규칙은 [오류 기록 6번](AddressablesDeploymentPitfalls.md)에 정리했다. 상세 증거: `Build/RuntimeCatalogLoadFix-20260916/`.
+
+## Android 공통 번들 경로 오류 복구 (2026-09-16)
+
+- 12:43 기기 로그의 `Library/com.unity.addressables/aa/Android/Android/...` 오류는 직전 배포의 카탈로그 재직렬화로 발생했다. `ContentCatalogData.CreateLocator()`는 `{UnityEngine.AddressableAssets.Addressables.RuntimePath}`를 현재 에디터 경로로 해석한다. 그 위치 객체를 그대로 `SetData()`에 넣어 저장하면서 PC 경로가 CDN 카탈로그에 고정됐다. 원본 빌드 JSON에는 정상 토큰이 있었다.
+- 앞선 검증은 원격 번들 247개만 CRC 로딩하고 로컬 의존성 3개를 제외해 이 오류를 놓쳤다. PC의 CRC 로딩 성공만으로 Android 경로 호환성을 판단하지 않는다. 카탈로그를 고칠 때는 원본 미해석 경로를 보존하며, 위치 객체를 왕복 직렬화하지 않는다.
+- 별도로 기본 그룹의 공통 `monoscripts`·`unitybuiltinassets` 번들이 로컬 경로였다. 리소스 업데이트 중 새 공통 번들이 생기면 기존 APK 안에는 없을 수 있으므로, 비어 있는 기본 그룹의 Build/Load Path를 Remote로 설정했다. Can Change Post Release도 확인했다. `FirebaseResourceBuild`는 이 설정이 되돌아가면 빌드를 차단한다.
+- 현재 `09.20.47` 카탈로그의 잘못된 경로 3개만 수정했다. 공통 번들 2개는 검증한 기존 빌드 파일을 Hosting으로 복사해 HTTPS로 연결하고, 기존 raytracing 번들은 APK 런타임 경로 토큰을 복원했다. 자산 키·옵션·의존성 직렬화는 변경하지 않았다. 이번 복구는 리소스 재빌드나 APK 재빌드를 하지 않는다.
+- Android APK 경로 모의 해석과 공통 번들 크기·CRC 검증 통과. 배포 검사에 Library·절대 로컬 경로 거부를 추가했고, 정상 RuntimePath 허용을 포함한 테스트 14개가 통과했다. Firebase Hosting 재배포 완료. 기록: `Build/AddressablesPathFix-20260916/`.
+- 재배포 후 CDN 파일 438개 HTTP·CORS·캐시 헤더와 manifest 일치 확인. 변경된 카탈로그·해시 및 추가 공통 번들 2개, 합계 4개를 다운로드해 SHA-256 대조를 통과했다. 실제 기기 재실행 검증은 별도다.
+- `Build/UiAtlasDeployment-20260916/fix-immutable-catalog.cs.txt`는 오류를 만든 과거 작업 기록이다. 재사용하지 않는다.
+
+## 전투 UI 아틀라스 보완 (2026-09-16 12:37 KST 빌드)
+
+- 전투 덱 배경·턴 타이머 이미지 3개를 `UIBattle`에 추가했다. 19개 아틀라스 / 원본 307개 전체의 Android 바인딩과 중복 없음 확인. `UIBattle`은 ASTC 6×6, 2048×2048 한 페이지를 유지한다. 상세 제외 항목은 `UIAtlases.md`를 따른다.
+- 현재 프로젝트가 사용하는 `catalog_2026.09.15.09.20.47`의 콘텐츠 업데이트를 빌드했다. 출시 기준 상태 파일은 `Build/AddressablesState/0.0.0/Android/20260915-092344-669/addressables_content_state.bin`이다. CDN에 별도로 존재하는 `13.16.42`를 포함한 다른 카탈로그는 보존했으며 이번 업데이트 대상으로 바꾸지 않았다.
+- 빌드 보고서 `Library/com.unity.addressables/BuildReports/buildlayout_2026.09.16.12.37.15.json`에 BuildError 없음. 기존 자산 키 517개의 타입·내부 경로·프로바이더 보존, 현재 카탈로그 번들 247개의 크기·CRC 로딩 검증 통과.
+- 로컬에 없던 기존 배포 파일 71개(122.87 MiB)를 CDN에서 받아 SHA-256을 검증하고 복원했다. 기존 번들 2개는 재빌드 시 파일명은 같지만 CRC와 바이트가 달라졌다. 기존 배포 파일을 복원하고 새 번들에 별도 URL·캐시 해시를 부여했으며, Unity의 `ContentCatalogData.SetData`로 카탈로그를 직렬화한 뒤 모든 키·타입·옵션·의존성을 대조했다. 다음 리소스 빌드도 기존 번들 불변성 검사를 통과해야 한다.
+- `bm-cardbattle-assets` Hosting 배포 완료. 카탈로그 10개 / 리소스 파일 436개를 유지하며 신규 번들 13개와 변경 카탈로그·해시의 합계는 34.56 MiB다. 이는 현재 작업 폴더의 기존 UI·폰트 등 변경분도 포함한 리소스 업데이트다.
+- 배포 후 436개 파일의 HTTP·CORS·캐시 헤더와 공개 manifest 일치 확인. 신규·변경 파일 15개를 실제 다운로드해 크기·SHA-256을 모두 대조했다.
+- `SpecData.bytes` 변경 없음. APK 빌드는 실행하지 않았다. 빌드·감사·카탈로그 보정·배포 대조 기록은 `Build/UiAtlasDeployment-20260916/`에 보관한다.
+
 ## 매칭 VS 왼쪽 바 복구 (2026-09-15 19:26 KST 빌드)
 
 - `MatchmakingRoot.prefab`의 왼쪽 `Title_Line03_Divider`만 비활성화되어 있었다. 연출은 위치만 움직이고 활성 상태를 바꾸지 않아 매칭 성사 후에도 나타나지 않았다. 해당 오브젝트의 `m_IsActive` 한 값만 1로 수정했다.
@@ -72,7 +126,7 @@ Editor의 Use Asset Database 모드는 HTTP 다운로드를 하지 않는다. �
   **그 앱을 출시할 때의 상태 파일**을 선택한다. 전체 빌드는 새 앱 릴리스용이다.
 - 이후 같은 Hosting 배포 명령을 실행한다. 카탈로그·해시는 재검증하고, 해시 이름의 번들은 장기 캐시한다.
 - 플랫폼·앱 버전이 다른 카탈로그를 섞지 않는다. 앱 버전을 바꿨다면 새 경로와 앱 빌드가 필요하다.
-- **ServerData의 기존 버전·플랫폼·번들을 유지한다.** Firebase Hosting은 폴더 전체를 새 릴리스로 올리므로
+- **현재 지원하는 앱의 버전·플랫폼·번들을 유지한다.** 개발 단계 미사용 파일은 위 정리 절차에 따라 제외할 수 있다. Firebase Hosting은 폴더 전체를 새 릴리스로 올리므로
   이전 파일을 지우면 아직 그 파일을 쓰는 앱이 다운로드에 실패한다.
 - 새 작업 PC/CI에서는 이전 `ServerData` 아티팩트를 먼저 복원한다. predeploy 검사는 기존 공개 목록과
   대조해 파일 누락·같은 이름의 번들 덮어쓰기를 막는다. `--offline`은 로컬 검사 전용이다.

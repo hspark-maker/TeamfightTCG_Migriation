@@ -234,6 +234,7 @@ test("callables: rank read before writes, live-state claims, rejection does not 
     "../packs/packSpecReader": {readSpecRows: async (env, table) => {
       if (table === "Card") return cards;
       if (table === "Reward") return readSheet("Reward");
+      if (table === "AccountLevel") return readSheet("AccountLevel");
       if (table === "PassSeason") return [];
       throw new Error("Unexpected table " + table);
     }},

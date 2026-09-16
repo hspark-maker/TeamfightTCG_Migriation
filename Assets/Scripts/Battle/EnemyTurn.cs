@@ -28,13 +28,17 @@ public class EnemyTurn : TurnBase
     {
         if (TurnState.BattleEnded) return;
         // 생각 시간은 연출 전용 난수로 정해 전투 판정의 MatchRandom 시퀀스를 보존한다.
-        // 모험은 생각 대기 없이 진행한다. 일반 매치는 플레이어와 같은 타이머에 1~3초만 사용한다.
+        // 모험은 타이머 표시 없이 1초 대기한다. 일반 매치는 플레이어와 같은 타이머에 1~3초만 사용한다.
         if (TutorialConfig.IsActive)
         {
             await UniTask.Delay((int)(GameTiming.Battle.EnemyTurnStartDelay * 1000),
                 cancellationToken: GetCt());
         }
-        else if (!AdventureRun.IsActive)
+        else if (AdventureRun.IsActive)
+        {
+            await UniTask.Delay(1000, ignoreTimeScale: true, cancellationToken: GetCt());
+        }
+        else
         {
             await TurnThinkTimer.WaitForEnemy(UnityEngine.Random.Range(1f, 3f),
                 GameTiming.Battle.TurnThinkTime, GetCt());

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getReplayDivergence = exports.claimPassRepeatReward = exports.claimPassReward = exports.getPass = exports.syncRankProfile = exports.syncGuideProgress = exports.claimMission = exports.claimAttendance = exports.getAttendance = exports.getMissions = exports.spinRoulette = exports.limitBreakCard = exports.reportAdventureWin = exports.grantTutorialCards = exports.claimBattleReward = exports.enhanceKeyword = exports.enhanceSynergyIntroduction = exports.enhanceCard = exports.claimPayout = exports.aggregateReplayDaily = exports.submitMatchResult = exports.verifyMatchTicket = exports.findAiMatch = exports.getRankLeaderboard = exports.getRankSnapshot = exports.lockDeck = exports.createMatch = exports.claimReward = exports.openPack = exports.repairSaveSlots = exports.ensureWallet = exports.ensureAccount = exports.devSetRank = exports.devResetDailyMissions = exports.devCompleteMissions = exports.devResetSave = exports.devBumpRevision = exports.ping = void 0;
+exports.getReplayDivergence = exports.claimPassRepeatReward = exports.claimPassReward = exports.getPass = exports.syncRankProfile = exports.syncGuideProgress = exports.claimMission = exports.claimAttendance = exports.getAttendance = exports.getMissions = exports.spinRoulette = exports.limitBreakCard = exports.reportAdventureWin = exports.grantTutorialCards = exports.claimBattleExperience = exports.claimBattleReward = exports.enhanceKeyword = exports.enhanceSynergyIntroduction = exports.enhanceCard = exports.claimPayout = exports.aggregateReplayDaily = exports.submitMatchResult = exports.verifyMatchTicket = exports.findAiMatch = exports.getRankLeaderboard = exports.getRankSnapshot = exports.lockDeck = exports.createMatch = exports.claimReward = exports.openPack = exports.repairSaveSlots = exports.ensureWallet = exports.ensureAccount = exports.devSetRank = exports.devResetDailyMissions = exports.devCompleteMissions = exports.devResetSave = exports.devBumpRevision = exports.ping = void 0;
 var ping_1 = require("./commands/ping");
 Object.defineProperty(exports, "ping", { enumerable: true, get: function () { return ping_1.ping; } });
 var devBumpRevision_1 = require("./commands/devBumpRevision");
@@ -48,6 +48,8 @@ var enhanceKeyword_1 = require("./commands/enhanceKeyword");
 Object.defineProperty(exports, "enhanceKeyword", { enumerable: true, get: function () { return enhanceKeyword_1.enhanceKeyword; } });
 var claimBattleReward_1 = require("./commands/claimBattleReward");
 Object.defineProperty(exports, "claimBattleReward", { enumerable: true, get: function () { return claimBattleReward_1.claimBattleReward; } });
+var claimBattleExperience_1 = require("./commands/claimBattleExperience");
+Object.defineProperty(exports, "claimBattleExperience", { enumerable: true, get: function () { return claimBattleExperience_1.claimBattleExperience; } });
 var grantTutorialCards_1 = require("./commands/grantTutorialCards");
 Object.defineProperty(exports, "grantTutorialCards", { enumerable: true, get: function () { return grantTutorialCards_1.grantTutorialCards; } });
 var reportAdventureWin_1 = require("./commands/reportAdventureWin");

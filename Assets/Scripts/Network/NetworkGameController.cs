@@ -44,6 +44,7 @@ public class NetworkGameController : MonoBehaviour
         Surrender = 11,
         MatchmakingProfile = 12,
         Emote = 13,
+        Checkpoint = 14,
     }
 
     UniTaskCompletionSource opponentReadyTcs;
@@ -157,6 +158,7 @@ public class NetworkGameController : MonoBehaviour
                         return;
                     }
                     bool t_cunningSwap = ReadInt(t_buf, t_offset + 9) != 0;
+                    NetworkSession.Instance?.Reconnect?.AttackStarted();
                     MultiplayerTurnRunner.Instance?.OnAttackReceived(_sender, t_atk, t_def, t_cunningSwap);
                     break;
                 }
@@ -185,6 +187,12 @@ public class NetworkGameController : MonoBehaviour
                     }
                     OnOpponentStateHashReceived(t_readySeq, ReadULong(t_buf, t_offset + 5));
                     OnOpponentReadyReceived(t_readySeq);
+                    break;
+
+                case MsgType.Checkpoint:
+                    if (!RequireLength(_data, 13, t_type)) return;
+                    NetworkSession.Instance?.Reconnect?.ReceiveCheckpoint(
+                        ReadInt(t_buf, t_offset + 1), ReadULong(t_buf, t_offset + 5));
                     break;
 
                 case MsgType.InitialDeck:
@@ -443,6 +451,8 @@ public class NetworkGameController : MonoBehaviour
         else TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
     }
 
+    internal void RejectTransportMessage(string reason) => RejectMessage(reason);
+
     static void ReportContentMismatch(string _detail)
     {
         if (preBattleReceiver != null) preBattleReceiver.OnContentMismatch(_detail);
@@ -660,6 +670,27 @@ public class NetworkGameController : MonoBehaviour
 
     public void ResetMatchState()
     {
+        NetworkSession.Instance?.Reconnect?.ResetTransport();
+        // 씬을 넘어 사는 대기는 취소로 끝낸다. 성공으로 풀면 지난 판의 실행이 재개된다.
+        UniTaskCompletionSource t_ready = this.opponentReadyTcs;
+        UniTaskCompletionSource<int> t_mulligan = this.opponentMulliganTcs;
+        UniTaskCompletionSource t_scene = this.sceneReadyTcs;
+        this.opponentReadyTcs = null;
+        this.opponentMulliganTcs = null;
+        this.sceneReadyTcs = null;
+        t_ready?.TrySetCanceled();
+        t_mulligan?.TrySetCanceled();
+        t_scene?.TrySetCanceled();
+
+        // 항복/AI 인수가 남긴 강제 해제 표시와 선도착 패킷도 경기 소유다.
+        this.opponentReadySeqs.Clear();
+        this.opponentReadyForced = false;
+        this.waitingForOpponentReady = false;
+        this.opponentMulliganReceived = false;
+        this.opponentMulliganForced = false;
+        this.waitingForOpponentMulligan = false;
+        this.opponentMulliganChoice = -1;
+        preBattleReceiver = null;
         this.LocalDeckHash = string.Empty;
         this.OpponentDeckHash = string.Empty;
         this.bufferedMatchmakingProfile = null;
@@ -678,6 +709,7 @@ public class NetworkGameController : MonoBehaviour
         this.sceneReadyReceived = false;
         this.awaitingSceneReady = false;
         this.hasBufferedInitialDeck = false;
+        this.bufferedOpponent = default;
         this.bufferedCardIds = null;
         this.bufferedGrowth = null;
         this.bufferedPairingNonce = null;
@@ -920,10 +952,8 @@ public class NetworkGameController : MonoBehaviour
 
     async UniTask WaitForReadyDeadline()
     {
-        await UniTask.Delay(TimeSpan.FromSeconds(NetTimeouts.AnimHandshakeSec),
-                            ignoreTimeScale: true,
-                            cancellationToken: this.destroyCt)
-                     .SuppressCancellationThrow();
+        await NetTimeouts.WaitBattleSeconds(NetTimeouts.AnimHandshakeSec, this.destroyCt)
+            .SuppressCancellationThrow();
     }
 
     async UniTask WaitForMulliganSignal(UniTask<int> _wait)
@@ -1005,13 +1035,16 @@ public class NetworkGameController : MonoBehaviour
 
     void SendToOpponents(byte[] _data)
     {
-        NetworkRunner t_runner = NetworkSession.Instance?.Runner;
-        if (t_runner == null) return;
-        foreach (PlayerRef t_p in t_runner.ActivePlayers)
-        {
-            if (t_p == t_runner.LocalPlayer) continue;
-            t_runner.SendReliableDataToPlayer(t_p, MSG_KEY, _data);
-        }
+        NetworkSession.Instance?.SendBattleMessage(_data);
+    }
+
+    internal void SendCheckpoint(int number, ulong hash)
+    {
+        byte[] message = new byte[13];
+        message[0] = (byte)MsgType.Checkpoint;
+        WriteInt(message, 1, number);
+        WriteULong(message, 5, hash);
+        SendToOpponents(message);
     }
 
     static void WriteInt(byte[] _buf, int _offset, int _value)

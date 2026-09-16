@@ -74,20 +74,12 @@ public class CardInstance
     /// <see cref="evolutionStage"/>가 이 값이 된다 — 레벨 숫자를 전투 쪽에 들이지 않기 위해 단계로만 본다.</summary>
     public const int EnhanceStage = 2;
 
-    /// <summary>이 카드가 <b>일반(키워드 없는) 카드의 강화</b> 자격을 갖는가.
-    ///
-    /// 판정을 <see cref="HasKeyword"/>가 아니라 <c>data.keywords</c>로 하는 이유: 시너지가 얹어 준 키워드나
-    /// 전투 중 걸린 표식·무적 때문에 "일반 카드"라는 정체성이 중간에 바뀌면 안 된다. 강화는 카드 원본의 속성이다.</summary>
-    public bool HasVanillaEnhance =>
-        this.evolutionStage >= EnhanceStage && this.spec.Keywords == CardKeyword.None;
+    /// <summary>무키워드 카드의 진화 추가타는 추후 도입 예정이므로 현재 모든 단계에서 비활성이다.
+    /// 실제 공격·프리뷰·승패 예측·AI는 이 공통 판정을 따른다.</summary>
+    public bool HasVanillaEnhance => false;
 
-    /// <summary>일반 강화 추가 피해 = <b>원래 체력</b>의 절반(버림).
-    ///
-    /// 기준이 현재 hp도, 강화로 늘어난 maxHp도 아니라 <c>data.maxHp</c>인 이유: 문구가 "원래 체력"이고,
-    /// 현재 hp 기준이면 맞을수록 약해지는 도발과 같은 축이 되어 "강화"로 읽히지 않는다.
-    /// 성장 HP·덩치(bonusHp)·시너지 공격력도 섞지 않는다 — 카드마다 고정된 값이라야 예측이 선다.</summary>
-    public int VanillaEnhanceDamage() =>
-        BattleMath.FloorToInt(this.spec.MaxHp * 0.5f);
+    /// <summary>미출시 추가타의 피해는 직접 조회하더라도 0이다.</summary>
+    public int VanillaEnhanceDamage() => 0;
 
     /// <summary>같은 공격 안에서 연달아 들어오는 두 직격(기본타 → 강화 추가타)의 누적 결과를 <b>부작용 없이</b> 계산.
     /// 돌려주는 값 = (실제 들어갈 총 피해, 이 공격으로 죽는가).

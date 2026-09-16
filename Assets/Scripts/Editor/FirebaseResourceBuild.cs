@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEditor.AddressableAssets;
 using UnityEditor.AddressableAssets.Build;
+using UnityEditor.AddressableAssets.Settings.GroupSchemas;
 using UnityEngine;
 
 // 리소스만 빌드한다. 스펙 임포터·앱 빌드·서버 명령은 실행하지 않는다.
@@ -27,6 +28,15 @@ public static class FirebaseResourceBuild
         string t_loadPath = t_settings.RemoteCatalogLoadPath.GetValue(t_settings);
         if (!t_loadPath.StartsWith("https://bm-cardbattle-assets.web.app/", StringComparison.Ordinal))
             throw new InvalidOperationException("Firebase 리소스 배포 주소를 확인하세요: " + t_loadPath);
+
+        // 공통 MonoScript·내장 셰이더 번들도 리소스 업데이트를 따라야 한다.
+        var t_sharedBundles = t_settings.DefaultGroup.GetSchema<BundledAssetGroupSchema>();
+        var t_sharedUpdates = t_settings.DefaultGroup.GetSchema<ContentUpdateGroupSchema>();
+        if (t_sharedBundles == null || t_sharedUpdates == null || t_sharedUpdates.StaticContent ||
+            t_sharedBundles.LoadPath.GetValue(t_settings).TrimEnd('/') != t_loadPath.TrimEnd('/') ||
+            t_sharedBundles.BuildPath.GetValue(t_settings).TrimEnd('/') !=
+                t_settings.RemoteCatalogBuildPath.GetValue(t_settings).TrimEnd('/'))
+            throw new InvalidOperationException("기본 그룹의 공통 번들은 Remote Build/Load Path와 Can Change Post Release 설정이 필요합니다.");
 
         UnityEditor.AddressableAssets.Settings.AddressableAssetSettings.BuildPlayerContent(out var t_result);
         if (!string.IsNullOrEmpty(t_result.Error)) throw new InvalidOperationException(t_result.Error);

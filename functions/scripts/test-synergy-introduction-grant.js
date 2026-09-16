@@ -37,6 +37,7 @@ test("callable charges zero through two stars, preserves the old grant, and reje
   let wallet = {rev: 0, balances: {Shard: 0}, paidBalances: {}};
   let mission = state(), writes = [], sources = [], maxLevel = 4;
   let overrides = [];
+  const shardIncrements = [];
   const transaction = {
     async get() { assert.equal(writes.length, 0); return {exists: true, data: () => grants}; },
     set(ref, value) { writes.push(value); },
@@ -54,6 +55,10 @@ test("callable charges zero through two stars, preserves the old grant, and reje
     "../missions/missionSpec": {readMissionCatalog: async () => catalog},
     "../missions/missionStore": {
       beginMissionBump: async () => ({state: mission}),
+      applyMissionIncrement(bump, event, amount) {
+        assert.equal(event, "SpendShard");
+        shardIncrements.push(amount);
+      },
       commitMissionBump() {}, missionResponse: (value) => value,
     },
     "../missions/guideMutation": {readGuideCards: async () => [], applyGuideProgress() {}},
@@ -84,6 +89,7 @@ test("callable charges zero through two stars, preserves the old grant, and reje
     assert.equal(first.cost, 0); assert.equal(first.freeShotUsed, true);
     assert.equal(first.level, 3); assert.equal(first.appliedShards, 93);
     assert.equal(first.evolved, true); assert.equal(first.shardProgress, 0);
+    assert.deepEqual(shardIncrements, []);
     assert.deepEqual(grants.synergyIntroduction, {cardId: 1, level: 3});
     await assert.rejects(enhanceSynergyIntroduction(request(2)), (e) => e.details.reason === "NotReady");
     assert.equal(writes.length, 0);
@@ -98,6 +104,7 @@ test("callable charges zero through two stars, preserves the old grant, and reje
     assert.deepEqual(sources, ["enhanceSynergyIntroduction"]);
     const paid = await enhanceCard(request());
     assert.equal(paid.cost, 1); assert.equal(paid.freeShotUsed, false);
+    assert.deepEqual(shardIncrements, [1]);
 
     // Legacy sessions that already received their first evolution still finish in one request.
     save.cardGrowth.entries = {1: entry(2, 12), 2: entry(1, 4)};
@@ -126,6 +133,23 @@ test("callable charges zero through two stars, preserves the old grant, and reje
     const before = structuredClone({save, grants, wallet});
     await assert.rejects(enhanceSynergyIntroduction(request()), (e) => e.details.reason === "RuleUnavailable");
     assert.deepEqual({save, grants, wallet}, before);
+    assert.deepEqual(shardIncrements, [1]); // Free grants and rejected requests consume no shards.
+
+    maxLevel = 4;
+    overrides = [];
+    save.cardGrowth.entries = {1: entry(1, 24)};
+    const capped = await enhanceCard({auth: {uid: "player"},
+      data: {env: "test", cardId: 1, amount: 10, freeShot: false}});
+    assert.equal(capped.cost, 1);
+    assert.deepEqual(shardIncrements, [1, 1]); // Count actual consumption, not requested amount.
+    save.cardGrowth.entries = {1: entry(1)};
+    const batch = await enhanceCard({auth: {uid: "player"},
+      data: {env: "test", cardId: 1, amount: 10, freeShot: false}});
+    assert.equal(batch.cost, 10);
+    assert.deepEqual(shardIncrements, [1, 1, 10]);
+    wallet.balances.Shard = 0;
+    await assert.rejects(enhanceCard(request()), (e) => e.details.reason === "NotAffordable");
+    assert.deepEqual(shardIncrements, [1, 1, 10]);
   } finally {
     Module._load = originalLoad;
     delete require.cache[file];

@@ -37,7 +37,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 20}
   m_SizeDelta: {x: 890, y: 1050}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &9800000000000204
@@ -1315,6 +1315,8 @@ MonoBehaviour:
   - {fileID: 21300000, guid: f570943a6f8979f4dbb486d975fc107d, type: 3}
   - {fileID: 21300000, guid: 6953e97c168b9bb4681606c1ddaf85a0, type: 3}
   - {fileID: 21300000, guid: 7147e2e1221f7d2419d92ab4a59f10a7, type: 3}
+  backgroundImage: {fileID: 8945142285257657071}
+  selfColor: {r: 0.8825388, g: 1, b: 0.8066038, a: 1}
 --- !u!1 &1561255311775630958
 GameObject:
   m_ObjectHideFlags: 0
@@ -2079,6 +2081,8 @@ MonoBehaviour:
   - {fileID: 21300000, guid: f570943a6f8979f4dbb486d975fc107d, type: 3}
   - {fileID: 21300000, guid: 6953e97c168b9bb4681606c1ddaf85a0, type: 3}
   - {fileID: 21300000, guid: 7147e2e1221f7d2419d92ab4a59f10a7, type: 3}
+  backgroundImage: {fileID: 6633584627132368129}
+  selfColor: {r: 0.8825388, g: 1, b: 0.8066038, a: 1}
 --- !u!1 &2956123613768875672
 GameObject:
   m_ObjectHideFlags: 0
@@ -4347,6 +4351,8 @@ MonoBehaviour:
   - {fileID: 21300000, guid: f570943a6f8979f4dbb486d975fc107d, type: 3}
   - {fileID: 21300000, guid: 6953e97c168b9bb4681606c1ddaf85a0, type: 3}
   - {fileID: 21300000, guid: 7147e2e1221f7d2419d92ab4a59f10a7, type: 3}
+  backgroundImage: {fileID: 7815645752543930567}
+  selfColor: {r: 0.8825388, g: 1, b: 0.8066038, a: 1}
 --- !u!1 &4988240745013382507
 GameObject:
   m_ObjectHideFlags: 0
@@ -5975,6 +5981,8 @@ MonoBehaviour:
   - {fileID: 21300000, guid: f570943a6f8979f4dbb486d975fc107d, type: 3}
   - {fileID: 21300000, guid: 6953e97c168b9bb4681606c1ddaf85a0, type: 3}
   - {fileID: 21300000, guid: 7147e2e1221f7d2419d92ab4a59f10a7, type: 3}
+  backgroundImage: {fileID: 549346065854846698}
+  selfColor: {r: 0.8825388, g: 1, b: 0.8066038, a: 1}
 --- !u!1 &7103170960803437150
 GameObject:
   m_ObjectHideFlags: 0
@@ -7248,6 +7256,8 @@ MonoBehaviour:
   - {fileID: 21300000, guid: f570943a6f8979f4dbb486d975fc107d, type: 3}
   - {fileID: 21300000, guid: 6953e97c168b9bb4681606c1ddaf85a0, type: 3}
   - {fileID: 21300000, guid: 7147e2e1221f7d2419d92ab4a59f10a7, type: 3}
+  backgroundImage: {fileID: 1672785732169655788}
+  selfColor: {r: 0.8825388, g: 1, b: 0.8066038, a: 1}
 --- !u!1 &8949870204796119734
 GameObject:
   m_ObjectHideFlags: 0

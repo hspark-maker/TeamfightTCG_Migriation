@@ -412,6 +412,10 @@ public class MissionPanel : ContentsPooledUI
         var t_cards = new List<OpenPackCard>();
         var t_packs = new List<ClaimRewardPack>();
         long t_passExp = 0;
+        long t_accountExp = 0;
+        long t_totalExp = 0;
+        int t_previousLevel = int.MaxValue;
+        int t_level = 0;
         for (int i = 0; i < _results.Count; i++)
         {
             var t_result = _results[i];
@@ -422,6 +426,13 @@ public class MissionPanel : ContentsPooledUI
             if (t_result.Cards != null) t_cards.AddRange(t_result.Cards);
             if (t_result.Packs != null) t_packs.AddRange(t_result.Packs);
             t_passExp += t_result.GrantedPassExp;
+            t_accountExp += t_result.AccountExperience?.GrantedExp ?? t_result.GrantedAccountExp;
+            t_totalExp = Math.Max(t_totalExp, t_result.AccountExperience?.TotalExp ?? AccountLevelManager.Exp);
+            if (t_result.AccountExperience?.IsLevelUp == true)
+            {
+                t_previousLevel = Math.Min(t_previousLevel, t_result.AccountExperience.PreviousLevel);
+                t_level = Math.Max(t_level, t_result.AccountExperience.Level);
+            }
         }
 
         var t_gains = new List<CurrencyGain>();
@@ -451,15 +462,28 @@ public class MissionPanel : ContentsPooledUI
                 rewardId = t_card.Key.ToString(), amount = t_card.Value }));
         if (RewardClaimPopup.TryGet(out var t_popup) && t_popup.RewardSlotCount > 0)
         {
-            string t_title = t_passExp > 0 ? $"{_title} · 패스 경험치 +{t_passExp:N0}" : _title;
-            ShowRewardPage(t_popup, t_title, t_lines, t_outcome, 0);
+            string t_title = _title;
+            if (t_level > t_previousLevel) t_title += $" · 레벨업 Lv.{t_previousLevel} → {t_level}";
+            if (t_passExp > 0) t_title += $"\n패스 경험치 +{t_passExp:N0}";
+            ShowRewardPage(t_popup, t_title, t_lines, t_outcome, 0, t_accountExp, t_totalExp);
         }
         else
             RewardClaimPopup.ClaimWithoutPopup(() => UniTask.FromResult(t_outcome)).Forget();
     }
 
+    internal static void ShowAccountExperienceRewards(AccountRewardHandoff.Entry _entry)
+    {
+        ShowClaimedRewards(new[] { new ClaimMissionResult
+        {
+            Granted = _entry.Granted,
+            Cards = _entry.Cards,
+            Packs = _entry.Packs,
+            AccountExperience = _entry.Experience,
+        } }, "전투 보상");
+    }
+
     static void ShowRewardPage(RewardClaimPopup _popup, string _title, List<RewardLine> _lines,
-                               RewardClaimOutcome _outcome, int _offset)
+                               RewardClaimOutcome _outcome, int _offset, long _accountExp = 0, long _totalExp = 0)
     {
         int t_count = Math.Min(_popup.RewardSlotCount, _lines.Count - _offset);
         int t_next = _offset + t_count;
@@ -468,10 +492,16 @@ public class MissionPanel : ContentsPooledUI
         var t_pageOutcome = new RewardClaimOutcome(_outcome.Granted, t_hasNext ? null : _outcome.Cards,
             t_hasNext ? null : _outcome.Packs, t_hasNext ? null : _outcome.PresentationBatches);
         int t_pages = Math.Max(1, (_lines.Count + _popup.RewardSlotCount - 1) / _popup.RewardSlotCount);
-        string t_title = t_pages > 1 ? $"{_title} ({_offset / _popup.RewardSlotCount + 1}/{t_pages})" : _title;
+        string t_page = t_pages > 1 ? $" ({_offset / _popup.RewardSlotCount + 1}/{t_pages})" : string.Empty;
+        int t_break = _title.IndexOf('\n');
+        // 공용 팝업 제목은 900×90, 기본 60pt다. 상세 경험치를 같은 크기로 두 줄 쓰면 영역을 넘는다.
+        string t_title = t_break >= 0
+            ? $"<size=36>{_title.Substring(0, t_break)}{t_page}</size>\n<size=28>{_title.Substring(t_break + 1)}</size>"
+            : $"<size=36>{_title}{t_page}</size>";
         _popup.Show(t_title, _lines.GetRange(_offset, t_count), () => UniTask.FromResult(t_pageOutcome),
             _claimOnDim: true,
-            _onClosed: t_hasNext ? () => ShowRewardPage(_popup, _title, _lines, _outcome, t_next) : (Action)null);
+            _onClosed: t_hasNext ? () => ShowRewardPage(_popup, _title, _lines, _outcome, t_next) : (Action)null,
+            _accountExp: _accountExp, _accountTotalExp: _totalExp);
     }
 
     // 리셋 시각의 진실원은 서버가 준 epoch ms 다. 남은 시간 표시에만 기기 시계를 쓴다 —

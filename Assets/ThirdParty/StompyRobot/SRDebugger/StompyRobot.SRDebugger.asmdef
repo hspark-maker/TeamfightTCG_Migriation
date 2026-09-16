@@ -12,6 +12,7 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [
-        "!DISABLE_SRDEBUGGER"
+        "!DISABLE_SRDEBUGGER",
+        "UNITY_EDITOR || DEVELOPMENT_BUILD"
     ]
 }

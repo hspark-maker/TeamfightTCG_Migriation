@@ -68,6 +68,11 @@ public class DeckPileUI : MonoBehaviour
     void OnDisable()
     {
         live.Remove(this);
+        if (currentOpen == this)
+        {
+            currentOpen = null;
+            TurnState.UiBlocking = false;
+        }
     }
 
     void Start()
@@ -197,7 +202,25 @@ public class DeckPileUI : MonoBehaviour
 
     /// <summary>열려 있는 덱 패널을 닫는다. 생각시간 초과 자동공격처럼 <b>플레이어 조작 없이</b> 판이 진행될 때
     /// 불러 준다 — 안 닫으면 공격 연출이 패널 뒤에서 돌아 무슨 일이 일어났는지 안 보인다.</summary>
-    public static void CloseAny() => currentOpen?.Close();
+    public static void CloseAny()
+    {
+        if (currentOpen != null) currentOpen.Close();
+    }
+
+    /// <summary>종료 로딩 아래에서 열린 패널을 즉시 닫고 지난 씬의 참조를 놓는다.</summary>
+    public static void Cleanup()
+    {
+        DeckPileUI t_open = currentOpen;
+        currentOpen = null;
+        live.Clear();
+        TurnState.UiBlocking = false;
+        UIPoolManager.Instance?.HideUI<PooledCardElement>();
+        if (t_open == null) return;
+
+        t_open.panelOpen = false;
+        t_open.CancelCloseVisual();
+        if (t_open.panel != null) t_open.FinishClose();
+    }
 
     /// <summary>현재 씬에서 지정 소유자의 덱 UI를 찾는다. 비활성/미배선 상태면 null.</summary>
     public static DeckPileUI For(int _ownerIndex)

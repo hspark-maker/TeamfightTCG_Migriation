@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Data_Synergy_Trace
   m_EditorClassIdentifier: Assembly-CSharp::SynergyData
   color: {r: 0, g: 0, b: 0, a: 0}
-  activeIcon: {fileID: 21300000, guid: 446fe3b6a53368a409492d9e03fce9aa, type: 3}
-  inactiveIcon: {fileID: 21300000, guid: df536d235c30e2544a7f3a52e47d851f, type: 3}
+  activeIcon: {fileID: 21300000, guid: c3b9946e08563634c8dd8a6395d97dd2, type: 3}
+  inactiveIcon: {fileID: 21300000, guid: 2af2df9c7e2185f4f9c9c56a076ec34b, type: 3}
   vfx: {fileID: 11400000, guid: 0ae442e2ce4d5f443a1f4080e1ed3a25, type: 2}
   synergyId: Trace

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 
 /// <summary>전투 결과의 1회 확정, 보상·랭크 적용, 서버 증거 제출을 소유한다.</summary>
@@ -25,10 +25,6 @@ public sealed class BattleOutcome
         // 무승부: 승자가 없으므로 랭크를 움직일 근거가 없다. 골드는 패배와 같은 정액분을 준다
         // (판은 끝까지 진행됐으니 무보상은 아니다). _won 은 false 로 흘러 보상 계산이 정액 경로를 탄다.
         bool t_draw = _reason == EMatchEndReason.Draw;
-
-        // 모험 갈래보다 위다 — 계정 경험치는 어느 전투에서든 오른다. 서버가 판정하는 축이 아니라
-        // 멀티·서버 정산 갈래에서도 여기서 그대로 확정한다(랭크처럼 미리보기로 미루지 않는다).
-        AccountLevelManager.ApplyBattleResult(_won);
 
         List<CardInstance> t_active = rules.playerField.GetActiveCards();
         int t_remaining = t_active.Count + rules.playerField.WaitingCount;

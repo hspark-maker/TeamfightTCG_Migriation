@@ -52,9 +52,9 @@ public class MultiplayerTurnRunner : MonoBehaviour
     /// <see cref="InitTimedOut"/> 참조.</summary>
     bool InitAborted => this.opponentLeftDuringInit || this.InitTimedOut || this.networkAbortRequested;
 
-    // 상대 카드 스폰 버퍼 — RPC 순서 보장으로 WaitForOpponentReady 이후 전부 수신됨
+    // 상대 스폰 명령은 로컬 공격 해결 뒤 적용한다. 재접속 재전송은 공격 연출보다 먼저 도착할 수 있다.
     readonly Queue<(int attackerSlot, int defenderSlot, bool cunningSwap)> attackBuffer = new Queue<(int, int, bool)>();
-    readonly Queue<CardInstance> enemySpawnBuffer = new Queue<CardInstance>();
+    readonly Queue<(int slot, int cardId, int ownerIndex)> enemySpawnBuffer = new Queue<(int, int, int)>();
     readonly Dictionary<int, CardGrowth> localGrowthByCardId = new Dictionary<int, CardGrowth>();
     IMatchGrowthSource matchGrowthSource;
     int[] receivedEnemyBoardOrder;
@@ -164,13 +164,6 @@ public class MultiplayerTurnRunner : MonoBehaviour
             return;
         }
 
-        if (this.enemyField?.GetSlot(_slot) != null)
-        {
-            Debug.LogError($"[Net] CardSpawn target slot is already occupied — slot={_slot}, owner={_ownerIndex}");
-            TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
-            return;
-        }
-
         if (!CardCatalog.Contains(_cardId))
         {
             Debug.LogError($"[Net] CardSpawn unknown card id — id={_cardId}, slot={_slot}, owner={_ownerIndex}");
@@ -178,14 +171,9 @@ public class MultiplayerTurnRunner : MonoBehaviour
             return;
         }
 
-        CardInstance t_card = this.enemyField?.PlaceCardDirectly(_slot, _cardId);
-        if (t_card == null)
-        {
-            Debug.LogError($"[Net] CardSpawn mirror placement failed — id={_cardId}, slot={_slot}, owner={_ownerIndex}");
-            TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
-            return;
-        }
-        this.enemySpawnBuffer.Enqueue(t_card);
+        // Attack 수신은 비동기 실행만 시작한다. 같은 프레임의 후속 Spawn을 즉시 배치하면
+        // BeforeAttack/사망 정리가 끝나지 않은 슬롯을 덮으므로 배리어 뒤까지 명령을 보존한다.
+        this.enemySpawnBuffer.Enqueue((_slot, _cardId, _ownerIndex));
     }
 
     public void OnInitialDeckReceived(MatchGrowthOpponent _opponent, int[] _cardIds, CardGrowth[] _growth)
@@ -720,10 +708,8 @@ public class MultiplayerTurnRunner : MonoBehaviour
 
     async UniTask WaitForAttackDeadline()
     {
-        await UniTask.Delay(System.TimeSpan.FromSeconds(NetTimeouts.TurnActionSec),
-                            ignoreTimeScale: true,
-                            cancellationToken: this.destroyCt)
-                     .SuppressCancellationThrow();
+        await NetTimeouts.WaitBattleSeconds(NetTimeouts.TurnActionSec, this.destroyCt)
+            .SuppressCancellationThrow();
     }
 
     async UniTask WaitForAttackSignal(UniTask<(int attackerSlot, int defenderSlot, bool cunningSwap)> _wait)
@@ -760,7 +746,7 @@ public class MultiplayerTurnRunner : MonoBehaviour
     }
 
     /// <summary>상대 이탈 뒤 네트워크 턴을 끝내고 현재 미러를 로컬 AI에 넘긴다.
-    /// 이미 배치된 스폰은 유지하고, 재생 대기 중인 RPC/연출 버퍼만 버린다.</summary>
+    /// 대기 중인 명령은 버리고, 아직 배치하지 않은 카드는 공격 해결 뒤 로컬 보충 경로가 채운다.</summary>
     public void PrepareAiTakeover()
     {
         this.attackBuffer.Clear();
@@ -768,12 +754,32 @@ public class MultiplayerTurnRunner : MonoBehaviour
         ForceOpponentAttackResolve();
     }
 
-    /// <summary>WaitForOpponentReady 이후 호출 → 수신된 상대 스폰 카드 반환 및 버퍼 비움.</summary>
+    /// <summary>로컬 공격 해결과 WaitForOpponentReady 이후 호출한다.
+    /// 배리어 앞에 수신한 상대 스폰 명령을 순서대로 적용하고 등장 연출에 넘긴다.</summary>
     public List<CardInstance> FlushEnemySpawns()
     {
         var t_result = new List<CardInstance>();
         while (this.enemySpawnBuffer.Count > 0)
-            t_result.Add(this.enemySpawnBuffer.Dequeue());
+        {
+            var t_spawn = this.enemySpawnBuffer.Dequeue();
+            if (this.enemyField?.GetSlot(t_spawn.slot) != null)
+            {
+                Debug.LogError($"[Net] CardSpawn target slot is already occupied — slot={t_spawn.slot}, owner={t_spawn.ownerIndex}");
+                this.enemySpawnBuffer.Clear();
+                TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
+                return t_result;
+            }
+
+            CardInstance t_card = this.enemyField?.PlaceCardDirectly(t_spawn.slot, t_spawn.cardId);
+            if (t_card == null)
+            {
+                Debug.LogError($"[Net] CardSpawn mirror placement failed — id={t_spawn.cardId}, slot={t_spawn.slot}, owner={t_spawn.ownerIndex}");
+                this.enemySpawnBuffer.Clear();
+                TurnRunner.Instance?.AbortMatch(EMatchEndReason.Desync);
+                return t_result;
+            }
+            t_result.Add(t_card);
+        }
         return t_result;
     }
 

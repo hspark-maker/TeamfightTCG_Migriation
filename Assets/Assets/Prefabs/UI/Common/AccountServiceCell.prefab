@@ -174,7 +174,7 @@ MonoBehaviour:
   m_text: "\uC5F0\uACB0 \uD574\uC81C"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 24b4aa79c7c8fee41b59a42f8ae762ec, type: 2}
-  m_sharedMaterial: {fileID: -4999335185947324146, guid: 24b4aa79c7c8fee41b59a42f8ae762ec, type: 2}
+  m_sharedMaterial: {fileID: 2100000, guid: d6fb066a8e0a49a5b28b310fac9b72e3, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -452,5 +452,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f7e6ce3bd326d5e40a9c6e07e5ebfef9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  overrideClips:
-  - {fileID: 8300000, guid: ae192f2d23d3ff348bfcb79b9abfa80e, type: 3}
+  overrideClips: []

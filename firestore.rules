@@ -45,6 +45,15 @@ service cloud.firestore {
         return docId == 'current';
       }
 
+      // 경험치·레벨 보상 낙인은 callable만 쓴다. 누락된 구 계정 필드는 0으로 읽어
+      // 새 클라이언트가 기본값 0을 직렬화해도 닉네임 등의 첫 저장이 막히지 않는다.
+      function preservesAccountProgress() {
+        return request.resource.data.profile.get('accountExp', 0) ==
+                 resource.data.profile.get('accountExp', 0) &&
+               request.resource.data.profile.get('accountRewardLevel', 0) ==
+                 resource.data.profile.get('accountRewardLevel', 0);
+      }
+
       // 최상위 필드 전수 검증. 모르는 필드가 하나라도 있으면 거부한다.
       function isValidSave() {
         return request.resource.data.keys().hasOnly([
@@ -105,6 +114,7 @@ service cloud.firestore {
       allow create: if false;
       // revision 을 정확히 1 올리는 쓰기만 통과 — 되감기·건너뛰기 모두 거부한다.
       allow update: if isOwner() && isKnownEnv(envId) && isKnownDoc() && isValidSave() &&
+                    preservesAccountProgress() &&
                     request.resource.data.schemaVersion == resource.data.schemaVersion &&
                     request.resource.data.revision == resource.data.revision + 1;
       allow delete: if false;

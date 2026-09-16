@@ -68,7 +68,7 @@ function buildFreshAccountSlots(starterCardIds, nickname = (0, generateNickname_
         // 닉네임만 값이 실린다 — 계정이 생기는 이 자리에서 한 번 뽑아 굳힌다. 클라가 폴백으로 만들면
         // 저장 전 세션마다 이름이 달라지고, 서버(매칭·랭킹)가 이름을 쓸 때 빈 값을 보게 된다.
         // 아바타·프레임은 null 이 설계다 — 기본 id 를 세이브에 굳히지 않고 ProfileManager 가 폴백한다.
-        profile: { nickname, avatarId: null, frameId: null },
+        profile: { nickname, avatarId: null, frameId: null, accountExp: 0, accountRewardLevel: 1 },
     };
 }
 //# sourceMappingURL=freshAccount.js.map

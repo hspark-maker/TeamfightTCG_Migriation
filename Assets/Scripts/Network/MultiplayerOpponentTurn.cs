@@ -170,6 +170,7 @@ public class MultiplayerOpponentTurn : TurnBase
             List<CardInstance> t_enemyPlaced = t_takeoverPlaced
                                                ?? t_runner?.FlushEnemySpawns()
                                                ?? new List<CardInstance>();
+            if (TurnState.BattleEnded) return;
             this.ctx.enemyFieldView.Refresh();
             this.ctx.enemyDeckUI?.Refresh();
             await this.ctx.enemyFieldView.PlayFillAnim(t_enemyPlaced);
@@ -178,6 +179,10 @@ public class MultiplayerOpponentTurn : TurnBase
             // divergence 카나리아 스냅샷. MultiplayerPlayerTurn과 **정확히 같은 지점**이어야 한다
             // (배리어 통과 + 양쪽 보충 완료 직후). 인자 순서는 무관하다 — BattleStateHash가 OwnerIndex로 정렬한다.
             NetworkGameController.Instance?.StageStateHash(this.ctx.playerField.State, this.ctx.enemyField.State);
+            if (NetworkSession.Instance?.Reconnect != null)
+                await NetworkSession.Instance.Reconnect.CheckpointAsync(this.ctx.playerField.State, this.ctx.enemyField.State,
+                    this.ctx.playerFieldView.GetCancellationTokenOnDestroy());
+            if (TurnState.BattleEnded) return;
 
             // 내 카드 전멸 → CheckGameOver에 위임 (Execution 데드락 방지)
             if (this.ctx.playerField.IsEmpty) break;

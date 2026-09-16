@@ -4,8 +4,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>도감의 고정 페이지를 유지하면서 조건에 맞는 카드를 따로 찾아보는 목록.</summary>
-public sealed class CollectionFilterResults : PooledOverlay<CollectionFilterResults>
+/// <summary>열어둔 컬렉션에 속한 카드의 검색·필터 결과 목록.</summary>
+public sealed class CollectionFilterResults : ContentsUIBehaviour
 {
     [SerializeField] Button closeButton;
     [SerializeField] Button filterButton;
@@ -17,8 +17,10 @@ public sealed class CollectionFilterResults : PooledOverlay<CollectionFilterResu
     [SerializeField] CardVisualView cardTemplate;
     [SerializeField] GameObject templateRoot;
 
-    protected override int SortingOrder => UiSortingOrder.CollectionResults;
-    public override bool UsesSafeArea => true;
+    static CollectionFilterResults s_openView;
+    public static bool IsOpen => s_openView != null && s_openView.IsViewVisible;
+    public event Action Closed;
+    public static event Action OnAnyClosed;
 
     sealed class Entry
     {
@@ -33,6 +35,8 @@ public sealed class CollectionFilterResults : PooledOverlay<CollectionFilterResu
     readonly Vector3[] m_corners = new Vector3[4];
     List<int> m_cards = new List<int>();
     CardListFilter m_filter = new CardListFilter();
+    AlbumTheme m_theme;
+    readonly List<int> m_scopeCards = new List<int>();
     UnityEngine.Object m_owner;
     RectTransform m_poolRoot;
     GridLayoutGroup m_grid;
@@ -41,24 +45,47 @@ public sealed class CollectionFilterResults : PooledOverlay<CollectionFilterResu
     bool m_rebuildPending, m_dirty;
     TMP_Text m_filterLabel;
 
-    public static bool Open(UnityEngine.Object owner)
+    public void SetCollection(AlbumTheme theme)
     {
-        if (owner == null || !TryGetOrCreate(out var view)) return false;
-        view.InitializeUI();
-        view.m_owner = owner;
-        view.m_filter.Clear();
-        if (view.searchInput != null) view.searchInput.SetTextWithoutNotify(string.Empty);
-        MarkOpen();
-        view.SetContentsVisible(true);
-        view.Rebuild();
-        return true;
+        if (ReferenceEquals(m_theme, theme)) return;
+        Hide();
+        m_theme = theme;
+        m_filter.Clear();
+        if (searchInput != null) searchInput.SetTextWithoutNotify(string.Empty);
+        m_scopeCards.Clear();
+        var seen = new HashSet<int>();
+        if (theme == null) return;
+        foreach (int card in theme.CardIds)
+            if (CardCatalog.Contains(card) && seen.Add(card)) m_scopeCards.Add(card);
     }
 
-    public static void CloseFor(UnityEngine.Object owner)
+    public void EditFilter(UnityEngine.Object owner, Action onApplied)
     {
-        if (UIPoolManager.instance != null
-            && UIPoolManager.instance.TryGetUI<CollectionFilterResults>(out var view)
-            && view.m_owner == owner) view.Hide();
+        if (owner == null || m_theme == null || HasPressedTile() || CardDetailOverlayView.IsOpen) return;
+        InitializeUI();
+        m_owner = owner;
+        if (searchInput != null) searchInput.DeactivateInputField();
+        CardFilterPopup.Open(m_filter, true, searchInput != null ? searchInput.text : null, filter =>
+        {
+            if (this == null || m_owner == null || !gameObject.activeInHierarchy) return;
+            m_filter = filter.Clone();
+            if (!m_filter.IsActive && string.IsNullOrWhiteSpace(searchInput != null ? searchInput.text : null))
+            {
+                Hide();
+                onApplied?.Invoke();
+                return;
+            }
+            s_openView = this;
+            SetContentsVisible(true);
+            Rebuild();
+            onApplied?.Invoke();
+        }, this, m_scopeCards);
+    }
+
+    public void Hide()
+    {
+        CardFilterPopup.CloseFor(this);
+        SetContentsVisible(false);
     }
 
     protected override void OnInitializeUI()
@@ -85,21 +112,24 @@ public sealed class CollectionFilterResults : PooledOverlay<CollectionFilterResu
         OwnershipManager.OnOwnershipChanged -= Rebuild;
         CardGrowthManager.OnGrowthChanged -= Rebuild;
         CardFilterPopup.CloseFor(this);
-        ClearOpen();
+        if (s_openView == this) s_openView = null;
         m_owner = null;
         m_rebuildPending = false;
         ReleaseTiles();
+        Closed?.Invoke();
+        OnAnyClosed?.Invoke();
     }
 
     void OpenFilter()
     {
-        if (!IsViewVisible || HasPressedTile() || CardDetailOverlayView.IsOpen) return;
-        if (searchInput != null) searchInput.DeactivateInputField();
-        CardFilterPopup.Open(m_filter, true, searchInput != null ? searchInput.text : null,
-            filter => { m_filter = filter; Rebuild(); }, this);
+        if (IsViewVisible) EditFilter(m_owner, null);
     }
 
-    void OnSearchChanged(string query) => Rebuild();
+    void OnSearchChanged(string query)
+    {
+        if (!m_filter.IsActive && string.IsNullOrWhiteSpace(query)) Hide();
+        else Rebuild();
+    }
 
     void Rebuild()
     {
@@ -110,7 +140,7 @@ public sealed class CollectionFilterResults : PooledOverlay<CollectionFilterResu
         // 상세 화면이 이전 목록을 참조하고 있을 수 있으므로 새 스냅샷으로 교체한다.
         var cards = new List<int>();
         string query = searchInput != null ? searchInput.text : null;
-        foreach (int card in CardCatalog.AllIds)
+        foreach (int card in m_scopeCards)
             if (m_filter.Matches(card, query)) cards.Add(card);
         m_cards = cards;
         m_entryCount = cards.Count;

@@ -1,4 +1,4 @@
-﻿보상 행 ID,보상 소유 영역,기존 수령 키,표시 순서,지급물 종류,지급물 ID,수량,메모
+보상 행 ID,보상 소유 영역,기존 수령 키,표시 순서,지급물 종류,지급물 ID,수량,메모
 id,ownerType,ownerId,order,rewardType,rewardId,amount,#memo
 int,string,string,int,string,string,long,string
 1,Album,t:Theme_Nature,1,Currency,Diamond,20,자연 테마 완성
@@ -165,3 +165,52 @@ int,string,string,int,string,string,long,string
 216,Attendance,day_5,1,Currency,Shard,60,7일 누적 출석 5일차
 217,Attendance,day_6,1,Currency,Diamond,10,7일 누적 출석 6일차
 218,Attendance,day_7,1,Pack,NormalPack_TEST,1,7일 누적 출석 7일차 일반 팩
+219,AccountLevel,2,1,Currency,Gold,100,계정 레벨 2 달성; 자동 지급; 이전 레벨 소급 없음
+220,AccountLevel,3,1,Currency,Gold,100,계정 레벨 3 달성; 자동 지급; 이전 레벨 소급 없음
+221,AccountLevel,4,1,Currency,Gold,100,계정 레벨 4 달성; 자동 지급; 이전 레벨 소급 없음
+222,AccountLevel,5,1,Currency,Gold,100,계정 레벨 5 달성; 자동 지급; 이전 레벨 소급 없음
+223,AccountLevel,6,1,Currency,Gold,100,계정 레벨 6 달성; 자동 지급; 이전 레벨 소급 없음
+224,AccountLevel,7,1,Currency,Gold,100,계정 레벨 7 달성; 자동 지급; 이전 레벨 소급 없음
+225,AccountLevel,8,1,Currency,Gold,100,계정 레벨 8 달성; 자동 지급; 이전 레벨 소급 없음
+226,AccountLevel,9,1,Currency,Gold,100,계정 레벨 9 달성; 자동 지급; 이전 레벨 소급 없음
+227,AccountLevel,10,1,Currency,Gold,100,계정 레벨 10 달성; 자동 지급; 이전 레벨 소급 없음
+228,AccountLevel,11,1,Currency,Gold,100,계정 레벨 11 달성; 자동 지급; 이전 레벨 소급 없음
+229,AccountLevel,12,1,Currency,Gold,100,계정 레벨 12 달성; 자동 지급; 이전 레벨 소급 없음
+230,AccountLevel,13,1,Currency,Gold,100,계정 레벨 13 달성; 자동 지급; 이전 레벨 소급 없음
+231,AccountLevel,14,1,Currency,Gold,100,계정 레벨 14 달성; 자동 지급; 이전 레벨 소급 없음
+232,AccountLevel,15,1,Currency,Gold,100,계정 레벨 15 달성; 자동 지급; 이전 레벨 소급 없음
+233,AccountLevel,16,1,Currency,Gold,100,계정 레벨 16 달성; 자동 지급; 이전 레벨 소급 없음
+234,AccountLevel,17,1,Currency,Gold,100,계정 레벨 17 달성; 자동 지급; 이전 레벨 소급 없음
+235,AccountLevel,18,1,Currency,Gold,100,계정 레벨 18 달성; 자동 지급; 이전 레벨 소급 없음
+236,AccountLevel,19,1,Currency,Gold,100,계정 레벨 19 달성; 자동 지급; 이전 레벨 소급 없음
+237,AccountLevel,20,1,Currency,Gold,100,계정 레벨 20 달성; 자동 지급; 이전 레벨 소급 없음
+238,AccountLevel,21,1,Currency,Gold,100,계정 레벨 21 달성; 자동 지급; 이전 레벨 소급 없음
+239,AccountLevel,22,1,Currency,Gold,100,계정 레벨 22 달성; 자동 지급; 이전 레벨 소급 없음
+240,AccountLevel,23,1,Currency,Gold,100,계정 레벨 23 달성; 자동 지급; 이전 레벨 소급 없음
+241,AccountLevel,24,1,Currency,Gold,100,계정 레벨 24 달성; 자동 지급; 이전 레벨 소급 없음
+242,AccountLevel,25,1,Currency,Gold,100,계정 레벨 25 달성; 자동 지급; 이전 레벨 소급 없음
+243,AccountLevel,26,1,Currency,Gold,100,계정 레벨 26 달성; 자동 지급; 이전 레벨 소급 없음
+244,AccountLevel,27,1,Currency,Gold,100,계정 레벨 27 달성; 자동 지급; 이전 레벨 소급 없음
+245,AccountLevel,28,1,Currency,Gold,100,계정 레벨 28 달성; 자동 지급; 이전 레벨 소급 없음
+246,AccountLevel,29,1,Currency,Gold,100,계정 레벨 29 달성; 자동 지급; 이전 레벨 소급 없음
+247,AccountLevel,30,1,Currency,Gold,100,계정 레벨 30 달성; 자동 지급; 이전 레벨 소급 없음
+248,AccountLevel,31,1,Currency,Gold,100,계정 레벨 31 달성; 자동 지급; 이전 레벨 소급 없음
+249,AccountLevel,32,1,Currency,Gold,100,계정 레벨 32 달성; 자동 지급; 이전 레벨 소급 없음
+250,AccountLevel,33,1,Currency,Gold,100,계정 레벨 33 달성; 자동 지급; 이전 레벨 소급 없음
+251,AccountLevel,34,1,Currency,Gold,100,계정 레벨 34 달성; 자동 지급; 이전 레벨 소급 없음
+252,AccountLevel,35,1,Currency,Gold,100,계정 레벨 35 달성; 자동 지급; 이전 레벨 소급 없음
+253,AccountLevel,36,1,Currency,Gold,100,계정 레벨 36 달성; 자동 지급; 이전 레벨 소급 없음
+254,AccountLevel,37,1,Currency,Gold,100,계정 레벨 37 달성; 자동 지급; 이전 레벨 소급 없음
+255,AccountLevel,38,1,Currency,Gold,100,계정 레벨 38 달성; 자동 지급; 이전 레벨 소급 없음
+256,AccountLevel,39,1,Currency,Gold,100,계정 레벨 39 달성; 자동 지급; 이전 레벨 소급 없음
+257,AccountLevel,40,1,Currency,Gold,100,계정 레벨 40 달성; 자동 지급; 이전 레벨 소급 없음
+258,AccountLevel,41,1,Currency,Gold,100,계정 레벨 41 달성; 자동 지급; 이전 레벨 소급 없음
+259,AccountLevel,42,1,Currency,Gold,100,계정 레벨 42 달성; 자동 지급; 이전 레벨 소급 없음
+260,AccountLevel,43,1,Currency,Gold,100,계정 레벨 43 달성; 자동 지급; 이전 레벨 소급 없음
+261,AccountLevel,44,1,Currency,Gold,100,계정 레벨 44 달성; 자동 지급; 이전 레벨 소급 없음
+262,AccountLevel,45,1,Currency,Gold,100,계정 레벨 45 달성; 자동 지급; 이전 레벨 소급 없음
+263,AccountLevel,46,1,Currency,Gold,100,계정 레벨 46 달성; 자동 지급; 이전 레벨 소급 없음
+264,AccountLevel,47,1,Currency,Gold,100,계정 레벨 47 달성; 자동 지급; 이전 레벨 소급 없음
+265,AccountLevel,48,1,Currency,Gold,100,계정 레벨 48 달성; 자동 지급; 이전 레벨 소급 없음
+266,AccountLevel,49,1,Currency,Gold,100,계정 레벨 49 달성; 자동 지급; 이전 레벨 소급 없음
+267,AccountLevel,50,1,Currency,Gold,100,계정 레벨 50 달성; 자동 지급; 이전 레벨 소급 없음

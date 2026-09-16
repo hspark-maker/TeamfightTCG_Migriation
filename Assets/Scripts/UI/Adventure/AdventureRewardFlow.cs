@@ -12,7 +12,7 @@ using Cysharp.Threading.Tasks;
 public static class AdventureRewardFlow
 {
     const string TITLE_SUFFIX   = " 격파";
-    const string TITLE_FALLBACK = "정점 클리어";
+    const string TITLE_FALLBACK = "모험 클리어";
 
     // 도는 중인 수령 왕복의 수. 카운트로 세는 것은 흐름이 static이라 중첩 호출을 구조적으로 막을 수 없기 때문이다.
     static int s_inFlight;

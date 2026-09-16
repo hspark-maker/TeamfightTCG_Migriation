@@ -5,6 +5,7 @@ using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 /// <summary>서버 응답을 기다리는 동안 화면을 덮는 전역 대기 표시. 입력 차단은 요청 즉시 걸고,
 /// 딤·스피너 그림은 showDelay가 지난 뒤에도 요청이 남아 있을 때만 켠다 —
@@ -56,6 +57,8 @@ public class ServerWaitOverlay : ContentsPooledUI
     readonly List<object> m_owners = new List<object>();
     Tween m_spin;
     bool m_visualsShown;
+    TMP_Text m_statusLabel;
+    object m_statusOwner;
 
     // 임계 대기를 무효화하는 축. 요청이 모두 걷히면 올려서, 뒤늦게 깨어난 대기가 빈 화면을 덮지 못하게 한다.
     int m_generation;
@@ -78,6 +81,30 @@ public class ServerWaitOverlay : ContentsPooledUI
         if (_owner == null || s_instance == null) return;
 
         s_instance.Remove(_owner);
+    }
+
+    /// <summary>대기 중인 owner의 진행 안내. Release 때 함께 지워 다른 요청에 남지 않는다.</summary>
+    public static void SetStatus(object owner, string message)
+    {
+        if (s_instance == null || owner == null || !s_instance.m_owners.Contains(owner)
+            || s_instance.visualGroup == null) return;
+        if (s_instance.m_statusLabel == null)
+        {
+            var go = new GameObject("WaitStatus", typeof(RectTransform), typeof(TextMeshProUGUI));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(s_instance.visualGroup.transform, false);
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(0f, -120f);
+            rect.sizeDelta = new Vector2(600f, 90f);
+            s_instance.m_statusLabel = go.GetComponent<TextMeshProUGUI>();
+            TutorialUIStyle.ApplyFont(s_instance.m_statusLabel);
+            s_instance.m_statusLabel.fontSize = 30f;
+            s_instance.m_statusLabel.alignment = TextAlignmentOptions.Center;
+            s_instance.m_statusLabel.raycastTarget = false;
+        }
+        s_instance.m_statusOwner = owner;
+        s_instance.m_statusLabel.text = message;
+        s_instance.m_statusLabel.gameObject.SetActive(true);
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -183,6 +210,7 @@ public class ServerWaitOverlay : ContentsPooledUI
 
     void Remove(object _owner)
     {
+        if (ReferenceEquals(this.m_statusOwner, _owner)) ClearStatus();
         for (int i = this.m_owners.Count - 1; i >= 0; i--)
             if (ReferenceEquals(this.m_owners[i], _owner)) this.m_owners.RemoveAt(i);
 
@@ -293,6 +321,7 @@ public class ServerWaitOverlay : ContentsPooledUI
     // 여기는 그 안에서 다음 대기를 처음부터 시작할 수 있게 상태만 되돌린다.
     void ResetToIdle()
     {
+        ClearStatus();
         this.m_generation++;
         this.m_visualsShown = false;
         this.m_owners.Clear();
@@ -308,6 +337,12 @@ public class ServerWaitOverlay : ContentsPooledUI
         }
 
         if (this.blocker != null) this.blocker.SetActive(false);
+    }
+
+    void ClearStatus()
+    {
+        this.m_statusOwner = null;
+        if (this.m_statusLabel != null) this.m_statusLabel.gameObject.SetActive(false);
     }
 
     void StartSpin()
