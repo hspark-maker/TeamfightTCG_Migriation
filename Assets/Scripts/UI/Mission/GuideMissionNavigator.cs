@@ -7,6 +7,28 @@ internal static class GuideMissionNavigator
     internal static bool CanGo(MissionDefinition _definition)
         => GuideMissionTrack.RouteOf(_definition).Kind != GuideMissionTrack.ERouteKind.None;
 
+    internal static string UnavailableReason(MissionDefinition _definition)
+    {
+        var t_route = GuideMissionTrack.RouteOf(_definition);
+        EOutgameFeature t_feature;
+        switch (t_route.Kind)
+        {
+            case GuideMissionTrack.ERouteKind.Match: t_feature = EOutgameFeature.LobbyMatchTab; break;
+            case GuideMissionTrack.ERouteKind.DeckEditor: t_feature = EOutgameFeature.LobbyDeckTab; break;
+            case GuideMissionTrack.ERouteKind.AdventureNode:
+                if (AdventureProgress.IndexOf(t_route.NodeId) < 0) return "모험 준비 중…";
+                t_feature = EOutgameFeature.Adventure;
+                break;
+            case GuideMissionTrack.ERouteKind.CardGrowth:
+                if (GuideMissionTrack.PickGrowthCard(_definition) <= 0) return "덱 편성 확인 필요";
+                t_feature = EOutgameFeature.LobbyCollectionTab;
+                break;
+            case GuideMissionTrack.ERouteKind.CollectionEnhance: t_feature = EOutgameFeature.LobbyCollectionTab; break;
+            default: return "이동할 곳 없음";
+        }
+        return OutgameFeatureLock.IsUnlocked(t_feature) ? null : "콘텐츠 해금 대기";
+    }
+
     internal static void Go(MissionDefinition _definition)
     {
         if (_definition != null && GuidanceCoordinator.TryRequestMission(_definition.Id)) return;

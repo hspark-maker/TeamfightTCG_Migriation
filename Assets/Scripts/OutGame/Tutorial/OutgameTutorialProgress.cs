@@ -73,6 +73,7 @@ public static class OutgameTutorialProgress
         if (t_slot.OutgameCompleted) return;
 
         t_slot.OutgameCompleted = true;
+        GuideMissionHintHistory.Arm();
         Save();
     }
 
@@ -130,6 +131,7 @@ public static class OutgameTutorialProgress
         t_slot.ChapterStepIndex = _step;
         t_slot.StepId           = OutgameTutorialRunner.StepIdAt(_chapter, _step);
         t_slot.OutgameCompleted = false;
+        GuideMissionHintHistory.Clear();
         t_slot.GuideResume = null;
         ContentUnlockManager.ResetForDebug();
         Save();

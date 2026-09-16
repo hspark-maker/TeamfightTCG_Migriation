@@ -6,6 +6,14 @@ using UnityEngine;
 
 public sealed partial class GuidanceCoordinator
 {
+    public enum EMissionGuideAction { None, Start, Resume }
+
+    sealed class GuidePreparationException : Exception
+    {
+        public GuidePreparationException()
+            : base("강화 가능한 카드나 샤드가 부족합니다. 준비되면 안내를 이어갈 수 있어요.") { }
+    }
+
     GuideMissionFlow m_flow;
     bool m_flowStarted;
     bool m_flowPreparing;
@@ -86,17 +94,26 @@ public sealed partial class GuidanceCoordinator
     {
         if (s_instance == null || !GuideMissionProgress.IsCurrent(_missionId)) return false;
         if (IsInputLocked) return true;
+        if (GetMissionGuideAction(_missionId) == EMissionGuideAction.None) return false;
         if (_missionId == MATCH_MISSION_ID) return s_instance.RequestMatchMission();
+        RequestCurrentMission();
+        return true;
+    }
+
+    /// <summary>미루기 상태를 바꾸지 않고 현재 미션의 안내 시작·재개 여부를 조회한다.</summary>
+    public static EMissionGuideAction GetMissionGuideAction(string _missionId)
+    {
+        if (s_instance == null || !GuideMissionProgress.IsCurrent(_missionId)) return EMissionGuideAction.None;
+        if (_missionId == MATCH_MISSION_ID)
+            return s_instance.CanRequestMatchMission() ? EMissionGuideAction.Start : EMissionGuideAction.None;
         foreach (var t_flow in GuideMissionFlows.All)
         {
             if (t_flow == null || t_flow.missionId != _missionId) continue;
-            OutgameTutorialRunner.ResumeDeferred(t_flow.tutorial);
-            if (PendingIntros(t_flow).Count == 0 && !OutgameTutorialRunner.HasPending(t_flow.tutorial)
-                && !GuideResume.IsFor(t_flow.tutorial)) return false;
-            RequestCurrentMission();
-            return true;
+            if (GuideResume.IsFor(t_flow.tutorial)) return EMissionGuideAction.Resume;
+            return PendingIntros(t_flow).Count > 0 || OutgameTutorialRunner.HasPending(t_flow.tutorial, _includeDeferred: true)
+                ? EMissionGuideAction.Start : EMissionGuideAction.None;
         }
-        return false;
+        return EMissionGuideAction.None;
     }
 
     GuideMissionFlow FindMissionFlow()
@@ -199,7 +216,7 @@ public sealed partial class GuidanceCoordinator
             EnsureFlow(_version, _ct);
             if (t_flow.tutorial == EOutgameTutorialTrigger.None) { CancelMissionFlow(false); return; }
             if (!PrepareFlowTarget(t_flow))
-                throw new InvalidOperationException("강화 가능한 카드나 샤드가 부족합니다. 준비되면 안내를 이어갑니다.");
+                throw new GuidePreparationException();
             if (t_flow.tutorial == EOutgameTutorialTrigger.CollectionTabFirstEnter
                 || t_flow.tutorial == EOutgameTutorialTrigger.SynergyGrowthIntroduction)
                 GuideResume.SetTarget(OutgameTutorialGuide.TargetCardId, OutgameTutorialGuide.TargetLevel);
@@ -219,6 +236,12 @@ public sealed partial class GuidanceCoordinator
             m_lastFlowFailure = null;
         }
         catch (OperationCanceledException) { }
+        catch (GuidePreparationException t_exception)
+        {
+            if (_version != m_flowVersion) return;
+            CancelMissionFlow(true);
+            ShowPreparationFailure(t_exception.Message);
+        }
         catch (Exception t_exception)
         {
             if (_version == m_flowVersion) DeferCurrentGuide(t_exception.Message);
@@ -246,8 +269,9 @@ public sealed partial class GuidanceCoordinator
             OutgameTutorialGuide.PrepareSynergyGrowth();
             return OutgameTutorialGuide.IsGrowthGoalReached || OutgameTutorialGuide.CanContinueEnhance();
         }
-        return OutgameTutorialRunner.TryGetGuidedChapter(_flow.tutorial, out _, out var t_chapter)
-            && OutgameTutorialGuide.PrepareEnhanceCard(t_chapter);
+        if (!OutgameTutorialRunner.TryGetGuidedChapter(_flow.tutorial, out _, out var t_chapter))
+            throw new InvalidOperationException("강화 안내 데이터를 찾지 못했습니다.");
+        return OutgameTutorialGuide.PrepareEnhanceCard(t_chapter);
     }
 
     async UniTask CompleteFlowAsync(int _version)
@@ -307,6 +331,23 @@ public sealed partial class GuidanceCoordinator
                 AlbumPageOverlayView.CloseOpen();
             }
         }
+    }
+
+    void ShowPreparationFailure(string _reason)
+    {
+        UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
+        {
+            titleText = _reason,
+            yesText = "재시도",
+            yesAction = RequestCurrentMission,
+            noText = "나중에",
+            noAction = ReturnToMatchAfterPreparationFailure,
+        });
+    }
+
+    void ReturnToMatchAfterPreparationFailure()
+    {
+        using (InternalNavigation()) m_shell?.TrySelectFeature(EOutgameFeature.LobbyMatchTab);
     }
 
     void ShowFlowFailure(string _reason)

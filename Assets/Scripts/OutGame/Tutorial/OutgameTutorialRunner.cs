@@ -82,8 +82,9 @@ public static class OutgameTutorialRunner
     // ───────────── 자율 안내(메모리 커서) ─────────────
 
     /// <summary>이 트리거로 아직 볼 것이 남았는가. 판정은 Fire의 무시 조건과 같아야 한다 —
-    /// UI가 규칙을 복제하지 않도록 "띄울지"의 답을 여기서만 낸다(데이터 미주입이면 false).</summary>
-    public static bool HasPending(EOutgameTutorialTrigger _trigger)
+    /// UI가 규칙을 복제하지 않도록 "띄울지"의 답을 여기서만 낸다(데이터 미주입이면 false).
+    /// 명시적 재시도 표시를 조회할 때는 이번 세션의 미루기를 무시할 수 있다.</summary>
+    public static bool HasPending(EOutgameTutorialTrigger _trigger, bool _includeDeferred = false)
     {
 #if UNITY_EDITOR
         if (OnboardingPlayTest.IsActive || OnboardingPlayTest.IsPreparing) return false;
@@ -95,7 +96,7 @@ public static class OutgameTutorialRunner
         if (OutgameTutorialProgress.IsTriggerDone(_trigger)) return false;
         if (_trigger == EOutgameTutorialTrigger.AdventureUnlocked
             && OutgameTutorialProgress.IsTriggerDone(EOutgameTutorialTrigger.AdventureMapFirstOpen)) return false;
-        if (s_deferred.Contains(_trigger)) return false;
+        if (!_includeDeferred && s_deferred.Contains(_trigger)) return false;
         if (!TryGetGuidedChapter(_trigger, out _, out var t_chapter) || t_chapter.StepCount == 0) return false;
 
         return OutgameFeatureLock.IsUnlocked(t_chapter.Prerequisite);

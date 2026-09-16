@@ -57,6 +57,8 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     // 버튼의 저작 문구. 승급전 상태가 풀리면 여기로 돌아간다 — 평상시 문구를 코드가 다시 쓰지 않게.
     string m_defaultPlayText;
     ContentUnlockPresentation m_unlockPresentation;
+    GuideMissionTrackerView m_guidePreview;
+    bool m_matchSettled;
 
     protected override void OnInitializeUI()
     {
@@ -68,6 +70,11 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (missionButton != null) missionButton.onClick.AddListener(OpenMissions);
         if (guideMissionButton != null) guideMissionButton.onClick.AddListener(OpenGuideMissions);
         if (guideMissionTrackerButton != null) guideMissionTrackerButton.onClick.AddListener(HandleGuideMissionTracker);
+        if (guideMissionTrackerButton != null)
+        {
+            m_guidePreview = guideMissionTrackerButton.GetComponent<GuideMissionTrackerView>();
+            if (m_guidePreview != null) m_guidePreview.PresentationFinished += RefreshGuideMissionButton;
+        }
         if (passButton != null) passButton.onClick.AddListener(OpenPass);
         if (adventureButton != null) adventureButton.onClick.AddListener(HandleAdventureRequested);
 
@@ -117,6 +124,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (missionButton != null) missionButton.onClick.RemoveListener(OpenMissions);
         if (guideMissionButton != null) guideMissionButton.onClick.RemoveListener(OpenGuideMissions);
         if (guideMissionTrackerButton != null) guideMissionTrackerButton.onClick.RemoveListener(HandleGuideMissionTracker);
+        if (m_guidePreview != null) m_guidePreview.PresentationFinished -= RefreshGuideMissionButton;
         if (passButton != null) passButton.onClick.RemoveListener(OpenPass);
         if (adventureButton != null) adventureButton.onClick.RemoveListener(HandleAdventureRequested);
 
@@ -127,6 +135,8 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
 
     public override void OnEnter()
     {
+        m_matchSettled = false;
+        m_guidePreview?.SetSettled(false);
         RefreshPlayLabel();
         ApplyFeatureLocks();
         RefreshGuideMissionButton();
@@ -148,9 +158,20 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         }
     }
 
-    public override void OnSettled() => m_unlockPresentation?.SetVisible(true);
+    public override void OnSettled()
+    {
+        m_matchSettled = true;
+        m_unlockPresentation?.SetVisible(true);
+        m_guidePreview?.SetSettled(true);
+    }
 
-    public override void OnLeave() => m_unlockPresentation?.SetVisible(false);
+    public override void OnLeave()
+    {
+        m_matchSettled = false;
+        m_unlockPresentation?.SetVisible(false);
+        m_guidePreview?.SetSettled(false);
+        RefreshGuideMissionButton();
+    }
 
     /// <summary>승급전 대기면 버튼 문구를 갈고, 아니면 저작 문구로 되돌린다.
     /// 랭크 정산 연출이 도는 중에는 갈지 않는다 — 별이 차기 전에 버튼이 결과를 먼저 표시하지 않게 한다.</summary>
@@ -251,10 +272,14 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (guideMissionButton != null) guideMissionButton.gameObject.SetActive(AnyGuideMissionOpen());
         if (guideMissionTrackerButton == null) return;
         MissionDefinition t_current = GuideMissionTrack.Current;
-        bool t_visible = MissionManager.IsReady && t_current != null
+        bool t_visible = MissionManager.IsReady && (t_current != null || (m_guidePreview != null && m_guidePreview.IsHoldingClaim))
             && OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission);
+        bool t_wasVisible = guideMissionTrackerButton.gameObject.activeSelf;
         guideMissionTrackerButton.gameObject.SetActive(t_visible);
-        guideMissionTrackerButton.interactable = t_visible && !MissionCommands.IsInFlight(t_current.Id);
+        if (t_visible && !t_wasVisible) m_guidePreview?.SetSettled(m_matchSettled);
+        guideMissionTrackerButton.interactable = t_visible
+            && (m_guidePreview == null || !m_guidePreview.IsHoldingClaim)
+            && GuidanceCoordinator.CanNavigateFromMatchTab(null) && GuideMissionPreviewState.Of(t_current).CanExecute;
     }
 
     void HandleGuideMissionTracker()
@@ -262,18 +287,30 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission)
             || !GuidanceCoordinator.CanNavigateFromMatchTab(null)) return;
         MissionDefinition t_current = GuideMissionTrack.Current;
-        if (t_current == null || MissionCommands.IsInFlight(t_current.Id)) return;
-        if (MissionManager.CanClaim(t_current)) ClaimGuideMissionAsync(t_current.Id).Forget();
-        else if (!MissionManager.IsComplete(t_current)) GuideMissionNavigator.Go(t_current);
+        if (m_guidePreview != null && m_guidePreview.IsHoldingClaim) return;
+        var t_state = GuideMissionPreviewState.Of(t_current);
+        if (!t_state.CanExecute) return;
+        m_guidePreview?.DismissHint();
+        if (t_state.Action == GuideMissionPreviewState.EAction.Claim) ClaimGuideMissionAsync(t_current).Forget();
+        else GuideMissionNavigator.Go(t_current);
     }
 
-    async UniTaskVoid ClaimGuideMissionAsync(string _missionId)
+    async UniTaskVoid ClaimGuideMissionAsync(MissionDefinition _mission)
     {
-        ClaimMissionResult t_result;
+        var t_preview = m_guidePreview;
+        int t_version = t_preview != null ? t_preview.BeginClaim(_mission) : 0;
+        ClaimMissionResult t_result = null;
         ServerWaitOverlay.Hold(this);
-        try { t_result = await MissionCommands.ClaimAsync(_missionId); }
-        finally { ServerWaitOverlay.Release(this); }
-        if (t_result != null) MissionPanel.ShowClaimedRewards(new[] { t_result });
+        try { t_result = await MissionCommands.ClaimAsync(_mission.Id); }
+        finally
+        {
+            ServerWaitOverlay.Release(this);
+            if (t_result == null && t_preview != null) t_preview.EndClaim(t_version, false);
+        }
+        if (t_result != null) MissionPanel.ShowClaimedRewards(new[] { t_result }, _onClosed: () =>
+        {
+            if (t_preview != null) t_preview.EndClaim(t_version, true);
+        });
     }
 
     static bool AnyGuideMissionOpen()

@@ -404,9 +404,14 @@ public class MissionPanel : ContentsPooledUI
     }
 
     // GuideMissionPanel 도 같은 보상 표시 경로를 쓴다 — 미션 보상 팝업 조립의 단일 지점.
-    internal static void ShowClaimedRewards(IReadOnlyList<ClaimMissionResult> _results, string _title = "미션 보상")
+    internal static void ShowClaimedRewards(IReadOnlyList<ClaimMissionResult> _results, string _title = "미션 보상",
+        Action _onClosed = null)
     {
-        if (_results.Count == 0) return;
+        if (_results.Count == 0)
+        {
+            _onClosed?.Invoke();
+            return;
+        }
 
         var t_bucket = new CurrencyGainBucket();
         var t_cards = new List<OpenPackCard>();
@@ -449,17 +454,22 @@ public class MissionPanel : ContentsPooledUI
         foreach (var t_card in t_cardCounts)
             t_lines.Add(new RewardLine(new AlbumRewardDef { rewardType = ERewardType.Card,
                 rewardId = t_card.Key.ToString(), amount = t_card.Value }));
+        if (t_lines.Count == 0 && t_passExp <= 0)
+        {
+            _onClosed?.Invoke();
+            return;
+        }
         if (RewardClaimPopup.TryGet(out var t_popup) && t_popup.RewardSlotCount > 0)
         {
             string t_title = t_passExp > 0 ? $"{_title} · 패스 경험치 +{t_passExp:N0}" : _title;
-            ShowRewardPage(t_popup, t_title, t_lines, t_outcome, 0);
+            ShowRewardPage(t_popup, t_title, t_lines, t_outcome, 0, _onClosed);
         }
         else
-            RewardClaimPopup.ClaimWithoutPopup(() => UniTask.FromResult(t_outcome)).Forget();
+            ShowRewardWithoutPopup(t_outcome, _onClosed).Forget();
     }
 
     static void ShowRewardPage(RewardClaimPopup _popup, string _title, List<RewardLine> _lines,
-                               RewardClaimOutcome _outcome, int _offset)
+                               RewardClaimOutcome _outcome, int _offset, Action _onClosed)
     {
         int t_count = Math.Min(_popup.RewardSlotCount, _lines.Count - _offset);
         int t_next = _offset + t_count;
@@ -471,7 +481,19 @@ public class MissionPanel : ContentsPooledUI
         string t_title = t_pages > 1 ? $"{_title} ({_offset / _popup.RewardSlotCount + 1}/{t_pages})" : _title;
         _popup.Show(t_title, _lines.GetRange(_offset, t_count), () => UniTask.FromResult(t_pageOutcome),
             _claimOnDim: true,
-            _onClosed: t_hasNext ? () => ShowRewardPage(_popup, _title, _lines, _outcome, t_next) : (Action)null);
+            _onClosed: t_hasNext ? () => ShowRewardPage(_popup, _title, _lines, _outcome, t_next, _onClosed) : _onClosed);
+    }
+
+    static async UniTask ShowRewardWithoutPopup(RewardClaimOutcome _outcome, Action _onClosed)
+    {
+        try
+        {
+            await RewardClaimPopup.ClaimWithoutPopup(() => UniTask.FromResult(_outcome));
+        }
+        finally
+        {
+            _onClosed?.Invoke();
+        }
     }
 
     // 리셋 시각의 진실원은 서버가 준 epoch ms 다. 남은 시간 표시에만 기기 시계를 쓴다 —

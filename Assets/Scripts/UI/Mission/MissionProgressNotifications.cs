@@ -39,7 +39,7 @@ internal static class MissionProgressNotifications
     internal static bool TryTake(out MissionProgressNotification _notification)
     {
         SynchronizeAccount();
-        s_pending.RemoveAll(t_item => !IsCurrent(t_item));
+        s_pending.RemoveAll(t_item => !IsCurrent(t_item) || IsPresentedByTracker(t_item));
         if (s_pending.Count == 0)
         {
             _notification = default;
@@ -108,6 +108,12 @@ internal static class MissionProgressNotifications
 
     static void Enqueue(MissionProgressNotification _notification)
     {
+        if (IsPresentedByTracker(_notification))
+        {
+            s_pending.RemoveAll(t_item => t_item.MissionId == _notification.MissionId);
+            return;
+        }
+
         for (int i = 0; i < s_pending.Count; i++)
         {
             MissionProgressNotification t_pending = s_pending[i];
@@ -120,6 +126,9 @@ internal static class MissionProgressNotifications
         }
         s_pending.Add(_notification);
     }
+
+    internal static bool IsPresentedByTracker(MissionProgressNotification _notification)
+        => _notification.Period == "guide" && GuideMissionTrackerView.IsPresenting(_notification.MissionId);
 
     static string PeriodKey(string _period)
     {
