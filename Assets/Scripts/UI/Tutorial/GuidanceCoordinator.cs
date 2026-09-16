@@ -112,7 +112,6 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
     void OnDisable()
     {
         m_pauseVersion++;
-        UnsubscribeFlowRecovery();
         CancelMatchMission();
         CancelMissionFlow(false);
         if (s_instance == this) s_instance = null;
@@ -121,6 +120,5 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
     void OnEnable()
     {
         s_instance = this;
-        SubscribeFlowRecovery();
     }
 }

@@ -12,6 +12,7 @@ public sealed partial class GuidanceCoordinator
     bool m_flowLocked;
     bool m_flowDeferred;
     bool m_retryRequested;
+    string m_requestedMissionId;
     bool m_applicationPaused;
     int m_flowVersion;
     int m_flowSession;
@@ -68,10 +69,16 @@ public sealed partial class GuidanceCoordinator
     public static void RequestCurrentMission()
     {
         if (s_instance == null) return;
+        if (s_instance.m_flowSession != ContentUnlockManager.SessionVersion)
+        {
+            s_instance.CancelMissionFlow(false);
+            s_instance.m_flowSession = ContentUnlockManager.SessionVersion;
+        }
         s_instance.m_retryRequested = true;
+        s_instance.m_requestedMissionId = GuideMissionProgress.Current?.Id;
         s_instance.m_lastFlowFailure = null;
         foreach (var t_flow in GuideMissionFlows.All)
-            if (t_flow != null && (GuideMissionFlows.IsEligible(t_flow) || GuideResume.IsFor(t_flow.tutorial)))
+            if (t_flow != null && GuideMissionFlows.IsEligible(t_flow))
                 OutgameTutorialRunner.ResumeDeferred(t_flow.tutorial);
     }
 
@@ -79,28 +86,32 @@ public sealed partial class GuidanceCoordinator
     {
         if (s_instance == null || !GuideMissionProgress.IsCurrent(_missionId)) return false;
         if (IsInputLocked) return true;
-        if (GuideResume.HasPending) { RequestCurrentMission(); return true; }
         if (_missionId == MATCH_MISSION_ID) return s_instance.RequestMatchMission();
         foreach (var t_flow in GuideMissionFlows.All)
         {
             if (t_flow == null || t_flow.missionId != _missionId) continue;
+            OutgameTutorialRunner.ResumeDeferred(t_flow.tutorial);
+            if (PendingIntros(t_flow).Count == 0 && !OutgameTutorialRunner.HasPending(t_flow.tutorial)
+                && !GuideResume.IsFor(t_flow.tutorial)) return false;
             RequestCurrentMission();
-            return PendingIntros(t_flow).Count > 0 || OutgameTutorialRunner.HasPending(t_flow.tutorial);
+            return true;
         }
         return false;
     }
 
     GuideMissionFlow FindMissionFlow()
     {
-        if (GuideResume.HasPending)
+        if (m_retryRequested && GuideMissionProgress.IsCurrent(m_requestedMissionId) && GuideResume.HasPending)
         {
             foreach (var t_flow in GuideMissionFlows.All)
-                if (t_flow != null && GuideResume.IsFor(t_flow.tutorial)) return t_flow;
-            GuideResume.Clear();
+                if (t_flow != null && t_flow.missionId == m_requestedMissionId
+                    && GuideResume.IsFor(t_flow.tutorial)) return t_flow;
         }
         foreach (var t_flow in GuideMissionFlows.All)
         {
             if (t_flow == null || !GuideMissionFlows.IsEligible(t_flow)) continue;
+            if (!string.IsNullOrEmpty(t_flow.missionId)
+                && (!m_retryRequested || t_flow.missionId != m_requestedMissionId)) continue;
             if (PendingIntros(t_flow).Count > 0 || OutgameTutorialRunner.HasPending(t_flow.tutorial)) return t_flow;
         }
         return null;
@@ -132,6 +143,11 @@ public sealed partial class GuidanceCoordinator
             return true;
         }
         if (m_flowDeferred && !m_retryRequested) return false;
+        if (m_retryRequested && !GuideMissionProgress.IsCurrent(m_requestedMissionId))
+        {
+            m_retryRequested = false;
+            m_requestedMissionId = null;
+        }
         if (OutgameTutorialRunner.IsRunning || OutgameTutorialRunner.IsGuidedRunning) return false;
         var t_flow = FindMissionFlow();
         if (t_flow == null) return false;
@@ -278,6 +294,7 @@ public sealed partial class GuidanceCoordinator
         m_flowDeferred = _defer;
         m_retryRequested = false;
         ClearTransition();
+        m_requestedMissionId = null;
         using (InternalNavigation())
         {
             if (t_ownedGuidance) OnboardingSession.Suspend();

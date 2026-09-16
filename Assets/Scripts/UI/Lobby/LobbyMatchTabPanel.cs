@@ -38,6 +38,9 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
              "가이드는 끝나면 다시 오지 않는 축이라 빈 화면 안내보다 사라지는 게 맞다.")]
     [SerializeField] Button guideMissionButton;
 
+    [Tooltip("매치 탭 좌측 하단 간편뷰. 진행 중에는 안내·이동, 달성 후에는 직접 보상을 받는다.")]
+    [SerializeField] Button guideMissionTrackerButton;
+
     [SerializeField] Button attendanceButton;
 
     [Tooltip("배틀패스를 여는 버튼. 시즌 공백기에도 눌린다 — 시즌이 없다는 것은 화면이 안내한다.")]
@@ -64,6 +67,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (rouletteButton != null) rouletteButton.onClick.AddListener(OpenRoulette);
         if (missionButton != null) missionButton.onClick.AddListener(OpenMissions);
         if (guideMissionButton != null) guideMissionButton.onClick.AddListener(OpenGuideMissions);
+        if (guideMissionTrackerButton != null) guideMissionTrackerButton.onClick.AddListener(HandleGuideMissionTracker);
         if (passButton != null) passButton.onClick.AddListener(OpenPass);
         if (adventureButton != null) adventureButton.onClick.AddListener(HandleAdventureRequested);
 
@@ -112,6 +116,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (rouletteButton != null) rouletteButton.onClick.RemoveListener(OpenRoulette);
         if (missionButton != null) missionButton.onClick.RemoveListener(OpenMissions);
         if (guideMissionButton != null) guideMissionButton.onClick.RemoveListener(OpenGuideMissions);
+        if (guideMissionTrackerButton != null) guideMissionTrackerButton.onClick.RemoveListener(HandleGuideMissionTracker);
         if (passButton != null) passButton.onClick.RemoveListener(OpenPass);
         if (adventureButton != null) adventureButton.onClick.RemoveListener(HandleAdventureRequested);
 
@@ -165,6 +170,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         bool t_missionsUnlocked = OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission);
         if (missionButton != null) missionButton.interactable = t_missionsUnlocked;
         if (guideMissionButton != null) guideMissionButton.interactable = t_missionsUnlocked;
+        RefreshGuideMissionButton();
 
         if (keywordGrowthButton != null)
             keywordGrowthButton.interactable = OutgameFeatureLock.IsUnlocked(EOutgameFeature.KeywordGrowth);
@@ -243,6 +249,31 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     void RefreshGuideMissionButton()
     {
         if (guideMissionButton != null) guideMissionButton.gameObject.SetActive(AnyGuideMissionOpen());
+        if (guideMissionTrackerButton == null) return;
+        MissionDefinition t_current = GuideMissionTrack.Current;
+        bool t_visible = MissionManager.IsReady && t_current != null
+            && OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission);
+        guideMissionTrackerButton.gameObject.SetActive(t_visible);
+        guideMissionTrackerButton.interactable = t_visible && !MissionCommands.IsInFlight(t_current.Id);
+    }
+
+    void HandleGuideMissionTracker()
+    {
+        if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission)
+            || !GuidanceCoordinator.CanNavigateFromMatchTab(null)) return;
+        MissionDefinition t_current = GuideMissionTrack.Current;
+        if (t_current == null || MissionCommands.IsInFlight(t_current.Id)) return;
+        if (MissionManager.CanClaim(t_current)) ClaimGuideMissionAsync(t_current.Id).Forget();
+        else if (!MissionManager.IsComplete(t_current)) GuideMissionNavigator.Go(t_current);
+    }
+
+    async UniTaskVoid ClaimGuideMissionAsync(string _missionId)
+    {
+        ClaimMissionResult t_result;
+        ServerWaitOverlay.Hold(this);
+        try { t_result = await MissionCommands.ClaimAsync(_missionId); }
+        finally { ServerWaitOverlay.Release(this); }
+        if (t_result != null) MissionPanel.ShowClaimedRewards(new[] { t_result });
     }
 
     static bool AnyGuideMissionOpen()

@@ -143,33 +143,14 @@ public sealed partial class GuidanceCoordinator
         GuideResume.SetStep(t_step.StepId);
     }
 
-    void OnFlowCurrencyChanged(ECurrencyType _currency, long _balance) => RequestFlowRetry();
-    void RequestFlowRetry()
-    {
-        if (m_flowDeferred) m_retryRequested = true;
-    }
-
-    void SubscribeFlowRecovery()
-    {
-        CurrencyManager.OnCurrencyChanged += OnFlowCurrencyChanged;
-        OwnershipManager.OnOwnershipChanged += RequestFlowRetry;
-        CardGrowthManager.OnGrowthChanged += RequestFlowRetry;
-    }
-
-    void UnsubscribeFlowRecovery()
-    {
-        CurrencyManager.OnCurrencyChanged -= OnFlowCurrencyChanged;
-        OwnershipManager.OnOwnershipChanged -= RequestFlowRetry;
-        CardGrowthManager.OnGrowthChanged -= RequestFlowRetry;
-    }
-
     void OnApplicationPause(bool _paused)
     {
         if (_paused)
         {
             m_pauseVersion++;
             m_applicationPaused = true;
-            if (m_flow != null) CancelMissionFlow(true, false);
+            CancelMatchMission();
+            if (m_flow != null || m_retryRequested) CancelMissionFlow(true, false);
             return;
         }
         if (!m_applicationPaused) return;
@@ -183,7 +164,6 @@ public sealed partial class GuidanceCoordinator
             var t_ct = this.GetCancellationTokenOnDestroy();
             if (!GuideResume.HasPending)
             {
-                if (m_flowDeferred) RequestCurrentMission();
                 return;
             }
             m_flowLocked = true;
@@ -206,7 +186,6 @@ public sealed partial class GuidanceCoordinator
                     AlbumPageOverlayView.CloseOpen();
                 }
             }
-            RequestCurrentMission();
         }
         catch (OperationCanceledException) { }
         catch (Exception t_exception) { if (_version == m_pauseVersion) ShowFlowFailure(t_exception.Message); }

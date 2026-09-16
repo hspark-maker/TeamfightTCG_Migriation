@@ -15,6 +15,13 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
     [SerializeField] Image rewardIcon;
     [SerializeField] TMP_Text rewardCountText;
 
+    Sprite m_authoredRewardIcon;
+
+    void Awake()
+    {
+        if (rewardIcon != null) m_authoredRewardIcon = rewardIcon.sprite;
+    }
+
     void OnEnable()
     {
         MissionManager.OnChanged += this.Rebind;
@@ -45,7 +52,8 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
 
         long t_target = t_definition.Target;
         long t_progress = t_target > 0 ? Math.Min(MissionManager.ProgressOf(t_definition), t_target) : MissionManager.ProgressOf(t_definition);
-        if (this.progressText != null) this.progressText.text = $"{t_progress} / {t_target}";
+        if (this.progressText != null) this.progressText.text = MissionCommands.IsInFlight(t_definition.Id)
+            ? "수령 중…" : MissionManager.CanClaim(t_definition) ? "보상 받기" : $"{t_progress} / {t_target}";
         this.ApplyReward(t_definition);
     }
 
@@ -56,6 +64,7 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
 
         if (this.rewardIcon != null)
         {
+            this.rewardIcon.sprite = m_authoredRewardIcon;
             if (t_gain != null && Enum.TryParse(t_gain.Currency, out ECurrencyType t_type))
             {
                 Sprite t_sprite = CurrencyLook.IconOf(t_type);
