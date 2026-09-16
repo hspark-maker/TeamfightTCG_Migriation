@@ -50,12 +50,13 @@ const tests = [];
 const test = (name, run) => tests.push({name, run});
 
 test("CSV: stable mission IDs, challenge before growth, events, targets and rewards", () => {
-  assert.deepEqual(guide.map((m) => m.id).sort(), Array.from({length: 15}, (_, i) => "guide." + String(i + 1).padStart(2, "0")));
+  assert.deepEqual(guide.map((m) => m.id).sort(), Array.from({length: 16}, (_, i) => "guide." + String(i + 1).padStart(2, "0"))
+    .filter((id) => id !== "guide.04"));
   assert.deepEqual(guide.map((m) => m.sortOrder), Array.from({length: 15}, (_, i) => i + 1));
   assert.deepEqual(guide.slice(0, 7).map((m) => [m.event, m.target]), [
     ["Guide.EnhanceCompleted", 1], ["Guide.Bronze2Reached", 1], ["Guide.AdventureNode01", 1],
-    ["Guide.AdventureNode02", 1], ["Guide.StarterCardsAtStar1", 3],
-    ["Guide.EvolveCompleted", 1], ["Guide.StarterCardsAtStar2", 3],
+    ["Guide.AdventureNode02", 1], ["Guide.EvolveCompleted", 1],
+    ["Guide.StarterCardsAtStar2", 3], ["Guide.CompleteSynergyBattle", 1],
   ]);
   assert.ok(guide.find((m) => m.id === "guide.11").sortOrder <
     guide.find((m) => m.id === "guide.10").sortOrder);
@@ -67,13 +68,14 @@ test("CSV: stable mission IDs, challenge before growth, events, targets and rewa
   }
   for (const id of ["guide.01", "guide.05", "guide.02"])
     assert.deepEqual(resolveRewards(rewards, "Guide", id).gains, [{currency: "Shard", amount: 10}]);
-  assert.deepEqual(resolveRewards(rewards, "Guide", "guide.04").gains, [{currency: "Shard", amount: 40}]);
+  assert.deepEqual(resolveRewards(rewards, "Guide", "guide.04").gains, []);
+  assert.deepEqual(resolveRewards(rewards, "Guide", "guide.16").gains, [{currency: "Shard", amount: 40}]);
   assert.deepEqual(resolveRewards(rewards, "Guide", "guide.06").gains, [{currency: "Gold", amount: 50}]);
 });
 
 test("challenge clears can be claimed without completing the following growth mission", () => {
   for (const [challengeId, growthId, nodeId] of [
-    ["guide.07", "guide.04", "node_02"], ["guide.11", "guide.10", "node_04"],
+    ["guide.07", "guide.05", "node_02"], ["guide.11", "guide.10", "node_04"],
   ]) {
     const state = emptyState();
     const challenge = guide.find((mission) => mission.id === challengeId);
@@ -168,7 +170,7 @@ test("locked completion is retained; new rewards once; existing claimed missions
   const paid = [];
   const transaction = {set: () => {}};
   const bump = {ref: {}, state, period};
-  for (const mission of guide.slice(0, 7)) {
+  for (const mission of guide.slice(0, 6)) {
     const verdict = judgeMissionClaim(mission.id, state, catalog);
     if (mission.id === "guide.02") { assert.equal(verdict.reason, "AlreadyClaimed"); continue; }
     assert.equal(verdict.allow, true, mission.id);
@@ -267,13 +269,26 @@ test("callables: rank read before writes, live-state claims, rejection does not 
     await assert.rejects(claimMission(request("guide.05")), (error) => error.details?.reason === "NotEligible");
     assert.equal(writes.length, 0);
     await claimMission(request("guide.03"));
-    await assert.rejects(claimMission(request("guide.04")), (error) => error.details?.reason === "NotEligible");
+    await assert.rejects(claimMission(request("guide.04")), (error) => error.details?.reason === "MissionDisabled");
     // Existing player already received the node 2 item reward before the order changed.
     const missionDoc = docs.get(root + "missions/current");
     missionDoc.claimed["guide.07"] = true;
-    for (const id of ["guide.04", "guide.05"]) await claimMission(request(id));
-    assert.equal(wallet.balances.Shard, 80);
+    await claimMission(request("guide.05"));
+    assert.equal(wallet.balances.Shard, 40);
     await assert.rejects(claimMission(request("guide.05")), (error) => error.details?.reason === "AlreadyClaimed");
+    assert.equal(wallet.balances.Shard, 40);
+    const beforeBattleClaim = docs.get(root + "missions/current");
+    beforeBattleClaim.claimed["guide.04"] = true;
+    beforeBattleClaim.claimed["guide.06"] = true;
+    beforeBattleClaim.claimed["guide.15"] = true;
+    await assert.rejects(claimMission(request("guide.16")), (error) => error.details?.reason === "NotEligible");
+    beforeBattleClaim.progress[key("CompleteSynergyBattle")] = 1;
+    await claimMission(request("guide.16"));
+    assert.equal(wallet.balances.Shard, 80);
+    assert.equal(docs.get(root + "missions/current").claimed["guide.04"], true);
+    assert.equal(docs.get(root + "missions/current").claimed["guide.15"], true);
+    await assert.rejects(claimMission(request("guide.16")), (error) => error.details?.reason === "AlreadyClaimed");
+    assert.equal(writes.length, 0);
     assert.equal(wallet.balances.Shard, 80);
   } finally {
     Module._load = originalLoad;

@@ -83,8 +83,12 @@ public static class OutgameTutorialRunner
     /// UI가 규칙을 복제하지 않도록 "띄울지"의 답을 여기서만 낸다(데이터 미주입이면 false).</summary>
     public static bool HasPending(EOutgameTutorialTrigger _trigger)
     {
+#if UNITY_EDITOR
+        if (OnboardingPlayTest.IsActive || OnboardingPlayTest.IsPreparing) return false;
+#endif
         if (_trigger == EOutgameTutorialTrigger.None) return false;
-        if (!GuideMissionFlows.TryGet(_trigger, out var t_flow) || !GuideMissionFlows.IsEligible(t_flow)) return false;
+        if (!GuideMissionFlows.TryGet(_trigger, out var t_flow)
+            || (!GuideResume.IsFor(_trigger) && !GuideMissionFlows.IsEligible(t_flow))) return false;
         if (!IsGuidedOpen) return false;
         if (OutgameTutorialProgress.IsTriggerDone(_trigger)) return false;
         if (_trigger == EOutgameTutorialTrigger.AdventureUnlocked
@@ -106,6 +110,7 @@ public static class OutgameTutorialRunner
         TryGetGuidedChapter(_trigger, out int t_chapterIndex, out var t_chapter);
         s_guidedChapter = t_chapterIndex;
         s_guidedStep = 0;
+        if (GuideResume.IsFor(_trigger)) SetGuidedStepForResume(GuideResume.Record.StepId);
 
         OnGuidedActivated?.Invoke();
         OnGuidedChanged?.Invoke();
@@ -116,6 +121,24 @@ public static class OutgameTutorialRunner
     {
         if (s_deferred.Remove(_trigger)) OnGuidedChanged?.Invoke();
     }
+
+#if UNITY_EDITOR
+    /// <summary>격리된 에디터 테스트에서 저작된 안내를 처음부터 재생한다.</summary>
+    public static void FirePlayTest(EOutgameTutorialTrigger _trigger)
+    {
+        if (!OnboardingPlayTest.IsActive || IsGuidedRunning)
+            throw new InvalidOperationException("격리된 온보딩 테스트 세션이 필요합니다.");
+        if ((_trigger != EOutgameTutorialTrigger.SynergyGrowthIntroduction
+                && _trigger != EOutgameTutorialTrigger.SynergyBattleIntroduction)
+            || !TryGetGuidedChapter(_trigger, out int t_index, out var t_chapter) || t_chapter.StepCount == 0)
+            throw new InvalidOperationException("테스트할 온보딩 챕터가 없습니다.");
+
+        s_guidedChapter = t_index;
+        s_guidedStep = 0;
+        OnGuidedActivated?.Invoke();
+        OnGuidedChanged?.Invoke();
+    }
+#endif
 
     // 자율 커서가 가리키는 스텝(미실행·범위 밖·빈 칸이면 false)
     public static bool TryGetGuidedStep(out TutorialStepDef _step)
@@ -129,6 +152,20 @@ public static class OutgameTutorialRunner
     public static bool IsGuidedAction(EOutgameTutorialAction _action)
         => TryGetGuidedStep(out var t_step) && t_step.Action == _action;
 
+    /// <summary>저장된 불변 스텝 ID로 현재 안내 커서를 복원한다.</summary>
+    public static bool SetGuidedStepForResume(int _stepId)
+    {
+        if (!IsGuidedRunning || !TryGetChapterRaw(s_guidedChapter, out var t_chapter)) return false;
+        for (int t_i = 0; t_i < t_chapter.StepCount; t_i++)
+        {
+            if (!t_chapter.TryGetStep(t_i, out var t_step) || t_step.StepId != _stepId) continue;
+            s_guidedStep = t_i;
+            return true;
+        }
+        s_guidedStep = 0;
+        return false;
+    }
+
     // 자율 스텝 진입 — 결말은 반환값이 말한다(EnterCurrentStep과 같은 규약)
     public static EOutgameTutorialStepResult EnterGuidedStep()
     {
@@ -140,6 +177,15 @@ public static class OutgameTutorialRunner
         }
 
         bool t_isLast = !TryGetChapterRaw(s_guidedChapter, out var t_chapter) || s_guidedStep + 1 >= t_chapter.StepCount;
+
+        if (OutgameTutorialGuide.ShouldSkipGrowthStep(t_step)
+            || (GuidedTrigger == EOutgameTutorialTrigger.SynergyBattleIntroduction && SynergyBattleGuide.IsDeckReady
+                && t_step.Action == EOutgameTutorialAction.Message
+                && (t_step.Anchor == EOutgameTutorialAnchor.DeckCollectionArea || t_step.Anchor == EOutgameTutorialAnchor.DeckSlotArea)))
+        {
+            NotifyGuidedStepSatisfied();
+            return EOutgameTutorialStepResult.Advanced;
+        }
 
         return TutorialStepExecutor.Enter(t_step,
             new OutgameTutorialStepContext(s_guidedChapter, s_guidedStep, s_guidedChapter, s_guidedStep + 1, t_isLast,
@@ -153,6 +199,7 @@ public static class OutgameTutorialRunner
 
         s_guidedStep++;
         if (!TryGetChapterRaw(s_guidedChapter, out var t_chapter) || s_guidedStep >= t_chapter.StepCount) FinishGuided();
+        else if (TryGetGuidedStep(out var t_step)) GuideResume.SetStep(t_step.StepId);
     }
 
     /// <summary>자율 안내를 낙인 없이 끊는다. 트리거를 주면 그 안내가 도는 중일 때만, 그리고 이번 세션은 미뤄 둔다(화면 이탈 = 미루기).
@@ -200,7 +247,11 @@ public static class OutgameTutorialRunner
 
         GuidedProgressSink() { }
 
-        public void Commit(int _chapter, int _step) => s_guidedStep = _step;
+        public void Commit(int _chapter, int _step)
+        {
+            s_guidedStep = _step;
+            if (TryGetGuidedStep(out var t_step)) GuideResume.SetStep(t_step.StepId);
+        }
 
         public void Complete() => FinishGuided();
     }

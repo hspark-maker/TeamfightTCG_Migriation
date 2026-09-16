@@ -39,14 +39,24 @@ internal static class GuideMissionProgress
     {
         if (_definitions == null || _isClaimed == null || string.IsNullOrEmpty(_missionId)) return false;
         MissionDefinition t_target = null;
+        MissionDefinition t_predecessor = null;
         foreach (MissionDefinition t_definition in _definitions)
-            if (GuideMissionTrack.IsGuide(t_definition) && t_definition.Id == _missionId)
+        {
+            if (!GuideMissionTrack.IsGuide(t_definition)) continue;
+            if (t_definition.Id == _missionId)
             {
                 t_target = t_definition;
                 break;
             }
+            t_predecessor = t_definition;
+        }
         if (t_target == null) return false;
         if (_isClaimed(_missionId)) return true;
+        // 앞에 새 미션이 삽입돼도 기존 수령으로 도달한 콘텐츠 이용 자격은 유지한다.
+        if (t_predecessor != null && _isClaimed(t_predecessor.Id)) return true;
+        foreach (MissionDefinition t_definition in _definitions)
+            if (GuideMissionTrack.IsGuide(t_definition) && t_definition.SortOrder > t_target.SortOrder
+                && _isClaimed(t_definition.Id)) return true;
         MissionDefinition t_current = CurrentOf(_definitions, _isClaimed);
         if (t_current == null) return false;
         return t_target.SortOrder < t_current.SortOrder || t_target.Id == t_current.Id;
@@ -61,6 +71,7 @@ public static class GuideMissionProgressValidation
     public static void Run()
     {
         ValidateFlowActivation();
+        ValidateInsertedMissionAccess();
         var t_definitions = new List<MissionDefinition>
         {
             new MissionDefinition { Id = "daily.test", Period = "daily", SortOrder = 0 },
@@ -134,6 +145,40 @@ public static class GuideMissionProgressValidation
         Require(!GuideMissionFlows.IsEligible(t_adventure, true, null)
             && !GuideMissionFlows.IsEligible(null, true, "guide.03"),
             "Completed missions and missing flows must not activate onboarding.");
+    }
+
+    static void ValidateInsertedMissionAccess()
+    {
+        var t_definitions = new List<MissionDefinition>
+        {
+            new MissionDefinition { Id = "daily.test", Period = "daily", SortOrder = 0 },
+            new MissionDefinition { Id = "guide.06", Period = "guide", SortOrder = 6 },
+            new MissionDefinition { Id = "guide.16", Period = "guide", SortOrder = 7 },
+            new MissionDefinition { Id = "guide.08", Period = "guide", SortOrder = 8 },
+            new MissionDefinition { Id = "guide.09", Period = "guide", SortOrder = 9 },
+            new MissionDefinition { Id = "guide.11", Period = "guide", SortOrder = 10 },
+            new MissionDefinition { Id = "guide.10", Period = "guide", SortOrder = 11 },
+        };
+        var t_claimed = new HashSet<string>(StringComparer.Ordinal) { "guide.06" };
+        Require(GuideMissionProgress.CurrentOf(t_definitions, t_claimed.Contains)?.Id == "guide.16"
+            && !GuideMissionProgress.HasReached(t_definitions, t_claimed.Contains, "guide.08"),
+            "A new account must complete the inserted mission before reaching the next act.");
+        t_claimed.Add("guide.08");
+        Require(GuideMissionProgress.CurrentOf(t_definitions, t_claimed.Contains)?.Id == "guide.16"
+            && GuideMissionProgress.HasReached(t_definitions, t_claimed.Contains, "guide.08")
+            && GuideMissionProgress.HasReached(t_definitions, t_claimed.Contains, "guide.09")
+            && !GuideMissionProgress.HasReached(t_definitions, t_claimed.Contains, "guide.11"),
+            "An inserted mission must preserve claimed access and the next previously reached guide.");
+        t_claimed.Add("guide.11");
+        Require(GuideMissionProgress.CurrentOf(t_definitions, t_claimed.Contains)?.Id == "guide.16"
+            && GuideMissionProgress.HasReached(t_definitions, t_claimed.Contains, "guide.09")
+            && GuideMissionProgress.HasReached(t_definitions, t_claimed.Contains, "guide.10"),
+            "Later claims must preserve earlier access and advance by sort order rather than mission ID.");
+        t_claimed.Add("missing");
+        t_claimed.Add("daily.test");
+        Require(!GuideMissionProgress.HasReached(t_definitions, t_claimed.Contains, "missing")
+            && !GuideMissionProgress.HasReached(t_definitions, t_claimed.Contains, "daily.test"),
+            "Historical claims must not unlock unknown or non-guide content.");
     }
 
     static void Require(bool _condition, string _message)

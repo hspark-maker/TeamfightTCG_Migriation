@@ -19,4 +19,6 @@ public enum EOutgameTutorialTrigger
     CaretakerPreparation = 15, // 폐기 — 기존 저장값만 보존한다
     CaretakerReady = 16, // 폐기 — 기존 저장값만 보존한다
     CaretakerActivation = 17, // 폐기 — 기존 저장값만 보존한다
+    SynergyGrowthIntroduction = 18,
+    SynergyBattleIntroduction = 19,
 }

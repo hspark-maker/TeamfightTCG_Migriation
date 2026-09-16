@@ -65,6 +65,10 @@ internal static class ServerSaveCommands
         while (s_inFlight != null)
             await s_inFlight.Task;
 
+#if UNITY_EDITOR
+        RequirePlayTestInactive(_commandName);
+#endif
+
         if (!PlayerSaveCloud.CanRunServerCommand)
             throw new InvalidOperationException(
                 $"Server command '{_commandName}' is not allowed while the save cloud is {PlayerSaveCloud.State}.");
@@ -147,7 +151,11 @@ internal static class ServerSaveCommands
     internal static async UniTask<TResponse> InvokeReadOnlyAsync<TResponse>(string _commandName, object _request)
         where TResponse : class
     {
-        return await RequireService(_commandName).InvokeAsync<TResponse>(_commandName, _request);
+        TResponse t_response = await RequireService(_commandName).InvokeAsync<TResponse>(_commandName, _request);
+#if UNITY_EDITOR
+        RequirePlayTestInactive(_commandName);
+#endif
+        return t_response;
     }
 
     // 같은 txId로 딱 한 번 다시 태운다. 요청은 서버에 닿았는데 응답만 잃은 갈래가 있고, 그때 서버는
@@ -177,12 +185,23 @@ internal static class ServerSaveCommands
 
     static ICallableService RequireService(string _commandName)
     {
+#if UNITY_EDITOR
+        RequirePlayTestInactive(_commandName);
+#endif
         ICallableService t_service = s_service;
         if (t_service == null)
             throw new InvalidOperationException($"Callable service is not available for '{_commandName}'.");
 
         return t_service;
     }
+
+#if UNITY_EDITOR
+    static void RequirePlayTestInactive(string _commandName)
+    {
+        if (OnboardingPlayTest.IsActive || OnboardingPlayTest.IsPreparing)
+            throw new InvalidOperationException($"온보딩 테스트 중 서버 명령 '{_commandName}'은 차단됩니다. 정상 플레이는 에디터 Play를 종료한 뒤 시작하세요.");
+    }
+#endif
 }
 
 /// <summary>서버 응답을 로컬 세이브에 채택하지 못했다. 이 예외가 나온 시점에 세션은 이미 접혔다.</summary>

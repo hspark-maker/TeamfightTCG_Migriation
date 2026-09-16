@@ -43,6 +43,7 @@ public static class GuidanceIntegrationValidation
                 "KeywordGrowthFirstOpen", "AdventureMapFirstOpen", "CollectionTabFirstEnter",
                 "GuideMissionIntroduction", "KeywordIntroduction", "SynergyIntroduction",
                 "CaretakerPreparation", "CaretakerReady", "CaretakerActivation",
+                "SynergyGrowthIntroduction", "SynergyBattleIntroduction",
             },
             SynergyIntroduction = new SynergyIntroductionSaveData { DeckSlot = 2, SynergyId = "Caretaker" },
         };

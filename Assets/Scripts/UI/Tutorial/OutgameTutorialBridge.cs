@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using UnityEngine;
@@ -39,6 +40,10 @@ public class OutgameTutorialBridge : MonoBehaviour
     TutorialStepDef m_step;
     bool m_subscribed;
     bool m_contentIntroStarted;
+    int m_stepVersion;
+    bool m_checkpointPending;
+    bool m_checkpointReady;
+    float m_anchorMissingSince = -1f;
     int m_contentIntroVersion;
 
     static OutgameTutorialBridge s_rankEntryOwner;
@@ -66,6 +71,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     bool m_awaitingUnlockFx;
     Tween m_enhanceResultClose;
     bool m_waitingEnhanceRequest;
+    float m_synergyDeckOpenDeadline;
 
     // 개봉 오버레이가 떠 있는 동안은 로비 안내를 억제한다 — 예전에 개봉 "씬"이 이 플래그로 하던 일과 같다.
     bool SuppressGuideUI => suppressGuideUI || PackOpenOverlay.IsOpen;
@@ -124,6 +130,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 그 시점엔 이미 다음 스텝으로 커밋된 뒤라 버리면 개봉 대기 스텝이 영영 적용되지 않는다.
     void ApplyCurrentStep()
     {
+        if (GuidanceCoordinator.IsRestoring) return;
         if (!CursorRunning) return;   // 강제도 자율도 서 있지 않으면 걸 게이트가 없다
 
         if (m_applying) { m_pendingApply = true; return; }
@@ -165,7 +172,8 @@ public class OutgameTutorialBridge : MonoBehaviour
         bool   t_guided = GuidedCursor;
         string t_at     = CursorCoord;
 
-        var t_result = EnterCursorStep();
+        EOutgameTutorialStepResult t_result;
+        using (GuidanceCoordinator.InternalNavigation()) t_result = EnterCursorStep();
 
         // 씬에 남는 자동 스텝은 여기서 끊으면 다음 스텝이 무관한 외부 신호(개봉 닫힘 등)를 기다리게 된다.
         // 그 자리 의존을 없애려고 같은 루프에서 다음 칸을 이어 진입시킨다(상한 8회가 폭주를 막는다).
@@ -183,7 +191,7 @@ public class OutgameTutorialBridge : MonoBehaviour
             if (t_guided)
             {
                 Debug.LogWarning($"[OutgameTutorialBridge] Guided step {t_at} failed to enter — deferring it for this session.");
-                OutgameTutorialRunner.AbortGuided(OutgameTutorialRunner.GuidedTrigger);
+                GuidanceCoordinator.DeferCurrentGuide("가이드 화면을 준비하지 못했습니다.");
             }
             else if (OutgameTutorialRunner.IsRunning)
             {
@@ -197,6 +205,8 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (!TryGetCursorStep(out var t_step)) return;
 
         m_step = t_step;
+        if (m_step.Completion == EOutgameTutorialCompletion.SynergyDeckEditor)
+            m_synergyDeckOpenDeadline = Time.unscaledTime + 5f;
 
         PresentStep();
     }
@@ -208,7 +218,31 @@ public class OutgameTutorialBridge : MonoBehaviour
     void PresentStep()
     {
         if (m_step == null) return;
-        if (m_enhancing || m_awaitingUnlockFx) return;
+        if (m_enhancing || m_awaitingUnlockFx || GuidanceCoordinator.IsRestoring) return;
+        if (GuidedCursor && !m_checkpointReady)
+        {
+            if (!m_checkpointPending) ConfirmCheckpointAsync().Forget();
+            return;
+        }
+        if (m_step.Completion == EOutgameTutorialCompletion.Click
+            && GuidanceCoordinator.IsCurrentTabAnchor(m_step.Anchor))
+        {
+            OnGateSatisfied();
+            return;
+        }
+
+        if (m_step.Completion == EOutgameTutorialCompletion.SynergyDeckEditor)
+        {
+            if (SynergyBattleGuide.IsEditorOpen) OnGateSatisfied();
+            return;
+        }
+
+        if (m_step.Completion == EOutgameTutorialCompletion.SynergyDeck)
+        {
+            if (SynergyBattleGuide.IsDeckReady) { OnGateSatisfied(); return; }
+            OutgameTutorialGateUI.Ensure(this.gatePrefab).ShowBanner(this, OutgameTutorialGuide.MessageOf(m_step));
+            return;
+        }
 
         if (m_step.Completion == EOutgameTutorialCompletion.UnlockIntro)
         {
@@ -287,14 +321,18 @@ public class OutgameTutorialBridge : MonoBehaviour
 
         // 서버가 이 축의 무료 한 방을 이미 소진했다면 이 스텝이 시킨 강화는 성립한 뒤다 — 응답 유실로 완료 신호만 잃은 자리라 여기서 통과시킨다.
         // 미달성이면 잘라내지 않고 흘려보낸다 — 이 스텝의 딤을 세우는 것은 아래 TryOpenGate 하나뿐이다.
-        if (m_step.FreeOfCharge && IsFreeShotSpent(m_step.Completion))
+        if ((m_step.FreeOfCharge && IsFreeShotSpent(m_step.Completion)
+                && (!GuidedCursor || m_step.Completion != EOutgameTutorialCompletion.Enhance
+                    || OutgameTutorialGuide.IsGrowthGoalReached))
+            || (GuidedCursor && m_step.Completion == EOutgameTutorialCompletion.Enhance
+                && OutgameTutorialGuide.IsGrowthGoalReached))
         {
             OnGateSatisfied();
             return;
         }
 
         if (m_step.Completion == EOutgameTutorialCompletion.Enhance
-            && OutgameTutorialRunner.GuidedTrigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
+            && OutgameTutorialGuide.IsEnhanceIntroduction
             && !OutgameTutorialGuide.CanContinueEnhance())
         {
             OnUnlockIntroCancelled();
@@ -330,8 +368,18 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 타깃이 이미 등록돼 있으면 즉시 게이트, 아니면 등록 통지를 기다린다.
     void TryOpenGate()
     {
-        if (m_step == null || m_step.Anchor == EOutgameTutorialAnchor.None) return;
-        if (!TutorialAnchorRegistry.TryGet(m_step.Anchor, out var t_rect, out var t_button)) return;
+        if (m_step == null || m_step.Anchor == EOutgameTutorialAnchor.None || GuidanceCoordinator.IsRestoring) return;
+        if (GuidedCursor && !m_checkpointReady) return;
+        if (!TutorialAnchorRegistry.TryGet(m_step.Anchor, out var t_rect, out var t_button))
+        {
+            if (GuidedCursor && GuideResume.Record?.GoalReached == true
+                && OutgameTutorialGuide.TargetCardId == 0 && m_step.Completion == EOutgameTutorialCompletion.Confirm
+                && (m_step.Anchor == EOutgameTutorialAnchor.CardDetailKeywordDescription
+                    || m_step.Anchor == EOutgameTutorialAnchor.CardDetailCardView))
+                OutgameTutorialGateUI.Ensure(gatePrefab).ShowMessageGate(this, null,
+                    OutgameTutorialGuide.MessageOf(m_step), OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
+            return;
+        }
 
         // 설명 스텝은 앵커를 "강조할 영역"으로만 쓴다 — 누를 대상이 아니라 Button이 없어도 되고 완료는 딤 탭이다.
         // 억제 씬에서도 예외적으로 띄운다(딤이 없으면 완료 신호가 없어 진행이 멈춘다).
@@ -450,6 +498,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 오버레이 하나가 닫혔다. 기다리던 화면이 아직 남아 있으면 계속 기다린다 — 어디까지 걷혀야 하는지는 완료 조건이 정한다.
     void OnOverlayClosed()
     {
+        if (GuidanceCoordinator.IsRestoring) return;
         if (m_step != null && m_step.Completion == EOutgameTutorialCompletion.Enhance
             && !CardDetailOverlayView.IsOpen)
         {
@@ -635,7 +684,8 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.Enhance) return;
 
-        if (_result.Outcome == EEnhanceOutcome.Success && !m_step.WaitUnlockIntro)
+        if (_result.Outcome == EEnhanceOutcome.Success && !m_step.WaitUnlockIntro
+            && !OutgameTutorialGuide.NeedsMoreSynergyGrowth)
         {
             // 무대는 아직 강화가 쥐고 있지만 안내는 여기서 손을 뗀다 — 남겨 두면 다음 스텝의 앵커 등록을 무시한다.
             m_enhancing = false;
@@ -664,6 +714,14 @@ public class OutgameTutorialBridge : MonoBehaviour
 
         if (_result.Outcome == EEnhanceOutcome.Success && m_step.WaitUnlockIntro)
         {
+            // 샤드 일부 투입도 성공이다. 2성 전의 키워드 해금은 보고 같은 강화 안내로 돌아온다.
+            if (OutgameTutorialGuide.NeedsMoreSynergyGrowth)
+            {
+                if (CardDetailOverlayView.IsUnlockFxPlaying) { m_awaitingUnlockFx = true; return; }
+                m_enhancing = false;
+                PresentStep();
+                return;
+            }
             if (NextStepWaitsForUnlockIntro())
             {
                 m_enhancing = false;
@@ -681,7 +739,8 @@ public class OutgameTutorialBridge : MonoBehaviour
 
         m_enhancing = false;
 
-        if (_result.Outcome == EEnhanceOutcome.Success) { OnGateSatisfied(); return; }
+        if (_result.Outcome == EEnhanceOutcome.Success && !OutgameTutorialGuide.NeedsMoreSynergyGrowth)
+        { OnGateSatisfied(); return; }
 
         PresentStep();
     }
@@ -698,6 +757,7 @@ public class OutgameTutorialBridge : MonoBehaviour
 
         m_awaitingUnlockFx = false;
         m_enhancing        = false;
+        if (OutgameTutorialGuide.NeedsMoreSynergyGrowth) { PresentStep(); return; }
         OnGateSatisfied();
     }
 
@@ -707,7 +767,7 @@ public class OutgameTutorialBridge : MonoBehaviour
             && m_step.Completion != EOutgameTutorialCompletion.UnlockIntro)) return;
         CloseGate();
         if (OutgameTutorialRunner.IsGuidedRunning)
-            OutgameTutorialRunner.AbortGuided(OutgameTutorialRunner.GuidedTrigger);
+            GuidanceCoordinator.DeferCurrentGuide("강화 안내를 계속할 수 없어 진행을 보관했습니다.");
     }
 
     bool NextStepWaitsForUnlockIntro()
@@ -759,7 +819,8 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 완료 → 커밋 후 다음 스텝을 같은 씬에서 이어간다(씬을 떠나는 스텝이면 다음 씬 브리지가 재개).
     void OnGateSatisfied()
     {
-        if (m_step == null || !TryGetCursorStep(out var t_current) || t_current != m_step) return;
+        if (m_step == null || GuidanceCoordinator.IsRestoring
+            || !TryGetCursorStep(out var t_current) || t_current != m_step) return;
         bool t_leftScene = m_step != null && m_step.LeavesScene;
 
         SatisfyCursorStep();
@@ -800,6 +861,10 @@ public class OutgameTutorialBridge : MonoBehaviour
 
     void CloseGate()
     {
+        m_stepVersion++;
+        m_checkpointPending = false;
+        m_checkpointReady = false;
+        m_anchorMissingSince = -1f;
         m_enhanceResultClose?.Kill();
         m_enhanceResultClose = null;
         m_enhancing = false;
@@ -825,10 +890,30 @@ public class OutgameTutorialBridge : MonoBehaviour
 
     void Update()
     {
-        if (m_step == null) return;
+        if (m_step == null || GuidanceCoordinator.IsRestoring) return;
         if (!TryGetCursorStep(out var t_current) || !ReferenceEquals(t_current, m_step))
         {
             CloseGate();
+            return;
+        }
+        if (m_step.Completion == EOutgameTutorialCompletion.SynergyDeckEditor)
+        {
+            if (SynergyBattleGuide.IsEditorOpen) OnGateSatisfied();
+            else if (Time.unscaledTime >= m_synergyDeckOpenDeadline)
+            {
+                GuidanceCoordinator.DeferCurrentGuide("덱 편집 화면을 준비하지 못했습니다.");
+                CloseGate();
+            }
+            return;
+        }
+        if (m_step.Completion == EOutgameTutorialCompletion.SynergyDeck)
+        {
+            if (!SynergyBattleGuide.IsEditorOpen)
+            {
+                GuidanceCoordinator.DeferCurrentGuide("덱 편집 화면이 닫혀 안내를 보관했습니다.");
+                CloseGate();
+            }
+            else if (SynergyBattleGuide.IsDeckReady) OnGateSatisfied();
             return;
         }
         if (m_step.Completion == EOutgameTutorialCompletion.Enhance && !m_enhancing && !m_awaitingUnlockFx)
@@ -846,9 +931,38 @@ public class OutgameTutorialBridge : MonoBehaviour
                 return;
             }
         }
+        if (GuidedCursor && m_checkpointReady && !m_enhancing && !m_awaitingUnlockFx
+            && !CardDetailOverlayView.IsRitualPlaying && !CardDetailOverlayView.IsUnlockFxPlaying
+            && !UnlockIntroOverlay.IsOpen && !SuppressGuideUI && m_step.Anchor != EOutgameTutorialAnchor.None
+            && !(GuideResume.Record?.GoalReached == true && OutgameTutorialGuide.TargetCardId == 0
+                && m_step.Completion == EOutgameTutorialCompletion.Confirm
+                && (m_step.Anchor == EOutgameTutorialAnchor.CardDetailKeywordDescription
+                    || m_step.Anchor == EOutgameTutorialAnchor.CardDetailCardView)))
+        {
+            bool t_available = TutorialAnchorRegistry.TryGet(m_step.Anchor, out var t_rect, out var t_button)
+                && t_rect != null && t_rect.gameObject.activeInHierarchy
+                && (m_step.Completion == EOutgameTutorialCompletion.Confirm
+                    || t_button == null || t_button.IsInteractable());
+            if (t_available)
+            {
+                m_anchorMissingSince = -1f;
+                if (OutgameTutorialGateUI.Instance != null && OutgameTutorialGateUI.Instance.IsTransitionOnly) TryOpenGate();
+            }
+            else if (m_anchorMissingSince < 0f)
+            {
+                m_anchorMissingSince = Time.unscaledTime;
+                OutgameTutorialGateUI.Ensure(gatePrefab).ShowTransitionGate(this);
+            }
+            else if (Time.unscaledTime - m_anchorMissingSince >= 5f)
+            {
+                GuidanceCoordinator.DeferCurrentGuide("안내 대상을 찾지 못했습니다. 다시 시도해 주세요.");
+                CloseGate();
+                return;
+            }
+        }
         if (m_step.Completion == EOutgameTutorialCompletion.ContentUnlockIntro) TryPresentContentIntro();
         if (m_step.Completion == EOutgameTutorialCompletion.Enhance && !m_enhancing && !m_awaitingUnlockFx
-            && OutgameTutorialRunner.GuidedTrigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
+            && OutgameTutorialGuide.IsEnhanceIntroduction
             && !OutgameTutorialGuide.CanContinueEnhance()) OnUnlockIntroCancelled();
     }
 
@@ -876,7 +990,7 @@ public class OutgameTutorialBridge : MonoBehaviour
             if (t_guided)
             {
                 CloseGate();
-                OutgameTutorialRunner.AbortGuided(t_trigger);
+                GuidanceCoordinator.DeferCurrentGuide("해금 소개가 중단되어 진행을 보관했습니다.");
             }
         });
     }
@@ -885,6 +999,34 @@ public class OutgameTutorialBridge : MonoBehaviour
         => this != null && isActiveAndEnabled && m_contentIntroVersion == _version
             && ReferenceEquals(m_step, _step) && TryGetCursorStep(out var t_current)
             && ReferenceEquals(t_current, _step);
+
+    async UniTask ConfirmCheckpointAsync()
+    {
+        m_checkpointPending = true;
+        int t_version = m_stepVersion;
+        var t_step = m_step;
+        OutgameTutorialGateUI.Ensure(gatePrefab).ShowTransitionGate(this);
+        bool t_saved = false;
+        using var t_timeout = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
+        using var t_timer = t_timeout.CancelAfterSlim(TimeSpan.FromSeconds(5));
+        try
+        {
+            t_saved = await GuideResume.SaveConfirmedAsync(t_timeout.Token);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception t_exception) { Debug.LogWarning($"[Tutorial] Checkpoint failed: {t_exception.Message}"); }
+        if (this == null || t_version != m_stepVersion || m_step != t_step || !GuidedCursor) return;
+        m_checkpointPending = false;
+        OutgameTutorialGateUI.Instance?.Clear(this);
+        if (!t_saved)
+        {
+            GuidanceCoordinator.DeferCurrentGuide("안내 진행을 저장하지 못했습니다. 연결을 확인해 주세요.");
+            CloseGate();
+            return;
+        }
+        m_checkpointReady = true;
+        PresentStep();
+    }
 
     void Subscribe()
     {
