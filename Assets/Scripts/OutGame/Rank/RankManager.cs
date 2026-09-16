@@ -105,35 +105,19 @@ public static class RankManager
         t_config.TryGetTier(t_index, out RankTier t_tier);
         bool t_hasNext = t_config.TryGetTier(t_index + 1, out RankTier t_next);
 
-        // 미도달이면 표시명·배지·다음 목표를 언랭크 기준으로 바꿔 준다 — 등급은 첫 티어 것을 그대로 쓴다.
         bool t_unranked = !s_configured || t_points < t_config.FirstTierPoints;
-
-        // 언랭크 배지가 미저작이면 첫 등급 배지로 폴백한다(빈 배지보다 낫다).
-        Sprite t_badge = t_unranked && t_config.unrankedBadge != null ? t_config.unrankedBadge : t_tier.Badge;
 
         return new RankInfo(
             t_index,
             t_tier.Grade,
             t_tier.Division,
-            t_unranked ? t_config.unrankedDisplayName : t_tier.DisplayName,
-            t_badge,
+            t_unranked ? string.Empty : t_tier.DisplayName,
+            t_unranked ? null : t_tier.Badge,
             t_points,
             t_unranked ? 0 : t_tier.RequiredPoints,
             t_unranked ? t_config.FirstTierPoints : (t_hasNext ? t_next.RequiredPoints : t_points),
             !t_unranked && !t_hasNext,
             t_unranked);
-    }
-
-    /// <summary>언랭크(첫 티어 미도달) 상태의 표시값. 승급 연출이 '오르기 직전'으로 되돌릴 때 쓴다 —
-    /// 그 시점엔 정산이 끝나 GetInfo가 이미 도달 상태를 돌려주므로 언랭크 표시를 따로 물어야 한다.
-    /// 폴백 규칙(언랭크 배지 미저작 → 첫 등급 배지)은 GetInfo와 같다.</summary>
-    public static void GetUnrankedDisplay(out string _displayName, out Sprite _badge)
-    {
-        var t_config = Config;
-        t_config.TryGetTier(0, out RankTier t_first);
-
-        _displayName = t_config.unrankedDisplayName;
-        _badge       = t_config.unrankedBadge != null ? t_config.unrankedBadge : t_first.Badge;
     }
 
     /// <summary>다음 등급의 배지. 진행 호 끝에 세우는 승급 목표 표시가 쓴다 —

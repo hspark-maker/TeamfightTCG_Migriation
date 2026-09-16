@@ -169,6 +169,43 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
     /// <summary>현재 편성 중인 카드 목록.</summary>
     public IReadOnlyList<int> WorkingCards => m_working;
 
+    /// <summary>동일 계정 세션에서만 복원하는 미저장 편성.</summary>
+    public sealed class Draft
+    {
+        internal int Session;
+        internal int Slot;
+        internal int Mode;
+        internal int[] Cards;
+        internal bool Dirty;
+        internal string SavedName;
+        internal string Name;
+    }
+
+    /// <summary>현재 편성을 저장소 변경 없이 보관한다.</summary>
+    public Draft CaptureDraft() => !IsOpen ? null : new Draft
+    {
+        Session = ContentUnlockManager.SessionVersion,
+        Slot = m_slotIndex,
+        Mode = (int)m_mode,
+        Cards = (int[])m_working.Clone(),
+        Dirty = m_dirty,
+        SavedName = m_savedName,
+        Name = ResolveName(),
+    };
+
+    /// <summary>같은 계정과 슬롯의 편성 초안만 복원한다.</summary>
+    public void RestoreDraft(Draft _draft)
+    {
+        if (_draft == null || _draft.Session != ContentUnlockManager.SessionVersion
+            || _draft.Slot != m_slotIndex || _draft.Mode != (int)m_mode) return;
+        Array.Copy(_draft.Cards, m_working, m_working.Length);
+        m_dirty = _draft.Dirty;
+        m_savedName = _draft.SavedName;
+        if (nameInput != null) nameInput.SetTextWithoutNotify(_draft.Name);
+        RefreshAll();
+        RebuildDeckStrip();
+    }
+
     /// <summary>현재 편성이 유효한 저장 슬롯과 같은 상태인지.</summary>
     public bool IsSavedComplete => IsOpen && !IsDirty
         && m_slotIndex >= 0 && m_slotIndex < DeckSaveManager.SLOT_COUNT
@@ -1191,8 +1228,8 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
 
     void OnBackClicked()
     {
-        if (!GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.DeckEditBackButton)) return;
-        RequestLeave(ExitEditor);
+        if (!GuidanceCoordinator.AllowsUserNavigation(EOutgameTutorialAnchor.DeckEditBackButton)) return;
+        RequestLeave(ExitEditor, true);
     }
 
     // 전투 시작. 나가기와 같은 판정을 거친다 — 전투가 소비하는 것은 세이브라, 저장하지 않은 편성분을
@@ -1214,8 +1251,15 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
     //
     // 나가도 되는 순간에 _onGranted를 부른다(즉시 또는 확인 팝업의 "나가기" 이후).
     // 나가면 안 되면 아무것도 부르지 않는다 — 호출측은 자기 전환을 그대로 포기하면 된다.
-    public void RequestLeave(Action _onGranted)
+    public void RequestLeave(Action _onGranted, bool _preserveGuideDraft = false)
     {
+        if (_preserveGuideDraft && !GuidanceCoordinator.IsInternalNavigation
+            && GuideResume.IsFor(EOutgameTutorialTrigger.SynergyBattleIntroduction))
+        {
+            if (OnboardingSession.IsBusy) return;
+            _onGranted?.Invoke();
+            return;
+        }
         // 편집이 열려 있지 않으면 저장할 것도 확인받을 것도 없다 —
         // 가드가 없으면 빈 m_working이 "미완성"으로 읽혀 엉뚱한 확인 팝업이 뜬다.
         if (!IsOpen)

@@ -1,3 +1,4 @@
+import {onboardingReceipt} from "../save/onboardingOperation";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {randomUUID} from "node:crypto";
@@ -95,7 +96,7 @@ export const enhanceKeyword = onCall(async (request) => {
   // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
   const txId = clientReceiptId(request.data?.txId, randomUUID());
 
-  const result = await mutateSave(env, uid, "enhanceKeyword", {kind: "client", txId},
+  const result = await mutateSave(env, uid, "enhanceKeyword", {kind: "client", txId, ...onboardingReceipt(request.data, "enhanceKeyword")},
     async (current, transaction, wallet): Promise<SaveMutation> => {
       const levels = readKeywordLevels(current.keywordGrowth);
       const currentLevel = levelOfKeyword(levels, keyword);

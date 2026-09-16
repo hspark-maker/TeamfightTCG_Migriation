@@ -7,7 +7,7 @@ using UnityEngine;
 /// <summary>서버가 이미 지급한 팩과 직접 지급 카드를 응답의 순서대로 보여준다.</summary>
 public static class RewardPackPresentation
 {
-    static Queue<(string PackId, List<DrawnCard> Cards, bool IsPack)> s_pending = new();
+    static Queue<(string PackId, List<DrawnCard> Cards, bool IsPack, bool Individually)> s_pending = new();
     static List<(CurrencyGain Refund, List<int> Cards)> s_lobbyRewards = new();
     static CancellationToken s_lifetime;
     static bool s_running;
@@ -31,17 +31,18 @@ public static class RewardPackPresentation
         {
             foreach (var t_batch in outcome.PresentationBatches)
                 if (t_batch.Cards != null && t_batch.Cards.Count > 0)
-                    s_pending.Enqueue((t_batch.PackId, new List<DrawnCard>(t_batch.Cards), t_batch.IsPack));
+                    s_pending.Enqueue((t_batch.PackId, new List<DrawnCard>(t_batch.Cards), t_batch.IsPack,
+                        outcome.ShowCardsIndividually));
         }
         else
         {
             if (outcome.Packs != null)
                 foreach (var t_pack in outcome.Packs)
                     if (t_pack?.Cards != null && t_pack.Cards.Count > 0)
-                        s_pending.Enqueue((t_pack.PackId, new List<DrawnCard>(t_pack.Cards), true));
+                        s_pending.Enqueue((t_pack.PackId, new List<DrawnCard>(t_pack.Cards), true, false));
 
             if (outcome.Cards != null && outcome.Cards.Count > 0)
-                s_pending.Enqueue((null, new List<DrawnCard>(outcome.Cards), false));
+                s_pending.Enqueue((null, new List<DrawnCard>(outcome.Cards), false, outcome.ShowCardsIndividually));
         }
 
         if (s_running || s_pending.Count == 0) return;
@@ -58,7 +59,7 @@ public static class RewardPackPresentation
         return true;
     }
 
-    static async UniTask RunAsync(Queue<(string PackId, List<DrawnCard> Cards, bool IsPack)> _queue,
+    static async UniTask RunAsync(Queue<(string PackId, List<DrawnCard> Cards, bool IsPack, bool Individually)> _queue,
                                  List<(CurrencyGain Refund, List<int> Cards)> _lobbyRewards,
                                  CancellationToken _token)
     {
@@ -80,7 +81,7 @@ public static class RewardPackPresentation
                 await UniTask.NextFrame(cancellationToken: _token);
                 await UniTask.WaitUntil(() =>
                     !PackOpenOverlay.IsOpen && !PackHandoff.HasPending && !PackPurchaseFlow.IsPurchasing
-                    && !CardSetRewardOverlay.IsOpen && !RewardClaimPopup.IsOpen
+                    && !CardSetRewardOverlay.IsOpen && !CardRewardOverlay.IsOpen && !RewardClaimPopup.IsOpen
                     && (!LobbyGainEffectDirector.Exists ||
                         (!t_waitingForLobby && !CardPackRewardHandoff.HasPending))
                     && !AlbumInsertSession.IsRunning
@@ -98,6 +99,22 @@ public static class RewardPackPresentation
                     continue;
                 }
                 var t_next = _queue.Peek();
+                if (!t_next.IsPack && t_next.Individually)
+                {
+                    if (!CardRewardOverlay.TryGet(out var t_cardOverlay))
+                    {
+                        Debug.LogWarning("[RewardPackPresentation] No single card overlay — keeping granted cards queued until the next Show call.");
+                        return;
+                    }
+
+                    t_cardOverlay.ShowGranted(t_next.Cards[0]);
+                    t_next.Cards.RemoveAt(0);
+                    if (t_next.Cards.Count == 0) _queue.Dequeue();
+                    // IsOpen은 획득 클릭 때 먼저 내려가므로 퇴장까지 기다린다.
+                    await UniTask.WaitUntil(() => t_cardOverlay == null || !t_cardOverlay.IsViewVisible,
+                        cancellationToken: _token);
+                    continue;
+                }
                 if (t_next.IsPack && TryReveal(t_next.PackId, t_next.Cards))
                 {
                     _queue.Dequeue();

@@ -15,6 +15,13 @@ using ScriptedAttack = TutorialScenarioData.ScriptedAttack;
 public static class TutorialConfig
 {
     public static bool IsActive { get; private set; }
+    public static event System.Action BattleFinished;
+
+    /// <summary>중단된 씬과 실제 전투 결과를 구분해 통지한다.</summary>
+    public static void NotifyBattleFinished()
+    {
+        if (IsActive) BattleFinished?.Invoke();
+    }
 
     /// <summary>튜토리얼 고정 시드(임의 상수). 이 값으로 <see cref="MatchRandom"/>을 시드하면
     /// 스플래시 대상·랜덤 패시브까지 실행마다 동일하게 재현된다(덱 순서는 <see cref="ShufflePolicy.None"/> 몫).

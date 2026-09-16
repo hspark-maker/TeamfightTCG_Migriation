@@ -1,4 +1,5 @@
 export {ping} from "./commands/ping";
+export {getOnboardingOperation} from "./commands/getOnboardingOperation";
 export {devBumpRevision} from "./commands/devBumpRevision";
 export {devResetSave} from "./commands/devResetSave";
 export {devCompleteMissions} from "./commands/devCompleteMissions";

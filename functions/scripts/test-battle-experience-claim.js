@@ -5,7 +5,11 @@ const clone = (value) => value === undefined ? undefined : structuredClone(value
 const documents = new Map(), versions = new Map();
 let conflictHook = null, failCommit = false, cardReward = false;
 function ref(path) {
-  return {path, collection: (name) => ({doc: (id) => ref(`${path}/${name}/${id}`)})};
+  return {
+    path,
+    get parent() { return ref(path.slice(0, path.lastIndexOf("/"))); },
+    collection: (name) => ({doc: (id) => ref(`${path}/${name}/${id}`)}),
+  };
 }
 const db = {
   doc: ref, collection: (name) => ({doc: (id) => ref(`${name}/${id}`)}),

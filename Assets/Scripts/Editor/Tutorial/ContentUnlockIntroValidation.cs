@@ -40,7 +40,7 @@ public static class ContentUnlockIntroValidation
                     && sink.Writes == 0,
                     "Entering an intro must not commit or launch content.");
                 foreach (var content in step.ContentIntros)
-                    Require(ContentUnlockAuthoring.Data.TryGetContentIntro(content, out var entry) && entry.icon != null,
+                    Require(ContentUnlockAuthoring.Data.TryGetContentIntro(content, out var entry) && entry.TryValidate(out _),
                         "Missing intro definition/icon.");
                 if (step.ContentIntros[0] == EContentUnlockIntro.Ranked)
                 {
@@ -60,9 +60,21 @@ public static class ContentUnlockIntroValidation
         try
         {
             Require(!HasIntroError(data, clone), "Valid intro authoring rejected.");
-            clone.contentIntros[0].icon = null;
+            clone.contentIntros[0].items[0].icon = null;
             Require(HasIntroError(data, clone), "Missing icon not rejected.");
-            clone.contentIntros[0].icon = ContentUnlockAuthoring.Data.contentIntros[0].icon;
+            clone.contentIntros[0].items[0].icon = ContentUnlockAuthoring.Data.contentIntros[0].items[0].icon;
+            var single = clone.contentIntros[0];
+            var originalItems = single.items;
+            Require(clone.TryGetContentIntro(EContentUnlockIntro.Mission, out var grouped), "Missing grouped intro.");
+            single.items = new[] { grouped.items[2], grouped.items[0], grouped.items[1] };
+            Require(!HasIntroError(data, clone), "Grouped items must work for non-mission content in authored order.");
+            single.items = new[] { grouped.items[0], grouped.items[0] };
+            Require(HasIntroError(data, clone), "Duplicate destinations not rejected.");
+            single.items = Array.Empty<ContentUnlockIntroItem>();
+            Require(HasIntroError(data, clone), "Empty items not rejected.");
+            single.items = new[] { grouped.items[0], grouped.items[1], grouped.items[2], originalItems[0] };
+            Require(HasIntroError(data, clone), "Items beyond view capacity not rejected.");
+            single.items = originalItems;
             clone.contentIntros.Add(clone.contentIntros[0]);
             Require(HasIntroError(data, clone), "Duplicate definition not rejected.");
             clone.contentIntros.RemoveAt(clone.contentIntros.Count - 1);
@@ -122,7 +134,7 @@ public static class ContentUnlockIntroValidation
             ContentUnlockAuthoring.Data.TryGetContentIntro(EContentUnlockIntro.Roulette, out var roulette);
             Require(ContentUnlockAuthoring.Data.TryGetContentIntro(EContentUnlockIntro.CardEnhance, out var enhance),
                 "Missing card enhancement definition.");
-            var icons = new[] { mission.icon };
+            var icons = new[] { mission.items[0].icon };
             int confirmations = 0;
             int cancellations = 0;
             view.Show("미션 오픈 !", mission.description,
@@ -145,7 +157,7 @@ public static class ContentUnlockIntroValidation
             Require(confirmations == 1 && cancellations == 0 && !ContentUnlockIntroView.IsOpen,
                 "Confirmation must complete exactly once.");
             view.Show("모험 오픈 !", "스테이지를 클리어하고 보상을 받으세요.",
-                new[] { mission.icon }, () => confirmations++, () => cancellations++);
+                new[] { mission.items[0].icon }, () => confirmations++, () => cancellations++);
             Require(!button.interactable, "Reopening must reset entrance input.");
             bool IconsVisible(int count = 1)
             {
@@ -182,9 +194,29 @@ public static class ContentUnlockIntroValidation
                 Set("m_cancelled", (Action)(() => cancellations++));
                 ShowNext();
             }
+            var reordered = new ContentUnlockIntroDef
+            {
+                content = EContentUnlockIntro.Roulette,
+                description = mission.description,
+                items = new[] { mission.items[2], mission.items[0], mission.items[1] },
+            };
+            Set("m_intro", view);
+            Set("m_intros", new List<ContentUnlockIntroDef> { reordered });
+            Set("m_introIndex", 0);
+            ShowNext();
+            Require(message.text == reordered.items[0].name + " / " + reordered.items[1].name + " / " + reordered.items[2].name
+                && IconsVisible(3), "Non-mission grouped intro must follow authored order.");
+            for (int i = 0; i < reordered.items.Length; i++)
+            {
+                var image = (Image)serialized.FindProperty("_icons").GetArrayElementAtIndex(i).objectReferenceValue;
+                var label = (TMPro.TMP_Text)serialized.FindProperty("_iconNames").GetArrayElementAtIndex(i).objectReferenceValue;
+                Require(image.sprite == reordered.items[i].icon && label.text == reordered.items[i].name,
+                    "Reordering must keep each name and icon together.");
+            }
+            view.Close();
             Prepare();
-            Require(message.text == mission.contentName + " / " + mission.guideMissionName && IconsVisible(2),
-                "Mission introduction must present both mission types on one panel.");
+            Require(message.text == mission.items[0].name + " / " + mission.items[1].name + " / " + mission.items[2].name && IconsVisible(3),
+                "Mission introduction must present both mission types and attendance on one panel.");
             DOTween.Complete(view, true);
             button.onClick.Invoke();
             DOTween.Complete(view, true);
@@ -192,10 +224,10 @@ public static class ContentUnlockIntroValidation
                 && (bool)ownerType.GetField("m_pendingIntro", flags).GetValue(owner),
                 "First confirmation must queue the next panel without completing the step.");
             ShowNext();
-            Require(message.text == roulette.contentName && IconsVisible() && !button.interactable,
+            Require(message.text == roulette.items[0].name && IconsVisible() && !button.interactable,
                 "Next content must reopen with its own title and entrance gate.");
             var firstIcon = (Image)serialized.FindProperty("_icons").GetArrayElementAtIndex(0).objectReferenceValue;
-            Require(firstIcon.sprite == roulette.icon, "Next content retained the previous icon.");
+            Require(firstIcon.sprite == roulette.items[0].icon, "Next content retained the previous icon.");
             DOTween.Complete(view, true);
             button.onClick.Invoke();
             DOTween.Complete(view, true);
@@ -203,8 +235,8 @@ public static class ContentUnlockIntroValidation
                 && (bool)ownerType.GetField("m_pendingIntro", flags).GetValue(owner),
                 "Second confirmation must queue card enhancement without completing the step.");
             ShowNext();
-            Require(message.text == enhance.contentName && IconsVisible() && !button.interactable
-                && firstIcon.sprite == enhance.icon,
+            Require(message.text == enhance.items[0].name && IconsVisible() && !button.interactable
+                && firstIcon.sprite == enhance.items[0].icon,
                 "Card enhancement must show its own title and icon without a lobby button target.");
             DOTween.Complete(view, true);
             button.onClick.Invoke();
@@ -307,8 +339,8 @@ public static class ContentUnlockIntroValidation
             {
                 pairDone = new Action[2];
                 view.ShowTogether("일일미션 / 가이드 미션 오픈 !", mission.description,
-                    new[] { mission.icon, mission.guideMissionIcon },
-                    new[] { mission.contentName, mission.guideMissionName }, new[] { target, secondTarget },
+                    new[] { mission.items[0].icon, mission.items[1].icon },
+                    new[] { mission.items[0].name, mission.items[1].name }, new[] { target, secondTarget },
                     () => confirmations++, () => cancellations++,
                     (index, done) => { pairArrivals++; pairDone[index] = done; });
                 DOTween.Complete(view, true);
@@ -318,7 +350,7 @@ public static class ContentUnlockIntroValidation
             }
             ShowPair();
             Require(pairArrivals == 2 && confirmations == 6 && IconsVisible(2),
-                $"Both icons must arrive once without finishing the step early: arrivals={pairArrivals}, confirmations={confirmations}, visible={IconsVisible(2)}, guideIcon={mission.guideMissionIcon}.");
+                $"Both icons must arrive once without finishing the step early: arrivals={pairArrivals}, confirmations={confirmations}, visible={IconsVisible(2)}, guideIcon={mission.items[1].icon}.");
             Require(Vector3.Distance(firstIcon.rectTransform.TransformPoint(firstIcon.rectTransform.rect.center),
                 target.TransformPoint(target.rect.center)) < 0.1f
                 && Vector3.Distance(secondIcon.rectTransform.TransformPoint(secondIcon.rectTransform.rect.center),
@@ -342,7 +374,60 @@ public static class ContentUnlockIntroValidation
             Require(pairDone[1] == null && pairDone[0] != null, "Hidden guide button must skip only its own effect.");
             pairDone[0]();
             Require(confirmations == 8 && !ContentUnlockIntroView.IsOpen, "Remaining mission effect did not finish.");
-            Debug.Log("[ContentUnlockIntroValidation] VIEW PASS: single/pair flights, separate destinations, all-effects completion, queue, cancellation, restoration, inactive targets, scale.");
+            var thirdIcon = (Image)serialized.FindProperty("_icons").GetArrayElementAtIndex(2).objectReferenceValue;
+            var thirdTargetObject = new GameObject("AttendanceTarget", typeof(RectTransform));
+            UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(thirdTargetObject, scene);
+            var thirdTarget = (RectTransform)thirdTargetObject.transform;
+            thirdTarget.SetParent(flightRoot, false);
+            thirdTarget.sizeDelta = new Vector2(100f, 100f);
+            thirdTarget.anchoredPosition = new Vector2(0f, -450f);
+            secondTargetObject.SetActive(true);
+            var tripleDone = new Action[3];
+            int tripleArrivals = 0;
+            void ShowTriple()
+            {
+                tripleDone = new Action[3];
+                view.ShowTogether("일일미션 / 가이드미션 / 출석", mission.description,
+                    new[] { mission.items[0].icon, mission.items[1].icon, mission.items[2].icon },
+                    new[] { mission.items[0].name, mission.items[1].name, mission.items[2].name },
+                    new[] { target, secondTarget, thirdTarget }, () => confirmations++, () => cancellations++,
+                    (index, done) => { tripleArrivals++; tripleDone[index] = done; });
+                DOTween.Complete(view, true);
+                Require(IconsVisible(3), "All three icons must be visible.");
+                Require(firstIcon.rectTransform.rect.width * 3f + 120f <= iconRoot.rect.width + 0.1f,
+                    "Three icons overflow the authored row.");
+                Require(firstIcon.rectTransform.anchoredPosition.x < secondIcon.rectTransform.anchoredPosition.x
+                    && secondIcon.rectTransform.anchoredPosition.x < thirdIcon.rectTransform.anchoredPosition.x,
+                    "Mission, guide mission and attendance order changed.");
+                button.onClick.Invoke();
+                button.onClick.Invoke();
+                DOTween.Complete(view, true);
+            }
+            ShowTriple();
+            Require(tripleArrivals == 3 && confirmations == 8 && ContentUnlockIntroView.IsOpen,
+                "Three arrivals must wait for all button effects.");
+            Require(Vector3.Distance(thirdIcon.rectTransform.TransformPoint(thirdIcon.rectTransform.rect.center),
+                thirdTarget.TransformPoint(thirdTarget.rect.center)) < 0.1f, "Attendance icon missed its button.");
+            tripleDone[0]();
+            tripleDone[1]();
+            Require(confirmations == 8 && ContentUnlockIntroView.IsOpen, "Attendance effect must finish before completion.");
+            tripleDone[2]();
+            tripleDone[2]();
+            Require(confirmations == 9 && !ContentUnlockIntroView.IsOpen && thirdIcon.transform.parent == iconRoot,
+                "Three effects must restore icons and complete exactly once.");
+            ShowTriple();
+            tripleDone[0]();
+            view.Close();
+            tripleDone[1]();
+            tripleDone[2]();
+            Require(confirmations == 9 && cancellations == 6 && thirdIcon.transform.parent == iconRoot,
+                "Cancelled attendance arrival must not complete the intro.");
+            view.Show("기존 배치 복구", "", icons, () => confirmations++, () => cancellations++);
+            DOTween.Complete(view, true);
+            Require(IconsVisible(1) && Mathf.Abs(firstIcon.rectTransform.rect.width - 420f) < 0.1f,
+                "Single-icon layout must recover its authored size after three icons.");
+            view.Close();
+            Debug.Log("[ContentUnlockIntroValidation] VIEW PASS: single/pair/triple flights, attendance arrival, all-effects completion, layout restoration, cancellation, inactive targets, scale.");
         }
         finally
         {

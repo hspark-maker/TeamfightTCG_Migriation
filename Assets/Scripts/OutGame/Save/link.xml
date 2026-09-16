@@ -26,6 +26,11 @@
     <type fullname="MissionReward" preserve="all"/>
     <type fullname="MissionGetResponse" preserve="all"/>
     <type fullname="ClaimMissionResult" preserve="all"/>
+    <type fullname="AttendanceResponse" preserve="all"/>
+    <type fullname="AttendanceState" preserve="all"/>
+    <type fullname="AttendanceDay" preserve="all"/>
+    <type fullname="AttendanceReward" preserve="all"/>
+    <type fullname="ClaimAttendanceResult" preserve="all"/>
     <type fullname="PassSeasonDefinition" preserve="all"/>
     <type fullname="PassLevelDefinition" preserve="all"/>
     <type fullname="PassProgress" preserve="all"/>

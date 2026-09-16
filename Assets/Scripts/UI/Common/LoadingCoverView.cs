@@ -76,12 +76,41 @@ public class LoadingCoverView : MonoBehaviour
     [Tooltip("전환 모드에서 커버가 이전 화면을 덮는 시간(초). 초기화 모드는 덮을 화면이 없어 무시한다.")]
     [SerializeField] float fadeInDuration = 0.15f;
 
+    [Header("첫 로딩 완료 · 시작 안내")]
+    [Tooltip("게이지와 로딩 문구를 함께 걷는 그룹. 첫 로딩 프리팹에만 배선한다.")]
+    [SerializeField] CanvasGroup _progressGroup;
+    [Tooltip("게이지 바깥의 독립 시작 안내. 비활성으로 저작하며 입력은 커버가 받는다.")]
+    [SerializeField] CanvasGroup _startPromptGroup;
+    [SerializeField] TMP_Text _startPromptText;
+    [Tooltip("완료 강조의 왕복 시간(초). 모든 시작 연출은 timeScale과 무관하게 재생한다.")]
+    [SerializeField, Min(0f)] float _completeDuration = 0.14f;
+    [SerializeField, Min(0f)] float _progressExitDuration = 0.18f;
+    [SerializeField, Min(0f)] float _promptEnterDuration = 0.24f;
+    [SerializeField] float _progressExitDistance = 10f;
+    [SerializeField] float _promptEnterDistance = 12f;
+    [Tooltip("밝아졌다 어두워지는 호흡 한 주기의 시간(초).")]
+    [SerializeField, Min(0.1f)] float _promptBreathDuration = 1.8f;
+    [SerializeField, Range(0f, 1f)] float _promptBreathAlpha = 0.65f;
+    [SerializeField, Min(0f)] float _startPressDuration = 0.12f;
+
+    enum EStartPresentation { Loading, Completing, WaitingForTap, Entering, Recovery }
+    EStartPresentation _startPresentation;
+    Tween _startTween;
+    RectTransform _progressRect;
+    RectTransform _promptRect;
+    Vector2 _progressHome;
+    Vector2 _promptHome;
+    Vector3 _progressScale;
+    Vector3 _promptScale;
+
     // 지금 화면을 덮고 있는 커버(없으면 null). 커버는 DontDestroyOnLoad로 다음 씬 위까지 살아남으므로
     // 새 씬의 Start는 아직 가려진 화면에서 돈다 — 로비 연출은 이게 걷힌 뒤에 시작해야 눈에 보인다.
     static LoadingCoverView s_active;
 
     /// <summary>커버가 화면을 덮고 있는가(페이드아웃이 끝나 파괴되면 false).</summary>
     public static bool IsCovering => s_active != null;
+    public static bool OwnsLobbyPreparation => s_active != null && s_active.m_waitForBattleResult
+        && !s_active.m_lobbyReady;
 
     // 커버 루트의 페이드 대상. Canvas·CanvasGroup·이 스크립트가 모두 같은 오브젝트라 배선 없이 잡는다.
     CanvasGroup m_group;
@@ -96,7 +125,10 @@ public class LoadingCoverView : MonoBehaviour
     Action m_beforeLoad;
     bool m_waitForBattleResult;
     bool m_choosingInitialScene;
+    bool m_initialBattleFailed;
     bool m_sceneLoadFailed;
+    bool m_lobbyPreparationFailed;
+    bool m_lobbyReady;
     GameSceneLoadOperation m_sceneOperation;
 
     // 커버가 최소 1초는 도니 커튼(0.25초)보다 넉넉하게 뺀다.
@@ -164,6 +196,20 @@ public class LoadingCoverView : MonoBehaviour
         s_active = this;
         m_group = GetComponent<CanvasGroup>();
 
+        _progressRect = progressBar != null ? progressBar.GetComponent<RectTransform>() : null;
+        _promptRect = _startPromptGroup != null ? _startPromptGroup.GetComponent<RectTransform>() : null;
+        if (_progressRect != null)
+        {
+            _progressHome = _progressRect.anchoredPosition;
+            _progressScale = _progressRect.localScale;
+        }
+        if (_promptRect != null)
+        {
+            _promptHome = _promptRect.anchoredPosition;
+            _promptScale = _promptRect.localScale;
+        }
+        ResetStartPresentation();
+
         if (progressBar != null) progressBar.normalizedValue = 0f;
 
         // 로그인 화면의 표시 여부는 여기서 정한다 — 화면 자신에게 맡기면 비활성으로 저작된 순간
@@ -177,11 +223,13 @@ public class LoadingCoverView : MonoBehaviour
     // 파괴 = 페이드아웃 완료(Reveal) 시점이다 — 여기가 "이제 화면이 보인다"의 유일한 신호다.
     void OnDisable()
     {
+        ResetStartPresentation();
         m_sceneOperation?.FinishWithoutCover(m_beforeLoad);
     }
 
     void OnDestroy()
     {
+        _startTween?.Kill();
         m_sceneOperation?.FinishWithoutCover(m_beforeLoad);
         if (s_active == this) s_active = null;
     }
@@ -212,6 +260,8 @@ public class LoadingCoverView : MonoBehaviour
 
     IEnumerator CoRunInitialize()
     {
+        ResetStartPresentation();
+        if (progressBar != null) progressBar.gameObject.SetActive(true);
         if (GameInitialization.State == EGameInitState.UpdateRequired)
         {
             ShowRecovery();
@@ -244,7 +294,7 @@ public class LoadingCoverView : MonoBehaviour
             {
                 // 리소스 전송은 번들 요청별 타임아웃을 따른다. 정상 다운로드를 로딩 연출 시간으로 끊지 않는다.
                 t_initializeWaitStarted = Time.realtimeSinceStartup;
-                if (progressBar != null) progressBar.normalizedValue = GameInitialization.Progress;
+                if (progressBar != null) progressBar.normalizedValue = Mathf.Min(GameInitialization.Progress, 0.99f);
             }
             if (Time.realtimeSinceStartup - t_initializeWaitStarted >= initializeWaitTimeout)
             {
@@ -264,6 +314,7 @@ public class LoadingCoverView : MonoBehaviour
 
         // (3) 조작 대기. 여기부터는 로딩이 아니라 사람을 기다리는 구간이다.
         yield return CoWaitForTap();
+        if (_startPresentation != EStartPresentation.Entering) yield break;
 
         SetAccountButtonVisible(false);
         yield return CoGoNext();
@@ -273,19 +324,136 @@ public class LoadingCoverView : MonoBehaviour
     // 안 거르면 계정 버튼을 누른 그 클릭이 그대로 "시작"으로 읽혀 로비로 넘어간다.
     IEnumerator CoWaitForTap()
     {
-        if (statusText != null) statusText.text = "화면을 터치해 시작하세요.";
+        PlayLoadingComplete();
+        while (_startPresentation == EStartPresentation.Completing) yield return null;
+        bool t_released = false;
+        yield return null;
 
-        while (true)
+        while (_startPresentation == EStartPresentation.WaitingForTap)
         {
             // 로그인 화면이 떠 있는 동안의 입력은 그쪽 것이다. 닫힌 뒤에도 한 프레임 더 흘린다 —
             // 닫은 그 클릭이 같은 프레임에 여기로 읽히면 화면만 닫고 곧장 로비로 넘어간다.
             if (loginPanel != null && loginPanel.gameObject.activeSelf) m_ignoreTapFrames = 2;
 
-            if (m_ignoreTapFrames > 0) m_ignoreTapFrames--;
-            else if (Input.anyKeyDown || Input.GetMouseButtonDown(0) || Input.touchCount > 0) yield break;
+            if (m_ignoreTapFrames > 0)
+            {
+                m_ignoreTapFrames--;
+                t_released = false;
+            }
+            else if (!t_released)
+                t_released = !Input.anyKey && Input.touchCount == 0;
+            else if (HasStartInput())
+            {
+                PlayStartPress();
+                yield break;
+            }
 
             yield return null;
         }
+    }
+
+    void ResetStartPresentation()
+    {
+        _startTween?.Kill();
+        _startTween = null;
+        _startPresentation = EStartPresentation.Loading;
+        m_ignoreTapFrames = 2;
+        if (_progressRect != null)
+        {
+            _progressRect.anchoredPosition = _progressHome;
+            _progressRect.localScale = _progressScale;
+        }
+        if (_progressGroup != null) _progressGroup.alpha = 1f;
+        if (progressBar != null) progressBar.normalizedValue = 0f;
+        if (_promptRect != null)
+        {
+            _promptRect.anchoredPosition = _promptHome;
+            _promptRect.localScale = _promptScale;
+        }
+        if (_startPromptGroup != null)
+        {
+            _startPromptGroup.alpha = 0f;
+            _startPromptGroup.gameObject.SetActive(false);
+        }
+        if (_startPromptText != null) _startPromptText.text = "터치하여 시작";
+    }
+
+    void PlayLoadingComplete()
+    {
+        _startPresentation = EStartPresentation.Completing;
+        if (progressBar != null) progressBar.normalizedValue = 1f;
+        var t_sequence = DOTween.Sequence().SetUpdate(true).SetLink(gameObject).Pause();
+        _startTween = t_sequence;
+        if (_progressRect != null)
+        {
+            t_sequence.Append(_progressRect.DOScale(_progressScale * 1.025f, _completeDuration * 0.5f).SetEase(Ease.OutQuad));
+            t_sequence.Append(_progressRect.DOScale(_progressScale, _completeDuration * 0.5f).SetEase(Ease.InOutSine));
+            t_sequence.Append(_progressRect.DOAnchorPos(_progressHome + Vector2.down * _progressExitDistance, _progressExitDuration).SetEase(Ease.InQuad));
+            if (_progressGroup != null) t_sequence.Join(_progressGroup.DOFade(0f, _progressExitDuration));
+        }
+        t_sequence.AppendCallback(() =>
+        {
+            if (progressBar != null) progressBar.gameObject.SetActive(false);
+            if (_startPromptGroup == null) return;
+            _promptRect.anchoredPosition = _promptHome + Vector2.down * _promptEnterDistance;
+            _promptRect.localScale = _promptScale * 0.97f;
+            _startPromptGroup.gameObject.SetActive(true);
+        });
+        if (_startPromptGroup != null)
+        {
+            t_sequence.Append(_startPromptGroup.DOFade(1f, _promptEnterDuration).SetEase(Ease.OutCubic));
+            t_sequence.Join(_promptRect.DOAnchorPos(_promptHome, _promptEnterDuration).SetEase(Ease.OutCubic));
+            t_sequence.Join(_promptRect.DOScale(_promptScale, _promptEnterDuration).SetEase(Ease.OutCubic));
+        }
+        t_sequence.OnComplete(() =>
+        {
+            _startPresentation = EStartPresentation.WaitingForTap;
+            _startTween = _startPromptGroup == null ? null : _startPromptGroup
+                .DOFade(_promptBreathAlpha, _promptBreathDuration * 0.5f)
+                .SetEase(Ease.InOutSine).SetLoops(-1, LoopType.Yoyo).SetUpdate(true).SetLink(gameObject).Play();
+        }).Play();
+    }
+
+    bool HasStartInput()
+    {
+        if (Input.touchCount > 0)
+        {
+            for (int t_index = 0; t_index < Input.touchCount; t_index++)
+            {
+                var t_touch = Input.GetTouch(t_index);
+                if (t_touch.phase == TouchPhase.Began && !IsAccountPointer(t_touch.position)) return true;
+            }
+            return false;
+        }
+        if (Input.GetMouseButtonDown(0)) return !IsAccountPointer(Input.mousePosition);
+        var t_selected = UnityEngine.EventSystems.EventSystem.current != null
+            ? UnityEngine.EventSystems.EventSystem.current.currentSelectedGameObject : null;
+        if (accountButton != null && t_selected != null && t_selected.transform.IsChildOf(accountButton.transform)) return false;
+        return Input.anyKeyDown;
+    }
+
+    bool IsAccountPointer(Vector2 _position)
+    {
+        if (accountButton == null || !accountButton.gameObject.activeInHierarchy) return false;
+        var t_canvas = accountButton.GetComponentInParent<Canvas>();
+        var t_camera = t_canvas != null && t_canvas.renderMode != RenderMode.ScreenSpaceOverlay ? t_canvas.worldCamera : null;
+        return RectTransformUtility.RectangleContainsScreenPoint(accountButton.GetComponent<RectTransform>(), _position, t_camera);
+    }
+
+    void PlayStartPress()
+    {
+        _startTween?.Kill();
+        _startPresentation = EStartPresentation.Entering;
+        if (_startPromptGroup == null) return;
+        _startPromptGroup.alpha = 1f;
+        _startTween = _promptRect.DOScale(_promptScale * 1.04f, _startPressDuration)
+            .SetEase(Ease.OutQuad).SetUpdate(true).SetLink(gameObject)
+            .OnComplete(() =>
+            {
+                if (_startPresentation != EStartPresentation.Entering) return;
+                _promptRect.localScale = _promptScale;
+                if (_startPromptText != null) _startPromptText.text = "시작하는 중…";
+            }).Play();
     }
 
     // 계정 버튼. 이미 계정이 정해진 기기에서만 뜬다 — 첫 실행은 로그인 화면이 이미 앞에 서 있다.
@@ -335,7 +503,7 @@ public class LoadingCoverView : MonoBehaviour
 
         ApplyStoreButton(t_updateRequired);
 
-        bool t_canRetry = m_sceneLoadFailed || GameInitialization.CanRetry;
+        bool t_canRetry = m_sceneLoadFailed || m_initialBattleFailed || m_lobbyPreparationFailed || GameInitialization.CanRetry;
 
         if (retryButton != null)
         {
@@ -385,6 +553,21 @@ public class LoadingCoverView : MonoBehaviour
 
         SetRecoveryVisible(false);
 
+        if (m_lobbyPreparationFailed)
+        {
+            m_lobbyPreparationFailed = false;
+            StartCoroutine(CoPrepareLobbyReturn());
+            return;
+        }
+
+        if (m_initialBattleFailed)
+        {
+            m_initialBattleFailed = false;
+            OutgameTutorialRunner.RewindToPendingBattleEntry();
+            StartCoroutine(CoGoNext());
+            return;
+        }
+
         if (m_sceneLoadFailed)
         {
             m_sceneLoadFailed = false;
@@ -402,6 +585,8 @@ public class LoadingCoverView : MonoBehaviour
     // 커버는 로딩 내내 interactable=false다(프리팹 저작값) — 복구 화면일 때만 버튼이 눌린다.
     void SetRecoveryVisible(bool _visible)
     {
+        ResetStartPresentation();
+        if (_visible) _startPresentation = EStartPresentation.Recovery;
         if (m_group != null) m_group.interactable = _visible;
         if (recoveryPanel != null) recoveryPanel.SetActive(_visible);
         if (progressBar == null) return;
@@ -423,20 +608,27 @@ public class LoadingCoverView : MonoBehaviour
     // 그쪽이 실패하면 씬 전환 없이 돌아와(구매 실패) 탈출로가 없는 이 씬에 갇히기 때문 — 로비 브리지가 맡는다.
     IEnumerator CoGoNext()
     {
-        // 바가 꽉 찬 것을 눈으로 확인시키는 홀드. 로딩 화면은 timeScale을 신뢰할 수 없어 unscaled.
-        if (holdBeforeLoad > 0f) yield return new WaitForSecondsRealtime(holdBeforeLoad);
-
         // 로드보다 반드시 먼저 — 이 뒤로 누가 씬을 걸든 커버가 살아남아 전환 순간을 덮는다.
         DontDestroyOnLoad(gameObject);
 
         // AutoBattle은 목적지를 이 커버에 전달한다. 실패 시 목적지만 재시도해 스텝을 두 번 커밋하지 않는다.
         m_choosingInitialScene = true;
+        Exception t_entryError = null;
         try
         {
             if (OutgameTutorialRunner.TryGetCurrentStep(out var t_step) && t_step.Action == EOutgameTutorialAction.AutoBattle)
-                OutgameTutorialRunner.EnterCurrentStep();
+                yield return OutgameTutorialRunner.EnterCurrentStepAsync(this.GetCancellationTokenOnDestroy())
+                    .ToCoroutine(exceptionHandler: t_error => t_entryError = t_error);
         }
         finally { m_choosingInitialScene = false; }
+        if (t_entryError != null)
+        {
+            Debug.LogException(t_entryError);
+            m_initialBattleFailed = true;
+            m_targetScene = null;
+            ShowRecovery();
+            yield break;
+        }
         if (string.IsNullOrEmpty(m_targetScene)) m_targetScene = LobbyScene;
         yield return CoLoadTarget(false);
     }
@@ -476,7 +668,7 @@ public class LoadingCoverView : MonoBehaviour
                 yield return MatchResultSubmission.WaitForBattleResultAsync().ToCoroutine();
             }
 
-            if (holdBeforeLoad > 0f) yield return new WaitForSecondsRealtime(holdBeforeLoad);
+            if (_animateProgress && holdBeforeLoad > 0f) yield return new WaitForSecondsRealtime(holdBeforeLoad);
 
             // 성공적으로 준비된 뒤에만 정리하고 활성화한다. 실패 시 이전 씬은 그대로 재시도를 기다린다.
             yield return t_op.Commit(m_beforeLoad);
@@ -489,13 +681,30 @@ public class LoadingCoverView : MonoBehaviour
             m_beforeLoad = null;
 
             yield return null;   // 새 씬이 최소 한 번 그려지도록 한 프레임 양보.
+            if (m_waitForBattleResult) yield return CoPrepareLobbyReturn();
         }
         finally
         {
             t_op.FinishWithoutCover(m_beforeLoad);
             m_sceneOperation = null;
-            if (!m_sceneLoadFailed) Reveal();
+            if (!m_sceneLoadFailed && !m_waitForBattleResult) Reveal();
         }
+    }
+
+    IEnumerator CoPrepareLobbyReturn()
+    {
+        Exception t_failure = null;
+        yield return OutgameTutorialBridge.PrepareLobbyReturnAsync(this.GetCancellationTokenOnDestroy())
+            .ToCoroutine(exceptionHandler: t_error => t_failure = t_error);
+        if (t_failure != null)
+        {
+            Debug.LogWarning($"[LobbyReturn] Preparation failed: {t_failure.GetBaseException().Message}");
+            m_lobbyPreparationFailed = true;
+            ShowRecovery();
+            yield break;
+        }
+        m_lobbyReady = true;
+        Reveal();
     }
 
     // ── 공용 ──────────────────────────────────────────────────────────────────
@@ -524,6 +733,7 @@ public class LoadingCoverView : MonoBehaviour
             if (_initializing) UpdateResourceDownloadStatus();
 
             float t_target = Mathf.Min(_progress(), t_elapsed / Mathf.Max(minDuration, 0.01f));
+            if (_initializing && !GameInitialization.IsReady) t_target = Mathf.Min(t_target, 0.99f);
             t_shown = Mathf.MoveTowards(t_shown, t_target, barFollowSpeed * Time.unscaledDeltaTime);
 
             if (progressBar != null) progressBar.normalizedValue = t_shown;
@@ -544,13 +754,15 @@ public class LoadingCoverView : MonoBehaviour
         }
 
         // 즉시 실패(오프라인 선체크)에서 0→100%가 한 번 번쩍이지 않게.
-        if (progressBar != null && !GameInitialization.IsTerminated) progressBar.normalizedValue = 1f;
+        if (progressBar != null && !GameInitialization.IsTerminated && (!_initializing || GameInitialization.IsReady))
+            progressBar.normalizedValue = 1f;
     }
 
     // 다음 씬 위에서 커버를 걷고 자신을 파괴한다. DDOL로 살아남은 오브젝트라 비활성화로는 부족하다.
     void Reveal()
     {
         if (this == null) return;   // 오브젝트가 이미 파괴돼 코루틴이 잘려 들어온 경우 — 걷을 커버가 없다.
+        _startTween?.Kill();
 
         if (m_group == null) { Destroy(gameObject); return; }
 

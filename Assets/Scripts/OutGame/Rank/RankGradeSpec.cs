@@ -23,7 +23,6 @@ public static class RankGradeSpec
             s_uninitialized.hideFlags = HideFlags.DontSave;
             s_uninitialized.winPoints = 0;
             s_uninitialized.losePoints = 0;
-            s_uninitialized.unrankedDisplayName = "동기화 중";
             s_uninitialized.grades = new List<RankGradeConfig>();
             return s_uninitialized;
         }

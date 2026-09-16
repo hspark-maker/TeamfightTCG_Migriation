@@ -27,8 +27,7 @@ public class ProfileSummaryView : MonoBehaviour
     [Tooltip("랭크 티어명 자리(\"브론즈 1\"). 미배선이면 그 축만 건너뛴다.")]
     [SerializeField] TMP_Text tierNameText;
 
-    [Tooltip("랭크 티어 배지 자리. 미배선이면 그 축만 건너뛴다.\n" +
-             "등급 표를 못 읽었거나 배지가 미저작이면 저작된 그림을 그대로 둔다.")]
+    [Tooltip("랭크 티어 배지 자리. 미배선이면 그 축만 건너뛴다. 배지가 없으면 숨긴다.")]
     [SerializeField] Image rankBadgeImage;
 
     [Header("계정 레벨")]
@@ -74,7 +73,11 @@ public class ProfileSummaryView : MonoBehaviour
         RankInfo t_rank = RankManager.GetInfo();
 
         if (this.tierNameText != null) this.tierNameText.text = t_rank.DisplayName;
-        if (this.rankBadgeImage != null && t_rank.Badge != null) this.rankBadgeImage.sprite = t_rank.Badge;
+        if (this.rankBadgeImage != null)
+        {
+            this.rankBadgeImage.sprite = t_rank.Badge;
+            this.rankBadgeImage.enabled = t_rank.Badge != null;
+        }
     }
 
     void RefreshLevel()

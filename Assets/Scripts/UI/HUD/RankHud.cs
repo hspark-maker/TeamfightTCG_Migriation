@@ -80,16 +80,6 @@ public class RankHud : MonoBehaviour
     [Tooltip("넘겨받는 별의 밑판이 잠깐 물드는 색. 원복은 저작 색으로 돌아간다.")]
     [SerializeField] Color handoffColor = Color.white;
 
-    [Header("승급전 대기")]
-    [Tooltip("별 넷이 꽉 찬 뒤의 '승급전' 상태 표현(배지 뒤 광선 · 문구 · 배지 호흡). 값은 전부 여기 안에 있다.")]
-    [SerializeField] RankPromoStandby promoStandby = new RankPromoStandby();
-
-    [Tooltip("고스트가 배지로 출발하는 프레임에 별 넷이 함께 맥동하는 세기.")]
-    [SerializeField] float promoStarPulse = 0.22f;
-
-    [Tooltip("배지로 수렴하는 고스트가 줄어드는 배율. 1보다 작아야 '빨려들었다'로 읽힌다.")]
-    [SerializeField] float promoGhostScale = 0.35f;
-
     [Header("포인트 손실 반응")]
     [Tooltip("게이지가 줄어든 자리까지 뒤로 미끄러지는 시간. 획득은 느리고 시끄럽게, 손실은 빠르고 조용하게 — 짧게 둔다.")]
     [SerializeField] float lossSlideDuration = 0.2f;
@@ -169,16 +159,6 @@ public class RankHud : MonoBehaviour
     // 켜진 별 자리에 띄운 고스트들. 시퀀스가 어디서 끊겨도 여기로 걷는다.
     readonly List<GameObject> m_ghosts = new List<GameObject>();
 
-    // 승급전 진입 연출(별 → 배지). 별 점등 한 박(m_starSeq)보다 오래 살아남아야 해서 따로 든다.
-    Sequence m_promoSeq;
-
-    // 배지로 수렴하는 고스트들. 점등 쪽 고스트와 섞으면 별 정리(RestorePipScales)가 비행 중인 이것들까지 걷는다.
-    readonly List<GameObject> m_promoGhosts = new List<GameObject>();
-
-    // 이번 정산이 승급전 대기로 넘어가는가. PrepareProgress가 세우고 마지막 별이 찰 때 한 번 소비한다 —
-    // 평범한 렌더로는 서지 않으므로 로비를 다시 열어도 진입 연출이 두 번 재생되지 않는다.
-    bool m_promoEnterDue;
-
     // 별 채움·밑판의 저작 색. 연출이 물들인 뒤 되돌릴 기준이다.
     Color[] m_starFillColors;
     Color[] m_starPlateColors;
@@ -237,11 +217,6 @@ public class RankHud : MonoBehaviour
         this.m_gainTo   = t_now.TierIndex != t_prev.TierIndex ? 1f : GaugeRatioOf(t_now);
 
         this.SetGaugeRatio(this.m_gainFrom);
-
-        // 전투 직전엔 아직 승급전이 아니었다 — 대기 표시를 걷어 두고, 마지막 별이 차는 프레임에 진입 연출로 켠다.
-        // 단계·등급이 갈리는 판도 도착지가 1이지만 그 결과는 대기가 아니라 승격·승급이라 여기 걸리지 않는다.
-        this.m_promoEnterDue = RankManager.IsPromoPending && this.m_gainFrom < 1f && this.m_gainTo >= 1f;
-        if (this.m_promoEnterDue) this.promoStandby.SetStandby(false);
     }
 
     /// <summary>조각이 배지에 꽂힌 프레임. 배지와 채워지는 별이 함께 튀고, 게이지가 목표치까지 한 번에 전진한다.</summary>
@@ -315,12 +290,11 @@ public class RankHud : MonoBehaviour
             this.m_holdTier = true;
         }
         // 첫 진입(언랭크 → 첫 등급)도 사건의 주인은 같은 오버레이다 — 게임에서 처음 얻는 등급이라 오히려 제일 큰 판이다.
-        // 여기서는 언랭크 화면으로 되돌려 묶어 두기만 한다. 배지가 갈리는 것을 안 보여주면 첫 등급이 '이미 그랬던 것'으로 읽힌다.
+        // 첫 등급이 미리 보이지 않도록 오버레이가 덮을 때까지 표시를 비운다.
         // 별 줄은 배지와 따로 묶는다 — 오버레이가 걷힌 뒤에 드러나는 것이 이 사건의 마지막 박이다.
         else
         {
-            RankManager.GetUnrankedDisplay(out string t_unrankedName, out Sprite t_unrankedBadge);
-            this.RenderTier(t_unrankedName, t_unrankedBadge);
+            this.RenderTier(string.Empty, null);
 
             this.m_holdTier = true;
             this.m_holdPips = true;
@@ -652,7 +626,6 @@ public class RankHud : MonoBehaviour
         if (this.gauge != null) this.gauge.SetThresholds(BuildMarkerRatios(), this.OnMarkerCrossed);
 
         this.CacheStarColors();
-        this.promoStandby.Capture();
     }
 
     // 연출이 물들이기 전의 별 색을 떠 둔다(어디서 끊겨도 여기로 되돌린다).
@@ -705,12 +678,6 @@ public class RankHud : MonoBehaviour
         this.KillReactions();
         this.RestorePipScales();
 
-        // 대기 표시는 상태라 다시 켜지지만, 무한 루프와 런타임 생성물은 여기서 반드시 걷는다.
-        // 다음 활성화의 Render가 SetStandby로 제 상태를 즉시 되세운다.
-        this.KillPromoEnter();
-        this.promoStandby.Reset();
-        this.m_promoEnterDue = false;
-
         // 오버레이를 못 보고 꺼지는 길(탭 전환·씬 언로드)에서 표시가 옛 등급에 고착되지 않게 묶음을 푼다.
         this.m_holdTier = false;
         this.m_holdPips = false;
@@ -734,10 +701,6 @@ public class RankHud : MonoBehaviour
         // 첫 진입 연출 중에는 이미 도달했어도 감춘 채로 둔다(m_holdPips).
         this.SetPipsVisible(!t_info.IsUnranked && !this.m_holdPips);
         this.SetGaugeRatio(GaugeRatioOf(t_info));
-
-        // 승급전은 사건이 아니라 상태다 — 로비에 들어올 때마다 여기서 즉시(연출 없이) 되세운다.
-        // 진입 연출이 도는 중이면 이미 대기 상태라 이 호출이 그 위를 덮지 않는다.
-        this.promoStandby.SetStandby(RankManager.IsPromoPending);
     }
 
     // 게이지에 먹일 비율. 진행을 그리는 값은 전부 여기를 지난다.
@@ -764,57 +727,6 @@ public class RankHud : MonoBehaviour
 
         this.PlayStarLit(_index);
         SoundManager.Instance?.PlayCue(EOutgameSound.RankStarFill);
-        this.TryPlayPromoEnter(_index);
-    }
-
-    // 마지막 별이 전진으로 찬 프레임 = 승급전 대기로 넘어가는 순간. 시선을 별에서 배지로 넘기는 것이 이 연출의 전부다.
-    void TryPlayPromoEnter(int _index)
-    {
-        if (!this.m_promoEnterDue || _index != RankConfig.WinsPerDivision - 1) return;
-
-        // 한 번 소비하면 끝이다 — 승급전을 치르고 나면 IsPromoPending이 false가 되어 Render가 알아서 끈다.
-        this.m_promoEnterDue = false;
-
-        this.KillPromoEnter();
-
-        this.m_promoSeq = this.promoStandby.BuildEnter(this.BadgeRect);
-        this.StagePromoSuck(this.m_promoSeq);
-        this.m_promoSeq.SetLink(this.gameObject)
-                       .OnKill(() =>
-                       {
-                           this.m_promoSeq = null;
-                           this.ClearGhosts(this.m_promoGhosts);
-                       });
-    }
-
-    // 별 넷이 함께 맥동하고, 각 별의 고스트가 배지로 수렴하며 줄어들고 사라진다.
-    void StagePromoSuck(Sequence _seq)
-    {
-        var t_gauge = this.gauge as RankStarGauge;
-        var t_badge = this.BadgeRect;
-        if (t_gauge == null || t_badge == null) return;
-
-        float t_at  = this.promoStandby.SuckAt;
-        float t_dur = this.promoStandby.SuckDuration;
-
-        for (int t_i = 0; t_i < t_gauge.StarCount; t_i++)
-        {
-            int t_index = t_i;   // 클로저가 반복마다 새 변수를 잡아야 마지막 별만 맥동하지 않는다
-            _seq.InsertCallback(t_at, () => UiPunch.Play(this.PipTransform(t_index), this.promoStarPulse));
-
-            var t_img = this.SpawnStarGhost(t_gauge, t_i, this.m_promoGhosts);
-            if (t_img == null) continue;
-
-            Color t_lit  = t_img.color;
-            Color t_gone = t_lit;
-            t_gone.a     = 0f;
-            t_img.color  = t_gone;   // 출발 전까지는 보이지 않는다 — 밑판 복제라 그냥 두면 채워진 별을 가린다
-
-            // 부모가 다른 사각으로 건너가므로 자리는 월드로 잡는다.
-            _seq.Insert(t_at, t_img.rectTransform.DOMove(t_badge.position, t_dur).SetEase(Ease.InQuad));
-            _seq.Insert(t_at, t_img.rectTransform.DOScale(this.promoGhostScale, t_dur).SetEase(Ease.InQuad));
-            _seq.Insert(t_at, t_img.DOColor(t_gone, t_dur).From(t_lit, setImmediately: false).SetEase(Ease.InQuad));
-        }
     }
 
     // 별이 꽉 차는 프레임에 사건을 몰아넣는다(흰 플래시 + 1.5배에서 내려앉기 + 고스트 확산),
@@ -1009,11 +921,14 @@ public class RankHud : MonoBehaviour
 
     void RenderTier(in RankRewardInfo _info) => this.RenderTier(_info.DisplayName, _info.Badge);
 
-    // 배지 미저작(null)이면 씬에 배선된 기존 스프라이트를 그대로 둔다.
     void RenderTier(string _displayName, Sprite _badge)
     {
-        if (this.badgeImage != null && _badge != null) this.badgeImage.sprite = _badge;
-        if (this.descText != null && _displayName != null) this.descText.text = _displayName;
+        if (this.badgeImage != null)
+        {
+            this.badgeImage.sprite = _badge;
+            this.badgeImage.enabled = _badge != null;
+        }
+        if (this.descText != null) this.descText.text = _displayName ?? string.Empty;
     }
 
     void SetGaugeRatio(float _ratio)
@@ -1043,16 +958,6 @@ public class RankHud : MonoBehaviour
         // Kill이 OnKill을 부르고 그쪽에서 참조를 비운다 — 여기서 먼저 비우면 Render의 연출 가드가 어긋난다.
         this.m_tierSeq.Kill();
         this.m_tierSeq = null;
-    }
-
-    // 승급전 진입 연출만 걷는다. 대기 '상태'는 여기서 끄지 않는다 — 끄고 켜는 축은 Render 하나다.
-    void KillPromoEnter()
-    {
-        var t_seq = this.m_promoSeq;
-        this.m_promoSeq = null;
-        if (t_seq != null) t_seq.Kill();
-
-        this.ClearGhosts(this.m_promoGhosts);
     }
 
     // 배지 색·스케일을 잡는 연출을 모두 걷는다(각 OnKill이 저작 상태로 되돌린다).

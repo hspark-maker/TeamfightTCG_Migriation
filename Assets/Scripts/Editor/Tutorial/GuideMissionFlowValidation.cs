@@ -89,7 +89,7 @@ public static class GuideMissionFlowValidation
                 }
                 if (content == EContentUnlockIntro.Mission && mission.Length > 0)
                     errors.Add($"{label}: mission access cannot depend on an active mission.");
-                if (!ContentUnlockAuthoring.Data.TryGetContentIntro(content, out var intro) || intro.icon == null)
+                if (!ContentUnlockAuthoring.Data.TryGetContentIntro(content, out var intro) || !intro.TryValidate(out _))
                     errors.Add($"{label}: intro definition/icon {content} missing.");
             }
         }

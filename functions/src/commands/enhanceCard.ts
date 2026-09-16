@@ -1,3 +1,4 @@
+import {onboardingReceipt} from "../save/onboardingOperation";
 import {measuredCallable} from "../observability/requestMetrics";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
@@ -133,7 +134,7 @@ function createEnhanceCard(synergyIntroduction: boolean) {
     // 기간은 여기서 한 번만 잰다 — 콜백은 재실행되므로 그 안에서 재면 경계에 걸린 호출이 흔들린다.
     const period = missionPeriod(Date.now());
 
-    const result = await mutateSave(env, uid, command, {kind: "client", txId},
+    const result = await mutateSave(env, uid, command, {kind: "client", txId, ...onboardingReceipt(request.data, command)},
       async (current, transaction, wallet): Promise<SaveMutation> => {
       // 미션 읽기가 콜백의 첫 줄이다. 아래 grants 읽기와는 둘 다 읽기라 순서를 다투지 않지만,
       // 미션 **쓰기**는 그 grants 읽기보다 뒤여야 해서 콜백 맨 끝으로 갈라 두었다.

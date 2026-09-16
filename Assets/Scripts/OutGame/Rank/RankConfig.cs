@@ -30,15 +30,6 @@ public class RankConfig : ScriptableObject
              "승급전에는 이 값이 쓰이지 않는다(패배 시 그 단계 절반 = 별 두 칸으로 스냅).")]
     public long losePoints = 10;
 
-    // 첫 티어 미도달(언랭크) 상태의 표시명
-    [Tooltip("첫 티어 미도달(언랭크) 상태의 표시명. 랭크는 튜토리얼 졸업과 함께 첫 등급 1단계로 진입하므로, " +
-             "그 전까지 표시되는 문구다. 티어 표시명과 달리 단계 숫자가 붙지 않는다.")]
-    public string unrankedDisplayName = "언랭크";
-
-    // 언랭크 상태의 배지(첫 등급 배지 대신 쓴다)
-    [Tooltip("첫 티어 미도달(언랭크) 상태에서 쓸 배지 스프라이트. 비워두면 첫 등급 배지가 그대로 보여 도달한 것처럼 읽히므로 저작을 권한다.")]
-    public Sprite unrankedBadge;
-
     // 배지 스킨과 에디터 미리보기용 기본값. 런타임 수치·표시명은 RankGrade 서버 표에서 조립한다.
     [Tooltip("등급 테이블. entryPoints 오름차순으로 저작한다. 4단계에서 다음 등급 entryPoints를 넘기면 인덱스 연속성으로 다음 등급 1단계가 된다. " +
              "단계 폭이 winPoints x 4로 고정되므로 등급 폭도 그 4배(현재 160)로 균일하다.")]

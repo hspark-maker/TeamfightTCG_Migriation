@@ -7,7 +7,7 @@ public readonly struct MatchProfile
     public readonly int    TierIndex;
     public readonly string RankName;
 
-    // 스프라이트는 null을 허용한다 — 뷰가 프리팹에 저작된 스프라이트를 그대로 유지한다.
+    // 배지가 없으면 뷰에서 숨긴다.
     public readonly Sprite RankBadge;
     public readonly Sprite Avatar;
     public readonly Sprite Frame;

@@ -38,13 +38,13 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
              "가이드는 끝나면 다시 오지 않는 축이라 빈 화면 안내보다 사라지는 게 맞다.")]
     [SerializeField] Button guideMissionButton;
 
+    [Tooltip("매치 탭 좌측 하단 간편뷰. 진행 중에는 안내·이동, 달성 후에는 직접 보상을 받는다.")]
+    [SerializeField] Button guideMissionTrackerButton;
+
+    [SerializeField] Button attendanceButton;
+
     [Tooltip("배틀패스를 여는 버튼. 시즌 공백기에도 눌린다 — 시즌이 없다는 것은 화면이 안내한다.")]
     [SerializeField] Button passButton;
-
-    [Tooltip("랭크 배지(RankInfo 안). 누르면 지금 등급의 승급 오버레이를 다시 본다 — 열람이라 랭크 값도 디렉터 상태도 건드리지 않는다.\n" +
-             "버튼 전이는 None으로 저작한다: 배지는 랭크 자체를 그리는 그림이라 눌림·비활성 틴트가 상태 오독을 부른다.\n" +
-             "언랭크 차단도 interactable이 아니라 핸들러가 한다 — 갱신 시점을 따로 둘 필요 없이 누른 순간 판정한다.")]
-    [SerializeField] Button rankBadgeButton;
 
     [Header("모험")]
     [Tooltip("모험 맵으로 가는 버튼. 이동 자체는 LobbyRoot가 한다 — 탭 패널은 탭 이동을 모른다.")]
@@ -57,6 +57,8 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     // 버튼의 저작 문구. 승급전 상태가 풀리면 여기로 돌아간다 — 평상시 문구를 코드가 다시 쓰지 않게.
     string m_defaultPlayText;
     ContentUnlockPresentation m_unlockPresentation;
+    GuideMissionTrackerView m_guidePreview;
+    bool m_matchSettled;
 
     protected override void OnInitializeUI()
     {
@@ -67,8 +69,13 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (rouletteButton != null) rouletteButton.onClick.AddListener(OpenRoulette);
         if (missionButton != null) missionButton.onClick.AddListener(OpenMissions);
         if (guideMissionButton != null) guideMissionButton.onClick.AddListener(OpenGuideMissions);
+        if (guideMissionTrackerButton != null) guideMissionTrackerButton.onClick.AddListener(HandleGuideMissionTracker);
+        if (guideMissionTrackerButton != null)
+        {
+            m_guidePreview = guideMissionTrackerButton.GetComponent<GuideMissionTrackerView>();
+            if (m_guidePreview != null) m_guidePreview.PresentationFinished += RefreshGuideMissionButton;
+        }
         if (passButton != null) passButton.onClick.AddListener(OpenPass);
-        if (rankBadgeButton != null) rankBadgeButton.onClick.AddListener(ReplayRankPromote);
         if (adventureButton != null) adventureButton.onClick.AddListener(HandleAdventureRequested);
 
         if (playLabel != null) m_defaultPlayText = playLabel.text;
@@ -80,13 +87,15 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (missionButton != null) FeatureLockView.Attach(missionButton.gameObject, EOutgameFeature.Mission);
         if (guideMissionButton != null) FeatureLockView.Attach(guideMissionButton.gameObject, EOutgameFeature.Mission);
         if (rouletteButton != null) FeatureLockView.Attach(rouletteButton.gameObject, EOutgameFeature.Roulette);
+        if (attendanceButton != null) FeatureLockView.Attach(attendanceButton.gameObject, EOutgameFeature.Mission);
         m_unlockPresentation = gameObject.AddComponent<ContentUnlockPresentation>();
         m_unlockPresentation.Bind(
             missionButton != null ? missionButton.GetComponent<FeatureLockView>() : null,
             adventureButton != null ? adventureButton.GetComponent<FeatureLockView>() : null,
             rouletteButton != null ? rouletteButton.GetComponent<FeatureLockView>() : null,
             playButton != null ? playButton.GetComponent<FeatureLockView>() : null,
-            guideMissionButton != null ? guideMissionButton.GetComponent<FeatureLockView>() : null);
+            guideMissionButton != null ? guideMissionButton.GetComponent<FeatureLockView>() : null,
+            attendanceButton != null ? attendanceButton.GetComponent<FeatureLockView>() : null);
 
         // 탭이 꺼져 있는 동안에도 신호를 받아야 한다 — 놓치면 다른 탭에 있던 사이 끝난 연출을 영영 못 따라간다.
         OutgameFeatureLock.OnChanged += ApplyFeatureLocks;
@@ -114,8 +123,9 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (rouletteButton != null) rouletteButton.onClick.RemoveListener(OpenRoulette);
         if (missionButton != null) missionButton.onClick.RemoveListener(OpenMissions);
         if (guideMissionButton != null) guideMissionButton.onClick.RemoveListener(OpenGuideMissions);
+        if (guideMissionTrackerButton != null) guideMissionTrackerButton.onClick.RemoveListener(HandleGuideMissionTracker);
+        if (m_guidePreview != null) m_guidePreview.PresentationFinished -= RefreshGuideMissionButton;
         if (passButton != null) passButton.onClick.RemoveListener(OpenPass);
-        if (rankBadgeButton != null) rankBadgeButton.onClick.RemoveListener(ReplayRankPromote);
         if (adventureButton != null) adventureButton.onClick.RemoveListener(HandleAdventureRequested);
 
         OutgameFeatureLock.OnChanged -= ApplyFeatureLocks;
@@ -125,6 +135,8 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
 
     public override void OnEnter()
     {
+        m_matchSettled = false;
+        m_guidePreview?.SetSettled(false);
         RefreshPlayLabel();
         ApplyFeatureLocks();
         RefreshGuideMissionButton();
@@ -146,12 +158,23 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         }
     }
 
-    public override void OnSettled() => m_unlockPresentation?.SetVisible(true);
+    public override void OnSettled()
+    {
+        m_matchSettled = true;
+        m_unlockPresentation?.SetVisible(true);
+        m_guidePreview?.SetSettled(true);
+    }
 
-    public override void OnLeave() => m_unlockPresentation?.SetVisible(false);
+    public override void OnLeave()
+    {
+        m_matchSettled = false;
+        m_unlockPresentation?.SetVisible(false);
+        m_guidePreview?.SetSettled(false);
+        RefreshGuideMissionButton();
+    }
 
     /// <summary>승급전 대기면 버튼 문구를 갈고, 아니면 저작 문구로 되돌린다.
-    /// 랭크 정산 연출이 도는 중에는 갈지 않는다 — 별이 차고 배지에 광선이 붙는 결말을 버튼이 먼저 말해버린다.</summary>
+    /// 랭크 정산 연출이 도는 중에는 갈지 않는다 — 별이 차기 전에 버튼이 결과를 먼저 표시하지 않게 한다.</summary>
     void RefreshPlayLabel()
     {
         if (playLabel == null) return;
@@ -168,6 +191,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         bool t_missionsUnlocked = OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission);
         if (missionButton != null) missionButton.interactable = t_missionsUnlocked;
         if (guideMissionButton != null) guideMissionButton.interactable = t_missionsUnlocked;
+        RefreshGuideMissionButton();
 
         if (keywordGrowthButton != null)
             keywordGrowthButton.interactable = OutgameFeatureLock.IsUnlocked(EOutgameFeature.KeywordGrowth);
@@ -202,28 +226,6 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (!RouletteManager.IsAvailable || !OutgameFeatureLock.IsUnlocked(EOutgameFeature.Roulette)) return;
 
         OpenPooled<RoulettePanel>();
-    }
-
-    /// <summary>지금 등급의 승급 연출을 다시 본다(열람). 랭크 값을 바꾸지 않고 디렉터도 거치지 않는다 —
-    /// OnAnyFinished를 기다리는 쪽(탭 문구·온보딩 브리지)이 열람을 정산으로 오인하면 안 된다.</summary>
-    public void ReplayRankPromote()
-    {
-        // 언랭크도 CurrentGrade가 Bronze를 돌려주므로 등급으로는 갈리지 않는다(PackUnlockRules와 같은 규율).
-        if (!RankManager.IsRanked) return;
-
-        // 온보딩 진행 여부로는 막지 않는다. 안내가 화면을 잡고 있는 동안에는 게이트 blocker가 이미 클릭을 먹고,
-        // IsRunning은 "시퀀스 미완주"라서 그것으로 막으면 온보딩을 끝내지 않은 계정은 배지가 영영 무반응이 된다.
-
-        // 정산 연출 중에는 막는다. Show가 앞 안무를 죽이며 디렉터의 덮임 통지를 앞당겨 발화시키고,
-        // 그쪽 대기가 열람 탭 한 번에 풀린다.
-        if (LobbyRankEffectDirector.Playing || RankPromoteOverlay.IsOpen) return;
-
-        if (!RankManager.TryGetTier(RankManager.TierIndex, out RankTier t_tier)) return;
-        if (!RankPromoteOverlay.TryGet(out RankPromoteOverlay t_overlay)) return;
-
-        // 시작 배지 없이 도달 연출만 — 열람은 "갈렸다"가 아니라 "이랬다"라 옛 배지 파열 두 박이 없다.
-        // 콜백 둘 다 null이 안전하다(Show와 OnTapped 모두 ?. 로 소비한다).
-        t_overlay.Show(RankTier.None, t_tier, EPromoteKind.FirstEntry, null, null, _browse: true);
     }
 
     /// <summary>강제 선형 FTUE 완료 후 일일·주간 미션을 연다.</summary>
@@ -268,6 +270,47 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     void RefreshGuideMissionButton()
     {
         if (guideMissionButton != null) guideMissionButton.gameObject.SetActive(AnyGuideMissionOpen());
+        if (guideMissionTrackerButton == null) return;
+        MissionDefinition t_current = GuideMissionTrack.Current;
+        bool t_visible = MissionManager.IsReady && (t_current != null || (m_guidePreview != null && m_guidePreview.IsHoldingClaim))
+            && OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission);
+        bool t_wasVisible = guideMissionTrackerButton.gameObject.activeSelf;
+        guideMissionTrackerButton.gameObject.SetActive(t_visible);
+        if (t_visible && !t_wasVisible) m_guidePreview?.SetSettled(m_matchSettled);
+        guideMissionTrackerButton.interactable = t_visible
+            && (m_guidePreview == null || !m_guidePreview.IsHoldingClaim)
+            && GuidanceCoordinator.CanNavigateFromMatchTab(null) && GuideMissionPreviewState.Of(t_current).CanExecute;
+    }
+
+    void HandleGuideMissionTracker()
+    {
+        if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission)
+            || !GuidanceCoordinator.CanNavigateFromMatchTab(null)) return;
+        MissionDefinition t_current = GuideMissionTrack.Current;
+        if (m_guidePreview != null && m_guidePreview.IsHoldingClaim) return;
+        var t_state = GuideMissionPreviewState.Of(t_current);
+        if (!t_state.CanExecute) return;
+        m_guidePreview?.DismissHint();
+        if (t_state.Action == GuideMissionPreviewState.EAction.Claim) ClaimGuideMissionAsync(t_current).Forget();
+        else GuideMissionNavigator.Go(t_current);
+    }
+
+    async UniTaskVoid ClaimGuideMissionAsync(MissionDefinition _mission)
+    {
+        var t_preview = m_guidePreview;
+        int t_version = t_preview != null ? t_preview.BeginClaim(_mission) : 0;
+        ClaimMissionResult t_result = null;
+        ServerWaitOverlay.Hold(this);
+        try { t_result = await MissionCommands.ClaimAsync(_mission.Id); }
+        finally
+        {
+            ServerWaitOverlay.Release(this);
+            if (t_result == null && t_preview != null) t_preview.EndClaim(t_version, false);
+        }
+        if (t_result != null) MissionPanel.ShowClaimedRewards(new[] { t_result }, _onClosed: () =>
+        {
+            if (t_preview != null) t_preview.EndClaim(t_version, true);
+        }, _showCardsIndividually: true);
     }
 
     static bool AnyGuideMissionOpen()

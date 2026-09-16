@@ -56,6 +56,7 @@ internal static class MissionContentNavigation
                 return EOutgameFeature.LobbyDeckTab;
             case "CompleteBattle":
             case GuideMissionTrack.EVENT_BRONZE2_REACHED:
+            case GuideMissionTrack.EVENT_SYNERGY_BATTLE:
             case "WinBattle":
             case "WinRankedBattle":
             case "DestroyCards":

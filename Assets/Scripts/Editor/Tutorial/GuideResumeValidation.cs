@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
+using TMPro;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
@@ -22,6 +23,7 @@ public static class GuideResumeValidation
         Require(!EditorApplication.isPlayingOrWillChangePlaymode && !OnboardingPlayTest.IsActive
             && !OnboardingPlayTest.IsPreparing, "Stop play mode before validation.");
         RunTimeoutLifetime();
+        ValidatePromotionLifetime();
         var t_restore = new List<Action>();
         var t_data = ScriptableObject.CreateInstance<OutgameTutorialData>();
         try
@@ -39,6 +41,7 @@ public static class GuideResumeValidation
             Replace(t_restore, typeof(OutgameTutorialGuide), "s_enhanceCard", 0);
             Replace(t_restore, typeof(OutgameTutorialGuide), "s_enhanceFree", false);
             Replace(t_restore, typeof(OutgameTutorialGuide), "s_growthAlreadyReached", false);
+            Replace(t_restore, typeof(OnboardingSession), "<Phase>k__BackingField", EOnboardingPhase.Waiting);
             ClearDeferred(t_restore);
 
             var t_flow = new GuideMissionFlow { missionId = "validation.past-mission", tutorial = TRIGGER };
@@ -73,18 +76,53 @@ public static class GuideResumeValidation
             Require(OutgameTutorialRunner.TryGetGuidedStep(out t_step) && t_step.StepId == t_first.StepId,
                 "A removed step ID did not fall back to a valid chapter step.");
             ValidateInputAndReturn(t_first);
+            ValidateDraftIsolation();
             ValidateAuthoredGrowthSequence();
             OutgameTutorialRunner.FinishGuided(TRIGGER);
             Require(OutgameTutorialProgress.IsTriggerDone(TRIGGER) && !GuideResume.HasPending
                 && GuideResume.Record == null, "Completing the guide left a stale resume record.");
             Require(!OutgameTutorialRunner.HasPending(TRIGGER), "A completed guide became pending again.");
-            Debug.Log("[GuideResumeValidation] PASS: old save compatibility, target and goal roundtrip, mission drift, step restore, leave/retry, missing step fallback, completion cleanup, transition input/return lock, internal navigation scope, selected tab detection, authored #30/#61/#67 sequence. UI play and remote upload are not covered.");
+            Debug.Log("[GuideResumeValidation] PASS: save compatibility, target/goal roundtrip, mission drift, step restore, leave/retry, completion cleanup, guided navigation restriction, critical input lock, draft copy/restore/account isolation, internal navigation, authored #30/#61/#67 sequence. UI play and remote upload are not covered.");
         }
         finally
         {
             for (int t_i = t_restore.Count - 1; t_i >= 0; t_i--) t_restore[t_i]();
             UnityEngine.Object.DestroyImmediate(t_data);
         }
+    }
+
+    public static void ValidatePromotionLifetime()
+    {
+        var t_owner = new GameObject("PromotionLifetime") { hideFlags = HideFlags.HideAndDontSave };
+        t_owner.SetActive(false);
+        try
+        {
+            var t_gate = t_owner.AddComponent<OutgameTutorialGateUI>();
+            var t_target = new GameObject("Target", typeof(RectTransform));
+            t_target.transform.SetParent(t_owner.transform, false);
+            var t_promote = typeof(OutgameTutorialGateUI).GetMethod("PromoteOne", BindingFlags.Instance | BindingFlags.NonPublic);
+            var t_demote = typeof(OutgameTutorialGateUI).GetMethod("Demote", BindingFlags.Instance | BindingFlags.NonPublic);
+            for (int t_i = 0; t_i < 4; t_i++)
+            {
+                bool t_clickable = t_i % 2 == 0;
+                t_promote.Invoke(t_gate, new object[] { t_target, t_clickable });
+                Require(t_target.GetComponent<GraphicRaycaster>().enabled == t_clickable,
+                    "Promotion did not restore clickable/read-only input.");
+                t_demote.Invoke(t_gate, null);
+                Require(t_target.GetComponents<Canvas>().Length == 1
+                    && t_target.GetComponents<GraphicRaycaster>().Length == 1
+                    && !t_target.GetComponent<Canvas>().overrideSorting
+                    && t_target.GetComponent<GraphicRaycaster>().enabled,
+                    "Same-frame demotion lost normal input or duplicated components.");
+            }
+            t_target.GetComponent<GraphicRaycaster>().enabled = false;
+            t_target.GetComponent<Canvas>().enabled = false;
+            t_promote.Invoke(t_gate, new object[] { t_target, true });
+            t_demote.Invoke(t_gate, null);
+            Require(!t_target.GetComponent<GraphicRaycaster>().enabled && !t_target.GetComponent<Canvas>().enabled,
+                "Promotion changed an originally disabled component.");
+        }
+        finally { UnityEngine.Object.DestroyImmediate(t_owner); }
     }
 
     static void ValidateStorage(GuideMissionFlow _flow, int _stepId)
@@ -124,6 +162,9 @@ public static class GuideResumeValidation
         t_owner.SetActive(false);
         var t_blocker = new GameObject("GuideResumeValidation.Blocker", typeof(RectTransform), typeof(Image))
             { hideFlags = HideFlags.HideAndDontSave };
+        var t_navigation = new GameObject("GuideResumeValidation.Navigation", typeof(RectTransform),
+            typeof(Canvas), typeof(GraphicRaycaster), typeof(LobbyTabBarView))
+            { hideFlags = HideFlags.HideAndDontSave };
         var t_restore = new List<Action>();
         object t_action = InstanceField(_step, "action").GetValue(_step);
         object t_anchor = InstanceField(_step, "anchor").GetValue(_step);
@@ -135,12 +176,21 @@ public static class GuideResumeValidation
             Replace(t_restore, typeof(GuidanceCoordinator), "s_instance", t_coordinator);
             Replace(t_restore, typeof(OutgameTutorialGateUI), "<Instance>k__BackingField", t_gate);
             SetInstance(t_coordinator, "m_flowLocked", true);
+            SetInstance(t_coordinator, "m_flowPreparing", true);
             SetInstance(t_coordinator, "m_shell", t_tabs);
             SetInstance(t_tabs, "tabs", new List<LobbyTabController.Tab>
                 { new LobbyTabController.Tab { tutorialAnchor = EOutgameTutorialAnchor.LobbyCollectionTab } });
             SetInstance(t_tabs, "m_currentIndex", 0);
+            SetInstance(t_tabs, "tabBar", t_navigation.GetComponent<LobbyTabBarView>());
+            var t_navigationCanvas = t_navigation.GetComponent<Canvas>();
+            t_navigationCanvas.overrideSorting = true;
+            t_navigationCanvas.sortingOrder = UiSortingOrder.LobbyBarsLifted;
             SetInstance(t_gate, "m_gateRoot", t_blocker);
             SetInstance(t_gate, "blocker", t_blocker.GetComponent<Image>());
+            var t_message = new GameObject("Message", typeof(RectTransform), typeof(TextMeshProUGUI));
+            t_message.transform.SetParent(t_blocker.transform, false);
+            SetInstance(t_gate, "messageRect", t_message.GetComponent<RectTransform>());
+            SetInstance(t_gate, "messageText", t_message.GetComponent<TextMeshProUGUI>());
             SetInstance(_step, "action", EOutgameTutorialAction.WaitClick);
             SetInstance(_step, "anchor", EOutgameTutorialAnchor.LobbyCollectionTab);
             Require(GuidanceCoordinator.IsCurrentTabAnchor(_step.Anchor)
@@ -149,6 +199,7 @@ public static class GuideResumeValidation
             t_gate.ShowTransitionGate(t_coordinator);
             Require(t_gate.IsTransitionOnly && t_blocker.GetComponent<Image>().raycastTarget
                 && t_blocker.GetComponent<Image>().color.a == 0f, "Transition is not a transparent input blocker.");
+            Require(!t_message.activeSelf, "Transition preparation must not show a message.");
             Require(!GuidanceCoordinator.AllowsUserAction(_step.Anchor)
                 && !GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.None),
                 "Checkpoint transition allowed target or unrelated input.");
@@ -160,15 +211,36 @@ public static class GuideResumeValidation
                     "Owned internal screen restoration was blocked.");
             Require(!GuidanceCoordinator.IsInternalNavigation, "Internal navigation escaped its scope.");
             t_gate.Clear(t_coordinator);
+            SetInstance(t_coordinator, "m_flowPreparing", false);
             Require(GuidanceCoordinator.CanCloseCardDetail && GuidanceCoordinator.CanCloseAlbum,
                 "Confirmed lobby return step cannot close its surfaces.");
             SetInstance(_step, "action", EOutgameTutorialAction.WaitCardDetailReturn);
             Require(GuidanceCoordinator.CanCloseCardDetail && !GuidanceCoordinator.CanCloseAlbum,
-                "Card-detail return opened the album exit as well.");
+                "Card-detail return allowed an unrelated album exit.");
             SetInstance(_step, "action", EOutgameTutorialAction.WaitClick);
             Require(GuidanceCoordinator.AllowsUserAction(_step.Anchor)
                 && !GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.LobbyDeckTab),
                 "Confirmed click step does not restrict navigation to its target.");
+            Require(!GuidanceCoordinator.AllowsUserNavigation(EOutgameTutorialAnchor.LobbyDeckTab)
+                && !GuidanceCoordinator.CanCloseCardDetail && !GuidanceCoordinator.CanCloseAlbum,
+                "An active guide allowed deferral through unrelated navigation.");
+            t_gate.ShowBanner(t_coordinator, "Navigation test");
+            Require(t_navigationCanvas.sortingOrder == UiSortingOrder.LobbyBarsLifted,
+                "Guidance promoted unrelated navigation above its gate.");
+            OnboardingSession.SetPhase(EOnboardingPhase.Confirming);
+            Require(!GuidanceCoordinator.AllowsUserNavigation(_step.Anchor),
+                "Confirmation allowed navigation before saving.");
+            t_gate.Clear(t_coordinator);
+            OutgameTutorialRunner.AbortGuided();
+            OnboardingSession.SetPhase(EOnboardingPhase.Waiting);
+            int t_sessionVersion = OnboardingSession.Version;
+            typeof(GuidanceCoordinator).GetMethod("CancelMissionFlow", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(t_coordinator, new object[] { false, true });
+            Require(OnboardingSession.Version == t_sessionVersion
+                && OnboardingSession.Phase == EOnboardingPhase.Waiting,
+                "An idle guidance coordinator suspended a session it does not own.");
+            OutgameTutorialRunner.ResumeDeferred(TRIGGER);
+            OutgameTutorialRunner.Fire(TRIGGER);
         }
         finally
         {
@@ -176,8 +248,49 @@ public static class GuideResumeValidation
             SetInstance(_step, "anchor", t_anchor);
             UnityEngine.Object.DestroyImmediate(t_owner);
             UnityEngine.Object.DestroyImmediate(t_blocker);
+            UnityEngine.Object.DestroyImmediate(t_navigation);
             for (int t_i = t_restore.Count - 1; t_i >= 0; t_i--) t_restore[t_i]();
         }
+    }
+
+    static void ValidateDraftIsolation()
+    {
+        var t_owner = new GameObject("GuideResumeValidation.Draft") { hideFlags = HideFlags.HideAndDontSave };
+        t_owner.SetActive(false);
+        string t_saveBefore = DataSaveManager.CreateSnapshot();
+        try
+        {
+            var t_editor = t_owner.AddComponent<DeckEditController>();
+            var t_modeField = InstanceField(t_editor, "m_mode");
+            t_modeField.SetValue(t_editor, Enum.ToObject(t_modeField.FieldType, 1));
+            SetInstance(t_editor, "m_slotIndex", 0);
+            SetInstance(t_editor, "m_dirty", true);
+            SetInstance(t_editor, "m_savedName", "Draft test");
+            var t_cards = (int[])InstanceField(t_editor, "m_working").GetValue(t_editor);
+            t_cards[0] = 900101;
+            t_cards[3] = 900104;
+            var t_draft = t_editor.CaptureDraft();
+            t_editor.Close();
+            t_modeField.SetValue(t_editor, Enum.ToObject(t_modeField.FieldType, 1));
+            SetInstance(t_editor, "m_slotIndex", 0);
+            t_editor.RestoreDraft(t_draft);
+            Require(t_editor.WorkingCards[0] == 900101 && t_editor.WorkingCards[3] == 900104
+                && (bool)InstanceField(t_editor, "m_dirty").GetValue(t_editor),
+                "Closing and reopening lost the unfinished deck or its dirty state.");
+            t_cards[0] = 0;
+            t_editor.RestoreDraft(t_draft);
+            Require(t_editor.WorkingCards[0] == 900101, "Draft shares the live working array.");
+            t_cards[0] = 0;
+            SetInstance(t_editor, "m_slotIndex", 1);
+            t_editor.RestoreDraft(t_draft);
+            Require(t_editor.WorkingCards[0] == 0, "Draft crossed deck slots.");
+            SetInstance(t_editor, "m_slotIndex", 0);
+            SetInstance(t_draft, "Session", ContentUnlockManager.SessionVersion - 1);
+            t_editor.RestoreDraft(t_draft);
+            Require(t_editor.WorkingCards[0] == 0, "Draft crossed account sessions.");
+            Require(DataSaveManager.CreateSnapshot() == t_saveBefore, "Draft capture or restore modified the save.");
+        }
+        finally { UnityEngine.Object.DestroyImmediate(t_owner); }
     }
 
     static void ValidateAuthoredGrowthSequence()

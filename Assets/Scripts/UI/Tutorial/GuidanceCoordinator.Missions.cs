@@ -6,12 +6,21 @@ using UnityEngine;
 
 public sealed partial class GuidanceCoordinator
 {
+    public enum EMissionGuideAction { None, Start, Resume }
+
+    sealed class GuidePreparationException : Exception
+    {
+        public GuidePreparationException()
+            : base("강화 가능한 카드나 샤드가 부족합니다. 준비되면 안내를 이어갈 수 있어요.") { }
+    }
+
     GuideMissionFlow m_flow;
     bool m_flowStarted;
     bool m_flowPreparing;
     bool m_flowLocked;
     bool m_flowDeferred;
     bool m_retryRequested;
+    string m_requestedMissionId;
     bool m_applicationPaused;
     int m_flowVersion;
     int m_flowSession;
@@ -34,6 +43,10 @@ public sealed partial class GuidanceCoordinator
             || (!IsRestoring && (OutgameTutorialGateUI.Instance == null || !OutgameTutorialGateUI.Instance.IsTransitionOnly)
                 && _anchor != EOutgameTutorialAnchor.None
                 && OutgameTutorialGuide.TryGetCurrentStep(out var t_step) && t_step.Anchor == _anchor);
+
+    /// <summary>안내가 허용한 이동만 통과시킨다.</summary>
+    public static bool AllowsUserNavigation(EOutgameTutorialAnchor _anchor)
+        => IsInternalNavigation || (!OnboardingSession.IsBusy && AllowsUserAction(_anchor));
 
     /// <summary>조정기와 스텝 실행기가 수행하는 화면 이동의 수명이다.</summary>
     public static IDisposable InternalNavigation() => new NavigationScope(s_instance);
@@ -64,10 +77,16 @@ public sealed partial class GuidanceCoordinator
     public static void RequestCurrentMission()
     {
         if (s_instance == null) return;
+        if (s_instance.m_flowSession != ContentUnlockManager.SessionVersion)
+        {
+            s_instance.CancelMissionFlow(false);
+            s_instance.m_flowSession = ContentUnlockManager.SessionVersion;
+        }
         s_instance.m_retryRequested = true;
+        s_instance.m_requestedMissionId = GuideMissionProgress.Current?.Id;
         s_instance.m_lastFlowFailure = null;
         foreach (var t_flow in GuideMissionFlows.All)
-            if (t_flow != null && (GuideMissionFlows.IsEligible(t_flow) || GuideResume.IsFor(t_flow.tutorial)))
+            if (t_flow != null && GuideMissionFlows.IsEligible(t_flow))
                 OutgameTutorialRunner.ResumeDeferred(t_flow.tutorial);
     }
 
@@ -75,28 +94,41 @@ public sealed partial class GuidanceCoordinator
     {
         if (s_instance == null || !GuideMissionProgress.IsCurrent(_missionId)) return false;
         if (IsInputLocked) return true;
-        if (GuideResume.HasPending) { RequestCurrentMission(); return true; }
+        if (GetMissionGuideAction(_missionId) == EMissionGuideAction.None) return false;
         if (_missionId == MATCH_MISSION_ID) return s_instance.RequestMatchMission();
+        RequestCurrentMission();
+        return true;
+    }
+
+    /// <summary>미루기 상태를 바꾸지 않고 현재 미션의 안내 시작·재개 여부를 조회한다.</summary>
+    public static EMissionGuideAction GetMissionGuideAction(string _missionId)
+    {
+        if (s_instance == null || !GuideMissionProgress.IsCurrent(_missionId)) return EMissionGuideAction.None;
+        if (_missionId == MATCH_MISSION_ID)
+            return s_instance.CanRequestMatchMission() ? EMissionGuideAction.Start : EMissionGuideAction.None;
         foreach (var t_flow in GuideMissionFlows.All)
         {
             if (t_flow == null || t_flow.missionId != _missionId) continue;
-            RequestCurrentMission();
-            return PendingIntros(t_flow).Count > 0 || OutgameTutorialRunner.HasPending(t_flow.tutorial);
+            if (GuideResume.IsFor(t_flow.tutorial)) return EMissionGuideAction.Resume;
+            return PendingIntros(t_flow).Count > 0 || OutgameTutorialRunner.HasPending(t_flow.tutorial, _includeDeferred: true)
+                ? EMissionGuideAction.Start : EMissionGuideAction.None;
         }
-        return false;
+        return EMissionGuideAction.None;
     }
 
     GuideMissionFlow FindMissionFlow()
     {
-        if (GuideResume.HasPending)
+        if (m_retryRequested && GuideMissionProgress.IsCurrent(m_requestedMissionId) && GuideResume.HasPending)
         {
             foreach (var t_flow in GuideMissionFlows.All)
-                if (t_flow != null && GuideResume.IsFor(t_flow.tutorial)) return t_flow;
-            GuideResume.Clear();
+                if (t_flow != null && t_flow.missionId == m_requestedMissionId
+                    && GuideResume.IsFor(t_flow.tutorial)) return t_flow;
         }
         foreach (var t_flow in GuideMissionFlows.All)
         {
             if (t_flow == null || !GuideMissionFlows.IsEligible(t_flow)) continue;
+            if (!string.IsNullOrEmpty(t_flow.missionId)
+                && (!m_retryRequested || t_flow.missionId != m_requestedMissionId)) continue;
             if (PendingIntros(t_flow).Count > 0 || OutgameTutorialRunner.HasPending(t_flow.tutorial)) return t_flow;
         }
         return null;
@@ -128,6 +160,11 @@ public sealed partial class GuidanceCoordinator
             return true;
         }
         if (m_flowDeferred && !m_retryRequested) return false;
+        if (m_retryRequested && !GuideMissionProgress.IsCurrent(m_requestedMissionId))
+        {
+            m_retryRequested = false;
+            m_requestedMissionId = null;
+        }
         if (OutgameTutorialRunner.IsRunning || OutgameTutorialRunner.IsGuidedRunning) return false;
         var t_flow = FindMissionFlow();
         if (t_flow == null) return false;
@@ -151,8 +188,9 @@ public sealed partial class GuidanceCoordinator
         {
             ShowTransition();
             var t_flow = m_flow;
+            await OnboardingCommands.RecoverPendingAsync(_ct);
+            EnsureFlow(_version, _ct);
             if (t_flow.tutorial != EOutgameTutorialTrigger.None) GuideResume.Begin(t_flow);
-            if (!await GuideResume.SaveConfirmedAsync(_ct)) throw new InvalidOperationException("안내 진행을 저장하지 못했습니다.");
             EnsureFlow(_version, _ct);
             var t_intros = PendingIntros(t_flow);
             if (t_intros.Count > 0)
@@ -175,17 +213,15 @@ public sealed partial class GuidanceCoordinator
             }
             if (GuideResume.IsFor(t_flow.tutorial)) GuideResume.Record.IntroductionSeen = true;
             DataSaveManager.Save();
-            if (!await GuideResume.SaveConfirmedAsync(_ct)) throw new InvalidOperationException("해금 안내 결과를 저장하지 못했습니다.");
             EnsureFlow(_version, _ct);
             if (t_flow.tutorial == EOutgameTutorialTrigger.None) { CancelMissionFlow(false); return; }
             if (!PrepareFlowTarget(t_flow))
-                throw new InvalidOperationException("강화 가능한 카드나 샤드가 부족합니다. 준비되면 안내를 이어갑니다.");
+                throw new GuidePreparationException();
             if (t_flow.tutorial == EOutgameTutorialTrigger.CollectionTabFirstEnter
                 || t_flow.tutorial == EOutgameTutorialTrigger.SynergyGrowthIntroduction)
                 GuideResume.SetTarget(OutgameTutorialGuide.TargetCardId, OutgameTutorialGuide.TargetLevel);
             await RestoreFlowSurfaceAsync(t_flow, _ct);
             EnsureFlow(_version, _ct);
-            if (!await GuideResume.SaveConfirmedAsync(_ct)) throw new InvalidOperationException("안내 재개 위치를 저장하지 못했습니다.");
             EnsureFlow(_version, _ct);
             m_flowPreparing = false;
             ClearTransition();
@@ -200,6 +236,12 @@ public sealed partial class GuidanceCoordinator
             m_lastFlowFailure = null;
         }
         catch (OperationCanceledException) { }
+        catch (GuidePreparationException t_exception)
+        {
+            if (_version != m_flowVersion) return;
+            CancelMissionFlow(true);
+            ShowPreparationFailure(t_exception.Message);
+        }
         catch (Exception t_exception)
         {
             if (_version == m_flowVersion) DeferCurrentGuide(t_exception.Message);
@@ -227,8 +269,9 @@ public sealed partial class GuidanceCoordinator
             OutgameTutorialGuide.PrepareSynergyGrowth();
             return OutgameTutorialGuide.IsGrowthGoalReached || OutgameTutorialGuide.CanContinueEnhance();
         }
-        return OutgameTutorialRunner.TryGetGuidedChapter(_flow.tutorial, out _, out var t_chapter)
-            && OutgameTutorialGuide.PrepareEnhanceCard(t_chapter);
+        if (!OutgameTutorialRunner.TryGetGuidedChapter(_flow.tutorial, out _, out var t_chapter))
+            throw new InvalidOperationException("강화 안내 데이터를 찾지 못했습니다.");
+        return OutgameTutorialGuide.PrepareEnhanceCard(t_chapter);
     }
 
     async UniTask CompleteFlowAsync(int _version)
@@ -257,8 +300,10 @@ public sealed partial class GuidanceCoordinator
     void ShowTransition() => OutgameTutorialBridge.EnsureGateForGuidance()?.ShowTransitionGate(this);
     void ClearTransition() => OutgameTutorialGateUI.Instance?.Clear(this);
 
-    void CancelMissionFlow(bool _defer)
+    void CancelMissionFlow(bool _defer, bool _closeSurface = true)
     {
+        bool t_ownedGuidance = m_flow != null || OutgameTutorialRunner.IsGuidedRunning;
+        var t_trigger = m_flow != null ? m_flow.tutorial : OutgameTutorialRunner.GuidedTrigger;
         bool t_ownedAdventure = m_flow != null && m_flow.tutorial == EOutgameTutorialTrigger.AdventureUnlocked;
         bool t_ownedGrowth = m_flow != null && (m_flow.tutorial == EOutgameTutorialTrigger.CollectionTabFirstEnter
             || m_flow.tutorial == EOutgameTutorialTrigger.SynergyGrowthIntroduction);
@@ -273,17 +318,36 @@ public sealed partial class GuidanceCoordinator
         m_flowDeferred = _defer;
         m_retryRequested = false;
         ClearTransition();
+        m_requestedMissionId = null;
         using (InternalNavigation())
         {
-            OutgameTutorialRunner.AbortGuided();
+            if (t_ownedGuidance) OnboardingSession.Suspend();
+            OutgameTutorialRunner.AbortGuided(_defer ? t_trigger : EOutgameTutorialTrigger.None);
             ContentUnlockPresentation.CancelCurrent();
-            if (t_ownedAdventure && _defer) m_launcher?.CancelGuidedAdventureEntry();
-            if (t_ownedGrowth && _defer)
+            if (t_ownedAdventure && _defer && _closeSurface) m_launcher?.CancelGuidedAdventureEntry();
+            if (t_ownedGrowth && _defer && _closeSurface)
             {
                 CardDetailOverlayView.Close();
                 AlbumPageOverlayView.CloseOpen();
             }
         }
+    }
+
+    void ShowPreparationFailure(string _reason)
+    {
+        UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
+        {
+            titleText = _reason,
+            yesText = "재시도",
+            yesAction = RequestCurrentMission,
+            noText = "나중에",
+            noAction = ReturnToMatchAfterPreparationFailure,
+        });
+    }
+
+    void ReturnToMatchAfterPreparationFailure()
+    {
+        using (InternalNavigation()) m_shell?.TrySelectFeature(EOutgameFeature.LobbyMatchTab);
     }
 
     void ShowFlowFailure(string _reason)
@@ -296,7 +360,17 @@ public sealed partial class GuidanceCoordinator
             titleText = _reason,
             yesText = "재시도",
             yesAction = RequestCurrentMission,
-            noText = "나중에",
+            noText = "종료",
+            noAction = QuitAfterFlowFailure,
         });
     }
+    static void QuitAfterFlowFailure()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
 }
