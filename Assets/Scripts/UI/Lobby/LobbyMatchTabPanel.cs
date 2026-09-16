@@ -310,7 +310,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (t_result != null) MissionPanel.ShowClaimedRewards(new[] { t_result }, _onClosed: () =>
         {
             if (t_preview != null) t_preview.EndClaim(t_version, true);
-        });
+        }, _showCardsIndividually: true);
     }
 
     static bool AnyGuideMissionOpen()

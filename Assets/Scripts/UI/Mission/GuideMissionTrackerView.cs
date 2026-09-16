@@ -11,7 +11,6 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
     [SerializeField] TMP_Text actText;
     [SerializeField] TMP_Text titleText;
     [SerializeField] TMP_Text progressText;
-    [SerializeField] TMP_Text actionText;
     [SerializeField] GameObject hintRoot;
     [SerializeField] CanvasGroup canvasGroup;
 
@@ -39,7 +38,6 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
     Tween m_progressTween;
     Tween m_rewardTween;
     Color m_progressColor;
-    Color m_actionColor;
     bool m_initialized;
 
     public event Action PresentationFinished;
@@ -103,7 +101,6 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
         m_button = GetComponent<Button>();
         if (titleText != null) titleText.maxVisibleLines = 2;
         if (progressText != null) m_progressColor = progressText.color;
-        if (actionText != null) m_actionColor = actionText.color;
     }
 
     void OnEnable()
@@ -131,7 +128,7 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
         bool t_ready = GuidanceCoordinator.CanNavigateFromMatchTab(null);
         if (m_holdingClaim && m_rewardsClosed && !m_transitioning
             && Time.frameCount > m_closedFrame && t_ready) PlayNextMission();
-        if (!m_transitioning) RefreshAction(t_ready);
+        if (!m_transitioning) RefreshInteractable(t_ready);
         if (hintRoot == null) return;
         if (hintRoot.activeSelf && (!t_ready || Time.unscaledTime >= m_hintUntil)) hintRoot.SetActive(false);
         if (!m_holdingClaim && m_displayed != null && t_ready && GuidanceCoordinator.CanPresent
@@ -165,7 +162,6 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
             if (this.actText != null) this.actText.text = string.Empty;
             if (this.titleText != null) this.titleText.text = string.Empty;
             if (this.progressText != null) this.progressText.text = string.Empty;
-            if (this.actionText != null) this.actionText.text = string.Empty;
             if (this.rewardIcon != null) this.rewardIcon.gameObject.SetActive(false);
             if (this.rewardCountText != null) this.rewardCountText.text = string.Empty;
             m_displayed = null;
@@ -173,7 +169,8 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
         }
 
         if (this.actText != null)
-            this.actText.text = GuideMissionTrack.TryGetAct(t_definition, out GuideMissionTrack.GuideAct t_act) ? t_act.Label : string.Empty;
+            this.actText.text = GuideMissionTrack.TryGetAct(t_definition, out GuideMissionTrack.GuideAct t_act)
+                ? $"가이드미션 {t_act.Name}" : "가이드미션";
         if (this.titleText != null) this.titleText.text = t_definition.Title ?? string.Empty;
 
         long t_target = t_definition.Target;
@@ -187,17 +184,13 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
         m_displayed = t_definition;
         m_progress = t_progress;
         m_complete = t_complete;
-        if (actionText != null) actionText.color = t_complete ? new Color(1f, 0.86f, 0.42f) : m_actionColor;
-        RefreshAction(m_settled && GuidanceCoordinator.CanNavigateFromMatchTab(null));
+        RefreshInteractable(m_settled && GuidanceCoordinator.CanNavigateFromMatchTab(null));
         this.ApplyReward(t_definition);
     }
 
-    void RefreshAction(bool _ready)
+    void RefreshInteractable(bool _ready)
     {
         var t_state = GuideMissionPreviewState.Of(m_displayed);
-        if (actionText != null) actionText.text = m_holdingClaim
-            ? MissionCommands.IsInFlight(m_displayed.Id) ? "수령 중…" : "보상 확인 중…"
-            : t_state.Label;
         if (m_button != null) m_button.interactable = _ready && !m_holdingClaim && t_state.CanExecute;
     }
 
@@ -230,7 +223,6 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
         {
             if (titleText != null) titleText.text = t_finished ? "가이드 완료" : m_claimAct;
             if (progressText != null) progressText.text = "완료";
-            if (actionText != null) actionText.text = string.Empty;
             PlayCompleted();
             t_sequence.AppendInterval(0.8f);
         }
