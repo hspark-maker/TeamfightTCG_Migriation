@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>Owns every visual and input detail inside the lobby bottom tab bar.</summary>
-public sealed class LobbyTabBarView : MonoBehaviour, IUIInitializable
+public sealed class LobbyTabBarView : MonoBehaviour, IUIInitializable, ICanvasRaycastFilter
 {
     [SerializeField] RectTransform focus;
     [SerializeField] Image focusIcon;
@@ -27,6 +27,10 @@ public sealed class LobbyTabBarView : MonoBehaviour, IUIInitializable
 
     public event Action<int> Selected;
     public int Count { get { EnsureViews(); return m_views.Length; } }
+
+    // 탭바가 딤보다 위로 승격되어 있어도 연출 뒤의 버튼이 터치를 받지 않는다.
+    public bool IsRaycastLocationValid(Vector2 _position, Camera _camera)
+        => !GuidanceCoordinator.IsLobbyPresentationBlockingNavigation;
 
     void Awake() => InitializeUI();
 

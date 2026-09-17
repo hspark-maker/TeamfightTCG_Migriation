@@ -22,6 +22,9 @@ public static class OutgameTutorialRunner
     // 진행도가 다음 스텝으로 넘어갈 때 발화
     public static event Action OnStepChanged;
 
+    /// <summary>전투 진입 실패·취소 후 같은 로비에서 안내를 재개한다.</summary>
+    public static event Action OnBattleEntryRestored;
+
     /// <summary>강제 온보딩을 처음 졸업한 순간.</summary>
     public static event Action OnSequenceCompleted;
 
@@ -595,6 +598,20 @@ public static class OutgameTutorialRunner
         OutgameTutorialProgress.Save();
     }
 
+    /// <summary>전투 진입을 취소하거나 거절당했으면 저장된 진입 스텝에서 안내를 다시 건다.</summary>
+    public static void RestorePendingBattleEntry()
+    {
+        int t_pendingId = DataSaveManager.Data.Tutorial?.Execution?.BattleEntryStepId ?? 0;
+        if (t_pendingId <= 0 || !TryFindStepId(t_pendingId, out int t_chapter, out int t_step)
+            || t_chapter >= ForcedChapterCount
+            || (!OutgameTutorialProgress.IsCompleted && OutgameTutorialProgress.StepId == t_pendingId)) return;
+
+        DataSaveManager.Data.Tutorial.OutgameCompleted = false;
+        OutgameTutorialProgress.CommitStep(t_chapter, t_step);
+        OutgameFeatureLock.Refresh();
+        OnBattleEntryRestored?.Invoke();
+    }
+
     /// <summary>버튼 리스너의 완료 저장이 끝난 뒤에만 씬을 떠난다.</summary>
     public static async UniTask<bool> ConfirmBattleDepartureAsync(CancellationToken _ct)
     {
@@ -677,6 +694,10 @@ public static class OutgameTutorialRunner
 
         if (t_chapter >= ForcedChapterCount)
         {
+            // 클릭 완료는 전투 결과가 아니다. 덱 선택/매칭 중 다른 UI 이벤트가 안내를 갱신해도
+            // 실제 결과 통지로 pending이 해제되기 전에는 졸업하지 않는다.
+            if ((DataSaveManager.Data.Tutorial?.Execution?.BattleEntryStepId ?? 0) > 0)
+                return EOutgameTutorialStepResult.Gated;
             // 끝 좌표(마지막 강제 스텝 바로 다음 자리)는 정상이다 — 전투로 나간 마지막 스텝이 미뤄 둔 졸업을 여기서 확정한다.
             // 브리지 Start에서 도는 자리라 로비 랭크 연출 디렉터의 캐리어 소비(다음 프레임)보다 앞선다.
             // 저작이 강제 챕터를 줄여 좌표가 자율 챕터 안에 남은 세이브도 여기로 온다 — 그 안내는 낙인이 없으니 알림 점이 다시 부른다.

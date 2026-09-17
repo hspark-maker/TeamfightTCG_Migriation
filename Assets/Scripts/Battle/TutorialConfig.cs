@@ -20,7 +20,8 @@ public static class TutorialConfig
     /// <summary>중단된 씬과 실제 전투 결과를 구분해 통지한다.</summary>
     public static void NotifyBattleFinished()
     {
-        if (IsActive) BattleFinished?.Invoke();
+        // 마지막 강제 안내는 대본 없는 일반 전투다. 그 결과도 진입 체크포인트를 해제해야 한다.
+        BattleFinished?.Invoke();
     }
 
     /// <summary>튜토리얼 고정 시드(임의 상수). 이 값으로 <see cref="MatchRandom"/>을 시드하면

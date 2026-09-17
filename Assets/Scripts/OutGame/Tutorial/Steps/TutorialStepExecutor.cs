@@ -33,7 +33,8 @@ public static class TutorialStepExecutor
         }
         if (_step.Action == EOutgameTutorialAction.AutoPurchase)
             return await PurchaseAndOpenAsync(_step, _context, _ct);
-        if (_step.Scenario != null && (_step.Action == EOutgameTutorialAction.AutoBattle
+        if ((_step.Scenario != null || OutgameTutorialRunner.IsRunning)
+            && (_step.Action == EOutgameTutorialAction.AutoBattle
             || _step.Action == EOutgameTutorialAction.BattleEntry))
             OutgameTutorialRunner.MarkPendingBattle(_step.StepId);
         if (t_meta.RequiresEntryConfirmation && !await GuideResume.SaveConfirmedAsync(_ct))

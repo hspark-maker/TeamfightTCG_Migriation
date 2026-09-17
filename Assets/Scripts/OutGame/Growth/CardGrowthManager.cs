@@ -288,13 +288,14 @@ public static partial class CardGrowthManager
         OnGrowthChanged?.Invoke();
     }
 
-    // 무료 한 방을 청구했는데 서버가 잔액 부족·만렙으로 막았다면 그 한 방은 이미 서버가 먹은 뒤다
-    // (안내 구간에는 제 돈으로 낼 잔액이 없다) — 응답을 잃어 클라만 모르는 자리라 표식을 다시 읽는다.
+    // 무료 한 방의 소진 거절(NotReady)·잔액 부족·만렙은 응답을 잃어 클라만 미사용으로 아는 경우가 있다.
+    // 서버 표식을 한 번 다시 읽고, 실제 소진이 확인될 때만 안내가 완료를 판정한다.
     // 왕복은 이 갈래에서만 늘어난다: 무료가 아닌 강화의 평범한 잔액 부족에는 붙지 않는다.
     static async UniTask RefreshFreeShotMarkIfRejectedAsync(bool _freeShot, EnhanceCommandResult _command)
     {
         if (!_freeShot || !_command.RejectedByServer) return;
-        if (_command.Outcome != EEnhanceOutcome.NotAffordable && _command.Outcome != EEnhanceOutcome.MaxLevel) return;
+        if (_command.Outcome != EEnhanceOutcome.NotReady && _command.Outcome != EEnhanceOutcome.NotAffordable
+            && _command.Outcome != EEnhanceOutcome.MaxLevel) return;
 
         await OutgameTutorialGuide.RefreshFreeShotSpentAsync();
     }

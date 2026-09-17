@@ -186,8 +186,7 @@ public class OutgameTutorialGateUI : MonoBehaviour
     /// 버튼이 없으면 소프트락이므로 게이트를 걸지 않는다.
     /// _onSatisfied가 null이면 클릭을 완료로 보지 않는다 — 딤만 유지하고 완료는 호출자가 다른 신호로 판정한다
     /// (구매처럼 눌러도 실패할 수 있는 스텝).
-    /// <paramref name="_dim"/>=false면 손가락·문구만 띄우고 차단은 기능 잠금(OutgameFeatureLock)에 맡긴다 —
-    /// 딤이 없으면 타깃을 가릴 것도 없으므로 승격도 하지 않는다.
+    /// <paramref name="_dim"/>=false면 딤 색만 숨긴다. 강제 안내 구간에서는 투명 차단판과 타깃 승격을 유지한다.
     /// <paramref name="_spotlight"/>는 타깃과 함께 밝힐 영역이다 — 보라고 올릴 뿐 누를 수는 없다(레이캐스터를 붙이지 않는다).
     /// 없으면(null) 종전대로 타깃만 올라간다.
     /// <paramref name="_owner"/>는 무대를 가져가는 브리지다(불변식 3).</summary>

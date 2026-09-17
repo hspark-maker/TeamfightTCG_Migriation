@@ -213,6 +213,8 @@ public static class ContentUnlockIntroValidation
             Set("m_intros", new List<ContentUnlockIntroDef> { reordered });
             Set("m_introIndex", 0);
             ShowNext();
+            Require(!ContentUnlockPresentation.IsPlaying && !CanNavigate(),
+                "The visible intro must block tabs even without the presentation runner flag.");
             Require(message.text == reordered.items[0].name + " / " + reordered.items[1].name + " / " + reordered.items[2].name
                 && IconsVisible(3), "Non-mission grouped intro must follow authored order.");
             for (int i = 0; i < reordered.items.Length; i++)

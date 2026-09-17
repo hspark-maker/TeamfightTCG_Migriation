@@ -37,8 +37,47 @@ public sealed partial class GuidanceCoordinator
         }
     }
 
+    internal static async UniTask<bool> TryRestoreForcedSurfaceAsync(TutorialStepDef _step, CancellationToken _ct)
+    {
+        if (_step == null) return false;
+        EOutgameFeature t_tab;
+        switch (_step.Anchor)
+        {
+            case EOutgameTutorialAnchor.LobbyPlayButton:
+            case EOutgameTutorialAnchor.LobbyMatchTab:
+                t_tab = EOutgameFeature.LobbyMatchTab; break;
+            case EOutgameTutorialAnchor.PackBuyButton:
+            case EOutgameTutorialAnchor.LobbyPackTab:
+                t_tab = EOutgameFeature.LobbyPackTab; break;
+            case EOutgameTutorialAnchor.DeckEditCollectionCard:
+            case EOutgameTutorialAnchor.DeckEditSaveButton:
+            case EOutgameTutorialAnchor.LobbyDeckTab:
+                t_tab = EOutgameFeature.LobbyDeckTab; break;
+            case EOutgameTutorialAnchor.AlbumThemeCell:
+            case EOutgameTutorialAnchor.LobbyCollectionTab:
+                t_tab = EOutgameFeature.LobbyCollectionTab; break;
+            default: return false;
+        }
+        if (s_instance == null) throw new InvalidOperationException("안내 화면을 찾을 수 없습니다.");
+        // 커서를 과거 탭 스텝으로 되감으면 설명·진입 효과까지 재실행된다.
+        // 현재 스텝의 화면만 복원하고 완료된 단계는 다시 실행하지 않는다.
+        await s_instance.SelectFlowTabAsync(t_tab, _ct);
+        _ct.ThrowIfCancellationRequested();
+        using (InternalNavigation())
+        {
+            if (t_tab == EOutgameFeature.LobbyDeckTab && DeckEditController.OpenEditor == null
+                && s_instance.m_shell.CurrentPanel is DeckTabController t_deck)
+                t_deck.OpenEditor(DeckSaveManager.SelectedSlot);
+            if (_step.Anchor == EOutgameTutorialAnchor.AlbumThemeCell
+                && !AlbumInsertSession.IsRunning && s_instance.m_shell.CurrentPanel is AlbumTabController t_album)
+                t_album.PageOverlay?.Close();
+        }
+        return true;
+    }
+
     async UniTask SelectFlowTabAsync(EOutgameFeature _feature, CancellationToken _ct)
     {
+        _ct.ThrowIfCancellationRequested();
         if (m_shell == null) throw new InvalidOperationException("로비 화면을 찾을 수 없습니다.");
         bool t_arrived = false;
         using (InternalNavigation())

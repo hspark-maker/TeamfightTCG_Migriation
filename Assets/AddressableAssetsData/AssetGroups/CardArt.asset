@@ -46,7 +46,7 @@ MonoBehaviour:
     - Cards
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 08ec9e965eb22a94a84dddfdb7c124d4
-    m_Address: Image_Card_Crystahorn_Stage2
+    m_Address: Image_Card_Crystalhorn_Stage2
     m_ReadOnly: 0
     m_SerializedLabels:
     - Cards
@@ -634,7 +634,7 @@ MonoBehaviour:
     - Cards
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c7f9f74e17ae58148aeb88fb95465173
-    m_Address: Image_Card_Crystahorn_Stage3
+    m_Address: Image_Card_Crystalhorn_Stage3
     m_ReadOnly: 0
     m_SerializedLabels:
     - Cards
@@ -977,6 +977,18 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7f0748b1e8e8c164397304a98735edf4
     m_Address: Image_Card_Woodhorn_Stage1_Silhouette
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7efcaaf926fffc045a89f5e2b0e464f1
+    m_Address: Image_Card_Crystahorn_Stage3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Cards
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fcdd7389657e3e048ab11f6460426f53
+    m_Address: Image_Card_Crystahorn_Stage2
     m_ReadOnly: 0
     m_SerializedLabels:
     - Cards

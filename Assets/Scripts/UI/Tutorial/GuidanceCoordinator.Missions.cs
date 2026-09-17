@@ -30,11 +30,17 @@ public sealed partial class GuidanceCoordinator
     CancellationTokenSource m_flowCancellation;
 
     public static bool IsInputLocked => GuideMissionTrackerView.IsShowingNextMission
+        || (OutgameTutorialRunner.IsRunning && !OutgameFeatureLock.IsFtueFreeNavigation
+            && OutgameTutorialRunner.TryGetCurrentStep(out _))
         || (s_instance != null && s_instance.m_flowLocked);
     public static bool IsRestoring => s_instance != null && s_instance.m_flowPreparing;
     public static bool IsInternalNavigation => s_instance != null && s_instance.m_internalNavigation > 0;
     public static bool IsCurrentTabAnchor(EOutgameTutorialAnchor _anchor)
         => s_instance != null && s_instance.m_shell != null && s_instance.m_shell.IsCurrentAnchorSelected(_anchor);
+
+    internal static bool IsLobbyTabAnchor(EOutgameTutorialAnchor _anchor)
+        => _anchor == EOutgameTutorialAnchor.LobbyPackTab || _anchor == EOutgameTutorialAnchor.LobbyDeckTab
+            || _anchor == EOutgameTutorialAnchor.LobbyCollectionTab || _anchor == EOutgameTutorialAnchor.LobbyMatchTab;
 
     static bool HasPendingMissionFlow => s_instance != null
         && (s_instance.m_flow != null || s_instance.FindMissionFlow() != null);
@@ -48,14 +54,29 @@ public sealed partial class GuidanceCoordinator
 
     /// <summary>안내가 허용한 이동만 통과시킨다.</summary>
     public static bool AllowsUserNavigation(EOutgameTutorialAnchor _anchor)
-        => IsInternalNavigation || (!IsContentIntroBlockingNavigation
-            && !OnboardingSession.IsBusy && AllowsUserAction(_anchor));
+        => IsInternalNavigation || (!IsLobbyPresentationBlockingNavigation
+            && !OnboardingSession.IsBusy && AllowsUserAction(_anchor)
+            && AllowsFtueTabNavigation(_anchor));
+
+    // 해금된 탭이라도 강제 튜토리얼의 현재 단계에서 요구한 이동만 허용한다.
+    // useDim=false 단계도 동일하다. 자유 이동 구간과 조정기의 내부 복구 이동은 유지한다.
+    static bool AllowsFtueTabNavigation(EOutgameTutorialAnchor _anchor)
+        => !OutgameTutorialRunner.IsRunning || OutgameFeatureLock.IsFtueFreeNavigation
+            || (OutgameTutorialRunner.TryGetCurrentStep(out var t_step)
+                && t_step.Completion == EOutgameTutorialCompletion.Click
+                && _anchor != EOutgameTutorialAnchor.None && t_step.Anchor == _anchor);
 
     /// <summary>소개 무대 준비 후부터 아이콘 도착까지 이탈을 막는다. 다른 탭에 있으면 무대로 복귀할 수 있다.</summary>
     public static bool IsContentIntroBlockingNavigation => ContentUnlockPresentation.IsPlaying
         || (ContentUnlockPresentation.IsReady && OnboardingSession.IsActive
             && OutgameTutorialGuide.TryGetCurrentStep(out var t_step)
             && t_step.Completion == EOutgameTutorialCompletion.ContentUnlockIntro);
+
+    /// <summary>승급·보상에서 해금 소개와 아이콘 도착까지, 실제 연출 수명으로 탭 입력을 막는다.</summary>
+    public static bool IsLobbyPresentationBlockingNavigation => IsContentIntroBlockingNavigation
+        || ContentUnlockIntroView.IsOpen || UnlockIntroOverlay.IsOpen
+        || RankPromoteOverlay.IsOpen || LobbyRankEffectDirector.Playing
+        || GuideMissionTrackerView.IsShowingNextMission;
 
     /// <summary>조정기와 스텝 실행기가 수행하는 화면 이동의 수명이다.</summary>
     public static IDisposable InternalNavigation() => new NavigationScope(s_instance);

@@ -72,6 +72,7 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
     }
 
     bool HasPriorityActivity => !GameInitialization.IsReady || !isActiveAndEnabled
+        || (m_shell != null && m_shell.IsTransitioning)
         || CurtainView.IsBusy || LoadingCoverView.IsCovering
         || (SceneTransitionVideo.Instance != null && SceneTransitionVideo.Instance.IsPlaying)
         || (m_launcher != null && m_launcher.IsRunning)

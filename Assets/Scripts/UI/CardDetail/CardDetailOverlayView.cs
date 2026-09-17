@@ -263,6 +263,9 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     public static void Open(IReadOnlyList<int> _cards, int _index, CardDetailOpenOptions _options = default)
     {
         if (_cards == null || _cards.Count == 0) return;
+        // 팩 결과 등 자체 입력을 쓰는 화면에서도 강제 안내 밖의 상세 진입을 막는다.
+        // 닫기가 제한된 안내 중 다른 카드를 열면 획득 버튼으로 돌아갈 수 없다.
+        if (!GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.AlbumCardSlot)) return;
 
         CardDetailOverlayView t_view = Resolve();
         if (t_view == null) return;

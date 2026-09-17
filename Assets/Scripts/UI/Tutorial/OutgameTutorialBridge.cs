@@ -125,7 +125,13 @@ public class OutgameTutorialBridge : MonoBehaviour
     public static async UniTask PrepareLobbyReturnAsync(CancellationToken _ct)
     {
         await OnboardingCommands.RecoverPendingAsync(_ct);
+        _ct.ThrowIfCancellationRequested();
+        // 결과 없이 돌아온 무효 경기는 안내를 전투 진입점으로 복원한다.
+        // 정상 결과는 TurnRunner의 결과 통지에서 pending을 이미 해제했다.
+        OutgameTutorialRunner.RestorePendingBattleEntry();
         if (!CursorRunning) return;
+        if (OutgameTutorialRunner.IsRunning && !await GuideResume.SaveConfirmedAsync(_ct))
+            throw new InvalidOperationException("전투 안내 진행을 저장하지 못했습니다. 다시 시도해 주세요.");
         var t_owner = s_instance;
         if (t_owner == null) throw new InvalidOperationException("로비 안내 화면을 찾지 못했습니다.");
         t_owner.m_returnPreparing = true;
@@ -915,6 +921,10 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_step == null || m_completing || GuidanceCoordinator.IsRestoring
             || !OnboardingSession.CanAcceptCompletion
             || !TryGetCursorStep(out var t_current) || t_current != m_step) return;
+        // 탭 버튼의 클릭은 이동 요청이다. 이탈 확인·슬라이드까지 끝나야 다음 안내로 넘어간다.
+        if (m_step.Completion == EOutgameTutorialCompletion.Click
+            && GuidanceCoordinator.IsLobbyTabAnchor(m_step.Anchor)
+            && !GuidanceCoordinator.IsCurrentTabAnchor(m_step.Anchor)) return;
         m_satisfiedStep = m_step;
         CompleteStepAsync(m_step).Forget();
     }
@@ -991,6 +1001,12 @@ public class OutgameTutorialBridge : MonoBehaviour
             CloseGate();
             return;
         }
+        if (m_step.Completion == EOutgameTutorialCompletion.Click
+            && GuidanceCoordinator.IsCurrentTabAnchor(m_step.Anchor))
+        {
+            OnGateSatisfied();
+            return;
+        }
         if (m_step.Completion == EOutgameTutorialCompletion.SynergyDeckEditor)
         {
             if (SynergyBattleGuide.IsEditorOpen) OnGateSatisfied();
@@ -1027,6 +1043,7 @@ public class OutgameTutorialBridge : MonoBehaviour
             }
         }
         if (!m_enhancing && !m_awaitingUnlockFx
+            && !GuidanceCoordinator.IsLobbyPresentationBlockingNavigation
             && !CardDetailOverlayView.IsRitualPlaying && !CardDetailOverlayView.IsUnlockFxPlaying
             && !UnlockIntroOverlay.IsOpen && !SuppressGuideUI && m_step.Anchor != EOutgameTutorialAnchor.None
             && !(GuideResume.Record?.GoalReached == true && OutgameTutorialGuide.TargetCardId == 0
@@ -1041,6 +1058,7 @@ public class OutgameTutorialBridge : MonoBehaviour
             if (t_available)
             {
                 m_anchorMissingSince = -1f;
+                m_anchorRestoreStepId = 0;
                 if (OutgameTutorialGateUI.Instance != null && OutgameTutorialGateUI.Instance.IsTransitionOnly) TryOpenGate();
             }
             else if (m_anchorMissingSince < 0f)
@@ -1070,7 +1088,8 @@ public class OutgameTutorialBridge : MonoBehaviour
                 throw new InvalidOperationException("안내 대상을 찾지 못했습니다. 다시 시도해 주세요.");
             m_anchorRestoreStepId = _step.StepId;
             if (GuidedCursor) await GuidanceCoordinator.TryRestoreCurrentSurfaceAsync(m_stepToken);
-            else if (TryRestoreForcedSurface()) return;
+            else if (!await GuidanceCoordinator.TryRestoreForcedSurfaceAsync(_step, m_stepToken))
+                throw new InvalidOperationException("안내 화면을 복구하지 못했습니다. 다시 시도해 주세요.");
             m_stepToken.ThrowIfCancellationRequested();
             if (!OnboardingSession.IsCurrent(t_version, _step.StepId)) return;
             m_anchorMissingSince = Time.unscaledTime;
@@ -1079,26 +1098,6 @@ public class OutgameTutorialBridge : MonoBehaviour
         catch (OperationCanceledException) { }
         catch (Exception t_error) { ShowStepFailure(t_error); }
         finally { m_restoringSurface = false; }
-    }
-
-    bool TryRestoreForcedSurface()
-    {
-        int t_chapter = OutgameTutorialProgress.ChapterIndex;
-        for (int t_i = OutgameTutorialProgress.StepIndex - 1; t_i >= 0; t_i--)
-        {
-            if (!OutgameTutorialRunner.TryGetStepAt(t_chapter, t_i, out var t_step)) continue;
-            if (t_step.LeavesScene || t_step.Action == EOutgameTutorialAction.WaitPurchase
-                || t_step.Action == EOutgameTutorialAction.AutoPurchase) break;
-            if (t_step.Action != EOutgameTutorialAction.WaitClick) continue;
-            if (t_step.Anchor != EOutgameTutorialAnchor.LobbyDeckTab
-                && t_step.Anchor != EOutgameTutorialAnchor.LobbyPackTab
-                && t_step.Anchor != EOutgameTutorialAnchor.LobbyCollectionTab
-                && t_step.Anchor != EOutgameTutorialAnchor.LobbyMatchTab) continue;
-            OutgameTutorialProgress.CommitStep(t_chapter, t_i);
-            ApplyCurrentStep();
-            return true;
-        }
-        return false;
     }
 
     void TryPresentContentIntro()
@@ -1140,6 +1139,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_subscribed) return;
 
         TutorialAnchorRegistry.OnRegistered   += OnAnchorRegistered;
+        OutgameTutorialRunner.OnBattleEntryRestored += ApplyCurrentStep;
         OutgameTutorialRunner.OnGuidedActivated += OnGuidedActivated;
         KeywordGrowthManager.OnEnhanced       += OnKeywordEnhanced;
         PackRevealView.OnAnyPackOpened        += OnPackOpened;
@@ -1170,6 +1170,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (!m_subscribed) return;
 
         TutorialAnchorRegistry.OnRegistered   -= OnAnchorRegistered;
+        OutgameTutorialRunner.OnBattleEntryRestored -= ApplyCurrentStep;
         OutgameTutorialRunner.OnGuidedActivated -= OnGuidedActivated;
         KeywordGrowthManager.OnEnhanced       -= OnKeywordEnhanced;
         PackRevealView.OnAnyPackOpened        -= OnPackOpened;

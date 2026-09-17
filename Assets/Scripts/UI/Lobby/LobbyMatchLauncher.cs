@@ -374,11 +374,27 @@ public class LobbyMatchLauncher : MonoBehaviour
         m_matchShell?.Close();
         m_running = false;
         MissionCutInView.SetMatchEntry(false);
+        RestoreTutorialAfterEntryFailureAsync().Forget();
         UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
         {
             titleText = _message,
             yesText = "확인",
         });
+    }
+
+    async UniTaskVoid RestoreTutorialAfterEntryFailureAsync()
+    {
+        var t_ct = this.GetCancellationTokenOnDestroy();
+        int t_version = m_entryVersion;
+        try
+        {
+            // 버튼의 완료 리스너가 먼저 저장하던 좌표를 덮어쓰지 않게 그 왕복까지 기다린다.
+            await UniTask.NextFrame(cancellationToken: t_ct);
+            await UniTask.WaitUntil(() => !OnboardingSession.IsBusy, cancellationToken: t_ct);
+            if (this == null || m_running || t_version != m_entryVersion) return;
+            OutgameTutorialRunner.RestorePendingBattleEntry();
+        }
+        catch (System.OperationCanceledException) { }
     }
 
     // 각 클라가 씬을 열기 직전, 대치 연출·콘텐츠 확인 중 매칭이 취소되지 않았는지 확인한다.
@@ -458,6 +474,8 @@ public class LobbyMatchLauncher : MonoBehaviour
                 {
                     AdventureRun.End();
                     MissionCutInView.SetMatchEntry(false);
+                    if (this != null && !t_ct.IsCancellationRequested && t_version == m_entryVersion)
+                        RestoreTutorialAfterEntryFailureAsync().Forget();
                 }
             }
             t_cancellation.Dispose();
