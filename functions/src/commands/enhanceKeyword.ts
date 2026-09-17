@@ -36,7 +36,7 @@ import {
 /**
  * 도메인 거절 사유. **와이어 계약**이다 — 클라 EEnhanceOutcome 의 이름과 그대로 대조된다.
  */
-type EnhanceReject = "MaxLevel" | "NotAffordable" | "RuleUnavailable" | "KeywordNotSupported";
+type EnhanceReject = "MaxLevel" | "NotAffordable" | "RuleUnavailable" | "KeywordNotSupported" | "NotReady";
 
 /** 무료 한 방이 걸린 축. 카드 강화와 다른 축이라 따로 소진된다. */
 const FREE_SHOT_AXIS = "enhanceKeyword";
@@ -113,7 +113,10 @@ export const enhanceKeyword = onCall(async (request) => {
       let freeShot: TutorialGrants | null = null;
       if (grantsReference !== null) {
         const grants = readGrants(await transaction.get(grantsReference));
-        if (hasFreeShot(grants, FREE_SHOT_AXIS)) freeShot = grants;
+        if (!hasFreeShot(grants, FREE_SHOT_AXIS)) {
+          reject("NotReady", "The tutorial free enhancement was already used.", {uid, env, keyword});
+        }
+        freeShot = grants;
       }
 
       const charged = freeShot === null ? step.cost : 0;

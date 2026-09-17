@@ -10,7 +10,6 @@ public class GameInitializer : MonoBehaviour
     [SerializeField] BattleFieldView playerFieldView;
     [SerializeField] BattleFieldView enemyFieldView;
     [SerializeField] BattleIntro battleIntro;
-    [SerializeField] AudioClip battleBGM;
 
     // 커튼이 열리는 동안 올라오게 — 로비를 뺄 때와 같은 규약으로 배틀도 페이드로 들어온다.
     const float BattleBgmFadeInSeconds = 0.8f;
@@ -163,7 +162,7 @@ public class GameInitializer : MonoBehaviour
         }
         ReleaseMultiplayerInitScope();
 
-        SoundManager.Instance?.PlayBGM(this.battleBGM, BattleBgmFadeInSeconds);
+        SoundManager.Instance?.PlayBattleBGM(BattleBgmFadeInSeconds);
 
         // 인트로 순서: 카메라 확대 → 코인 토스 → 선공 턴 전환 연출 → 카드 배치(딜) → 턴 루프.
         var t_runner = GetComponent<TurnRunner>();

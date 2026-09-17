@@ -94,6 +94,9 @@ public static class ContentUnlockIntroValidation
         var scene = EditorSceneManager.NewPreviewScene();
         GameObject instance = null;
         GameObject dimInstance = null;
+        var presentationInstance = typeof(ContentUnlockPresentation).GetField("s_instance",
+            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        object previousPresentation = presentationInstance.GetValue(null);
         try
         {
             var dimPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
@@ -146,6 +149,8 @@ public static class ContentUnlockIntroValidation
             Require(confirmations == 0, "Early click completed intro.");
             DOTween.Goto(view, 0.15f, false);
             Require(!button.interactable, "Confirmation enabled halfway through entrance.");
+            DOTween.Goto(view, 0.6f, false);
+            Require(button.interactable, "Confirmation must become available within 0.6 seconds.");
             DOTween.Complete(view, true);
             Require(button.interactable, "Entrance completion did not enable confirmation.");
             button.onClick.Invoke();
@@ -178,6 +183,10 @@ public static class ContentUnlockIntroValidation
             var ownerObject = new GameObject("SequentialIntroValidation");
             UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(ownerObject, scene);
             var owner = ownerObject.AddComponent<ContentUnlockPresentation>();
+            presentationInstance.SetValue(null, owner);
+            bool CanNavigate() => GuidanceCoordinator.AllowsUserNavigation(EOutgameTutorialAnchor.LobbyCollectionTab);
+            bool navigationBeforeIntro = CanNavigate();
+            Require(navigationBeforeIntro, "Isolated navigation validation requires no other tutorial navigation lock.");
             const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
             var ownerType = typeof(ContentUnlockPresentation);
             void Set(string name, object value) => ownerType.GetField(name, flags).SetValue(owner, value);
@@ -215,6 +224,7 @@ public static class ContentUnlockIntroValidation
             }
             view.Close();
             Prepare();
+            Require(!CanNavigate(), "Lobby tab navigation must be blocked during an intro.");
             Require(message.text == mission.items[0].name + " / " + mission.items[1].name + " / " + mission.items[2].name && IconsVisible(3),
                 "Mission introduction must present both mission types and attendance on one panel.");
             DOTween.Complete(view, true);
@@ -223,6 +233,7 @@ public static class ContentUnlockIntroValidation
             Require(confirmations == 1 && !ContentUnlockIntroView.IsOpen
                 && (bool)ownerType.GetField("m_pendingIntro", flags).GetValue(owner),
                 "First confirmation must queue the next panel without completing the step.");
+            Require(!CanNavigate(), "Closing one panel must not unlock tab navigation before the next intro.");
             ShowNext();
             Require(message.text == roulette.items[0].name && IconsVisible() && !button.interactable,
                 "Next content must reopen with its own title and entrance gate.");
@@ -234,6 +245,7 @@ public static class ContentUnlockIntroValidation
             Require(confirmations == 1 && !ContentUnlockIntroView.IsOpen
                 && (bool)ownerType.GetField("m_pendingIntro", flags).GetValue(owner),
                 "Second confirmation must queue card enhancement without completing the step.");
+            Require(!CanNavigate(), "Tab navigation must remain blocked between all queued intros.");
             ShowNext();
             Require(message.text == enhance.items[0].name && IconsVisible() && !button.interactable
                 && firstIcon.sprite == enhance.items[0].icon,
@@ -244,6 +256,8 @@ public static class ContentUnlockIntroValidation
             DOTween.Complete(view, true);
             Require(confirmations == 2 && cancellations == 1 && !ContentUnlockIntroView.IsOpen,
                 "Only the last panel may complete the step, exactly once.");
+            Require(CanNavigate() == navigationBeforeIntro,
+                "Finishing the final intro must restore the previous navigation state.");
             Prepare();
             DOTween.Complete(view, true);
             button.onClick.Invoke();
@@ -252,6 +266,8 @@ public static class ContentUnlockIntroValidation
             Require(confirmations == 2 && cancellations == 2
                 && !(bool)ownerType.GetField("m_pendingIntro", flags).GetValue(owner),
                 "Cancellation between panels must clear the remaining queue without completion.");
+            Require(CanNavigate() == navigationBeforeIntro,
+                "Cancelling the intro queue must restore the previous navigation state.");
             var flightRoot = (RectTransform)serialized.FindProperty("_flightRoot").objectReferenceValue;
             var iconRoot = (RectTransform)serialized.FindProperty("iconRoot").objectReferenceValue;
             var stageGroup = (CanvasGroup)serialized.FindProperty("_contentGroup").objectReferenceValue;
@@ -442,13 +458,17 @@ public static class ContentUnlockIntroValidation
             }
             finally
             {
-                if (instance != null) UnityEngine.Object.DestroyImmediate(instance);
-                if (dimInstance != null)
+                try
                 {
-                    ScreenDimValidation.InvokeLifecycle(dimInstance.GetComponent<ScreenDim>(), "OnDestroy");
-                    UnityEngine.Object.DestroyImmediate(dimInstance);
+                    if (instance != null) UnityEngine.Object.DestroyImmediate(instance);
+                    if (dimInstance != null)
+                    {
+                        ScreenDimValidation.InvokeLifecycle(dimInstance.GetComponent<ScreenDim>(), "OnDestroy");
+                        UnityEngine.Object.DestroyImmediate(dimInstance);
+                    }
+                    EditorSceneManager.ClosePreviewScene(scene);
                 }
-                EditorSceneManager.ClosePreviewScene(scene);
+                finally { presentationInstance.SetValue(null, previousPresentation); }
             }
         }
     }

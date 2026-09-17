@@ -18,6 +18,8 @@ public static class FirebaseResourceBuild
         if (!Regex.IsMatch(PlayerSettings.bundleVersion, @"^[A-Za-z0-9][A-Za-z0-9._-]*$"))
             throw new InvalidOperationException("앱 버전은 영문·숫자·점·밑줄·하이픈만 사용할 수 있습니다.");
 
+        RemoteAudioBuildValidation.Validate();
+
         var t_settings = AddressableAssetSettingsDefaultObject.Settings;
         if (t_settings == null || !t_settings.BuildRemoteCatalog || !t_settings.EnableJsonCatalog)
             throw new InvalidOperationException("원격 JSON 카탈로그 설정이 필요합니다.");

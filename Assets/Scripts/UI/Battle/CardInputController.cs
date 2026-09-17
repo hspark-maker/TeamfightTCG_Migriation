@@ -3,15 +3,15 @@ using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 /// <summary>카드 한 장의 **입력 제스처 상태머신 전부**를 소유한다.
 /// 터치 시작 → 탭/드래그 판정 → 조준 방향·데드존 → 타깃 추적/거절 → 손 뗌(공격 발동/복귀)까지,
 /// 그리고 롱프레스(정보·시너지 팝업) 수명이 여기 있다.
 ///
 /// MonoBehaviour가 아니라 순수 C# 객체다 — <see cref="CardView"/>가 필드로 들고 생성한다.
-/// CardView에는 <c>OnMouseDown/Drag/Up</c>·<c>Update</c>·<c>OnDrawGizmos</c>가 얇은 전달 스텁으로만 남는다:
-/// Unity의 OnMouse* 메시지는 콜라이더가 달린 GameObject의 컴포넌트에만 가고,
-/// 별도 MonoBehaviour로 빼면 프리팹/씬 YAML을 재직렬화해야 하기 때문이다.
+/// CardView는 EventSystem 포인터 이벤트·Update·OnDrawGizmos를 전달한다.
+/// Physics2DRaycaster가 카드 콜라이더를 찾고 시작 포인터 하나를 끝까지 추적한다.
 ///
 /// 인스펙터 배선/튜닝값(dragThreshold·deadZoneRadius·dirThreshold·hintArrow·swipeGuide·dragLine·aimTilt*)은
 /// 전부 CardView의 SerializeField에 그대로 남고, 여기엔 생성자로 **값만** 주입된다.
@@ -57,6 +57,8 @@ public class CardInputController
     bool longPressSynergyShown;   // true면 카드 정보가 아니라 시너지 설명 팝업을 띄운 상태
     bool longPressDimShown;       // 누르는 동안 배경 어둡기를 띄웠나(팝업이 뜨기 전에도 켜지므로 따로 센다)
     CancellationTokenSource longPressCts;
+    InputPointer pointer;
+    bool pointerActive;
     #endregion
 
     public CardInputController(
@@ -85,9 +87,22 @@ public class CardInputController
     }
 
     #region Frame
-    /// <summary>CardView.Update가 매 프레임 그대로 전달. 입력이 닫혔을 때의 복귀 처리가 전부다.</summary>
+    /// <summary>시작 포인터의 이동·해제를 추적하고 입력이 닫히면 제스처를 취소한다.</summary>
     public void Tick()
     {
+        if (this.pointerActive)
+        {
+            if (!TurnState.CardInputAllowed || this.owner.BoundCard == null
+                || !this.pointer.TryRead(out var t_position, out var t_held, out var t_canceled) || t_canceled)
+                CancelPointer();
+            else
+            {
+                this.currentDragScreenPos = t_position;
+                if (t_held) HandlePointerDrag();
+                else ReleasePointer();   // Up 메시지가 유실되어도 한 번만 종료한다.
+            }
+        }
+
         // 입력이 닫히면(턴 종료/타임아웃 등) 무장된 탭 공격자 강조가 고착되지 않게 해제.
         if (BattleSelection.SelectedAttacker != null && !TurnState.CardInputAllowed)
             BattleSelection.Clear(_instant: true);   // 아래 MoveTo의 루트 DOKill에 축소 트윈이 잘리지 않게 즉시 확정.
@@ -115,14 +130,17 @@ public class CardInputController
     #endregion
 
     #region Pointer
-    public void OnMouseDown()
+    public void OnPointerDown(PointerEventData _event)
     {
+        if (this.pointerActive || _event.button != PointerEventData.InputButton.Left) return;
         if (!TurnState.CardInputAllowed || this.owner.BoundCard == null) return;
         if (TurnState.ForcedAttacker != null && this.owner.BoundCard.ownerIndex == TurnState.LocalOwnerIndex
             && this.owner.BoundCard != TurnState.ForcedAttacker) return;   // 적 카드는 통과(탭 공격 발사 위해)
 
         CancelLongPress();
-        this.touchStartScreenPos  = (Vector2)Input.mousePosition;
+        this.pointer = InputPointer.Capture(_event);
+        this.pointerActive = true;
+        this.touchStartScreenPos  = _event.position;
         this.dragStartScreenPos   = this.touchStartScreenPos;
         this.currentDragScreenPos = this.touchStartScreenPos;
         this.activeGesture        = Gesture.None;   // 새 터치 — 제스처 미확정(탭/드래그 판정 대기).
@@ -154,7 +172,19 @@ public class CardInputController
         this.owner.FocusWeapon(true);
     }
 
-    public void OnMouseDrag()
+    public void OnDrag(PointerEventData _event)
+    {
+        if (!this.pointerActive || !this.pointer.Matches(_event)) return;
+        if (!this.pointer.TryRead(out var t_position, out _, out var t_canceled) || t_canceled)
+        {
+            CancelPointer();
+            return;
+        }
+        this.currentDragScreenPos = t_position;
+        // 제스처 진행은 Tick에서 매 프레임 한 번만 한다(정지 중 조준 보간도 유지).
+    }
+
+    void HandlePointerDrag()
     {
         if (!TurnState.CardInputAllowed || this.owner.BoundCard == null) return;
 
@@ -162,10 +192,8 @@ public class CardInputController
         if (TurnState.ForcedAttacker != null && this.owner.BoundCard.ownerIndex == TurnState.LocalOwnerIndex
             && this.owner.BoundCard != TurnState.ForcedAttacker) return;   // 적 카드는 통과(탭 공격 발사 위해)
 
-        this.currentDragScreenPos = (Vector2)Input.mousePosition;
-
         // 튜토리얼 Inspect: 적 카드 롱프레스 팝업은 손 뗄 때까지 유지 — 작은 드리프트/데드존으로
-        // 사라지지 않게 취소 로직을 건너뛴다(실제 소비는 OnMouseUp의 NotifyInspected).
+        // 사라지지 않게 취소 로직을 건너뛴다(실제 소비는 ReleasePointer의 NotifyInspected).
         if (this.longPressFired && IsTutorialInspectTarget()) return;
 
         // 카드 범위를 벗어나면 즉시 설명 팝업을 닫는다.
@@ -228,8 +256,42 @@ public class CardInputController
         HandleAimDrag(t_drag, _forward: this.activeGesture != Gesture.DragDown);
     }
 
-    public void OnMouseUp()
+    public void OnPointerUp(PointerEventData _event)
     {
+        if (!this.pointerActive || !this.pointer.Matches(_event)) return;
+        if (!this.pointer.TryRead(out var t_position, out _, out var t_canceled) || t_canceled)
+        {
+            CancelPointer();
+            return;
+        }
+        this.currentDragScreenPos = t_position;
+        ReleasePointer();
+    }
+
+    public void CancelPointer()
+    {
+        if (!this.pointerActive && this.longPressCts == null && this.dragState == DragState.Idle) return;
+        bool t_wasDragging = this.dragState != DragState.Idle;
+        this.pointerActive = false;
+        this.dragState = DragState.Idle;
+        this.activeGesture = Gesture.None;
+        CancelLongPress();
+        this.swipeGuide?.SetVisible(false);
+        HideDragLine();
+        ClearTargetPreview();
+        ResetAimTilt();
+        if (t_wasDragging)
+        {
+            BattleBoardView.RestoreAllFades();
+            if (this.owner.isActiveAndEnabled) this.owner.MoveToSlot().Forget();
+        }
+        if (BattleSelection.SelectedAttacker != this.owner) this.owner.FocusWeapon(false);
+    }
+
+    void ReleasePointer()
+    {
+        if (!this.pointerActive) return;
+        this.pointerActive = false;
         // 처형/튜토리얼 지정 공격자 외 카드는 완전 무반응(클릭·탭 무시).
         if (TurnState.ForcedAttacker != null && this.owner.BoundCard != null
             && this.owner.BoundCard.ownerIndex == TurnState.LocalOwnerIndex
@@ -296,7 +358,7 @@ public class CardInputController
         // (같은 카드 재탭 해제·다른 카드로 선택 전환이 손 떨림만으로 죽던 원인).
         bool t_isTap = !BattleUxFlags.DragAimAttack
             || (this.activeGesture == Gesture.None
-                && Vector2.Distance((Vector2)Input.mousePosition, this.touchStartScreenPos) < this.deadZoneRadius);
+                && Vector2.Distance(this.currentDragScreenPos, this.touchStartScreenPos) < this.deadZoneRadius);
 
         // 튜토리얼: 탭이 이번 스텝의 조작이 아니면 무반응(무장·발사 둘 다 차단).
         if (t_isTap && !GestureAllowed(Gesture.None))
@@ -416,9 +478,9 @@ public class CardInputController
     /// 조준 방향 부호(밀기 = 그 방향, 당기기 = 반대 방향). 가이드는 조준 방향(t_aimDir.x)을 그대로 받으므로
     /// 모드가 바뀌면 자연히 반전되고, 가이드가 놓이는 쪽(위/아래)만 _forward를 따른다.
     ///
-    /// 손가락이 시작점 기준 위/아래 어디에 있든 조준을 유지한다 — 제스처는 OnMouseDrag가 이미 확정했고,
+    /// 손가락이 시작점 기준 위/아래 어디에 있든 조준을 유지한다 — 제스처는 HandlePointerDrag가 이미 확정했고,
     /// 양쪽 다 조준 모드라 "반대편으로 넘어감 = 취소"가 성립하지 않는다. 예전의 슬롯 복귀(ReturnDrag)는
-    /// 모드 전환 구간에서 슬롯→센터 왕복으로만 보였다. 취소는 그냥 손을 떼면 된다(OnMouseUp이 복귀시킨다).</summary>
+    /// 모드 전환 구간에서 슬롯→센터 왕복으로만 보였다. 취소는 그냥 손을 떼면 된다(ReleasePointer가 복귀시킨다).</summary>
     void HandleAimDrag(Vector2 _drag, bool _forward)
     {
         UIPoolManager.Instance?.HideUI<PooledCardElement>();
@@ -476,14 +538,21 @@ public class CardInputController
                 await UniTask.Yield(PlayerLoopTiming.Update, _ct);
 
                 // 짧은 탭의 Up 이벤트가 저프레임에서 유실돼도 실제 포인터 상태로 즉시 복구한다.
-                if (!TurnState.CardInputAllowed || this.owner.BoundCard == null || !IsPointerHeld())
+                if (!this.pointerActive || !TurnState.CardInputAllowed || this.owner.BoundCard == null
+                    || !this.pointer.TryRead(out var t_position, out var t_held, out var t_canceled) || t_canceled)
                 {
-                    CancelLongPress();
+                    CancelPointer();
+                    return;
+                }
+                this.currentDragScreenPos = t_position;
+                if (!t_held)
+                {
+                    ReleasePointer();
                     return;
                 }
 
                 // 드래그 이벤트 빈도에 기대지 않고 대기 루프가 직접 이동 취소를 판정한다.
-                if (Vector2.Distance((Vector2)Input.mousePosition, this.touchStartScreenPos) > this.deadZoneRadius)
+                if (Vector2.Distance(this.currentDragScreenPos, this.touchStartScreenPos) > this.deadZoneRadius)
                 {
                     CancelLongPress();
                     return;
@@ -544,22 +613,9 @@ public class CardInputController
                 this.owner.SetLongPressLift(true);
             }
             this.longPressFired = true;
-            // Inspect 통지는 손을 뗀 순간(OnMouseUp)으로 이동 — 팝업이 뜨자마자 스텝이 넘어가지 않도록.
+            // Inspect 통지는 손을 뗀 순간(ReleasePointer)으로 이동 — 팝업이 뜨자마자 스텝이 넘어가지 않도록.
         }
         catch (OperationCanceledException) { }
-    }
-
-    static bool IsPointerHeld()
-    {
-        if (Input.touchCount == 0) return Input.GetMouseButton(0);
-
-        for (int i = 0; i < Input.touchCount; i++)
-        {
-            TouchPhase t_phase = Input.GetTouch(i).phase;
-            if (t_phase == TouchPhase.Began || t_phase == TouchPhase.Moved || t_phase == TouchPhase.Stationary)
-                return true;
-        }
-        return false;
     }
 
     /// <summary>롱프레스 확정 뒤 카드 정보창의 배경 어둡기를 켠다.</summary>
@@ -619,7 +675,7 @@ public class CardInputController
     }
 
     /// <summary>롱프레스 취소. **이미 떠 있던 설명 팝업도 같이 닫는다.**
-    /// 예전엔 플래그만 지워서, 드래그로 취소된 경우 OnMouseUp의 t_wasLongPress가 false가 되어
+    /// 예전엔 플래그만 지워서, 드래그로 취소된 경우 ReleasePointer의 t_wasLongPress가 false가 되어
     /// 팝업을 닫는 분기를 건너뛰고 화면에 그대로 남았다(잔류 버그).</summary>
     void CancelLongPress()
     {

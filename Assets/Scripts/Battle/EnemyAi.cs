@@ -6,15 +6,15 @@ using UnityEngine;
 /// <see cref="EnemyTurn"/>은 이 함수만 부른다(튜토리얼 자유공격 스텝 포함).
 ///
 /// 규칙
-///  · 공격자: **3계층 사다리**로 후보군(pool)을 먼저 정하고, 그 안에서 체력 가중 룰렛으로 뽑는다.
-///      1계층 — 체력 30% 이상인 **키워드 카드**(<see cref="HasActiveKeyword"/>)
-///      2계층 — 1계층이 비면, 체력 30% 이상인 나머지 카드
-///      3계층 — 전원 빈사(30% 미만)면 전체. 가중치를 뒤집어 **체력이 낮을수록** 먼저 나간다
-///              (죽어 슬롯을 비우면 새 카드가 보충돼 보드가 회전한다).
+///  · 공격자: **4계층 사다리**로 후보군(pool)을 먼저 정하고, 그 안에서 체력 가중 룰렛으로 뽑는다.
+///      1계층 — 체력 30% 이상인 공격형 키워드 카드(원거리·무쌍·처형·교활)
+///      2계층 — 체력 30% 이상인 나머지 키워드 카드
+///      3계층 — 체력 30% 이상인 나머지 카드
+///      4계층 — 전원 빈사(30% 미만)면 전체. 공격형 키워드 4배, 나머지 키워드 2배 가중치.
 ///  · 타깃  : 유효 타깃 중 실효 체력이 낮은 카드 우선. 일반 키워드는 체력 점수 1/2, 원거리·힐러는 1/4.
 ///
 /// 이 게임에서 공격력은 곧 현재 체력이다(<see cref="CardInstance.AttackDamage"/>) — 체력 가중치는
-/// 생존력이자 화력 가중치다. 키워드 종류와 관계없이 현재 활성화된 키워드 카드를 우선한다.
+/// 생존력이자 화력 가중치다. 현재 활성화된 공격형 키워드를 불사 등 다른 키워드보다 우선한다.
 ///
 /// 결정론: 랜덤은 <see cref="MatchRandom.AiRange"/>(AI 전용 파생 스트림)만 쓰고, 공격자 1회 선택당 **정확히 1회** 소비한다
 /// (계층이 어디로 갈리든 소비 횟수는 같다). 룰렛은 후보 리스트 순서(슬롯 오름차순)를 그대로 훑는다.
@@ -34,6 +34,17 @@ public static class EnemyAi
 
     /// <summary>키워드 보유 카드의 선택 가중치 배수.</summary>
     public const int KeywordWeightMultiplier = 2;
+
+    /// <summary>빈사일 때 공격형 키워드 카드의 선택 가중치 배수.</summary>
+    public const int OffensiveKeywordWeightMultiplier = 4;
+
+    const CardKeyword OffensiveKeywords = CardKeyword.Ranged | CardKeyword.Peerless
+        | CardKeyword.Execution | CardKeyword.Cunning;
+
+    /// <summary>현재 활성화된 공격형 키워드가 있는가. 미해금 키워드는 포함하지 않는다.</summary>
+    public static bool HasOffensiveKeyword(CardInstance _card)
+        => _card != null &&
+           ((_card.unlockedKeywords | _card.runtimeKeywords | _card.synergyKeywords) & OffensiveKeywords) != CardKeyword.None;
 
     /// <summary>현재 활성 키워드가 하나라도 있는가. 미해금 키워드는 제외하고 런타임·시너지 부여분은 포함한다.</summary>
     public static bool HasActiveKeyword(CardInstance _card)
@@ -67,6 +78,8 @@ public static class EnemyAi
     /// <summary>공격자 선택 계층. 값이 작을수록 우선한다.</summary>
     public enum AttackerTier
     {
+        /// <summary>체력 30% 이상 + 활성 공격형 키워드 보유.</summary>
+        OffensiveHealthy,
         /// <summary>체력 30% 이상 + 활성 키워드 보유.</summary>
         KeywordHealthy,
         /// <summary>체력 30% 이상(키워드 무관).</summary>
@@ -86,18 +99,20 @@ public static class EnemyAi
 
         bool t_healthy = !IsLowHp(_card);
         if (_tier == AttackerTier.Healthy) return t_healthy;
+        if (_tier == AttackerTier.OffensiveHealthy) return t_healthy && HasOffensiveKeyword(_card);
         return t_healthy && HasActiveKeyword(_card);   // KeywordHealthy
     }
 
     /// <summary>계층 안에서 쓰는 룰렛 가중치. 항상 1 이상이라 후보가 있으면 합도 반드시 양수다.
     ///
     /// 빈사 계층만 가중치를 뒤집는다(<c>HpWeightMax + 1 - w</c>): 어차피 다음 공격에 죽을 카드를 먼저
-    /// 내보내 슬롯을 비우고 새 카드를 받는 편이 낫다. 빈사만 남아도 키워드 카드에는 2배 가중치를 준다.</summary>
+    /// 내보내 슬롯을 비우고 새 카드를 받는 편이 낫다. 공격형 키워드는 4배, 나머지 키워드는 2배 가중치를 준다.</summary>
     public static int SelectWeight(CardInstance _card, AttackerTier _tier)
     {
         int t_w = HpWeight(_card);
         if (_tier != AttackerTier.Desperate) return t_w;
         t_w = HpWeightMax + HpWeightMin - t_w;
+        if (HasOffensiveKeyword(_card)) return t_w * OffensiveKeywordWeightMultiplier;
         return HasActiveKeyword(_card) ? t_w * KeywordWeightMultiplier : t_w;
     }
 
@@ -105,6 +120,7 @@ public static class EnemyAi
     /// <see cref="AttackerTier.Desperate"/>는 모두를 포함하므로 후보가 하나라도 있으면 반드시 성립한다.</summary>
     public static AttackerTier ResolveTier(IReadOnlyList<CardInstance> _candidates)
     {
+        if (HasAny(_candidates, AttackerTier.OffensiveHealthy)) return AttackerTier.OffensiveHealthy;
         if (HasAny(_candidates, AttackerTier.KeywordHealthy)) return AttackerTier.KeywordHealthy;
         if (HasAny(_candidates, AttackerTier.Healthy))        return AttackerTier.Healthy;
         return AttackerTier.Desperate;

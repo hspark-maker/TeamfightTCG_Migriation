@@ -151,8 +151,12 @@ function createEnhanceCard(synergyIntroduction) {
                     }
                     freeShot = grants;
                 }
-                else if ((0, tutorialGrants_1.hasFreeShot)(grants, FREE_SHOT_AXIS))
+                else {
+                    if (!(0, tutorialGrants_1.hasFreeShot)(grants, FREE_SHOT_AXIS)) {
+                        reject("NotReady", "The tutorial free enhancement was already used.", { uid, env, cardId });
+                    }
                     freeShot = grants;
+                }
             }
             const paid = freeShot === null && step.cost > 0;
             const balances = wallet.balances;

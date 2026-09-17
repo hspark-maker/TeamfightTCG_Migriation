@@ -62,6 +62,8 @@
     <type fullname="ContentUnlockSaveData" preserve="all"/>
     <type fullname="ServerSlotPatch" preserve="all"/>
     <type fullname="ServerCommandResult" preserve="all"/>
+    <type fullname="ClaimBattleExperienceResult" preserve="all"/>
+    <type fullname="AccountExperienceResult" preserve="all"/>
     <type fullname="WalletPatch" preserve="all"/>
     <type fullname="EnsureAccountResult" preserve="all"/>
     <type fullname="EnsureWalletResult" preserve="all"/>

@@ -5,6 +5,7 @@ using Cysharp.Threading.Tasks;
 using Fusion;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class TurnRunner : MonoBehaviour
 {
@@ -42,6 +43,8 @@ public class TurnRunner : MonoBehaviour
     bool resultFinalized;// 결과 표시 경로에 진입했는가. 여운·팝업이 두 번 돌지 않게 하는 게이트.
     CurrencyGain lastReward; // CaptureResult에서 확정한 지급분. F-20 팝업 표시용(표시만, 재지급 없음).
     long lastRankDelta;  // CaptureResult에서 확정한 랭크 포인트 증감(클램프 반영). 팝업 표시용(표시만).
+    long lastAccountExp;       // 승패 기준 표시용 예상 경험치. 서버 프로필에는 쓰지 않는다.
+    long lastAccountTotalExp;  // 제출 전 누적치 + 예상 경험치. 빠른 서버 응답에도 이중 가산하지 않는다.
 
     // 보상을 만든 생존 카드 스냅샷. 여운이 도는 동안 필드가 정리돼도 흔들리지 않게 값으로 잡아 둔다.
     List<int> lastSurvivorCards;
@@ -106,7 +109,7 @@ public class TurnRunner : MonoBehaviour
 
     bool TrySurrenderEnemyBeforeTurn(int _owner)
     {
-        if (this.resultFinalized || TutorialConfig.IsActive || IsMyTurn(_owner)
+        if (this.resultFinalized || TutorialConfig.IsActive || AdventureRun.IsActive || IsMyTurn(_owner)
             || (DeckConfig.IsMultiplayer && !DeckConfig.AiTakeover)) return false;
         if (this.enemyField == null || this.enemyField.OwnerIndex != _owner) return false;
         if (!EnemyAiSurrender.ShouldSurrender(this.enemyField.State, this.playerField?.State))
@@ -173,7 +176,6 @@ public class TurnRunner : MonoBehaviour
         this.resultFinalized = true;
 
         TurnState.BattleEnded = true;
-        NetworkSession.Instance?.Reconnect?.EndBattle();
         TurnState.InputAllowed = false;    // 결과 팝업 뒤에서 공격이 계속 나가지 않게
         this.battleEndCts.Cancel();
         if (_reason == EMatchEndReason.Surrender) ReleaseNetworkWaits();
@@ -280,7 +282,10 @@ public class TurnRunner : MonoBehaviour
         if (this.destroyCt.IsCancellationRequested) return;
         GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
         t_popup?.Show(this.lastReward, this.lastRankDelta, _won,
-            this.lastSurvivorCards, this.lastFallenCards);
+            this.lastSurvivorCards, this.lastFallenCards,
+            this.lastAccountExp, this.lastAccountTotalExp);
+        if (t_popup != null && t_popup.HasExperienceView && AccountLevelManager.IsConfigured && this.lastAccountExp > 0)
+            AccountRewardHandoff.MarkExperienceShown(MatchResultSubmission.BattleMatchId);
     }
 
 #if UNITY_EDITOR
@@ -291,10 +296,10 @@ public class TurnRunner : MonoBehaviour
     {
         // F3/F4로 생존 장수를 바꾸고 F1/F2로 그 장수로 재생한다.
         // 패배(F2)는 설계상 분출·롤링이 없다 — 값만 박힌 채 뜨는 게 정상이다.
-        if (Input.GetKeyDown(KeyCode.F3)) SetPreviewSurvivors(s_previewSurvivors + 1);
-        if (Input.GetKeyDown(KeyCode.F4)) SetPreviewSurvivors(s_previewSurvivors - 1);
-        if (Input.GetKeyDown(KeyCode.F1)) PreviewResult(true).Forget();
-        if (Input.GetKeyDown(KeyCode.F2)) PreviewResult(false).Forget();
+        if (Keyboard.current?.f3Key.wasPressedThisFrame == true) SetPreviewSurvivors(s_previewSurvivors + 1);
+        if (Keyboard.current?.f4Key.wasPressedThisFrame == true) SetPreviewSurvivors(s_previewSurvivors - 1);
+        if (Keyboard.current?.f1Key.wasPressedThisFrame == true) PreviewResult(true).Forget();
+        if (Keyboard.current?.f2Key.wasPressedThisFrame == true) PreviewResult(false).Forget();
     }
 
     void SetPreviewSurvivors(int _count)
@@ -316,7 +321,9 @@ public class TurnRunner : MonoBehaviour
 
         await BattleResultBeat.Play(_won, this.destroyCt);
         GameResultPopup t_popup = _won ? this.winPopup : this.losePopup;
-        t_popup?.Show(t_reward, _won ? 10 : -5, _won, t_cards, t_fallen);
+        long t_exp = TutorialConfig.IsActive ? 0 : (_won ? AccountLevelSpec.WinExp : AccountLevelSpec.LoseExp);
+        t_popup?.Show(t_reward, _won ? 10 : -5, _won, t_cards, t_fallen,
+            t_exp, AccountLevelManager.Exp + t_exp);
     }
 
     // 미리보기 전사 목록: 덱에서 생존 목록에 없는 카드를 담는다. 장수로 자르면 같은 카드가
@@ -458,14 +465,6 @@ public class TurnRunner : MonoBehaviour
         // 멀리건 RPC 상한이 무효 경기를 확정했거나 씬이 내려간 경우 턴 루프를 새로 시작하지 않는다.
         if (this.destroyCt.IsCancellationRequested || this.resultFinalized || this.forcedEnd) return;
 
-        if (DeckConfig.IsMultiplayer && !DeckConfig.AiTakeover && NetworkSession.Instance != null)
-        {
-            NetworkSession.Instance.Reconnect.BeginBattle();
-            await NetworkSession.Instance.Reconnect.CheckpointAsync(
-                this.playerField.State, this.enemyField.State, this.BattleEndToken);
-            if (this.resultFinalized || this.forcedEnd) return;
-        }
-
         // (4) 턴 루프(선공 배너 재생 완료 → 첫 턴 배너 스킵).
         RunBattleLoop(t_first, _skipFirstBanner: true).Forget();
     }
@@ -583,8 +582,12 @@ public class TurnRunner : MonoBehaviour
             this.battleOutcome = new BattleOutcome(this.ruleCtx);
         }
 
+        long t_accountExpBefore = AccountLevelManager.Exp;
         if (!this.battleOutcome.TryCapture(_won, _reason)) return;
 
+        // 튜토리얼에서는 표시용 경험치를 0으로 전달해 결과 패널을 숨긴다.
+        this.lastAccountExp = TutorialConfig.IsActive ? 0 : (_won ? AccountLevelSpec.WinExp : AccountLevelSpec.LoseExp);
+        this.lastAccountTotalExp = t_accountExpBefore + this.lastAccountExp;
         this.lastReward = this.battleOutcome.Reward;
         this.lastRankDelta = this.battleOutcome.RankDelta;
         this.lastSurvivorCards = this.battleOutcome.SurvivorCards;
@@ -609,15 +612,26 @@ public class TurnRunner : MonoBehaviour
     void HandlePlayerLeft(PlayerRef _p)
     {
         if (!DeckConfig.IsMultiplayer) return;
-        if (NetworkSession.Instance?.Reconnect?.Active == true) return;
         if (DeckConfig.AiTakeover || this.aiTakeoverPending || this.resultFinalized) return;
 
         TurnState.InputAllowed = false;
-        BeginAiTakeover();
+        if (NetTimeouts.OpponentDropGraceSec <= 0f)
+        {
+            BeginAiTakeover();
+            return;
+        }
+
+        this.aiTakeoverPending = true;
+        BeginAiTakeoverAfterGrace().Forget();
     }
 
-    internal void HandleReconnectExpired()
+    async UniTaskVoid BeginAiTakeoverAfterGrace()
     {
+        await UniTask.Delay(TimeSpan.FromSeconds(NetTimeouts.OpponentDropGraceSec),
+                            ignoreTimeScale: true,
+                            cancellationToken: this.destroyCt)
+                     .SuppressCancellationThrow();
+
         if (this.destroyCt.IsCancellationRequested || this.resultFinalized || DeckConfig.AiTakeover) return;
         BeginAiTakeover();
     }

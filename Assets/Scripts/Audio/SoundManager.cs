@@ -6,9 +6,21 @@ public class SoundManager : MonoBehaviour
 {
     public static SoundManager Instance { get; private set; }
 
-    [SerializeField] SoundConfig config;
-    [SerializeField] SoundBank outgameSoundBank;
+    // 다운로드가 끝난 RuntimeContentCatalog에서 공급한다. 시작 프리팹에 직접 연결하지 않는다.
+    SoundConfig config;
+    SoundBank outgameSoundBank;
     [SerializeField] int sfxPoolSize = 8;
+
+    public bool IsConfigured => this.config != null && this.outgameSoundBank != null;
+
+    public void Configure(SoundConfig _config, SoundBank _outgameSoundBank)
+    {
+        if (_config == null || _outgameSoundBank == null)
+            throw new System.ArgumentException("Downloaded sound configuration is missing.");
+        this.config = _config;
+        this.outgameSoundBank = _outgameSoundBank;
+        ApplySfxVolume();
+    }
 
     AudioSource bgmSource;
     AudioSource[] sfxPool;
@@ -28,7 +40,6 @@ public class SoundManager : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(transform.root.gameObject);   // 초기화 프리팹의 자식이라 루트 기준(단독 배치면 자기 자신)
         BuildSources();
-        if (config?.bgm != null) PlayBGM(config.bgm);
     }
 
     void OnDestroy()
@@ -90,6 +101,9 @@ public class SoundManager : MonoBehaviour
     // ── BGM ───────────────────────────────────────────────────────────────
 
     public void PlayBGM(AudioClip _clip) => PlayBGM(_clip, 0f);
+
+    public void PlayLobbyBGM(float _fadeIn) => PlayBGM(this.config?.lobbyBgm, _fadeIn);
+    public void PlayBattleBGM(float _fadeIn) => PlayBGM(this.config?.battleBgm, _fadeIn);
 
     /// <summary>_clip을 처음부터 켠다. _fadeIn이 0보다 크면 그 시간만큼 볼륨이 올라온다.</summary>
     public void PlayBGM(AudioClip _clip, float _fadeIn)

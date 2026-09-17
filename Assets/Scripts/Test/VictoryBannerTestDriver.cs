@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 [DisallowMultipleComponent]
@@ -41,15 +42,15 @@ public sealed class VictoryBannerTestDriver : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Space))
+        if (Keyboard.current?.spaceKey.wasPressedThisFrame == true)
             Cycle();
-        else if (Input.GetKeyDown(KeyCode.S))
+        else if (Keyboard.current?.sKey.wasPressedThisFrame == true)
             Show();
-        else if (Input.GetKeyDown(KeyCode.H))
+        else if (Keyboard.current?.hKey.wasPressedThisFrame == true)
             Hide();
-        else if (Input.GetKeyDown(KeyCode.R))
+        else if (Keyboard.current?.rKey.wasPressedThisFrame == true)
             ResetBanner();
-        else if (Input.GetKeyDown(KeyCode.O))
+        else if (Keyboard.current?.oKey.wasPressedThisFrame == true)
             ToggleReferenceOverlay();
 
         UpdateStatus();

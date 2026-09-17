@@ -1545,7 +1545,7 @@ MonoBehaviour:
   fanfare:
     layer: {fileID: 900200000000000002}
     effectPrefab: {fileID: 8594253529536542813, guid: 0448abe5e3f44db4fb434c705ebc8e8d, type: 3}
-    effectScale: 3
+    effectScale: 10
     quickScale: 0.7
     playbackSpeed: 8
     duration: 0.65

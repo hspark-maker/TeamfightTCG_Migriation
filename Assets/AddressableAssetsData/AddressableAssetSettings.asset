@@ -62,6 +62,7 @@ MonoBehaviour:
   m_BuildAddressablesWithPlayerBuild: 2
   m_overridePlayerVersion: 
   m_GroupAssets:
+  - {fileID: 11400000, guid: e4b843ce4d984937851f1e144f6dde11, type: 2}
   - {fileID: 11400000, guid: 24e163a472eaca64fab18c6c99bc99b3, type: 2}
   - {fileID: 11400000, guid: 1b8d167b9c4b2304ead27568583e4d21, type: 2}
   - {fileID: 11400000, guid: c4c312d1be46bd94280da227bea28ab7, type: 2}
@@ -113,6 +114,7 @@ MonoBehaviour:
     - UIPrefab
     - RemoteUI
     - RemoteScenes
+    - RemoteAudio
   m_SchemaTemplates: []
   m_GroupTemplateObjects:
   - {fileID: 11400000, guid: bd0015e072740b841a3a5530a37d3da7, type: 2}

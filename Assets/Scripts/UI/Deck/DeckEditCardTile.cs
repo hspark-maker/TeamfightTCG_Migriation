@@ -138,7 +138,7 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
                                           : 1f;
     }
 
-    // 참조만 보관한다. StandaloneInputModule은 포인터 id별로 PointerEventData 인스턴스를 재사용·갱신하므로
+    // 참조만 보관한다. InputSystemUIInputModule은 포인터 id별로 PointerEventData 인스턴스를 재사용·갱신하므로
     // 이 참조는 항상 최신 위치를 가리킨다(복사해두면 오히려 낡은 좌표로 드래그가 시작된다).
     public void OnPointerDown(PointerEventData _data)
     {

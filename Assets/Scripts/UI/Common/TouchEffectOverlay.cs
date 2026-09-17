@@ -1,4 +1,6 @@
 using UnityEngine;
+using Touch = UnityEngine.InputSystem.EnhancedTouch.Touch;
+using TouchPhase = UnityEngine.InputSystem.TouchPhase;
 
 /// <summary>화면 아무 곳이나 누르면 그 자리에 터지는 전역 터치 이펙트.
 ///
@@ -92,23 +94,24 @@ public sealed class TouchEffectOverlay : SingletonOverlayBase
     {
         if (!Enabled) return;
 
-        int t_touches = Input.touchCount;
+        int t_touches = Touch.activeTouches.Count;
         if (t_touches > 0)
         {
             // 터치가 있는 프레임에는 마우스를 보지 않는다 — 모바일에서 터치 0번이 마우스로도 잡혀 한 번 누른 것이 두 번 튄다.
             int t_emitted = 0;
             for (int i = 0; i < t_touches && t_emitted < MAX_PER_FRAME; i++)
             {
-                Touch t_touch = Input.GetTouch(i);
+                Touch t_touch = Touch.activeTouches[i];
                 if (t_touch.phase != TouchPhase.Began) continue;
 
-                Emit(t_touch.position);
+                Emit(t_touch.screenPosition);
                 t_emitted++;
             }
             return;
         }
 
-        if (Input.GetMouseButtonDown(0)) Emit(Input.mousePosition);
+        if (GameInput.TryGetPress(out InputPointer t_pointer) && t_pointer.TryRead(out Vector2 t_position, out _, out _))
+            Emit(t_position);
     }
 
     void Emit(Vector2 _screenPos)

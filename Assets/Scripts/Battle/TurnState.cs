@@ -40,10 +40,7 @@ public static class TurnState
     public static bool UiBlocking { get; set; }
 
     /// <summary>카드 입력을 실제로 받아도 되는가. 입력 판정은 전부 이 하나를 본다.</summary>
-    public static bool CardInputAllowed => InputAllowed && !UiBlocking && !DebugUiBlocking && !ReconnectPaused;
-
-    /// <summary>재접속 중 입력·생각시간 정지. 원래 InputAllowed를 보존해 남은 시간을 유지한다.</summary>
-    public static bool ReconnectPaused { get; set; }
+    public static bool CardInputAllowed => InputAllowed && !UiBlocking && !DebugUiBlocking;
 
     // 씬을 넘어 유지되는 디버그 UI의 차단 상태. Reset 대신 표시 주체가 열기·닫기에 맞춰 해제한다.
     public static bool DebugUiBlocking { get; set; }
@@ -75,7 +72,6 @@ public static class TurnState
     public static void Reset()
     {
         BattleEnded     = false;
-        ReconnectPaused = false;
         InputAllowed    = false;
         UiBlocking      = false;
         ForcedAttacker  = null;

@@ -442,8 +442,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f239a19a17ed772418feb91a522a482e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  config: {fileID: 11400000, guid: 354fc699ded8b7849ac32ab399efef7f, type: 2}
-  outgameSoundBank: {fileID: 11400000, guid: 71d3c5a08e6b492fa04c7b18d2e6539f, type: 2}
   sfxPoolSize: 8
 --- !u!1 &8830170169402083151
 GameObject:

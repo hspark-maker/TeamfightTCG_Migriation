@@ -9,7 +9,7 @@ public class AlbumInsertFanfareFx
 {
     [SerializeField] RectTransform layer;
     [SerializeField] UIParticle effectPrefab;
-    [Min(0.01f)] [SerializeField] float effectScale = 3f;
+    [Min(0.01f)] [SerializeField] float effectScale = 10f;
     [Range(0.1f, 1f)] [SerializeField] float quickScale = 0.7f;
     [Min(0.01f)] [SerializeField] float playbackSpeed = 8f;
     [Min(0.01f)] [SerializeField] float duration = 0.65f;

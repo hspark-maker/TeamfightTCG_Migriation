@@ -2,10 +2,11 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using TMPro;
 
 [RequireComponent(typeof(CardAnimator))]
-public class CardView : MonoBehaviour
+public class CardView : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
 {
     #region Static / Events
     // 탭 공격 무장 상태의 진실원은 BattleSelection. 아래 셰임은 기존 구독처를 위한 전달일 뿐이다.
@@ -130,9 +131,8 @@ public class CardView : MonoBehaviour
     CardInstance boundCard;
 
     // 입력 제스처 상태머신(탭/드래그/롱프레스/조준/타깃 추적)은 CardInputController가 통째로 소유한다.
-    // 여기 남는 건 Unity 메시지(OnMouse*/Update/OnDrawGizmos)를 그대로 넘기는 전달 스텁뿐이다 —
-    // OnMouse*는 콜라이더가 달린 GameObject의 컴포넌트에만 오고, 별도 MonoBehaviour로 빼면
-    // 프리팹/씬 YAML을 재직렬화해야 한다. 인스펙터 배선/튜닝값은 위 SerializeField에 그대로 남고 값만 주입한다.
+    // EventSystem 포인터 이벤트/Update/OnDrawGizmos를 전달한다.
+    // 인스펙터 배선/튜닝값은 위 SerializeField에 그대로 남고 값만 주입한다.
     // 지연 생성 폴백은 WeaponView/ArmedVfxView와 같은 규약(Awake 이전 경로가 생겨도 NRE로 무너지지 않게).
     CardInputController inputCtrl;
 
@@ -224,7 +224,7 @@ public class CardView : MonoBehaviour
         if (this.swipeGuide != null)
             foreach (SpriteRenderer t_sr in this.swipeGuide.GetComponentsInChildren<SpriteRenderer>(true))
                 this.cardAnim.ExcludeFromFade(t_sr);
-        this.selfCollider = GetComponentInChildren<Collider2D>();   // OnMouse* 를 받는 콜라이더
+        this.selfCollider = GetComponentInChildren<Collider2D>();   // Physics2DRaycaster가 찾는 콜라이더
 
         if (this.dragLine == null)
         {
@@ -251,7 +251,16 @@ public class CardView : MonoBehaviour
         if (this.hpText != null) this.hpText.DOKill();
     }
 
-    void OnDisable() => this.deferredHealEffectCount = 0;
+    void OnDisable()
+    {
+        this.deferredHealEffectCount = 0;
+        this.inputCtrl?.CancelPointer();
+    }
+
+    void OnApplicationFocus(bool _focused)
+    {
+        if (!_focused) this.inputCtrl?.CancelPointer();
+    }
 
     // 튜토리얼: hintArrow를 강제 표시(정상 Update 로직 무시). 안내 중 "여기서 드래그" 포인터.
     bool tutorialPointer;
@@ -266,11 +275,9 @@ public class CardView : MonoBehaviour
 
     #region Input
     // 제스처 상태머신 본체는 CardInputController(순수 C# 객체)가 소유한다.
-    // 여기 남는 건 Unity가 콜라이더 GameObject의 컴포넌트에만 보내는 OnMouse* 메시지 전달 스텁뿐이다 —
-    // 별도 MonoBehaviour로 빼면 프리팹/씬 YAML을 재직렬화해야 한다.
-    void OnMouseDown() => InputCtrl.OnMouseDown();
-    void OnMouseDrag() => InputCtrl.OnMouseDrag();
-    void OnMouseUp()   => InputCtrl.OnMouseUp();
+    public void OnPointerDown(PointerEventData _event) => InputCtrl.OnPointerDown(_event);
+    public void OnDrag(PointerEventData _event) => InputCtrl.OnDrag(_event);
+    public void OnPointerUp(PointerEventData _event) => InputCtrl.OnPointerUp(_event);
 
     /// <summary>조준 기울기 원복 스텁. 탭 공격(HandleEnemyTap)은 **적 카드의** 컨트롤러에서 도는데
     /// 되돌려야 할 기울기는 공격자 카드의 것이라, 컨트롤러끼리 서로를 알지 않도록 이 스텁을 거친다.</summary>
@@ -562,7 +569,7 @@ public class CardView : MonoBehaviour
     }
 
     // 조준 포커스: 이 카드를 확대(_on)/원복. 드래그 타겟 전환·탭 무장/해제 시 호출.
-    // **transform.DOKill 금지** — 해제 호출이 공격 발동 직후에 오는 경로가 있어(OnMouseUp: OnAttack → ClearTargetPreview)
+    // **transform.DOKill 금지** — 해제 호출이 공격 발동 직후에 오는 경로가 있어(ReleasePointer: OnAttack → ClearTargetPreview)
     // 전체 DOKill을 하면 막 시작한 시네마 이동(DOMove)까지 같이 죽는다. 실제로 피격자만 제자리에 남는 버그가 그것.
     // 그래서 이 확대 트윈만 따로 들고 있다가 그것만 끈다.
     // _instant: 공격 발동 직전 원복처럼 뒤이어 AttackSequence의 DOKill이 들어오는 경로 — 트윈이 중간에 죽어

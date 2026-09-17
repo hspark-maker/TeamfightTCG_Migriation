@@ -88,7 +88,7 @@ public class PooledCardElement : ContentsPooledUI
         // 루트가 캔버스 전체 stretch라 루트 로컬 좌표계 = 캔버스 중심 기준. 콘텐츠 앵커도 중앙(0.5,0.5)이므로
         // 여기서 나온 값을 anchoredPosition에 그대로 넣으면 된다.
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            this.rectTransform, Input.mousePosition, t_cam, out Vector2 t_cursor);
+            this.rectTransform, GameInput.PointerPosition, t_cam, out Vector2 t_cursor);
         t_cursor += this.cursorOffset;
 
         Vector2 t_scale = new Vector2(Mathf.Abs(t_content.localScale.x), Mathf.Abs(t_content.localScale.y));
@@ -105,7 +105,7 @@ public class PooledCardElement : ContentsPooledUI
             return;
         }
 
-        bool  t_preferLeft = Input.mousePosition.x > Screen.width * 0.5f;   // 동점일 때만 쓰는 취향값
+        bool  t_preferLeft = GameInput.PointerPosition.x > Screen.width * 0.5f;   // 동점일 때만 쓰는 취향값
         bool  t_bestLeft     = t_preferLeft;
         Vector2 t_bestPos    = t_cursor;
         float t_bestOverflow = float.MaxValue;

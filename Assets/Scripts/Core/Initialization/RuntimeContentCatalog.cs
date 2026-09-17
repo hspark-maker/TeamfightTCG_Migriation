@@ -20,6 +20,8 @@ public sealed class RuntimeContentCatalog : ScriptableObject
     public ContentUnlockData contentUnlockData;
     public KeywordIconConfig keywordIconConfig;
     public CardFrameConfig cardFrameConfig;
+    public SoundConfig soundConfig;
+    public SoundBank outgameSoundBank;
 
     public void Validate()
     {
@@ -27,7 +29,9 @@ public sealed class RuntimeContentCatalog : ScriptableObject
             synergyRegistry == null || albumConfig == null || currencyLook == null ||
             adventureConfig == null || profileConfig == null || emoteCatalog == null ||
             deckImageCatalog == null || rouletteConfig == null || tutorialData == null ||
-            keywordIconConfig == null || cardFrameConfig == null || contentUnlockData == null)
+            keywordIconConfig == null || cardFrameConfig == null || contentUnlockData == null ||
+            soundConfig == null || outgameSoundBank == null ||
+            soundConfig.lobbyBgm == null || soundConfig.battleBgm == null)
             throw new InvalidOperationException("RuntimeContentCatalog has missing authored references.");
     }
 }

@@ -4,7 +4,8 @@ using UnityEngine;
 public class SoundConfig : ScriptableObject
 {
     [Header("BGM")]
-    public AudioClip bgm;
+    public AudioClip lobbyBgm;
+    public AudioClip battleBgm;
 
     [Header("SFX")]
     public AudioClip[] uiClickClips;

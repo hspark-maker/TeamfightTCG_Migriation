@@ -14,6 +14,8 @@ public sealed class RuntimeContentPreloadStep : MainInitializer
             return;
         }
         await RuntimeContentCache.PreloadAsync(t_token);
+        SoundManager.Instance.Configure(RuntimeContentCache.Config.soundConfig,
+            RuntimeContentCache.Config.outgameSoundBank);
         DataLibrary.instance.keywordIconConfig = RuntimeContentCache.Config.keywordIconConfig;
         DataLibrary.instance.cardFrameConfig = RuntimeContentCache.Config.cardFrameConfig;
     }

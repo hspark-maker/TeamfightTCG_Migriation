@@ -682,9 +682,9 @@ MonoBehaviour:
   iconRoot: {fileID: 5373120218496253276}
   glowRoot: {fileID: 7720656102033531328}
   _flightRoot: {fileID: 8909000000000000012}
-  _fadeDuration: 0.18
+  _fadeDuration: 0.1
   _fadeEase: 9
-  _flightDuration: 0.4
+  _flightDuration: 0.25
   _flightEase: 9
   dim:
     alpha: 0.92
@@ -699,7 +699,7 @@ MonoBehaviour:
   iconDuration: 0.1
   iconDropDistance: 180
   iconDropScale: 1.4
-  confirmDelay: 0.6
+  confirmDelay: 0.1
   confirmDuration: 0.16
   confirmRiseDistance: 90
 --- !u!1 &5242407723083386333

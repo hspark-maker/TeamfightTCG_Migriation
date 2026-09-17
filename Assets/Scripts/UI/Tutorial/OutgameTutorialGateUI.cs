@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
 // 아웃게임 튜토리얼 강제 게이트 UI(스텝·세이브·앵커를 모르는 순수 표시 컴포넌트).
@@ -1019,6 +1020,6 @@ public class OutgameTutorialGateUI : MonoBehaviour
 
         var t_es = new GameObject("EventSystem");
         t_es.AddComponent<UnityEngine.EventSystems.EventSystem>();
-        t_es.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+        t_es.AddComponent<InputSystemUIInputModule>();
     }
 }

@@ -4,6 +4,8 @@ using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
+using Touch = UnityEngine.InputSystem.EnhancedTouch.Touch;
+using TouchPhase = UnityEngine.InputSystem.TouchPhase;
 using UnityEngine.UI;
 
 // 씬 전환을 덮는 전체화면 로딩 커버. 두 가지 방식으로 산다.
@@ -341,7 +343,7 @@ public class LoadingCoverView : MonoBehaviour
                 t_released = false;
             }
             else if (!t_released)
-                t_released = !Input.anyKey && Input.touchCount == 0;
+                t_released = !GameInput.AnyHeld;
             else if (HasStartInput())
             {
                 PlayStartPress();
@@ -416,20 +418,21 @@ public class LoadingCoverView : MonoBehaviour
 
     bool HasStartInput()
     {
-        if (Input.touchCount > 0)
+        if (Touch.activeTouches.Count > 0)
         {
-            for (int t_index = 0; t_index < Input.touchCount; t_index++)
+            for (int t_index = 0; t_index < Touch.activeTouches.Count; t_index++)
             {
-                var t_touch = Input.GetTouch(t_index);
-                if (t_touch.phase == TouchPhase.Began && !IsAccountPointer(t_touch.position)) return true;
+                var t_touch = Touch.activeTouches[t_index];
+                if (t_touch.phase == TouchPhase.Began && !IsAccountPointer(t_touch.screenPosition)) return true;
             }
             return false;
         }
-        if (Input.GetMouseButtonDown(0)) return !IsAccountPointer(Input.mousePosition);
+        if (GameInput.TryGetPress(out InputPointer t_pointer) && t_pointer.TryRead(out Vector2 t_position, out _, out _))
+            return !IsAccountPointer(t_position);
         var t_selected = UnityEngine.EventSystems.EventSystem.current != null
             ? UnityEngine.EventSystems.EventSystem.current.currentSelectedGameObject : null;
         if (accountButton != null && t_selected != null && t_selected.transform.IsChildOf(accountButton.transform)) return false;
-        return Input.anyKeyDown;
+        return GameInput.AnyPressedThisFrame;
     }
 
     bool IsAccountPointer(Vector2 _position)

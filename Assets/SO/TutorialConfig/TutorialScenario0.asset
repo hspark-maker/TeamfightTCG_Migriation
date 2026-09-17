@@ -16,7 +16,7 @@ MonoBehaviour:
   playerCardLevel: 1
   enemyCardLevel: 1
   playerDeckIds: 010000001c00000014000000060000000b0000001e000000
-  enemyDeckIds: 1d0000000600000004000000140000001a0000000f000000
+  enemyDeckIds: 1d000000110000000900000010000000120000000f000000
   playerScript:
   - kind: 1
     attackerSlot: -1

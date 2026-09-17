@@ -163,7 +163,12 @@ function createEnhanceCard(synergyIntroduction: boolean) {
               reject("NotReady", "Synergy introduction free enhancement is not available.", {uid, env, cardId});
             }
             freeShot = grants;
-          } else if (hasFreeShot(grants, FREE_SHOT_AXIS)) freeShot = grants;
+          } else {
+            if (!hasFreeShot(grants, FREE_SHOT_AXIS)) {
+              reject("NotReady", "The tutorial free enhancement was already used.", {uid, env, cardId});
+            }
+            freeShot = grants;
+          }
         }
 
         const paid = freeShot === null && step.cost > 0;

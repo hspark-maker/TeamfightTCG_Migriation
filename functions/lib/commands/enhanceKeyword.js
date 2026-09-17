@@ -114,8 +114,10 @@ exports.enhanceKeyword = (0, https_1.onCall)(async (request) => {
         let freeShot = null;
         if (grantsReference !== null) {
             const grants = (0, tutorialGrants_1.readGrants)(await transaction.get(grantsReference));
-            if ((0, tutorialGrants_1.hasFreeShot)(grants, FREE_SHOT_AXIS))
-                freeShot = grants;
+            if (!(0, tutorialGrants_1.hasFreeShot)(grants, FREE_SHOT_AXIS)) {
+                reject("NotReady", "The tutorial free enhancement was already used.", { uid, env, keyword });
+            }
+            freeShot = grants;
         }
         const charged = freeShot === null ? step.cost : 0;
         const balances = wallet.balances;

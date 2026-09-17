@@ -48,6 +48,10 @@ public class GameResultPopup : MonoBehaviour
     [SerializeField] GameObject goldLine;         // 골드 줄 전체(옵션)
 
     [SerializeField] CanvasGroup hintGroup;       // "터치하면 메인 화면으로" 안내
+    [SerializeField] AccountExperienceRewardView experienceReward = new AccountExperienceRewardView();
+    [SerializeField] CanvasGroup experienceGroup;
+
+    public bool HasExperienceView => this.experienceReward.IsWired && this.experienceGroup != null;
 
     [Header("연출")]
     [SerializeField] SurvivorGoldFlight cardFlight = new SurvivorGoldFlight();
@@ -79,6 +83,7 @@ public class GameResultPopup : MonoBehaviour
     RollingCounter m_rank;
 
     bool m_revealDone;    // 연출 완료 여부. 진행 중 터치는 스킵, 완료 후 터치는 메인 이동.
+    bool m_leaving;
 
     void Awake()
     {
@@ -106,7 +111,7 @@ public class GameResultPopup : MonoBehaviour
     }
 
     /// <summary>
-    /// 결과 팝업 노출. 두 값 모두 이미 지급·영속화된 값을 그대로 표시만 한다(_rankDelta는 패배 시 음수).
+    /// 결과 팝업 노출. 예상 보상·랭크·경험치를 표시만 한다. 실제 지급·저장은 서버 정산이 담당한다.
     /// _won=false면 분출·롤링을 통째로 접고 확정값만 띄운다 — 축하 연출은 승리의 몫이다.
     /// _survivorCards는 승리 보상을 만든 생존 카드로, 왼쪽부터 한 장씩 차례로 골드로 빨려든다.
     /// null과 빈 리스트는 다른 뜻이다 — null은 "생존 수를 모른다"(코인 분출로 폴백),
@@ -116,13 +121,15 @@ public class GameResultPopup : MonoBehaviour
     /// </summary>
     public void Show(CurrencyGain _reward, long _rankDelta = 0, bool _won = true,
                      IReadOnlyList<int> _survivorCards = null,
-                     IReadOnlyList<int> _fallenCards = null)
+                     IReadOnlyList<int> _fallenCards = null,
+                     long _accountExp = 0, long _accountTotalExp = 0)
     {
         gameObject.SetActive(true);
 
         KillTweens();
 
         this.m_revealDone = false;
+        this.m_leaving = false;
 
         long t_gold = _reward.HasAmount ? _reward.Amount : 0;
 
@@ -134,6 +141,8 @@ public class GameResultPopup : MonoBehaviour
         bool t_goldWillRoll = _won && t_gold != 0 && (t_cards == null || t_cards.Count > 0);
 
         ResetVisual(t_gold, _rankDelta, _won, t_goldWillRoll, t_cards, t_fallen);
+        if (this.experienceGroup != null) this.experienceGroup.alpha = 0f;
+        Sequence t_experience = this.experienceReward.Build(_accountExp, _accountTotalExp);
 
         // 결과 연출은 통째로 unscaled로 돈다. 배너 Animator가 unscaled로 못박혀 있는 데다,
         // 부전승 경로(TurnRunner의 _withBeat:false)는 결정타 강조가 눌러둔 timeScale을
@@ -168,6 +177,14 @@ public class GameResultPopup : MonoBehaviour
         }
 
         float t_end = t_cursor + t_enter;
+
+        // 경험치는 승패 배너와 같은 박자에 보이고, 게이지도 결과 시퀀스와 함께 스킵된다.
+        if (t_experience != null)
+        {
+            t_end = Mathf.Max(t_end, InsertLine(t_experience, t_cursor));
+            if (this.experienceGroup != null)
+                this.revealSeq.Insert(t_cursor, this.experienceGroup.DOFade(1f, this.rewardRevealDuration));
+        }
 
         // 골드 줄은 타이틀이 다 서기 전에 끼어든다 — 순차로 두면 그만큼 결과 화면이 길어진다.
         float t_goldAt = t_cursor + t_enter * this.panelOverlap;
@@ -321,6 +338,7 @@ public class GameResultPopup : MonoBehaviour
     // 전체화면 터치. 연출 중이면 스킵, 끝난 뒤면 메인 화면으로.
     void HandleTouch()
     {
+        if (this.m_leaving) return;
         if (!this.m_revealDone)
         {
             if (this.revealSeq != null && this.revealSeq.IsActive()) this.revealSeq.Complete(true);
@@ -332,6 +350,7 @@ public class GameResultPopup : MonoBehaviour
             return;
         }
 
+        this.m_leaving = true;
         BattleCleanup.LoadScene(this.mainMenuScene);
     }
 

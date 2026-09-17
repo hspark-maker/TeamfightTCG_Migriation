@@ -37,20 +37,9 @@ public static class NetTimeouts
     /// <summary>상대 멀리건 선택 패킷 대기 상한. 초과 시 무효 경기로 종료한다.</summary>
     public const float MulliganWaitSec = 30f;
 
-    /// <summary>실행 중인 전투의 재접속 유예. 만료·AI 인수 뒤에는 복귀하지 않는다.</summary>
-    public const float OpponentDropGraceSec = 30f;
-    public const float ReconnectHeartbeatSec = 3f;
-
-    /// <summary>재접속 시간은 기존 공격/연출 통신 대기 예산에서 제외한다.</summary>
-    public static async Cysharp.Threading.Tasks.UniTask WaitBattleSeconds(float seconds, System.Threading.CancellationToken ct)
-    {
-        float elapsed = 0f;
-        while (elapsed < seconds)
-        {
-            await Cysharp.Threading.Tasks.UniTask.Yield(ct);
-            if (!TurnState.ReconnectPaused) elapsed += UnityEngine.Time.unscaledDeltaTime;
-        }
-    }
+    /// <summary>상대 이탈 후 AI가 인수하기 전 유예. 현재 0은 즉시 인수한다.
+    /// Firebase 재접속은 이 창에서만 허용하고, AI 인수 뒤에는 복귀시키지 않는다.</summary>
+    public const float OpponentDropGraceSec = 0f;
 
     /// <summary>씬 전환 전 Runner 종료 대기 상한. 종료가 늦어져도 UI가 잠기지 않게 상한을 두고
     /// 넘기면 그냥 진행한다(BattleCleanup). 대기 자체를 빼면 안 된다 —

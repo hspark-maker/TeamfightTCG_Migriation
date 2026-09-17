@@ -1,5 +1,6 @@
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 [DisallowMultipleComponent]
@@ -29,7 +30,7 @@ public sealed class FirebaseAuthProbe : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.R))
+        if (Keyboard.current?.rKey.wasPressedThisFrame == true)
             this.Service.InitializeAsync().Forget();
     }
 

@@ -49,6 +49,8 @@ public class PackTearHandle : MonoBehaviour
     bool m_armed;
     bool m_committed;   // 확정 후 재입력 차단
     bool m_dragging;
+    InputPointer m_pointer;
+    Vector2 m_pointerPosition;
 
     Vector2 m_dragStart;
     Vector2 m_lastPointer;
@@ -87,14 +89,26 @@ public class PackTearHandle : MonoBehaviour
         if (!m_dragging)
         {
             // 버튼 등 실제 UI를 누른 것은 그쪽 몫이다 — 제스처가 가로채지 않는다.
-            if (Input.GetMouseButtonDown(0) && !IsPointerOverUI()) BeginDrag();
+            if (GameInput.TryGetPress(out InputPointer t_pointer)
+                && t_pointer.TryRead(out Vector2 t_position, out _, out _)
+                && !IsPointerOverUI(t_position))
+            {
+                m_pointer = t_pointer;
+                m_pointerPosition = t_position;
+                BeginDrag();
+            }
             return;
         }
 
+        if (!m_pointer.TryRead(out m_pointerPosition, out bool t_held, out bool t_canceled) || t_canceled)
+        {
+            m_dragging = false;
+            return;
+        }
         UpdateDrag();
 
-        // 손을 뗐거나(정상) 포인터가 사라졌으면(터치 취소) 확정 판정으로 넘긴다.
-        if (Input.GetMouseButtonUp(0) || !Input.GetMouseButton(0)) EndDrag();
+        // 정상적으로 손을 뗄 때만 확정한다. 터치 취소는 진행도를 보존하고 다음 입력을 기다린다.
+        if (!t_held) EndDrag();
     }
 
     void BeginDrag()
@@ -199,23 +213,32 @@ public class PackTearHandle : MonoBehaviour
     // 화면 너비에 비례 — 태블릿에서 손가락을 두 배로 끌게 만들지 않는다.
     float TearDistance() => Mathf.Max(1f, Screen.width * tearScreenRatio);
 
-    // 터치·마우스 공통 포인터 위치. Unity가 터치를 mousePosition으로도 흘려주므로 한 경로로 충분하다.
-    static Vector2 CurrentPointer() => Input.mousePosition;
+    Vector2 CurrentPointer() => m_pointerPosition;
 
     // "아무 UI 위인가"가 아니라 "눌러야 할 버튼 위인가"를 묻는다.
     // 개봉 화면이 로비 위에 겹치면서 아래 로비 UI(레이캐스트 타깃 200여 개)가 늘 포인터 밑에 깔린다 —
     // IsPointerOverGameObject로 판정하면 화면 어디서도 제스처가 시작되지 않는다(단독 씬 시절엔 밑이 비어 통과했다).
-    // 맨 위 히트 하나만 본다: 그 아래는 어차피 클릭이 닿지 않으므로 양보할 이유가 없다.
-    static bool IsPointerOverUI()
+    // 개봉 화면보다 아래에 깔린 UI는 양보 대상이 아니다. 팩 아래 빈 공간에서도 찢기를 시작한다.
+    bool IsPointerOverUI(Vector2 _position)
     {
         var t_es = EventSystem.current;
         if (t_es == null) return false;
 
         s_hits.Clear();
-        t_es.RaycastAll(new PointerEventData(t_es) { position = CurrentPointer() }, s_hits);
+        t_es.RaycastAll(new PointerEventData(t_es) { position = _position }, s_hits);
         if (s_hits.Count == 0) return false;
 
-        var t_top = s_hits[0].gameObject;
+        var t_hit = s_hits[0];
+        var t_canvas = GetComponentInParent<Canvas>();
+        if (t_canvas != null)
+        {
+            int t_hitLayer = SortingLayer.GetLayerValueFromID(t_hit.sortingLayer);
+            int t_ownLayer = SortingLayer.GetLayerValueFromID(t_canvas.sortingLayerID);
+            if (t_hitLayer < t_ownLayer ||
+                (t_hitLayer == t_ownLayer && t_hit.sortingOrder < t_canvas.sortingOrder)) return false;
+        }
+
+        var t_top = t_hit.gameObject;
         if (t_top == null) return false;
 
         // 라벨을 눌러도 버튼을 누른 것이다 — 부모까지 훑는다.
@@ -229,4 +252,6 @@ public class PackTearHandle : MonoBehaviour
         m_armed = false;
         m_dragging = false;
     }
+
+    void OnApplicationFocus(bool _focused) { if (!_focused) m_dragging = false; }
 }

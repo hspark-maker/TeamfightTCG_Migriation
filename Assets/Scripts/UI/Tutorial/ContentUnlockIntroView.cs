@@ -20,9 +20,9 @@ public sealed class ContentUnlockIntroView : PooledOverlay<ContentUnlockIntroVie
     [SerializeField] RectTransform glowRoot;
     [SerializeField] RectTransform _flightRoot;
     [Header("퇴장 · 아이콘 이동")]
-    [SerializeField, Min(0f)] float _fadeDuration = 0.18f;
+    [SerializeField, Min(0f)] float _fadeDuration = 0.1f;
     [SerializeField] Ease _fadeEase = Ease.OutCubic;
-    [SerializeField, Min(0f)] float _flightDuration = 0.4f;
+    [SerializeField, Min(0f)] float _flightDuration = 0.25f;
     [SerializeField] Ease _flightEase = Ease.OutCubic;
     [SerializeField] OverlayDim dim = new OverlayDim();
     [SerializeField] EOutgameSound _introSound = EOutgameSound.PopupOpen;
@@ -37,7 +37,7 @@ public sealed class ContentUnlockIntroView : PooledOverlay<ContentUnlockIntroVie
     [SerializeField] float iconDropDistance = 180f;
     [SerializeField] float iconDropScale = 1.4f;
     [Header("등장 · 확인")]
-    [SerializeField] float confirmDelay = 0.6f;
+    [SerializeField] float confirmDelay = 0.1f;
     [SerializeField] float confirmDuration = 0.16f;
     [SerializeField] float confirmRiseDistance = 90f;
 
@@ -198,7 +198,7 @@ public sealed class ContentUnlockIntroView : PooledOverlay<ContentUnlockIntroVie
         {
             _intro.Insert(impact, _glowGroup.DOFade(1f, 0.08f));
             _intro.Insert(impact, glowRoot.DOScale(_glowScale * 1.06f, 0.1f).SetEase(Ease.OutQuad));
-            _intro.Insert(impact + 0.1f, glowRoot.DOScale(_glowScale, 0.28f).SetEase(Ease.OutQuad));
+            _intro.Insert(impact + 0.1f, glowRoot.DOScale(_glowScale, 0.16f).SetEase(Ease.OutQuad));
         }
         _intro.Insert(confirmAt, _confirmGroup.DOFade(1f, confirmDuration));
         _intro.Insert(confirmAt, confirmRect.DOAnchorPos(_confirmHome, confirmDuration).SetEase(Ease.OutCubic));

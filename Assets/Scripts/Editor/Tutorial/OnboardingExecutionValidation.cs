@@ -48,11 +48,12 @@ public static class OnboardingExecutionValidation
 
             ValidateContracts();
             ValidateStorage();
+            ValidateUnlockHistoryAdoption(t_restore);
             ValidateLifetime(t_first, t_second);
             ValidateCompletion(t_first, t_second);
             ValidatePackReplay(t_data);
             Require(t_saveNotifications > 0, "Description completion did not enqueue asynchronous save notification.");
-            Debug.Log("[OnboardingExecutionValidation] PASS: stale generation, cancellation, description completion without remote confirmation, reentrant/late duplicate completion, all action contracts, legacy nullable records, execution/command JSON roundtrip, pack presentation replay and chapter/consumption isolation. Server and assets were not modified.");
+            Debug.Log("[OnboardingExecutionValidation] PASS: stale generation, cancellation, description completion without remote confirmation, reentrant/late duplicate completion, all action contracts, legacy nullable records, execution/command JSON roundtrip, unlock history preserved across server responses, pack presentation replay and chapter/consumption isolation. Server and assets were not modified.");
         }
         finally
         {
@@ -107,6 +108,45 @@ public static class OnboardingExecutionValidation
             !t_copy.OnboardingCommand.Consumed && t_copy.OnboardingCommand.ResultJson == t_old.OnboardingCommand.ResultJson,
             "Save roundtrip lost a command identity, result or confirmation boundary.");
         DataSaveManager.Data.Tutorial = new TutorialSaveData();
+    }
+
+    static void ValidateUnlockHistoryAdoption(List<Action> _restore)
+    {
+        Replace(_restore, typeof(DataSaveManager), "OnServerSlotsAdopted", (Action<ESaveSlot>)null);
+        var t_history = new ContentUnlockSaveData
+        {
+            Version = 1,
+            Unlocked = new List<string> { ContentUnlockManager.MISSION, ContentUnlockManager.CARD_ENHANCE },
+            Pending = new List<string> { ContentUnlockManager.CARD_ENHANCE },
+        };
+        DataSaveManager.Data.Profile.ContentUnlocks = t_history;
+        var t_patch = new ServerSlotPatch
+        {
+            Profile = new ProfileSaveData
+            {
+                AccountExp = 123,
+                AccountRewardLevel = 4,
+                ContentUnlocks = new ContentUnlockSaveData
+                {
+                    Version = 1,
+                    Unlocked = new List<string> { ContentUnlockManager.MISSION },
+                    Pending = new List<string> { ContentUnlockManager.MISSION },
+                },
+            },
+        };
+        typeof(DataSaveManager).GetMethod("AdoptServerSlots", STATIC_FIELDS).Invoke(null, new object[] { t_patch });
+        Require(ReferenceEquals(DataSaveManager.Data.Profile.ContentUnlocks, t_history)
+            && !t_history.Pending.Contains(ContentUnlockManager.MISSION)
+            && t_history.Pending.Contains(ContentUnlockManager.CARD_ENHANCE),
+            "A server response restored a completed introduction or erased an unlocked pending introduction.");
+        Require(DataSaveManager.Data.Profile.AccountExp == 123
+            && DataSaveManager.Data.Profile.AccountRewardLevel == 4,
+            "Preserving introduction history prevented authoritative profile rewards from being adopted.");
+        var t_remote = new UserSaveData();
+        typeof(DataSaveManager).GetMethod("AdoptRemote", STATIC_FIELDS).Invoke(null, new object[] { t_remote });
+        Require(ReferenceEquals(DataSaveManager.Data, t_remote)
+            && !ReferenceEquals(DataSaveManager.Data.Profile.ContentUnlocks, t_history),
+            "A fresh remote session inherited the previous session's introduction history.");
     }
 
     static void ValidateLifetime(TutorialStepDef _first, TutorialStepDef _second)

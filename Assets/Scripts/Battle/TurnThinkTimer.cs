@@ -51,13 +51,13 @@ public static class TurnThinkTimer
         Limit = _displayLimitSec;
         Remaining = _displayLimitSec;
         Active = true;
-        double t_elapsed = 0;
+        double t_start = Time.realtimeSinceStartupAsDouble;
 
         try
         {
             while (t_generation == s_generation)
             {
-                if (!TurnState.ReconnectPaused) t_elapsed += Time.unscaledDeltaTime;
+                double t_elapsed = Time.realtimeSinceStartupAsDouble - t_start;
                 if (t_elapsed >= _actSec) return;
                 Remaining = Mathf.Max(0f, (float)(_displayLimitSec - t_elapsed));
                 await UniTask.Yield(_ct);
@@ -90,13 +90,6 @@ public static class TurnThinkTimer
                 // false→true 엣지: 새 입력 창 시작 → 예산 리셋
                 if (t_allowed && !t_prevAllowed) t_elapsed = 0f;
                 t_prevAllowed = t_allowed;
-
-                if (TurnState.ReconnectPaused)
-                {
-                    if (t_allowed) Remaining = Mathf.Max(0f, _limitSec - t_elapsed);
-                    await UniTask.Yield(_ct);
-                    continue;
-                }
 
                 if (t_allowed)
                 {

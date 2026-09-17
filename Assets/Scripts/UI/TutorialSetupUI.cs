@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 using TMPro;
 using ScriptedAttack = TutorialScenarioData.ScriptedAttack;
@@ -98,6 +99,6 @@ public class TutorialSetupUI : MonoBehaviour
         if (Object.FindObjectOfType<UnityEngine.EventSystems.EventSystem>() != null) return;
         var t_es = new GameObject("EventSystem");
         t_es.AddComponent<UnityEngine.EventSystems.EventSystem>();
-        t_es.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+        t_es.AddComponent<InputSystemUIInputModule>();
     }
 }

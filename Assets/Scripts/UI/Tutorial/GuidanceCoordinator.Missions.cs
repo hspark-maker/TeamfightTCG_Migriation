@@ -46,7 +46,14 @@ public sealed partial class GuidanceCoordinator
 
     /// <summary>안내가 허용한 이동만 통과시킨다.</summary>
     public static bool AllowsUserNavigation(EOutgameTutorialAnchor _anchor)
-        => IsInternalNavigation || (!OnboardingSession.IsBusy && AllowsUserAction(_anchor));
+        => IsInternalNavigation || (!IsContentIntroBlockingNavigation
+            && !OnboardingSession.IsBusy && AllowsUserAction(_anchor));
+
+    /// <summary>소개 무대 준비 후부터 아이콘 도착까지 이탈을 막는다. 다른 탭에 있으면 무대로 복귀할 수 있다.</summary>
+    public static bool IsContentIntroBlockingNavigation => ContentUnlockPresentation.IsPlaying
+        || (ContentUnlockPresentation.IsReady && OnboardingSession.IsActive
+            && OutgameTutorialGuide.TryGetCurrentStep(out var t_step)
+            && t_step.Completion == EOutgameTutorialCompletion.ContentUnlockIntro);
 
     /// <summary>조정기와 스텝 실행기가 수행하는 화면 이동의 수명이다.</summary>
     public static IDisposable InternalNavigation() => new NavigationScope(s_instance);
@@ -127,8 +134,7 @@ public sealed partial class GuidanceCoordinator
         foreach (var t_flow in GuideMissionFlows.All)
         {
             if (t_flow == null || !GuideMissionFlows.IsEligible(t_flow)) continue;
-            if (!string.IsNullOrEmpty(t_flow.missionId)
-                && (!m_retryRequested || t_flow.missionId != m_requestedMissionId)) continue;
+            // 플레이로 현재 미션에 도달하면 클릭 없이 시작한다. 중단한 안내의 재시도는 별도로 처리한다.
             if (PendingIntros(t_flow).Count > 0 || OutgameTutorialRunner.HasPending(t_flow.tutorial)) return t_flow;
         }
         return null;

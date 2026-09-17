@@ -3,6 +3,7 @@ using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
 /// <summary>
@@ -14,8 +15,7 @@ using UnityEngine.UI;
 /// 기능:
 /// - 순차 배너: 스텝마다 문구 교체(fade+pop).
 /// - 탭 진행: 마스크 활성 구간에서 화면 탭으로 다음 진행(<see cref="WaitForTapAsync"/>).
-/// - 입력 마스크: 마스크는 uGUI raycast를 흡수한다. **주의: 카드 입력은 Physics2D
-///   `OnMouseDown`이라 uGUI 마스크로 차단되지 않는다** — 실제 카드 입력 차단은 호출측이
+/// - 입력 마스크: 마스크는 EventSystem raycast를 흡수해 카드 포인터 입력도 차단한다. 전투 상태의 입력 차단은 호출측이
 ///   `TurnState.InputAllowed=false`로 하며, 마스크는 (1)탭 감지 (2)배경 어둡게(darken) 담당.
 ///   darken 여부(<see cref="ScriptedAttack.dimBackground"/>)와 무관하게 마스크는 탭을 받는다.
 /// - 포인터: 공격 스텝에서 공격자 카드에 hintArrow(드래그 방향) 표시 + 양측 슬롯 하이라이트.
@@ -248,7 +248,7 @@ public class TutorialOverlayUI : MonoBehaviour
 
     /// <summary>
     /// 필드 포커스 안내. <paramref name="_screenRect"/>(화면 px)만 남기고 나머지를 딤으로 덮는다.
-    /// 카드 입력은 Physics2D라 uGUI 패널로 막히지 않는다 — 여기서 하는 건 **어디를 볼지 알려주는 것뿐**이고,
+    /// 포커스 패널은 raycast를 받지 않는다 — 여기서 하는 건 **어디를 볼지 알려주는 것뿐**이고,
     /// 무엇을 고를 수 있는지는 호출측이 TurnState로 정한다(자유 선택은 일부러 제한하지 않는다).
     ///
     /// 탭 힌트는 끈다 — 이 구간은 화면 탭이 아니라 카드 선택으로 진행한다.
@@ -291,14 +291,9 @@ public class TutorialOverlayUI : MonoBehaviour
         {
             EnsureFocusPanels();
             LayoutFocusPanels(_screenRect);
-            // 탭 모드면 패널이 raycast를 삼키지 않아야 아래 마스크가 탭을 받는다.
-            foreach (RectTransform t_panel in this.focusPanels)
-                t_panel.GetComponent<Image>().raycastTarget = !_waitTap;
-            foreach (RectTransform t_corner in this.focusCorners)
-                t_corner.GetComponent<Image>().raycastTarget = !_waitTap;
-
+            // 시각 안내가 재선택·무장 해제를 막지 않게 한다. 탭 대기는 별도 dimMask가 받는다.
             this.focusGroup.gameObject.SetActive(true);
-            this.focusGroup.blocksRaycasts = !_waitTap;
+            this.focusGroup.blocksRaycasts = false;
             this.focusGroup.DOKill();
             this.focusGroup.DOFade(DimStrength, 0.15f).SetLink(this.focusGroup.gameObject);
         }
@@ -523,7 +518,7 @@ public class TutorialOverlayUI : MonoBehaviour
             t_go.transform.SetParent(t_root.transform, false);
             var t_img = t_go.AddComponent<Image>();
             t_img.color = new Color(0f, 0f, 0f, 1f);   // 어둡기는 CanvasGroup alpha로만(dimMask와 같은 규약)
-            t_img.raycastTarget = true;                // 구멍 밖 UI 클릭 차단
+            t_img.raycastTarget = false;
             this.focusPanels[i] = (RectTransform)t_go.transform;
         }
 
@@ -537,7 +532,7 @@ public class TutorialOverlayUI : MonoBehaviour
             var t_img = t_go.AddComponent<Image>();
             t_img.sprite = CornerSprite(i);
             t_img.color  = new Color(0f, 0f, 0f, 1f);
-            t_img.raycastTarget = true;
+            t_img.raycastTarget = false;
             this.focusCorners[i] = (RectTransform)t_go.transform;
         }
     }
@@ -763,7 +758,7 @@ public class TutorialOverlayUI : MonoBehaviour
         if (Object.FindObjectOfType<UnityEngine.EventSystems.EventSystem>() != null) return;
         var t_es = new GameObject("EventSystem");
         t_es.AddComponent<UnityEngine.EventSystems.EventSystem>();
-        t_es.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+        t_es.AddComponent<InputSystemUIInputModule>();
     }
 
 }

@@ -474,8 +474,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         }
 
         OutgameTutorialGateUI.Ensure(this.gatePrefab)
-            .ShowGate(this, t_rect, t_button, OutgameTutorialGuide.MessageOf(m_step), t_onSatisfied, m_step.UseDim, SpotlightRect(),
-                _holdPointer: m_step.Action == EOutgameTutorialAction.WaitEnhance);
+            .ShowGate(this, t_rect, t_button, OutgameTutorialGuide.MessageOf(m_step), t_onSatisfied, m_step.UseDim, SpotlightRect());
     }
 
     // 타깃과 함께 밝힐 영역. 아직 등록되지 않았으면 강조 없이 진행한다 — 이 축이 진행을 막을 이유가 없다.

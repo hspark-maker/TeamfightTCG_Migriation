@@ -1,5 +1,6 @@
 #if !DISABLE_SRDEBUGGER && (UNITY_EDITOR || DEVELOPMENT_BUILD)
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 // F8은 에디터에서 SROptions+ 창, 플레이어에서 SRDebugger 옵션 탭으로 연결한다.
 // 화면 표시·입력 차단은 SRDebugger, 전투 콜라이더 차단은 TurnState가 담당한다.
@@ -36,7 +37,7 @@ public class OutgameDebugOverlay : MonoBehaviour
 
     void Update()
     {
-        if (!Input.GetKeyDown(KeyCode.F8)) return;
+        if (Keyboard.current?.f8Key.wasPressedThisFrame != true) return;
 #if UNITY_EDITOR
         if (SRDebug.Instance.IsDebugPanelVisible) SRDebug.Instance.HideDebugPanel();
         UnityEditor.EditorApplication.ExecuteMenuItem("Window/SRDebugger/SROptions Window (UXML)");

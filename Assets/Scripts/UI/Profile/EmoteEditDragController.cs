@@ -19,7 +19,7 @@ public class EmoteEditDragController : MonoBehaviour
     PointerEventData m_pointer;
     ScrollRect m_scroll;
     bool m_vertical, m_horizontal;
-    int m_finger = -1;
+    InputPointer m_inputPointer;
     public bool IsDragging => this.m_pointer != null;
     Camera EventCamera => this.m_canvas != null && this.m_canvas.renderMode != RenderMode.ScreenSpaceOverlay
         ? this.m_canvas.worldCamera : null;
@@ -47,17 +47,7 @@ public class EmoteEditDragController : MonoBehaviour
         this.m_source = _source;
         this.m_pointer = _pointer;
         _pointer.eligibleForClick = false;
-        this.m_finger = -1;
-        float t_nearest = float.MaxValue;
-        for (int t_i = 0; t_i < Input.touchCount; t_i++)
-        {
-            Touch t_touch = Input.GetTouch(t_i);
-            if (t_touch.phase == TouchPhase.Ended || t_touch.phase == TouchPhase.Canceled) continue;
-            float t_distance = Vector2.SqrMagnitude(t_touch.position - _pointer.position);
-            if (t_distance >= t_nearest) continue;
-            t_nearest = t_distance;
-            this.m_finger = t_touch.fingerId;
-        }
+        this.m_inputPointer = InputPointer.Capture(_pointer);
         this.m_scroll = _scroll;
         if (_scroll != null)
         {
@@ -131,27 +121,8 @@ public class EmoteEditDragController : MonoBehaviour
     void Update()
     {
         if (this.m_pointer == null) return;
-        Vector2 t_position = this.m_pointer.position;
-        bool t_held = false;
-        bool t_cancelled = false;
-        if (this.m_finger < 0)
-        {
-            t_position = Input.mousePosition;
-            t_held = Input.GetMouseButton(0);
-        }
-        else
-        {
-            t_cancelled = true;
-            for (int t_i = 0; t_i < Input.touchCount; t_i++)
-            {
-                Touch t_touch = Input.GetTouch(t_i);
-                if (t_touch.fingerId != this.m_finger) continue;
-                t_position = t_touch.position;
-                t_cancelled = t_touch.phase == TouchPhase.Canceled;
-                t_held = !t_cancelled && t_touch.phase != TouchPhase.Ended;
-                break;
-            }
-        }
+        bool t_found = this.m_inputPointer.TryRead(out Vector2 t_position, out bool t_held, out bool t_cancelled);
+        t_cancelled |= !t_found;
         this.Move(t_position);
         if (t_held) return;
         int t_slot = t_cancelled ? -1 : this.HitTest(t_position);
@@ -190,7 +161,7 @@ public class EmoteEditDragController : MonoBehaviour
         if (this.m_source != null) this.m_source.CancelGesture();
         this.m_pointer = null;
         this.m_source = null;
-        this.m_finger = -1;
+        this.m_inputPointer = default;
         if (this.m_ghost != null) this.m_ghost.gameObject.SetActive(false);
         if (this.m_slots != null)
             foreach (EmoteItemCell t_slot in this.m_slots)

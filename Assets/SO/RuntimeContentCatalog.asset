@@ -27,3 +27,5 @@ MonoBehaviour:
   contentUnlockData: {fileID: 11400000, guid: 1e1be2bef9712811f618230dfaf88480, type: 2}
   keywordIconConfig: {fileID: 11400000, guid: 2e0475eb8d64d1449916d99de758135a, type: 2}
   cardFrameConfig: {fileID: 11400000, guid: ed4cd9df9407f0a4e97ba1a9c52f5890, type: 2}
+  soundConfig: {fileID: 11400000, guid: 354fc699ded8b7849ac32ab399efef7f, type: 2}
+  outgameSoundBank: {fileID: 11400000, guid: 71d3c5a08e6b492fa04c7b18d2e6539f, type: 2}

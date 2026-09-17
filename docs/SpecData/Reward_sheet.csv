@@ -6,26 +6,26 @@ int,string,string,int,string,string,long,string
 7,Album,b,1,Currency,Gold,1500,앨범 전체 완성
 8,Album,b,2,Currency,Diamond,30,앨범 전체 완성
 9,Album,b,3,Currency,Shard,300,앨범 전체 완성
-10,Adventure,node_01,1,Currency,Gold,110,
-11,Adventure,node_02,1,Currency,Shard,30,
-13,Adventure,node_04,1,Currency,Gold,110,
-14,Adventure,node_05,1,Currency,Shard,60,
-16,Adventure,chapter_01,1,Currency,Gold,110,
-18,Adventure,node_07,1,Currency,Gold,140,
-19,Adventure,node_08,1,Currency,Shard,40,
-21,Adventure,node_10,1,Currency,Gold,150,
-22,Adventure,node_11,1,Currency,Shard,70,
-24,Adventure,chapter_02,1,Currency,Gold,150,
-26,Adventure,node_13,1,Currency,Gold,180,
-27,Adventure,node_14,1,Currency,Shard,50,
-29,Adventure,node_16,1,Currency,Gold,180,
-30,Adventure,node_17,1,Currency,Shard,80,
-32,Adventure,chapter_03,1,Currency,Gold,190,
-34,Adventure,node_19,1,Currency,Gold,220,
-35,Adventure,node_20,1,Currency,Shard,60,
-37,Adventure,node_22,1,Currency,Gold,220,
-38,Adventure,node_23,1,Currency,Shard,90,
-40,Adventure,chapter_04,1,Currency,Gold,220,
+10,Adventure,node_01,1,Currency,Gold,80,
+11,Adventure,node_02,1,Currency,Shard,20,
+13,Adventure,node_04,1,Currency,Gold,80,
+14,Adventure,node_05,1,Currency,Shard,40,
+16,Adventure,chapter_01,1,Currency,Gold,80,
+18,Adventure,node_07,1,Currency,Gold,110,
+19,Adventure,node_08,1,Currency,Shard,30,
+21,Adventure,node_10,1,Currency,Gold,110,
+22,Adventure,node_11,1,Currency,Shard,50,
+24,Adventure,chapter_02,1,Currency,Gold,110,
+26,Adventure,node_13,1,Currency,Gold,140,
+27,Adventure,node_14,1,Currency,Shard,40,
+29,Adventure,node_16,1,Currency,Gold,140,
+30,Adventure,node_17,1,Currency,Shard,60,
+32,Adventure,chapter_03,1,Currency,Gold,140,
+34,Adventure,node_19,1,Currency,Gold,170,
+35,Adventure,node_20,1,Currency,Shard,50,
+37,Adventure,node_22,1,Currency,Gold,170,
+38,Adventure,node_23,1,Currency,Shard,70,
+40,Adventure,chapter_04,1,Currency,Gold,170,
 42,Rank,0,1,Currency,Gold,80,브론즈 1
 44,Rank,1,1,Currency,Gold,80,브론즈 2
 46,Rank,2,1,Currency,Gold,80,브론즈 3
@@ -54,33 +54,33 @@ int,string,string,int,string,string,long,string
 82,Battle,win.perCard,1,Currency,Gold,10,승리 시 생존 카드 1장당 지급(계수)
 83,Battle,win.floor,1,Currency,Gold,10,승리 지급액 하한(부전승 바닥)
 84,Battle,lose.flat,1,Currency,Gold,5,패배 고정 지급(생존 카드 무관)
-85,Mission,daily.openPack1,1,Currency,Gold,50,미션 catalog/모험 집계 동기화 대기
-93,Mission,daily.destroyCards3,1,Currency,Gold,80,미션 catalog/모험 집계 동기화 대기
+85,Mission,daily.openPack1,1,Currency,Gold,20,미션 catalog/모험 집계 동기화 대기
+93,Mission,daily.destroyCards3,1,Currency,Gold,40,미션 catalog/모험 집계 동기화 대기
 101,Pass,S1:1,1,Currency,Gold,200,시즌 1 무료 트랙 레벨 1
 106,Pass,S1:6,1,Currency,Gold,300,시즌 1 무료 트랙 레벨 6
 107,Pass,S1:7,1,Currency,Shard,100,시즌 1 무료 트랙 레벨 7
 110,Pass,S1:10,1,Currency,Diamond,50,시즌 1 무료 트랙 레벨 10
-111,Adventure,node_01,2,Currency,Shard,30,
-112,Adventure,node_03,2,Currency,Shard,30,
-113,Adventure,node_04,2,Currency,Shard,60,
+111,Adventure,node_01,2,Currency,Shard,20,
+112,Adventure,node_03,2,Currency,Shard,20,
+113,Adventure,node_04,2,Currency,Shard,50,
 114,Adventure,node_06,1,Currency,Shard,30,
 115,Adventure,chapter_01,2,Currency,Diamond,10,
 116,Adventure,chapter_01,3,Pack,NormalPack_TEST,1,팩 지급 구현 대기
-117,Adventure,node_07,2,Currency,Shard,40,
-118,Adventure,node_09,2,Currency,Shard,40,
-119,Adventure,node_10,2,Currency,Shard,70,
+117,Adventure,node_07,2,Currency,Shard,30,
+118,Adventure,node_09,2,Currency,Shard,30,
+119,Adventure,node_10,2,Currency,Shard,50,
 120,Adventure,node_12,1,Currency,Shard,40,
 121,Adventure,chapter_02,2,Currency,Diamond,15,
 122,Adventure,chapter_02,3,Pack,NormalPack_TEST,1,팩 지급 구현 대기
-123,Adventure,node_13,2,Currency,Shard,50,
-124,Adventure,node_15,2,Currency,Shard,50,
-125,Adventure,node_16,2,Currency,Shard,80,
+123,Adventure,node_13,2,Currency,Shard,40,
+124,Adventure,node_15,2,Currency,Shard,40,
+125,Adventure,node_16,2,Currency,Shard,60,
 126,Adventure,node_18,1,Currency,Shard,50,
 127,Adventure,chapter_03,2,Currency,Diamond,20,
 128,Adventure,chapter_03,3,Pack,GiantsGardenPack,1,팩 지급 구현 대기
-129,Adventure,node_19,2,Currency,Shard,60,
-130,Adventure,node_21,2,Currency,Shard,60,
-131,Adventure,node_22,2,Currency,Shard,90,
+129,Adventure,node_19,2,Currency,Shard,50,
+130,Adventure,node_21,2,Currency,Shard,50,
+131,Adventure,node_22,2,Currency,Shard,70,
 132,Adventure,node_24,1,Currency,Shard,60,
 133,Adventure,chapter_04,2,Currency,Diamond,30,
 134,Adventure,chapter_04,3,Pack,HuntingBrandPack,2,팩 지급 구현 대기
@@ -89,16 +89,16 @@ int,string,string,int,string,string,long,string
 137,Rank,11,3,Pack,GiantsGardenPack,1,골드 4 팩 지급 구현 대기
 138,Rank,15,3,Pack,HuntingBrandPack,2,플래티넘 4 팩 지급 구현 대기
 139,Rank,19,3,Pack,ImmortalLegacyPack,3,다이아몬드 4 팩 지급 구현 대기
-140,Mission,daily.completeBattle3,1,Currency,Shard,40,미션 catalog/모험 집계 동기화 대기
-141,Mission,daily.completeBattle5,1,Currency,Gold,100,미션 catalog/모험 집계 동기화 대기
+140,Mission,daily.completeBattle3,1,Currency,Shard,30,미션 catalog/모험 집계 동기화 대기
+141,Mission,daily.completeBattle5,1,Currency,Gold,50,미션 catalog/모험 집계 동기화 대기
 142,Mission,daily.completeBattle3,2,Currency,RouletteTicket,1,일일 첫 회전은 전투 3회 완료로 지급; 승패 무관
 143,Mission,daily.triggerKeyword2,1,Currency,Gold,10,에너지 보상을 골드로 대체
-144,Mission,daily.triggerSynergy2,1,Currency,Shard,20,미션 catalog/모험 집계 동기화 대기
-145,Mission,weekly.completeBattle20,1,Currency,Shard,120,미션 catalog/모험 집계 동기화 대기
-146,Mission,weekly.completeBattle35,1,Currency,Shard,60,미션 catalog/모험 집계 동기화 대기
-147,Mission,weekly.completeBattle35,2,Currency,Gold,300,미션 catalog/모험 집계 동기화 대기
+144,Mission,daily.triggerSynergy2,1,Currency,Shard,10,미션 catalog/모험 집계 동기화 대기
+145,Mission,weekly.completeBattle20,1,Currency,Shard,80,미션 catalog/모험 집계 동기화 대기
+146,Mission,weekly.completeBattle35,1,Currency,Shard,40,미션 catalog/모험 집계 동기화 대기
+147,Mission,weekly.completeBattle35,2,Currency,Gold,180,미션 catalog/모험 집계 동기화 대기
 148,Mission,weekly.openPack10,1,Pack,NormalPack_TEST,1,미션 catalog/모험 집계 동기화 대기; 팩 지급 구현 대기
-149,Mission,weekly.enhanceCard10,1,Currency,Gold,230,기존 골드 200 + 에너지 대체 골드 30
+149,Mission,weekly.enhanceCard10,1,Currency,Gold,120,기존 골드 200 + 에너지 대체 골드 30
 151,Mission,weekly.winBattle10,1,Currency,Diamond,20,미션 catalog/모험 집계 동기화 대기
 152,Mission,weekly.completeBattle20,2,Currency,RouletteTicket,3,주간 회전 보충은 전투 20회 완료로 지급; 승패 무관
 153,Pass,S1:2,1,Currency,Shard,60,시즌 1 무료 트랙 레벨 2
@@ -114,16 +114,16 @@ int,string,string,int,string,string,long,string
 165,Pass,S1:10,2,PackChoice,UnlockedThemePack,1,시즌 1 무료 트랙 레벨 10; 팩 지급 구현 대기
 166,Guide,guide.02,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
 167,Guide,guide.03,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
-168,Guide,guide.16,1,Currency,Shard,40,guide.04 보상을 신규 실전 미션으로 이전; 과거 guide.04 수령 여부와 무관하게 guide.16 계정당 1회 지급
-169,Guide,guide.06,1,Currency,Gold,50,계정당 1회 가이드 지급 구현 대기
-170,Guide,guide.07,1,Currency,Shard,30,계정당 1회 가이드 지급 구현 대기
+168,Guide,guide.16,1,Currency,Shard,10,guide.04 보상을 신규 실전 미션으로 이전; 과거 guide.04 수령 여부와 무관하게 guide.16 계정당 1회 지급
+169,Guide,guide.06,1,Currency,Gold,30,계정당 1회 가이드 지급 구현 대기
+170,Guide,guide.07,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
 171,Guide,guide.07,2,Card,9,1,계정당 1회 가이드 지급 구현 대기
-172,Guide,guide.08,1,Currency,Shard,30,계정당 1회 가이드 지급 구현 대기
-173,Guide,guide.09,1,Currency,Shard,90,계정당 1회 가이드 지급 구현 대기
-174,Guide,guide.10,1,Currency,Gold,60,계정당 1회 가이드 지급 구현 대기
-175,Guide,guide.11,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
-176,Guide,guide.12,1,Currency,Shard,20,계정당 1회 가이드 지급 구현 대기
-177,Guide,guide.13,1,Currency,Shard,60,계정당 1회 가이드 지급 구현 대기
+172,Guide,guide.08,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
+173,Guide,guide.09,1,Currency,Shard,25,계정당 1회 가이드 지급 구현 대기
+174,Guide,guide.10,1,Currency,Gold,40,계정당 1회 가이드 지급 구현 대기
+175,Guide,guide.11,1,Currency,Shard,5,계정당 1회 가이드 지급 구현 대기
+176,Guide,guide.12,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
+177,Guide,guide.13,1,Currency,Shard,20,계정당 1회 가이드 지급 구현 대기
 178,Guide,guide.14,1,Pack,NormalPack_TEST,1,계정당 1회 가이드 지급 구현 대기
 179,Guide,guide.15,1,Currency,Diamond,10,계정당 1회 가이드 지급 구현 대기
 180,Guide,guide.15,2,Currency,RouletteTicket,1,계정당 1회 가이드 지급 구현 대기
@@ -132,9 +132,9 @@ int,string,string,int,string,string,long,string
 183,CardDuplicate,Arcane,1,Currency,Shard,5,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
 184,CardDuplicate,Mythic,1,Currency,Shard,10,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
 185,Mission,daily.completeMissions5,1,Currency,RouletteTicket,1,일일 미션 5개 완료 추가 보상
-186,Mission,daily.completeMissions5,2,Currency,Diamond,30,일일 미션 5개 완료 추가 보상
+186,Mission,daily.completeMissions5,2,Currency,Diamond,10,일일 미션 5개 완료 추가 보상
 187,Mission,weekly.completeMissions5,1,Currency,RouletteTicket,3,주간 미션 5개 완료 추가 보상
-188,Mission,weekly.completeMissions5,2,Currency,Diamond,100,주간 미션 5개 완료 추가 보상
+188,Mission,weekly.completeMissions5,2,Currency,Diamond,30,주간 미션 5개 완료 추가 보상
 189,Pass,S1:repeat,1,Currency,Gold,100,만렙 이후 마지막 레벨 간격 EXP마다 반복 보상
 190,Pass,S1:premium:1,1,Currency,Gold,400,시즌 1 프리미엄 트랙 레벨 1
 191,Pass,S1:premium:2,1,Currency,Shard,120,시즌 1 프리미엄 트랙 레벨 2
@@ -165,52 +165,52 @@ int,string,string,int,string,string,long,string
 216,Attendance,day_5,1,Currency,Shard,60,7일 누적 출석 5일차
 217,Attendance,day_6,1,Currency,Diamond,10,7일 누적 출석 6일차
 218,Attendance,day_7,1,Pack,NormalPack_TEST,1,7일 누적 출석 7일차 일반 팩
-219,AccountLevel,2,1,Currency,Gold,100,계정 레벨 2 달성; 자동 지급; 이전 레벨 소급 없음
-220,AccountLevel,3,1,Currency,Gold,100,계정 레벨 3 달성; 자동 지급; 이전 레벨 소급 없음
-221,AccountLevel,4,1,Currency,Gold,100,계정 레벨 4 달성; 자동 지급; 이전 레벨 소급 없음
-222,AccountLevel,5,1,Currency,Gold,100,계정 레벨 5 달성; 자동 지급; 이전 레벨 소급 없음
-223,AccountLevel,6,1,Currency,Gold,100,계정 레벨 6 달성; 자동 지급; 이전 레벨 소급 없음
-224,AccountLevel,7,1,Currency,Gold,100,계정 레벨 7 달성; 자동 지급; 이전 레벨 소급 없음
-225,AccountLevel,8,1,Currency,Gold,100,계정 레벨 8 달성; 자동 지급; 이전 레벨 소급 없음
-226,AccountLevel,9,1,Currency,Gold,100,계정 레벨 9 달성; 자동 지급; 이전 레벨 소급 없음
-227,AccountLevel,10,1,Currency,Gold,100,계정 레벨 10 달성; 자동 지급; 이전 레벨 소급 없음
-228,AccountLevel,11,1,Currency,Gold,100,계정 레벨 11 달성; 자동 지급; 이전 레벨 소급 없음
-229,AccountLevel,12,1,Currency,Gold,100,계정 레벨 12 달성; 자동 지급; 이전 레벨 소급 없음
-230,AccountLevel,13,1,Currency,Gold,100,계정 레벨 13 달성; 자동 지급; 이전 레벨 소급 없음
-231,AccountLevel,14,1,Currency,Gold,100,계정 레벨 14 달성; 자동 지급; 이전 레벨 소급 없음
-232,AccountLevel,15,1,Currency,Gold,100,계정 레벨 15 달성; 자동 지급; 이전 레벨 소급 없음
-233,AccountLevel,16,1,Currency,Gold,100,계정 레벨 16 달성; 자동 지급; 이전 레벨 소급 없음
-234,AccountLevel,17,1,Currency,Gold,100,계정 레벨 17 달성; 자동 지급; 이전 레벨 소급 없음
-235,AccountLevel,18,1,Currency,Gold,100,계정 레벨 18 달성; 자동 지급; 이전 레벨 소급 없음
-236,AccountLevel,19,1,Currency,Gold,100,계정 레벨 19 달성; 자동 지급; 이전 레벨 소급 없음
-237,AccountLevel,20,1,Currency,Gold,100,계정 레벨 20 달성; 자동 지급; 이전 레벨 소급 없음
-238,AccountLevel,21,1,Currency,Gold,100,계정 레벨 21 달성; 자동 지급; 이전 레벨 소급 없음
-239,AccountLevel,22,1,Currency,Gold,100,계정 레벨 22 달성; 자동 지급; 이전 레벨 소급 없음
-240,AccountLevel,23,1,Currency,Gold,100,계정 레벨 23 달성; 자동 지급; 이전 레벨 소급 없음
-241,AccountLevel,24,1,Currency,Gold,100,계정 레벨 24 달성; 자동 지급; 이전 레벨 소급 없음
-242,AccountLevel,25,1,Currency,Gold,100,계정 레벨 25 달성; 자동 지급; 이전 레벨 소급 없음
-243,AccountLevel,26,1,Currency,Gold,100,계정 레벨 26 달성; 자동 지급; 이전 레벨 소급 없음
-244,AccountLevel,27,1,Currency,Gold,100,계정 레벨 27 달성; 자동 지급; 이전 레벨 소급 없음
-245,AccountLevel,28,1,Currency,Gold,100,계정 레벨 28 달성; 자동 지급; 이전 레벨 소급 없음
-246,AccountLevel,29,1,Currency,Gold,100,계정 레벨 29 달성; 자동 지급; 이전 레벨 소급 없음
-247,AccountLevel,30,1,Currency,Gold,100,계정 레벨 30 달성; 자동 지급; 이전 레벨 소급 없음
-248,AccountLevel,31,1,Currency,Gold,100,계정 레벨 31 달성; 자동 지급; 이전 레벨 소급 없음
-249,AccountLevel,32,1,Currency,Gold,100,계정 레벨 32 달성; 자동 지급; 이전 레벨 소급 없음
-250,AccountLevel,33,1,Currency,Gold,100,계정 레벨 33 달성; 자동 지급; 이전 레벨 소급 없음
-251,AccountLevel,34,1,Currency,Gold,100,계정 레벨 34 달성; 자동 지급; 이전 레벨 소급 없음
-252,AccountLevel,35,1,Currency,Gold,100,계정 레벨 35 달성; 자동 지급; 이전 레벨 소급 없음
-253,AccountLevel,36,1,Currency,Gold,100,계정 레벨 36 달성; 자동 지급; 이전 레벨 소급 없음
-254,AccountLevel,37,1,Currency,Gold,100,계정 레벨 37 달성; 자동 지급; 이전 레벨 소급 없음
-255,AccountLevel,38,1,Currency,Gold,100,계정 레벨 38 달성; 자동 지급; 이전 레벨 소급 없음
-256,AccountLevel,39,1,Currency,Gold,100,계정 레벨 39 달성; 자동 지급; 이전 레벨 소급 없음
-257,AccountLevel,40,1,Currency,Gold,100,계정 레벨 40 달성; 자동 지급; 이전 레벨 소급 없음
-258,AccountLevel,41,1,Currency,Gold,100,계정 레벨 41 달성; 자동 지급; 이전 레벨 소급 없음
-259,AccountLevel,42,1,Currency,Gold,100,계정 레벨 42 달성; 자동 지급; 이전 레벨 소급 없음
-260,AccountLevel,43,1,Currency,Gold,100,계정 레벨 43 달성; 자동 지급; 이전 레벨 소급 없음
-261,AccountLevel,44,1,Currency,Gold,100,계정 레벨 44 달성; 자동 지급; 이전 레벨 소급 없음
-262,AccountLevel,45,1,Currency,Gold,100,계정 레벨 45 달성; 자동 지급; 이전 레벨 소급 없음
-263,AccountLevel,46,1,Currency,Gold,100,계정 레벨 46 달성; 자동 지급; 이전 레벨 소급 없음
-264,AccountLevel,47,1,Currency,Gold,100,계정 레벨 47 달성; 자동 지급; 이전 레벨 소급 없음
-265,AccountLevel,48,1,Currency,Gold,100,계정 레벨 48 달성; 자동 지급; 이전 레벨 소급 없음
-266,AccountLevel,49,1,Currency,Gold,100,계정 레벨 49 달성; 자동 지급; 이전 레벨 소급 없음
-267,AccountLevel,50,1,Currency,Gold,100,계정 레벨 50 달성; 자동 지급; 이전 레벨 소급 없음
+219,AccountLevel,2,1,Currency,Gold,30,계정 레벨 2 달성; 자동 지급; 이전 레벨 소급 없음
+220,AccountLevel,3,1,Currency,Gold,30,계정 레벨 3 달성; 자동 지급; 이전 레벨 소급 없음
+221,AccountLevel,4,1,Currency,Gold,30,계정 레벨 4 달성; 자동 지급; 이전 레벨 소급 없음
+222,AccountLevel,5,1,Currency,Gold,30,계정 레벨 5 달성; 자동 지급; 이전 레벨 소급 없음
+223,AccountLevel,6,1,Currency,Gold,30,계정 레벨 6 달성; 자동 지급; 이전 레벨 소급 없음
+224,AccountLevel,7,1,Currency,Gold,30,계정 레벨 7 달성; 자동 지급; 이전 레벨 소급 없음
+225,AccountLevel,8,1,Currency,Gold,30,계정 레벨 8 달성; 자동 지급; 이전 레벨 소급 없음
+226,AccountLevel,9,1,Currency,Gold,30,계정 레벨 9 달성; 자동 지급; 이전 레벨 소급 없음
+227,AccountLevel,10,1,Currency,Gold,30,계정 레벨 10 달성; 자동 지급; 이전 레벨 소급 없음
+228,AccountLevel,11,1,Currency,Gold,30,계정 레벨 11 달성; 자동 지급; 이전 레벨 소급 없음
+229,AccountLevel,12,1,Currency,Gold,30,계정 레벨 12 달성; 자동 지급; 이전 레벨 소급 없음
+230,AccountLevel,13,1,Currency,Gold,30,계정 레벨 13 달성; 자동 지급; 이전 레벨 소급 없음
+231,AccountLevel,14,1,Currency,Gold,30,계정 레벨 14 달성; 자동 지급; 이전 레벨 소급 없음
+232,AccountLevel,15,1,Currency,Gold,30,계정 레벨 15 달성; 자동 지급; 이전 레벨 소급 없음
+233,AccountLevel,16,1,Currency,Gold,30,계정 레벨 16 달성; 자동 지급; 이전 레벨 소급 없음
+234,AccountLevel,17,1,Currency,Gold,30,계정 레벨 17 달성; 자동 지급; 이전 레벨 소급 없음
+235,AccountLevel,18,1,Currency,Gold,30,계정 레벨 18 달성; 자동 지급; 이전 레벨 소급 없음
+236,AccountLevel,19,1,Currency,Gold,30,계정 레벨 19 달성; 자동 지급; 이전 레벨 소급 없음
+237,AccountLevel,20,1,Currency,Gold,30,계정 레벨 20 달성; 자동 지급; 이전 레벨 소급 없음
+238,AccountLevel,21,1,Currency,Gold,30,계정 레벨 21 달성; 자동 지급; 이전 레벨 소급 없음
+239,AccountLevel,22,1,Currency,Gold,30,계정 레벨 22 달성; 자동 지급; 이전 레벨 소급 없음
+240,AccountLevel,23,1,Currency,Gold,30,계정 레벨 23 달성; 자동 지급; 이전 레벨 소급 없음
+241,AccountLevel,24,1,Currency,Gold,30,계정 레벨 24 달성; 자동 지급; 이전 레벨 소급 없음
+242,AccountLevel,25,1,Currency,Gold,30,계정 레벨 25 달성; 자동 지급; 이전 레벨 소급 없음
+243,AccountLevel,26,1,Currency,Gold,30,계정 레벨 26 달성; 자동 지급; 이전 레벨 소급 없음
+244,AccountLevel,27,1,Currency,Gold,30,계정 레벨 27 달성; 자동 지급; 이전 레벨 소급 없음
+245,AccountLevel,28,1,Currency,Gold,30,계정 레벨 28 달성; 자동 지급; 이전 레벨 소급 없음
+246,AccountLevel,29,1,Currency,Gold,30,계정 레벨 29 달성; 자동 지급; 이전 레벨 소급 없음
+247,AccountLevel,30,1,Currency,Gold,30,계정 레벨 30 달성; 자동 지급; 이전 레벨 소급 없음
+248,AccountLevel,31,1,Currency,Gold,30,계정 레벨 31 달성; 자동 지급; 이전 레벨 소급 없음
+249,AccountLevel,32,1,Currency,Gold,30,계정 레벨 32 달성; 자동 지급; 이전 레벨 소급 없음
+250,AccountLevel,33,1,Currency,Gold,30,계정 레벨 33 달성; 자동 지급; 이전 레벨 소급 없음
+251,AccountLevel,34,1,Currency,Gold,30,계정 레벨 34 달성; 자동 지급; 이전 레벨 소급 없음
+252,AccountLevel,35,1,Currency,Gold,30,계정 레벨 35 달성; 자동 지급; 이전 레벨 소급 없음
+253,AccountLevel,36,1,Currency,Gold,30,계정 레벨 36 달성; 자동 지급; 이전 레벨 소급 없음
+254,AccountLevel,37,1,Currency,Gold,30,계정 레벨 37 달성; 자동 지급; 이전 레벨 소급 없음
+255,AccountLevel,38,1,Currency,Gold,30,계정 레벨 38 달성; 자동 지급; 이전 레벨 소급 없음
+256,AccountLevel,39,1,Currency,Gold,30,계정 레벨 39 달성; 자동 지급; 이전 레벨 소급 없음
+257,AccountLevel,40,1,Currency,Gold,30,계정 레벨 40 달성; 자동 지급; 이전 레벨 소급 없음
+258,AccountLevel,41,1,Currency,Gold,30,계정 레벨 41 달성; 자동 지급; 이전 레벨 소급 없음
+259,AccountLevel,42,1,Currency,Gold,30,계정 레벨 42 달성; 자동 지급; 이전 레벨 소급 없음
+260,AccountLevel,43,1,Currency,Gold,30,계정 레벨 43 달성; 자동 지급; 이전 레벨 소급 없음
+261,AccountLevel,44,1,Currency,Gold,30,계정 레벨 44 달성; 자동 지급; 이전 레벨 소급 없음
+262,AccountLevel,45,1,Currency,Gold,30,계정 레벨 45 달성; 자동 지급; 이전 레벨 소급 없음
+263,AccountLevel,46,1,Currency,Gold,30,계정 레벨 46 달성; 자동 지급; 이전 레벨 소급 없음
+264,AccountLevel,47,1,Currency,Gold,30,계정 레벨 47 달성; 자동 지급; 이전 레벨 소급 없음
+265,AccountLevel,48,1,Currency,Gold,30,계정 레벨 48 달성; 자동 지급; 이전 레벨 소급 없음
+266,AccountLevel,49,1,Currency,Gold,30,계정 레벨 49 달성; 자동 지급; 이전 레벨 소급 없음
+267,AccountLevel,50,1,Currency,Gold,30,계정 레벨 50 달성; 자동 지급; 이전 레벨 소급 없음

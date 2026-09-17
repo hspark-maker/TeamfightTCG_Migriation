@@ -77,10 +77,15 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     [Header("일러스트만 보기 (선택 — 미배선이면 기능만 빠진다)")]
     [Tooltip("누를 때마다 카드 위 정보(이름·이름판·체력·레벨·키워드 아이콘·프레임 장식·시너지)를 가렸다 되돌린다.")]
     [SerializeField] Button artOnlyButton;
+
     [Tooltip("켜짐/꺼짐을 색으로 알리는 아이콘(선택 — 미배선이면 색 피드백만 빠진다).")]
     [SerializeField] Image  artOnlyIcon;
     [SerializeField] Color  artOnlyOffColor = Color.white;
     [SerializeField] Color  artOnlyOnColor  = new Color(1f, 0.82f, 0.25f, 1f);
+
+    [Header("카드 획득처")]
+    [SerializeField] Button acquisitionButton;
+    [SerializeField] CardAcquisitionView acquisitionView;
 
     [Header("강화 연출 (선택 — 미배선이면 연출 없이 지금까지처럼 값만 즉시 갱신)")]
     [SerializeField] CardEnhanceRitualView ritual;
@@ -343,6 +348,8 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
             this.artOnlyButton.onClick.AddListener(ToggleArtOnly);
         }
 
+        if (this.acquisitionButton != null) this.acquisitionButton.onClick.AddListener(OpenAcquisition);
+
 
         if (this.enhanceButton != null) this.m_enhanceTone = this.enhanceButton.GetComponent<UIEffect>();
 
@@ -388,6 +395,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
 
     protected override void OnViewHidden()
     {
+        this.acquisitionView?.Hide();
         this.m_viewVersion++;
         StopShardAbsorb();
         LobbyShellBars.Show(this);
@@ -465,6 +473,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
 
     public override void Hide()
     {
+        this.acquisitionView?.Hide();
         this.m_viewVersion++;
         StopShardAbsorb();
         // 퇴장 중 입력부터 죽인다 — 닫히는 도중 전환이 시작되면 close 시퀀스와 같은 노드를 두고 싸운다.
@@ -562,6 +571,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     // 그 방향의 다음 "유효" 카드로 한 칸. 목록 끝에서는 반대편 끝으로 이어진다(순환).
     void Step(int _dir)
     {
+        if (this.acquisitionView != null && this.acquisitionView.IsOpen) return;
         if (!GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.None)) return;
         if (_dir == 0) return;
 
@@ -653,7 +663,8 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     // 순환이라 넘길 카드가 아예 없을 때(1장짜리)만 통째로 숨긴다. Hide()가 죽여둔 입력이 여기서 되살아난다.
     void RefreshArrows()
     {
-        bool t_multi = HasMultipleCards() && !this.m_ritualPlaying;
+        bool t_multi = HasMultipleCards() && !this.m_ritualPlaying
+            && !(this.acquisitionView != null && this.acquisitionView.IsOpen);
 
         if (this.swipeDetector != null) this.swipeDetector.Interactable = t_multi;
     }
@@ -757,6 +768,8 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
 
     void ApplyArtOnlyChrome()
     {
+        if (this.acquisitionButton != null)
+            this.acquisitionButton.gameObject.SetActive(!this.m_readOnly && !this.m_artOnly);
         if (this.artOnlyIcon != null)
             this.artOnlyIcon.color = this.m_artOnly ? this.artOnlyOnColor : this.artOnlyOffColor;
     }
@@ -764,6 +777,8 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     // 카드가 바뀔 때의 전량 갱신. 조건 없는 칩 재생성은 여기뿐이다.
     void Apply(int _card)
     {
+        this.acquisitionView?.Hide();
+        ApplyArtOnlyChrome();
         this.m_viewVersion++;
         StopShardAbsorb();
         bool t_owned = OwnershipManager.IsOwned(_card);
@@ -783,6 +798,39 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         RewindScroll();
 
         RefreshGrowth(_card, t_owned);
+    }
+
+    void OpenAcquisition()
+    {
+        if (this.acquisitionView == null || this.m_readOnly || this.m_ritualPlaying
+            || this.m_enhanceRequestPending || this.m_unlockFxPlaying
+            || DOTween.IsTweening(this)
+            || !GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.None)) return;
+        int t_card = CardAt(this.m_index);
+        if (t_card <= 0) return;
+        this.acquisitionView.Show(t_card, NavigateToAcquisitionPack, RefreshArrows);
+        RefreshArrows();
+    }
+
+    void NavigateToAcquisitionPack(string _packId)
+    {
+        if (!GuidanceCoordinator.CanCloseCardDetail
+            || !GuidanceCoordinator.AllowsUserNavigation(EOutgameTutorialAnchor.LobbyPackTab)
+            || !OutgameFeatureLock.IsUnlocked(EOutgameFeature.PackCarousel)
+            || OutgameTutorialRunner.TryGetForcedPack(out _, out _)
+            || PackPurchaseFlow.IsPurchasing) return;
+
+        bool t_available = false;
+        foreach (var t_source in CardAcquisitionSources.Resolve(CardAt(this.m_index)))
+            if (t_source.PackId == _packId && t_source.Available) { t_available = true; break; }
+        var t_shell = FindFirstObjectByType<LobbyTabController>();
+        if (!t_available || t_shell == null
+            || !t_shell.TrySelectFeature(EOutgameFeature.LobbyPackTab, _afterSelect: () =>
+            {
+                var t_shop = t_shell.CurrentPanel?.GetComponent<PackShowcaseController>();
+                if (t_shop != null && t_shop.TrySelectPack(_packId)) Hide();
+                else this.acquisitionView.ShowNavigationUnavailable();
+            })) this.acquisitionView.ShowNavigationUnavailable();
     }
 
     // 성장에 따라 움직이는 것만 다시 그린다 — 통지마다 Apply를 돌리면 값이 그대로인 칩까지 매번 다시 짓는다.
@@ -815,6 +863,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         bool        t_syn   = _owned && SynergyUnlocked(_card);
 
         bool t_sameCard = _card == this.m_keywordCard;
+        bool t_synergyChanged = t_sameCard && t_syn != this.m_shownSynergyOpen;
 
         // 같은 카드가 선 채로 잠김이 풀렸다 = 방금 해금됐다(판을 걷는 일은 PlayPendingUnlockFx가 맡는다).
         if (t_sameCard)
@@ -827,9 +876,9 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         }
 
         // 시너지 관문(1차 진화)은 키워드 마스크를 안 건드리고 넘어갈 수 있다 — 따로 보지 않으면 잠긴 칩이 그대로 남는다.
-        if (t_sameCard && t_syn != this.m_shownSynergyOpen) BuildSynergySection(_card, _owned);
+        if (t_synergyChanged) BuildSynergySection(_card, _owned);
 
-        if (t_sameCard && t_trait == this.m_shownTrait && t_info == this.m_shownInfo) return;
+        if (t_sameCard && !t_synergyChanged && t_trait == this.m_shownTrait && t_info == this.m_shownInfo) return;
 
         if (this.cardView != null) this.cardView.RefreshKeywords(_card, _owned);
         BuildKeywordSection(_card, _owned);
@@ -1311,15 +1360,20 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
 
         EnhanceResult t_result;
 
-        // 명령은 백그라운드에서 직렬 처리한다. 닫기·카드 이동은 응답을 기다리지 않는다.
+        // 서버 왕복 동안 대기 표시를 띄우고, 응답 뒤 연출로 넘어가기 전에 걷는다.
         try
         {
+            ServerWaitOverlay.Hold(this);
             t_result = await CardGrowthManager.TryEnhanceAsync(t_card, _amount);
         }
         catch (Exception t_exception)
         {
             Debug.LogException(t_exception);
             t_result = new EnhanceResult(EEnhanceOutcome.NotReady, CardGrowthManager.LevelOf(t_card));
+        }
+        finally
+        {
+            ServerWaitOverlay.Release(this);
         }
 
         // 마지막 샤드가 도착한 뒤 강화 반짝임 또는 진화를 시작한다. 닫기·카드 이동은 기다리지 않는다.

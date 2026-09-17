@@ -13,6 +13,17 @@ using UnityEngine.EventSystems;
 /// </summary>
 public static class MulliganPhase
 {
+    static readonly List<RaycastResult> s_pointerHits = new List<RaycastResult>();
+
+    static bool IsOverUI(Vector2 _position)
+    {
+        if (EventSystem.current == null) return false;
+        s_pointerHits.Clear();
+        EventSystem.current.RaycastAll(new PointerEventData(EventSystem.current) { position = _position }, s_pointerHits);
+        // Physics2DRaycaster가 잡은 카드 자체는 UI 차단으로 취급하지 않는다.
+        return s_pointerHits.Count > 0 && s_pointerHits[0].module is UnityEngine.UI.GraphicRaycaster;
+    }
+
     /// <summary>멀리건 단계 실행. _firstOwner=선공 ownerIndex(0=플레이어팀, 1=적팀).
     /// _ct=씬 파괴/이탈 시 사람 선택 대기를 깨는 취소 토큰(TurnRunner 수명).</summary>
     public static async UniTask Run(TurnContext _ctx, int _firstOwner, CancellationToken _ct)
@@ -157,13 +168,14 @@ public static class MulliganPhase
                 }
 
                 if (t_ui != null && t_ui.SkipPressed) { t_chosen = -1; break; }      // 스킵 = 교환 없음.
-                if (!Input.GetMouseButtonDown(0)) continue;
+                if (!GameInput.TryGetPress(out InputPointer t_pointer)
+                    || !t_pointer.TryRead(out Vector2 t_position, out _, out _)) continue;
                 if (Camera.main == null) continue;
                 // UI(스킵 버튼) 위 클릭은 카드 선택으로 처리하지 않음.
-                if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) continue;
+                if (IsOverUI(t_position)) continue;
 
                 Vector3 t_wp = Camera.main.ScreenToWorldPoint(new Vector3(
-                    Input.mousePosition.x, Input.mousePosition.y, -Camera.main.transform.position.z));
+                    t_position.x, t_position.y, -Camera.main.transform.position.z));
                 Collider2D t_hit = Physics2D.OverlapPoint(t_wp);
                 if (t_hit == null) continue;
 

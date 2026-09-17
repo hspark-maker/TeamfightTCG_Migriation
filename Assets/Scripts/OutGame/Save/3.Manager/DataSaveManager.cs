@@ -168,7 +168,15 @@ public static class DataSaveManager
         if (_slots.AlbumReward != null) { Data.AlbumReward = _slots.AlbumReward; t_touched |= ESaveSlot.AlbumReward; }
         if (_slots.Adventure != null) { Data.Adventure = _slots.Adventure; t_touched |= ESaveSlot.Adventure; }
         if (_slots.Tutorial != null) { Data.Tutorial = _slots.Tutorial; t_touched |= ESaveSlot.Tutorial; }
-        if (_slots.Profile != null) { Data.Profile = _slots.Profile; t_touched |= ESaveSlot.Profile; }
+        if (_slots.Profile != null)
+        {
+            // 서버 명령은 경험치·보상을 쓰지만 해금 연출 이력은 클라이언트가 저장한다.
+            // 아직 업로드되지 않은 완료 이력을 응답의 옛 사본으로 덮으면 같은 연출이 다시 열린다.
+            if (Data.Profile?.ContentUnlocks != null)
+                _slots.Profile.ContentUnlocks = Data.Profile.ContentUnlocks;
+            Data.Profile = _slots.Profile;
+            t_touched |= ESaveSlot.Profile;
+        }
 
         Data = Normalize(Data);
 

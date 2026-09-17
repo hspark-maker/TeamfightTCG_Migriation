@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2dbedbfef2f4e94499a82f2c9ded3d07, type: 3}
   m_Name: SoundConfig
   m_EditorClassIdentifier: 
-  bgm: {fileID: 0}
-  bgmVolume: 0.5
+  lobbyBgm: {fileID: 8300000, guid: dbcce29b33e028546959403d711b4021, type: 3}
+  battleBgm: {fileID: 8300000, guid: 95a3d120974634d12a5df368d1864f23, type: 3}
   uiClickClips:
   - {fileID: 8300000, guid: 3b7a828a646174088aa48ee1db9c439c, type: 3}
   hitClips:

@@ -42,7 +42,7 @@ public static class GuideOnboardingDataAuthoring
                 int t_id = t_step.FindPropertyRelative("stepId").intValue;
                 if (t_id == 28 || t_id == 29) t_step.FindPropertyRelative("anchorCardId").intValue = 0;
                 if (t_id == 30) t_step.FindPropertyRelative("guideMessage").stringValue =
-                    "강화 버튼을 꾹 누르세요!\n샤드가 점점 빠르게 들어가고, 필요량을 채우면 별이 늘어나요.\n{enhanceCost}";
+                    "강화 버튼을 한 번 누르세요!\n선택한 수량의 샤드가 들어가고, 필요량을 채우면 별이 늘어나요.\n{enhanceCost}";
 
             }
         }

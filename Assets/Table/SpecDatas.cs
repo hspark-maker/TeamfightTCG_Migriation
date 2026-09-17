@@ -515,3 +515,19 @@ public partial class LoadingTip
     /// 노출 여부(1=노출)
     public int enabled;
 }
+
+[GeneratorSpecData]
+public partial class AdventureReward
+{
+    /// 행 고유 번호(부여 후 변경 금지)
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 보상을 받는 대상 — AdventureNode.nodeId 또는 AdventureChapter.chapterId
+    public string ownerKey;
+    /// 같은 ownerKey 안에서의 표시 순서
+    public int order;
+    /// 지급 재화(Gold/Diamond/Energy/Shard)
+    public string currency;
+    /// 지급량(0 이하는 지급도 표시도 되지 않는다)
+    public long amount;
+}

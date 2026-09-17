@@ -169,6 +169,21 @@ public class PackShowcaseController : MonoBehaviour, IUIInitializable
         RefreshBuyLock();
     }
 
+    // 획득처에서 고른 팩을 실제 구매 대상과 같은 캐러셀에 선택한다.
+    public bool TrySelectPack(string _packId)
+    {
+        if (s_transitioning || PackPurchaseFlow.IsPurchasing || carousel == null
+            || !OutgameFeatureLock.IsUnlocked(EOutgameFeature.PackCarousel)
+            || OutgameTutorialRunner.TryGetForcedPack(out _, out _)) return false;
+        InitializeUI();
+        Refresh();
+        int t_index = m_display.IndexOf(_packId);
+        if (t_index < 0) return false;
+        carousel.SetIndex(t_index, false);
+        OnPageChanged(carousel.Index);
+        return true;
+    }
+
     // 진열 갱신. 탭을 여는 시점과 스텝이 바뀌는 시점이 다르므로(탭 활성화가 스텝 커밋보다 먼저다)
     // 두 시점 모두에서 다시 해석해야 표시와 결제가 갈리지 않는다.
     void Refresh()

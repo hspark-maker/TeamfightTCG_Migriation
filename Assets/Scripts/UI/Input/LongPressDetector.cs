@@ -27,21 +27,25 @@ public class LongPressDetector : MonoBehaviour, IPointerDownHandler, IPointerUpH
     bool    pressing, fired;
     float   timer;
     Vector2 startPos;
+    InputPointer pointer;
 
     void Update()
     {
-        if (!this.pressing || this.fired) return;
+        if (!this.pressing) return;
 
         // PointerUp 이벤트가 프레임 사이에서 유실돼도 실제 포인터가 풀렸으면 즉시 취소한다.
-        if (!IsPointerHeld())
+        bool t_found = this.pointer.TryRead(out Vector2 t_position, out bool t_held, out bool t_canceled);
+        if (!t_found || !t_held)
         {
-            bool t_tap = Vector2.Distance(Input.mousePosition, this.startPos) <= this.cancelDistance;
+            bool t_tap = !this.fired && t_found && !t_canceled && Vector2.Distance(t_position, this.startPos) <= this.cancelDistance;
             this.pressing = false;
             if (t_tap) OnTap?.Invoke();
             return;
         }
 
-        if (Vector2.Distance(Input.mousePosition, this.startPos) > this.cancelDistance)
+        if (this.fired) return;
+
+        if (Vector2.Distance(t_position, this.startPos) > this.cancelDistance)
         {
             this.pressing = false;
             return;
@@ -59,35 +63,30 @@ public class LongPressDetector : MonoBehaviour, IPointerDownHandler, IPointerUpH
 
     public void OnPointerDown(PointerEventData _data)
     {
+        if (this.pressing || _data.button != PointerEventData.InputButton.Left) return;
+        this.pointer = InputPointer.Capture(_data);
         this.pressing = true;
         this.timer    = 0f;
         this.fired    = false;
         this.startPos = _data.position;
     }
 
-    static bool IsPointerHeld()
-    {
-        if (Input.touchCount == 0) return Input.GetMouseButton(0);
-
-        for (int i = 0; i < Input.touchCount; i++)
-        {
-            TouchPhase t_phase = Input.GetTouch(i).phase;
-            if (t_phase == TouchPhase.Began || t_phase == TouchPhase.Moved || t_phase == TouchPhase.Stationary)
-                return true;
-        }
-        return false;
-    }
-
     public void OnPointerUp(PointerEventData _data)
     {
+        if (!this.pointer.Matches(_data)) return;
+        this.pointer.TryRead(out _, out _, out bool t_canceled);
         // Update가 이미 취소(pressing=false)했으면 탭이 아니다. 뗀 프레임에 한 번 더 재는 것은
         // 눌렀다 곧바로 멀리서 뗀 경우(Update가 중간값을 못 본 경우)를 막기 위해서다.
         bool t_tap = this.pressing
                   && !this.fired
+                  && !t_canceled
                   && Vector2.Distance(_data.position, this.startPos) <= this.cancelDistance;
 
         this.pressing = false;
 
         if (t_tap) OnTap?.Invoke();
     }
+
+    void OnDisable() => this.pressing = false;
+    void OnApplicationFocus(bool _focused) { if (!_focused) this.pressing = false; }
 }

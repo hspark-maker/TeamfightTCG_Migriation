@@ -55,8 +55,8 @@ test("CSV: stable mission IDs, challenge before growth, events, targets and rewa
   assert.deepEqual(guide.map((m) => m.sortOrder), Array.from({length: 15}, (_, i) => i + 1));
   assert.deepEqual(guide.slice(0, 7).map((m) => [m.event, m.target]), [
     ["Guide.EnhanceCompleted", 1], ["Guide.Bronze2Reached", 1], ["Guide.AdventureNode01", 1],
-    ["Guide.AdventureNode02", 1], ["Guide.EvolveCompleted", 1],
-    ["Guide.StarterCardsAtStar2", 3], ["Guide.CompleteSynergyBattle", 1],
+    ["Guide.EvolveCompleted", 1], ["Guide.StarterCardsAtStar2", 3],
+    ["Guide.CompleteSynergyBattle", 1], ["Guide.AdventureNode02", 1],
   ]);
   assert.ok(guide.find((m) => m.id === "guide.11").sortOrder <
     guide.find((m) => m.id === "guide.10").sortOrder);
@@ -69,13 +69,13 @@ test("CSV: stable mission IDs, challenge before growth, events, targets and rewa
   for (const id of ["guide.01", "guide.05", "guide.02"])
     assert.deepEqual(resolveRewards(rewards, "Guide", id).gains, [{currency: "Shard", amount: 10}]);
   assert.deepEqual(resolveRewards(rewards, "Guide", "guide.04").gains, []);
-  assert.deepEqual(resolveRewards(rewards, "Guide", "guide.16").gains, [{currency: "Shard", amount: 40}]);
-  assert.deepEqual(resolveRewards(rewards, "Guide", "guide.06").gains, [{currency: "Gold", amount: 50}]);
+  assert.deepEqual(resolveRewards(rewards, "Guide", "guide.16").gains, [{currency: "Shard", amount: 10}]);
+  assert.deepEqual(resolveRewards(rewards, "Guide", "guide.06").gains, [{currency: "Gold", amount: 30}]);
 });
 
 test("challenge clears can be claimed without completing the following growth mission", () => {
   for (const [challengeId, growthId, nodeId] of [
-    ["guide.07", "guide.05", "node_02"], ["guide.11", "guide.10", "node_04"],
+    ["guide.07", "guide.08", "node_02"], ["guide.11", "guide.10", "node_04"],
   ]) {
     const state = emptyState();
     const challenge = guide.find((mission) => mission.id === challengeId);
@@ -165,6 +165,7 @@ test("locked completion is retained; new rewards once; existing claimed missions
   const state = emptyState();
   state.progress = evaluate({...save([1, 3, 4], {1: entry(2), 3: entry(2), 4: entry(2)}),
     adventure: {clearedNodeIds: ["node_01", "node_02"]}}, {}, {bestTierIndex: 1});
+  state.progress[key("CompleteSynergyBattle")] = 1;
   state.claimed["guide.02"] = true;
   assert.equal(judgeMissionClaim("guide.06", state, catalog).reason, "NotEligible");
   const paid = [];
@@ -285,12 +286,12 @@ test("callables: rank read before writes, live-state claims, rejection does not 
     await assert.rejects(claimMission(request("guide.16")), (error) => error.details?.reason === "NotEligible");
     beforeBattleClaim.progress[key("CompleteSynergyBattle")] = 1;
     await claimMission(request("guide.16"));
-    assert.equal(wallet.balances.Shard, 80);
+    assert.equal(wallet.balances.Shard, 50);
     assert.equal(docs.get(root + "missions/current").claimed["guide.04"], true);
     assert.equal(docs.get(root + "missions/current").claimed["guide.15"], true);
     await assert.rejects(claimMission(request("guide.16")), (error) => error.details?.reason === "AlreadyClaimed");
     assert.equal(writes.length, 0);
-    assert.equal(wallet.balances.Shard, 80);
+    assert.equal(wallet.balances.Shard, 50);
   } finally {
     Module._load = originalLoad;
     for (const file of commandFiles) delete require.cache[require.resolve(file)];

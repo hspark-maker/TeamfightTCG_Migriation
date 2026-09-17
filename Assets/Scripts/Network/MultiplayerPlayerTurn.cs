@@ -60,7 +60,6 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
 
     void HandleCardViewAttack(CardView _attacker, CardView _target)
     {
-        if (TurnState.ReconnectPaused) return;
         CardInstance t_attCard = _attacker.BoundCard;
         CardInstance t_defCard = _target.BoundCard;
 
@@ -89,7 +88,6 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
     /// </summary>
     void ForceTimeoutAttack()
     {
-        if (TurnState.ReconnectPaused) return;
         if (!TurnState.InputAllowed) return;   // 이미 액션 시작됨 → 무시(원자성)
 
         // 선택을 먼저 — 유효 공격이 확정될 때만 입력을 차단한다.
@@ -117,10 +115,7 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
 
     async UniTask ExecuteAttackAsync(CardInstance _attacker, CardInstance _defender)
     {
-        if (NetworkSession.Instance?.Reconnect != null)
-            await NetworkSession.Instance.Reconnect.WaitForInputAsync(this.ctx.playerFieldView.GetCancellationTokenOnDestroy());
         if (TurnState.BattleEnded) return;
-        NetworkSession.Instance?.Reconnect?.AttackStarted();
         this.runningAttacks++;
         try { await ExecuteAttackCore(_attacker, _defender); }
         finally { this.runningAttacks--; }
@@ -191,26 +186,21 @@ public class MultiplayerPlayerTurn : TurnBase, IAiTakeoverContinuable
             }
         }
 
-        // 상대 스폰 반영. 재전송된 명령도 로컬 공격 해결 뒤 이 경계에서 배치한다.
+        // 상대 스폰 반영 (OnCardSpawnReceived로 이미 enemyField에 배치됨)
         List<CardInstance> t_enemyPlaced = t_takeoverPlaced
                                            ?? MultiplayerTurnRunner.Instance?.FlushEnemySpawns()
                                            ?? new List<CardInstance>();
-        if (TurnState.BattleEnded) return;
         this.ctx.enemyFieldView.Refresh();
         this.ctx.enemyDeckUI?.Refresh();
         await this.ctx.enemyFieldView.PlayFillAnim(t_enemyPlaced);
         if (TurnState.BattleEnded) return;
 
         // divergence 카나리아 스냅샷. **공격 해결 직후가 아니라 여기다.**
-        // 상대 CardSpawn은 위 FlushEnemySpawns에서 반영한다. 배리어와 보충 전에 뜨면
-        // 상대 스폰 명령의 수신·적용 시점에 따라 정상 경기에서도 지문이 갈린다.
+        // 상대 CardSpawn은 수신 즉시 enemyField에 반영되므로(PlaceCardDirectly), 보충 전에 뜨면
+        // "상대 보충분이 도착했는가"가 회선 속도에 좌우돼 정상 경기에서도 지문이 갈린다.
         // 배리어를 통과하고 양쪽 보충이 모두 끝난 이 지점은 두 클라가 반드시 같은 보드다.
         // 이 지문은 **다음 배리어**에 실려 나간다(순번도 그때 것으로 맞춰진다).
         NetworkGameController.Instance?.StageStateHash(this.ctx.playerField.State, this.ctx.enemyField.State);
-        if (NetworkSession.Instance?.Reconnect != null)
-            await NetworkSession.Instance.Reconnect.CheckpointAsync(this.ctx.playerField.State, this.ctx.enemyField.State,
-                this.ctx.playerFieldView.GetCancellationTokenOnDestroy());
-        if (TurnState.BattleEnded) return;
 
         if (t_result.canAttackAgain && this.ctx.enemyField.IsEmpty)
         {

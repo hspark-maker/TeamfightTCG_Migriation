@@ -130,5 +130,5 @@ public class SynergyCountIcon : MonoBehaviour,
     }
 
     static Vector2 CurrentPointerPos()
-        => Input.touchCount > 0 ? Input.GetTouch(0).position : (Vector2)Input.mousePosition;
+        => GameInput.PointerPosition;
 }

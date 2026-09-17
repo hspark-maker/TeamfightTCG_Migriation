@@ -6,6 +6,7 @@ using UnityEditor.Animations;
 using UnityEditor.Events;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -1063,7 +1064,7 @@ public static class VictoryBannerTestBuilder
             UnityEventTools.AddPersistentListener(resetButton.onClick, driver.ResetBanner);
 
             CreateText(glow.transform, "LayerInfo", "V10  TWO HIGH-WIDE BURSTS + ANIMATOR SHOW / SUCTION FOLD HIDE", 20, FontStyle.Normal, new Vector2(920f, 65f), new Vector2(0f, -535f), new Color(0.4f, 0.5f, 0.7f, 1f));
-            new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+            new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
 
             EditorSceneManager.MarkSceneDirty(scene);
             if (!EditorSceneManager.SaveScene(scene, ScenePath))

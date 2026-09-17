@@ -3,7 +3,7 @@ using DG.Tweening;
 using TMPro;
 using UnityEngine;
 
-// 이미 서버가 지급한 경험치의 표시만 담당한다. 보상 팝업의 등장 시퀀스가 수명을 소유한다.
+// 전달받은 경험치의 표시만 담당한다. 전투 결과는 예상치, 보상 팝업은 서버 지급치를 넘긴다.
 [Serializable]
 public sealed class AccountExperienceRewardView
 {
@@ -17,12 +17,19 @@ public sealed class AccountExperienceRewardView
 
     public Sequence Build(long _gained, long _total, bool _hasItems)
     {
+        if (this.root != null)
+            this.root.anchoredPosition = new Vector2(0f, _hasItems ? -330f : 0f);
+        return Build(_gained, _total);
+    }
+
+    // 전투 결과에서는 프리팹에 저작한 위치를 유지한다.
+    public Sequence Build(long _gained, long _total)
+    {
         if (this.root == null) return null;
         bool t_visible = _gained > 0 && AccountLevelManager.IsConfigured;
         this.root.gameObject.SetActive(t_visible);
         if (!t_visible) return null;
 
-        this.root.anchoredPosition = new Vector2(0f, _hasItems ? -330f : 0f);
         if (this.gainText != null) this.gainText.text = $"계정 경험치 <color=#A36213>+{_gained:N0}</color>";
         long t_start = Math.Max(0, _total - _gained);
         AccountLevelInfo t_first = AccountLevelManager.GetInfoAt(t_start);

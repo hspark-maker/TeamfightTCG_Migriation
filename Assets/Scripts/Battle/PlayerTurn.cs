@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using DG.Tweening;
@@ -101,7 +101,7 @@ public class PlayerTurn : TurnBase
         {
             if (t_step0.kind == TutorialScenarioData.StepKind.Inspect)
             {
-                // Inspect: 배너만 띄우고(마스크 off) 입력 허용 → OnMouseDown/롱프레스 동작.
+                // Inspect: 배너만 띄우고(마스크 off) 입력 허용 → OnPointerDown/롱프레스 동작.
                 // 롱프레스 통지(WaitForInspectAsync) 대기 후, 다음 스텝 준비 위해 입력 재차단.
                 // "상대 정보 확인" 집중: 확인 대상(적 targetSlot) 1장만 밝게, 나머지 전부 암전. 대기 후 원복.
                 t_overlay?.ShowInspect(t_step0.guideMessage, t_step0.bannerAnchor);
@@ -201,7 +201,7 @@ public class PlayerTurn : TurnBase
 
     /// <summary>튜토리얼: 공격 스텝을 오버레이에 안내(문구+공격자/타깃 하이라이트+드래그 포인터).
     /// 추가로 스크립트 공격자를 <see cref="TurnState.ForcedAttacker"/>로 지정 → (1)다른 카드 입력 차단
-    /// (OnMouseDown 게이트) (2)나머지 로컬 카드를 검게 암전(RestoreAllFades). "그 카드 말고 다 검게".</summary>
+    /// (OnPointerDown 게이트) (2)나머지 로컬 카드를 검게 암전(RestoreAllFades). "그 카드 말고 다 검게".</summary>
     void ShowTutorialStep(TutorialScenarioData.ScriptedAttack _step)
     {
         EndGuidedFreeSelect();   // 이전 스텝의 포커스/구독 정리(아래 자유 분기에서 필요하면 다시 건다)

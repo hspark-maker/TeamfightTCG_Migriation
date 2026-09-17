@@ -36,7 +36,7 @@ public class DeckEditDragController : MonoBehaviour
     bool             m_dragging;
     int              m_card;
     PointerEventData m_data;
-    int              m_finger = -1;   // 추적 중인 레거시 Input 터치의 fingerId. -1 = 마우스(터치 없음)
+    InputPointer     m_pointer;
 
     // 드래그 동안 세워둔 목록과 그 원래 축 설정. 소유권을 뺏는 것(pointerDrag=null)만으로는 부족하다 —
     // 그건 "이미 잡힌 드래그"를 끊을 뿐이라, 고스트를 든 채 손가락이 움직이는 동안 목록이 새로 잡혀 흐를 수 있다.
@@ -76,7 +76,7 @@ public class DeckEditDragController : MonoBehaviour
         }
 
         // 2) 입력 모듈이 더는 이 포인터의 드래그를 라우팅하지 않게 한다.
-        //    StandaloneInputModule.ProcessDrag는 pointerDrag == null이면 첫 줄에서 return한다.
+        //    InputSystemUIInputModule.ProcessPointerButtonDrag는 pointerDrag == null이면 바로 return한다.
         _data.dragging    = false;
         _data.pointerDrag = null;
 
@@ -105,7 +105,7 @@ public class DeckEditDragController : MonoBehaviour
 
         m_card     = _card;
         m_data     = _data;
-        m_finger   = ResolveFinger(_data.position);
+        m_pointer  = InputPointer.Capture(_data);
         m_dragging = true;
 
         // 고스트는 1회 Instantiate 후 재사용되므로 크기는 드래그마다 다시 준다 —
@@ -196,13 +196,16 @@ public class DeckEditDragController : MonoBehaviour
         Cancel();
     }
 
+    void OnApplicationFocus(bool _focused) { if (!_focused) Cancel(); }
+
     void Update()
     {
         if (!m_dragging) return;
 
         // 손 뗐는지는 여기서 판정한다. 타일 OnPointerUp에 의존하면
         // 드래그 중 타일이 재빌드/비활성화될 때 이벤트를 놓쳐 고스트가 화면에 붙어버린다.
-        ReadPointer(out Vector2 t_pos, out bool t_held);
+        bool t_found = m_pointer.TryRead(out Vector2 t_pos, out bool t_held, out bool t_canceled);
+        if (!t_found || t_canceled) { Cancel(); return; }
         MoveGhost(t_pos);
         HighlightHoveredSlot(t_pos);
 
@@ -241,7 +244,7 @@ public class DeckEditDragController : MonoBehaviour
         m_dragging = false;
         m_card     = 0;
         m_data     = null;
-        m_finger   = -1;
+        m_pointer  = default;
 
         // 손을 뗄 때까지 입력 모듈이 이 포인터를 계속 갱신하므로, 종료 시점에도 클릭 자격을 다시 눌러둔다
         // (Begin 이후 다른 코드가 되살릴 여지 차단 — 드롭 직후 타일 클릭이 뒤늦게 터지는 것을 막는다).
@@ -376,63 +379,5 @@ public class DeckEditDragController : MonoBehaviour
                 return t_i;
         }
         return -1;
-    }
-
-    // 드래그를 시작한 그 손가락만 추적한다.
-    // Input.GetTouch(0)으로 고정해 읽으면, 두 번째 손가락이 닿았다가 첫 손가락을 떼는 순간 touch 배열이 당겨져
-    // 고스트가 엉뚱한 손가락으로 순간이동하고 드래그가 끝나지도 않는다.
-    void ReadPointer(out Vector2 _pos, out bool _held)
-    {
-        if (m_data == null)
-        {
-            _pos = Vector2.zero; _held = false;
-            return;
-        }
-
-        if (m_finger >= 0)
-        {
-            for (int t_i = 0; t_i < Input.touchCount; t_i++)
-            {
-                Touch t_touch = Input.GetTouch(t_i);
-                if (t_touch.fingerId != m_finger) continue;
-
-                _pos  = t_touch.position;
-                _held = t_touch.phase != TouchPhase.Ended && t_touch.phase != TouchPhase.Canceled;
-                return;
-            }
-
-            // 그 손가락이 터치 목록에서 사라졌다 = 이미 뗐다. 마지막으로 알던 위치에서 종료 처리한다.
-            _pos  = m_data.position;
-            _held = false;
-            return;
-        }
-
-        _pos  = Input.mousePosition;   // ProjectSettings activeInputHandler=Input Manager(Old)
-        _held = Input.GetMouseButton(0);
-    }
-
-    // 손가락 판별에 PointerEventData.pointerId를 쓰지 않는다 — 그 값의 의미가 입력 모듈마다 다르다.
-    // 레거시 StandaloneInputModule은 마우스에 음수(-1)를 주지만, 이 프로젝트가 쓰는 InputSystemUIInputModule은
-    // 마우스에도 양수를 주고 터치 id도 레거시 fingerId와 체계가 다르다. 그대로 믿으면 마우스가 "터치"로 읽혀
-    // 매칭에 실패하고, 드래그가 시작된 첫 프레임에 "이미 뗐다"로 판정돼 고스트가 뜨자마자 사라진다.
-    // 그래서 추적 대상은 위치·눌림을 실제로 읽는 쪽(레거시 Input)에서 직접 고른다.
-    static int ResolveFinger(Vector2 _startPos)
-    {
-        int   t_finger = -1;
-        float t_best   = float.MaxValue;
-
-        for (int t_i = 0; t_i < Input.touchCount; t_i++)
-        {
-            Touch t_touch = Input.GetTouch(t_i);
-            if (t_touch.phase == TouchPhase.Ended || t_touch.phase == TouchPhase.Canceled) continue;
-
-            float t_dist = Vector2.Distance(t_touch.position, _startPos);
-            if (t_dist >= t_best) continue;
-
-            t_best   = t_dist;
-            t_finger = t_touch.fingerId;
-        }
-
-        return t_finger;   // 터치가 없으면 -1 = 마우스 경로
     }
 }

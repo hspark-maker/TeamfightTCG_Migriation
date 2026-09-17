@@ -240,7 +240,7 @@ public class CardCinematicPlayer : MonoBehaviour
             t_elapsed += Time.unscaledDeltaTime;
             if (!this.allowSkip || t_elapsed < SkipInputGuard) continue;
 
-            if (Input.anyKeyDown || Input.GetMouseButtonDown(0)) { _tcs.TrySetResult(); return; }
+            if (GameInput.AnyPressedThisFrame) { _tcs.TrySetResult(); return; }
         }
     }
 

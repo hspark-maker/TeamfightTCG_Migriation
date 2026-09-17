@@ -688,9 +688,7 @@ MonoBehaviour:
         action: 11
         anchor: 21
         spotlight: 0
-        guideMessage: "\uAC15\uD654 \uBC84\uD2BC\uC744 \uAFB9 \uB204\uB974\uC138\uC694!\n\uC0E4\uB4DC\uAC00
-          \uC810\uC810 \uBE60\uB974\uAC8C \uB4E4\uC5B4\uAC00\uACE0, \uD544\uC694\uB7C9\uC744
-          \uCC44\uC6B0\uBA74 \uBCC4\uC774 \uB298\uC5B4\uB098\uC694.\n{enhanceCost}"
+        guideMessage: "\uAC15\uD654 \uBC84\uD2BC\uC744 \uD55C \uBC88 \uB204\uB974\uC138\uC694!\n\uC120\uD0DD\uD55C \uC218\uB7C9\uC758 \uC0E4\uB4DC\uAC00 \uB4E4\uC5B4\uAC00\uACE0, \uD544\uC694\uB7C9\uC744 \uCC44\uC6B0\uBA74 \uBCC4\uC774 \uB298\uC5B4\uB098\uC694.\n{enhanceCost}"
         messageAtBottom: 0
         unlocks: 
         unlocksAll: 0

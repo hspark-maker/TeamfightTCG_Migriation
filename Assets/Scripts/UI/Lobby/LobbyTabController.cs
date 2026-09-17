@@ -55,7 +55,8 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
         && m_pendingArrive == null && m_leaving == null
         // 미완주 상태라도 전체 해금된 로비는 자유 조작을 허용한다.
         && (!OutgameTutorialRunner.IsRunning || OutgameFeatureLock.IsFtueFreeNavigation)
-        && !OutgameTutorialRunner.IsGuidedRunning && !GuidanceCoordinator.IsInputLocked;
+        && !OutgameTutorialRunner.IsGuidedRunning && !GuidanceCoordinator.IsInputLocked
+        && !GuidanceCoordinator.IsContentIntroBlockingNavigation;
 
     /// <summary>Moves one adjacent tab through the same policy as a tab button.</summary>
     public void TrySwipe(int _direction)

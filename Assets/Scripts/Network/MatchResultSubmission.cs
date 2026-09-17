@@ -80,6 +80,8 @@ static class MatchResultSubmission
     static CancellationTokenSource s_retryCancellation;
     static PendingSubmission s_battleSubmission;
 
+    internal static string BattleMatchId => s_battleSubmission?.matchId;
+
     internal static void Initialize(string _envId)
     {
         s_generation++;
