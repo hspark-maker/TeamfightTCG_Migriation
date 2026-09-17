@@ -44,9 +44,10 @@ public static class SpecPayloadCodec
     /// </summary>
     public static readonly string[] ServerOnlyTableNames = { "Mission", "RankAiEncounter" };
 
-    // AIDeck.card1~card6로 대체된 구형 자식 표. 생성 타입은 남아 있지만 소비자가 없으므로
+    // AIDeckCard는 AIDeck.card1~card6, AdventureReward는 Reward(ownerType=Adventure)로 대체됐다.
+    // 생성 타입은 남아 있지만 소비자가 없으므로
     // 동기화·서버 발행에는 포함하지 않고, 미등록 표 경고에서만 제외한다.
-    static readonly string[] RetiredTableNames = { "AIDeckCard" };
+    static readonly string[] RetiredTableNames = { "AIDeckCard", "AdventureReward" };
 
     /// <summary>서버 발행·롤백 검증 대상. 클라이언트 동기화 목록과 구분한다.</summary>
     public static IEnumerable<string> PublishedTableNames

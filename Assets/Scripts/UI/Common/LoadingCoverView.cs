@@ -33,6 +33,11 @@ public class LoadingCoverView : MonoBehaviour
     [Tooltip("진행도 슬라이더. 미배선이면 표시 없이 대기만 한다(min/max 무관하게 정규값으로 쓴다).")]
     [SerializeField] Slider progressBar;
     [SerializeField] TMP_Text statusText;
+    [Tooltip("미션 게이지처럼 채워진 영역에 겹쳐 표시할 다른 색의 로딩 문구.")]
+    [SerializeField] TMP_Text _filledStatusText;
+    [SerializeField] RectTransform _statusTextFillMask;
+    readonly Vector3[] _fillCorners = new Vector3[4];
+    readonly Vector3[] _statusCorners = new Vector3[4];
     [Tooltip("전투 복귀 팁. 유효한 시트 문구가 없으면 저작 문구를 유지한다.")]
     [SerializeField] TMP_Text _tipText;
 
@@ -723,6 +728,35 @@ public class LoadingCoverView : MonoBehaviour
                 : "게임 리소스를 확인하는 중입니다.";
         else if (GameInitialization.State == EGameInitState.LoadingAssets)
             statusText.text = "게임 리소스를 불러오는 중입니다.";
+    }
+
+    void LateUpdate()
+    {
+        if (statusText == null || _filledStatusText == null || _statusTextFillMask == null
+            || progressBar == null || progressBar.fillRect == null) return;
+        if (_filledStatusText.text != statusText.text) _filledStatusText.text = statusText.text;
+
+        RectTransform t_source = statusText.rectTransform;
+        Transform t_parent = _statusTextFillMask.parent;
+        progressBar.fillRect.GetWorldCorners(_fillCorners);
+        t_source.GetWorldCorners(_statusCorners);
+        Vector3 t_left = t_parent.InverseTransformPoint(_fillCorners[0]);
+        Vector3 t_right = t_parent.InverseTransformPoint(_fillCorners[2]);
+        Vector3 t_bottom = t_parent.InverseTransformPoint(_statusCorners[0]);
+        Vector3 t_top = t_parent.InverseTransformPoint(_statusCorners[2]);
+        float t_width = Mathf.Max(0f, t_right.x - t_left.x);
+        bool t_visible = statusText.gameObject.activeInHierarchy && progressBar.gameObject.activeInHierarchy
+            && progressBar.normalizedValue > 0f && t_width > 0f;
+        _statusTextFillMask.gameObject.SetActive(t_visible);
+        if (!t_visible) return;
+
+        _statusTextFillMask.localPosition = new Vector3(t_left.x, t_bottom.y, t_bottom.z);
+        _statusTextFillMask.sizeDelta = new Vector2(t_width, Mathf.Max(0f, t_top.y - t_bottom.y));
+        RectTransform t_filled = _filledStatusText.rectTransform;
+        t_filled.pivot = t_source.pivot;
+        t_filled.sizeDelta = t_source.rect.size;
+        t_filled.localScale = t_source.localScale;
+        t_filled.SetPositionAndRotation(t_source.position, t_source.rotation);
     }
 
     IEnumerator CoFillBar(Func<float> _progress, bool _initializing = false)

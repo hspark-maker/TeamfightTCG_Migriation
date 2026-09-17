@@ -97,7 +97,7 @@ public static class OutgameTutorialGuide
             || t_event == GuideMissionTrack.EVENT_STARTER_CARDS_STAR2
             || t_event == GuideMissionTrack.EVENT_CARETAKER_CARDS_STAR1;
         if (t_starters)
-            foreach (int t_card in new[] { 1, 3, 4 })
+            foreach (int t_card in GuideMissionPreparation.CardIds)
                 if (GuideMissionTrack.StarOf(t_card) < (t_event == GuideMissionTrack.EVENT_STARTER_CARDS_STAR2 ? 2 : 1)
                     && CanGuideEnhance(t_card)) { s_enhanceCard = t_card; return true; }
         int t_growth = GuideMissionTrack.PickGrowthCard(GuideMissionTrack.Current);

@@ -33,7 +33,7 @@ MonoBehaviour:
     minRankGrade: 0
     minRankDivision: 0
     minAccountLevel: 0
-    guideMissionId: 
+    guideMissionId: guide.06
   - feature: 16
     requireFtue: 1
     requireRank: 0
@@ -69,8 +69,7 @@ MonoBehaviour:
       icon: {fileID: 21300000, guid: 7a72c74924ba2434889a09c3d1d9dbd4, type: 3}
       destination: 4
   - content: 4
-    description: "\uD589\uC6B4\uC774 \uB2F9\uC2E0\uC744 \uAE30\uB2E4\uB9AC\uACE0
-      \uC788\uC2B5\uB2C8\uB2E4!"
+    description: "카드 강화에 조각이 부족한가요? 룰렛에서 조각을 비롯한 다양한 보상을 획득하세요!"
     items:
     - name: "\uB8F0\uB81B"
       icon: {fileID: 21300000, guid: 52d6b52ffa3f0ca429846b662c006ea7, type: 3}

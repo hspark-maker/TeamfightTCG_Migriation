@@ -52,6 +52,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     float m_anchorMissingSince = -1f;
     int m_anchorRestoreStepId;
     bool m_restoringSurface;
+    bool m_freeBattleHintSuspended;
     int m_contentIntroVersion;
 
     static OutgameTutorialBridge s_rankEntryOwner;
@@ -299,6 +300,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         if (m_step == null) return;
         if (m_enhancing || m_awaitingUnlockFx || GuidanceCoordinator.IsRestoring) return;
+        if (SuspendFreeBattleHint()) return;
         if (!PackOpenOverlay.IsOpen && (m_step.Completion == EOutgameTutorialCompletion.PackOpen
             || m_step.Anchor == EOutgameTutorialAnchor.PackAcquireButton))
         {
@@ -465,6 +467,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     void TryOpenGate()
     {
         if (m_step == null || m_step.Anchor == EOutgameTutorialAnchor.None || GuidanceCoordinator.IsRestoring) return;
+        if (SuspendFreeBattleHint()) return;
         if (!TutorialAnchorRegistry.TryGet(m_step.Anchor, out var t_rect, out var t_button))
         {
             if (GuidedCursor && GuideResume.Record?.GoalReached == true
@@ -969,6 +972,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         m_stepVersion++;
         m_anchorMissingSince = -1f;
+        m_freeBattleHintSuspended = false;
         m_enhanceResultClose?.Kill();
         m_enhanceResultClose = null;
         m_enhancing = false;
@@ -992,6 +996,24 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear(this);
     }
 
+    // 해금 이후의 전투 안내는 자유 이동을 허용한다. 다른 화면에서 플레이 버튼이
+    // 사라진 것은 정상 이탈이므로, 차단판/5초 복구를 걸지 않고 안내 표시만 보류한다.
+    bool SuspendFreeBattleHint()
+    {
+        if (m_step == null || GuidedCursor || !OutgameFeatureLock.IsFtueFreeNavigation
+            || m_step.Action != EOutgameTutorialAction.BattleEntry
+            || m_step.Anchor != EOutgameTutorialAnchor.LobbyPlayButton) return false;
+        if (GuidanceCoordinator.IsCurrentTabAnchor(EOutgameTutorialAnchor.LobbyMatchTab)
+            && DeckEditController.OpenEditor == null && !CardDetailOverlayView.IsOpen
+            && !PackOpenOverlay.IsOpen) return false;
+
+        m_anchorMissingSince = -1f;
+        m_anchorRestoreStepId = 0;
+        HideGuide();
+        m_freeBattleHintSuspended = true;
+        return true;
+    }
+
     void Update()
     {
         if (LoadingCoverView.OwnsLobbyPreparation && !m_returnPreparing) return;
@@ -999,6 +1021,13 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (!TryGetCursorStep(out var t_current) || !ReferenceEquals(t_current, m_step))
         {
             CloseGate();
+            return;
+        }
+        if (SuspendFreeBattleHint()) return;
+        if (m_freeBattleHintSuspended)
+        {
+            m_freeBattleHintSuspended = false;
+            PresentStep();
             return;
         }
         if (m_step.Completion == EOutgameTutorialCompletion.Click

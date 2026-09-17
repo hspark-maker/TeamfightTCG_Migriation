@@ -9,6 +9,7 @@ const {judgeMissionClaim} = require("../lib/missions/judgeMissionClaim");
 const {readMissions, applyPeriodReset, commitMissionClaim} = require("../lib/missions/missionStore");
 const {parseRewardRows, resolveRewards} = require("../lib/rewardTable");
 const {BASE_LEVEL, applyEnhanceLevel} = require("../lib/growth/cardGrowth");
+const {resolveDropPool} = require("../lib/packs/packDraw");
 
 function readSheet(name) {
   const source = fs.readFileSync(path.join(__dirname, "../../docs/SpecData", name + "_sheet.csv"), "utf8")
@@ -100,14 +101,49 @@ test("rank: missing/bronze 1 fail; bronze 2/higher pass; maximum persists after 
   assert.equal(evaluate({}, reached)[key("Bronze2Reached")], 1);
 });
 
-test("starter cards: count 0..3 owned fixed IDs; no deck; greater stars count", () => {
+test("caretaker growth: any three owned caretaker species count without a deck", () => {
   for (const target of [1, 2]) for (let count = 0; count <= 3; count++) {
     const entries = Object.fromEntries([3, 4, 1].map((id, i) => [id, entry(i < count ? target + 1 : target - 1)]));
     assert.equal(evaluate(save([3, 4, 1], entries))[key("StarterCardsAtStar" + target)], count);
   }
   const entries = {3: entry(3), 4: entry(3), 1: entry(3), 99: entry(3)};
-  assert.equal(evaluate(save([3, 4, 99], entries))[key("StarterCardsAtStar2")], 2);
+  assert.equal(evaluate(save([3, 4, 99], entries))[key("StarterCardsAtStar2")], 3);
+  assert.equal(evaluate(save([3, 4, 99], entries))[key("StarterCardsAtStar1")], 2);
   assert.equal(evaluate(save([3, 3, 4, 1], entries))[key("StarterCardsAtStar2")], 3);
+  assert.equal(evaluate(save([3, 4], entries))[key("StarterCardsAtStar2")], 2);
+  assert.equal(evaluate(save([3, 4, 98], {...entries, 98: entry(3)}))[key("StarterCardsAtStar2")], 2);
+  assert.equal(evaluate(save([1, 3, 4, 99], entries))[key("StarterCardsAtStar2")], 4);
+});
+
+test("real CSV: Waveri substitutes for Startori and the node 2 reward unlocks both synergies", () => {
+  const realCards = readSheet("Card");
+  const starter = [1, 2, 4, 15, 20, 11];
+  const initial = save(starter, {1: entry(2), 2: entry(2), 4: entry(2)});
+  assert.equal(evaluateGuideProgress(initial, realCards, catalog)[key("StarterCardsAtStar2")], 3);
+  const reward = resolveRewards(rewards, "Guide", "guide.07");
+  const rewardCards = reward.items.filter((item) => item.rewardType === "Card");
+  assert.deepEqual(rewardCards.map((item) => item.rewardId).sort(), ["8", "9"]);
+  assert.ok(rewardCards.every((item) => item.amount === 1));
+  const ids = [...starter, 8, 9];
+  const grown = save(ids, Object.fromEntries(ids.map((id) => [id, entry(2)])));
+  grown.deck = {slots: [{cardIds: [1, 2, 4, 8, 9, 11]}], selectedSlot: 0};
+  assert.equal(evaluateGuideProgress(grown, realCards, catalog)[key("CaretakerTraceDeck")], 2);
+  grown.ownership.cardIds = ids.filter((id) => id !== 8);
+  assert.equal(evaluateGuideProgress(grown, realCards, catalog)[key("CaretakerTraceDeck")], 0);
+});
+
+test("already-claimed node 2 reward: Nightchestnut is obtainable in the Bronze shop pool", () => {
+  const dropRows = readSheet("CardPackDrop").filter((row) => row.packId === "NormalPack_TEST");
+  const catalogIds = new Set(readSheet("Card").filter((row) => row.channel === "Live").map((row) => row.id));
+  const bronze = resolveDropPool(dropRows, 0, catalogIds);
+  assert.equal(bronze.filter((card) => card.cardId === 8).length, 1);
+  assert.ok(bronze.find((card) => card.cardId === 8).weight > 0);
+  assert.deepEqual(resolveDropPool(dropRows, 1, catalogIds).filter((card) => card.cardId === 8),
+    [{cardId: 8, weight: 250}]);
+  const pack = readSheet("CardPack").find((row) => row.packId === "NormalPack_TEST");
+  assert.equal(pack.channel, "Live");
+  assert.ok(pack.sortOrder > 0);
+  assert.ok(!pack.minRankGrade || pack.minRankGrade === "Bronze");
 });
 
 test("growth: partial shards and 1 star enhance only; 2+ stars count both", () => {

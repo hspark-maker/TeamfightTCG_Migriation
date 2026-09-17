@@ -928,6 +928,8 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     // 걷힌 줄로 스크롤을 옮기고 내용을 들여보낸 뒤, 이번에 열린 개념을 전면 안내로 넘긴다.
     void RevealUnlockedSections(GameObject _focus, CardKeyword _keywords, bool _synergy)
     {
+        // 이미 확인을 기다리는 소개를 늦게 도착한 연출 콜백으로 교체하지 않는다.
+        if (m_introOwned) return;
         ScrollTo(_focus);
 
         // 마지막 축을 잡아 둔다 — 안내가 서지 않는 판에서는 이 안무가 끝나야 탭이 닫기로 돌아온다.
@@ -1878,6 +1880,10 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     /// <summary>개념 안내를 전면에 다시 세운다(해금 순간의 자동 안내와 같은 화면).</summary>
     void ShowIntros(List<UnlockIntro> _intros)
     {
+        // 해금 직후 설명 띠도 클릭 가능해진다. 자동 소개보다 먼저 수동 소개를 열면
+        // 뒤늦은 자동 Show가 기존 창을 Cancel하여 진행 중인 강화 안내까지 중단한다.
+        if (m_enhanceRequestPending || m_ritualPlaying || m_unlockFxPlaying
+            || m_introOwned || UnlockIntroOverlay.IsOpen) return;
         if (_intros == null || _intros.Count == 0) return;
         if (!UnlockIntroOverlay.TryGet(out UnlockIntroOverlay t_overlay)) return;
 

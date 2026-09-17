@@ -231,7 +231,8 @@ internal static class DeckLockSubmission
                         }
                         if (t_status == "rejected")
                         {
-                            Debug.LogError($"[LockDeck] Server validation rejected: {t_data["reason"]}");
+                            Debug.LogError($"[LockDeck] Server validation rejected: {t_data["reason"]} " +
+                                           $"cardId={t_data["cardId"]} matchId={_matchId}");
                             return DeckLockResult.Rejected;
                         }
                         if (t_status == "pending")

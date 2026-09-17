@@ -64,7 +64,7 @@ MonoBehaviour:
       parallelGain: 0
       scenario: {fileID: 0}
       cardId: 0
-      cardIds: 0100000014000000040000000f00000023000000
+      cardIds: 0100000014000000040000000f0000000b000000
       showDeckGate: 0
       deckName: 
       onFailure: 0
@@ -587,7 +587,7 @@ MonoBehaviour:
     guideFlows:
     - missionId: 
       tutorial: 0
-      contentIntros: 0200000004000000
+      contentIntros: 02000000
       destination: 0
     - missionId: guide.01
       tutorial: 2
@@ -600,6 +600,10 @@ MonoBehaviour:
     - missionId: guide.05
       tutorial: 18
       contentIntros: 
+      destination: 0
+    - missionId: guide.06
+      tutorial: 0
+      contentIntros: 04000000
       destination: 0
     - missionId: guide.16
       tutorial: 19

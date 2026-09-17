@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.resolveStarterCardIds = resolveStarterCardIds;
 const logger = __importStar(require("firebase-functions/logger"));
+const https_1 = require("firebase-functions/v2/https");
 const specBlobReader_1 = require("../specs/specBlobReader");
 const starterPool_1 = require("./starterPool");
 /** 카드 카탈로그 표. 클라·서버 모두 Card 하나만 읽는다(Card_Test 표는 폐기). */
@@ -56,12 +57,8 @@ async function readKnownCardGrades(env) {
     return grades;
 }
 /**
- * 스펙 표에서 스타터 카드를 읽는다. 표가 없거나 읽지 못해도 계정 생성을 막지 않는다.
- *
- * 클라 BattleContentSync 는 meta 문서의 rowCount·payloadHash 로 표 무결성을 대조하고 어긋나면
- * 통째로 거부하는데, 여기서는 rows 를 직접 읽어 그 검사를 건너뛴다. 업로드가 중간에 끊긴 표로
- * 만들어진 계정만 다른 스타터를 갖게 된다 — 카드 존재 검사가 그 피해를 덱 무효화까지는 가지
- * 않게 막지만, 무결성 대조까지 옮기는 것은 R3(스펙 서버화)의 몫이다.
+ * 스펙 표에서 스타터 카드를 읽는다. 읽기에 실패하면 재시도를 요청한다.
+ * 코드에 남은 과거 희귀 카드 목록으로 계정을 만들지 않고 표를 유일한 지급 출처로 둔다.
  * @param {string} env 환경 id
  * @return {Promise<object>} 카드 목록, 등급과 출처
  */
@@ -77,29 +74,24 @@ async function resolveStarterCardIds(env) {
             minGrade: String(row.minGrade ?? ""),
             cardId: Number(row.cardId),
         }));
-        // 카탈로그를 못 읽으면 존재 검사 없이 뽑는 대신 폴백으로 간다 — 검증 없이 지급하면
+        // 카탈로그를 못 읽으면 계정 생성을 멈춘다 — 검증 없이 지급하면
         // 카탈로그에 없는 카드가 덱에 굳어 클라가 덱 0개로 초기화되고 복구 경로가 없다.
         grades = await readKnownCardGrades(env);
         const knownCardIds = new Set(grades.keys());
         const cardIds = knownCardIds.size > 0 ?
             (0, starterPool_1.resolveStarterCardsFromRows)(rows, starterPool_1.FRESH_ACCOUNT_GRADE, knownCardIds) :
             [];
-        if (cardIds.length > 0)
-            return { cardIds, source: "spec", grades };
-        logger.info("starter cards fell back to the built-in list", {
-            env,
-            rowCount: rows.length,
-            knownCardCount: knownCardIds.size,
-        });
-        return { cardIds: [...starterPool_1.FALLBACK_STARTER_CARD_IDS], source: "fallback", grades };
+        if (cardIds.length === 0)
+            throw new Error("StarterPack does not contain a complete valid deck.");
+        // 지급 구성과 등급은 표가 정한다. 우드혼처럼 희귀 카드가 저작돼도 정상 지급한다.
+        return { cardIds, source: "spec", grades };
     }
     catch (error) {
-        // 스펙을 못 읽는 것이 계정을 못 만들 이유는 아니다 — 어느 갈래였는지만 남기고 폴백으로 간다.
         logger.error("starter card spec read failed", {
             env,
             message: error instanceof Error ? error.message : String(error),
         });
-        return { cardIds: [...starterPool_1.FALLBACK_STARTER_CARD_IDS], source: "specError", grades };
+        throw new https_1.HttpsError("unavailable", "Starter card data is unavailable. Please retry.");
     }
 }
 //# sourceMappingURL=starterCards.js.map

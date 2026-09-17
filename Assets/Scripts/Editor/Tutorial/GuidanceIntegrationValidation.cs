@@ -26,9 +26,10 @@ public static class GuidanceIntegrationValidation
         Require(errors == 0, "Tutorial authoring has blocking errors.");
         Require(GuideOnboardingDataAuthoring.HasEnhanceUnlockStep(sequence),
             "Guide onboarding enhance unlock step is missing.");
-        Require(GuideMissionPreparation.CardIds.Count == 3 && GuideMissionPreparation.CardIds[0] == 3
-            && GuideMissionPreparation.CardIds[1] == 4 && GuideMissionPreparation.CardIds[2] == 1,
-            "Caretaker preparation must retain the existing guide targets.");
+        var preparationCards = GuideMissionPreparation.CardIds;
+        Require(preparationCards.Count <= 3, "Caretaker preparation shows at most three candidates.");
+        foreach (int card in preparationCards)
+            Require(GuideMissionPreparation.IsCaretaker(card), "Preparation candidate must be a caretaker.");
         var settings = new JsonSerializerSettings
         {
             ContractResolver = new DefaultContractResolver { NamingStrategy = new CamelCaseNamingStrategy() },

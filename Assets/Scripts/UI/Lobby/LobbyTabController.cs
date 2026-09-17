@@ -118,6 +118,24 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
 
     void Awake() => InitializeUI();
 
+    void LateUpdate()
+    {
+        if (tabBar != null) tabBar.SetInputBlockedVisual(!CanUseTabBar());
+    }
+
+    bool CanUseTabBar()
+    {
+        if (m_currentIndex < 0) return true; // 초기 배치 전에는 잠금 연출을 시작하지 않는다.
+        for (int t_i = 0; t_i < tabs.Count; t_i++)
+        {
+            var t_tab = tabs[t_i];
+            if (t_i == m_currentIndex || t_tab.panel == null) continue;
+            if (OutgameFeatureLock.IsUnlocked(t_tab.unlockFeature)
+                && GuidanceCoordinator.AllowsUserNavigation(t_tab.tutorialAnchor)) return true;
+        }
+        return false;
+    }
+
     public void InitializeUI()
     {
         if (m_initialized) return;

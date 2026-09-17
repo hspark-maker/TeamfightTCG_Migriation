@@ -195,6 +195,9 @@ public static class TutorialStepExecutor
     {
         if (_step.Scenario == null || !DeckSaveManager.TryBuildDeck(_step.Scenario.PlayerDeckIds, out List<int> t_cards))
             throw new InvalidOperationException("지급 덱의 카드 구성이 올바르지 않습니다.");
+        foreach (int t_cardId in t_cards)
+            if (!OwnershipManager.IsOwned(t_cardId))
+                throw new InvalidOperationException($"지급 덱에 미소유 카드가 있습니다(cardId={t_cardId}, packId={_step.PackId}). 지급 팩과 시나리오 구성을 확인하세요.");
         if (!DeckSaveManager.TryFindSlot(t_cards, out int t_index)
             && !DeckSaveManager.TryInsertFront(t_cards, _step.DeckName, DeckImages.PickRandomKey(), out t_index))
             throw new InvalidOperationException("지급 덱을 저장할 공간이 없습니다.");

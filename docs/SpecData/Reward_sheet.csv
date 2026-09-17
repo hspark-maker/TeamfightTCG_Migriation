@@ -214,3 +214,4 @@ int,string,string,int,string,string,long,string
 265,AccountLevel,48,1,Currency,Gold,30,계정 레벨 48 달성; 자동 지급; 이전 레벨 소급 없음
 266,AccountLevel,49,1,Currency,Gold,30,계정 레벨 49 달성; 자동 지급; 이전 레벨 소급 없음
 267,AccountLevel,50,1,Currency,Gold,30,계정 레벨 50 달성; 자동 지급; 이전 레벨 소급 없음
+268,Guide,guide.07,3,Card,8,1,두 시너지 가이드 진입 전 깜밤이 확정 지급

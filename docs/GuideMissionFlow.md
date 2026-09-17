@@ -19,11 +19,12 @@ Inspector는 FTUE 목록과 가이드 설정을 별도로 보여준다. 전용 �
 
 | 미션 | 해금 소개 | 목적지 | 기존 완료 키 |
 |---|---|---|---|
-| 빈 값: FTUE 졸업 | 미션, 룰렛 | 없음 | 없음 |
+| 빈 값: FTUE 졸업 | 미션 | 없음 | 없음 |
 | guide.01 | 카드 강화 | 컬렉션 | CollectionTabFirstEnter |
 | guide.03 | 모험 | 모험 맵 | AdventureUnlocked |
+| guide.06 | 룰렛 | 없음 | 없음 |
 
-`contentUnlocks`는 FTUE·랭크·계정 레벨·가이드 미션 조건을 AND로 평가한다. 현재 카드 강화는 `guide.01`, 모험은 `guide.03` 도달을 요구한다. 미션·룰렛은 FTUE 완료만 요구한다. 기존 저작의 해금 시점은 유지했다. 안내 순서나 챕터의 첫 스텝으로 이용 자격을 추론하지 않는다.
+`contentUnlocks`는 FTUE·랭크·계정 레벨·가이드 미션 조건을 AND로 평가한다. 현재 카드 강화는 `guide.01`, 모험은 `guide.03`, 룰렛은 `guide.06` 도달을 요구한다. 미션은 FTUE 완료만 요구한다. 룰렛은 첫 무료 시너지 성장 안내를 마치고 돌보미 카드 3장을 2성으로 키우는 구간에 소개한다. 잔액 부족을 실시간 판정하는 조건은 아니며, 이미 해금된 계정의 이용 자격은 유지한다. 안내 순서나 챕터의 첫 스텝으로 이용 자격을 추론하지 않는다.
 
 `tutorial`은 저장 호환을 위한 안내 식별자다. 기존 enum 이름과 값은 유지하되 연결된 안내를 탭 진입 사건으로 시작하지 않는다. 신규 스텝 ID는 기존 에디터 발급 절차를 사용한다.
 
@@ -44,6 +45,18 @@ Inspector는 FTUE 목록과 가이드 설정을 별도로 보여준다. 전용 �
 해금 여부, 소개 확인, 온보딩 완료는 별도 의미다. 소개는 항목마다 `MarkPresented`로 소비하며, 안내 중단 시 이미 확인한 소개를 다시 재생하지 않는다. 진행 중인 자율 안내가 중단되면 이번 세션 자동 재시작을 미루고, 미션 이동 버튼으로 재개한다. 기존 `CompletedTriggers`와 모험 레거시 완료 호환은 유지한다.
 
 미션 정의·서버 저장 스키마·재화 권한은 변경하지 않는다. guide.05 시너지 상세 안내와 무료 성장 지급은 후속 작업이다. 키워드 강화·덱 시너지 조합 소개는 기존 조건을 유지한다.
+
+## 돌보미 성장·두 시너지 진행 수정 (2026-09-17)
+
+- `guide.06`은 특정 카드 3종 대신 보유한 돌보미 중 서로 다른 3종의 2성 이상 성장을 인정한다. 기존 `Guide.StarterCardsAtStar2` 이벤트 키·최고 진행도·수령 기록은 유지한다. 안내 후보도 카드 표의 돌보미 전체에서 보유·성장 상태가 좋은 3종을 고른다.
+- `guide.07` 보상에 깜밤이(8) 1장을 추가한다. 기존 버섯냥(9)과 함께 다음 돌보미·추적 조합을 준비할 수 있다. `guide.08`의 2성 이상 돌보미 3종 + 깜밤이·버섯냥 편성 조건은 유지한다.
+- `guide.07`을 이미 수령한 계정에는 보상을 재지급하지 않는다. 이 계정도 실버 전에 깜밤이를 얻을 수 있도록 브론즈 일반 팩 풀에 가중치 400으로 추가했다. 브론즈 풀의 상대 확률은 다시 정규화되며 실버 이상 풀은 그대로다.
+- 후속 사용자 지시로 서버 배포와 CSV 발행을 완료했다. `bm-cardbattle` / `asia-northeast3`의 `getMissions`, `claimMission`, `syncGuideProgress`, `enhanceCard`, `enhanceSynergyIntroduction`, `limitBreakCard`, `openPack`, `claimReward`, `claimAttendance`, `claimBattleExperience`, `claimPassReward`, `spinRoulette` 12개를 선별 배포하고 모두 `ACTIVE`임을 확인했다.
+- test **6.57→6.58**, live **6.9→6.10**을 발행했다. `publish-guide-synergy-spec.js`가 CSV를 직접 읽어 Mission 21·22행 수정, Reward 268행·CardPackDrop 1409행 추가만 허용한다. 환경별 15개 문서를 CAS 조건의 단일 commit으로 반영하고 재조회했다. 나머지 21개 표 pin은 보존했다. 발행 계획·이전 문서·배포 로그는 `.codex_tmp/guide-synergy-deploy/`에 보관했다.
+- 새 test 계정에서 실제 `getMissions`·`claimMission`을 호출해 포슬램·파도리·솜구름몽만으로 2→3 진행도 및 guide.06 수령, guide.07의 깜밤이·버섯냥 지급, 중복 수령 거절, guide.08 두 시너지 달성을 확인했다. 기존 사용자 데이터는 변경하지 않았다. Unity에서 `GuidanceIntegrationValidation`도 통과했다.
+- 런타임 표는 서버 스냅샷으로 동기화되므로 `SpecData.bytes`·자동 생성 C#은 갱신하지 않았다. 외부 스프레드시트는 이번 발행 범위 밖이다.
+- 클라이언트 릴리즈 APK 빌드 완료: `Build/GuideSynergy-20260917/CardBattle-guide-synergy-20260917.apk` (57,135,781바이트). Android ARM64 / IL2CPP / development=false, 빌드 오류 0·경고 47. ZIP CRC와 새 `IsCaretaker` 메서드의 IL2CPP 메타데이터 포함을 확인했다. SHA-256: `831a5fd784152593797e7f8781fcc2add443eedda0ea945646bdf974eaf14f45`. Addressables 재빌드·Hosting 변경 없이 기존 리소스를 사용했다. 설치·기기 실플레이는 수행하지 않았다.
+- 검증: 서버 가이드 회귀 12개, 실제 `GuideMissionPreparation` 카드 선택 검사 7개, 런타임·에디터 C# 컴파일, CSV 열 수·행 ID 중복 검사를 통과했다. 기기 실플레이는 별도 확인이 필요하다.
 
 ## 검증
 
