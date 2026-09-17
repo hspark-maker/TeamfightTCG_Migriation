@@ -47,13 +47,29 @@ public static class GuideMissionFlowValidation
             errors.Add("Tutorial asset missing.");
             return errors;
         }
+        var contents = new HashSet<string>(StringComparer.Ordinal);
+        if (data.ftueChapters != null)
+            foreach (var chapter in data.ftueChapters)
+            {
+                if (chapter == null) continue;
+                for (int i = 0; i < chapter.StepCount; i++)
+                {
+                    if (!chapter.TryGetStep(i, out var step)
+                        || step.Action != EOutgameTutorialAction.ContentUnlockIntro || step.ContentIntros == null) continue;
+                    foreach (var content in step.ContentIntros)
+                    {
+                        string key = ContentUnlockIntroDef.KeyOf(content);
+                        if (!string.IsNullOrEmpty(key) && !contents.Add(key))
+                            errors.Add($"FTUE step {step.StepId}: duplicate content key {key}.");
+                    }
+                }
+            }
         if (data.guide.guideFlows == null || data.guide.guideFlows.Count == 0)
         {
             return errors;
         }
         var missions = new HashSet<string>(StringComparer.Ordinal);
         var tutorials = new HashSet<EOutgameTutorialTrigger>();
-        var contents = new HashSet<string>(StringComparer.Ordinal);
         for (int i = 0; i < data.guide.guideFlows.Count; i++)
         {
             var flow = data.guide.guideFlows[i];

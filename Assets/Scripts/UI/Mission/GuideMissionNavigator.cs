@@ -51,6 +51,8 @@ internal static class GuideMissionNavigator
         LobbyTabController t_shell = FindShell();
         DeckTabController t_tab = t_shell != null ? t_shell.GetComponentInChildren<DeckTabController>(true) : null;
         if (t_tab == null) return;
+        // 공통 가이드 바는 덱 편집 중에도 눌린다. 같은 탭을 다시 열면 저장 전 편집을 덮어쓴다.
+        if (t_shell.CurrentPanel == t_tab) return;
 
         t_shell.TrySelectFeature(EOutgameFeature.LobbyDeckTab, _onArrived: () =>
         {

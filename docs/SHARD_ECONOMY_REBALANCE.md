@@ -1,5 +1,7 @@
 # Shard 경제 · AI 난이도 곡선 재조정 (2026-08-24)
 
+> 과거 작업 기록이다. 현재 모험 보상은 `docs/SpecData/Reward_sheet.csv`의 `ownerType=Adventure` 행에서 읽는다. 아래의 AdventureReward 표는 미사용 중복 CSV로 확인되어 2026-09-17 삭제했으며 수정·업로드 대상이 아니다.
+
 ## 배경 — 실측
 
 | 항목 | 수치 |

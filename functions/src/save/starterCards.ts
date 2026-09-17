@@ -1,8 +1,8 @@
 import * as logger from "firebase-functions/logger";
+import {HttpsError} from "firebase-functions/v2/https";
 import {readSpecRows} from "../specs/specBlobReader";
 import {
   DropRow,
-  FALLBACK_STARTER_CARD_IDS,
   FRESH_ACCOUNT_GRADE,
   resolveStarterCardsFromRows,
   STARTER_PACK_ID,
@@ -12,7 +12,7 @@ import {
 const CARD_TABLES = ["Card"];
 
 /** 스타터 카드가 어디서 나왔는가. 로그·응답에 실어 사후에 갈래를 판별한다. */
-export type StarterSource = "spec" | "fallback" | "specError";
+export type StarterSource = "spec";
 
 /**
  * 카드 카탈로그의 id와 등급. 최초 지급 성장값에도 같은 표를 쓴다.
@@ -33,12 +33,8 @@ async function readKnownCardGrades(env: string): Promise<Map<number, string>> {
 }
 
 /**
- * 스펙 표에서 스타터 카드를 읽는다. 표가 없거나 읽지 못해도 계정 생성을 막지 않는다.
- *
- * 클라 BattleContentSync 는 meta 문서의 rowCount·payloadHash 로 표 무결성을 대조하고 어긋나면
- * 통째로 거부하는데, 여기서는 rows 를 직접 읽어 그 검사를 건너뛴다. 업로드가 중간에 끊긴 표로
- * 만들어진 계정만 다른 스타터를 갖게 된다 — 카드 존재 검사가 그 피해를 덱 무효화까지는 가지
- * 않게 막지만, 무결성 대조까지 옮기는 것은 R3(스펙 서버화)의 몫이다.
+ * 스펙 표에서 스타터 카드를 읽는다. 읽기에 실패하면 재시도를 요청한다.
+ * 코드에 남은 과거 희귀 카드 목록으로 계정을 만들지 않고 표를 유일한 지급 출처로 둔다.
  * @param {string} env 환경 id
  * @return {Promise<object>} 카드 목록, 등급과 출처
  */
@@ -57,7 +53,7 @@ export async function resolveStarterCardIds(
         cardId: Number(row.cardId),
       }));
 
-    // 카탈로그를 못 읽으면 존재 검사 없이 뽑는 대신 폴백으로 간다 — 검증 없이 지급하면
+    // 카탈로그를 못 읽으면 계정 생성을 멈춘다 — 검증 없이 지급하면
     // 카탈로그에 없는 카드가 덱에 굳어 클라가 덱 0개로 초기화되고 복구 경로가 없다.
     grades = await readKnownCardGrades(env);
     const knownCardIds = new Set(grades.keys());
@@ -66,20 +62,16 @@ export async function resolveStarterCardIds(
       resolveStarterCardsFromRows(rows, FRESH_ACCOUNT_GRADE, knownCardIds) :
       [];
 
-    if (cardIds.length > 0) return {cardIds, source: "spec", grades};
-
-    logger.info("starter cards fell back to the built-in list", {
-      env,
-      rowCount: rows.length,
-      knownCardCount: knownCardIds.size,
-    });
-    return {cardIds: [...FALLBACK_STARTER_CARD_IDS], source: "fallback", grades};
+    if (cardIds.length === 0) throw new Error("StarterPack does not contain a complete valid deck.");
+    if (cardIds.some((id) => grades.get(id) !== "Common")) {
+      throw new Error("StarterPack must contain only Common cards.");
+    }
+    return {cardIds, source: "spec", grades};
   } catch (error) {
-    // 스펙을 못 읽는 것이 계정을 못 만들 이유는 아니다 — 어느 갈래였는지만 남기고 폴백으로 간다.
     logger.error("starter card spec read failed", {
       env,
       message: error instanceof Error ? error.message : String(error),
     });
-    return {cardIds: [...FALLBACK_STARTER_CARD_IDS], source: "specError", grades};
+    throw new HttpsError("unavailable", "Starter card data is unavailable. Please retry.");
   }
 }

@@ -67,6 +67,16 @@ public sealed partial class GuidanceCoordinator
         if (!t_chapter.TryGetStep(t_index, out var t_step))
             throw new InvalidOperationException("안내 재개 위치를 찾을 수 없습니다.");
 
+        // 첫 강화 안내는 컬렉션으로 자동 이동한다. 예전 탭 클릭 단계에 저장된 계정도 다음 안내로 잇는다.
+        if (_flow.tutorial == EOutgameTutorialTrigger.CollectionTabFirstEnter
+            && t_step.Action == EOutgameTutorialAction.WaitClick
+            && t_step.Anchor == EOutgameTutorialAnchor.LobbyCollectionTab)
+        {
+            t_index++;
+            if (!t_chapter.TryGetStep(t_index, out t_step))
+                throw new InvalidOperationException("컬렉션 이동 후 안내 단계를 찾을 수 없습니다.");
+        }
+
         bool t_growth = _flow.tutorial == EOutgameTutorialTrigger.CollectionTabFirstEnter
             || _flow.tutorial == EOutgameTutorialTrigger.SynergyGrowthIntroduction;
         if (t_growth)
@@ -88,8 +98,7 @@ public sealed partial class GuidanceCoordinator
                     && t_step.Anchor == EOutgameTutorialAnchor.None
                     && t_index == t_chapter.StepCount - 1);
             bool t_page = t_detail || t_step.Anchor == EOutgameTutorialAnchor.AlbumCardSlot;
-            if (_flow.tutorial != EOutgameTutorialTrigger.CollectionTabFirstEnter || t_index > 0)
-                await SelectFlowTabAsync(EOutgameFeature.LobbyCollectionTab, _ct);
+            await SelectFlowTabAsync(EOutgameFeature.LobbyCollectionTab, _ct);
             int t_card = OutgameTutorialGuide.TargetCardId;
             if (t_page && t_card > 0)
             {

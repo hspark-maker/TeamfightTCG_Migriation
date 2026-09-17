@@ -1,1 +1,0 @@
-Succeeded errors=0 warnings=18 duration=00:02:08.0223766 path=C:/Users/cookapps/Desktop/Builds/26.09.14-optimized.apk

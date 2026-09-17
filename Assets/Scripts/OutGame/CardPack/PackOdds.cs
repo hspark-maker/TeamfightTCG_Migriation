@@ -25,10 +25,15 @@ public static class PackOdds
             t_result.Add(new PackOddsEntry(t_cardId, (float)t_pool[t_i].EffectiveWeight / t_sum));
         }
 
-        // 랭크나 풀 순서가 바뀌어도 목록이 흔들리지 않게 동률은 카드 id로 가른다.
-        t_result.Sort((a, b) => b.Rate != a.Rate
-            ? b.Rate.CompareTo(a.Rate)
-            : a.CardId.CompareTo(b.CardId));
+        // 낮은 희귀도부터 표시하고, 같은 희귀도는 기존 확률·카드 id 순서를 유지한다.
+        t_result.Sort((a, b) =>
+        {
+            int t_grade = CardCatalog.RequireSpec(a.CardId).Grade.CompareTo(CardCatalog.RequireSpec(b.CardId).Grade);
+            if (t_grade != 0) return t_grade;
+            return b.Rate != a.Rate
+                ? b.Rate.CompareTo(a.Rate)
+                : a.CardId.CompareTo(b.CardId);
+        });
         return t_result;
     }
 

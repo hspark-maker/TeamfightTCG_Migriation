@@ -13,7 +13,8 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
         && !HasPendingMissionFlow && CanPresentContentUnlock;
 
     /// <summary>해금 연출 자체를 제외한 로비 무대 준비 상태.</summary>
-    public static bool CanPresentContentUnlock => s_instance != null && s_instance.SafeToPresent()
+    public static bool CanPresentContentUnlock => !GuideMissionTrackerView.HasPendingPresentation
+        && s_instance != null && s_instance.SafeToPresent()
 #if UNITY_EDITOR
         && !OnboardingPlayTest.IsActive && !OnboardingPlayTest.IsPreparing
 #endif
@@ -51,7 +52,7 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
     }
 
     static bool StageBusyForGuided
-        => ContentUnlockPresentation.IsPlaying || HasForeignGate
+        => GuideMissionTrackerView.HasPendingPresentation || ContentUnlockPresentation.IsPlaying || HasForeignGate
         || CardFilterPopup.IsOpen || CollectionFilterResults.IsOpen
         || UnlockIntroOverlay.IsOpen
         || CardDetailOverlayView.IsRitualPlaying || CardDetailOverlayView.IsUnlockFxPlaying

@@ -5,7 +5,7 @@
 ## 변경 대상
 
 - `Reward_sheet.csv`: 모험·랭크·일일/주간·가이드·패스·카드 중복 보상. 도감과 전투 정산 계수는 보존했다.
-- `AdventureReward_sheet.csv`: 기존 호환용 재화 표를 통합 Reward의 모험 재화 값과 일치시켰다. blob에는 원래 이 표가 없으며 공식 임포터도 새 표로 추가하지 않는다. 팩을 표현하려고 기존 재화 스키마를 변경하지 않았다.
+- `AdventureReward_sheet.csv`: 당시 중복 재화 표도 맞췄으나, 2026-09-17 클라이언트·서버가 모두 Reward만 읽고 발행 대상에도 없음을 확인해 CSV를 삭제했다. 모험 보상은 `Reward_sheet.csv`의 `ownerType=Adventure` 행만 수정·업로드한다.
 - `Mission_sheet.csv`: 일일 6개, 주간 5개, 가이드 13개 정의. 퇴역 미션의 기존 ID·키는 남기고 비활성화했다. 가이드는 기존 문자열 필드에 정의했으며 새 CS 필드는 만들지 않았다.
 - `CardEnhance_sheet.csv`: 10/20/150. 상한까지 명시 행이 모두 존재하므로 기존 CardEnhanceRule의 비상 폴백은 변경하지 않았다.
 - `PassLevel_sheet.csv`: 시즌 S1의 누적 경험치 300~3,000. 시즌 기간·ID는 보존했다.

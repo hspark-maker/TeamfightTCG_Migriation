@@ -1,5 +1,4 @@
 ﻿using System;
-using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -38,9 +37,6 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
              "가이드는 끝나면 다시 오지 않는 축이라 빈 화면 안내보다 사라지는 게 맞다.")]
     [SerializeField] Button guideMissionButton;
 
-    [Tooltip("매치 탭 좌측 하단 간편뷰. 진행 중에는 안내·이동, 달성 후에는 직접 보상을 받는다.")]
-    [SerializeField] Button guideMissionTrackerButton;
-
     [SerializeField] Button attendanceButton;
 
     [Tooltip("배틀패스를 여는 버튼. 시즌 공백기에도 눌린다 — 시즌이 없다는 것은 화면이 안내한다.")]
@@ -57,8 +53,6 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     // 버튼의 저작 문구. 승급전 상태가 풀리면 여기로 돌아간다 — 평상시 문구를 코드가 다시 쓰지 않게.
     string m_defaultPlayText;
     ContentUnlockPresentation m_unlockPresentation;
-    GuideMissionTrackerView m_guidePreview;
-    bool m_matchSettled;
 
     protected override void OnInitializeUI()
     {
@@ -69,12 +63,6 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (rouletteButton != null) rouletteButton.onClick.AddListener(OpenRoulette);
         if (missionButton != null) missionButton.onClick.AddListener(OpenMissions);
         if (guideMissionButton != null) guideMissionButton.onClick.AddListener(OpenGuideMissions);
-        if (guideMissionTrackerButton != null) guideMissionTrackerButton.onClick.AddListener(HandleGuideMissionTracker);
-        if (guideMissionTrackerButton != null)
-        {
-            m_guidePreview = guideMissionTrackerButton.GetComponent<GuideMissionTrackerView>();
-            if (m_guidePreview != null) m_guidePreview.PresentationFinished += RefreshGuideMissionButton;
-        }
         if (passButton != null) passButton.onClick.AddListener(OpenPass);
         if (adventureButton != null) adventureButton.onClick.AddListener(HandleAdventureRequested);
 
@@ -123,8 +111,6 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (rouletteButton != null) rouletteButton.onClick.RemoveListener(OpenRoulette);
         if (missionButton != null) missionButton.onClick.RemoveListener(OpenMissions);
         if (guideMissionButton != null) guideMissionButton.onClick.RemoveListener(OpenGuideMissions);
-        if (guideMissionTrackerButton != null) guideMissionTrackerButton.onClick.RemoveListener(HandleGuideMissionTracker);
-        if (m_guidePreview != null) m_guidePreview.PresentationFinished -= RefreshGuideMissionButton;
         if (passButton != null) passButton.onClick.RemoveListener(OpenPass);
         if (adventureButton != null) adventureButton.onClick.RemoveListener(HandleAdventureRequested);
 
@@ -135,41 +121,19 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
 
     public override void OnEnter()
     {
-        m_matchSettled = false;
-        m_guidePreview?.SetSettled(false);
         RefreshPlayLabel();
         ApplyFeatureLocks();
         RefreshGuideMissionButton();
-        if (OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission)) RefreshGuideMissionsAsync().Forget();
-    }
-
-    /// <summary>덱 저장·전투 뒤 로비로 돌아온 시점에 가이드 진행도를 다시 읽는다.
-    /// 디바운스 안의 업로드를 먼저 확정해야 서버가 최신 덱으로 판정한다. 캐시가 유효하면 왕복은 생략된다.</summary>
-    static async UniTaskVoid RefreshGuideMissionsAsync()
-    {
-        try
-        {
-            if (PlayerSaveCloud.HasPendingUpload) await PlayerSaveCloud.FlushAsync();
-            await MissionCommands.RefreshAsync();
-        }
-        catch (Exception t_exception)
-        {
-            Debug.LogWarning($"[LobbyMatchTabPanel] Guide mission refresh on lobby entry failed — {t_exception.GetBaseException().Message}");
-        }
     }
 
     public override void OnSettled()
     {
-        m_matchSettled = true;
         m_unlockPresentation?.SetVisible(true);
-        m_guidePreview?.SetSettled(true);
     }
 
     public override void OnLeave()
     {
-        m_matchSettled = false;
         m_unlockPresentation?.SetVisible(false);
-        m_guidePreview?.SetSettled(false);
         RefreshGuideMissionButton();
     }
 
@@ -270,47 +234,6 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     void RefreshGuideMissionButton()
     {
         if (guideMissionButton != null) guideMissionButton.gameObject.SetActive(AnyGuideMissionOpen());
-        if (guideMissionTrackerButton == null) return;
-        MissionDefinition t_current = GuideMissionTrack.Current;
-        bool t_visible = MissionManager.IsReady && (t_current != null || (m_guidePreview != null && m_guidePreview.IsHoldingClaim))
-            && OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission);
-        bool t_wasVisible = guideMissionTrackerButton.gameObject.activeSelf;
-        guideMissionTrackerButton.gameObject.SetActive(t_visible);
-        if (t_visible && !t_wasVisible) m_guidePreview?.SetSettled(m_matchSettled);
-        guideMissionTrackerButton.interactable = t_visible
-            && (m_guidePreview == null || !m_guidePreview.IsHoldingClaim)
-            && GuidanceCoordinator.CanNavigateFromMatchTab(null) && GuideMissionPreviewState.Of(t_current).CanExecute;
-    }
-
-    void HandleGuideMissionTracker()
-    {
-        if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission)
-            || !GuidanceCoordinator.CanNavigateFromMatchTab(null)) return;
-        MissionDefinition t_current = GuideMissionTrack.Current;
-        if (m_guidePreview != null && m_guidePreview.IsHoldingClaim) return;
-        var t_state = GuideMissionPreviewState.Of(t_current);
-        if (!t_state.CanExecute) return;
-        m_guidePreview?.DismissHint();
-        if (t_state.Action == GuideMissionPreviewState.EAction.Claim) ClaimGuideMissionAsync(t_current).Forget();
-        else GuideMissionNavigator.Go(t_current);
-    }
-
-    async UniTaskVoid ClaimGuideMissionAsync(MissionDefinition _mission)
-    {
-        var t_preview = m_guidePreview;
-        int t_version = t_preview != null ? t_preview.BeginClaim(_mission) : 0;
-        ClaimMissionResult t_result = null;
-        ServerWaitOverlay.Hold(this);
-        try { t_result = await MissionCommands.ClaimAsync(_mission.Id); }
-        finally
-        {
-            ServerWaitOverlay.Release(this);
-            if (t_result == null && t_preview != null) t_preview.EndClaim(t_version, false);
-        }
-        if (t_result != null) MissionPanel.ShowClaimedRewards(new[] { t_result }, _onClosed: () =>
-        {
-            if (t_preview != null) t_preview.EndClaim(t_version, true);
-        }, _showCardsIndividually: true);
     }
 
     static bool AnyGuideMissionOpen()

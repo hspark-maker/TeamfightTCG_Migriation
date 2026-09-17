@@ -4,7 +4,7 @@
 
 ## 변경 수치
 
-진실원은 `SpecData/Reward_sheet.csv`와 `SpecData/AdventureReward_sheet.csv`다. 아래 수치는 해당 보상 전체를 수령했을 때의 합계이며, 계정 레벨은 2~50레벨 누적이다.
+진실원은 `SpecData/Reward_sheet.csv`다. 모험 보상도 `ownerType=Adventure` 행에서 읽는다. 사용하지 않는 중복 표 `AdventureReward_sheet.csv`는 2026-09-17 삭제했으며 업로드 대상이 아니다. 아래 수치는 해당 보상 전체를 수령했을 때의 합계이며, 계정 레벨은 2~50레벨 누적이다.
 
 | 보상 출처 | 재화 | 기존 | 변경 |
 | --- | --- | ---: | ---: |
@@ -42,8 +42,8 @@ guide.11의 모험 4번 정점은 guide.10보다 먼저 진행한다. 모험 6�
 
 ## 검증 및 반영 상태
 
-- Reward 101개, AdventureReward 32개, 총 133개 수량 셀만 축소했다. ID·스키마·순서·기타 셀은 변경 전과 동일하다.
-- AdventureReward 40개 행의 재화 보상이 Reward와 일치한다.
+- Reward 101개 수량 셀을 축소했다. ID·스키마·순서·기타 셀은 변경 전과 동일하다.
+- 당시 함께 맞췄던 AdventureReward는 미사용 중복 CSV로 확인되어 삭제했다. 삭제 전 40개 행 모두 Reward에 같은 소유자·순서·재화·수량으로 보존됨을 확인했다. 클라이언트 AdventureSpec과 서버 claimReward 모두 Reward를 읽으며, 발행 목록에도 AdventureReward는 없다.
 - 출처별 합계와 위 가이드 순서별 수급량을 독립 CSV 파서로 검산했다.
 - 기존 가이드 테스트의 옛 순서·보상 기대값을 현재 CSV에 맞췄다. `node functions/scripts/test-guide-mission-growth.js`: 10개 통과.
 - `SpecData.bytes`, `SpecDatas.cs`, `SpecDataManager.cs` 해시가 변경 전과 동일하다.

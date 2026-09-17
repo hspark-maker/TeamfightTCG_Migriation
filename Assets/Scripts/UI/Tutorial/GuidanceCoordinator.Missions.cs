@@ -15,6 +15,7 @@ public sealed partial class GuidanceCoordinator
     }
 
     GuideMissionFlow m_flow;
+    GuideMissionFlow m_unconfirmedIntroFlow;
     bool m_flowStarted;
     bool m_flowPreparing;
     bool m_flowLocked;
@@ -28,7 +29,8 @@ public sealed partial class GuidanceCoordinator
     string m_lastFlowFailure;
     CancellationTokenSource m_flowCancellation;
 
-    public static bool IsInputLocked => s_instance != null && s_instance.m_flowLocked;
+    public static bool IsInputLocked => GuideMissionTrackerView.IsShowingNextMission
+        || (s_instance != null && s_instance.m_flowLocked);
     public static bool IsRestoring => s_instance != null && s_instance.m_flowPreparing;
     public static bool IsInternalNavigation => s_instance != null && s_instance.m_internalNavigation > 0;
     public static bool IsCurrentTabAnchor(EOutgameTutorialAnchor _anchor)
@@ -87,6 +89,7 @@ public sealed partial class GuidanceCoordinator
         if (s_instance.m_flowSession != ContentUnlockManager.SessionVersion)
         {
             s_instance.CancelMissionFlow(false);
+            s_instance.m_unconfirmedIntroFlow = null;
             s_instance.m_flowSession = ContentUnlockManager.SessionVersion;
         }
         s_instance.m_retryRequested = true;
@@ -125,6 +128,8 @@ public sealed partial class GuidanceCoordinator
 
     GuideMissionFlow FindMissionFlow()
     {
+        // 마지막 소개가 끝나 pending이 비어도, 실패한 완료 저장은 재시도할 수 있어야 한다.
+        if (m_retryRequested && m_unconfirmedIntroFlow != null) return m_unconfirmedIntroFlow;
         if (m_retryRequested && GuideMissionProgress.IsCurrent(m_requestedMissionId) && GuideResume.HasPending)
         {
             foreach (var t_flow in GuideMissionFlows.All)
@@ -154,6 +159,7 @@ public sealed partial class GuidanceCoordinator
         if (m_flowSession != ContentUnlockManager.SessionVersion)
         {
             CancelMissionFlow(false);
+            m_unconfirmedIntroFlow = null;
             m_flowDeferred = false;
             m_flowSession = ContentUnlockManager.SessionVersion;
         }
@@ -166,7 +172,8 @@ public sealed partial class GuidanceCoordinator
             return true;
         }
         if (m_flowDeferred && !m_retryRequested) return false;
-        if (m_retryRequested && !GuideMissionProgress.IsCurrent(m_requestedMissionId))
+        if (m_retryRequested && m_unconfirmedIntroFlow == null
+            && !GuideMissionProgress.IsCurrent(m_requestedMissionId))
         {
             m_retryRequested = false;
             m_requestedMissionId = null;
@@ -196,7 +203,16 @@ public sealed partial class GuidanceCoordinator
             var t_flow = m_flow;
             await OnboardingCommands.RecoverPendingAsync(_ct);
             EnsureFlow(_version, _ct);
-            if (t_flow.tutorial != EOutgameTutorialTrigger.None) GuideResume.Begin(t_flow);
+            if (m_unconfirmedIntroFlow != null)
+            {
+                if (!await GuideResume.SaveConfirmedAsync(_ct))
+                    throw new InvalidOperationException("해금 안내 완료를 저장하지 못했습니다. 재시도하면 저장부터 이어갑니다.");
+                EnsureFlow(_version, _ct);
+                m_unconfirmedIntroFlow = null;
+                if (!GuideMissionFlows.IsEligible(t_flow)) { CancelMissionFlow(false); return; }
+            }
+            if (t_flow.tutorial != EOutgameTutorialTrigger.None
+                && !OutgameTutorialProgress.IsTriggerDone(t_flow.tutorial)) GuideResume.Begin(t_flow);
             EnsureFlow(_version, _ct);
             var t_intros = PendingIntros(t_flow);
             if (t_intros.Count > 0)
@@ -215,12 +231,18 @@ public sealed partial class GuidanceCoordinator
                     EnsureFlow(_version, _ct);
                     ShowTransition();
                     ContentUnlockManager.MarkPresented(ContentUnlockIntroDef.KeyOf(t_intro));
+                    m_unconfirmedIntroFlow = t_flow;
+                    if (!await GuideResume.SaveConfirmedAsync(_ct))
+                        throw new InvalidOperationException("해금 안내 완료를 저장하지 못했습니다. 재시도하면 저장부터 이어갑니다.");
+                    EnsureFlow(_version, _ct);
+                    m_unconfirmedIntroFlow = null;
                 }
             }
             if (GuideResume.IsFor(t_flow.tutorial)) GuideResume.Record.IntroductionSeen = true;
             DataSaveManager.Save();
             EnsureFlow(_version, _ct);
-            if (t_flow.tutorial == EOutgameTutorialTrigger.None) { CancelMissionFlow(false); return; }
+            if (t_flow.tutorial == EOutgameTutorialTrigger.None
+                || OutgameTutorialProgress.IsTriggerDone(t_flow.tutorial)) { CancelMissionFlow(false); return; }
             if (!PrepareFlowTarget(t_flow))
                 throw new GuidePreparationException();
             if (t_flow.tutorial == EOutgameTutorialTrigger.CollectionTabFirstEnter

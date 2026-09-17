@@ -64,7 +64,7 @@ MonoBehaviour:
       parallelGain: 0
       scenario: {fileID: 0}
       cardId: 0
-      cardIds: 010000001c00000014000000060000000b0000001e00000008000000
+      cardIds: 0100000014000000040000000f00000023000000
       showDeckGate: 0
       deckName: 
       onFailure: 0

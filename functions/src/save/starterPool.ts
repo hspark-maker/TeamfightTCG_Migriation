@@ -1,13 +1,7 @@
 import {STARTER_DECK_SIZE} from "./freshAccount";
 
-/** 스타터 덱을 저작한 팩. 클라 Assets/SO/CardPack/TutorialPack/StarterPack.asset 의 packId. */
+/** 스타터 덱을 저작한 팩. 진실원은 CardPackDrop 표의 StarterPack 행이다. */
 export const STARTER_PACK_ID = "StarterPack";
-
-/**
- * 시트에서 스타터를 해석하지 못했을 때 쓰는 목록.
- * 진실원은 Assets/SO/CardPack/TutorialPack/StarterPack.asset 의 poolIds — 저기가 바뀌면 여기도 바꾼다.
- */
-export const FALLBACK_STARTER_CARD_IDS = [1, 28, 20, 6, 11, 30];
 
 /** 클라 ERankGrade 의 쌍둥이. 값 순서가 등급 높낮이다. */
 const GRADE_ORDER: Record<string, number> = {
@@ -60,7 +54,7 @@ export function resolveStarterCardsFromRows(
   knownCardIds: Set<number> = new Set(),
 ): number[] {
   // id 를 못 읽는 행은 순서를 정할 수 없다 — 비교자가 NaN 을 뱉어 정렬 자체가 미정의가 된다.
-  // 클라는 이런 표를 통째로 거부하므로 여기서도 버리고, 6장을 못 채우면 폴백으로 간다.
+  // 클라는 이런 표를 통째로 거부하므로 여기서도 버리고, 6장을 못 채우면 지급을 중단한다.
   const usable = rows.filter((row) => Number.isInteger(row.id));
   const affordable = usable.filter((row) => parseGrade(row.minGrade) <= grade);
   if (affordable.length === 0) return [];
@@ -90,6 +84,6 @@ export function resolveStarterCardsFromRows(
     if (cardIds.length === STARTER_DECK_SIZE) break;
   }
 
-  // 덱은 정확히 STARTER_DECK_SIZE 장이어야 성립한다 — 모자라면 부분 지급 대신 폴백으로 간다.
+  // 덱은 정확히 STARTER_DECK_SIZE 장이어야 성립한다 — 모자라면 부분 지급 대신 호출부가 재시도를 요청한다.
   return cardIds.length === STARTER_DECK_SIZE ? cardIds : [];
 }

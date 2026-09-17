@@ -38,6 +38,8 @@ public class OutgameTutorialBridge : MonoBehaviour
 
     // 이 씬에서 대기 중인 스텝. null이면 걸 게이트가 없다(자동 스텝·씬 전환·완료).
     TutorialStepDef m_step;
+    TutorialStepDef m_satisfiedStep;
+    int m_sessionVersion;
     bool m_subscribed;
     bool m_contentIntroStarted;
     int m_stepVersion;
@@ -166,6 +168,15 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (GuidanceCoordinator.IsRestoring || !CursorRunning) return;
         if (m_completing) return;
         if (m_applying) { m_pendingApply = true; return; }
+        // 같은 대기 스텝의 화면 갱신은 진입 명령이나 해금 연출을 다시 시작하지 않는다.
+        if (m_step != null && TryGetCursorStep(out var t_current) && ReferenceEquals(t_current, m_step)
+            && OnboardingSession.Phase == EOnboardingPhase.Waiting
+            && OnboardingSession.IsCurrent(m_sessionVersion, m_step.StepId))
+        {
+            if (ReferenceEquals(m_satisfiedStep, m_step)) OnGateSatisfied();
+            else PresentStep();
+            return;
+        }
         ApplyCurrentStepAsync().Forget();
     }
 
@@ -182,6 +193,7 @@ public class OutgameTutorialBridge : MonoBehaviour
                 TryGetCursorStep(out var t_entering);
                 m_stepToken = OnboardingSession.Begin(t_entering, this.GetCancellationTokenOnDestroy());
                 int t_version = OnboardingSession.Version;
+                m_sessionVersion = t_version;
                 bool t_wait = t_entering != null && TutorialActionMeta.Of(t_entering.Action).RequiresEntryConfirmation
                     || OnboardingCommands.HasPending || DataSaveManager.Data.Tutorial?.Execution?.Phase == "Confirming";
                 if (t_wait && !m_returnPreparing) ServerWaitOverlay.Hold(m_entryWait);
@@ -191,8 +203,17 @@ public class OutgameTutorialBridge : MonoBehaviour
                     if (DataSaveManager.Data.Tutorial?.Execution?.Phase == "Confirming"
                         && !await GuideResume.SaveConfirmedAsync(m_stepToken))
                         throw new InvalidOperationException("진행 위치를 저장하지 못했습니다.");
-                    t_result = t_entering == null ? await EnterCursorStepAsync(m_stepToken)
-                        : await OnboardingSession.ExecuteAsync(t_entering, EnterCursorStepAsync, m_stepToken);
+                    if (t_entering != null && ReferenceEquals(m_satisfiedStep, t_entering))
+                    {
+                        // 카드 지급처럼 진입 자체가 연출을 여는 스텝도 다시 실행하지 않는다.
+                        await OnboardingCommands.RecoverPendingAsync(m_stepToken);
+                        m_stepToken.ThrowIfCancellationRequested();
+                        OnboardingSession.SetPhase(EOnboardingPhase.Waiting);
+                        t_result = EOutgameTutorialStepResult.Gated;
+                    }
+                    else
+                        t_result = t_entering == null ? await EnterCursorStepAsync(m_stepToken)
+                            : await OnboardingSession.ExecuteAsync(t_entering, EnterCursorStepAsync, m_stepToken);
                 }
                 finally { ServerWaitOverlay.Release(m_entryWait); }
                 if (this == null || !OnboardingSession.IsCurrent(t_version, t_entering?.StepId ?? 0)) return;
@@ -206,7 +227,9 @@ public class OutgameTutorialBridge : MonoBehaviour
                 if (!TryGetCursorStep(out m_step)) return;
                 if (m_step.Completion == EOutgameTutorialCompletion.SynergyDeckEditor)
                     m_synergyDeckOpenDeadline = Time.unscaledTime + 5f;
-                PresentStep();
+                // 완료 동작 후 저장만 실패했다면, 재시도에서는 완료 확정만 이어간다.
+                if (ReferenceEquals(m_satisfiedStep, m_step)) OnGateSatisfied();
+                else PresentStep();
                 return;
             }
             if (CursorRunning) throw new InvalidOperationException("온보딩 자동 진행이 반복됩니다.");
@@ -892,6 +915,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_step == null || m_completing || GuidanceCoordinator.IsRestoring
             || !OnboardingSession.CanAcceptCompletion
             || !TryGetCursorStep(out var t_current) || t_current != m_step) return;
+        m_satisfiedStep = m_step;
         CompleteStepAsync(m_step).Forget();
     }
 
@@ -905,6 +929,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         {
             bool t_done = await OnboardingSession.CompleteAsync(_step, SatisfyCursorStep, m_stepToken);
             if (!t_done || this == null) return;
+            if (ReferenceEquals(m_satisfiedStep, _step)) m_satisfiedStep = null;
             ServerWaitOverlay.Release(m_completionWait);
             OutgameFeatureLock.Refresh();
             if (!CursorRunning || _step.LeavesScene) { CloseGate(); return; }

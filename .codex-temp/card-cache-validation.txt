@@ -1,2 +1,0 @@
-FAIL: System.Exception: Timeout at catalog; pending=0
-  at Unity.AI.Assistant.Agent.Dynamic.Extension.Editor.CommandScript.Tick () [0x00035] in <0b05556858e34caeac3c43428d5a1ef1>:0

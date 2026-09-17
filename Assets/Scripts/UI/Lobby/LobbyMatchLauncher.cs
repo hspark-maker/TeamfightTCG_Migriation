@@ -669,13 +669,15 @@ public class LobbyMatchLauncher : MonoBehaviour
     /// <summary>모험 맵을 열고 정점 하나를 가운데에 둔다. 가이드 미션 "이동"이 부른다. 잠겨 있으면 false.</summary>
     public bool TryOpenAdventureMapAt(int _nodeIndex)
     {
-        if (adventurePanel == null || !OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure)) return false;
+        if (!isActiveAndEnabled || m_running || adventurePanel == null || matchPanel == null
+            || lobbyTabController == null || !OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure)) return false;
 
-        // 목록 오버레이는 다른 탭에서도 눌린다 — 맵은 배틀 탭 위에 서야 한다(복귀 경로와 같은 순서).
-        if (matchPanel != null) lobbyTabController?.Select(matchPanel, false);
-        OpenAdventureMap();
-        if (_nodeIndex >= 0) adventurePanel.FocusNode(_nodeIndex);
-        return adventurePanel.IsOpen;
+        // 덱 저장/이탈 확인을 통과하고 매치 탭에 도착한 뒤에만 맵을 연다.
+        return lobbyTabController.TrySelectFeature(EOutgameFeature.LobbyMatchTab, _onArrived: () =>
+        {
+            OpenAdventureMap();
+            if (_nodeIndex >= 0) adventurePanel.FocusNode(_nodeIndex);
+        });
     }
 
     void OpenAdventureMap()

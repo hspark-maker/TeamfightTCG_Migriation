@@ -269,6 +269,10 @@ public class GuideMissionPanel : ContentsPooledUI
     async UniTaskVoid ClaimAsync(string _missionId)
     {
         // 왕복 동안 입력을 막는다. 진행도·낙인은 낙관 갱신하지 않는다(MissionPanel 과 같은 계약).
+        var t_tracker = GuideMissionTrackerView.Visible;
+        var t_mission = MissionManager.Find(_missionId);
+        if (t_mission == null || (t_tracker != null && t_tracker.IsHoldingClaim)) return;
+        int t_version = t_tracker != null ? t_tracker.BeginClaim(t_mission) : 0;
         ClaimMissionResult t_result = null;
         ServerWaitOverlay.Hold(this);
         try
@@ -279,11 +283,15 @@ public class GuideMissionPanel : ContentsPooledUI
         {
             // **팝업보다 먼저 걷는다.** 순서를 뒤집으면 안내가 대기 딤에 묻힌다.
             ServerWaitOverlay.Release(this);
+            if (t_result == null && t_tracker != null) t_tracker.EndClaim(t_version, false);
         }
         if (t_result != null)
         {
-            if ((t_result.Cards?.Count ?? 0) > 0) this.Close();
-            MissionPanel.ShowClaimedRewards(new[] { t_result }, _showCardsIndividually: true);
+            this.Close();
+            MissionPanel.ShowClaimedRewards(new[] { t_result }, _onClosed: () =>
+            {
+                if (t_tracker != null) t_tracker.EndClaim(t_version, true);
+            }, _showCardsIndividually: true);
         }
     }
 }
