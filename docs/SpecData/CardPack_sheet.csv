@@ -12,5 +12,5 @@ int,string,string,string,string,long,int,int,string,long,string,int,string
 10,GiantsGardenPack,거인의 사냥,Live,Diamond,30,3,0,Shard,0,Gold,6,UltraPack
 11,ElementalFlowPack,원소의 흐름,Live,Diamond,30,3,0,Shard,0,Bronze,7,UltraPack
 12,RangePack,원거리덱,Live,Gold,0,6,1,Shard,0,,0,TutorialPack
-13,TutorialStarterGrant,튜토리얼 스타터 지급,Live,Gold,0,5,1,Shard,0,,0,TutorialPack
+13,TutorialStarterGrant,튜토리얼 스타터 지급,Live,Gold,0,7,1,Shard,0,,0,TutorialPack
 14,TutorialFirstCard,튜토리얼 첫 카드,Live,Gold,0,1,1,Shard,0,,0,TutorialPack
