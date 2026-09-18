@@ -176,10 +176,7 @@ public static class OutgameTutorialGuide
     /// <summary>강화 문구의 비용 설명을 현재 무료 자격으로 해석한다.</summary>
     public static string MessageOf(TutorialStepDef _step)
         => SynergyBattleGuide.MessageOf((_step?.GuideMessage ?? string.Empty).Replace("{enhanceCost}",
-            HasFreeShot(EOutgameTutorialAction.WaitEnhance) ? "이번 강화는 무료예요." : "샤드를 사용해 카드를 성장시켜요.")
-            .Replace("{growthStatus}", s_growthAlreadyReached
-                ? "이미 시너지가 해금된 2성 카드를 보유하고 있어요."
-                : "카드를 2성으로 성장시키면 그 카드의 시너지가 해금돼요."));
+            HasFreeShot(EOutgameTutorialAction.WaitEnhance) ? "이번 강화는 무료예요." : "샤드를 사용해 카드를 성장시켜요."));
 
     /// <summary>지금 이 한 방을 안내가 대신 내주는가 = 저작이 무료라고 말한 스텝에 서 있고, 그 스텝이 아직 안 썼다.
     /// 무엇이 무료인지는 코드가 아니라 스텝의 freeOfCharge가 정한다.

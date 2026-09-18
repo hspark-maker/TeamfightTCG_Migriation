@@ -676,6 +676,12 @@ public class LobbyMatchLauncher : MonoBehaviour
         if (deckPanel != null) lobbyTabController?.Select(deckPanel);
     }
 
+    /// <summary>가이드 미션으로 이동하기 전에 현재 모험 맵을 닫는다.</summary>
+    public void CloseAdventureMapForGuide()
+    {
+        if (IsAdventureMapOpen) adventurePanel.Close();
+    }
+
     /// <summary>미션에서 모험 선택 화면을 연다. 정점 선택과 전투 시작은 사용자가 한다.</summary>
     public bool TryOpenAdventureMap(System.Action _beforeOpen = null)
     {

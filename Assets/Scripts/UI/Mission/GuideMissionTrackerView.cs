@@ -49,6 +49,9 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
     bool m_visible;
     bool m_ready;
     LobbyTabController m_shell;
+    LobbyMatchLauncher m_launcher;
+    Canvas m_liftedCanvas;
+    bool m_navigating;
     RectTransform m_rect;
     RectTransform m_tabBar;
     RectTransform m_gauge;
@@ -104,7 +107,7 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
         && s_visible.isActiveAndEnabled && s_visible.m_settled && s_visible.m_visible
         && s_visible.m_displayed?.Id == _missionId
         && (s_visible.canvasGroup == null || s_visible.canvasGroup.alpha > 0.99f)
-        && GuidanceCoordinator.CanNavigateFromLobby(null);
+        && GuidanceCoordinator.CanUseGuideMissionPreview;
 
     internal void SetSettled(bool _settled)
     {
@@ -160,6 +163,7 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
         m_shell = GetComponentInParent<LobbyTabController>();
         if (m_shell != null)
         {
+            m_launcher = m_shell.GetComponent<LobbyMatchLauncher>();
             var t_bar = m_shell.GetComponentInChildren<LobbyTabBarView>(true);
             if (t_bar != null) m_tabBar = t_bar.transform as RectTransform;
             m_tabs = m_shell.GetComponentsInChildren<LobbyTabPanel>(true);
@@ -196,6 +200,7 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
         OutgameTutorialRunner.OnGuidedChanged -= this.Rebind;
         OutgameFeatureLock.OnChanged -= this.Rebind;
         CancelPresentation();
+        UiSortingOrder.DropNested(m_liftedCanvas);
         m_displayed = null;
         m_settled = false;
         m_ready = false;
@@ -316,7 +321,7 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
     {
         if (!m_settled || Time.unscaledTime < m_nextRefresh) return;
         m_nextRefresh = Time.unscaledTime + 0.1f;
-        bool t_ready = GuidanceCoordinator.CanNavigateFromLobby(null);
+        bool t_ready = GuidanceCoordinator.CanUseGuideMissionPreview;
         if (t_ready && !m_ready && OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission))
             RefreshMissionsAsync().Forget();
         m_ready = t_ready;
@@ -382,14 +387,19 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
         m_displayed = t_definition;
         m_progress = t_progress;
         m_complete = t_complete;
-        RefreshInteractable(m_settled && GuidanceCoordinator.CanNavigateFromLobby(null));
+        RefreshInteractable(m_settled && GuidanceCoordinator.CanUseGuideMissionPreview);
         this.ApplyReward(t_definition);
     }
 
     void RefreshInteractable(bool _ready)
     {
         var t_state = GuideMissionPreviewState.Of(m_displayed);
-        if (m_button != null) m_button.interactable = m_visible && _ready && !m_holdingClaim && t_state.CanExecute;
+        if (m_button != null) m_button.interactable = m_visible && _ready && !m_holdingClaim && !m_navigating && t_state.CanExecute;
+        bool t_lift = m_visible && _ready && m_shell != null
+            && (!(m_shell.CurrentPanel is LobbyMatchTabPanel) || (m_launcher != null && m_launcher.IsAdventureMapOpen));
+        if (t_lift && (m_liftedCanvas == null || !m_liftedCanvas.overrideSorting))
+            m_liftedCanvas = UiSortingOrder.LiftNested(gameObject, UiSortingOrder.LobbyBarsLifted);
+        else if (!t_lift) UiSortingOrder.DropNested(m_liftedCanvas);
         RefreshPresentationText();
     }
 
@@ -410,13 +420,30 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
 
     void HandleClick()
     {
-        if (!m_visible || m_holdingClaim || !GuidanceCoordinator.CanNavigateFromLobby(null)) return;
+        if (!m_visible || m_holdingClaim || m_navigating || !GuidanceCoordinator.CanUseGuideMissionPreview) return;
         MissionDefinition t_current = GuideMissionTrack.Current;
         var t_state = GuideMissionPreviewState.Of(t_current);
         if (!t_state.CanExecute) return;
         DismissHint();
         if (t_state.Action == GuideMissionPreviewState.EAction.Claim) ClaimAsync(t_current).Forget();
-        else GuideMissionNavigator.Go(t_current);
+        else NavigateAsync(t_current).Forget();
+    }
+
+    async UniTaskVoid NavigateAsync(MissionDefinition _mission)
+    {
+        m_navigating = true;
+        try
+        {
+            if (m_launcher != null && m_launcher.IsAdventureMapOpen)
+            {
+                m_launcher.CloseAdventureMapForGuide();
+                await UniTask.WaitUntil(() => m_launcher == null || !m_launcher.IsAdventureMapOpen,
+                    cancellationToken: this.GetCancellationTokenOnDestroy());
+            }
+            if (isActiveAndEnabled && GuidanceCoordinator.CanUseGuideMissionPreview
+                && GuideMissionTrack.Current?.Id == _mission.Id) GuideMissionNavigator.Go(_mission);
+        }
+        finally { m_navigating = false; }
     }
 
     async UniTaskVoid ClaimAsync(MissionDefinition _mission)
@@ -433,7 +460,7 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
         if (t_result != null) MissionPanel.ShowClaimedRewards(new[] { t_result }, _onClosed: () =>
         {
             if (this != null) EndClaim(t_version, true);
-        }, _showCardsIndividually: true);
+        }, _skipDirectCardPresentation: true);
     }
 
     /// <summary>탭 이동·상세 화면 복귀 뒤 저장을 먼저 확정하고 가이드 진행도를 갱신한다.</summary>

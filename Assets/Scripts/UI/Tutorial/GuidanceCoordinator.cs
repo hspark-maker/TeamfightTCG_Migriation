@@ -51,6 +51,14 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
         && !s_instance.AdventureMapOpen && !ContentUnlockPresentation.IsPlaying
         && !OutgameTutorialRunner.IsRunning && s_instance.SafeToPresent(false, _notification);
 
+    /// <summary>공통 가이드 바는 모험 맵과 덱 탭의 편집 화면에서도 실행할 수 있다.</summary>
+    public static bool CanUseGuideMissionPreview => !IsInputLocked
+        && s_instance != null && s_instance.m_shell != null && s_instance.m_shell.CanSwipe
+        && s_instance.m_shell.CurrentPanel != null && s_instance.m_shell.CurrentPanel.IsViewVisible
+        && !ContentUnlockPresentation.IsPlaying && !OutgameTutorialRunner.IsRunning
+        && s_instance.SafeToPresent(_except: s_instance.m_shell.CurrentPanel is DeckTabController
+            ? DeckEditController.OpenEditor : null);
+
     /// <summary>매치 탭이 제자리에 있고 로비 진입 조건을 만족할 때 화면 이동을 허용한다.</summary>
     public static bool CanNavigateFromMatchTab(PooledUIBase _notification)
         => CanNavigateFromLobby(_notification)

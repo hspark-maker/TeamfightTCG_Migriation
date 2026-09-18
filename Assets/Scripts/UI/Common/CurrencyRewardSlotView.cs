@@ -10,6 +10,8 @@ public class CurrencyRewardSlotView
     [SerializeField] GameObject root;
     [SerializeField] Image icon;
     [SerializeField] TMP_Text amountLabel;
+    [SerializeField] CardVisualView cardVisual;
+    [SerializeField] CanvasGroup cardGroup;
     [Tooltip("보상 아이콘 뒤의 파티클 묶음. 아이콘 퇴장과 같은 시간에 함께 숨긴다.")]
     [SerializeField] CanvasGroup backgroundEffects;
 
@@ -18,9 +20,14 @@ public class CurrencyRewardSlotView
     public Image Icon => this.icon;
     public TMP_Text Amount => this.amountLabel;
     public CanvasGroup BackgroundEffects => this.backgroundEffects;
+    public CanvasGroup CardGroup => this.cardGroup;
+    public RectTransform VisualTransform => this.cardGroup != null && this.cardGroup.gameObject.activeSelf
+        ? (RectTransform)this.cardGroup.transform : this.icon != null ? this.icon.rectTransform : null;
 
     public void Bind(Sprite _icon, long _amount)
     {
+        if (cardGroup != null) cardGroup.gameObject.SetActive(false);
+        if (cardVisual != null) cardVisual.gameObject.SetActive(false);
         if (root != null) root.SetActive(true);
         if (icon != null) icon.enabled = true;
         if (icon != null && _icon != null) icon.sprite = _icon;   // null이면 목업 스프라이트 보존
@@ -29,6 +36,8 @@ public class CurrencyRewardSlotView
 
     public void Hide()
     {
+        if (cardVisual != null) cardVisual.gameObject.SetActive(false);
+        if (cardGroup != null) cardGroup.gameObject.SetActive(false);
         if (root != null) root.SetActive(false);
     }
 
@@ -36,6 +45,13 @@ public class CurrencyRewardSlotView
     {
         Bind(_line.Icon, _line.Amount);
         if (icon != null) icon.enabled = _line.Icon != null;
+        if (_line.Type == ERewardType.Card && cardVisual != null && cardGroup != null &&
+            int.TryParse(_line.RewardId, out int t_cardId) && CardCatalog.TryGetSpec(t_cardId, out _))
+        {
+            if (icon != null) icon.enabled = false;
+            cardGroup.gameObject.SetActive(true);
+            cardVisual.Bind(t_cardId, _owned: true, _mine: true);
+        }
         if (!_line.IsCurrency && _line.Icon == null && amountLabel != null)
             amountLabel.text = RewardItemDisplay.NameOf(_line.Type.ToString(), _line.RewardId) + " ×" + _line.Amount;
     }

@@ -141,8 +141,9 @@ public class GameResultPopup : MonoBehaviour
         bool t_goldWillRoll = _won && t_gold != 0 && (t_cards == null || t_cards.Count > 0);
 
         ResetVisual(t_gold, _rankDelta, _won, t_goldWillRoll, t_cards, t_fallen);
-        if (this.experienceGroup != null) this.experienceGroup.alpha = 0f;
         Sequence t_experience = this.experienceReward.Build(_accountExp, _accountTotalExp);
+        // Build가 알파를 복원하므로 초기화 뒤 숨겨야 카드 연출과 겹치지 않는다.
+        if (this.experienceGroup != null) this.experienceGroup.alpha = 0f;
 
         // 결과 연출은 통째로 unscaled로 돈다. 배너 Animator가 unscaled로 못박혀 있는 데다,
         // 부전승 경로(TurnRunner의 _withBeat:false)는 결정타 강조가 눌러둔 timeScale을
@@ -188,10 +189,10 @@ public class GameResultPopup : MonoBehaviour
         float t_rankAt = t_cardsFlew ? Mathf.Max(t_goldAt, t_end - this.rankOverlap) : t_goldAt;
         t_end = Mathf.Max(t_end, InsertLine(BuildCounterLine(this.m_rank, this.rankBurst, _won), t_rankAt));
 
-        // 카드 레이어가 보상 위에 그려지므로 타일을 모두 걷은 뒤 경험치를 드러낸다.
+        // 골드·랭크 재화 흡수가 모두 끝난 뒤 경험치를 드러낸다.
         if (t_experience != null)
         {
-            float t_experienceAt = t_cardsFlew ? Mathf.Max(t_titleEnd, t_goldEnd) : t_titleEnd;
+            float t_experienceAt = t_end;
             if (this.experienceGroup != null)
             {
                 const float EXPERIENCE_FADE_DURATION = 0.2f;

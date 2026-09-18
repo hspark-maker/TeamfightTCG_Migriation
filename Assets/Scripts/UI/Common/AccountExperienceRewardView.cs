@@ -26,6 +26,8 @@ public sealed class AccountExperienceRewardView
     public Sequence Build(long _gained, long _total)
     {
         if (this.root == null) return null;
+        var t_group = this.root.GetComponent<CanvasGroup>();
+        if (t_group != null) t_group.alpha = 1f;
         bool t_visible = _gained > 0 && AccountLevelManager.IsConfigured;
         this.root.gameObject.SetActive(t_visible);
         if (!t_visible) return null;
@@ -71,6 +73,16 @@ public sealed class AccountExperienceRewardView
                 this.levelText.text = $"Lv.{t_first.Level} → Lv.{t_last.Level} <color=#A36213>레벨업!</color>";
         });
         return t_sequence;
+    }
+
+    /// <summary>경험치 표시를 보상 수령 시퀀스의 퇴장 구간에 맞춰 숨긴다.</summary>
+    public void BuildOutro(Sequence _sequence, float _at, float _duration)
+    {
+        if (_sequence == null || this.root == null || !this.root.gameObject.activeSelf) return;
+
+        var t_group = this.root.GetComponent<CanvasGroup>();
+        if (t_group != null)
+            _sequence.Insert(_at, t_group.DOFade(0f, _duration).SetEase(Ease.InQuad));
     }
 
     void Render(AccountLevelInfo _info, long _exp)
