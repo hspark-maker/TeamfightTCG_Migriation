@@ -291,7 +291,7 @@ public class GuideMissionPanel : ContentsPooledUI
             MissionPanel.ShowClaimedRewards(new[] { t_result }, _onClosed: () =>
             {
                 if (t_tracker != null) t_tracker.EndClaim(t_version, true);
-            }, _showCardsIndividually: true);
+            }, _skipDirectCardPresentation: true);
         }
     }
 }

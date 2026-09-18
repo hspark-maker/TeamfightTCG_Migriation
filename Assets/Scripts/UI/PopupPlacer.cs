@@ -13,6 +13,15 @@ public static class PopupPlacer
     /// <summary>누르고 있는 버튼 위에 띄우고, 화면 모서리에서는 안전 영역 안으로 밀어넣는다.</summary>
     public static void PlaceAboveAnchor(RectTransform _self, RectTransform _anchor,
         float _gap, float _edgePadding = 16f)
+        => PlaceVertical(_self, _anchor, _gap, _edgePadding, true);
+
+    /// <summary>앵커 아래에 표시하되 안전 영역 안에 맞춘다.</summary>
+    public static void PlaceBelowAnchor(RectTransform _self, RectTransform _anchor,
+        float _gap, float _edgePadding = 16f)
+        => PlaceVertical(_self, _anchor, _gap, _edgePadding, false);
+
+    static void PlaceVertical(RectTransform _self, RectTransform _anchor,
+        float _gap, float _edgePadding, bool _above)
     {
         if (_self == null || _anchor == null) return;
         Canvas t_canvas = _self.GetComponentInParent<Canvas>();
@@ -25,7 +34,7 @@ public static class PopupPlacer
             Mathf.Max(t_bounds.yMin, t_canvasRect.rect.yMin),
             Mathf.Min(t_bounds.xMax, t_canvasRect.rect.xMax), Mathf.Min(t_bounds.yMax, t_canvasRect.rect.yMax));
         Vector3 t_anchorTop = t_canvasRect.InverseTransformPoint(
-            _anchor.TransformPoint(new Vector3(_anchor.rect.center.x, _anchor.rect.yMax, 0f)));
+            _anchor.TransformPoint(new Vector3(_anchor.rect.center.x, _above ? _anchor.rect.yMax : _anchor.rect.yMin, 0f)));
 
         _self.localScale = Vector3.one;
         Vector3 t_half = t_canvasRect.InverseTransformVector(
@@ -38,7 +47,7 @@ public static class PopupPlacer
         float t_halfH = Mathf.Abs(t_half.y) * t_scale;
         float t_x = Mathf.Clamp(t_anchorTop.x, t_bounds.xMin + _edgePadding + t_halfW,
             t_bounds.xMax - _edgePadding - t_halfW);
-        float t_y = Mathf.Clamp(t_anchorTop.y + _gap + t_halfH,
+        float t_y = Mathf.Clamp(t_anchorTop.y + (_above ? 1f : -1f) * (_gap + t_halfH),
             t_bounds.yMin + _edgePadding + t_halfH, t_bounds.yMax - _edgePadding - t_halfH);
         _self.position = t_canvasRect.TransformPoint(new Vector3(t_x, t_y, 0f));
     }

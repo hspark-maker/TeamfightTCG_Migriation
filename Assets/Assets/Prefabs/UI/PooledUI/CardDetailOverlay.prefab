@@ -7809,6 +7809,7 @@ GameObject:
   - component: {fileID: 5565600773928500597}
   - component: {fileID: 7559975877057946334}
   - component: {fileID: 6303195616330956602}
+  - component: {fileID: 2946256095117848502}
   m_Layer: 0
   m_Name: BottomBar
   m_TagString: Untagged
@@ -7888,6 +7889,20 @@ CanvasGroup:
   m_Interactable: 1
   m_BlocksRaycasts: 1
   m_IgnoreParentGroups: 0
+--- !u!114 &2946256095117848502
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6577922521657124775}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
+  key: 36
+  spotlightBackground: {fileID: 0}
 --- !u!1 &6579744193275352289
 GameObject:
   m_ObjectHideFlags: 0
@@ -11186,7 +11201,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &8909500000000000002
 RectTransform:
   m_ObjectHideFlags: 0
@@ -11442,7 +11457,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &8909500000000000011
 RectTransform:
   m_ObjectHideFlags: 0

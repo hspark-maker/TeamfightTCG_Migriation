@@ -642,8 +642,7 @@ MonoBehaviour:
         action: 0
         anchor: 19
         spotlight: 19
-        guideMessage: "\uC0E4\uB4DC\uB97C \uD558\uB098\uC529 \uB123\uC5B4 \uCE74\uB4DC\uB97C
-          \uAC15\uD654\uD574 \uBD05\uC2DC\uB2E4."
+        guideMessage: "\uCE74\uB4DC\uB97C \uAC15\uD654\uD574\uBD05\uC2DC\uB2E4."
         messageAtBottom: 0
         unlocks: 
         unlocksAll: 0
@@ -688,11 +687,63 @@ MonoBehaviour:
         deckName: 
         onFailure: 0
         contentIntros: 
+      - stepId: 83
+        action: 1
+        anchor: 35
+        spotlight: 35
+        guideMessage: "\uC0E4\uB4DC\uB294 \uAC15\uD654\uC5D0 \uC0AC\uC6A9\uB418\uB294
+          \uC7AC\uD654\uC608\uC694."
+        messageAtBottom: 0
+        unlocks: 
+        unlocksAll: 0
+        locks: 
+        useDim: 1
+        packId: 
+        packPriceLabel: 
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle: 
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds: 
+        showDeckGate: 0
+        deckName: 
+        onFailure: 0
+        contentIntros: 
+      - stepId: 84
+        action: 1
+        anchor: 36
+        spotlight: 36
+        guideMessage: "\uC0AC\uC6A9\uD560 \uC0E4\uB4DC \uAC1C\uC218\uB97C \uC815\uD574
+          \uAC15\uD654\uD560 \uC218 \uC788\uC5B4\uC694.\n\uD544\uC694\uB7C9\uC744
+          \uCC44\uC6B0\uBA74 \uBCC4\uC774 \uB298\uACE0 \uCE74\uB4DC\uAC00 \uAC15\uD574\uC838\uC694."
+        messageAtBottom: 0
+        unlocks: 
+        unlocksAll: 0
+        locks: 
+        useDim: 1
+        packId: 
+        packPriceLabel: 
+        anchorCardId: 0
+        freeOfCharge: 0
+        waitUnlockIntro: 0
+        rewardTitle: 
+        parallelGain: 0
+        scenario: {fileID: 0}
+        cardId: 0
+        cardIds: 
+        showDeckGate: 0
+        deckName: 
+        onFailure: 0
+        contentIntros: 
       - stepId: 30
         action: 11
         anchor: 21
         spotlight: 0
-        guideMessage: "\uAC15\uD654 \uBC84\uD2BC\uC744 \uD55C \uBC88 \uB204\uB974\uC138\uC694!\n\uC120\uD0DD\uD55C \uC218\uB7C9\uC758 \uC0E4\uB4DC\uAC00 \uB4E4\uC5B4\uAC00\uACE0, \uD544\uC694\uB7C9\uC744 \uCC44\uC6B0\uBA74 \uBCC4\uC774 \uB298\uC5B4\uB098\uC694.\n{enhanceCost}"
+        guideMessage: "{enhanceCost}\n\uAC15\uD654 \uBC84\uD2BC\uC744 \uB20C\uB7EC
+          \uBCF4\uC138\uC694."
         messageAtBottom: 0
         unlocks: 
         unlocksAll: 0
@@ -717,7 +768,7 @@ MonoBehaviour:
         anchor: 31
         spotlight: 32
         guideMessage: "\uCE74\uB4DC\uAC00 \uC131\uC7A5\uD558\uBA74 \uACE0\uC720 \uD0A4\uC6CC\uB4DC
-          \uB2A5\uB825\uC774 \uD574\uAE08\uB429\uB2C8\uB2E4."
+          \uB2A5\uB825\uC774 \uD574\uAE08\uB3FC\uC694."
         messageAtBottom: 1
         unlocks: 
         unlocksAll: 0
@@ -741,10 +792,8 @@ MonoBehaviour:
         action: 1
         anchor: 0
         spotlight: 0
-        guideMessage: "\uC0E4\uB4DC\uB97C \uB123\uC744\uC218\uB85D \uB2A5\uB825\uCE58\uAC00
-          \uC624\uB974\uACE0, \uB2E4 \uCC44\uC6B0\uBA74 \uCE74\uB4DC\uAC00 \uC9C4\uD654\uD574\uC694.\n\uC774\uC81C
-          \uAC15\uD654\uD55C \uCE74\uB4DC\uB97C \uC804\uD22C\uC5D0\uC11C \uC0AC\uC6A9\uD574
-          \uBCF4\uC138\uC694!"
+        guideMessage: "\uAC15\uD654\uD55C \uCE74\uB4DC\uB97C \uC804\uD22C\uC5D0\uC11C
+          \uC0AC\uC6A9\uD574 \uBCF4\uC138\uC694!"
         messageAtBottom: 0
         unlocks: 
         unlocksAll: 0
@@ -1051,8 +1100,8 @@ MonoBehaviour:
         action: 1
         anchor: 0
         spotlight: 0
-        guideMessage: "\uC774\uBC88\uC5D0\uB294 \uCE74\uB4DC\uB4E4\uC774 \uD568\uAED8
-          \uB9CC\uB4DC\uB294 \uD6A8\uACFC, '\uC2DC\uB108\uC9C0'\uB97C \uC54C\uC544\uBCFC\uAC8C\uC694."
+        guideMessage: "\uCE74\uB4DC\uB4E4\uC774 \uD568\uAED8 \uB9CC\uB4DC\uB294 \uD6A8\uACFC,
+          '\uC2DC\uB108\uC9C0'\uB97C \uC54C\uC544\uBCFC\uAC8C\uC694."
         messageAtBottom: 0
         unlocks: 
         unlocksAll: 0
@@ -1076,9 +1125,8 @@ MonoBehaviour:
         action: 1
         anchor: 0
         spotlight: 0
-        guideMessage: "{growthStatus}\n\uC2DC\uB108\uC9C0\uB9C8\uB2E4 \uD568\uAED8
-          \uD3B8\uC131\uD574\uC57C \uD558\uB294 \uCE74\uB4DC \uC218\uC640 \uD6A8\uACFC\uAC00
-          \uB2EC\uB77C\uC694."
+        guideMessage: "\uCE74\uB4DC\uB97C 2\uC131\uC73C\uB85C \uC131\uC7A5\uC2DC\uD0A4\uBA74
+          \uADF8 \uCE74\uB4DC\uC758 \uC2DC\uB108\uC9C0\uAC00 \uD574\uAE08\uB3FC\uC694."
         messageAtBottom: 0
         unlocks: 
         unlocksAll: 0
@@ -1103,7 +1151,7 @@ MonoBehaviour:
         anchor: 18
         spotlight: 0
         guideMessage: "\uB3C4\uAC10\uC5D0\uC11C \uC2DC\uB108\uC9C0\uB97C \uD574\uAE08\uD560
-          \uCE74\uB4DC\uB97C \uCC3E\uC544\uBCFC\uAE4C\uC694?"
+          \uCE74\uB4DC\uB97C \uCC3E\uC544\uBCF4\uC138\uC694."
         messageAtBottom: 1
         unlocks: 
         unlocksAll: 0
@@ -1175,9 +1223,9 @@ MonoBehaviour:
         action: 11
         anchor: 21
         spotlight: 0
-        guideMessage: "\uC774\uBC88\uC5D0\uB294 \uAC15\uD654 \uD55C \uBC88\uC73C\uB85C
-          \uBC14\uB85C 2\uC131\uC774 \uB3FC\uC694.\n\uBB34\uB8CC\uB85C \uC2DC\uB108\uC9C0\uB97C
-          \uD574\uAE08\uD574 \uBCF4\uC138\uC694."
+        guideMessage: "\uC774\uBC88 \uAC15\uD654\uB294 \uBB34\uB8CC\uC608\uC694.
+          \n\uAC15\uD654\uD558\uC5EC \uC2DC\uB108\uC9C0\uB97C \uD574\uAE08\uD574
+          \uBCF4\uC138\uC694!"
         messageAtBottom: 1
         unlocks: 
         unlocksAll: 0
@@ -1201,9 +1249,9 @@ MonoBehaviour:
         action: 1
         anchor: 34
         spotlight: 32
-        guideMessage: "\uC2DC\uB108\uC9C0\uAC00 \uD574\uAE08\uB410\uC5B4\uC694!\n\uC774
-          \uC2DC\uB108\uC9C0\uC758 \uD6A8\uACFC\uC640 \uD544\uC694\uD55C \uCE74\uB4DC
-          \uC218\uB97C \uD655\uC778\uD574 \uBCF4\uC138\uC694."
+        guideMessage: "\uC2DC\uB108\uC9C0\uAC00 \uD574\uAE08\uB410\uC5B4\uC694!\n\uC2DC\uB108\uC9C0
+          \uD6A8\uACFC\uC640 \uD544\uC694\uD55C \uCE74\uB4DC \uC218\uB97C \uD655\uC778\uD574
+          \uBCF4\uC138\uC694."
         messageAtBottom: 0
         unlocks: 
         unlocksAll: 0
@@ -1227,9 +1275,8 @@ MonoBehaviour:
         action: 1
         anchor: 34
         spotlight: 32
-        guideMessage: "\uC2DC\uB108\uC9C0\uB294 \uD574\uAE08\uB9CC\uC73C\uB85C \uBC1C\uB3D9\uD558\uC9C0
-          \uC54A\uC544\uC694.\n\uAC19\uC740 \uC2DC\uB108\uC9C0\uAC00 \uD574\uAE08\uB41C
-          \uCE74\uB4DC\uB97C \uD544\uC694\uD55C \uC218\uB9CC\uD07C \uB371\uC5D0 \uD3B8\uC131\uD574\uC57C
+        guideMessage: "\uAC19\uC740 \uC2DC\uB108\uC9C0\uAC00 \uD574\uAE08\uB41C \uCE74\uB4DC\uB97C
+          \uD544\uC694\uD55C \uC218\uB9CC\uD07C \uB371\uC5D0 \uD3B8\uC131\uD558\uBA74
           \uD6A8\uACFC\uAC00 \uD65C\uC131\uD654\uB3FC\uC694."
         messageAtBottom: 0
         unlocks: 
@@ -1302,10 +1349,8 @@ MonoBehaviour:
         action: 1
         anchor: 0
         spotlight: 0
-        guideMessage: "\uB371\uC758 \uC2DC\uB108\uC9C0 \uD45C\uC2DC\uC5D0\uC11C \uD544\uC694\uD55C
-          \uCE74\uB4DC \uC218\uC640 \uD6A8\uACFC\uB97C \uD655\uC778\uD560 \uC218
-          \uC788\uC5B4\uC694.\n\uC774\uC81C \uAC19\uC740 \uC2DC\uB108\uC9C0\uC758
-          \uCE74\uB4DC\uB4E4\uC744 \uC900\uBE44\uD574 \uBCFC\uAE4C\uC694?"
+        guideMessage: "\uC2DC\uB108\uC9C0\uC5D0 \uD544\uC694\uD55C \uCE74\uB4DC\uB97C
+          \uC900\uBE44\uD574 \uC804\uD22C\uC5D0\uC11C \uD65C\uC6A9\uD574 \uBCF4\uC138\uC694!"
         messageAtBottom: 0
         unlocks: 
         unlocksAll: 0
@@ -1457,8 +1502,7 @@ MonoBehaviour:
         action: 1
         anchor: 33
         spotlight: 0
-        guideMessage: "\uC2DC\uB108\uC9C0\uAC00 \uD65C\uC131\uD654\uB410\uC5B4\uC694!
-          \uD45C\uC2DC\uB97C \uB20C\uB7EC \uD6A8\uACFC\uB97C \uD655\uC778\uD574 \uBCF4\uC138\uC694."
+        guideMessage: "\uD604\uC7AC \uB371\uC5D0\uC11C \uD65C\uC131\uD654\uB41C \uC2DC\uB108\uC9C0\uC785\uB2C8\uB2E4."
         messageAtBottom: 1
         unlocks: 
         unlocksAll: 0
@@ -1506,9 +1550,8 @@ MonoBehaviour:
         action: 1
         anchor: 0
         spotlight: 0
-        guideMessage: "\uC774 \uB371\uC73C\uB85C \uB7AD\uD06C\uB098 \uBAA8\uD5D8
-          \uC804\uD22C\uB97C \uD55C \uBC88 \uB05D\uB0B4 \uBCF4\uC138\uC694.\n\uC2B9\uD328\uC640
-          \uAD00\uACC4\uC5C6\uC774 \uC778\uC815\uB3FC\uC694."
+        guideMessage: "\uC774 \uB371\uC744 \uC0AC\uC6A9\uD558\uC5EC \uC804\uD22C\uB97C
+          \uC218\uD589\uD574\uBCF4\uC138\uC694!"
         messageAtBottom: 0
         unlocks: 
         unlocksAll: 0
@@ -1560,4 +1603,4 @@ MonoBehaviour:
         deckName: 
         onFailure: 0
         contentIntros: 
-  nextStepId: 83
+  nextStepId: 85

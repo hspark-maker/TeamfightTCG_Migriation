@@ -342,7 +342,7 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
         if (t_result != null) MissionPanel.ShowClaimedRewards(new[] { t_result }, _onClosed: () =>
         {
             if (this != null) EndClaim(t_version, true);
-        }, _showCardsIndividually: true);
+        }, _skipDirectCardPresentation: true);
     }
 
     /// <summary>탭 이동·상세 화면 복귀 뒤 저장을 먼저 확정하고 가이드 진행도를 갱신한다.</summary>

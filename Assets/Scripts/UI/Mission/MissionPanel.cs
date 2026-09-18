@@ -405,7 +405,7 @@ public class MissionPanel : ContentsPooledUI
 
     // GuideMissionPanel 도 같은 보상 표시 경로를 쓴다 — 미션 보상 팝업 조립의 단일 지점.
     internal static void ShowClaimedRewards(IReadOnlyList<ClaimMissionResult> _results, string _title = "미션 보상",
-        Action _onClosed = null, bool _showCardsIndividually = false)
+        Action _onClosed = null, bool _skipDirectCardPresentation = false)
     {
         if (_results.Count == 0)
         {
@@ -453,8 +453,6 @@ public class MissionPanel : ContentsPooledUI
 
         // 이미 지급된 응답이다. 팝업 확인에서는 서버 수령을 다시 호출하지 않는다.
         var t_outcome = RewardItemDisplay.ToOutcome(t_gains, t_cards, t_packs);
-        t_outcome = new RewardClaimOutcome(t_outcome.Granted, t_outcome.Cards, t_outcome.Packs,
-            t_outcome.PresentationBatches, _showCardsIndividually);
         var t_packCounts = new Dictionary<string, long>();
         foreach (var t_pack in t_outcome.Packs)
             t_packCounts[t_pack.PackId] = t_packCounts.TryGetValue(t_pack.PackId, out long t_count) ? t_count + 1 : 1;
@@ -467,6 +465,14 @@ public class MissionPanel : ContentsPooledUI
         foreach (var t_card in t_cardCounts)
             t_lines.Add(new RewardLine(new AlbumRewardDef { rewardType = ERewardType.Card,
                 rewardId = t_card.Key.ToString(), amount = t_card.Value }));
+        if (_skipDirectCardPresentation)
+        {
+            var t_packBatches = new List<RewardPresentationBatch>();
+            foreach (var t_batch in t_outcome.PresentationBatches)
+                if (t_batch.IsPack) t_packBatches.Add(t_batch);
+            t_outcome = new RewardClaimOutcome(t_outcome.Granted, _packs: t_outcome.Packs,
+                _presentationBatches: t_packBatches);
+        }
         if (t_lines.Count == 0 && t_passExp <= 0 && t_accountExp <= 0)
         {
             _onClosed?.Invoke();

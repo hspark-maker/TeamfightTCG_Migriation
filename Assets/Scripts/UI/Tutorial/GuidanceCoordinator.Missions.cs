@@ -154,6 +154,8 @@ public sealed partial class GuidanceCoordinator
         if (OutgameTutorialRunner.IsDefeatEnhanceInterlude
             && GuideMissionFlows.TryGet(EOutgameTutorialTrigger.CollectionTabFirstEnter, out var t_defeatFlow))
             return t_defeatFlow;
+        // 안내 시작은 매치 탭에서만 허용하고, 시작 후 목적지 이동은 기존 흐름을 따른다.
+        if (!IsCurrentTabAnchor(EOutgameTutorialAnchor.LobbyMatchTab) || AdventureMapOpen) return null;
         // 마지막 소개가 끝나 pending이 비어도, 실패한 완료 저장은 재시도할 수 있어야 한다.
         if (m_retryRequested && m_unconfirmedIntroFlow != null) return m_unconfirmedIntroFlow;
         if (m_retryRequested && GuideMissionProgress.IsCurrent(m_requestedMissionId) && GuideResume.HasPending)
@@ -208,6 +210,7 @@ public sealed partial class GuidanceCoordinator
         var t_flow = FindMissionFlow();
         if (t_flow == null) return false;
         PooledUIBase t_surface = t_flow.tutorial == EOutgameTutorialTrigger.SynergyBattleIntroduction
+            || (m_retryRequested && m_shell != null && m_shell.CurrentPanel is DeckTabController)
             ? DeckEditController.OpenEditor : null;
         if (StageBusyForGuided || !SafeToPresent(_except: t_surface)) return false;
         m_retryRequested = false;

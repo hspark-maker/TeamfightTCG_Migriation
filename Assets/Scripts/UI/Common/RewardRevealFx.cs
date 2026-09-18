@@ -144,6 +144,9 @@ public class RewardRevealFx
     /// <summary>아이콘이 빨려들기 시작하는 시각 — 획득 연출을 여기에 맞춰야 "아이콘이 빛이 됐다"로 읽힌다.</summary>
     public float LaunchAt => this.launchRise;
 
+    /// <summary>보상 아이콘이 사라지는 데 걸리는 시간.</summary>
+    public float LaunchDuration => this.launchDuration;
+
     /// <summary>
     /// 빛 줄기가 쓸 그림. 이미 저작된 훈김(rayGlow)을 빌려 새 배선 없이 얻는다 —
     /// 팝업마다 같은 스프라이트를 한 번 더 꽂게 하면 진실원이 둘이 된다.
@@ -249,6 +252,8 @@ public class RewardRevealFx
                 if (!IsLive(this.m_slots[t_i])) continue;
 
                 var t_icon   = this.m_slots[t_i].Icon;
+                var t_visual = this.m_slots[t_i].VisualTransform;
+                var t_card = this.m_slots[t_i].CardGroup;
                 var t_amount = this.m_slots[t_i].Amount;
                 var t_background = this.m_slots[t_i].BackgroundEffects;
 
@@ -256,12 +261,15 @@ public class RewardRevealFx
                     _seq.Insert(this.launchRise,
                                 t_background.DOFade(0f, this.launchDuration).SetEase(Ease.InQuad));
 
-                if (t_icon != null)
+                if (t_visual != null)
                 {
-                    _seq.Insert(0f, t_icon.transform.DOScale(this.launchScale, this.launchRise).SetEase(Ease.OutQuad));
+                    _seq.Insert(0f, t_visual.DOScale(this.launchScale, this.launchRise).SetEase(Ease.OutQuad));
                     _seq.Insert(this.launchRise,
-                                t_icon.transform.DOScale(0f, this.launchDuration).SetEase(Ease.InBack));
-                    this.InsertFadeOut(_seq, t_icon, this.launchRise, this.launchDuration);
+                                t_visual.DOScale(0f, this.launchDuration).SetEase(Ease.InBack));
+                    if (t_card != null && t_card.gameObject.activeSelf)
+                        _seq.Insert(this.launchRise, t_card.DOFade(0f, this.launchDuration).SetEase(Ease.InQuad));
+                    else
+                        this.InsertFadeOut(_seq, t_icon, this.launchRise, this.launchDuration);
                 }
 
                 if (t_amount != null)
@@ -302,7 +310,7 @@ public class RewardRevealFx
             {
                 if (this.m_slots[t_i] == null) continue;
 
-                RestoreSlotGraphic(this.m_slots[t_i].Icon);
+                RestoreSlotVisual(this.m_slots[t_i]);
                 RestoreSlotGraphic(this.m_slots[t_i].Amount);
                 var t_background = this.m_slots[t_i].BackgroundEffects;
                 if (t_background != null)
@@ -371,7 +379,13 @@ public class RewardRevealFx
         {
             if (!IsLive(this.m_slots[t_i])) continue;
 
-            this.StagePunch(_seq, this.m_slots[t_i].Icon,   this.iconOvershoot,   this.iconDuration);
+            RestoreSlotVisual(this.m_slots[t_i]);
+            var t_visual = this.m_slots[t_i].VisualTransform;
+            if (t_visual != null)
+            {
+                t_visual.localScale = Vector3.one * (1f + this.iconOvershoot);
+                _seq.Insert(this.punchAt, t_visual.DOScale(1f, this.iconDuration).SetEase(Ease.OutQuint));
+            }
             this.StagePunch(_seq, this.m_slots[t_i].Amount, this.amountOvershoot, this.amountDuration);
         }
     }
@@ -522,6 +536,17 @@ public class RewardRevealFx
 
         _target.DOKill();
         SetAlpha(_target, _alpha);
+    }
+
+    static void RestoreSlotVisual(CurrencyRewardSlotView _slot)
+    {
+        RestoreSlotGraphic(_slot.Icon);
+        var t_card = _slot.CardGroup;
+        if (t_card == null) return;
+        t_card.DOKill();
+        t_card.transform.DOKill();
+        t_card.transform.localScale = Vector3.one;
+        t_card.alpha = 1f;
     }
 
     static void RestoreSlotGraphic(Graphic _target)

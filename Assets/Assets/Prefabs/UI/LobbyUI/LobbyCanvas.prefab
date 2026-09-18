@@ -71,8 +71,8 @@ MonoBehaviour:
     serializedVersion: 2
     x: 0
     y: 0
-    width: 1.23833333
-    height: 2.25733333
+    width: 1.2383333
+    height: 2.2573335
 --- !u!114 &56178243163133495
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -86,7 +86,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScrollingUvBackground
   speed: {x: 0.01, y: 0.006}
-  tiling: 0.426666667
+  tiling: 0.42666668
   scroll: 1
 --- !u!1 &136089387091211165
 GameObject:
@@ -587,6 +587,8 @@ MonoBehaviour:
   focusSpinSeconds: 6
   focusSpinClockwise: 1
   focusSlideSeconds: 0.35
+  blockedOpacity: 0.55
+  blockedTransitionSeconds: 0.18
 --- !u!114 &901230000000000004
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1315,6 +1317,8 @@ MonoBehaviour:
   packPopDuration: 0.14
   packGatherScale: 0.15
   packArcHeight: 160
+  levelUpTarget: {fileID: 7506216988818169143}
+  levelUpPrefab: {fileID: 5167354530381438290, guid: f882946c67d9fe4498cf73d056399e48, type: 3}
 --- !u!114 &7770487399785170923
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3267,6 +3271,7 @@ GameObject:
   - component: {fileID: 3251720595112796475}
   - component: {fileID: 5435202971204567795}
   - component: {fileID: 193870954230821135}
+  - component: {fileID: 8562369609937045568}
   m_Layer: 0
   m_Name: Status_Shard
   m_TagString: Untagged
@@ -3375,6 +3380,20 @@ MonoBehaviour:
   spendPressDuration: 0.14
   spendReturnDuration: 0.2
   spendTint: {r: 1, g: 0.42, b: 0.35, a: 1}
+--- !u!114 &8562369609937045568
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6320877353773061386}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialAnchor
+  key: 35
+  spotlightBackground: {fileID: 0}
 --- !u!1 &6423011523005246021
 GameObject:
   m_ObjectHideFlags: 0
@@ -3522,7 +3541,7 @@ MonoBehaviour:
     serializedVersion: 2
     x: 0
     y: 0
-    width: 0.139312507
+    width: 0.1393125
     height: 0.25395
 --- !u!114 &7110622832524516765
 MonoBehaviour:
@@ -4236,7 +4255,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8370548787059305162, guid: 66ffb7617a312064db3f733154b3f638, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 53.25
+      value: 42.375
       objectReference: {fileID: 0}
     - target: {fileID: 8370548787059305162, guid: 66ffb7617a312064db3f733154b3f638, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -4643,11 +4662,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7902516097386695650, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
       propertyPath: m_CellSize.x
-      value: 257.73257
+      value: 261.3275
       objectReference: {fileID: 0}
     - target: {fileID: 7902516097386695650, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
       propertyPath: m_CellSize.y
-      value: 343.05096
+      value: 347.83594
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -4669,6 +4688,52 @@ MonoBehaviour:
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 5176086449309812204, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
   m_PrefabInstance: {fileID: 3080964694133836860}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1001 &3691564239151476505
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 8136611112812122143}
+    m_Modifications:
+    - target: {fileID: 200909457594692985, guid: 3d159050b5617d54695dc1f47ff12230, type: 3}
+      propertyPath: m_fontColor32.rgba
+      value: 4294967295
+      objectReference: {fileID: 0}
+    - target: {fileID: 200909457594692985, guid: 3d159050b5617d54695dc1f47ff12230, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
+    - target: {fileID: 1428962976975991633, guid: 3d159050b5617d54695dc1f47ff12230, type: 3}
+      propertyPath: m_Name
+      value: GuideMissionTrackerCard
+      objectReference: {fileID: 0}
+    - target: {fileID: 1428962976975991633, guid: 3d159050b5617d54695dc1f47ff12230, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2789225113426311118, guid: 3d159050b5617d54695dc1f47ff12230, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
+    - target: {fileID: 8271700393075397102, guid: 3d159050b5617d54695dc1f47ff12230, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
+    - target: {fileID: 8721229421755178628, guid: 3d159050b5617d54695dc1f47ff12230, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 3d159050b5617d54695dc1f47ff12230, type: 3}
+--- !u!224 &506932934052162616 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 3761612676796023585, guid: 3d159050b5617d54695dc1f47ff12230, type: 3}
+  m_PrefabInstance: {fileID: 3691564239151476505}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &4170094572064320260
 PrefabInstance:
@@ -4825,7 +4890,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1002, guid: 2c98023a88fc48eab8fd67b947bd3981, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 53.25
+      value: 42.375
       objectReference: {fileID: 0}
     - target: {fileID: 1004, guid: 2c98023a88fc48eab8fd67b947bd3981, type: 3}
       propertyPath: layer
@@ -5403,46 +5468,4 @@ MonoBehaviour:
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 2067141598830091887, guid: 933048697c23a7a48a5d4f36d0033fb3, type: 3}
   m_PrefabInstance: {fileID: 7857085950436996758}
-  m_PrefabAsset: {fileID: 0}
---- !u!1001 &3691564239151476505
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 8136611112812122143}
-    m_Modifications:
-    - target: {fileID: 200909457594692985, guid: 3d159050b5617d54695dc1f47ff12230, type: 3}
-      propertyPath: m_TextStyleHashCode
-      value: -1183493901
-      objectReference: {fileID: 0}
-    - target: {fileID: 1428962976975991633, guid: 3d159050b5617d54695dc1f47ff12230, type: 3}
-      propertyPath: m_Name
-      value: GuideMissionTrackerCard
-      objectReference: {fileID: 0}
-    - target: {fileID: 1428962976975991633, guid: 3d159050b5617d54695dc1f47ff12230, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 2789225113426311118, guid: 3d159050b5617d54695dc1f47ff12230, type: 3}
-      propertyPath: m_TextStyleHashCode
-      value: -1183493901
-      objectReference: {fileID: 0}
-    - target: {fileID: 8271700393075397102, guid: 3d159050b5617d54695dc1f47ff12230, type: 3}
-      propertyPath: m_TextStyleHashCode
-      value: -1183493901
-      objectReference: {fileID: 0}
-    - target: {fileID: 8721229421755178628, guid: 3d159050b5617d54695dc1f47ff12230, type: 3}
-      propertyPath: m_TextStyleHashCode
-      value: -1183493901
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 3d159050b5617d54695dc1f47ff12230, type: 3}
---- !u!224 &506932934052162616 stripped
-RectTransform:
-  m_CorrespondingSourceObject: {fileID: 3761612676796023585, guid: 3d159050b5617d54695dc1f47ff12230, type: 3}
-  m_PrefabInstance: {fileID: 3691564239151476505}
   m_PrefabAsset: {fileID: 0}
