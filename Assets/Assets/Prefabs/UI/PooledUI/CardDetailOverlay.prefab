@@ -309,7 +309,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &7173741053852118315
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2303,7 +2303,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4284940144
-  m_fontColor: {r: 0.4373725, g: 1, b: 0.4009434, a: 1}
+  m_fontColor: {r: 0.36151296, g: 0.8207547, b: 0.30584726, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -3681,8 +3681,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4284940144
-  m_fontColor: {r: 0.4392157, g: 1, b: 0.4, a: 1}
+    rgba: 4283355484
+  m_fontColor: {r: 0.36151296, g: 0.8207547, b: 0.30584726, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -6483,7 +6483,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontColor: {r: 0.4392157, g: 1, b: 0.4, a: 1}
+  m_fontColor: {r: 0.36151296, g: 0.8207547, b: 0.30584726, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -9957,7 +9957,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &8909000000000000002
 RectTransform:
   m_ObjectHideFlags: 0
@@ -11061,7 +11061,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &8909500000000000011
 RectTransform:
   m_ObjectHideFlags: 0
