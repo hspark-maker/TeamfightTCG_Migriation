@@ -26,7 +26,7 @@ int,string,string,int,int,string
 1059,StarterPack,Bronze,20,1,꿀꿀비
 1060,StarterPack,Bronze,4,1,솜구름몽
 1061,StarterPack,Bronze,15,1,물방울룽
-1062,StarterPack,Bronze,11,1,우드혼
+1062,StarterPack,Bronze,35,1,우드혼
 1063,SynergyPack,Bronze,20,1,꿀꿀비
 1064,SynergyPack,Bronze,18,1,모래몽
 1065,SynergyPack,Bronze,17,1,와글도도
@@ -205,12 +205,12 @@ int,string,string,int,int,string
 1364,RangePack,Bronze,20,1,꿀꿀비
 1365,RangePack,Bronze,4,1,솜구름몽
 1366,RangePack,Bronze,15,1,물방울룽
-1367,RangePack,Bronze,11,1,우드혼
+1367,RangePack,Bronze,35,1,우드혼
 1368,TutorialStarterGrant,Bronze,1,1,포슬램
 1369,TutorialStarterGrant,Bronze,20,1,꿀꿀비
 1370,TutorialStarterGrant,Bronze,4,1,솜구름몽
 1371,TutorialStarterGrant,Bronze,15,1,물방울룽
-1372,TutorialStarterGrant,Bronze,11,1,우드혼
+1372,TutorialStarterGrant,Bronze,35,1,우드혼
 1375,TutorialFirstCard,Bronze,2,1,
 1376,NormalPack_TEST,Bronze,4,662,솜구름몽
 1377,NormalPack_TEST,Bronze,9,662,버섯냥
@@ -245,4 +245,3 @@ int,string,string,int,int,string
 1406,NormalPack_TEST,Gold,38,8,크랙몬
 1407,NormalPack_TEST,Platinum,36,8,틱톡곤
 1408,NormalPack_TEST,Platinum,38,8,크랙몬
-1409,NormalPack_TEST,Bronze,8,400,깜밤이

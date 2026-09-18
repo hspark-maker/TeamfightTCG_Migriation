@@ -176,23 +176,30 @@ public class GameResultPopup : MonoBehaviour
             this.revealSeq.Insert(t_cursor, this.panel.DOScale(1f, this.enterDuration).SetEase(Ease.OutBack));
         }
 
-        float t_end = t_cursor + t_enter;
-
-        // 경험치는 승패 배너와 같은 박자에 보이고, 게이지도 결과 시퀀스와 함께 스킵된다.
-        if (t_experience != null)
-        {
-            t_end = Mathf.Max(t_end, InsertLine(t_experience, t_cursor));
-            if (this.experienceGroup != null)
-                this.revealSeq.Insert(t_cursor, this.experienceGroup.DOFade(1f, this.rewardRevealDuration));
-        }
+        float t_titleEnd = t_cursor + t_enter;
+        float t_end = t_titleEnd;
 
         // 골드 줄은 타이틀이 다 서기 전에 끼어든다 — 순차로 두면 그만큼 결과 화면이 길어진다.
         float t_goldAt = t_cursor + t_enter * this.panelOverlap;
-        t_end = Mathf.Max(t_end, InsertLine(BuildGoldLine(_won, t_cards, t_fallen, out bool t_cardsFlew), t_goldAt));
+        float t_goldEnd = InsertLine(BuildGoldLine(_won, t_cards, t_fallen, out bool t_cardsFlew), t_goldAt);
+        t_end = Mathf.Max(t_end, t_goldEnd);
 
         // 카드가 날아갈 때만 랭크를 뒤로 미룬다(꼬리는 물린다). 그 외에는 예전처럼 같은 시점에 겹친다.
         float t_rankAt = t_cardsFlew ? Mathf.Max(t_goldAt, t_end - this.rankOverlap) : t_goldAt;
         t_end = Mathf.Max(t_end, InsertLine(BuildCounterLine(this.m_rank, this.rankBurst, _won), t_rankAt));
+
+        // 카드 레이어가 보상 위에 그려지므로 타일을 모두 걷은 뒤 경험치를 드러낸다.
+        if (t_experience != null)
+        {
+            float t_experienceAt = t_cardsFlew ? Mathf.Max(t_titleEnd, t_goldEnd) : t_titleEnd;
+            if (this.experienceGroup != null)
+            {
+                const float EXPERIENCE_FADE_DURATION = 0.2f;
+                this.revealSeq.Insert(t_experienceAt, this.experienceGroup.DOFade(1f, EXPERIENCE_FADE_DURATION));
+                t_experienceAt += EXPERIENCE_FADE_DURATION;
+            }
+            t_end = Mathf.Max(t_end, InsertLine(t_experience, t_experienceAt));
+        }
 
         // 배너는 콜백 한 번으로 켜질 뿐 시퀀스에 길이를 남기지 않는다.
         // 끝점을 못 박아 두지 않으면 뒷줄이 전부 미배선인 화면에서 duration 0으로 즉시 완료되고,

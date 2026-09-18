@@ -81,6 +81,10 @@ public sealed class AccountExperienceRewardView
         if (this.progressText != null)
             this.progressText.text = _info.IsMaxLevel ? "MAX" : $"{t_current:N0} / {t_span:N0}";
         if (this.fill != null)
-            this.fill.anchorMax = new Vector2(_info.IsMaxLevel || t_span <= 0 ? 1f : Mathf.Clamp01((float)t_current / t_span), 1f);
+        {
+            float t_ratio = _info.IsMaxLevel || t_span <= 0 ? 1f : Mathf.Clamp01((float)t_current / t_span);
+            this.fill.anchorMax = new Vector2(t_ratio, 1f);
+            this.fill.gameObject.SetActive(t_ratio > 0f);
+        }
     }
 }

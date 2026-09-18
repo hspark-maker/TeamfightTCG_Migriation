@@ -12,6 +12,7 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
     [SerializeField] TMP_Text actText;
     [SerializeField] TMP_Text titleText;
     [SerializeField] TMP_Text progressText;
+    [SerializeField] RectTransform progressFill;
     [SerializeField] GameObject hintRoot;
     [SerializeField] CanvasGroup canvasGroup;
 
@@ -286,6 +287,13 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
 
     void RefreshPresentationText()
     {
+        if (progressFill != null)
+        {
+            float t_ratio = m_displayed == null ? 0f : m_displayed.Target > 0
+                ? Mathf.Clamp01((float)m_progress / m_displayed.Target) : m_complete ? 1f : 0f;
+            progressFill.anchorMax = new Vector2(t_ratio, 1f);
+            progressFill.gameObject.SetActive(t_ratio > 0f);
+        }
         if (m_displayed == null || m_transitioning) return;
         string t_progress = m_complete ? "완료" : $"{m_progress} / {m_displayed.Target}";
         if (titleText != null) titleText.text = m_docked ? $"지금 · {m_displayed.Title}  {t_progress}" : m_displayed.Title;
