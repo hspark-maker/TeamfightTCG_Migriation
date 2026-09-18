@@ -26,6 +26,7 @@ public class CurrencyRewardSlotView
 
     public void Bind(Sprite _icon, long _amount)
     {
+        if (icon != null) CardArtBinding.Clear(icon.gameObject);
         if (cardGroup != null) cardGroup.gameObject.SetActive(false);
         if (cardVisual != null) cardVisual.gameObject.SetActive(false);
         if (root != null) root.SetActive(true);
@@ -51,8 +52,21 @@ public class CurrencyRewardSlotView
             if (icon != null) icon.enabled = false;
             cardGroup.gameObject.SetActive(true);
             cardVisual.Bind(t_cardId, _owned: true, _mine: true);
+            return;
         }
         if (!_line.IsCurrency && _line.Icon == null && amountLabel != null)
             amountLabel.text = RewardItemDisplay.NameOf(_line.Type.ToString(), _line.RewardId) + " ×" + _line.Amount;
+
+        // 카드 아트는 비동기 로드된다. 슬롯의 활성 수명에 묶어 숨김·재사용 시 이전 요청을 해제한다.
+        if (_line.Type == ERewardType.Card && icon != null &&
+            int.TryParse(_line.RewardId, out int t_iconCardId) && CardCatalog.TryGetSpec(t_iconCardId, out var t_spec))
+        {
+            CardArtBinding.Bind(icon, CardArtCache.AddressOf(t_spec, 0), t_sprite =>
+            {
+                if (amountLabel != null)
+                    amountLabel.text = t_sprite != null ? _line.Amount.ToString("N0")
+                        : RewardItemDisplay.NameOf(_line.Type.ToString(), _line.RewardId) + " ×" + _line.Amount;
+            });
+        }
     }
 }

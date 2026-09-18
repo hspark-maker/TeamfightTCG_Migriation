@@ -466,8 +466,8 @@ public class GameInitializer : MonoBehaviour
             // 튜토리얼: 양 덱 고정 주입(무셔플=저작 순서가 곧 등장 순서·6장 이하 허용). 적덱 GetRandomDeck 우회.
             // 덱 게이트(ShowDeckGate)를 켜도 여기는 갈리지 않는다 — 튜토리얼 전투 덱은 언제나 시나리오가 정한다.
             //
-            // 진행도 대신 시나리오 저작 레벨의 성장값을 넘긴다. 레벨을 캡처해 대기 카드가 뒤늦게 나와도
-            // 같은 키워드·시너지·진화·HP 곡선을 탄다. 범용 공급자 미배선 시에는 기존 Lv1 공급자로 폴백한다.
+            // 시나리오 저작 레벨을 기본으로 삼는다. 플레이어가 그 레벨 이상이면 샤드 진행도를 포함한 실제 성장값을 쓴다.
+            // 적은 저작 레벨을 유지한다. 범용 공급자 미배선 시에는 기존 Lv1 공급자로 폴백한다.
             System.Func<int, CardGrowth> t_playerGrowth = s_baseGrowthProvider;
             System.Func<int, CardGrowth> t_enemyGrowth  = s_baseGrowthProvider;
             if (s_growthAtLevelProvider != null)
@@ -476,6 +476,16 @@ public class GameInitializer : MonoBehaviour
                 int t_enemyLevel  = TutorialConfig.EnemyCardLevel;
                 t_playerGrowth = _card => s_growthAtLevelProvider(_card, t_playerLevel);
                 t_enemyGrowth  = _card => s_growthAtLevelProvider(_card, t_enemyLevel);
+            }
+            if (s_growthProvider != null)
+            {
+                var t_scenarioGrowth = t_playerGrowth;
+                t_playerGrowth = _card =>
+                {
+                    CardGrowth t_authored = t_scenarioGrowth != null ? t_scenarioGrowth(_card) : default;
+                    CardGrowth t_owned = s_growthProvider(_card);
+                    return t_owned.Level >= t_authored.Level ? t_owned : t_authored;
+                };
             }
             this.playerField.Initialize(TutorialConfig.PlayerDeck, 0, ShufflePolicy.None, t_playerGrowth);
             this.enemyField.Initialize(TutorialConfig.EnemyDeck, 1, ShufflePolicy.None, t_enemyGrowth);

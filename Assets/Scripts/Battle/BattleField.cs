@@ -34,8 +34,9 @@ public class BattleField : MonoBehaviour
     /// (원격 미러는 상대 전사 목록의 정본이 아니다. 필요해지면 그때 경로를 확인하고 열 것).</summary>
     public IReadOnlyList<int> FallenCards => this.state.FallenCards;
 
-    /// <summary>흐름 시너지 스택. 흐름 카드가 런타임 등장(NotifyEntered)할 때마다 +1, 카드 flowBonus 재동기의 기준값.
-    /// Initialize/InitializeFromRemote에서 0 리셋. 초기배치는 미발화 → 0부터 런타임 등장으로만 성장. 전투 중 파생.</summary>
+    /// <summary>흐름 시너지 스택. 흐름 카드가 필드에 설 때마다 +1 — 오프닝 배치([Placed], ApplyDeckSynergy가
+    /// 슬롯 순서로 발화)와 런타임 등장([Entered]) 전부. 카드 flowBonus 재동기의 기준값.
+    /// Initialize/InitializeFromRemote에서 0 리셋. 전투 중 파생.</summary>
     public int FlowStack => this.state.FlowStack;
 
     /// <summary>이 덱으로 산출된 시너지 상태. 배틀 시작 시 1회 확정, 전투 중 불변. UI(SynergyPanelUI) 참조용.</summary>
@@ -134,9 +135,9 @@ public class BattleField : MonoBehaviour
         => this.state.SwapWithWaiting(_card);
 
     /// <summary>후공 어드밴티지 멀리건: _slotIndex 슬롯 카드를 대기열의 _deckIndex 카드와 교환.
-    /// 전투 시작 1회. 스왑-인 카드는 오프닝 배치와 동일한 [Placed] 경로(런타임 등장 [Entered] 아님) —
-    /// [Entered]로 발화하면 돌보미/흐름 등 런타임 스폰 보너스가 이 카드에만 붙어 나머지 오프닝 카드와
-    /// 비대칭이 생긴다. 시너지는 ApplyDeckSynergy에서 대기 카드까지 이미 적용됨 → 재적용 금지(bonusHp 이중가산).
+    /// 전투 시작 1회. 스왑-인 카드는 오프닝 배치와 동일한 [Placed] 경로 — 돌보미/흐름 등 스폰 트리거는
+    /// Placed에서도 발화하므로(카드가 필드에 서는 모든 순간 = 발동 1회) 스왑-인도 오프닝 카드와 같은
+    /// 규칙을 탄다. 시너지는 ApplyDeckSynergy에서 대기 카드까지 이미 적용됨 → 재적용 금지(bonusHp 이중가산).
     /// _deckIndex는 호출부가 MatchRandom으로 산출(결정론, 멀티 확장 대비). 반환: 새로 슬롯에 들어온 카드(실패 시 null).</summary>
     public CardInstance MulliganSwap(int _slotIndex, int _deckIndex)
     {
@@ -267,7 +268,7 @@ public class BattleField : MonoBehaviour
         this.state.NotifyBoardChanged(); // 오프닝 배치분에도 라이브 카운트 파생 상태를 깔아준다(Entered는 오프닝에 미발화)
     }
 
-    /// <summary>흐름: 스택 +1. 스택 권위는 BattleField 소유(FlowSynergyEffect가 런타임 스폰 시 호출). 순수 산술.</summary>
+    /// <summary>흐름: 스택 +1. 스택 권위는 BattleField 소유(FlowSynergyEffect가 배치/스폰 시 호출). 순수 산술.</summary>
     public void AddFlowStack(int _amount) => this.state.AddFlowStack(_amount);
 
     /// <summary>튜토리얼 확정승: 슬롯+대기 카드의 현재 체력을 _hp 이하로 낮춤(공격력=체력이라 적이 약해짐).

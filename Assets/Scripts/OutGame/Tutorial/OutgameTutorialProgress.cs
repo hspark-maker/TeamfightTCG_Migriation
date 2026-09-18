@@ -95,7 +95,9 @@ public static class OutgameTutorialProgress
         if (t_slot.CompletedTriggers == null) t_slot.CompletedTriggers = new List<string>();
 
         string t_key = _trigger.ToString();
-        bool t_hadResume = t_slot.GuideResume?.Trigger == t_key;
+        bool t_hadResume = t_slot.GuideResume?.Trigger == t_key
+            && !(_trigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
+                && OutgameTutorialRunner.IsDefeatEnhanceInterlude);
         if (t_hadResume) t_slot.GuideResume = null;
         if (t_slot.CompletedTriggers.Contains(t_key))
         {

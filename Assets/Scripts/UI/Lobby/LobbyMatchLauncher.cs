@@ -42,6 +42,7 @@ public class LobbyMatchLauncher : MonoBehaviour
     public bool IsAdventureMapOpen => adventurePanel != null && adventurePanel.IsOpen;
 
     IMatchmaker      m_matchmaker;
+    IMatchmaker      m_bronzeOneMatchmaker;
     MatchmakingShell m_matchShell;
     MatchDeckShell m_deckShell;
 
@@ -62,10 +63,20 @@ public class LobbyMatchLauncher : MonoBehaviour
     }
 
 
-    // 실 상대를 먼저 찾고, 못 만나면 안쪽 AI 매칭으로 내려간다. 멀티/싱글 판정은 이 결과가 소유한다 —
+    // 브론즈 1은 COM으로 바로 연결한다. 이후에는 실 상대를 먼저 찾고, 없으면 AI로 내려간다.
+    // 멀티/싱글 판정은 이 결과가 소유한다 —
     // 여기서 갈리는 것이 DeckConfig.IsMultiplayer 이고, 씬 로드·랭크 정산·보상 경로가 전부 그 값을 따른다.
-    IMatchmaker Matchmaker => m_matchmaker ??=
-        new PhotonRankedMatchmaker(new ServerMatchmaker(profilePool));
+    IMatchmaker Matchmaker
+    {
+        get
+        {
+            // 런처가 살아 있는 동안 승급해도 현재 티어로 다시 고른다.
+            RankInfo t_rank = RankManager.GetInfo();
+            if (RankManager.IsRanked && t_rank.Grade == ERankGrade.Bronze && t_rank.Division == 1)
+                return m_bronzeOneMatchmaker ??= new ServerMatchmaker(profilePool, 0.5f, 0.5f);
+            return m_matchmaker ??= new PhotonRankedMatchmaker(new ServerMatchmaker(profilePool));
+        }
+    }
 
     // 프리팹 자체는 동기 UI 카탈로그의 의존성이라 부팅 때 이미 적재돼 있다 — 미루는 것은 생성뿐이다.
     // 로비 캔버스에 미리 얹지 않고 첫 매칭 때 띄우는 이유는 로비 프리팹을 저장할 때마다 SafeArea가

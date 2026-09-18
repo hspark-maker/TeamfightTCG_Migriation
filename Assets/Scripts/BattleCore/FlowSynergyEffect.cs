@@ -6,7 +6,9 @@ using TeamfightTCG.BattleCore;
 // flowBonus는 **흐름 카드에만** FlowStack으로 세팅 → CardInstance.AttackDamage에 가산.
 // 스택 1당 "흐름 카드가 공격으로 주는 데미지 +1"(비흐름 카드는 flowBonus=0, 영향 없음).
 // 값 규칙은 CardInstance에 위임. RNG 미소비, 순수 산술.
-// "등장"은 런타임 스폰(NotifyEntered)만 — 오프닝 배치(Placed)는 미발화(BattleFieldState 스폰 경로가 게이팅).
+// "등장" = 오프닝 배치(Placed) + 런타임 스폰(Entered) 전부 — 필드에 서는 모든 순간이 스택을 쌓는다
+// (멀리건 스왑-인도 Placed 경로라 동일 발화. 스왑-아웃 카드가 나중에 Entered로 재입장하면 또 쌓인다 —
+//  교활 재진입과 같은 "매 등장" 규칙).
 public class FlowSynergyEffect : SynergyEffect
 {
     int amount = 1;
@@ -24,8 +26,15 @@ public class FlowSynergyEffect : SynergyEffect
         return _key == nameof(amount);
     }
 
+    // [Placed] 오프닝 배치(멀리건 스왑-인 포함). 디스패처가 self 소속만 발화하지만
+    // 공용 몸통이 소속을 재판정하므로 그대로 태운다(멱등 아님 — 스택형이라 발화 1회 = +1).
+    public override void OnPlaced(SpawnCtx _ctx) => AddStackAndResync(_ctx);
+
+    // [Entered] 런타임 등장. **이 디스패처는 BelongsTo 필터를 안 걸므로** 소속을 직접 판정해야 한다.
+    public override void OnEntered(SpawnCtx _ctx) => AddStackAndResync(_ctx);
+
     // 동기 완결: 메서드가 반환되기 전에 상태변이를 모두 끝낸다.
-    public override void OnEntered(SpawnCtx _ctx)
+    void AddStackAndResync(SpawnCtx _ctx)
     {
         if (_ctx.self == null || _ctx.field == null) return;
 

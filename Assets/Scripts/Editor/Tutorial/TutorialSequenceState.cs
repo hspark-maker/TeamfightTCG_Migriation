@@ -7,6 +7,7 @@ using System.Collections.Generic;
 ///
 /// 다만 fail-open 경로(정지 판정 · ForceUnlockAllForDebug · 러너 미가동)는 일부러 모델링하지 않는다.
 /// 저작 검증이 보려는 것은 "정상 진행"이고, 그 셋은 막힌 저작까지 열어 주어 증상을 가리는 쪽이다.</summary>
+// 첫 패배의 강화 인터루드는 저작 좌표를 바꾸지 않는 런타임 분기다. 복귀 시 이 스냅샷을 다시 따른다.
 public sealed class TutorialSequenceState
 {
     /// <summary>한 스텝에 서 있을 때의 해금 스냅샷(누적 해금 + 그 스텝만의 일시 잠금)</summary>

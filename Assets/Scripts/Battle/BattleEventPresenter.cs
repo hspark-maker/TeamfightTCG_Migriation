@@ -27,7 +27,7 @@ public static class BattleEventPresenter
         {
             case BattleEventKind.Heal:
                 if ((_event.Flags & BattleEventFlags.Deferred) != 0) t_view.DeferHpDisplay(_event.Value);
-                else t_view.PlayHealEffect(_event.Value);
+                else t_view.PlayHealEffect(_event.Value, _playParticles: (_event.Flags & BattleEventFlags.Revival) == 0);
                 break;
             case BattleEventKind.ShieldChanged:
                 t_view.SetShieldVisible((_event.Flags & BattleEventFlags.Visible) != 0);

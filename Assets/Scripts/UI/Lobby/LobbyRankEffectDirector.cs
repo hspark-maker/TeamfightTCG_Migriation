@@ -248,6 +248,7 @@ public class LobbyRankEffectDirector : MonoBehaviour
 
         RankRewardPanel t_panel = UIPoolManager.Instance.AddOrUpdateUI<RankRewardPanel>();
         if (t_panel == null) yield break;
+        t_panel.BeginRewardGuide();
 
         // 닫힐 때까지 기다린다 — 이 뒤가 곧 랭크 연출의 끝(OnAnyFinished)이라, 안 기다리면 튜토리얼 안내가 목록 위에 겹친다.
         // 비활성으로 빠지는 길도 닫힘으로 본다: 여기서 영영 멈추면 뒤따르는 안내가 통째로 잠긴다.

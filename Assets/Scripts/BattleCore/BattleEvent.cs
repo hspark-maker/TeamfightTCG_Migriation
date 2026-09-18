@@ -28,6 +28,7 @@ namespace TeamfightTCG.BattleCore
         Enhanced = 1 << 2,
         Deferred = 1 << 3,
         Visible = 1 << 4,
+        Revival = 1 << 5, // 부활 체력 복구: HP 표기는 갱신하되 일반 회복 파티클은 생략한다.
     }
 
     /// <summary>리졸버 출력. Unity 없이 직렬화할 수 있는 값만 가진다.</summary>

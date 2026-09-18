@@ -247,6 +247,7 @@ public sealed partial class GuidanceCoordinator
                 m_flowPreparing = false;
                 m_flowLocked = false;
                 ClearTransition();
+                if (OutgameTutorialRunner.IsDefeatEnhanceInterlude) RequestCurrentMission();
             }
         }
     }

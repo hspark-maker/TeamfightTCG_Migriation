@@ -53,7 +53,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     [SerializeField] ScrollRect     detailScroll;
 
     [Header("성장 (선택 — 미배선이면 성장 표시 없이 지금까지와 동일하게 동작)")]
-    [SerializeField] TMP_Text levelValueText;
+    [SerializeField] GrowthStarStrip growthStars;
 
     [Header("강화 조작 (선택 — 미배선이면 조작 없이 표시만 한다)")]
     [SerializeField] Button     enhanceButton;
@@ -178,6 +178,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     /// <summary>지금 해금 연출이 도는 중인가.</summary>
     public static bool IsUnlockFxPlaying => s_instance != null && s_instance.m_unlockFxPlaying;
     public static bool IsRitualPlaying => s_instance != null && (s_instance.m_ritualPlaying || s_instance.m_enhanceRequestPending);
+    public static bool IsGrowthPresentationFocused => s_instance != null && s_instance.isShow && IsRitualPlaying;
 
     static CardDetailOverlayView s_instance;
     protected override int SortingOrder => UiSortingOrder.CardDetail;
@@ -197,6 +198,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
 
     // 연출 중에는 값 갱신을 미룬다 — 서버 왕복이 끝나는 순간 통지가 와서 공개 전에 Lv·HP가 튄다.
     bool m_ritualPlaying;
+    bool m_growthHudHidden;
 
     // 진화 연출에 넘길 문양 재사용 버퍼(연타하는 조작이라 매번 새 List를 만들지 않는다).
     readonly List<Graphic> m_emblemBuffer = new List<Graphic>();
@@ -396,11 +398,21 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         RefreshArrows();
     }
 
+    void LateUpdate()
+    {
+        bool t_focused = this.isShow && (this.m_ritualPlaying || this.m_enhanceRequestPending);
+        if (this.m_growthHudHidden == t_focused) return;
+        this.m_growthHudHidden = t_focused;
+        if (this.isShow)
+            LobbyShellBars.Hide(this, transform, t_focused ? EShellBars.All : EShellBars.Bottom);
+    }
+
     protected override void OnViewHidden()
     {
         this.acquisitionView?.Hide();
         this.m_viewVersion++;
         StopShardAbsorb();
+        this.m_growthHudHidden = false;
         LobbyShellBars.Show(this);
 
         ScreenDim.Hide(this, EDimLayer.Content);
@@ -1058,10 +1070,9 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     // 값이 없어도 행을 끄지 않는다 — 카드마다 패널 높이가 흔들린다.
     void ApplyGrowth(int _card, bool _owned)
     {
-        if (this.levelValueText == null) return;
-
-        if (_owned) SetLevelText(CardGrowthManager.GrowthOf(_card).Level);
-        else        this.levelValueText.text = LockedValue;
+        if (this.growthStars == null) return;
+        this.growthStars.gameObject.SetActive(_owned);
+        if (_owned) SetGrowthStars(CardGrowthManager.GrowthOf(_card).Level);
     }
 
     // 규칙·비용·성공률은 전부 CardGrowthManager가 정본이고 여기선 표시만 한다.
@@ -1667,13 +1678,13 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
                                   OnAnyEnhanceResultReady?.Invoke(_result);
                               },
                               // 이을 것이 없는 판이라 탭을 기다리지 않는다 — 읽을 것이 다 나오면 스스로 상세로 돌아간다.
-                              _autoReturn: t_selfReturn);
+                              _autoReturn: t_selfReturn,
+                              _centeredCard: _evolve && this.m_activeRitual == this.evolveRitual);
     }
 
-    void SetLevelText(int _level)
+    void SetGrowthStars(int _level)
     {
-        if (this.levelValueText != null)
-            this.levelValueText.text = GrowthStar.ProgressLabel(_level, CardGrowthManager.MaxLevel);
+        if (this.growthStars != null) this.growthStars.SetLevel(_level);
     }
 
     void BuildKeywordSection(int _card, bool _owned)

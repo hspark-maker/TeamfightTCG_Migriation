@@ -52,6 +52,7 @@ public static class OnboardingExecutionValidation
             ValidateLifetime(t_first, t_second);
             ValidateCompletion(t_first, t_second);
             ValidatePackReplay(t_data);
+            ValidateDefeatEnhance(t_data, t_restore);
             Require(t_saveNotifications > 0, "Description completion did not enqueue asynchronous save notification.");
             Debug.Log("[OnboardingExecutionValidation] PASS: stale generation, cancellation, description completion without remote confirmation, reentrant/late duplicate completion, all action contracts, legacy nullable records, execution/command JSON roundtrip, unlock history preserved across server responses, pack presentation replay and chapter/consumption isolation. Server and assets were not modified.");
         }
@@ -61,6 +62,74 @@ public static class OnboardingExecutionValidation
             for (int t_i = t_restore.Count - 1; t_i >= 0; t_i--) t_restore[t_i]();
             UnityEngine.Object.DestroyImmediate(t_data);
         }
+    }
+
+    static void ValidateDefeatEnhance(OutgameTutorialData _data, List<Action> _restore)
+    {
+        Replace(_restore, typeof(ContentUnlockManager), "s_initialized", false);
+        Replace(_restore, typeof(OutgameTutorialRunner), "OnGuidedChanged", (Action)null);
+        Replace(_restore, typeof(OutgameTutorialRunner), "OnBattleEntryRestored", (Action)null);
+        Replace(_restore, typeof(OutgameFeatureLock), "OnChanged", (Action)null);
+        var t_slot = new TutorialSaveData { StepId = 910003 };
+        DataSaveManager.Data.Tutorial = t_slot;
+        _data.ftueChapters.Clear();
+        _data.guide.guideChapters.Clear();
+        _data.guide.guideFlows.Clear();
+        var t_beforeBattle = Message(910003);
+        var t_forced = new OutgameTutorialChapter();
+        t_forced.EditorSteps.Add(t_beforeBattle);
+        _data.ftueChapters.Add(t_forced);
+        var t_guided = new OutgameTutorialChapter { EditorTrigger = EOutgameTutorialTrigger.CollectionTabFirstEnter };
+        t_guided.EditorSteps.Add(Message(910004));
+        _data.guide.guideChapters.Add(t_guided);
+        var t_flow = new GuideMissionFlow { missionId = "guide.01", tutorial = EOutgameTutorialTrigger.CollectionTabFirstEnter };
+        _data.guide.guideFlows.Add(t_flow);
+        _data.NormalizeChapterKinds();
+        Set(typeof(OutgameTutorialRunner), "s_forcedCount", 1);
+        Set(typeof(OutgameTutorialRunner), "s_guidedChapter", -1);
+        var t_result = typeof(OutgameTutorialRunner).GetMethod("NotifyDefeatForEnhance", STATIC_FIELDS);
+        t_result.Invoke(null, new object[] { false });
+        Require(!t_slot.DefeatEnhancePending, "A win/draw scheduled defeat guidance.");
+        t_result.Invoke(null, new object[] { true });
+        Require(t_slot.DefeatEnhancePending && !OutgameTutorialRunner.TryBeginDefeatEnhance(),
+            "Defeat guidance must wait for card grants and deck preparation before the next battle entry.");
+        SetStep(t_beforeBattle, "action", EOutgameTutorialAction.BattleEntry);
+        t_slot.Execution = new OnboardingExecutionSaveData { BattleEntryStepId = t_beforeBattle.StepId };
+        Require(!OutgameTutorialRunner.TryBeginDefeatEnhance(), "An unfinished battle was interrupted by enhancement.");
+        t_slot.Execution.BattleEntryStepId = 0;
+        Require(OutgameTutorialRunner.TryBeginDefeatEnhance() && !OutgameTutorialRunner.IsRunning
+            && OutgameTutorialRunner.IsDefeatEnhanceInterlude && GuideMissionFlows.IsEligible(t_flow)
+            && OutgameTutorialRunner.HasPending(t_guided.Trigger, _includeDeferred: true)
+            && t_slot.StepId == t_beforeBattle.StepId && !t_slot.OutgameCompleted,
+            "The early enhancement did not pause the exact FTUE position without graduating.");
+        Require(!GuideMissionFlows.IsEligible(new GuideMissionFlow { missionId = "guide.03",
+                tutorial = EOutgameTutorialTrigger.AdventureUnlocked }), "Early enhancement unlocked another mission guide.");
+        string t_snapshot = DataSaveManager.CreateSnapshot();
+        Require(JObject.Parse(t_snapshot)["tutorial"]?["defeatEnhancePending"]?.Value<bool>() == true,
+            "The defeat request was not serialized with its Firestore key.");
+        DataSaveManager.Data.Tutorial = JsonConvert.DeserializeObject<UserSaveData>(t_snapshot).Tutorial;
+        Require(OutgameTutorialRunner.IsDefeatEnhanceInterlude, "Reload lost the early enhancement request.");
+        Set(typeof(OutgameTutorialRunner), "s_guidedChapter", 1);
+        Set(typeof(OutgameTutorialRunner), "s_guidedStep", 0);
+        OutgameTutorialRunner.FinishGuided();
+        Require(OutgameTutorialRunner.IsDefeatEnhanceInterlude && !OutgameTutorialRunner.IsRunning
+            && OutgameTutorialProgress.IsTriggerDone(t_guided.Trigger),
+            "Finishing the guide resumed FTUE before completion confirmation and surface restoration.");
+        // 앱 종료가 완료 저장과 로비 복귀 사이에 끼어도 같은 완료 복구 경로를 사용한다.
+        DataSaveManager.Data.Tutorial = JsonConvert.DeserializeObject<UserSaveData>(DataSaveManager.CreateSnapshot()).Tutorial;
+        Require(OutgameTutorialRunner.IsDefeatEnhanceInterlude, "Reload lost a completed guide's pending FTUE return.");
+        OutgameTutorialRunner.ResumeAfterDefeatEnhance();
+        Require(OutgameTutorialRunner.IsRunning && !OutgameTutorialRunner.IsDefeatEnhanceInterlude
+            && OutgameTutorialProgress.StepId == t_beforeBattle.StepId && GuideResume.Record == null
+            && !OutgameTutorialRunner.TryBeginDefeatEnhance(), "The guide failed to resume the saved FTUE battle once.");
+        t_result.Invoke(null, new object[] { true });
+        Require(!DataSaveManager.Data.Tutorial.DefeatEnhancePending, "A second defeat repeated completed enhancement guidance.");
+        DataSaveManager.Data.Tutorial = new TutorialSaveData { OutgameCompleted = true };
+        t_result.Invoke(null, new object[] { true });
+        Require(!DataSaveManager.Data.Tutorial.DefeatEnhancePending, "Graduated players received the early FTUE branch.");
+        Require(!JsonConvert.DeserializeObject<TutorialSaveData>("{}").DefeatEnhancePending,
+            "Legacy saves acquired a fabricated defeat request.");
+        Debug.Log("[DefeatEnhanceValidation] PASS: loss-only scheduling, grant/deck checkpoint, battle guard, FTUE suspension, isolated guide eligibility, pending/completed save roundtrips, exact resumption, no repeat and legacy defaults.");
     }
 
     static void ValidateContracts()

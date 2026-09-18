@@ -30,6 +30,7 @@ public sealed partial class GuidanceCoordinator
     CancellationTokenSource m_flowCancellation;
 
     public static bool IsInputLocked => GuideMissionTrackerView.IsShowingNextMission
+        || OutgameTutorialRunner.IsDefeatEnhanceInterlude
         || (OutgameTutorialRunner.IsRunning && !OutgameFeatureLock.IsFtueFreeNavigation
             && OutgameTutorialRunner.TryGetCurrentStep(out _))
         || (s_instance != null && s_instance.m_flowLocked);
@@ -149,6 +150,10 @@ public sealed partial class GuidanceCoordinator
 
     GuideMissionFlow FindMissionFlow()
     {
+        // FTUE 도중 예약한 강화는 미션 도달과 무관하다. 완료 저장 후 복귀 중 종료한 경우도 여기서 잇는다.
+        if (OutgameTutorialRunner.IsDefeatEnhanceInterlude
+            && GuideMissionFlows.TryGet(EOutgameTutorialTrigger.CollectionTabFirstEnter, out var t_defeatFlow))
+            return t_defeatFlow;
         // 안내 시작은 매치 탭에서만 허용하고, 시작 후 목적지 이동은 기존 흐름을 따른다.
         if (!IsCurrentTabAnchor(EOutgameTutorialAnchor.LobbyMatchTab) || AdventureMapOpen) return null;
         // 마지막 소개가 끝나 pending이 비어도, 실패한 완료 저장은 재시도할 수 있어야 한다.
@@ -266,7 +271,12 @@ public sealed partial class GuidanceCoordinator
             DataSaveManager.Save();
             EnsureFlow(_version, _ct);
             if (t_flow.tutorial == EOutgameTutorialTrigger.None
-                || OutgameTutorialProgress.IsTriggerDone(t_flow.tutorial)) { CancelMissionFlow(false); return; }
+                || OutgameTutorialProgress.IsTriggerDone(t_flow.tutorial))
+            {
+                if (OutgameTutorialRunner.IsDefeatEnhanceInterlude) await CompleteFlowAsync(_version);
+                else CancelMissionFlow(false);
+                return;
+            }
             if (!PrepareFlowTarget(t_flow))
                 throw new GuidePreparationException();
             if (t_flow.tutorial == EOutgameTutorialTrigger.CollectionTabFirstEnter
@@ -332,9 +342,30 @@ public sealed partial class GuidanceCoordinator
         ShowTransition();
         try
         {
+            // 마지막 안내의 완료 저장이 브리지 토큰을 쥐고 있다. 그 처리가 끝나야 취소·FTUE 재개가 유실되지 않는다.
+            await UniTask.WaitUntil(() => !OnboardingSession.IsBusy, cancellationToken: m_flowCancellation.Token);
+            EnsureFlow(_version, m_flowCancellation.Token);
             if (!await GuideResume.SaveConfirmedAsync(m_flowCancellation.Token))
                 throw new InvalidOperationException("안내 완료 기록을 저장하지 못했습니다.");
-            if (_version == m_flowVersion) CancelMissionFlow(false);
+            if (_version != m_flowVersion) return;
+            bool t_resumeFtue = OutgameTutorialRunner.IsDefeatEnhanceInterlude;
+            if (t_resumeFtue)
+            {
+                using (InternalNavigation())
+                {
+                    CardDetailOverlayView.Close();
+                    AlbumPageOverlayView.CloseOpen();
+                }
+                await SelectFlowTabAsync(EOutgameFeature.LobbyMatchTab, m_flowCancellation.Token);
+                EnsureFlow(_version, m_flowCancellation.Token);
+            }
+            else if (m_flow.tutorial == EOutgameTutorialTrigger.CollectionTabFirstEnter)
+            {
+                DataSaveManager.Data.Tutorial.DefeatEnhancePending = false;
+                OutgameTutorialProgress.Save();
+            }
+            CancelMissionFlow(false);
+            if (t_resumeFtue) OutgameTutorialRunner.ResumeAfterDefeatEnhance();
         }
         catch (OperationCanceledException) { }
         catch (Exception t_exception)
@@ -392,8 +423,8 @@ public sealed partial class GuidanceCoordinator
             titleText = _reason,
             yesText = "재시도",
             yesAction = RequestCurrentMission,
-            noText = "나중에",
-            noAction = ReturnToMatchAfterPreparationFailure,
+            noText = OutgameTutorialRunner.IsDefeatEnhanceInterlude ? "종료" : "나중에",
+            noAction = OutgameTutorialRunner.IsDefeatEnhanceInterlude ? QuitAfterFlowFailure : ReturnToMatchAfterPreparationFailure,
         });
     }
 
