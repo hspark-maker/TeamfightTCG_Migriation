@@ -131,7 +131,9 @@ public sealed partial class GuidanceCoordinator
                 t_chapter.TryGetStep(t_index, out t_step);
             }
             if (t_step == null) throw new InvalidOperationException("성장 안내의 설명 단계가 없습니다.");
-            bool t_detail = t_index >= t_enhance && t_enhance >= 0
+            bool t_detail = (t_index >= t_enhance && t_enhance >= 0
+                || t_step.Anchor == EOutgameTutorialAnchor.CardDetailShardIcon
+                || t_step.Anchor == EOutgameTutorialAnchor.CardDetailShardAmount)
                 && t_step.Action != EOutgameTutorialAction.CloseAlbumPage
                 && !(t_step.Completion == EOutgameTutorialCompletion.Confirm
                     && t_step.Anchor == EOutgameTutorialAnchor.None

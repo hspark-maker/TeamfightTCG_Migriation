@@ -149,6 +149,8 @@ public readonly struct TutorialAnchorMeta
         new(A.CardDetailCardView,         F.None,               "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/CardDetailOverlay.prefab"),
         new(A.DeckSynergyStrip,           F.None,               "덱 편집",               "UI/Deck/DeckEditController.cs"),
         new(A.CardDetailSynergyDescription, F.None,             "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/CardDetailOverlay.prefab"),
+        new(A.CardDetailShardIcon,        F.None,               "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/CardDetailOverlay.prefab"),
+        new(A.CardDetailShardAmount,      F.None,               "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/CardDetailOverlay.prefab"),
     };
 
     // 이 구조의 조용한 실패 두 가지를 이 창을 처음 열 때 소리내어 잡는다(에디터 어셈블리라 초기화가 아니다).

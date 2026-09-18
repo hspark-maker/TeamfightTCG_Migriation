@@ -41,6 +41,7 @@ internal static class ServerSaveCommands
         MissionCommands.ResetSession();
         AttendanceCommands.ResetSession();
         AccountRewardHandoff.ResetSession();
+        AccountLevelUpHandoff.ResetSession();
         RankLeaderboardCommands.ResetSession();
     }
 
@@ -117,6 +118,7 @@ internal static class ServerSaveCommands
                     TResponse t_replayed = OnboardingCommands.ReadResult<TResponse>(t_record);
                     if (t_replayed.AccountExperience != null)
                         t_replayed.AccountExperience.TotalExp = AccountLevelManager.Exp;
+                    AccountLevelUpHandoff.Enqueue(t_replayed.Revision, t_replayed.AccountExperience);
                     OnboardingCommands.Consume(t_record);
                     return t_replayed;
                 }
@@ -145,6 +147,7 @@ internal static class ServerSaveCommands
                 TResponse t_recovered = OnboardingCommands.ReadResult<TResponse>(t_record);
                 if (t_recovered.AccountExperience != null)
                     t_recovered.AccountExperience.TotalExp = AccountLevelManager.Exp;
+                AccountLevelUpHandoff.Enqueue(t_recovered.Revision, t_recovered.AccountExperience);
                 OnboardingCommands.Consume(t_record);
                 return t_recovered;
             }
@@ -177,6 +180,7 @@ internal static class ServerSaveCommands
 
             if (t_result.AccountExperience != null)
                 t_result.AccountExperience.TotalExp = AccountLevelManager.Exp;
+            AccountLevelUpHandoff.Enqueue(t_result.Revision, t_result.AccountExperience);
 
             OnboardingCommands.Complete(t_record, t_result);
             OnboardingCommands.Consume(t_record);
