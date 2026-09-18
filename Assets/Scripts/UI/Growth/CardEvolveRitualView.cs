@@ -23,6 +23,10 @@ public class CardEvolveRitualView : CardGrowthRitualView, IUIInitializable
     [Header("무대 (미배선이면 연출 없이 콜백만 즉시 흘린다)")]
     [Tooltip("⚠ LayoutGroup에 구동되지 않는 노드여야 한다 — 매 프레임 좌표가 되돌려지면 부양이 보이지 않는다.")]
     [SerializeField] RectTransform cardStage;                                   // 부양·진동·확대를 받는 노드(CardSlot)
+    [Tooltip("진화 동안 카드 전체를 줄여 내리는 부모. 미션 알림 아래에서 성장 숫자가 보일 공간을 확보한다.")]
+    [SerializeField] RectTransform presentationRoot;
+    [SerializeField, Range(0.5f, 1f)] float presentationScale = 0.8f;
+    [SerializeField] float presentationLowering = 200f;
     [Tooltip("cardStage 자신의 AspectRatioFitter(FitInParent). 연출 동안만 재운다 —\n" +
              "  이 모드는 레이아웃 리빌드마다 anchoredPosition을 0으로 못 박아 부양·진동을 지운다.\n" +
              "  미배선이면 그냥 그 위험을 안고 돈다(리빌드가 안 끼면 보이지 않는다).")]
@@ -214,6 +218,8 @@ public class CardEvolveRitualView : CardGrowthRitualView, IUIInitializable
     };
 
     Vector2 m_baseAnchored;   // cardStage의 authoring 자리. 중간값을 기준으로 잡으면 반복할수록 밀린다
+    Vector2 m_basePresentationPosition;
+    Vector3 m_basePresentationScale;
     bool    m_baseCaptured;
 
     // 무대의 자리는 부양과 진동이 함께 정한다. 둘이 각자 anchoredPosition을 밀면 나중 트윈이 앞 트윈을 지운다.
@@ -379,6 +385,11 @@ public class CardEvolveRitualView : CardGrowthRitualView, IUIInitializable
 
     protected override void BuildReturn(Sequence _seq, float _at, float _dur, float _end)
     {
+        if (this.presentationRoot != null)
+        {
+            _seq.Insert(_at, this.presentationRoot.DOAnchorPos(this.m_basePresentationPosition, _dur).SetEase(Ease.OutQuad));
+            _seq.Insert(_at, this.presentationRoot.DOScale(this.m_basePresentationScale, _dur).SetEase(Ease.OutQuad));
+        }
         _seq.Insert(_at, this.shading.TweenHeat(0f, _dur).SetEase(Ease.OutQuad));
         _seq.Insert(_at, this.shading.TweenBlind(0f, Mathf.Min(0.1f, _dur)));
         _seq.Insert(_at, this.shading.TweenCover(0f, Mathf.Min(0.1f, _dur)));
@@ -407,6 +418,11 @@ public class CardEvolveRitualView : CardGrowthRitualView, IUIInitializable
 
         this.m_baseCaptured = true;
         this.m_baseAnchored = this.cardStage.anchoredPosition;
+        if (this.presentationRoot != null)
+        {
+            this.m_basePresentationPosition = this.presentationRoot.anchoredPosition;
+            this.m_basePresentationScale = this.presentationRoot.localScale;
+        }
 
         this.dimTint.Capture();
         this.rays.CapturePoses();
@@ -417,6 +433,11 @@ public class CardEvolveRitualView : CardGrowthRitualView, IUIInitializable
         if (!this.m_baseCaptured) return;
 
         ClearStageAxes();   // 자세를 못 박기 전에 축부터 — 남은 높이·진폭이 다음 판의 출발점이 되면 안 된다
+        if (this.presentationRoot != null)
+        {
+            this.presentationRoot.anchoredPosition = this.m_basePresentationPosition;
+            this.presentationRoot.localScale = this.m_basePresentationScale;
+        }
 
         if (this.cardStage != null)
         {
@@ -450,6 +471,13 @@ public class CardEvolveRitualView : CardGrowthRitualView, IUIInitializable
     // 패널이 걷히고 카드가 한 번 들이쉰다. 담금질과 반대로 **커진다** — 첫 프레임부터 결이 다르다는 신호다.
     void BuildEnter(Sequence _seq, float _at, float _dur, bool _chained)
     {
+        if (this.presentationRoot != null)
+        {
+            _seq.Insert(_at, this.presentationRoot.DOAnchorPos(
+                this.m_basePresentationPosition + Vector2.down * this.presentationLowering, _dur).SetEase(Ease.OutCubic));
+            _seq.Insert(_at, this.presentationRoot.DOScale(
+                this.m_basePresentationScale * this.presentationScale, _dur).SetEase(Ease.OutCubic));
+        }
         _seq.InsertCallback(_at, () => this.retractPanels.SetBlocking(false));
 
         // 이어받는 길엔 RestoreVisual이 지나가지 않는다 — 앞 판이 남긴 높이에서 부양이 출발하면 카드가 내려간다.

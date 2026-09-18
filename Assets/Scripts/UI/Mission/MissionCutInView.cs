@@ -157,6 +157,8 @@ public sealed class MissionCutInView : ContentsPooledUI
 
     bool CanShow => GameInitialization.IsReady
         && !ContentUnlockPresentation.IsPlaying
+        // 강화·진화 중에는 현재 알림을 일시정지하고 새 알림도 소비하지 않는다.
+        && !CardDetailOverlayView.IsGrowthPresentationFocused
         && SceneManager.GetActiveScene().name == "LobbyScene"
         && !CurtainView.IsBusy
         // 튜토리얼 완료 여부나 풀 UI는 진행 알림을 막지 않는다. 현재 재생 중인 소개만 기다린다.

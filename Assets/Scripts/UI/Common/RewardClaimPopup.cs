@@ -18,6 +18,7 @@ public class RewardClaimPopup : PooledOverlay<RewardClaimPopup>
 
     [SerializeField] TMP_Text titleText;  // 티어 표시명(선택)
     [SerializeField] Button claimButton;  // [획득]
+    public Button ClaimButton => this.claimButton;
 
     [Tooltip("보상 칸(아이콘 + 수량). 저작한 보상이 칸 수보다 적으면 남는 칸은 꺼진다.")]
     [SerializeField] CurrencyRewardSlotView[] rewardSlots;

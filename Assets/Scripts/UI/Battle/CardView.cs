@@ -1035,8 +1035,8 @@ public class CardView : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
         => BattleVfx.PlayAttached(BattleVfxId.Heal, transform, IsEnemySide, VfxSortingLayerId);
 
     /// <summary>회복 파티클 + HP 표기 갱신. CardInstance.Heal/ReviveAtHalf가 실제 회복량으로 호출.
-    /// 회복이면 경로(힐러/돌보미/포식자/유산/부활) 불문 여기 하나로 수렴한다.</summary>
-    public void PlayHealEffect(int _amount, bool _consumeDeferred = false)
+    /// 부활은 HP 표기만 갱신하고 전용 부활 연출을 사용한다.</summary>
+    public void PlayHealEffect(int _amount, bool _consumeDeferred = false, bool _playParticles = true)
     {
         // 힐러 경로는 여기가 **표기의 발화점**이다 — 수치는 턴 시작에 이미 들어갔고(결정론),
         // 숫자는 투사체가 닿는 지금부터 굴러 오른다(그때까지는 DeferHpDisplay가 붙잡고 있었다).
@@ -1054,6 +1054,7 @@ public class CardView : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
             int t_target    = Mathf.Min(this.hpDisplayTarget + t_step, t_revealed);
             AnimateHpDisplay(t_target, this.boundCard.bonusHp, _clearPending: false);
         }
+        if (!_playParticles) return;
         if (this.deferHealEffect)
         {
             if (this.boundCard == this.deferredHealEffectCard) this.deferredHealEffectCount++;

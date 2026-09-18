@@ -383,10 +383,7 @@ public class CardVisualView : MonoBehaviour
     {
         int t_level = DeckPower.LevelOf(_card, _mine);
         if (this.levelText != null)
-        {
-            this.levelText.gameObject.SetActive(_show);
-            if (_show) this.levelText.text = GrowthStar.Label(t_level);
-        }
+            this.levelText.gameObject.SetActive(false);
 
         if (this.growthStars == null) return;
 
@@ -397,9 +394,7 @@ public class CardVisualView : MonoBehaviour
             if (t_icon == null) continue;
 
             t_icon.gameObject.SetActive(_show);
-            Color t_color = t_icon.color;
-            t_color.a = t_i < t_star ? 1f : 0.22f;
-            t_icon.color = t_color;
+            t_icon.color = t_i < t_star ? GrowthStarStrip.FilledColor : GrowthStarStrip.EmptyColor;
         }
     }
 

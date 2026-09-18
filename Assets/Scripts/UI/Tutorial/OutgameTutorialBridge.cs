@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 아웃게임 튜토리얼의 씬 수명 브리지(씬당 1개). 강제 시퀀스(세이브 커서)와 자율 안내(메모리 커서)를 같은 코드로 그린다 —
-// 둘은 시간상 겹치지 않으므로(자율은 졸업 뒤에만 열린다) "지금 어느 커서인가"는 러너에게 매번 묻는다.
+// 첫 패배 강화 중에는 강제 커서가 멈춘다. "지금 어느 커서인가"는 러너에게 매번 묻는다.
 // 개봉은 씬이 아니라 로비 오버레이라 재개해 줄 다른 브리지가 없다 — 오버레이 열림/닫힘도 이 브리지가 직접 이어받는다.
 // 씬 이름을 보지 않는다 — 현재 스텝의 앵커가 이 씬에 등록되는 순간에만 게이트가 켜지고, 없으면 조용히 대기한다.
 // 스텝 타입도 보지 않는다 — 어떤 신호를 기다릴지는 스텝의 Completion 하나로 갈린다.
@@ -86,7 +86,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     bool SuppressGuideUI => suppressGuideUI || PackOpenOverlay.IsOpen;
 
     // ── 커서 창구 4개. 이 넷 밖에서는 강제/자율을 구분하지 않는다 — 나머지 코드는 스텝의 Completion만 본다.
-    // 자율 세션이 도는 동안은 강제 시퀀스가 끝난 뒤라(졸업이 문이다) 두 커서가 동시에 서지 않는다.
+    // 자율 세션 동안 강제 시퀀스는 완료되었거나 첫 패배 강화로 멈춰 있다.
     static bool GuidedCursor => OutgameTutorialRunner.IsGuidedRunning;
 
     static bool CursorRunning => OutgameTutorialRunner.IsGuidedRunning || OutgameTutorialRunner.IsRunning;
@@ -196,6 +196,7 @@ public class OutgameTutorialBridge : MonoBehaviour
             {
                 m_pendingApply = false;
                 CloseGate();
+                if (OutgameTutorialRunner.TryBeginDefeatEnhance()) return;
                 OutgameFeatureLock.Refresh();
                 TryGetCursorStep(out var t_entering);
                 m_stepToken = OnboardingSession.Begin(t_entering, this.GetCancellationTokenOnDestroy());

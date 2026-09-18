@@ -47,6 +47,7 @@ public class RankRewardRowView : MonoBehaviour, IUIInitializable
 
     /// <summary>이 행의 보상 칸(보상 목록과 같은 순서). 수령 팝업이 닫힌 뒤 획득 빛이 피어날 자리로 쓴다.</summary>
     public IReadOnlyList<CurrencyRewardSlotView> RewardSlots => this.rewardSlots;
+    public Button RewardButton => this.rewardBox;
 
     public void InitializeUI()
     {

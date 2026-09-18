@@ -475,6 +475,71 @@ public static class ContentUnlockIntroValidation
         }
     }
 
+    [MenuItem("Tools/Tutorial/Validate Pending Unlock Appearance")]
+    public static void RunPendingUnlockAppearance()
+    {
+        const System.Reflection.BindingFlags fields = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var initialized = typeof(ContentUnlockManager).GetField("s_initialized",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Require(!EditorApplication.isPlaying && !(bool)initialized.GetValue(null)
+            && string.IsNullOrEmpty(FirebaseAuthService.Instance.UserId)
+            && !OutgameFeatureLock.ForceUnlockAllForDebug, "Requires an uninitialized edit-mode session.");
+        var previousProfile = DataSaveManager.Data.Profile;
+        var scene = EditorSceneManager.NewPreviewScene();
+        GameObject host = null;
+        FeatureLockView view = null;
+        try
+        {
+            var slot = new ContentUnlockSaveData { Version = 1 };
+            DataSaveManager.Data.Profile = new ProfileSaveData { ContentUnlocks = slot };
+            ContentUnlockManager.Initialize(() => false); // 검증 중 저장·규칙 평가를 하지 않는다.
+            host = new GameObject("PendingUnlockValidation", typeof(RectTransform), typeof(Image));
+            host.SetActive(false);
+            UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(host, scene);
+            view = host.AddComponent<FeatureLockView>();
+            var badge = new GameObject("LockBadge", typeof(RectTransform));
+            badge.transform.SetParent(host.transform, false);
+            typeof(FeatureLockView).GetField("m_badge", fields).SetValue(view, badge);
+            typeof(FeatureLockView).GetField("m_badgeScale0", fields).SetValue(view, Vector3.one);
+            view.Bind(EOutgameFeature.Adventure);
+            host.SetActive(true);
+            typeof(FeatureLockView).GetMethod("OnDisable", fields).Invoke(view, null);
+            typeof(FeatureLockView).GetMethod("OnEnable", fields).Invoke(view, null);
+            Require(badge.activeSelf && view.IsLocked, "Adventure starts locked.");
+
+            slot.Unlocked.Add(ContentUnlockManager.ADVENTURE);
+            slot.Pending.Add(ContentUnlockManager.ADVENTURE);
+            OutgameFeatureLock.NotifyContentChanged();
+            Require(!view.IsLocked && badge.activeSelf,
+                "Pending adventure intro must keep its lock visible immediately when eligibility changes.");
+            view.HoldUnlockPresentation();
+            int completed = 0;
+            Require(view.PresentUnlock(() => completed++), "Eligible adventure must accept its explicit arrival.");
+            OutgameFeatureLock.NotifyContentChanged();
+            Require(view.IsPresenting, "A pending refresh must not interrupt the explicit arrival.");
+            ((Sequence)typeof(FeatureLockView).GetField("m_unlockFx", fields).GetValue(view)).Complete(true);
+            OutgameFeatureLock.NotifyContentChanged();
+            Require(completed == 1 && !badge.activeSelf, "Arrival must remain unlocked across refreshes.");
+            view.CancelPresentation();
+            Require(badge.activeSelf, "Cancelled unconfirmed intro must restore the pending lock.");
+            typeof(FeatureLockView).GetMethod("OnDisable", fields).Invoke(view, null);
+            typeof(FeatureLockView).GetMethod("OnEnable", fields).Invoke(view, null);
+            Require(badge.activeSelf, "Returning to a tab must retain its pending lock.");
+            slot.Pending.Clear();
+            OutgameFeatureLock.NotifyContentChanged();
+            Require(!badge.activeSelf, "Already presented content must stay unlocked.");
+            Debug.Log("[ContentUnlockIntroValidation] PENDING PASS: eligibility / intro wait / arrival / refresh / cancel / re-enable / confirmed.");
+        }
+        finally
+        {
+            if (view != null) typeof(FeatureLockView).GetMethod("OnDisable", fields).Invoke(view, null);
+            if (host != null) UnityEngine.Object.DestroyImmediate(host);
+            ContentUnlockManager.ResetSession();
+            DataSaveManager.Data.Profile = previousProfile;
+            EditorSceneManager.ClosePreviewScene(scene);
+        }
+    }
+
     static bool HasIntroError(OutgameTutorialData data, ContentUnlockData unlocks)
     {
         foreach (var issue in TutorialValidator.Validate(data, unlocks))
