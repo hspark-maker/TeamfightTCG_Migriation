@@ -15,8 +15,32 @@ MonoBehaviour:
   m_GroupName: RemoteAudio
   m_GUID: 5450641dd1f94523bad9b5c563d8b3b8
   m_SerializeEntries:
-  - m_GUID: 71d3c5a08e6b492fa04c7b18d2e6539f
-    m_Address: Audio/OutgameSoundBank.asset
+  - m_GUID: 05be5e7bcbf21394c83f2c4b1d5df3b7
+    m_Address: Audio/10_deck_box_open_002.wav
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteAudio
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 19d866d3f6c29664797c6105e3200086
+    m_Address: Audio/ALT10_Item5B.wav
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteAudio
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 19f89c6e740e7447f9e12a8310d3e973
+    m_Address: Audio/ALT01_DM-CGS-03.wav
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteAudio
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2388c8cbeae623d4bacd723e2b0d2e17
+    m_Address: Audio/06_pulling_card_from_top_of_deck_fast_001.wav
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteAudio
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2ca3e7ab0f586cc4698cc8d67b0d1acc
+    m_Address: Audio/37_Whoosh 3.wav
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteAudio
@@ -27,14 +51,98 @@ MonoBehaviour:
     m_SerializedLabels:
     - RemoteAudio
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3c2ddd6280704c0dad648bda03df6972
+    m_Address: Audio/CardImpact_PopPunch.wav
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteAudio
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4941cc7cf4669fc45bf85bccb37734cc
+    m_Address: Audio/11_PAPER_Tear_Fast_mono.wav
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteAudio
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 54a171aaf3d4b99428b1fe9209fc4ec8
+    m_Address: Audio/ALT13_DropGems06_-_Mono.wav
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteAudio
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 66104518864c5184d928fca8f73e06de
+    m_Address: Audio/13_BOOK_Turn_Page_02_mono.wav
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteAudio
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6e8772b49f34d402a90016ed445d8a2f
+    m_Address: Audio/ALT03_DM-CGS-20.wav
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteAudio
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 71d3c5a08e6b492fa04c7b18d2e6539f
+    m_Address: Audio/OutgameSoundBank.asset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteAudio
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 724131bc8a7f34041bb9f1701f0cb58d
+    m_Address: Audio/ALT02_DM-CGS-16.wav
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteAudio
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 95a3d120974634d12a5df368d1864f23
+    m_Address: Audio/33_BRPG_Take_Courage_Lite_Loop.wav
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteAudio
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b4ed406e6e315450f85fa2c0f65bce01
+    m_Address: Audio/SE11_DistClickBlocked1.wav
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteAudio
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c15bf3e4bf463bd4e971457b7c7d5ee1
+    m_Address: Audio/ALT15_Bravery_1.mp3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteAudio
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c454f0066ef17b94daa5753983170042
+    m_Address: Audio/ALT12_Menu3B.wav
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteAudio
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c4894baa3bd2fd34dbbbf69a91eef832
+    m_Address: Audio/29_casting_charge_whoosh_buildup4.wav
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteAudio
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ccb817da7165f554dac2a7f7395431e7
+    m_Address: Audio/ALT09_BrokenShield.wav
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteAudio
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: dbcce29b33e028546959403d711b4021
     m_Address: Audio/LobbyBGM.mp3
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteAudio
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 2388c8cbeae623d4bacd723e2b0d2e17
-    m_Address: Audio/06_pulling_card_from_top_of_deck_fast_001.wav
+  - m_GUID: dda7aafb2d8030547aa1fef2bd554ed9
+    m_Address: Audio/ALT11_Item5D.wav
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteAudio
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e74246c0fa1bfa24c84db0f5589eb8f1
+    m_Address: Audio/ALT16_Shield_1.mp3
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteAudio
@@ -53,156 +161,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ff2444774e7035542862735ea0e24dab
     m_Address: Audio/09_card_throw_normal_002.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 05be5e7bcbf21394c83f2c4b1d5df3b7
-    m_Address: Audio/10_deck_box_open_002.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4941cc7cf4669fc45bf85bccb37734cc
-    m_Address: Audio/11_PAPER_Tear_Fast_mono.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 66104518864c5184d928fca8f73e06de
-    m_Address: Audio/13_BOOK_Turn_Page_02_mono.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: c4894baa3bd2fd34dbbbf69a91eef832
-    m_Address: Audio/29_casting_charge_whoosh_buildup4.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 95a3d120974634d12a5df368d1864f23
-    m_Address: Audio/33_BRPG_Take_Courage_Lite_Loop.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 2ca3e7ab0f586cc4698cc8d67b0d1acc
-    m_Address: Audio/37_Whoosh 3.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: a549c84e3eee2b743ac03ef26ab4e5f8
-    m_Address: Audio/SE01_punch_heavy_huge_distorted_01.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 1939c027bda6826418c1578c4c43746b
-    m_Address: Audio/SE02_punch_heavy_huge_distorted_02.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 522695d86095b6b489ff1545dff74d9c
-    m_Address: Audio/SE06_rock_impact_heavy_slam_04.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 7764c23c700d49b498f0466cac823963
-    m_Address: Audio/SE07_stone_hit_crash_164.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 8904096a3646d43fd88ea2a4d254fa10
-    m_Address: Audio/SE09_GlassHitScroll6.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: bc3f79aa976ad4b4db5b175e859e4592
-    m_Address: Audio/SE10_HitsAccept2.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: b4ed406e6e315450f85fa2c0f65bce01
-    m_Address: Audio/SE11_DistClickBlocked1.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 1b47404b1d27b3540bfb0b43d486d7e9
-    m_Address: Audio/SE12_UI_Animate_Bright_Whistle_Appear_stereo.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: a1cb145c82435764984d4c7e37dd159b
-    m_Address: Audio/SE13_UI_Animate_Bright_Whistle_Disappear_stereo.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: eb8fae547eebd5b4099bed1184025d14
-    m_Address: Audio/SE14_UI_Notification_Bright_Keys_01_stereo.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: a17c77289a0ad9244b0c57a8d0f156cc
-    m_Address: Audio/SE15_coin_bag_ring_gemstone_item_01.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: a311af8d30e8248039087421007391e9
-    m_Address: Audio/SE16_BellishAccept6.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 88eb2fe763a8cdc45b1f0a941b1a2352
-    m_Address: Audio/SE17_chime_bell_positive_ring_01.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 08aec233fac232445b4196babb78e0b2
-    m_Address: Audio/SE18_jingle_chime_11_positive.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: ba3b015ea97c74091835aafc5c1c213b
-    m_Address: Audio/SE19_Arcane_Spell_Conjure_Mana_01_16_441.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 2a1ac1ad8e8474d1882b8e6dfae0b9b9
-    m_Address: Audio/SE20_Arcane_Spell_Mana_Burst_01_16_441.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 3b7a828a646174088aa48ee1db9c439c
-    m_Address: Audio/SE22_Clicks_13.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 0a13e5041130c4346aaf801a7c369eda
-    m_Address: Audio/SE23_ui_button_socket_movement_02.wav
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteAudio
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 0055582bcea4a5e46a7edbfb29993193
-    m_Address: Audio/SE24_UI_Notification_Taps_01_x3_mono.wav
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteAudio
