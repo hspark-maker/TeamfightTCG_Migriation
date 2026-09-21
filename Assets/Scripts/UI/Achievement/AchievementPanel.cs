@@ -13,11 +13,17 @@ public sealed class AchievementPanel : ContentsPooledUI
     [SerializeField] TMP_Text statusText;
     [SerializeField] Button closeButton;
     [SerializeField] Button dimButton;
+    [SerializeField] TMP_Text summaryText;
+    [SerializeField] TMP_Text availableText;
+    [SerializeField] Button[] categoryButtons;
+    [SerializeField] Sprite selectedTabSprite;
+    [SerializeField] Sprite unselectedTabSprite;
 
     readonly List<AchievementRowView> m_rows = new();
     readonly List<AchievementDefinition> m_visible = new();
     readonly Dictionary<string, AchievementDefinition> m_groups = new();
     bool m_refreshing;
+    int m_category;
 
     public override void Initialization(UIData _data) { InitializeUI(); data = _data; }
     public override void Show()
@@ -33,6 +39,11 @@ public sealed class AchievementPanel : ContentsPooledUI
     {
         closeButton?.onClick.AddListener(Hide);
         dimButton?.onClick.AddListener(Hide);
+        for (int i = 0; i < (categoryButtons?.Length ?? 0); i++)
+        {
+            int t_category = i;
+            categoryButtons[i].onClick.AddListener(() => SelectCategory(t_category));
+        }
     }
     protected override void OnViewShown() => AchievementManager.OnChanged += Rebuild;
     protected override void OnViewHidden() => AchievementManager.OnChanged -= Rebuild;
@@ -75,8 +86,22 @@ public sealed class AchievementPanel : ContentsPooledUI
                 m_groups[t_definition.GroupId] = t_definition;
         }
         m_visible.Clear();
-        m_visible.AddRange(m_groups.Values);
+        foreach (var t_definition in m_groups.Values)
+        {
+            bool t_collection = t_definition.Event == "OpenPack" || t_definition.Event == "CompleteAlbum";
+            if (m_category == 0 || (m_category == 2) == t_collection) m_visible.Add(t_definition);
+        }
         m_visible.Sort(CompareDisplayOrder);
+        int t_claimed = 0;
+        int t_available = 0;
+        foreach (var t_definition in AchievementManager.Definitions)
+        {
+            if (AchievementManager.IsClaimed(t_definition.Id)) t_claimed++;
+            else if (AchievementManager.CanClaim(t_definition)) t_available++;
+        }
+        if (summaryText != null) summaryText.text = $"{t_claimed:N0} <size=65%>/ {AchievementManager.Definitions.Count:N0}</size>";
+        if (availableText != null) availableText.text = t_available > 0 ? $"받을 보상 {t_available:N0}개" : "도전은 계속됩니다!";
+        UpdateTabs();
         for (int i = 0; i < m_visible.Count; i++)
         {
             if (i == m_rows.Count) m_rows.Add(Instantiate(rowPrefab, listContent));
@@ -85,6 +110,21 @@ public sealed class AchievementPanel : ContentsPooledUI
         }
         for (int i = m_visible.Count; i < m_rows.Count; i++) m_rows[i].gameObject.SetActive(false);
         SetStatus(m_visible.Count == 0 ? "표시할 업적이 없습니다." : null);
+    }
+
+    void SelectCategory(int _category)
+    {
+        if (m_category == _category) return;
+        m_category = _category;
+        Rebuild();
+        if (listContent != null && listContent.GetComponentInParent<ScrollRect>() is { } t_scroll)
+            t_scroll.verticalNormalizedPosition = 1f;
+    }
+
+    void UpdateTabs()
+    {
+        for (int i = 0; i < (categoryButtons?.Length ?? 0); i++)
+            categoryButtons[i].image.sprite = i == m_category ? selectedTabSprite : unselectedTabSprite;
     }
 
     // 미수령 중 가장 낮은 단계, 모두 수령했다면 가장 높은 단계.

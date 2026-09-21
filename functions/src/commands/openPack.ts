@@ -131,7 +131,7 @@ export const openPack = onCall(measuredCallable("openPack", async (request) => {
   const period = missionPeriod(Date.now());
 
   const result = await mutateSave(env, uid, "openPack", {kind: "client", txId, ...onboardingReceipt(request.data, "openPack")},
-    async (current, transaction, wallet): Promise<SaveMutation> => {
+    async (current, transaction, wallet, preparePackStatistics): Promise<SaveMutation> => {
       // 독립 문서는 함께 읽고, 미션·지갑 쓰기 전에 모두 확보한다.
       const missionReference = missionsRef(db, env, uid);
       const [missionSnapshot, rankSnapshot] = await transaction.getAll(
@@ -177,6 +177,7 @@ export const openPack = onCall(measuredCallable("openPack", async (request) => {
 
       // 진행도는 콜백 **안**에서 올린다 — mutateSave 는 영수증이 히트하면 이 콜백을 통째로 건너뛰므로,
       // 그 덕에 재시도가 진행도를 두 번 올리지 않는다. 콜백 밖으로 옮기면 그 보장이 사라진다.
+      await preparePackStatistics(1);
       commitMissionBump(transaction, missions, EVENTS.packOpened.missionKey, 1, FieldValue.serverTimestamp());
       missionState = missionResponse(missions.state, period, catalog);
 

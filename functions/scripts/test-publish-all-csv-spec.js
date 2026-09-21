@@ -12,12 +12,13 @@ const dataOf = (doc) => Object.fromEntries(Object.entries(doc.fields).map(([key,
 let assertions = 0;
 function check(value, message) { assert(value, message); assertions++; }
 
-function fixture(local, {change = true, missingAchievement = true, orphan = false} = {}) {
+function fixture(local, {change = true, missingAchievement = true, missingCardCraft = false, orphan = false} = {}) {
   const docs = new Map(); let clock = 0; let commits = 0;
   const put = (name, value) => docs.set(name, {name, fields: fieldsOf(value), updateTime: `2026-09-21T00:00:${String(++clock).padStart(6, "0")}.000000Z`});
   const tables = {};
   for (const name of local.names) {
     if (name === "Achievement" && missingAchievement) continue;
+    if (name === "CardCraft" && missingCardCraft) continue;
     const source = local.tables[name];
     const rows = clone(source.rows);
     if (name === "LoadingTip" && change) {
@@ -81,7 +82,8 @@ async function main() {
   };
   try {
     const local = publisher.localSnapshot();
-    check(local.names.length === 25 && local.names.includes("LoadingTip") && local.names.includes("Achievement"), "25 published CSVs required");
+    check(local.names.length === 26 && local.names.includes("LoadingTip") && local.names.includes("Achievement") &&
+      local.names.includes("CardCraft"), "26 published CSVs required");
     check(local.tables.Mission.columns.includes("accountExp") && local.tables.Achievement.rows.length === 61,
       "CSV-only DTO schema mismatch");
     const schema = [["int", "id"], ["string", "text"], ["long", "amount"]];
@@ -107,9 +109,9 @@ async function main() {
       .every((write) => write.currentDocument.exists === false), "New table CAS must require absence");
     check(plan.backups.some((doc) => doc.name.endsWith("/LoadingTip/rows/999999")) &&
       plan.backups.some((doc) => doc.name.endsWith("_release_index_6_58")), "Previous rows/release backups missing");
-    check(plan.writes.length <= 500 && Object.keys(plan.expectedTables).length === 25, "One complete atomic release");
+    check(plan.writes.length <= 500 && Object.keys(plan.expectedTables).length === local.names.length, "One complete atomic release");
     const result = await publisher.applyPlan(plan, fake.request);
-    check(fake.commits === 1 && result.verifiedTables === 25, "Apply must issue one commit and verify every release blob");
+    check(fake.commits === 1 && result.verifiedTables === local.names.length, "Apply must issue one commit and verify every release blob");
     check(!fake.docs.has(`${BASE}/LoadingTip/rows/999999`), "Removed row survived");
     for (const name of local.names) for (const row of local.tables[name].rows)
       assert.deepEqual(dataOf(fake.docs.get(`${BASE}/${name}/rows/${row.id}`)), row);
@@ -125,7 +127,19 @@ async function main() {
     check(stagedPlan.writes.every((write) => !(write.update?.name || write.delete).includes("/rows/")),
       "Identical staged rows must not be rewritten");
     const stagedResult = await publisher.applyPlan(stagedPlan, staged.request);
-    check(stagedResult.verifiedTables === 25 && staged.commits === 1, "Staged publish must remain one atomic commit");
+    check(stagedResult.verifiedTables === local.names.length && staged.commits === 1, "Staged publish must remain one atomic commit");
+    const crafting = fixture(local, {change: false, missingAchievement: false, missingCardCraft: true});
+    const craftingPlan = await publisher.makePlan("test", crafting.request);
+    check(craftingPlan.changes.length === 1 && craftingPlan.changes[0].table === "CardCraft",
+      "Existing release must allow adding the server-only crafting table");
+    check(craftingPlan.writes.filter((write) => write.update?.name.startsWith(`${BASE}/CardCraft`))
+      .every((write) => write.currentDocument.exists === false), "Crafting table creation must require absence");
+    await publisher.applyPlan(craftingPlan, crafting.request);
+    check(isDeepStrictEqual(dataOf(crafting.docs.get(`${BASE}/CardCraft`)).columns, ["id", "grade", "cost", "enabled"]),
+      "Crafting CSV comment column must not enter the published schema");
+    for (const row of local.tables.CardCraft.rows)
+      assert.deepEqual(dataOf(crafting.docs.get(`${BASE}/CardCraft/rows/${row.id}`)), row);
+    assertions++;
     await assert.rejects(publisher.makePlan("live", fake.request), /only supports test/); assertions++;
     await assert.rejects(publisher.makePlan("test", fixture(local, {orphan: true}).request), /orphan rows/); assertions++;
 
@@ -151,7 +165,7 @@ async function main() {
     const escaped = clone(stalePlan); escaped.writes[0].update.name = `${DB}/envs/live/specs/Card`;
     await assert.rejects(publisher.applyPlan(escaped, stale.request), /escaped test/); assertions++;
     assert.throws(() => checkCommit(Array.from({length: 501}, (_, i) => ({delete: `${BASE}/${i}`}))), /500 writes/); assertions++;
-    console.log(`PASS: ${assertions} offline assertions; 25 CSVs; ${plan.writes.length} atomic fake writes; no binary or remote access.`);
+    console.log(`PASS: ${assertions} offline assertions; ${local.names.length} CSVs; ${plan.writes.length} atomic fake writes; no binary or remote access.`);
   } finally { fs.readFileSync = originalRead; }
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -162,7 +162,7 @@ export const claimMission = onCall(async (request) => {
   let passProgress: PassProgressResponse | undefined;
 
   const result = await mutateSave(env, uid, "claimMission", {kind: "client", txId},
-    async (current, transaction, wallet): Promise<SaveMutation> => {
+    async (current, transaction, wallet, preparePackStatistics): Promise<SaveMutation> => {
       // 읽기가 콜백의 첫 줄이고, 아래 쓰기보다 앞이다(Firestore 트랜잭션 규칙).
       // beginMissionBump 이 기간 리셋까지 반영하므로, 어제 진행도로 오늘 보상을 타는 경로가 없다.
       const missions = await beginMissionBump(transaction, db, env, uid, period, current);
@@ -229,6 +229,7 @@ export const claimMission = onCall(async (request) => {
           packs: [...(itemGrant.packs ?? []), ...(experienceGrant.packs ?? [])],
         };
       }
+      await preparePackStatistics(itemGrant.packs?.length ?? 0);
       grantedCurrencies = [...rewardJudgement.gains, ...itemGrant.currencies];
       grantedPassExp = mission.passExp;
       const grantCards = itemContext?.cards ?? accountContext?.itemContext?.cards;

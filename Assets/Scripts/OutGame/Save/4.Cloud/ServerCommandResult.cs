@@ -20,6 +20,8 @@ internal class ServerCommandResult
 
     [JsonProperty("achievements")] public AchievementSnapshot Achievements { get; set; }
 
+    [JsonProperty("statistics")] public PlayerStatisticsSnapshot Statistics { get; set; }
+
     [JsonProperty("accountExperience")] public AccountExperienceResult AccountExperience { get; set; }
 }
 

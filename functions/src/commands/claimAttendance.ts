@@ -41,7 +41,7 @@ export const claimAttendance = onCall(async (request) => {
   let attendance: AttendanceResponse | undefined;
   let missions: MissionResponse | undefined;
   return mutateSave(env, uid, "claimAttendance", {kind: "client", txId},
-    async (current, transaction, wallet): Promise<SaveMutation> => {
+    async (current, transaction, wallet, preparePackStatistics): Promise<SaveMutation> => {
       const reference = attendanceRef(db, env, uid);
       const snapshot = await transaction.get(reference);
       const verdict = judgeAttendanceClaim(readAttendance(snapshot.data()), {dailyKey, cycle, day}, nowMs);
@@ -52,6 +52,7 @@ export const claimAttendance = onCall(async (request) => {
         Number(rank?.data()?.points ?? (current.rank as {points?: number})?.points ?? 0)) :
         {slots: {}, cards: [], currencies: []};
       granted = [...reward.currencies, ...items.currencies];
+      await preparePackStatistics(items.packs?.length ?? 0);
       if (missionBump && itemContext) {
         applyGuideProgress(missionBump, current, items.slots, itemContext.cards, catalog);
         commitMissionProgress(transaction, missionBump, FieldValue.serverTimestamp());

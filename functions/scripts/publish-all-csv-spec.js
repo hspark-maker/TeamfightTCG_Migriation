@@ -89,7 +89,7 @@ function localSnapshot() {
   const classes = new Map([...read(GENERATED).matchAll(/public partial class (\w+)\s*\{([\s\S]*?)^\}/gm)]
     .map((m) => [m[1], m[2]]));
   const account = read(ACCOUNT);
-  for (const name of ["Mission", "Achievement"])
+  for (const name of ["Mission", "Achievement", "CardCraft"])
     classes.set(name, account.match(new RegExp(`sealed class ${name}UploadRow\\s*\\{([\\s\\S]*?)\\n    \\}`))?.[1]);
   classes.set("RankAiEncounter", read(RANK));
   const version = read(VERSION);

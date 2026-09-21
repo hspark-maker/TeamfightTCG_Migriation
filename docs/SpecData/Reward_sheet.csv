@@ -127,10 +127,10 @@ int,string,string,int,string,string,long,string
 178,Guide,guide.14,1,Pack,NormalPack_TEST,1,계정당 1회 가이드 지급 구현 대기
 179,Guide,guide.15,1,Currency,Diamond,10,계정당 1회 가이드 지급 구현 대기
 180,Guide,guide.15,2,Currency,RouletteTicket,1,계정당 1회 가이드 지급 구현 대기
-181,CardDuplicate,Common,1,Currency,Shard,1,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
-182,CardDuplicate,Rare,1,Currency,Shard,2,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
-183,CardDuplicate,Arcane,1,Currency,Shard,5,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
-184,CardDuplicate,Mythic,1,Currency,Shard,10,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
+181,CardDuplicate,Common,1,Currency,CardDust,1,중복 카드 제작 재화; 0원 튜토리얼팩 제외
+182,CardDuplicate,Rare,1,Currency,CardDust,2,중복 카드 제작 재화; 0원 튜토리얼팩 제외
+183,CardDuplicate,Arcane,1,Currency,CardDust,5,중복 카드 제작 재화; 0원 튜토리얼팩 제외
+184,CardDuplicate,Mythic,1,Currency,CardDust,10,중복 카드 제작 재화; 0원 튜토리얼팩 제외
 185,Mission,daily.completeMissions5,1,Currency,RouletteTicket,1,일일 미션 5개 완료 추가 보상
 186,Mission,daily.completeMissions5,2,Currency,Diamond,10,일일 미션 5개 완료 추가 보상
 187,Mission,weekly.completeMissions5,1,Currency,RouletteTicket,3,주간 미션 5개 완료 추가 보상

@@ -40,11 +40,12 @@ public static class SpecPayloadCodec
     /// 정의를 받는다. 클라이언트 동기화 제외가 서버 발행 제외를 뜻하지는 않는다.</para>
     /// <para><c>RankAiEncounter</c> — 에디터가 CSV에서 직접 발행한다. 클라는 매치 응답의 성장 스냅샷만 받는다.</para>
     /// <para><c>Achievement</c> — CSV에서 발행하며 클라는 <c>getAchievements</c> 응답으로만 정의를 받는다.</para>
+    /// <para><c>CardCraft</c> — CSV에서 발행하는 서버 전용 등급별 제작 가격이다.</para>
     ///
     /// <para>목록으로 거르는 이유는 <see cref="ServerOwnedRewardOwners"/> 와 같다 — 통째로 조용히
     /// 만들면 진짜로 빠뜨린 표까지 묻힌다. 제외는 이름을 적는 의도적 행위여야 한다.</para>
     /// </summary>
-    public static readonly string[] ServerOnlyTableNames = { "Mission", "RankAiEncounter", "Achievement" };
+    public static readonly string[] ServerOnlyTableNames = { "Mission", "RankAiEncounter", "Achievement", "CardCraft" };
 
     // AIDeckCard는 AIDeck.card1~card6, AdventureReward는 Reward(ownerType=Adventure)로 대체됐다.
     // 생성 타입은 남아 있지만 소비자가 없으므로

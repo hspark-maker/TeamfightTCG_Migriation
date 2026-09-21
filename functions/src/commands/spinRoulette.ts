@@ -102,10 +102,9 @@ export const spinRoulette = onCall(async (request) => {
   const cycleRef = db.doc(`envs/${env}/users/${uid}/rouletteCycles/${rouletteCycleKey(rouletteId)}`);
 
   const result = await mutateSave(env, uid, "spinRoulette", {kind: "client", txId},
-    async (current, transaction, wallet) => {
+    async (current, transaction, wallet, preparePackStatistics) => {
       missionState = undefined;
       const cycleSnapshot = await transaction.get(cycleRef);
-      const rank = itemContext ? await transaction.get(rankRef(db, env, uid)) : null;
       const balances = wallet.balances;
       if (!canAfford(balances, board.priceType, board.price)) {
         reject("InsufficientTicket", `Not enough ${board.priceType} to spin '${rouletteId}'.`,
@@ -116,12 +115,14 @@ export const spinRoulette = onCall(async (request) => {
       // 옛 잔액 기준으로 정한 상품을 새 잔액에 얹는다.
       const {slot, cycle} = drawRouletteCycle(board.slots, cycleSnapshot.data(), randomInt);
       drawn = slot;
+      const rank = slot.rewardType === "Pack" ? await transaction.get(rankRef(db, env, uid)) : null;
       itemGrant = slot.rewardType === "Pack" ? grantRewardItems(current,
         [{rewardType: "Pack", rewardId: slot.rewardId, amount: slot.amount}], itemContext!, rewardRows, "",
         Number(rank?.data()?.points ?? (current.rank as {points?: number})?.points ?? 0)) :
         {slots: {}, cards: [], currencies: []};
       granted = slot.currency === null ? itemGrant.currencies :
         [{currency: slot.currency, amount: slot.amount}];
+      await preparePackStatistics(itemGrant.packs?.length ?? 0);
       if (itemContext && itemGrant.cards.length > 0) {
         const missions = await beginMissionBump(transaction, db, env, uid, period, current);
         applyGuideProgress(missions, current, itemGrant.slots, itemContext.cards, catalog);

@@ -6,7 +6,7 @@ const lib = process.env.FUNCTIONS_TEST_LIB || path.resolve(__dirname, "../lib");
 const moduleAt = (name) => path.join(lib, name);
 const clone = (value) => value === undefined ? undefined : structuredClone(value);
 const documents = new Map(), versions = new Map();
-let commits = 0, retries = 0, beforeCommit = null, packMode = false, failGrant = false;
+let commits = 0, retries = 0, beforeCommit = null, packMode = false, mixedMode = false, failGrant = false;
 let reads = [];
 function reference(key) {
   return {
@@ -24,7 +24,7 @@ function collection(key) {
 }
 function snapshot(key) {
   const value = clone(documents.get(key));
-  return {exists: value !== undefined, data: () => clone(value)};
+  return {ref: reference(key), exists: value !== undefined, data: () => clone(value)};
 }
 const db = {
   doc: reference, collection,
@@ -72,8 +72,9 @@ const header = (rouletteId) => ({id: 1, rouletteId, displayName: rouletteId,
   priceType: "RouletteTicket", price: 1, sortOrder: 0});
 const slots = (rouletteId) => quotas.map((weight, slotIndex) => ({
   id: slotIndex + 1, rouletteId, slotIndex, weight,
-  rewardType: packMode ? "Pack" : "Currency", rewardId: packMode ? "TestPack" : "Gold",
-  amount: packMode ? 1 : slotIndex + 1,
+  rewardType: packMode || (mixedMode && slotIndex >= 6) ? "Pack" : "Currency",
+  rewardId: packMode || (mixedMode && slotIndex >= 6) ? "TestPack" : "Gold",
+  amount: packMode || (mixedMode && slotIndex >= 6) ? 1 : slotIndex + 1,
 }));
 stub(moduleAt("firebaseApp"), {db});
 stub(moduleAt("roulette/rouletteSpecReader"), {
@@ -111,7 +112,7 @@ const state = () => clone([...documents]);
 let passed = 0;
 async function test(name, run) {
   documents.clear(); versions.clear(); reads = [];
-  commits = 0; retries = 0; beforeCommit = null; packMode = false; failGrant = false;
+  commits = 0; retries = 0; beforeCommit = null; packMode = false; mixedMode = false; failGrant = false;
   seed();
   await run();
   passed++;
@@ -128,6 +129,20 @@ async function test(name, run) {
     await spin("next-cycle");
     assert.equal(remaining(), 99);
     assert.equal(commits, 101);
+  });
+  await test("mixed board reads rank only for its three pack awards per cycle", async () => {
+    mixedMode = true;
+    let packs = 0;
+    for (let i = 0; i < 100; i++) {
+      reads = [];
+      const result = await spin(`mixed-${i}`);
+      const rankReads = reads.filter((key) => key === `${root()}/rank/current`).length;
+      assert.equal(rankReads, result.rewardType === "Pack" ? 1 : 0);
+      if (result.rewardType === "Pack") packs++;
+    }
+    assert.equal(packs, 3);
+    assert.equal(remaining(), 0);
+    assert.equal(documents.get(walletPath()).balances.RouletteTicket, 100);
   });
   await test("receipt replay preserves response, cycle, wallet and save", async () => {
     const first = await spin("replay-one"), before = state();

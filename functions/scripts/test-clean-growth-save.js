@@ -10,7 +10,7 @@ test("new accounts contain no retired growth data and retain starters and wallet
   assert.deepEqual(slots.cardGrowth, {entries: {1: {level: 2}}});
   assert.deepEqual(slots.ownership.cardIds, [1, 2, 3, 4, 5, 6]);
   assert.deepEqual(slots.deck.slots[0].cardIds, [1, 2, 3, 4, 5, 6]);
-  assert.deepEqual(buildFreshAccountBalances(), {Gold: 100, Diamond: 0, Energy: 0, Shard: 0, RouletteTicket: 0});
+  assert.deepEqual(buildFreshAccountBalances(), {Gold: 100, Diamond: 0, Energy: 0, Shard: 0, RouletteTicket: 0, CardDust: 0});
 });
 
 test("card serialization strips retired fields from legacy and direct input without changing active growth", () => {

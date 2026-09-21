@@ -11,7 +11,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CURRENCY_MAX = exports.CURRENCY_KEYS = void 0;
 exports.parseCurrency = parseCurrency;
 /** 클라 ECurrencyType 의 이름. 지갑 잔액에 실리는 키는 이 목록이 전부다. */
-exports.CURRENCY_KEYS = ["Gold", "Diamond", "Energy", "Shard", "RouletteTicket"];
+exports.CURRENCY_KEYS = ["Gold", "Diamond", "Energy", "Shard", "RouletteTicket", "CardDust"];
 /** 재화 하나에 두는 상한. */
 exports.CURRENCY_MAX = 1000000000000;
 /**

@@ -2,8 +2,9 @@
 const assert = require("node:assert/strict");
 const {test} = require("node:test");
 const {parseAchievementCatalog, achievementProgressKey} = require("../lib/achievements/achievementCatalog");
-const {activeAchievementSynergies, applyAchievementAlbums, applyAchievementBattle,
-  incrementAchievement, judgeAchievementClaim} = require("../lib/achievements/achievementProgress");
+const {activeAchievementSynergies, judgeAchievementClaim} = require("../lib/achievements/achievementProgress");
+const {readStatistics, projectAchievements, applyStatisticsBattle, applyStatisticsAlbums, applyStatisticsPacks} =
+  require("../lib/statistics/playerStatistics");
 const {achievementsRef, readAchievements, writeAchievements, achievementResponse} = require("../lib/achievements/achievementStore");
 const {parseAlbumEntryRows, parseAlbumThemeRows} = require("../lib/completionTable");
 
@@ -11,8 +12,16 @@ const row = (stage = 1, extra = {}) => ({id: stage, achievementId: `wins.${stage
   eventKey: "WinBattle", synergyId: "", targetCount: stage * 10, title: "Wins", description: "Total wins",
   rewardCurrency: "Gold", rewardAmount: 10, sortOrder: 1, enabled: 1, ...extra});
 const fresh = () => readAchievements({data: () => undefined});
-const battle = (state, extra = {}) => applyAchievementBattle(state,
-  {verified: true, tutorial: false, won: true, draw: false, destroyed: 3, synergies: ["Bulk"], ...extra});
+const mutateStatistics = (state, mutate) => {
+  const statistics = readStatistics(undefined, state, 1);
+  mutate(statistics);
+  Object.assign(state, projectAchievements(statistics, state));
+};
+const battle = (state, extra = {}) => mutateStatistics(state, (statistics) => applyStatisticsBattle(statistics,
+  {verified: true, tutorial: false, mode: "ranked", won: true, draw: false, destroyed: 3,
+    attacks: 0, damageDealt: 0, healed: 0, synergyTriggers: 0, synergies: ["Bulk"], ...extra}));
+const applyAchievementAlbums = (state, save, entries, themes) =>
+  mutateStatistics(state, (statistics) => applyStatisticsAlbums(statistics, save, entries, themes));
 
 test("catalog exposes strict existing currency rewards, stages and parameterized keys", () => {
   const catalog = parseAchievementCatalog([row(2), row(1)]);
@@ -40,7 +49,7 @@ test("wins, destroys and synergy plays accrue across claims and dates without re
   battle(state);
   state.claimed["wins.1"] = true;
   battle(state, {won: false, destroyed: 2, synergies: ["Bulk", "Bulk", "Trace"]});
-  incrementAchievement(state, "OpenPack", 2);
+  mutateStatistics(state, (statistics) => applyStatisticsPacks(statistics, 2));
   assert.deepEqual(state.progress, {WinBattle: 1, DestroyCards: 5, WinStreak: 1,
     "PlaySynergy:Bulk": 2, "PlaySynergy:Trace": 1, OpenPack: 2});
   assert.equal(state.claimed["wins.1"], true);
@@ -117,4 +126,3 @@ test("stored state normalizes malformed counters and response revision increases
   assert.equal(response.progress.WinBattle, 0);
   assert.equal(achievementsRef({doc: (path) => path}, "test", "user"), "envs/test/users/user/achievements/current");
 });
-

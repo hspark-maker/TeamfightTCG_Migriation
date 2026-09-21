@@ -15,6 +15,13 @@ MonoBehaviour:
   m_GroupName: RemoteUI
   m_GUID: c993a00f3241b5846818633e56411b36
   m_SerializeEntries:
+  - m_GUID: a9dc1c04d3b64deea0ef2dc9957eb126
+    m_Address: PlayerStatisticsPanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2d190845db3641e28ab71bf380f4d0de
     m_Address: AchievementPanel
     m_ReadOnly: 0

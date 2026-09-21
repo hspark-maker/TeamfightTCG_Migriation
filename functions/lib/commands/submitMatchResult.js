@@ -48,6 +48,8 @@ const guideProgress_1 = require("../missions/guideProgress");
 const guideSynergyBattle_1 = require("../missions/guideSynergyBattle");
 const achievementProgress_1 = require("../achievements/achievementProgress");
 const achievementStore_1 = require("../achievements/achievementStore");
+const playerStatistics_1 = require("../statistics/playerStatistics");
+const playerStatisticsStore_1 = require("../statistics/playerStatisticsStore");
 const period_1 = require("../missions/period");
 const matchResult_1 = require("../matchResult");
 const payout_1 = require("../payout");
@@ -118,6 +120,27 @@ function authoritativeInputsAgree(a, b) {
 function sameNumbers(left, right) {
     return Array.isArray(left) && left.length === right.length &&
         left.every((value, index) => value === right[index]);
+}
+/** 완료 재조회도 최초 정산과 같은 참가자 검증을 거친다. */
+function requireMatchParticipant(match, uid) {
+    if (match?.seedSource !== "server" ||
+        !Array.isArray(match.participantUids) || !match.participantUids.includes(uid)) {
+        throw new https_1.HttpsError("permission-denied", "server match identity is not registered");
+    }
+}
+/** 현재 Card 표는 스냅샷을 봉인하지 않던 구 solo 계약에서만 필요하다. */
+function needsLegacyAiCardSpecs(match) {
+    return match?.mode === "solo" && match.resultProtocol === 1 &&
+        ((0, payloadGuards_1.safeInteger)(match.expectedParticipants) ?? 2) === 1 && match.aiGrowthVersion == null &&
+        typeof match.adventureNodeId !== "string";
+}
+/** 저장된 완료 결과의 응답은 신규 정산의 부수 효과를 재실행하지 않는다. */
+function storedMatchResult(match, status) {
+    const simulation = (0, payloadGuards_1.objectRecord)(match.serverSimulation);
+    return { status, reason: match.reason ?? null,
+        ...(typeof match.adventureNodeId !== "string" ? {} : { adventureNodeId: match.adventureNodeId,
+            won: simulation?.ok === true && simulation.draw !== true && simulation.winnerOwner === 0,
+            draw: simulation?.draw === true }) };
 }
 function parseSubmitData(raw) {
     if (raw == null || typeof raw !== "object")
@@ -252,12 +275,19 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
     if (data.seedSource !== "server") {
         throw new https_1.HttpsError("failed-precondition", "legacy match results are not authoritative");
     }
+    const matchRef = firebaseApp_1.db.doc(`envs/${data.env}/matches/${data.matchId}`);
+    const initialMatch = (await matchRef.get()).data();
+    requireMatchParticipant(initialMatch, uid);
+    // confirmed/flagged는 종료 상태다. createMatch도 이 문서를 pairing으로 되돌리지 않으며,
+    // findAiMatch는 기존 문서를 재사용한다. 최신 표 장애가 완료 응답 재조회까지 막지 않게 한다.
+    if (initialMatch?.status === "confirmed" || initialMatch?.status === "flagged") {
+        return storedMatchResult(initialMatch, initialMatch.status);
+    }
     // 랭크 재생 토글은 트랜잭션 밖에서 제출당 한 번만 읽는다.
     // 모험 매치는 승리 낙인과 미션이 검증 결과를 요구하므로 토글과 무관하게 재생한다.
     const replayEnabled = await (0, battleReplayConfig_1.isBattleReplayEnabled)(data.env);
-    const matchRef = firebaseApp_1.db.doc(`envs/${data.env}/matches/${data.matchId}`);
-    const initialMatch = (await matchRef.get()).data();
     const adventureMatch = typeof initialMatch?.adventureNodeId === "string";
+    const legacyAiCardSpecs = needsLegacyAiCardSpecs(initialMatch);
     const achievementPins = (0, battleReplayService_1.parseSpecPins)(data.env, initialMatch?.specPins);
     const [achievementCards, achievementTiers] = achievementPins === null ? [[], []] : await Promise.all([
         (0, specBlobReader_1.readPinnedSpecRows)(data.env, "Card", achievementPins.Card),
@@ -275,7 +305,7 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
         const [rewardSpecRows, rankSpecRows, cardSpecRows, seasonSpecRows] = await Promise.all([
             adventureMatch ? Promise.resolve([]) : (0, specBlobReader_1.readSpecRows)(data.env, "Reward"),
             adventureMatch ? Promise.resolve([]) : (0, specBlobReader_1.readSpecRows)(data.env, "RankGrade"),
-            (0, specBlobReader_1.readSpecRows)(data.env, cardTable),
+            legacyAiCardSpecs ? (0, specBlobReader_1.readSpecRows)(data.env, cardTable) : Promise.resolve([]),
             adventureMatch ? Promise.resolve([]) : (0, specBlobReader_1.readSpecRows)(data.env, "PassSeason"),
         ]);
         rewardRows = (0, rewardTable_1.parseRewardRows)(rewardSpecRows);
@@ -307,20 +337,13 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
         if ((adventureNodeId != null) !== adventureMatch) {
             throw new https_1.HttpsError("unavailable", "match type changed");
         }
-        if (data.seedSource === "server") {
-            const participantUids = match?.participantUids;
-            if (match?.seedSource !== "server" ||
-                !Array.isArray(participantUids) || !participantUids.includes(uid)) {
-                throw new https_1.HttpsError("permission-denied", "server match identity is not registered");
-            }
-        }
+        requireMatchParticipant(match, uid);
         const status = typeof match?.status === "string" ? match.status : "pending";
         if (status !== "pending") {
-            const simulation = (0, payloadGuards_1.objectRecord)(match?.serverSimulation);
-            return { kind: "done", value: { status, reason: match?.reason ?? null,
-                    ...(adventureNodeId == null ? {} : { adventureNodeId,
-                        won: simulation?.ok === true && simulation.draw !== true && simulation.winnerOwner === 0,
-                        draw: simulation?.draw === true }) } };
+            return { kind: "done", value: storedMatchResult(match, status) };
+        }
+        if (needsLegacyAiCardSpecs(match) !== legacyAiCardSpecs) {
+            throw new https_1.HttpsError("unavailable", "match AI contract changed");
         }
         const submissions = { ...match?.submissions };
         const incoming = { ...data, uid, submittedAt: firestore_1.Timestamp.now() };
@@ -571,7 +594,8 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
         const saveRefs = entries.map((entry) => firebaseApp_1.db.doc(`envs/${data.env}/users/${entry.uid}/save/current`));
         const missionRefs = entries.map((entry) => (0, missionStore_1.missionsRef)(firebaseApp_1.db, data.env, entry.uid));
         const achievementRefs = entries.map((entry) => (0, achievementStore_1.achievementsRef)(firebaseApp_1.db, data.env, entry.uid));
-        const snapshots = await tx.getAll(...rankRefs, ...rankStateRefs, ...saveRefs, ...missionRefs, ...achievementRefs);
+        const statisticsRefs = entries.map((entry) => (0, playerStatisticsStore_1.playerStatisticsRef)(firebaseApp_1.db, data.env, entry.uid));
+        const snapshots = await tx.getAll(...rankRefs, ...rankStateRefs, ...saveRefs, ...missionRefs, ...achievementRefs, ...statisticsRefs);
         const count = entries.length;
         const rankSnapshots = snapshots.slice(0, rankRefs.length);
         const rankStateSnapshots = snapshots.slice(rankRefs.length, rankRefs.length + rankStateRefs.length);
@@ -704,19 +728,25 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
                 if (JSON.stringify(achievementPins) !== JSON.stringify((0, battleReplayService_1.parseSpecPins)(data.env, match?.specPins))) {
                     throw new https_1.HttpsError("unavailable", "Match achievement specs changed; retry settlement.");
                 }
-                const state = (0, achievementStore_1.readAchievements)(snapshots[saveOffset + count * 2 + i]);
+                const context = (0, playerStatisticsStore_1.statisticsFromSnapshots)(snapshots[saveOffset + count * 3 + i], snapshots[saveOffset + count * 2 + i], settledAt.toMillis());
                 const approval = (0, payloadGuards_1.objectRecord)(approvals?.[entries[i].uid]);
                 const approvedCards = Array.isArray(approval?.cardSnapshots) ? approval.cardSnapshots : [];
                 const simulation = serverReplay.outcome;
-                (0, achievementProgress_1.applyAchievementBattle)(state, {
+                (0, playerStatistics_1.applyStatisticsBattle)(context.state, {
                     verified: true,
                     tutorial: match?.tutorial === true || match?.mode === "tutorial",
+                    mode: adventureNodeId == null ? "ranked" : "adventure",
                     won: simulation.winnerOwner === owner,
                     draw: simulation.draw,
                     destroyed: destroyedByOwner?.[owner] ?? 0,
+                    attacks: replayStats?.attacksByOwner[owner] ?? 0,
+                    damageDealt: replayStats?.damageDealtByOwner[owner] ?? 0,
+                    healed: replayStats?.healedByOwner[owner] ?? 0,
+                    synergyTriggers: replayStats?.synergyFiredByOwner[owner] ?? 0,
                     synergies: (0, achievementProgress_1.activeAchievementSynergies)(approvedCards, achievementCards, achievementTiers),
                 });
-                (0, achievementStore_1.writeAchievements)(tx, achievementRefs[i], state, missionNow);
+                if (match?.tutorial !== true && match?.mode !== "tutorial")
+                    (0, playerStatisticsStore_1.commitStatistics)(tx, context, missionNow);
             }
         }
         // 클라 발산율의 유일한 조회 수단이다. 문서에만 쌓으면 집계할 방법이 없다.
