@@ -530,7 +530,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     /// <summary>지금 도는 연출을 한 박 당긴다. 당길 것이 있었으면 true — 부른 쪽은 자기 일(닫기)을 하지 않는다.</summary>
     bool SkipPlayingFx()
     {
-        // 당길 무대가 없으면(한계돌파처럼 유예만 선 왕복) 탭을 삼키지 않는다 — 나가는 문이 왕복 내내 막힌다.
+        // 당길 무대가 없으면 탭을 삼키지 않는다 — 나가는 문이 왕복 내내 막힌다.
         if (this.m_ritualPlaying && this.m_activeRitual != null) { SkipRitual(); return true; }
         if (this.m_unlockFxPlaying) { SkipUnlockFx(); return true; }
 
@@ -1932,7 +1932,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         return true;
     }
 
-    // 칩은 런타임에 만들지 않는다 — 깔아 두는 쪽은 Tools/UI/도감 상세창 칩 박기다.
+    // 칩은 런타임에 만들지 않는다 — 깔아 두는 쪽은 Tools/Card Battle/UI/도감 상세창 칩 박기다.
     /// <summary>줄에 미리 깔아 둔 _index번째 칩을 채워 켠다. 칩이 모자라면 false — 호출부는 거기서 멈춘다.</summary>
     static bool TryShowChip(Transform _root, int _index, string _what,
                             Sprite _icon, string _name, float _iconScale, bool _open)
@@ -1941,7 +1941,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         if (_index >= _root.childCount)
         {
             Debug.LogWarning($"[CardDetailOverlay] Not enough {_what} chips — only the {_root.childCount} laid out in the prefab are visible. " +
-                             "Increase the count with Tools/UI/Bake album detail chips");
+                             "Increase the count with Tools/Card Battle/UI/Bake album detail chips");
             return false;
         }
 

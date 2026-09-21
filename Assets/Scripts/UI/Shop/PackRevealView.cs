@@ -749,7 +749,7 @@ public class PackRevealView : MonoBehaviour, IUIInitializable
     void SkipToSummary()
     {
         m_skipSummaryInstant = true;
-        // 성장 중 연타는 위치·배율·연출을 다시 건드리지 않고 남은 카드 스킵 요청만 유지한다.
+        // 이미 낱장 확인 단계면 남은 카드만 즉시 걷는다.
         if (m_stage == EStage.Flicking)
         {
             if (cardStack != null) cardStack.FlickAllImmediate();
@@ -782,7 +782,7 @@ public class PackRevealView : MonoBehaviour, IUIInitializable
         m_stage = EStage.Flicking;
         GateInput(true);
         if (skipButton != null) skipButton.gameObject.SetActive(true);
-        // 일반 카드는 즉시 제거하고 성장 카드만 전부 완주한 뒤 HandleStackEmptied로 요약에 도달한다.
+        // 남은 카드를 즉시 제거하고 HandleStackEmptied로 요약에 도달한다.
         cardStack.FlickAllImmediate();
     }
 

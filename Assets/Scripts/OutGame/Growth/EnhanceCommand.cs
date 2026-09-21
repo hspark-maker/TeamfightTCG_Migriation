@@ -3,14 +3,13 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 강화 판정을 서버에 묻는 단일 창구.
-// 성공률·비용·차감·레벨의 진실원은 서버 enhanceCard / enhanceKeyword 다 — 매니저에 남은 만렙·미초기화 검사는
+// 비용·차감·레벨의 진실원은 서버 enhanceCard / enhanceSynergyIntroduction 이다 — 매니저에 남은 만렙·미초기화 검사는
 // 왕복을 아끼는 낙관 검사일 뿐이고, 둘이 엇갈렸을 때 이기는 쪽은 언제나 서버다.
-// 카드와 키워드가 같은 계약(요청 freeShot · 응답 outcome/level/cost)을 쓰므로 여기 하나로 모은다.
+// 카드 강화와 시너지 소개 강화의 응답을 같은 계약으로 채택한다.
 internal static class EnhanceCommand
 {
     const string CARD_COMMAND    = "enhanceCard";
     const string SYNERGY_COMMAND = "enhanceSynergyIntroduction";
-    const string KEYWORD_COMMAND = "enhanceKeyword";
 
     // 거절 사유의 계약 코드. 서버 rejectDomain 이 message 앞머리에 실어 보내고
     // ServerCommandRejectedException.Reason 이 그것을 떼어 준다.
@@ -55,41 +54,7 @@ internal static class EnhanceCommand
         }
     }
 
-    /// <summary>키워드 강화 1회를 서버에 요청한다. 확률 실패가 없어 성립하면 반드시 오른다.</summary>
-    internal static async UniTask<EnhanceCommandResult> EnhanceKeywordAsync(
-        CardKeyword _keyword, bool _freeShot, CurrencyPendingTicket _pending = null)
-    {
-        try
-        {
-            var t_result = await ServerSaveCommands.InvokeAsync<EnhanceKeywordResult>(
-                KEYWORD_COMMAND,
-                new { env = ContentProfileConfig.Active.CloudEnvId, keyword = (int)_keyword, freeShot = _freeShot },
-                _pending);
-
-            return new EnhanceCommandResult(t_result.ResolveOutcome(), t_result.Level, t_result.FreeShotUsed);
-        }
-        catch (ServerCommandRejectedException t_rejected)
-        {
-            return Blocked(KEYWORD_COMMAND, t_rejected);
-        }
-        catch (ServerAdoptionException t_adoption)
-        {
-            Debug.LogWarning($"[EnhanceCommand] Adopting the response closed the session — {t_adoption.Message}");
-            return EnhanceCommandResult.Blocked(EEnhanceOutcome.NotReady);
-        }
-        catch (Exception t_exception)
-        {
-            Debug.LogError($"[EnhanceCommand] {KEYWORD_COMMAND} failed — {t_exception.GetBaseException().Message}");
-            return EnhanceCommandResult.Blocked(EEnhanceOutcome.NotReady);
-        }
-        finally
-        {
-            // 요청 인자를 짓다 던지면 InvokeAsync 에 닿지 못해 그쪽 회수가 돌지 않는다. 멱등이라 정상 갈래와 겹쳐도 안전하다.
-            _pending?.Settle();
-        }
-    }
-
-    // 거절을 화면이 읽을 결말로 접는다. 못 가리는 사유(RuleUnavailable · KeywordNotSupported · 미지)는 NotReady 다 —
+    // 거절을 화면이 읽을 결말로 접는다. 못 가리는 사유(RuleUnavailable · 미지)는 NotReady 다 —
     // "지금은 못 한다"가 곧 재화 소모 없음이라, 잘못 짚어 잔액 부족을 알리는 것보다 안전한 폴백이다.
     static EnhanceCommandResult Blocked(string _commandName, ServerCommandRejectedException _rejected)
     {

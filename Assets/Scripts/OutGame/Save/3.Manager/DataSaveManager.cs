@@ -12,14 +12,13 @@ public enum ESaveUploadTiming
 
 public static class DataSaveManager
 {
-    internal const int SaveSlotCount = 9;
+    internal const int SaveSlotCount = 8;
 
     static readonly ESaveSlot[] s_saveSlots =
     {
         ESaveSlot.Ownership,
         ESaveSlot.Deck,
         ESaveSlot.CardGrowth,
-        ESaveSlot.KeywordGrowth,
         ESaveSlot.Rank,
         ESaveSlot.AlbumReward,
         ESaveSlot.Adventure,
@@ -137,7 +136,6 @@ public static class DataSaveManager
             case ESaveSlot.Ownership: return _data.Ownership;
             case ESaveSlot.Deck: return _data.Deck;
             case ESaveSlot.CardGrowth: return _data.CardGrowth;
-            case ESaveSlot.KeywordGrowth: return _data.KeywordGrowth;
             case ESaveSlot.Rank: return _data.Rank;
             case ESaveSlot.AlbumReward: return _data.AlbumReward;
             case ESaveSlot.Adventure: return _data.Adventure;
@@ -163,7 +161,6 @@ public static class DataSaveManager
         if (_slots.Ownership != null) { Data.Ownership = _slots.Ownership; t_touched |= ESaveSlot.Ownership; }
         if (_slots.Deck != null) { Data.Deck = _slots.Deck; t_touched |= ESaveSlot.Deck; }
         if (_slots.CardGrowth != null) { Data.CardGrowth = _slots.CardGrowth; t_touched |= ESaveSlot.CardGrowth; }
-        if (_slots.KeywordGrowth != null) { Data.KeywordGrowth = _slots.KeywordGrowth; t_touched |= ESaveSlot.KeywordGrowth; }
         if (_slots.Rank != null) { Data.Rank = _slots.Rank; t_touched |= ESaveSlot.Rank; }
         if (_slots.AlbumReward != null) { Data.AlbumReward = _slots.AlbumReward; t_touched |= ESaveSlot.AlbumReward; }
         if (_slots.Adventure != null) { Data.Adventure = _slots.Adventure; t_touched |= ESaveSlot.Adventure; }
@@ -204,7 +201,6 @@ public static class DataSaveManager
         if (t_data.Ownership == null) t_data.Ownership = new OwnershipSaveData();
         if (t_data.Deck == null) t_data.Deck = new DeckSaveData();
         if (t_data.CardGrowth == null) t_data.CardGrowth = new CardGrowthSaveData();
-        if (t_data.KeywordGrowth == null) t_data.KeywordGrowth = new KeywordGrowthSaveData();
         if (t_data.Rank == null) t_data.Rank = new RankSaveData();
         if (t_data.AlbumReward == null) t_data.AlbumReward = new AlbumRewardSaveData();
         if (t_data.Adventure == null) t_data.Adventure = new AdventureSaveData();

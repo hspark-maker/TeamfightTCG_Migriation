@@ -145,6 +145,7 @@ public static partial class SpecFirestoreUploader
 
         if (!t_names.Contains(SpecLocalTables.CsvOnlyTableName)) t_names.Add(SpecLocalTables.CsvOnlyTableName);
         if (!t_names.Contains(LoadingTipAuthoring.TABLE_NAME)) t_names.Add(LoadingTipAuthoring.TABLE_NAME);
+        if (!t_names.Contains("Achievement")) t_names.Add("Achievement");
 
         t_names.Sort(StringComparer.Ordinal);
         return t_names;
@@ -551,7 +552,7 @@ public static partial class SpecFirestoreUploader
         _snapshot = null;
         _error = null;
         // 계정 성장 표는 CSV가 발행 원본이다. 새 경험치 열을 bytes 생성 없이 반영한다.
-        if (_table == "Mission" || _table == "AccountLevel" || _table == "Reward")
+        if (_table == "Mission" || _table == "AccountLevel" || _table == "Reward" || _table == "Achievement")
             return TryBuildAccountCsvSnapshot(_table, out _snapshot, out _error);
         if (_table == LoadingTipAuthoring.TABLE_NAME)
         {
@@ -918,7 +919,8 @@ public static partial class SpecFirestoreUploader
             return false;
         }
         foreach (string t_table in SpecPayloadCodec.PublishedTableNames)
-            if (_tablesJson.IndexOf("\"" + t_table + "\":", StringComparison.Ordinal) < 0)
+            // 업적 도입 전 릴리스도 되돌릴 수 있다. 새 릴리스 발행 시에는 이 표를 필수로 검증한다.
+            if (t_table != "Achievement" && _tablesJson.IndexOf("\"" + t_table + "\":", StringComparison.Ordinal) < 0)
             {
                 _error = $"릴리스 스냅샷 tablesJson에 '{t_table}' 표가 없다.";
                 return false;

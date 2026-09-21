@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -15,7 +16,6 @@ public static class OnboardingPlayTestValidation
     const BindingFlags STATIC_FIELDS = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
 
     /// <summary>에셋이나 서버를 변경하지 않고 격리 회귀를 실행한다.</summary>
-    [MenuItem("Tools/Tutorial/Validate Onboarding Play Test")]
     public static void Run()
     {
         Require(!EditorApplication.isPlayingOrWillChangePlaymode && !OnboardingPlayTest.IsActive,
@@ -47,13 +47,13 @@ public static class OnboardingPlayTestValidation
             Replace(t_restore, typeof(GrowthSpec), "s_baseEnhanceCost", 10L);
             Replace(t_restore, typeof(GrowthSpec), "s_costGrowthPerLevel", 0L);
             ClearDictionary(t_restore, typeof(GrowthSpec), "s_cardCosts");
-            ClearDictionary(t_restore, typeof(GrowthSpec), "s_limitBreakSteps");
-            Replace(t_restore, typeof(GrowthSpec), "s_maxLimitBreak", 0);
             Replace(t_restore, typeof(CardCatalog), "<IsReady>k__BackingField", true);
             ClearDictionary(t_restore, typeof(CardCatalog), "s_specById");
             var t_specs = (Dictionary<int, CardSpec>)Get(typeof(CardCatalog), "s_specById");
             t_specs[CARD_ID] = new CardSpec(CARD_ID, "PlayTestValidation", "PlayTestValidation", default,
                 10, CardKeyword.Ranged, 3, 0, 10, 10, 10, "", default, Array.Empty<string>());
+            var t_included = (HashSet<int>)Get(typeof(CardCatalog), "s_includedIds");
+            if (t_included.Add(CARD_ID)) t_restore.Add(() => t_included.Remove(CARD_ID));
             Replace(t_restore, typeof(CardGrowthManager), "s_initialized", true);
             Replace(t_restore, typeof(CardGrowthManager), "OnGrowthChanged", null);
             ClearDictionary(t_restore, typeof(CardGrowthManager), "s_growth");
@@ -127,18 +127,76 @@ public static class OnboardingPlayTestValidation
                 && t_freeFirst.AppliedShards == 20 && CardGrowthManager.ShardProgressOf(CARD_ID) == 0
                 && CurrencyManager.Shard == 0 && !OutgameTutorialGuide.HasFreeCardEnhance(CARD_ID),
                 "Earlier tutorial grant consumption or zero balance blocked free synergy growth.");
-            t_growth[CARD_ID] = new CardGrowthEntry { Level = 2, ShardProgress = 4, Snack = 7, LimitBreak = 1 };
+            t_growth[CARD_ID] = new CardGrowthEntry { Level = 2, ShardProgress = 4 };
             var t_freeSecond = CardGrowthManager.TryEnhanceAsync(CARD_ID).GetAwaiter().GetResult();
             Require(t_freeSecond.Outcome == EEnhanceOutcome.Success && t_freeSecond.Level == 3
-                && t_freeSecond.AppliedShards == 6 && t_growth[CARD_ID].Snack == 7 && t_growth[CARD_ID].LimitBreak == 1
+                && t_freeSecond.AppliedShards == 6
                 && CurrencyManager.Shard == 0 && !OutgameTutorialGuide.HasFreeCardEnhance(CARD_ID),
                 "Synergy support must stop at two stars without charging the wallet.");
-            Debug.Log("[OnboardingPlayTestValidation] PASS: entry rejection, zero-network command guard, late response guard, partial shards, star boundaries, costs, keyword unlock, original save isolation. UI play is not covered.");
+            ValidateSaveSchema(t_clone, t_growth);
+            Debug.Log("[OnboardingPlayTestValidation] PASS: entry rejection, zero-network command guard, late response guard, partial shards, star boundaries, costs, keyword unlock, original save isolation, card-only growth and save schema; unknown legacy fields ignored without regeneration. UI play is not covered.");
         }
         finally
         {
             for (int t_i = t_restore.Count - 1; t_i >= 0; t_i--) t_restore[t_i]();
         }
+    }
+
+    static void ValidateSaveSchema(UserSaveData _save, Dictionary<int, CardGrowthEntry> _growth)
+    {
+        // 위 fixture가 원래 static 값을 finally에서 복원한다. 서버나 스펙 산출물은 건드리지 않는다.
+        Require(GrowthSpec.TryValidateRequired(out _), "Retired limit-break rules still block initialization.");
+        _growth[CARD_ID] = new CardGrowthEntry { Level = 3, ShardProgress = 4 };
+        _save.CardGrowth.Entries[CARD_ID.ToString()] = _growth[CARD_ID];
+
+        CardGrowth t_current = CardGrowthManager.GrowthOf(CARD_ID);
+        Require(t_current.HpBonus == 24 && t_current.UnlockedKeywords == CardKeyword.Ranged,
+            "Retired growth changed HP or keyword unlock; expected 20 card + 4 partial shard HP only.");
+        Require(CardGrowthManager.PreviewGrowthAtLevel(CARD_ID, 4).HpBonus == 30,
+            "Enhancement preview included retired growth HP.");
+        Require(CardGrowthManager.GrowthAtLevel(CARD_ID, 4).HpBonus == 30,
+            "A fixed-level opponent inherited account growth.");
+        Type t_aiRow = typeof(CardGrowthManager).Assembly.GetType("AiMatchCardGrowth", true);
+        Type t_aiGrowth = typeof(CardGrowthManager).Assembly.GetType("AiMatchGrowth", true);
+        foreach (string t_legacy in new[] { string.Empty, ",\"limitBreak\":3" })
+        {
+            string t_json = "[{\"cardId\":" + CARD_ID + ",\"level\":4,\"hpBonus\":30," +
+                "\"evolutionStage\":2,\"unlockedKeywords\":1,\"synergyUnlocked\":true" + t_legacy + "}]";
+            object t_rows = JsonConvert.DeserializeObject(t_json, t_aiRow.MakeArrayType());
+            var t_ai = (IReadOnlyDictionary<int, CardGrowth>)t_aiGrowth.GetMethod("Read", STATIC_FIELDS)
+                .Invoke(null, new object[] { 1, new[] { CARD_ID }, t_rows });
+            Require(t_ai[CARD_ID].HpBonus == 30 && t_ai[CARD_ID].UnlockedKeywords == CardKeyword.Ranged,
+                "AI growth required retired fields or changed the server's card-only snapshot.");
+        }
+        // JSON.NET 기본 unknown-field 무시 계약을 확인한다. 런타임 마이그레이션은 만들지 않는다.
+        var t_settings = (JsonSerializerSettings)typeof(DataSaveManager)
+            .GetProperty("SaveSerializerSettings", STATIC_FIELDS).GetValue(null);
+        var t_old = JObject.FromObject(_save, JsonSerializer.Create(t_settings));
+        t_old["keywordGrowth"] = new JObject { ["levels"] = new JObject { ["1"] = 10 } };
+        var t_oldCard = (JObject)t_old["cardGrowth"]["entries"][CARD_ID.ToString()];
+        t_oldCard["snack"] = 99;
+        t_oldCard["limitBreak"] = 2;
+        var t_copy = t_old.ToObject<UserSaveData>(JsonSerializer.Create(t_settings));
+        var t_serialized = JObject.FromObject(t_copy, JsonSerializer.Create(t_settings));
+        var t_card = (JObject)t_serialized["cardGrowth"]["entries"][CARD_ID.ToString()];
+        Require(t_serialized["keywordGrowth"] == null && t_card["snack"] == null && t_card["limitBreak"] == null,
+            "Current save writers regenerated retired growth fields.");
+        Require(t_copy.CardGrowth.Entries[CARD_ID.ToString()].Level == 3
+            && t_copy.CardGrowth.Entries[CARD_ID.ToString()].ShardProgress == 4,
+            "Ignoring unknown fields changed current card growth.");
+        Require((int)Get(typeof(DataSaveManager), "SaveSlotCount") == 8 && !Enum.IsDefined(typeof(ESaveSlot), 1 << 4)
+            && (int)ESaveSlot.Rank == (1 << 5) && (int)ESaveSlot.Profile == (1 << 9),
+            "Save slot removal shifted live slot IDs.");
+
+        Type t_document = typeof(CardGrowthManager).Assembly.GetType("PlayerSaveDocument", true);
+        MethodInfo t_map = t_document.GetMethod("ToSlotFieldMap", STATIC_FIELDS);
+        try
+        {
+            t_map.Invoke(null, new object[] { t_copy, (ESaveSlot)(1 << 4), 1L });
+            throw new InvalidOperationException("Retired slot generated a metadata-only save write.");
+        }
+        catch (TargetInvocationException t_error) when (t_error.InnerException is ArgumentOutOfRangeException) { }
+
     }
 
     static object Get(Type _type, string _field) => _type.GetField(_field, STATIC_FIELDS).GetValue(null);

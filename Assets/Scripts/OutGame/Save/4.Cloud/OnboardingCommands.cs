@@ -26,9 +26,7 @@ internal static class OnboardingCommands
                 t_step.Action == EOutgameTutorialAction.CardGrant || t_step.Action == EOutgameTutorialAction.CardSetGrant;
             case "openPack": return t_step.Action == EOutgameTutorialAction.AutoPurchase || t_step.Action == EOutgameTutorialAction.WaitPurchase;
             case "enhanceCard":
-            case "enhanceSynergyIntroduction":
-            case "limitBreakCard": return t_step.Action == EOutgameTutorialAction.WaitEnhance;
-            case "enhanceKeyword": return t_step.Action == EOutgameTutorialAction.WaitKeywordEnhance;
+            case "enhanceSynergyIntroduction": return t_step.Action == EOutgameTutorialAction.WaitEnhance;
             default: return false;
         }
     }
@@ -183,7 +181,7 @@ internal static class OnboardingCommands
     internal static void Consume(OnboardingCommandSaveData _record)
     {
         // 샤드 투입은 목표까지 한 스텝에서 여러 번 실행된다. 지급·구매는 스텝 전환까지 재생한다.
-        if (_record == null || !(_record.Command.StartsWith("enhance", StringComparison.Ordinal) || _record.Command == "limitBreakCard")) return;
+        if (_record == null || !_record.Command.StartsWith("enhance", StringComparison.Ordinal)) return;
         _record.Consumed = true;
         DataSaveManager.Save();
     }

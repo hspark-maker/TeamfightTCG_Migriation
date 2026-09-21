@@ -75,8 +75,6 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     Canvas m_canvas;
     bool m_interactable;
     bool m_dragging;
-    bool m_skipRemaining;
-    bool m_growthPlaying;
     int m_generation;
     PackCardView m_revealedTop;
 
@@ -96,7 +94,6 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     // 최근 프레임의 미는 속도(카드 좌표계 단위/초). 짧고 빠른 플릭을 거리 대신 이 값으로 살린다.
     float m_dragSpeed;
-    Vector2 m_growthDragOffset;
 
     public int Remaining => m_stack.Count;
 
@@ -291,19 +288,10 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         var t_view = m_stack[0];
         if (m_revealedTop == t_view) return;
         m_revealedTop = t_view;
-        m_growthPlaying = t_view.HasPendingSnackGrowth;
         int t_generation = m_generation;
         OnCardRevealed?.Invoke(t_view);
         if (t_generation != m_generation) return;
         StartFloat(t_view);
-        if (!m_growthPlaying) return;
-
-        t_view.PlaySnackGrowth(() =>
-        {
-            if (t_generation != m_generation || m_stack.Count == 0 || m_stack[0] != t_view) return;
-            m_growthPlaying = false;
-            if (m_skipRemaining) DrainSkippedCards();
-        });
     }
 
     // 맨 위 카드만 제자리에서 미세하게 뜬다. 아래 카드는 건드리지 않는다 — 하나만 살아 있어야 그 대비가 읽힌다.
@@ -333,10 +321,9 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             });
     }
 
-    /// <summary>일반 카드는 즉시 치우고 성장 카드는 결과 확인 입력을 받은 뒤 치운다.</summary>
+    /// <summary>남은 카드를 즉시 치우고 결과 화면으로 진행한다.</summary>
     public void FlickAllImmediate()
     {
-        m_skipRemaining = true;
         m_interactable = false;
         m_dragging = false;
         m_emerging = false;
@@ -345,26 +332,18 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     void DrainSkippedCards()
     {
-        if (m_growthPlaying) return;
         while (m_stack.Count > 0)
         {
             var t_view = m_stack[0];
-            if (t_view != null && t_view.HasPendingSnackGrowth)
-            {
-                RevealTop();
-                return;
-            }
-
             m_stack.RemoveAt(0);
             m_revealedTop = null;
             DestroyCard(t_view);
         }
 
-        m_skipRemaining = false;
         OnEmptied?.Invoke();
     }
 
-    // 입장/찢기 중 direct skip도 팩 안쪽 배율·위치에서 성장하지 않게 완성된 더미로 세운다.
+    // 입장/찢기 중 direct skip도 완성된 더미의 위치·배율로 정렬한다.
     public void SettleForSkip(Vector2 _center, float _scale)
     {
         m_emerging = false;
@@ -379,7 +358,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     {
         if (_view == null) return;
         _view.transform.DOKill();
-        // Destroy는 프레임 끝까지 지연된다. 먼저 비활성화해 이전 성장 완료 콜백을 즉시 폐기한다.
+        // Destroy는 프레임 끝까지 지연되므로 먼저 비활성화한다.
         _view.gameObject.SetActive(false);
         Destroy(_view.gameObject);
     }
@@ -388,8 +367,6 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     public void Clear()
     {
         m_generation++;
-        m_skipRemaining = false;
-        m_growthPlaying = false;
         m_revealedTop = null;
         // 파괴보다 먼저 뗀다 — 등장 setter는 이 클래스가 끊을 수 없는 중첩 트윈이 굴린다(PlayEmerge의 ⚠ 참고).
         m_emerging = false;
@@ -412,13 +389,9 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     public void OnBeginDrag(PointerEventData _e)
     {
         if (_e.button != PointerEventData.InputButton.Left || m_stack.Count == 0 || m_stack[0] == null) return;
-        if (!m_growthPlaying && (!m_interactable || m_stack[0].HasPendingSnackGrowth)) return;
+        if (!m_interactable) return;
         m_dragging = true;
         m_dragSpeed = 0f;
-        m_growthDragOffset = Vector2.zero;
-
-        // 성장 중에는 제스처만 받는다. 카드 위치·배율은 성장 연출이 계속 소유한다.
-        if (m_growthPlaying) return;
 
         var t_top = m_stack[0];
         if (t_top == null) return;
@@ -446,11 +419,6 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         float t_dt = Time.unscaledDeltaTime;
         if (t_dt > 0f) m_dragSpeed = t_move.magnitude / t_dt;
 
-        if (m_growthPlaying)
-        {
-            m_growthDragOffset += t_move;
-            return;
-        }
         t_rt.anchoredPosition += t_move;
 
         // 민 만큼 기운다 — 손에 붙는 느낌은 위치보다 회전에서 온다(기울기는 좌우 성분만 반영).
@@ -468,7 +436,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         if (t_rt == null) return;
 
         // 방향을 가리지 않는다 — 어느 쪽으로 밀었든 민 거리로 판정하고 그 방향으로 날려보낸다.
-        var t_offset = m_growthPlaying ? m_growthDragOffset : t_rt.anchoredPosition - m_cardHome;
+        var t_offset = t_rt.anchoredPosition - m_cardHome;
         float t_dist = t_offset.magnitude;
 
         // 거리가 찼거나, 짧아도 충분히 빠르게 튕겼으면 넘긴다.
@@ -477,17 +445,16 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         // 둘 다 아니면 되감기 — 실수로 건드린 것을 넘김으로 처리하지 않는다.
         if (t_dist < flickThreshold && !t_flicked)
         {
-            if (!m_growthPlaying) ReturnHome(t_top);
+            ReturnHome(t_top);
             return;
         }
 
-        AdvanceTop(t_offset / Mathf.Max(0.0001f, t_dist));
+        DismissTop(t_offset / Mathf.Max(0.0001f, t_dist));
     }
 
     void DismissTop(Vector2 _direction)
     {
-        if (!m_interactable || m_growthPlaying || m_stack.Count == 0 ||
-            m_stack[0] == null || m_stack[0].HasPendingSnackGrowth) return;
+        if (!m_interactable || m_stack.Count == 0 || m_stack[0] == null) return;
 
         var t_top = m_stack[0];
         m_stack.RemoveAt(0);
@@ -509,23 +476,7 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     {
         // 탭은 한 장만 넘긴다. 전체 스킵은 PackRevealView의 전용 버튼이 맡는다.
         if (_e.dragging || m_dragging || _e.button != PointerEventData.InputButton.Left) return;
-        AdvanceTop(new Vector2(1f, 0f));
-    }
-
-    void AdvanceTop(Vector2 _direction)
-    {
-        if (m_growthPlaying)
-        {
-            if (m_stack.Count == 0 || m_stack[0] == null) return;
-            var t_view = m_stack[0];
-            // 탭·슬라이드 모두 연출 중에는 결과까지만, 다음 입력에서 현재 카드를 넘긴다.
-            if (t_view.SkipSnackGrowth()) return;
-            bool t_skipping = m_skipRemaining;
-            if (t_view.ConfirmSnackGrowthResult() && !t_skipping)
-                DismissTop(_direction);
-            return;
-        }
-        DismissTop(_direction);
+        DismissTop(new Vector2(1f, 0f));
     }
 
     // 밀려난 카드를 민 방향으로 날려보내며 지운다. 결과는 남기지 않는다 — 전부 넘긴 뒤 결과 격자가 다시 보여준다.
@@ -588,8 +539,6 @@ public class PackCardStack : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     void OnDisable()
     {
         m_generation++;
-        m_skipRemaining = false;
-        m_growthPlaying = false;
         m_revealedTop = null;
         // 등장 setter가 먼저 손을 떼야 아래 SnapCardsHome이 실제로 남는다 — 트윈 쪽은 끊을 수 없다.
         m_emerging = false;

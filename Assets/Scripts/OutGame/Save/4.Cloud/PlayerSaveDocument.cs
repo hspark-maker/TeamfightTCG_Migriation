@@ -17,13 +17,12 @@ static class PlayerSaveDocument
     internal const string FIELD_DEVICE_ID = "deviceId";
     internal const string FIELD_APP_VERSION = "appVersion";
 
-    // 슬롯 9 — UserSaveData의 [FirestoreProperty] 이름과 반드시 같다(읽기는 ConvertTo가, 쓰기는 이 표가 한다).
+    // 슬롯 8 — UserSaveData의 [FirestoreProperty] 이름과 반드시 같다(읽기는 ConvertTo가, 쓰기는 이 표가 한다).
     // currency는 여기 없다 — 지갑 문서로 갔다. Update라 이 표에서 빠진 필드는 지워지는 게 아니라
     // 원격에 그대로 남는다 — 슬롯을 표에서 누락시키면 그 슬롯이 조용히 영원히 stale이 된다.
     internal const string FIELD_OWNERSHIP = "ownership";
     internal const string FIELD_DECK = "deck";
     internal const string FIELD_CARD_GROWTH = "cardGrowth";
-    internal const string FIELD_KEYWORD_GROWTH = "keywordGrowth";
     internal const string FIELD_RANK = "rank";
     internal const string FIELD_ALBUM_REWARD = "albumReward";
     internal const string FIELD_ADVENTURE = "adventure";
@@ -45,7 +44,7 @@ static class PlayerSaveDocument
         s_appVersion = Application.version;
     }
 
-    /// <summary>메타 5개와 dirty 최상위 슬롯만 담은 Update용 필드 맵. 슬롯 9개를 전부 넘기면
+    /// <summary>메타 5개와 dirty 최상위 슬롯만 담은 Update용 필드 맵. 슬롯 8개를 전부 넘기면
     /// 예전 전체 덮어쓰기와 같은 맵이 나온다 — 전체 재전송에 별도 경로가 필요 없는 이유다.</summary>
     internal static Dictionary<string, object> ToSlotFieldMap(
         UserSaveData _data,
@@ -65,12 +64,17 @@ static class PlayerSaveDocument
             [FIELD_APP_VERSION] = s_appVersion,
         };
 
+        ESaveSlot t_remainingSlots = _dirtySlots;
         for (int i = 0; i < DataSaveManager.SaveSlotCount; i++)
         {
             ESaveSlot t_slot = DataSaveManager.SaveSlotAt(i);
             if ((_dirtySlots & t_slot) == 0) continue;
             t_fields[FieldNameForSlot(t_slot)] = DataSaveManager.GetSlotValue(_data, t_slot);
+            t_remainingSlots &= ~t_slot;
         }
+
+        if (t_remainingSlots != ESaveSlot.None)
+            throw new ArgumentOutOfRangeException(nameof(_dirtySlots), _dirtySlots, "Unknown save slot.");
 
         return t_fields;
     }
@@ -82,7 +86,6 @@ static class PlayerSaveDocument
             case ESaveSlot.Ownership: return FIELD_OWNERSHIP;
             case ESaveSlot.Deck: return FIELD_DECK;
             case ESaveSlot.CardGrowth: return FIELD_CARD_GROWTH;
-            case ESaveSlot.KeywordGrowth: return FIELD_KEYWORD_GROWTH;
             case ESaveSlot.Rank: return FIELD_RANK;
             case ESaveSlot.AlbumReward: return FIELD_ALBUM_REWARD;
             case ESaveSlot.Adventure: return FIELD_ADVENTURE;

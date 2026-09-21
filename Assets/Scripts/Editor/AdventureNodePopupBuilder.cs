@@ -31,7 +31,6 @@ public static class AdventureNodePopupBuilder
     static readonly Color TEXT_SUB   = new Color(0.66f, 0.79f, 0.95f, 1f);   // "가능한 보상" — 금색은 클리어 축이라 쓰지 않는다.
     static readonly Color POWER      = new Color(1f, 0.86f, 0.45f, 1f);
 
-    [MenuItem("Tools/Adventure/Rebuild NodePopup Prefab")]
     public static void Build()
     {
         TMP_FontAsset t_font = BorrowFont();

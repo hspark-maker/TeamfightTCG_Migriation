@@ -15,18 +15,16 @@ MonoBehaviour:
   lobbyBgm: {fileID: 8300000, guid: dbcce29b33e028546959403d711b4021, type: 3}
   battleBgm: {fileID: 8300000, guid: 95a3d120974634d12a5df368d1864f23, type: 3}
   uiClickClips:
-  - {fileID: 8300000, guid: 3b7a828a646174088aa48ee1db9c439c, type: 3}
+  - {fileID: 8300000, guid: 6e8772b49f34d402a90016ed445d8a2f, type: 3}
   hitClips:
-  - {fileID: 8300000, guid: a549c84e3eee2b743ac03ef26ab4e5f8, type: 3}
-  - {fileID: 8300000, guid: 1939c027bda6826418c1578c4c43746b, type: 3}
+  - {fileID: 8300000, guid: 3c2ddd6280704c0dad648bda03df6972, type: 3}
   deathClips:
-  - {fileID: 8300000, guid: 522695d86095b6b489ff1545dff74d9c, type: 3}
-  - {fileID: 8300000, guid: 7764c23c700d49b498f0466cac823963, type: 3}
+  - {fileID: 8300000, guid: ccb817da7165f554dac2a7f7395431e7, type: 3}
   dealCardClips:
   - {fileID: 8300000, guid: 2388c8cbeae623d4bacd723e2b0d2e17, type: 3}
   - {fileID: 8300000, guid: ed906fa8eaeff64488645ea3a72f129d, type: 3}
   turnChangeClips:
-  - {fileID: 8300000, guid: 0055582bcea4a5e46a7edbfb29993193, type: 3}
+  - {fileID: 8300000, guid: c454f0066ef17b94daa5753983170042, type: 3}
   cinemaEnterClips:
   - {fileID: 8300000, guid: 2ca3e7ab0f586cc4698cc8d67b0d1acc, type: 3}
   sfxVolume: 0.85

@@ -129,7 +129,7 @@ public class CardSetRewardOverlay : PooledOverlay<CardSetRewardOverlay>
         this.m_continueGrantedPage = t_next < _cards.Count;
         this.m_drawn.Clear();
         for (int i = _offset; i < t_next; i++) this.m_drawn.Add(_cards[i]);
-        if (this.grid != null) this.grid.Show(this.m_drawn, _holdForSnackGrowth: true);
+        if (this.grid != null) this.grid.Show(this.m_drawn);
     }
 
     // 잠금은 등장 안무가 푼다. Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서는 그 안무가 없어
@@ -196,8 +196,7 @@ public class CardSetRewardOverlay : PooledOverlay<CardSetRewardOverlay>
         // 손은 버튼이 다 뜬 뒤에 돌려준다. 잠금을 푸는 곳이 여기뿐이라, 빠지면 [받기]가 영영 잠긴 모달이 된다.
         t_seq.InsertCallback(this.claimDelay + this.claimFadeDuration, () =>
         {
-            if (this.grid != null) this.grid.PlaySnackGrowth(() => this.SetInputEnabled(true));
-            else this.SetInputEnabled(true);
+            this.SetInputEnabled(true);
         });
 
         t_seq.OnComplete(() => this.m_intro = null);

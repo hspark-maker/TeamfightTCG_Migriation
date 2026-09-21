@@ -286,7 +286,7 @@ public static class OutgameDebugActions
     {
         CardGrowthManager.DebugResetAll();
 
-        Debug.Log("[OutgameDebug] Card growth reset — every card at 0 stars, unevolved, limit break 0, snacks 0");
+        Debug.Log("[OutgameDebug] Card growth reset — every card at 0 stars, unevolved");
     }
 
     // 카탈로그 전량 지급

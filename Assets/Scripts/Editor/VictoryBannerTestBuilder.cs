@@ -84,7 +84,7 @@ public static class VictoryBannerTestBuilder
         new Vector2(190f, 237f)
     };
 
-    [MenuItem("Tools/Result Banner/Rebuild Victory Banner + Lab Scene")]
+    [MenuItem("Tools/Card Battle/연출 테스트/Result Banner/Rebuild Victory Banner + Lab Scene")]
     public static void BuildAndOpen()
     {
         if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
@@ -98,7 +98,7 @@ public static class VictoryBannerTestBuilder
         BuildTestEnvironment(true);
     }
 
-    [MenuItem("Tools/Result Banner/Open Victory Lab Scene %#v")]
+    [MenuItem("Tools/Card Battle/연출 테스트/Result Banner/Open Victory Lab Scene %#v")]
     public static void OpenTestSceneOnLaunch()
     {
         Scene currentScene = SceneManager.GetActiveScene();

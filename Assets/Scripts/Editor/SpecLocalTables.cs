@@ -63,8 +63,7 @@ public static class SpecLocalTables
                 if (t_fields[c].FieldType == typeof(string)) { t_fields[c].SetValue(t_row, t_values[c]); continue; }
                 if (!int.TryParse(t_values[c], NumberStyles.Integer, CultureInfo.InvariantCulture, out int t_value))
                 { _error = $"RankAiEncounter {r + 1}행 {t_fields[c].Name} 정수 오류."; return false; }
-                if ((t_fields[c].Name.StartsWith("level", StringComparison.Ordinal) && (t_value < 1 || t_value > 4)) ||
-                    (t_fields[c].Name.StartsWith("limitBreak", StringComparison.Ordinal) && (t_value < 0 || t_value > 3)))
+                if (t_fields[c].Name.StartsWith("level", StringComparison.Ordinal) && (t_value < 1 || t_value > 4))
                 { _error = $"RankAiEncounter {r + 1}행 {t_fields[c].Name} 범위 오류."; return false; }
                 t_fields[c].SetValue(t_row, t_value);
             }
@@ -72,11 +71,6 @@ public static class SpecLocalTables
                 t_row.highlightSlot < 0 || t_row.highlightSlot > 6 ||
                 (t_row.battleKind != "Normal" && t_row.battleKind != "DivisionFinal" && t_row.battleKind != "GradeFinal"))
             { _error = $"RankAiEncounter {r + 1}행 식별자·티어·전투 종류·강조 슬롯 오류."; return false; }
-            int[] t_levels = { t_row.level1, t_row.level2, t_row.level3, t_row.level4, t_row.level5, t_row.level6 };
-            int[] t_breaks = { t_row.limitBreak1, t_row.limitBreak2, t_row.limitBreak3, t_row.limitBreak4, t_row.limitBreak5, t_row.limitBreak6 };
-            for (int slot = 0; slot < t_levels.Length; slot++)
-                if (t_breaks[slot] > 0 && t_levels[slot] != 4)
-                { _error = $"RankAiEncounter {r + 1}행 {slot + 1}번 슬롯 한계돌파는 Lv4에서만 가능하다."; return false; }
             if (!t_ids.Add(t_row.id) || !t_keys.Add($"{t_row.tierIndex}:{t_row.battleKind}:{t_row.deckId}"))
             { _error = $"RankAiEncounter {r + 1}행 id 또는 티어·전투 종류·덱 중복."; return false; }
             t_rows.Add(t_row);

@@ -446,7 +446,6 @@ public class OutgameTutorialBridge : MonoBehaviour
         // 화면은 이 스텝보다 먼저 열리므로(같은 클릭이 창을 먼저 띄운다) 옛 비용을 띄운 채다 —
         // 다시 읽게 하지 않으면 잔액이 그에 못 미치는 유저의 강화 버튼이 비활성으로 굳는다.
         if (m_step.Completion == EOutgameTutorialCompletion.Enhance)             CardGrowthManager.NotifyCostRuleChanged();
-        else if (m_step.Completion == EOutgameTutorialCompletion.KeywordEnhance) KeywordGrowthManager.NotifyCostRuleChanged();
 
         // 설명 스텝은 앵커가 없어도 정상이다(강조 없이 문구만) — 완료가 딤 탭이라 진행이 막히지 않는다.
         // 억제 씬에서도 띄운다: 억제하면 완료 신호인 딤 자체가 사라져 진행이 영구히 멈춘다.
@@ -497,7 +496,6 @@ public class OutgameTutorialBridge : MonoBehaviour
         // 완료는 성공 신호가 확정하며, 버튼이 잠기면 게이트가 알아서 딤을 걷는다(탈출로 겸 연출 관람로).
         Action t_onSatisfied = m_step.Completion == EOutgameTutorialCompletion.Purchase
                             || m_step.Completion == EOutgameTutorialCompletion.Enhance
-                            || m_step.Completion == EOutgameTutorialCompletion.KeywordEnhance
                             || m_step.Completion == EOutgameTutorialCompletion.DeckEquip
                             || m_step.Completion == EOutgameTutorialCompletion.DeckSave
             ? null
@@ -631,7 +629,6 @@ public class OutgameTutorialBridge : MonoBehaviour
         switch (_completion)
         {
             case EOutgameTutorialCompletion.Enhance:        return OutgameTutorialGuide.IsFreeShotSpentOnServer(EOutgameTutorialAction.WaitEnhance);
-            case EOutgameTutorialCompletion.KeywordEnhance: return OutgameTutorialGuide.IsFreeShotSpentOnServer(EOutgameTutorialAction.WaitKeywordEnhance);
             default:                                        return false;
         }
     }
@@ -883,14 +880,6 @@ public class OutgameTutorialBridge : MonoBehaviour
                     && t_chapter.TryGetStep(t_i + 1, out var t_next))
                     return t_next.Action == EOutgameTutorialAction.WaitUnlockIntro;
         return false;
-    }
-
-    // 키워드 강화 성공. 카드 강화와 달리 무대를 쥐는 결과판이 없어 기다릴 것 없이 바로 넘긴다.
-    void OnKeywordEnhanced(CardKeyword _keyword)
-    {
-        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.KeywordEnhance) return;
-
-        OnGateSatisfied();
     }
 
     // 자율 안내 발화 통지. 탭 전환 도중에 켜지므로 이 씬이 그대로 이어받는다.
@@ -1175,7 +1164,6 @@ public class OutgameTutorialBridge : MonoBehaviour
         TutorialAnchorRegistry.OnRegistered   += OnAnchorRegistered;
         OutgameTutorialRunner.OnBattleEntryRestored += ApplyCurrentStep;
         OutgameTutorialRunner.OnGuidedActivated += OnGuidedActivated;
-        KeywordGrowthManager.OnEnhanced       += OnKeywordEnhanced;
         PackRevealView.OnAnyPackOpened        += OnPackOpened;
         PackShowcaseController.OnAnyPurchased += OnPurchased;
         PackOpenOverlay.OnOpened              += OnPackOverlayOpened;
@@ -1206,7 +1194,6 @@ public class OutgameTutorialBridge : MonoBehaviour
         TutorialAnchorRegistry.OnRegistered   -= OnAnchorRegistered;
         OutgameTutorialRunner.OnBattleEntryRestored -= ApplyCurrentStep;
         OutgameTutorialRunner.OnGuidedActivated -= OnGuidedActivated;
-        KeywordGrowthManager.OnEnhanced       -= OnKeywordEnhanced;
         PackRevealView.OnAnyPackOpened        -= OnPackOpened;
         PackShowcaseController.OnAnyPurchased -= OnPurchased;
         PackOpenOverlay.OnOpened              -= OnPackOverlayOpened;

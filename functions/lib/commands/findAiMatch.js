@@ -44,8 +44,6 @@ const generateNickname_1 = require("../profile/generateNickname");
 const aiDeckDraw_1 = require("../matchmaking/aiDeckDraw");
 const rankAiEncounter_1 = require("../matchmaking/rankAiEncounter");
 const deckValidation_1 = require("../deckValidation");
-const enhanceRules_1 = require("../growth/enhanceRules");
-const limitBreakTable_1 = require("../growth/limitBreakTable");
 const matchPairing_1 = require("../matchPairing");
 const countedTransaction_1 = require("../observability/countedTransaction");
 const payout_1 = require("../payout");
@@ -152,16 +150,16 @@ function storedResponse(raw, data) {
         deck,
         cardLevel: aiDeck.cardLevel,
         ...(typeof aiDeck.nickname === "string" ? { nickname: aiDeck.nickname } : {}),
-        ...(snapshots == null ? {} : growthResponse(aiDeck.cardGrowth, snapshots)),
+        ...(snapshots == null ? {} : growthResponse(snapshots)),
         playerBoardOrder,
         enemyBoardOrder,
         resultProtocol: 1,
         ...(data.adventureNodeId == null ? {} : { adventureNodeId: data.adventureNodeId }),
     };
 }
-function growthResponse(growth, snapshots) {
+function growthResponse(snapshots) {
     return { aiGrowthVersion: 1, cardGrowth: snapshots.map((snapshot) => ({
-            ...snapshot, limitBreak: growth.find((entry) => entry.cardId === snapshot.cardId).limitBreak,
+            ...snapshot,
         })) };
 }
 /**
@@ -213,7 +211,7 @@ exports.findAiMatch = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
         const snapshots = (0, deckValidation_1.buildAiDeckSnapshots)(deck.cardIds, cardLevel, cardSpecs);
         if (snapshots == null)
             throw new https_1.HttpsError("failed-precondition", "Adventure AI growth is invalid.");
-        const cardGrowth = snapshots.map((card) => ({ cardId: card.cardId, level: card.level, limitBreak: 0 }));
+        const cardGrowth = snapshots.map((card) => ({ cardId: card.cardId, level: card.level }));
         const seedHex = (0, node_crypto_1.randomBytes)(8).toString("hex");
         const playerBoardOrder = shuffle(data.playerDeck);
         const enemyBoardOrder = shuffle(deck.cardIds);
@@ -292,7 +290,7 @@ exports.findAiMatch = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
         if (matchRef == null || matchId == null)
             throw new Error("AI match identity missing");
         const specPins = await (0, specBlobReader_1.readSpecPins)(authoredData.env, authoredData.aiGrowthVersion === 1 ?
-            [...specBlobReader_1.BATTLE_REPLAY_SPEC_TABLES, "CardLimitBreak", "CardEnhanceRule", "AIDeck", "RankAiEncounter"] :
+            [...specBlobReader_1.BATTLE_REPLAY_SPEC_TABLES, "AIDeck", "RankAiEncounter"] :
             specBlobReader_1.BATTLE_REPLAY_SPEC_TABLES);
         if ((0, specBlobReader_1.fingerprintOfSpecPins)(authoredData.env, specPins, ["Card"]) !== authoredData.contentFingerprint) {
             throw new https_1.HttpsError("failed-precondition", "content_fingerprint_mismatch");
@@ -304,10 +302,8 @@ exports.findAiMatch = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
         let encounter = null;
         let draw = null;
         if (authoredData.aiGrowthVersion === 1) {
-            const [cardRows, limitBreakRows, ruleRows, pinnedDeckRows, encounterRows] = await Promise.all([
+            const [cardRows, pinnedDeckRows, encounterRows] = await Promise.all([
                 (0, specBlobReader_1.readPinnedSpecRows)(data.env, "Card", specPins.Card),
-                (0, specBlobReader_1.readPinnedSpecRows)(data.env, "CardLimitBreak", specPins.CardLimitBreak),
-                (0, specBlobReader_1.readPinnedSpecRows)(data.env, "CardEnhanceRule", specPins.CardEnhanceRule),
                 (0, specBlobReader_1.readPinnedSpecRows)(data.env, "AIDeck", specPins.AIDeck),
                 (0, specBlobReader_1.readPinnedSpecRows)(data.env, "RankAiEncounter", specPins.RankAiEncounter),
             ]);
@@ -317,10 +313,6 @@ exports.findAiMatch = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
             const selected = (0, rankAiEncounter_1.drawRankAiEncounter)(profiles, pinnedDecks.rows, tierIndex, battleKind, node_crypto_1.randomInt);
             encounter = selected.profile;
             draw = { deckId: selected.deck.deckId, deck: [...selected.deck.cardIds], cardLevel: 0 };
-            const rule = (0, enhanceRules_1.parseCardEnhanceRule)(ruleRows);
-            if (rule == null)
-                throw new Error("CardEnhanceRule spec is invalid");
-            const curve = (0, limitBreakTable_1.parseLimitBreakCurve)(limitBreakRows, rule.maxLimitBreak);
             const specs = new Map(cardRows.map((row) => {
                 const spec = (0, deckValidation_1.parseCardSpecRow)(row);
                 if (spec == null)
@@ -328,7 +320,7 @@ exports.findAiMatch = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
                 return [spec.id, spec];
             }));
             cardGrowth = encounter.cardGrowth;
-            const built = (0, deckValidation_1.buildAiDeckSnapshots)(draw.deck, cardGrowth, specs, curve);
+            const built = (0, deckValidation_1.buildAiDeckSnapshots)(draw.deck, cardGrowth, specs);
             if (built == null)
                 throw new Error("AI card growth is invalid");
             snapshots = built;
@@ -400,7 +392,7 @@ exports.findAiMatch = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
                 deck: selectedDraw.deck,
                 cardLevel: selectedDraw.cardLevel,
                 nickname,
-                ...(authoredData.aiGrowthVersion === 1 ? growthResponse(cardGrowth, snapshots) : {}),
+                ...(authoredData.aiGrowthVersion === 1 ? growthResponse(snapshots) : {}),
                 playerBoardOrder,
                 enemyBoardOrder,
                 resultProtocol: authoredData.resultProtocol,

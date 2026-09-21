@@ -3,14 +3,14 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
-// 카드 성장(강화 레벨)의 static 단일 창구. 간식은 같은 세이브 항목을 써서 partial 조각(.Snack.cs)이 맡는다.
-public static partial class CardGrowthManager
+// 카드 성장(강화 레벨·샤드 진행도)의 static 단일 창구.
+public static class CardGrowthManager
 {
     static readonly Dictionary<int, CardGrowthEntry> s_growth = new Dictionary<int, CardGrowthEntry>();
 
     static bool s_initialized;
 
-    // 샤드 투입·진화·키워드 성장 변경 통지.
+    // 샤드 투입·진화 변경 통지.
     public static event Action OnGrowthChanged;
 
     /// <summary>곡선·비용이 실제로 실렸는가. 스펙시트(CardEnhanceRule)가 진실원이 된 뒤로 "항상 준비"가 아니다 —
@@ -31,9 +31,6 @@ public static partial class CardGrowthManager
     {
         s_growth.Clear();
 
-        KeywordGrowthManager.OnChanged -= NotifyGrowthChanged;
-        KeywordGrowthManager.OnChanged += NotifyGrowthChanged;
-
         var t_data = DataSaveManager.Data.CardGrowth;
         if (t_data != null && t_data.Entries != null)
         {
@@ -50,8 +47,6 @@ public static partial class CardGrowthManager
         s_initialized = true;
     }
 
-    static void NotifyGrowthChanged() => OnGrowthChanged?.Invoke();
-
     /// <summary>캐시를 세이브 슬롯에 반영만 한다(디스크 쓰기 없음) — 여러 도메인을 건드리는 흐름에서
     /// 같은 파일을 반복해 쓰지 않도록 디스크 쓰기는 마지막 한 곳이 맡는다.</summary>
     internal static void FlushToData()
@@ -65,7 +60,7 @@ public static partial class CardGrowthManager
         {
             var t_entry = t_pair.Value;
             if (t_entry == null) continue;
-            if (t_entry.Level <= CardGrowth.BaseLevel && t_entry.ShardProgress <= 0 && t_entry.Snack <= 0 && t_entry.LimitBreak <= 0) continue;
+            if (t_entry.Level <= CardGrowth.BaseLevel && t_entry.ShardProgress <= 0) continue;
 
             t_entries[t_pair.Key.ToString()] = t_entry;
         }
@@ -84,17 +79,17 @@ public static partial class CardGrowthManager
     }
 
     public static CardGrowth GrowthAtLevel(int _id, int _level)
-        => Snapshot(_id, ClampLevel(_level), false, 0);
+        => Snapshot(_id, ClampLevel(_level));
 
-    /// <summary>강화 전 안내용. 보유 키워드 성장·한계돌파를 유지하고 목표 레벨만 바꿔 본다.</summary>
+    /// <summary>강화 전 안내용. 목표 레벨의 체력과 해금을 미리 본다.</summary>
     public static CardGrowth PreviewGrowthAtLevel(int _id, int _level)
-        => Snapshot(_id, ClampLevel(_level), true, LimitBreakOf(_id));
+        => Snapshot(_id, ClampLevel(_level));
 
     /// <summary>카드 번호의 성장 스냅샷(기록이 없으면 미강화). HP는 레벨과 샤드 진행도에서, 해금은 레벨에서 파생된다.
     /// 화면도 전투도 이 길 하나로 읽는다 — 서버가 확정하지 않은 값이 여기 얹히면 서버가 모르는 체력이
     /// lockDeck 에 실려 덱 잠금이 거절된다.</summary>
     public static CardGrowth GrowthOf(int _id)
-        => Snapshot(_id, LevelOf(_id), true, LimitBreakOf(_id), ShardProgressOf(_id));
+        => Snapshot(_id, LevelOf(_id), ShardProgressOf(_id));
 
     public static int ShardRequiredOf(int _id) => _id > 0 ? GrowthRules.ShardRequiredAt(LevelOf(_id)) : 0;
 
@@ -113,7 +108,7 @@ public static partial class CardGrowthManager
         int t_progress = ShardProgressOf(_id) + 1;
         if (t_progress >= t_required || OutgameTutorialGuide.HasFreeCardEnhance(_id))
             return PreviewGrowthAtLevel(_id, t_level + 1);
-        return Snapshot(_id, t_level, true, LimitBreakOf(_id), t_progress);
+        return Snapshot(_id, t_level, t_progress);
     }
 
     /// <summary>다음 별까지 남은 전체 비용. 한 번 투입 비용과 구분하여 가이드에 사용한다.</summary>
@@ -274,12 +269,12 @@ public static partial class CardGrowthManager
         return t_changed;
     }
 
-    // 강화·한계돌파·남은 간식을 함께 재설정한다(디버그 전용, 진행도 손실).
+    // 카드 강화를 재설정한다(디버그 전용, 진행도 손실).
     public static void DebugResetAll()
     {
         if (!s_initialized) return;
 
-        // 세 축은 같은 CardGrowthEntry에 있다. 항목을 비워 한계돌파 체력까지 기본값으로 돌린다.
+        // 카드별 항목을 비워 미강화로 되돌린다.
         s_growth.Clear();
         OutgameTutorialGuide.ResetFreeShotForDebug();   // 강화를 처음부터 다시 보는 상태다
         FlushToData();
@@ -320,17 +315,10 @@ public static partial class CardGrowthManager
     }
 
     // _card가 null이면(카탈로그 미초기화·미등록) 키워드 해금만 비고 나머지는 그대로 — 레벨까지 잃지 않는다.
-    // 한계돌파 단계는 부르는 쪽이 골라 넘긴다 — 저장값과 표시값(낙관분 포함)이 갈리는 축이라
-    // 여기서 직접 읽으면 어느 스냅샷이든 같은 값을 담게 되고, 그 순간 서버 제출에 확정 전 체력이 섞인다.
-    static CardGrowth Snapshot(int _cardId, int _level, bool _includeKeywordGrowth, int _limitBreakStage, int _shardProgress = 0)
+    static CardGrowth Snapshot(int _cardId, int _level, int _shardProgress = 0)
     {
         CardKeyword t_unlockedKeywords = GrowthRules.UnlockedKeywordsAt(_cardId, _level);
         int t_hpBonus = GrowthRules.HpBonusAt(_cardId, _level) + GrowthRules.ShardHpBonusAt(_cardId, _level, _shardProgress);
-        if (_includeKeywordGrowth)
-        {
-            t_hpBonus += KeywordGrowthManager.HpBonusFor(t_unlockedKeywords);
-            t_hpBonus += GrowthRules.LimitBreakHpBonusAt(_limitBreakStage);
-        }
 
         return new CardGrowth(
             _level,

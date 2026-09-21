@@ -16,7 +16,6 @@ static class TutorialGrantsCloud
 {
     const string DOCUMENT_SUFFIX = "/grants/current";
     const string FIELD_ENHANCE_CARD = "enhanceCard";
-    const string FIELD_ENHANCE_KEYWORD = "enhanceKeyword";
 
     static FirebaseContext s_context;
     static string s_envId = string.Empty;
@@ -28,10 +27,7 @@ static class TutorialGrantsCloud
     /// <summary>카드 강화의 무료 한 방을 서버가 이미 소진했는가.</summary>
     internal static bool EnhanceCardSpent { get; private set; }
 
-    /// <summary>키워드 강화의 무료 한 방을 서버가 이미 소진했는가.</summary>
-    internal static bool EnhanceKeywordSpent { get; private set; }
-
-    /// <summary>문서를 실제로 읽었는가. false면 아직 만들어지지 않았다(= 두 축 모두 미사용).</summary>
+    /// <summary>문서를 실제로 읽었는가. false면 아직 만들어지지 않았다(= 카드 강화 미사용).</summary>
     internal static bool HasDocument => s_hasDocument;
 
     /// <summary>마지막 읽기 실패 사유. 성공했으면 빈 문자열이다.</summary>
@@ -96,19 +92,19 @@ static class TutorialGrantsCloud
                 return false;
             }
 
-            // 문서 부재는 두 축 모두 미사용이다. 되감기가 문서를 지울 수 있게 된 뒤로는 여기서
+            // 문서 부재는 카드 강화 미사용이다. 되감기가 문서를 지울 수 있게 된 뒤로는 여기서
             // 표식을 걷어 줘야 세션 도중 재읽기가 꺼진 상태를 실제로 반영한다(안 걷으면 옛 값이 남는다).
             if (t_snapshot == null || !t_snapshot.Exists)
             {
                 s_hasDocument = false;
-                Adopt(false, false);
+                Adopt(false);
                 return true;
             }
 
             // 깨진 필드는 미사용으로 선다 — 서버 readGrants와 같은 관대함이다.
             // 못 읽었다고 무료 한 방을 닫으면 낼 돈이 없는 신규 계정이 그 자리에서 멈춘다.
             s_hasDocument = true;
-            Adopt(ReadFlag(t_snapshot, FIELD_ENHANCE_CARD), ReadFlag(t_snapshot, FIELD_ENHANCE_KEYWORD));
+            Adopt(ReadFlag(t_snapshot, FIELD_ENHANCE_CARD));
             return true;
         }
         catch (Exception t_exception)
@@ -145,12 +141,11 @@ static class TutorialGrantsCloud
         return FirebaseRootPath.User(s_envId, _userId) + DOCUMENT_SUFFIX;
     }
 
-    static void Adopt(bool _enhanceCard, bool _enhanceKeyword)
+    static void Adopt(bool _enhanceCard)
     {
-        if (EnhanceCardSpent == _enhanceCard && EnhanceKeywordSpent == _enhanceKeyword) return;
+        if (EnhanceCardSpent == _enhanceCard) return;
 
         EnhanceCardSpent = _enhanceCard;
-        EnhanceKeywordSpent = _enhanceKeyword;
         OnChanged?.Invoke();
     }
 
@@ -173,7 +168,6 @@ static class TutorialGrantsCloud
     {
         s_hasDocument = false;
         EnhanceCardSpent = false;
-        EnhanceKeywordSpent = false;
         LastError = string.Empty;
     }
 }

@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 룰렛 화면(RouletteOverlay에 부착). 칸을 채우고 회전 한 판의 흐름을 중계한다.
-// 풀(UIPoolManager)이 수명을 쥔다 — 규약은 RankRewardPanel·KeywordGrowthPanel과 같다.
+// 풀(UIPoolManager)이 수명을 쥔다 — 규약은 RankRewardPanel과 같다.
 //
 // 멈출 칸도 상품도 이 화면이 정하지 않는다. 결과값이 칸 번호와 상품을 함께 운반하고,
 // 여기서 저작 표를 되읽지 않으므로 서버 블롭과 클라 저작이 어긋나도 연출이 실지급과 갈리지 않는다.

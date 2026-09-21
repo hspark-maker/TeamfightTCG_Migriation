@@ -32,7 +32,6 @@ public static class OnboardingPlayTest
                 DataSaveManager.CreateSnapshot(), DataSaveManager.SaveSerializerSettings);
             DataSaveManager.AdoptRemote(t_copy);
             OwnershipManager.Init();
-            KeywordGrowthManager.Init();
             PrepareGrowth(false);
             DeckSaveManager.LoadFromSave();
             Dictionary<string, long> t_balances = new Dictionary<string, long>();

@@ -44,7 +44,6 @@ const missionStore_1 = require("../missions/missionStore");
 const period_1 = require("../missions/period");
 const missionSpec_1 = require("../missions/missionSpec");
 const guideMutation_1 = require("../missions/guideMutation");
-const snackGrowthProgress_1 = require("../missions/snackGrowthProgress");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
 const saveDocument_1 = require("../save/saveDocument");
@@ -400,7 +399,6 @@ exports.claimReward = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
         // 올리면 미션 수령이 미션을 낳는 자기참조가 된다.
         const finish = (slots) => {
             (0, guideMutation_1.applyGuideProgress)(missions, current, slots, guideCards, catalog);
-            (0, snackGrowthProgress_1.applySnackGrowthProgress)(missions, itemGrant.cards);
             (0, missionStore_1.commitMissionBump)(transaction, missions, eventNames_1.EVENTS.rewardClaimed.missionKey, 1, firestore_1.FieldValue.serverTimestamp());
             missionState = (0, missionStore_1.missionResponse)(missions.state, period, catalog);
             return { slots, wallet: paid };

@@ -14,6 +14,7 @@ public sealed class RankAiEncounterRow
     public int level4;
     public int level5;
     public int level6;
+    // 폐기된 한계돌파 열. CSV 발행 스키마만 보존하며 서버 성장 계산은 읽지 않는다.
     public int limitBreak1;
     public int limitBreak2;
     public int limitBreak3;

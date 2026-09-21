@@ -4,7 +4,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 
 /// <summary>
-/// 열려 있는 씬의 Canvas에 SafeArea 래퍼를 끼워 넣는다. 메뉴: Tools/UI/Install SafeArea (Open Scene).
+/// 열려 있는 씬의 Canvas에 SafeArea 래퍼를 끼워 넣는다. 메뉴: Tools/Card Battle/UI/Install SafeArea (Open Scene).
 ///
 /// 하는 일: Canvas 바로 아래에 "SafeArea" RectTransform을 만들고 <b>기존 자식을 순서 그대로</b> 그 밑으로 옮긴다.
 /// 손으로 하면 자식 순서(=UI 그리는 순서)가 뒤섞이기 쉬워서 도구로 만든다.
@@ -41,7 +41,6 @@ public static class SafeAreaInstaller
         new("Assets/Assets/Prefabs/UI/PooledUI/PooledCardElement.prefab", "", "CardElement"),
         new("Assets/Assets/Prefabs/UI/PooledUI/AdventureNodePopup.prefab", "Contents", "Panel"),
         new("Assets/Assets/Prefabs/UI/PooledUI/RankRewardOverlay.prefab", "Contents", "Panel"),
-        new("Assets/Assets/Prefabs/UI/PooledUI/KeywordGrowthOverlay.prefab", "Contents", "Panel"),
         new("Assets/Assets/Prefabs/UI/PooledUI/SettingUI.prefab", "Contents", "Panel"),
         new("Assets/Assets/Prefabs/UI/PooledUI/PackOddsPopup.prefab", "Contents", "Panel"),
     };
@@ -49,7 +48,7 @@ public static class SafeAreaInstaller
     // 이름이 여기 포함되면 건너뛴다(전체 화면 연출용 캔버스).
     static readonly string[] SkipCanvases = { "CinematicCanvas", "CoinFlipCanvas" };
 
-    [MenuItem("Tools/UI/Install SafeArea (Open Scene)")]
+    [MenuItem("Tools/Card Battle/UI/Install SafeArea (Open Scene)")]
     public static void InstallInOpenScene()
     {
         var t_scene = EditorSceneManager.GetActiveScene();
@@ -87,7 +86,7 @@ public static class SafeAreaInstaller
                    + (t_added > 0 ? " (scene needs saving)" : ""));
     }
 
-    [MenuItem("Tools/UI/Install SafeArea (Pooled UI Prefabs)")]
+    [MenuItem("Tools/Card Battle/UI/Install SafeArea (Pooled UI Prefabs)")]
     public static void InstallInPooledPrefabs()
     {
         int t_added = 0, t_skipped = 0, t_failed = 0;

@@ -18,7 +18,7 @@ static class CardDetailChipBaker
     const int KeywordChipCount = 9;
     const int SynergyChipCount = 3;
 
-    [MenuItem("Tools/UI/도감 상세창 칩 박기")]
+    [MenuItem("Tools/Card Battle/UI/도감 상세창 칩 박기")]
     static void Bake()
     {
         GameObject t_root = PrefabUtility.LoadPrefabContents(OverlayPath);

@@ -24,13 +24,9 @@
 
 ## 저작
 
-`Editor/BalloonPengPrototypeBuilder.cs`에 본 위치, 가중치 범위와 모션 수치가 있습니다. 생성 메뉴는 `Tools > Art Prototypes > Build BalloonPeng Isometric`입니다. 생성된 에셋은 Unity Inspector와 Animation 창에서도 편집할 수 있습니다.
-
-이 메뉴는 최초 생성용이며 기존 산출물이 있으면 덮어쓰지 않고 중단합니다.
-
-기존 시제품에 파닥임을 반영할 때는 `Tools > Art Prototypes > Update BalloonPeng Flutter`를 사용합니다. 클립과 메시의 GUID를 유지하여 프리팹·씬 연결을 보존합니다.
-
-걷기 생성 메뉴는 `Tools > Art Prototypes > Build BalloonPeng Walk`입니다. `Update BalloonPeng Walk`는 걷기 클립과 전용 메시만 갱신합니다.
+시제품 제작이 끝난 에디터 생성기와 `Tools > Art Prototypes` 메뉴는 정리했습니다.
+기존 프리팹·메시·애니메이션은 유지하며 Unity Inspector와 Animation 창에서 편집할 수 있습니다.
+최초 생성 코드와 수치는 이 폴더의 Git 이력에 남아 있습니다.
 
 ## 걷기
 

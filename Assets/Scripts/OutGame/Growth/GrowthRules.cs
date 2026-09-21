@@ -1,4 +1,4 @@
-// 성장 규칙. 수치의 진실원은 스펙시트(CardEnhanceRule / CardEnhance / CardLimitBreak)고 GrowthSpec이 읽는다 —
+// 성장 규칙. 수치의 진실원은 스펙시트(CardEnhanceRule / CardEnhance)고 GrowthSpec이 읽는다 —
 // 서버 functions/src/growth 가 같은 표를 재계산하므로 코드에 값을 박으면 저작이 바뀌는 순간 조용히 갈린다.
 // 표를 못 읽으면 상한은 0, TryGet 계열은 false다(임의 기본값으로 버튼을 열어 주지 않는다).
 public static class GrowthRules
@@ -9,11 +9,8 @@ public static class GrowthRules
     /// <summary>1차 진화 레벨. 도달하면 진화 단계 1 + 시너지 기능이 열린다.</summary>
     public const int FirstEvolutionLevel = 3;
 
-    /// <summary>2차 진화 레벨. 도달하면 진화 단계 2 + 키워드 강화가 열린다.</summary>
+    /// <summary>2차 진화 레벨. 도달하면 진화 단계 2가 열린다.</summary>
     public const int SecondEvolutionLevel = 4;
-
-    /// <summary>한계돌파 최대 단계. 표의 곡선이 단계 1부터 이어지는 데까지만 연다.</summary>
-    public static int MaxLimitBreak => GrowthSpec.MaxLimitBreak;
 
     /// <summary>레벨 _level에서의 진화 단계(0 = 미진화).</summary>
     public static int EvolutionStageAt(int _level)
@@ -74,14 +71,6 @@ public static class GrowthRules
         return (int)((long)HpGainAt(_cardId, _level + 1) * ClampShardProgress(_level, _progress) / t_required);
     }
 
-    /// <summary>한계돌파 _stage까지의 누적 체력 가산분.</summary>
-    public static int LimitBreakHpBonusAt(int _stage)
-        => _stage < 0 ? 0 : GrowthSpec.LimitBreakHpBonusAt(_stage);
-
-    /// <summary>한계돌파 한 단계의 비용·가산분(곡선 밖이면 false).</summary>
-    public static bool TryGetLimitBreakStep(int _stage, out LimitBreakStep _step)
-        => GrowthSpec.TryGetLimitBreakStep(_stage, out _step);
-
     /// <summary>레벨 _level로 올리는 한 스텝(범위 밖이면 false). 바닥 레벨은 강화로 도달하는 레벨이 아니다.</summary>
     public static bool TryGetStep(int _cardId, int _level, out GrowthStep _step)
     {
@@ -94,65 +83,6 @@ public static class GrowthRules
 
     static int HpGainAt(int _cardId, int _level)
         => _cardId > 0 && CardCatalog.RequireSpec(_cardId).TryGetHpGain(_level, out int t_hp) ? t_hp : 0;
-}
-
-// 키워드 강화 규칙. 상한·비용·재화는 스펙시트(KeywordEnhance)가 답하고 GrowthSpec이 읽는다.
-// 레벨당 체력만 코드에 남는다 — 서버 덱 검증이 레벨당 1로 하드코딩돼 있어 표로 옮기면 그 계약까지 같이 바뀐다.
-public static class KeywordGrowthRules
-{
-    public const int HpPerLevel = 1;
-
-    static readonly CardKeyword[] s_supported =
-    {
-        CardKeyword.Ranged,
-        CardKeyword.Peerless,
-        CardKeyword.Execution,
-        CardKeyword.Taunt,
-        CardKeyword.Cunning,
-        CardKeyword.Healer,
-    };
-
-    public static CardKeyword[] SupportedKeywords => s_supported;
-
-    public static bool Supports(CardKeyword _keyword)
-    {
-        if (!IsSingleKeyword(_keyword)) return false;
-
-        for (int t_i = 0; t_i < s_supported.Length; t_i++)
-            if (s_supported[t_i] == _keyword) return true;
-
-        return false;
-    }
-
-    /// <summary>키워드 _keyword의 강화 상한 레벨(행이 없으면 0 — 그 키워드는 강화가 열리지 않는다).</summary>
-    public static int MaxLevelOf(CardKeyword _keyword)
-        => Supports(_keyword) ? GrowthSpec.KeywordMaxLevelOf(_keyword) : 0;
-
-    /// <summary>세이브·서버 응답에서 읽은 레벨을 캐시에 담기 전에 조인다. 저작 상한이 아니라 늘 코덱 천장으로만
-    /// 조인다 — 서버 readKeywordLevels도 같은 자리에서 표를 보지 않는다. 저작이 상한을 낮췄다고 클라만 레벨을
-    /// 깎으면 서버가 아는 진행도와 갈린다.</summary>
-    public static int ClampSavedLevel(CardKeyword _keyword, int _level)
-    {
-        if (_level <= 0 || !Supports(_keyword)) return 0;
-
-        return _level > GrowthSpec.KeywordMaxLevelCeiling ? GrowthSpec.KeywordMaxLevelCeiling : _level;
-    }
-
-    public static bool TryGetNextStep(CardKeyword _keyword, int _level, out GrowthStep _step)
-    {
-        _step = default;
-        if (!Supports(_keyword) || !GrowthSpec.TryGetKeywordEnhanceCost(_keyword, _level, out EnhanceCost t_cost))
-            return false;
-
-        _step = new GrowthStep(_level + 1, HpPerLevel, t_cost.Currency, t_cost.Cost, t_cost.SuccessRate);
-        return true;
-    }
-
-    static bool IsSingleKeyword(CardKeyword _keyword)
-    {
-        int t_value = (int)_keyword;
-        return t_value > 0 && (t_value & (t_value - 1)) == 0;
-    }
 }
 
 // 레벨 하나의 파생 스냅샷(GrowthRules가 곡선·비용에서 계산해 내주는 값)
@@ -172,20 +102,5 @@ public readonly struct GrowthStep
         Currency    = _currency;
         Cost        = _cost;
         SuccessRate = _successRate;
-    }
-}
-
-// 한계돌파 한 단계의 값
-public readonly struct LimitBreakStep
-{
-    public readonly int Stage;
-    public readonly int HpGain;
-    public readonly int SnackCost;
-
-    public LimitBreakStep(int _stage, int _hpGain, int _snackCost)
-    {
-        Stage     = _stage;
-        HpGain    = _hpGain;
-        SnackCost = _snackCost;
     }
 }

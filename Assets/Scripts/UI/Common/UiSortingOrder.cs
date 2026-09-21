@@ -63,7 +63,7 @@ public static class UiSortingOrder
     /// <summary>수령 버튼을 안내하는 동안만 보상 팝업을 게이트 바로 아래에 둔다.</summary>
     public const int GuidedRewardClaim = TutorialGate - 1;
 
-    /// <summary>풀에서 여는 로비 오버레이(KeywordGrowthOverlay 등). 담기는 자리인 <see cref="Pool"/>(400)는
+    /// <summary>풀에서 여는 로비 오버레이(RankRewardOverlay 등). 담기는 자리인 <see cref="Pool"/>(400)는
     /// 튜토리얼 게이트(<see cref="TutorialGate"/>)보다 위라, <b>안내가 가리켜야 하는 무대</b>는 이 층으로 내려앉는다
     /// — 자기 Canvas + overrideSorting으로 컨테이너에서 떨어져 나온다.
     /// 컨테이너 값을 내리는 것은 답이 아니다: 딤에 묻히면 안 되는 실패 팝업까지 함께 내려간다.</summary>

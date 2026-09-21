@@ -141,8 +141,7 @@ test("lockDeck first approval snapshots qualification; retry neither reads missi
       validateDeckShape: () => null, validateDeckSnapshots: () =>
         rejectValidation ? {ok: false, code: "synergy_mismatch", cardId: 1} : {ok: true}},
     "../growth/enhanceRules": {parseCardEnhanceRule: () => ({maxLimitBreak: 1, maxLevel: 3}),
-      authoredMaxLimitBreak: () => 1, parseCardEnhanceOverrides: () => [], cardEnhanceStep: () => ({})},
-    "../growth/limitBreakTable": {parseLimitBreakCurve: () => ({maxStage: 1})},
+      parseCardEnhanceOverrides: () => [], cardEnhanceStep: () => ({})},
     "../missions/missionSpec": {readMissionCatalog: async () => catalog},
     "../specs/specBlobReader": {readSpecRows: async (env, table) =>
       table === "Card" ? cards : table === "SynergyTierDef" ? tiers : [{}]},

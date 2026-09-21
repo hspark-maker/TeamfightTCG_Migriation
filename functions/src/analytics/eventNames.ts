@@ -9,8 +9,6 @@ export const EVENTS = {
   rankedBattleWon: {name: "battle.ranked_won", missionKey: "WinRankedBattle"},
   battleRewardClaimed: {name: "battle.reward_claimed"},
   cardEnhanceResolved: {name: "card.enhance_resolved", missionKey: "EnhanceCard"},
-  cardLimitBreakCompleted: {name: "card.limit_break_completed", missionKey: "LimitBreakCard"},
-  keywordEnhanced: {name: "keyword.enhanced"},
   matchCreated: {name: "match.created"},
   matchDeckLocked: {name: "match.deck_locked"},
   missionClaimed: {name: "mission.claimed"},

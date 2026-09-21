@@ -9,10 +9,9 @@ public static class GrowthStandaloneInitializer
         // CardInstance가 마스터 데이터의 키워드를 전부 열린 것으로 취급해, 강화·해금을 바꿔도 표시가 그대로다.
         BattleGrowthBridge.Install();
 
-        if (CardGrowthManager.IsReady && KeywordGrowthManager.IsReady) return true;
+        if (CardGrowthManager.IsReady) return true;
 
         // Init은 세이브 채택 이후에 부른다 — DataSaveManager.Data를 그대로 캐싱한다.
-        KeywordGrowthManager.Init();
         CardGrowthManager.Init();
         return true;
     }

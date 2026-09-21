@@ -15,7 +15,6 @@
 import {CURRENCY_KEYS, CurrencyKey} from "../currency/currencyKeys";
 import {intOf} from "../save/saveValues";
 import {BASE_LEVEL} from "./cardGrowth";
-import {isSupportedKeyword, KEYWORD_MAX_LEVEL, parseKeywordFlag} from "./keywordGrowth";
 
 /** 성공률 1000분율의 분모. */
 export const PERMILLE = 1000;
@@ -26,18 +25,8 @@ export const PERMILLE = 1000;
  */
 export const CARD_MAX_LEVEL_CEILING = 4;
 
-/**
- * 한계돌파 단계의 천장. 클라 GrowthRules.MaxLimitBreak 과 같다 —
- * 클라 LimitBreakOf 가 3 에서 클램프하므로 표가 더 큰 값을 말하면 서버만 단계를 열어 주고
- * 화면·DeckPower·덱 잠금이 어긋난다.
- */
-export const LIMIT_BREAK_STAGE_CEILING = 3;
-
 /** 카드 강화 기본 결제 재화. CardEnhanceRule 표에는 재화 열이 없다(클라는 ECurrencyType.Shard 고정). */
 const CARD_DEFAULT_CURRENCY: CurrencyKey = "Shard";
-
-/** 키워드 강화 기본 결제 재화. 클라 KeywordGrowthRules 가 ECurrencyType.Energy 고정이다. */
-const KEYWORD_DEFAULT_CURRENCY: CurrencyKey = "Energy";
 
 /** 난수원. 0 이상 max 미만의 정수를 낸다(crypto.randomInt 형태). */
 export type RollFn = (max: number) => number;
@@ -53,19 +42,8 @@ export interface EnhanceStep {
 /** CardEnhanceRule 표의 전역 1행. */
 export interface CardEnhanceRule {
   maxLevel: number;
-  /** 한계돌파 상한. 0 은 그 축이 닫혀 있다는 뜻이고 카드 강화 자체는 그대로 선다. */
-  maxLimitBreak: number;
   baseEnhanceCost: number;
   costGrowthPerLevel: number;
-}
-
-/** KeywordEnhance 표의 키워드 1행. */
-export interface KeywordEnhanceRule {
-  keyword: number;
-  maxLevel: number;
-  baseCost: number;
-  costGrowthPerLevel: number;
-  currency: CurrencyKey;
 }
 
 /**
@@ -92,28 +70,11 @@ export function parseCardEnhanceRule(rows: Record<string, unknown>[]): CardEnhan
   const maxLevel = intOf(row.maxLevel);
   if (maxLevel <= BASE_LEVEL) return null;
 
-  // maxLimitBreak <= 0 이어도 null 을 내지 않는다 — 한계돌파 열 하나가 비었다는 이유로
-  // 카드 강화 전체가 RuleUnavailable 로 죽는다. 0 은 "축이 닫혀 있다"이고 거절은 호출부가 한다.
-  const maxLimitBreak = Math.max(0, intOf(row.maxLimitBreak));
-
   return {
     maxLevel: maxLevel > CARD_MAX_LEVEL_CEILING ? CARD_MAX_LEVEL_CEILING : maxLevel,
-    maxLimitBreak: maxLimitBreak > LIMIT_BREAK_STAGE_CEILING ? LIMIT_BREAK_STAGE_CEILING : maxLimitBreak,
     baseEnhanceCost: intOf(row.baseEnhanceCost),
     costGrowthPerLevel: intOf(row.costGrowthPerLevel),
   };
-}
-
-/**
- * 표가 저작한 한계돌파 상한의 **원본**. parseCardEnhanceRule 이 이 값을 천장에서 자르는데
- * 순수 모듈이라 잘린 사실을 스스로 알릴 수 없다 — 호출부가 둘을 대조해 로그를 남긴다.
- * @param {Record<string, unknown>[]} rows CardEnhanceRule 표(id 오름차순)
- * @return {number | null} 저작값(행이 없으면 null)
- */
-export function authoredMaxLimitBreak(rows: Record<string, unknown>[]): number | null {
-  const row = rows[0];
-  if (row === undefined) return null;
-  return Math.max(0, intOf(row.maxLimitBreak));
 }
 
 /**
@@ -162,51 +123,6 @@ export function cardEnhanceStep(
   return {
     level,
     currency: CARD_DEFAULT_CURRENCY,
-    cost: cost > 0 ? cost : 0,
-    successPermille: PERMILLE,
-  };
-}
-
-/**
- * 키워드별 규칙. 지원 목록(growth/keywordGrowth) 밖 키워드 행은 버린다 —
- * 클라가 읽지 못하는 키에 레벨을 씌우면 진행도가 다음 저장에서 사라진다.
- * @param {Record<string, unknown>[]} rows KeywordEnhance 표(id 오름차순)
- * @return {Map<number, KeywordEnhanceRule>} 플래그 정수 → 규칙
- */
-export function parseKeywordEnhanceRules(rows: Record<string, unknown>[]): Map<number, KeywordEnhanceRule> {
-  const rules = new Map<number, KeywordEnhanceRule>();
-  for (const row of rows) {
-    const keyword = parseKeywordFlag(String(row.keyword ?? ""));
-    if (!isSupportedKeyword(keyword) || rules.has(keyword)) continue;
-
-    // 표 툴팁: 1 미만은 1로 올라간다. 천장은 코덱 상한이다 — 그 위 레벨은 클라가 잘라 읽어 결제가 헛돈다.
-    const maxLevel = Math.max(1, intOf(row.maxLevel));
-    rules.set(keyword, {
-      keyword,
-      maxLevel: maxLevel > KEYWORD_MAX_LEVEL ? KEYWORD_MAX_LEVEL : maxLevel,
-      baseCost: intOf(row.baseCost),
-      costGrowthPerLevel: intOf(row.costGrowthPerLevel),
-      currency: costCurrency(row.costCurrency, KEYWORD_DEFAULT_CURRENCY),
-    });
-  }
-  return rules;
-}
-
-/**
- * 레벨 level 에서 한 단계 올리는 스텝. 만렙이면 null.
- * 키워드 강화는 확률 실패가 없다(클라 TryEnhance 에 판정이 없다) — 성공률을 최대로 실어 같은 경로를 탄다.
- * @param {KeywordEnhanceRule} rule 키워드 규칙
- * @param {number} level 현재 레벨(0 = 미강화)
- * @return {EnhanceStep | null} 스텝
- */
-export function keywordEnhanceStep(rule: KeywordEnhanceRule, level: number): EnhanceStep | null {
-  if (level < 0 || level >= rule.maxLevel) return null;
-
-  const nextLevel = level + 1;
-  const cost = rule.baseCost + (nextLevel - 1) * rule.costGrowthPerLevel;
-  return {
-    level: nextLevel,
-    currency: rule.currency,
     cost: cost > 0 ? cost : 0,
     successPermille: PERMILLE,
   };

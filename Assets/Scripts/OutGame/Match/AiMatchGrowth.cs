@@ -23,8 +23,6 @@ internal static class AiMatchGrowth
         {
             if (t_row == null || !t_ids.Remove(t_row.CardId) || !CardCatalog.Contains(t_row.CardId) ||
                 t_row.Level < CardGrowth.BaseLevel || t_row.Level > CardSpec.MaxHpCurveLevel ||
-                t_row.LimitBreak < 0 || t_row.LimitBreak > 3 ||
-                (t_row.LimitBreak > 0 && t_row.Level != CardSpec.MaxHpCurveLevel) ||
                 t_row.HpBonus < 0 || t_row.EvolutionStage < 0 ||
                 t_row.EvolutionStage > CardSpec.MaxEvolutionStage || t_row.UnlockedKeywords < 0)
                 throw new InvalidOperationException("Server returned invalid AI card growth.");
@@ -40,7 +38,6 @@ internal sealed class AiMatchCardGrowth
 {
     [JsonProperty("cardId", Required = Required.Always)] public int CardId { get; set; }
     [JsonProperty("level", Required = Required.Always)] public int Level { get; set; }
-    [JsonProperty("limitBreak", Required = Required.Always)] public int LimitBreak { get; set; }
     [JsonProperty("hpBonus", Required = Required.Always)] public int HpBonus { get; set; }
     [JsonProperty("evolutionStage", Required = Required.Always)] public int EvolutionStage { get; set; }
     [JsonProperty("unlockedKeywords", Required = Required.Always)] public int UnlockedKeywords { get; set; }

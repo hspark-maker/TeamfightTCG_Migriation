@@ -1000,8 +1000,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AttendanceDayView
   dayLabel: {fileID: 7600010051}
   stateLabel: {fileID: 7600010093}
-  background: {fileID: 7600010047}
-  stateBackground: {fileID: 7600010089}
   todayBorder: {fileID: 7600010040}
   rewardGroup: {fileID: 7600010054}
   rewardSlots:
@@ -1017,9 +1015,6 @@ MonoBehaviour:
     icon: {fileID: 7600010081}
     amountLabel: {fileID: 7600010085}
     backgroundEffects: {fileID: 0}
-  normalColor: {r: 1, g: 0.98, b: 0.92, a: 1}
-  todayColor: {r: 1, g: 0.94, b: 0.71, a: 1}
-  claimedColor: {r: 0.85, g: 0.83, b: 0.77, a: 1}
 --- !u!1 &7600010040
 GameObject:
   m_ObjectHideFlags: 0
@@ -2400,8 +2395,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AttendanceDayView
   dayLabel: {fileID: 7600010108}
   stateLabel: {fileID: 7600010150}
-  background: {fileID: 7600010104}
-  stateBackground: {fileID: 7600010146}
   todayBorder: {fileID: 7600010097}
   rewardGroup: {fileID: 7600010111}
   rewardSlots:
@@ -2417,9 +2410,6 @@ MonoBehaviour:
     icon: {fileID: 7600010138}
     amountLabel: {fileID: 7600010142}
     backgroundEffects: {fileID: 0}
-  normalColor: {r: 1, g: 0.98, b: 0.92, a: 1}
-  todayColor: {r: 1, g: 0.94, b: 0.71, a: 1}
-  claimedColor: {r: 0.85, g: 0.83, b: 0.77, a: 1}
 --- !u!1 &7600010097
 GameObject:
   m_ObjectHideFlags: 0
@@ -3800,8 +3790,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AttendanceDayView
   dayLabel: {fileID: 7600010165}
   stateLabel: {fileID: 7600010207}
-  background: {fileID: 7600010161}
-  stateBackground: {fileID: 7600010203}
   todayBorder: {fileID: 7600010154}
   rewardGroup: {fileID: 7600010168}
   rewardSlots:
@@ -3817,9 +3805,6 @@ MonoBehaviour:
     icon: {fileID: 7600010195}
     amountLabel: {fileID: 7600010199}
     backgroundEffects: {fileID: 0}
-  normalColor: {r: 1, g: 0.98, b: 0.92, a: 1}
-  todayColor: {r: 1, g: 0.94, b: 0.71, a: 1}
-  claimedColor: {r: 0.85, g: 0.83, b: 0.77, a: 1}
 --- !u!1 &7600010154
 GameObject:
   m_ObjectHideFlags: 0
@@ -5200,8 +5185,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AttendanceDayView
   dayLabel: {fileID: 7600010222}
   stateLabel: {fileID: 7600010264}
-  background: {fileID: 7600010218}
-  stateBackground: {fileID: 7600010260}
   todayBorder: {fileID: 7600010211}
   rewardGroup: {fileID: 7600010225}
   rewardSlots:
@@ -5217,9 +5200,6 @@ MonoBehaviour:
     icon: {fileID: 7600010252}
     amountLabel: {fileID: 7600010256}
     backgroundEffects: {fileID: 0}
-  normalColor: {r: 1, g: 0.98, b: 0.92, a: 1}
-  todayColor: {r: 1, g: 0.94, b: 0.71, a: 1}
-  claimedColor: {r: 0.85, g: 0.83, b: 0.77, a: 1}
 --- !u!1 &7600010211
 GameObject:
   m_ObjectHideFlags: 0
@@ -6600,8 +6580,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AttendanceDayView
   dayLabel: {fileID: 7600010279}
   stateLabel: {fileID: 7600010321}
-  background: {fileID: 7600010275}
-  stateBackground: {fileID: 7600010317}
   todayBorder: {fileID: 7600010268}
   rewardGroup: {fileID: 7600010282}
   rewardSlots:
@@ -6617,9 +6595,6 @@ MonoBehaviour:
     icon: {fileID: 7600010309}
     amountLabel: {fileID: 7600010313}
     backgroundEffects: {fileID: 0}
-  normalColor: {r: 1, g: 0.98, b: 0.92, a: 1}
-  todayColor: {r: 1, g: 0.94, b: 0.71, a: 1}
-  claimedColor: {r: 0.85, g: 0.83, b: 0.77, a: 1}
 --- !u!1 &7600010268
 GameObject:
   m_ObjectHideFlags: 0
@@ -8000,8 +7975,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AttendanceDayView
   dayLabel: {fileID: 7600010336}
   stateLabel: {fileID: 7600010378}
-  background: {fileID: 7600010332}
-  stateBackground: {fileID: 7600010374}
   todayBorder: {fileID: 7600010325}
   rewardGroup: {fileID: 7600010339}
   rewardSlots:
@@ -8017,9 +7990,6 @@ MonoBehaviour:
     icon: {fileID: 7600010366}
     amountLabel: {fileID: 7600010370}
     backgroundEffects: {fileID: 0}
-  normalColor: {r: 1, g: 0.98, b: 0.92, a: 1}
-  todayColor: {r: 1, g: 0.94, b: 0.71, a: 1}
-  claimedColor: {r: 0.85, g: 0.83, b: 0.77, a: 1}
 --- !u!1 &7600010325
 GameObject:
   m_ObjectHideFlags: 0
@@ -9401,8 +9371,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AttendanceDayView
   dayLabel: {fileID: 7600010393}
   stateLabel: {fileID: 7600010439}
-  background: {fileID: 7600010389}
-  stateBackground: {fileID: 7600010435}
   todayBorder: {fileID: 7600010382}
   rewardGroup: {fileID: 7600010400}
   rewardSlots:
@@ -9418,9 +9386,6 @@ MonoBehaviour:
     icon: {fileID: 7600010427}
     amountLabel: {fileID: 7600010431}
     backgroundEffects: {fileID: 0}
-  normalColor: {r: 1, g: 0.95, b: 0.79, a: 1}
-  todayColor: {r: 1, g: 0.94, b: 0.71, a: 1}
-  claimedColor: {r: 0.85, g: 0.83, b: 0.77, a: 1}
 --- !u!1 &7600010382
 GameObject:
   m_ObjectHideFlags: 0

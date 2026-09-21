@@ -46,6 +46,8 @@ const analyticsEvent_1 = require("../observability/analyticsEvent");
 const missionStore_1 = require("../missions/missionStore");
 const guideProgress_1 = require("../missions/guideProgress");
 const guideSynergyBattle_1 = require("../missions/guideSynergyBattle");
+const achievementProgress_1 = require("../achievements/achievementProgress");
+const achievementStore_1 = require("../achievements/achievementStore");
 const period_1 = require("../missions/period");
 const matchResult_1 = require("../matchResult");
 const payout_1 = require("../payout");
@@ -256,6 +258,11 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
     const matchRef = firebaseApp_1.db.doc(`envs/${data.env}/matches/${data.matchId}`);
     const initialMatch = (await matchRef.get()).data();
     const adventureMatch = typeof initialMatch?.adventureNodeId === "string";
+    const achievementPins = (0, battleReplayService_1.parseSpecPins)(data.env, initialMatch?.specPins);
+    const [achievementCards, achievementTiers] = achievementPins === null ? [[], []] : await Promise.all([
+        (0, specBlobReader_1.readPinnedSpecRows)(data.env, "Card", achievementPins.Card),
+        (0, specBlobReader_1.readPinnedSpecRows)(data.env, "SynergyTierDef", achievementPins.SynergyTierDef),
+    ]);
     const cardTable = "Card";
     // 표 3개를 블롭으로 읽는다 — 행 문서를 훑으면 제출 1건마다 행 수만큼(Reward 85 · Card 41 …) 과금된다.
     // readSpecRows 가 (env, table) 단위로 5분 캐시를 이미 갖고 있다(specs/specBlobReader.ts).
@@ -563,7 +570,8 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
         const rankStateRefs = adventureNodeId != null ? [] : entries.map((entry) => firebaseApp_1.db.doc(`envs/${data.env}/users/${entry.uid}/payoutState/current`));
         const saveRefs = entries.map((entry) => firebaseApp_1.db.doc(`envs/${data.env}/users/${entry.uid}/save/current`));
         const missionRefs = entries.map((entry) => (0, missionStore_1.missionsRef)(firebaseApp_1.db, data.env, entry.uid));
-        const snapshots = await tx.getAll(...rankRefs, ...rankStateRefs, ...saveRefs, ...missionRefs);
+        const achievementRefs = entries.map((entry) => (0, achievementStore_1.achievementsRef)(firebaseApp_1.db, data.env, entry.uid));
+        const snapshots = await tx.getAll(...rankRefs, ...rankStateRefs, ...saveRefs, ...missionRefs, ...achievementRefs);
         const count = entries.length;
         const rankSnapshots = snapshots.slice(0, rankRefs.length);
         const rankStateSnapshots = snapshots.slice(rankRefs.length, rankRefs.length + rankStateRefs.length);
@@ -692,6 +700,24 @@ exports.submitMatchResult = (0, https_1.onCall)({ enforceAppCheck: false, timeou
             }
             // 참가자별 모든 카운터를 누적한 뒤 정산과 같은 커밋에 한 번만 저장한다.
             (0, missionStore_1.commitMissionBumps)(tx, bump, increments, missionNow);
+            if (authoritativeRules && serverReplay?.ok === true && owner >= 0 && owner <= 1) {
+                if (JSON.stringify(achievementPins) !== JSON.stringify((0, battleReplayService_1.parseSpecPins)(data.env, match?.specPins))) {
+                    throw new https_1.HttpsError("unavailable", "Match achievement specs changed; retry settlement.");
+                }
+                const state = (0, achievementStore_1.readAchievements)(snapshots[saveOffset + count * 2 + i]);
+                const approval = (0, payloadGuards_1.objectRecord)(approvals?.[entries[i].uid]);
+                const approvedCards = Array.isArray(approval?.cardSnapshots) ? approval.cardSnapshots : [];
+                const simulation = serverReplay.outcome;
+                (0, achievementProgress_1.applyAchievementBattle)(state, {
+                    verified: true,
+                    tutorial: match?.tutorial === true || match?.mode === "tutorial",
+                    won: simulation.winnerOwner === owner,
+                    draw: simulation.draw,
+                    destroyed: destroyedByOwner?.[owner] ?? 0,
+                    synergies: (0, achievementProgress_1.activeAchievementSynergies)(approvedCards, achievementCards, achievementTiers),
+                });
+                (0, achievementStore_1.writeAchievements)(tx, achievementRefs[i], state, missionNow);
+            }
         }
         // 클라 발산율의 유일한 조회 수단이다. 문서에만 쌓으면 집계할 방법이 없다.
         // simulateRules 가 false 여도 찍는다 — 로그가 아예 없으면 "재생이 실패했다"와

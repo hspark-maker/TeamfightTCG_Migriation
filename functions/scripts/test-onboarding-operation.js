@@ -13,6 +13,7 @@ class Ref {
 async function runTransaction(callback, options) {
   const staged = [];
   const transaction = {
+    async get(ref) { return (await this.getAll(ref))[0]; },
     async getAll(...refs) {
       assert.equal(staged.length, 0, "Firestore reads must precede writes");
       reads += refs.length;
@@ -91,6 +92,7 @@ async function recover(args = {packId: "starter"}, uid = "test-user") {
   assert.equal(recovered.operation.result.wallet, undefined);
   assert.equal(recovered.operation.result.updatedSlots, undefined);
   assert.equal(recovered.operation.result.missions, undefined);
+  assert.equal(recovered.operation.result.achievements, undefined);
   assert.equal(recovered.current.save.revision, 9);
   assert.equal(recovered.current.wallet.rev, 7);
   assert.deepEqual(recovered.current.save.ownership.cardIds, [17, 22]);

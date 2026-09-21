@@ -14,6 +14,8 @@ import {recordEvent} from "../observability/analyticsEvent";
 import {commitMissionBumps, missionBumpFromSnapshot, missionsRef} from "../missions/missionStore";
 import {evaluateGuideRankProgress} from "../missions/guideProgress";
 import {completeGuideSynergyBattle} from "../missions/guideSynergyBattle";
+import {activeAchievementSynergies, applyAchievementBattle} from "../achievements/achievementProgress";
+import {achievementsRef, readAchievements, writeAchievements} from "../achievements/achievementStore";
 import {missionPeriod} from "../missions/period";
 import {
   decideMatch,
@@ -39,11 +41,12 @@ import {HEX_16, HEX_32, HEX_64, objectRecord, safeInteger} from "../match/payloa
 import {
   buildAiDeckSnapshots,
   CardSpecForValidation,
+  CardSnapshot,
   computeDeckHash,
   parseCardSpecRow,
   readAiDeckSnapshots,
 } from "../deckValidation";
-import {readSpecRows} from "../specs/specBlobReader";
+import {readPinnedSpecRows, readSpecRows} from "../specs/specBlobReader";
 import {SERVER_AUTHORITATIVE_RULESET_VERSION} from "../matchPairing";
 import {
   BattleReplayOutcome,
@@ -291,6 +294,11 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
   const matchRef = db.doc(`envs/${data.env}/matches/${data.matchId}`);
   const initialMatch = (await matchRef.get()).data();
   const adventureMatch = typeof initialMatch?.adventureNodeId === "string";
+  const achievementPins = parseSpecPins(data.env, initialMatch?.specPins);
+  const [achievementCards, achievementTiers] = achievementPins === null ? [[], []] : await Promise.all([
+    readPinnedSpecRows(data.env, "Card", achievementPins.Card),
+    readPinnedSpecRows(data.env, "SynergyTierDef", achievementPins.SynergyTierDef),
+  ]);
   const cardTable = "Card";
   // 표 3개를 블롭으로 읽는다 — 행 문서를 훑으면 제출 1건마다 행 수만큼(Reward 85 · Card 41 …) 과금된다.
   // readSpecRows 가 (env, table) 단위로 5분 캐시를 이미 갖고 있다(specs/specBlobReader.ts).
@@ -594,7 +602,8 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
     const saveRefs = entries.map((entry) =>
       db.doc(`envs/${data.env}/users/${entry.uid}/save/current`));
     const missionRefs = entries.map((entry) => missionsRef(db, data.env, entry.uid));
-    const snapshots = await tx.getAll(...rankRefs, ...rankStateRefs, ...saveRefs, ...missionRefs);
+    const achievementRefs = entries.map((entry) => achievementsRef(db, data.env, entry.uid));
+    const snapshots = await tx.getAll(...rankRefs, ...rankStateRefs, ...saveRefs, ...missionRefs, ...achievementRefs);
     const count = entries.length;
     const rankSnapshots = snapshots.slice(0, rankRefs.length);
     const rankStateSnapshots = snapshots.slice(rankRefs.length, rankRefs.length + rankStateRefs.length);
@@ -729,6 +738,24 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
       }
       // 참가자별 모든 카운터를 누적한 뒤 정산과 같은 커밋에 한 번만 저장한다.
       commitMissionBumps(tx, bump, increments, missionNow);
+      if (authoritativeRules && serverReplay?.ok === true && owner >= 0 && owner <= 1) {
+        if (JSON.stringify(achievementPins) !== JSON.stringify(parseSpecPins(data.env, match?.specPins))) {
+          throw new HttpsError("unavailable", "Match achievement specs changed; retry settlement.");
+        }
+        const state = readAchievements(snapshots[saveOffset + count * 2 + i]);
+        const approval = objectRecord(approvals?.[entries[i].uid]);
+        const approvedCards = Array.isArray(approval?.cardSnapshots) ? approval.cardSnapshots as CardSnapshot[] : [];
+        const simulation = serverReplay.outcome;
+        applyAchievementBattle(state, {
+          verified: true,
+          tutorial: match?.tutorial === true || match?.mode === "tutorial",
+          won: simulation.winnerOwner === owner,
+          draw: simulation.draw,
+          destroyed: destroyedByOwner?.[owner] ?? 0,
+          synergies: activeAchievementSynergies(approvedCards, achievementCards, achievementTiers),
+        });
+        writeAchievements(tx, achievementRefs[i], state, missionNow);
+      }
     }
 
     // 클라 발산율의 유일한 조회 수단이다. 문서에만 쌓으면 집계할 방법이 없다.

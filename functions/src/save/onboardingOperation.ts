@@ -19,11 +19,13 @@ export function onboardingFingerprint(command: string, args: Record<string, unkn
     normalized = {cardId: Number(args.cardId ?? 0), amount: args.amount ?? 1,
       freeShot: command === "enhanceSynergyIntroduction" || args.freeShot === true};
     break;
-  case "enhanceKeyword":
-    normalized = {keyword: Number(args.keyword ?? 0), freeShot: args.freeShot === true};
-    break;
+  // 폐기된 한계돌파의 과거 처리 기록 조회용 지문. 실행 callable은 제공하지 않는다.
   case "limitBreakCard":
     normalized = {cardId: Number(args.cardId ?? 0)};
+    break;
+  // 폐기 명령의 읽기 전용 복구 호환. 과거 영수증 조회용 지문만 유지하며 callable은 제공하지 않는다.
+  case "enhanceKeyword":
+    normalized = {keyword: Number(args.keyword ?? 0), freeShot: args.freeShot === true};
     break;
   default:
     throw new Error(`Unsupported onboarding command: ${command}`);
@@ -56,5 +58,6 @@ export function onboardingResult(cached: Record<string, unknown>): Record<string
   delete result.slotKeys;
   delete result.wallet;
   delete result.missions;
+  delete result.achievements;
   return result;
 }

@@ -15,11 +15,11 @@ import {beginMissionBump, commitMissionProgress, missionResponse, MissionRespons
 import {missionPeriod} from "../missions/period";
 import {readMissionCatalog} from "../missions/missionSpec";
 import {applyGuideProgress} from "../missions/guideMutation";
-import {applySnackGrowthProgress} from "../missions/snackGrowthProgress";
 import {readSpecRows} from "../specs/specBlobReader";
 import {EVENTS} from "../analytics/eventNames";
 import {recordEvent} from "../observability/analyticsEvent";
-import {drawRouletteSlot, resolveRouletteBoard, RouletteSlot, isLegacyRouletteReceipt} from "../roulette/rouletteDraw";
+import {resolveRouletteBoard, RouletteSlot, isLegacyRouletteReceipt} from "../roulette/rouletteDraw";
+import {drawRouletteCycle, rouletteCycleKey} from "../roulette/rouletteCycle";
 import {MAX_ROULETTE_ID_LENGTH, readRouletteHeaderRow, readRouletteSlotRows} from "../roulette/rouletteSpecReader";
 
 /**
@@ -99,10 +99,12 @@ export const spinRoulette = onCall(async (request) => {
   let drawn: RouletteSlot | null = null;
   let itemGrant: GrantedItems = {slots: {}, cards: [], currencies: []};
   let granted: RewardGain[] = [];
+  const cycleRef = db.doc(`envs/${env}/users/${uid}/rouletteCycles/${rouletteCycleKey(rouletteId)}`);
 
   const result = await mutateSave(env, uid, "spinRoulette", {kind: "client", txId},
     async (current, transaction, wallet) => {
       missionState = undefined;
+      const cycleSnapshot = await transaction.get(cycleRef);
       const rank = itemContext ? await transaction.get(rankRef(db, env, uid)) : null;
       const balances = wallet.balances;
       if (!canAfford(balances, board.priceType, board.price)) {
@@ -112,10 +114,7 @@ export const spinRoulette = onCall(async (request) => {
 
       // 추첨이 콜백 안이어야 한다 — 밖에서 뽑으면 경합으로 트랜잭션이 재실행될 때
       // 옛 잔액 기준으로 정한 상품을 새 잔액에 얹는다.
-      const slot = drawRouletteSlot(board.slots, randomInt);
-      if (slot === null) {
-        reject("EmptyPool", `Roulette '${rouletteId}' has no drawable slot.`, context);
-      }
+      const {slot, cycle} = drawRouletteCycle(board.slots, cycleSnapshot.data(), randomInt);
       drawn = slot;
       itemGrant = slot.rewardType === "Pack" ? grantRewardItems(current,
         [{rewardType: "Pack", rewardId: slot.rewardId, amount: slot.amount}], itemContext!, rewardRows, "",
@@ -126,7 +125,6 @@ export const spinRoulette = onCall(async (request) => {
       if (itemContext && itemGrant.cards.length > 0) {
         const missions = await beginMissionBump(transaction, db, env, uid, period, current);
         applyGuideProgress(missions, current, itemGrant.slots, itemContext.cards, catalog);
-        applySnackGrowthProgress(missions, itemGrant.cards);
         commitMissionProgress(transaction, missions, FieldValue.serverTimestamp());
         missionState = missionResponse(missions.state, period, catalog);
       }
@@ -134,6 +132,8 @@ export const spinRoulette = onCall(async (request) => {
       // 차감과 지급을 한 nextWallet 으로 묶는다 — 영수증 changes 가 순증감 한 줄로 남아야 한다.
       const paid = spend(balances, board.priceType, board.price);
       const after = grant(paid, granted);
+      // 미션의 추가 읽기도 끝난 뒤 기록한다. 거절·경합·재전송으로 당첨 몫만 소모되지 않는다.
+      transaction.set(cycleRef, cycle);
       return {slots: itemGrant.slots, wallet: nextWallet(wallet, after, "spinRoulette")};
     },
     (adopted) => {

@@ -10,7 +10,6 @@ using UnityEngine;
 // 리소스만 빌드한다. 스펙 임포터·앱 빌드·서버 명령은 실행하지 않는다.
 public static class FirebaseResourceBuild
 {
-    [MenuItem("Tools/Addressables/Build Firebase Resources")]
     public static void Build()
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode)

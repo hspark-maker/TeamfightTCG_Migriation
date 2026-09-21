@@ -14,7 +14,6 @@
     <type fullname="&lt;&gt;f__AnonymousType*" preserve="all"/>
     <!-- 응답·중첩 모델의 setter도 직접 호출되지 않으므로 각 타입을 보존한다. -->
     <type fullname="ReportAdventureWinResult" preserve="all"/>
-    <type fullname="SnackGrowthResult" preserve="all"/>
     <type fullname="OutgameDebugActions/DebugRankResult" preserve="all"/>
     <type fullname="AiMatchCardGrowth" preserve="all"/>
     <type fullname="MatchTicketVerifyResult" preserve="all"/>
@@ -26,6 +25,11 @@
     <type fullname="MissionReward" preserve="all"/>
     <type fullname="MissionGetResponse" preserve="all"/>
     <type fullname="ClaimMissionResult" preserve="all"/>
+    <type fullname="AchievementSnapshot" preserve="all"/>
+    <type fullname="AchievementDefinition" preserve="all"/>
+    <type fullname="AchievementReward" preserve="all"/>
+    <type fullname="AchievementGetResponse" preserve="all"/>
+    <type fullname="ClaimAchievementResult" preserve="all"/>
     <type fullname="AttendanceResponse" preserve="all"/>
     <type fullname="AttendanceState" preserve="all"/>
     <type fullname="AttendanceDay" preserve="all"/>
@@ -53,7 +57,6 @@
     <type fullname="DeckSlotSaveData" preserve="all"/>
     <type fullname="CardGrowthSaveData" preserve="all"/>
     <type fullname="CardGrowthEntry" preserve="all"/>
-    <type fullname="KeywordGrowthSaveData" preserve="all"/>
     <type fullname="RankSaveData" preserve="all"/>
     <type fullname="AlbumRewardSaveData" preserve="all"/>
     <type fullname="TournamentSaveData" preserve="all"/>
@@ -79,9 +82,7 @@
     <type fullname="OpenPackResult" preserve="all"/>
     <type fullname="OpenPackCard" preserve="all"/>
     <type fullname="EnhanceCardResult" preserve="all"/>
-    <type fullname="EnhanceKeywordResult" preserve="all"/>
     <type fullname="GrantTutorialCardsResult" preserve="all"/>
-    <type fullname="LimitBreakCardResult" preserve="all"/>
     <type fullname="ReportTournamentWinResult" preserve="all" />
   </assembly>
   <assembly fullname="Firebase.Firestore" preserve="all"/>

@@ -52,6 +52,9 @@ public sealed class MissionRewardStrip : MonoBehaviour, IUIInitializable
         this.HideDetails();
     }
 
+    internal void BindCurrencies(List<ClaimRewardGain> _currencies)
+        => Bind(new MissionReward { Currencies = _currencies });
+
     internal void Bind(MissionReward _reward)
     {
         this.InitializeUI();

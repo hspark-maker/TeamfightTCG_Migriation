@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LIMIT_BREAK_CURVE_SHRUNK = exports.LOCKED_DECK_SIZE = void 0;
+exports.LOCKED_DECK_SIZE = void 0;
 exports.parseAiCardGrowth = parseAiCardGrowth;
 exports.readAiDeckSnapshots = readAiDeckSnapshots;
 exports.parseCardSpecRow = parseCardSpecRow;
@@ -10,8 +10,6 @@ exports.validateDeckSnapshots = validateDeckSnapshots;
 exports.computeDeckHash = computeDeckHash;
 const node_crypto_1 = require("node:crypto");
 const cardGrowth_1 = require("./growth/cardGrowth");
-const enhanceRules_1 = require("./growth/enhanceRules");
-const limitBreakTable_1 = require("./growth/limitBreakTable");
 // 카드 ID에 묶인 성장 계약. 슬롯 정렬이나 셔플로 성장 대상이 바뀌지 않는다.
 function parseAiCardGrowth(cardIds, raw) {
     if (cardIds.length !== exports.LOCKED_DECK_SIZE || new Set(cardIds).size !== cardIds.length ||
@@ -24,15 +22,12 @@ function parseAiCardGrowth(cardIds, raw) {
         const row = record(item);
         if (row == null)
             return null;
-        const { cardId, level, limitBreak } = row;
+        const { cardId, level } = row;
         if (typeof cardId !== "number" || !cardIds.includes(cardId) || seen.has(cardId) ||
-            typeof level !== "number" || !Number.isSafeInteger(level) || level < BASE_LEVEL || level > MAX_LEVEL ||
-            typeof limitBreak !== "number" || !Number.isSafeInteger(limitBreak) ||
-            limitBreak < 0 || limitBreak > enhanceRules_1.LIMIT_BREAK_STAGE_CEILING ||
-            (limitBreak > 0 && level !== MAX_LEVEL))
+            typeof level !== "number" || !Number.isSafeInteger(level) || level < BASE_LEVEL || level > MAX_LEVEL)
             return null;
         seen.add(cardId);
-        result.push({ cardId, level, limitBreak });
+        result.push({ cardId, level });
     }
     return result.sort((a, b) => a.cardId - b.cardId);
 }
@@ -58,19 +53,10 @@ function readAiDeckSnapshots(cardIds, rawGrowth, rawSnapshots) {
     return snapshots;
 }
 exports.LOCKED_DECK_SIZE = 6;
-/**
- * 저장된 한계돌파 단계가 **코드 천장 이하인데 곡선만 넘을 때**의 실패 코드.
- *
- * 위조가 아니라 표 사고다 — 서버가 이미 지급한 단계를 곡선 축소·행 결손이 뒤늦게 부정한 것이라,
- * 호출부는 이 코드만 rejectLock 이 아닌 unavailable 로 접어야 한다(매치 문서에 rejected 를 박으면
- * 아무 잘못 없는 상대 몫까지 그 매치가 통째로 탄다).
- */
-exports.LIMIT_BREAK_CURVE_SHRUNK = "limit_break_curve_shrunk";
 const BASE_LEVEL = 1;
 const MAX_LEVEL = 4;
 const FIRST_EVOLUTION_LEVEL = 3;
 const SECOND_EVOLUTION_LEVEL = 4;
-const MAX_KEYWORD_GROWTH = 10;
 const KEYWORD_FLAGS = {
     Ranged: 1,
     Peerless: 2,
@@ -83,14 +69,6 @@ const KEYWORD_FLAGS = {
     BonusHp: 256,
     Immortal: 512,
 };
-const GROWABLE_KEYWORDS = [
-    "Ranged",
-    "Peerless",
-    "Execution",
-    "Taunt",
-    "Cunning",
-    "Healer",
-];
 function integer(value) {
     if (typeof value === "number" && Number.isSafeInteger(value))
         return value;
@@ -175,29 +153,26 @@ function parseCardSpecRow(raw) {
  * @param {number[]} cardIds 카드 ID 배열
  * @param {number | AiCardGrowth[]} rawLevel 구 공통 레벨 또는 카드별 성장
  * @param {object} specs 카드 스펙 맵
- * @param {LimitBreakCurve} curve 한계돌파 곡선
  * @return {object} 카드 스냅샷 배열 또는 null
  */
-function buildAiDeckSnapshots(cardIds, rawLevel, specs, curve) {
+function buildAiDeckSnapshots(cardIds, rawLevel, specs) {
     if (cardIds.length !== exports.LOCKED_DECK_SIZE || new Set(cardIds).size !== cardIds.length ||
         (typeof rawLevel === "number" && !Number.isSafeInteger(rawLevel)))
         return null;
     const growth = parseAiCardGrowth(cardIds, typeof rawLevel === "number" ?
-        cardIds.map((cardId) => ({ cardId, level: Math.max(BASE_LEVEL, Math.min(MAX_LEVEL, rawLevel)), limitBreak: 0 })) :
+        cardIds.map((cardId) => ({ cardId, level: Math.max(BASE_LEVEL, Math.min(MAX_LEVEL, rawLevel)) })) :
         rawLevel);
     if (growth == null)
         return null;
     const snapshots = [];
-    for (const { cardId, level, limitBreak } of growth) {
+    for (const { cardId, level } of growth) {
         const spec = specs.get(cardId);
-        if (spec == null || (limitBreak > 0 && (curve == null || limitBreak > curve.maxStage)))
+        if (spec == null)
             return null;
         const gains = [0, 0, spec.hp2, spec.hp3, spec.hp4];
         let hpBonus = 0;
         for (let current = BASE_LEVEL + 1; current <= level; current++)
             hpBonus += gains[current];
-        if (limitBreak > 0 && curve != null)
-            hpBonus += (0, limitBreakTable_1.limitBreakHpBonus)(curve, limitBreak);
         snapshots.push({
             cardId,
             level,
@@ -237,42 +212,24 @@ function savedGrowth(save, cardId) {
     const entries = growth == null ? null : record(growth.entries);
     const entry = entries == null ? null : record(entries[String(cardId)]);
     if (entry == null)
-        return { level: BASE_LEVEL, limitBreak: 0, shardProgress: 0 };
+        return { level: BASE_LEVEL, shardProgress: 0 };
     const level = integer(entry.level);
-    const limitBreak = integer(entry.limitBreak);
-    if (level == null || limitBreak == null)
+    if (level == null)
         return null;
     const shardProgress = entry.shardProgress == null ? 0 : integer(entry.shardProgress);
     if (shardProgress == null || shardProgress < 0)
         return null;
-    return { level, limitBreak, shardProgress };
+    return { level, shardProgress };
 }
-function keywordGrowthLevels(save) {
-    const growth = record(save.keywordGrowth);
-    return growth == null ? null : record(growth.levels);
-}
-function expectedHpBonus(spec, level, limitBreak, curve, unlockedKeywords, levels) {
+function expectedHpBonus(spec, level) {
     const gains = [0, 0, spec.hp2, spec.hp3, spec.hp4];
     let result = 0;
     for (let current = BASE_LEVEL + 1; current <= Math.min(level, MAX_LEVEL); current++) {
         result += gains[current];
     }
-    // 한계돌파 가산도 누적이다 — 위 레벨 루프와 같은 성격이라 곡선의 1..stage 합을 쓴다.
-    result += (0, limitBreakTable_1.limitBreakHpBonus)(curve, limitBreak);
-    for (const name of GROWABLE_KEYWORDS) {
-        if ((unlockedKeywords & KEYWORD_FLAGS[name]) === 0)
-            continue;
-        const key = String(KEYWORD_FLAGS[name]);
-        const savedLevel = levels[key] == null ? 0 : integer(levels[key]);
-        if (savedLevel == null || savedLevel < 0 || savedLevel > MAX_KEYWORD_GROWTH)
-            return null;
-        result += savedLevel;
-    }
     return result;
 }
-// 한계돌파 곡선은 **필수 인자**다. 선택 인자에 하드코딩 폴백을 두면 곡선의 진실원이 다시 둘이 된다
-// — 순수 모듈이라 표를 스스로 못 읽으므로 호출부(lockDeck)가 읽어 주입한다.
-function validateDeckSnapshots(snapshots, specs, rawSave, limitBreak, enhanceSteps = new Map()) {
+function validateDeckSnapshots(snapshots, specs, rawSave, enhanceSteps = new Map()) {
     const save = record(rawSave);
     if (save == null)
         return fail("save_shape_invalid", 0);
@@ -287,9 +244,6 @@ function validateDeckSnapshots(snapshots, specs, rawSave, limitBreak, enhanceSte
             return fail("ownership_shape_invalid", 0);
         owned.add(id);
     }
-    const levels = keywordGrowthLevels(save);
-    if (levels == null)
-        return fail("keyword_growth_shape_invalid", 0);
     for (const snapshot of snapshots) {
         const spec = specs.get(snapshot.cardId);
         if (spec == null)
@@ -300,20 +254,13 @@ function validateDeckSnapshots(snapshots, specs, rawSave, limitBreak, enhanceSte
         if (growth == null)
             return fail("card_growth_shape_invalid", snapshot.cardId);
         // 천장 초과는 **위조**다. 어떤 표로도 그 값이 나올 수 없으므로 지금처럼 덱을 거절한다.
-        if (growth.level < BASE_LEVEL || growth.level > MAX_LEVEL ||
-            growth.limitBreak < 0 || growth.limitBreak > enhanceRules_1.LIMIT_BREAK_STAGE_CEILING) {
+        if (growth.level < BASE_LEVEL || growth.level > MAX_LEVEL) {
             return fail("saved_growth_out_of_range", snapshot.cardId);
-        }
-        // 천장 이하인데 곡선만 넘었다 = 표가 깎인 것이다. 갈래를 나눠 호출부가 거절과 표 사고를 구별한다.
-        if (growth.limitBreak > limitBreak.maxStage) {
-            return fail(exports.LIMIT_BREAK_CURVE_SHRUNK, snapshot.cardId);
         }
         if (snapshot.level !== growth.level)
             return fail("level_mismatch", snapshot.cardId);
         const unlocked = snapshot.level >= spec.keywordUnlockLevel ? spec.keywords : 0;
-        let hpBonus = expectedHpBonus(spec, snapshot.level, growth.limitBreak, limitBreak, unlocked, levels);
-        if (hpBonus == null)
-            return fail("keyword_growth_out_of_range", snapshot.cardId);
+        let hpBonus = expectedHpBonus(spec, snapshot.level);
         if (growth.shardProgress > 0 && growth.level < MAX_LEVEL) {
             const step = enhanceSteps.get(growth.level + 1);
             if (step == null)

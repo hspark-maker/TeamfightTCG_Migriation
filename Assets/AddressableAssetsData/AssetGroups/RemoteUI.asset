@@ -15,6 +15,13 @@ MonoBehaviour:
   m_GroupName: RemoteUI
   m_GUID: c993a00f3241b5846818633e56411b36
   m_SerializeEntries:
+  - m_GUID: 2d190845db3641e28ab71bf380f4d0de
+    m_Address: AchievementPanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 02aab46ebb075e94b8f1d49d31c05343
     m_Address: Atlases/UISharedButtons
     m_ReadOnly: 0
@@ -135,13 +142,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteUI
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4124b08d48d20e947a8ce81242bc1032
-    m_Address: KeywordGrowthPanel
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteUI
-    - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 433bc64ee546c684e85071d606a25a87
     m_Address: SyncUiPrefabCatalog

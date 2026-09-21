@@ -7,8 +7,6 @@ using UnityEngine;
 // 둘이 엇갈렸을 때 이기는 쪽은 언제나 서버다 — 서버 거절이 나오는 것이 정상 동작이다.
 public static class CardPackOpener
 {
-    // 중복 1장이 주는 간식 수. 실제 적립은 서버가 하고, 이 값은 표시·검증 기준선이다.
-    public const int SnackPerDuplicate = 1;
 
     // 거절 사유의 계약 코드. 서버 rejectDomain 이 message 앞머리에 실어 보내고
     // ServerCommandRejectedException.Reason 이 그것을 떼어 준다.
@@ -128,7 +126,7 @@ public static class CardPackOpener
                 OpenPackCard t_card = t_cards[t_i];
                 if (t_card == null || t_card.CardId <= 0) continue;
 
-                t_drawn.Add(new DrawnCard(t_card.CardId, t_card.IsNew, t_card.Snack, t_card.SnackGrowth));
+                t_drawn.Add(new DrawnCard(t_card.CardId, t_card.IsNew));
             }
         }
 

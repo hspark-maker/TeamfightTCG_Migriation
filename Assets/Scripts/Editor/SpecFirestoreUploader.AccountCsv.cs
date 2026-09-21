@@ -7,6 +7,24 @@ using System.Reflection;
 
 public static partial class SpecFirestoreUploader
 {
+    // 업적은 CSV에서 서버로만 발행하며 생성 테이블과 bytes에 추가하지 않는다.
+    sealed class AchievementUploadRow
+    {
+        public int id;
+        public string achievementId;
+        public string groupId;
+        public int stage;
+        public string eventKey;
+        public string synergyId;
+        public int targetCount;
+        public string title;
+        public string description;
+        public string rewardCurrency;
+        public long rewardAmount;
+        public int sortOrder;
+        public int enabled;
+    }
+
     // 발행 전용 DTO. 자동 생성 Mission과 SpecData.bytes를 수정하지 않는다.
     sealed class MissionUploadRow
     {
@@ -46,7 +64,8 @@ public static partial class SpecFirestoreUploader
     {
         _rows = null;
         _error = null;
-        Type t_type = _table == "Mission" ? typeof(MissionUploadRow) :
+        Type t_type = _table == "Achievement" ? typeof(AchievementUploadRow) :
+            _table == "Mission" ? typeof(MissionUploadRow) :
             _table == "AccountLevel" ? typeof(AccountLevel) : _table == "Reward" ? typeof(Reward) : null;
         if (t_type == null || !SpecDocsCsvExporter.TryParseCsv(_csv, out List<List<string>> t_matrix))
         { _error = $"{_table} CSV 형식 오류."; return false; }
