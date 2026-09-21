@@ -1317,8 +1317,7 @@ MonoBehaviour:
   packPopDuration: 0.14
   packGatherScale: 0.15
   packArcHeight: 160
-  levelUpTarget: {fileID: 7506216988818169143}
-  levelUpPrefab: {fileID: 5167354530381438290, guid: f882946c67d9fe4498cf73d056399e48, type: 3}
+  levelUpAvatar: {fileID: 2000266573669376334}
 --- !u!114 &7770487399785170923
 MonoBehaviour:
   m_ObjectHideFlags: 0

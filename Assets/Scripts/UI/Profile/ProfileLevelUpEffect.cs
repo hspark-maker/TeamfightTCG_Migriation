@@ -12,7 +12,7 @@ public sealed class ProfileLevelUpEffect : MonoBehaviour
     [SerializeField] TMP_Text levelText;
     [Header("표현")]
     [SerializeField] Color lightTint = new Color(1f, 0.87f, 0.45f, 1f);
-    [SerializeField] string levelFormat = "LEVEL UP · Lv.{0}";
+    [SerializeField] string levelFormat = "LEVEL UP";
     [SerializeField, Min(0f)] float labelGap = 20f;
     [SerializeField, Min(0f)] float edgePadding = 20f;
     [SerializeField, Min(0.1f)] float flashSize = 1.5f;
@@ -26,6 +26,7 @@ public sealed class ProfileLevelUpEffect : MonoBehaviour
 
     Sequence _sequence;
     RectTransform _target;
+    Canvas _canvas;
 
     public bool IsPlaying => _sequence != null && _sequence.IsActive();
     public bool IsWired => visibility != null && flash != null && ring != null && levelText != null;
@@ -36,13 +37,14 @@ public sealed class ProfileLevelUpEffect : MonoBehaviour
         if (!IsWired || target == null || !target.gameObject.activeInHierarchy || level <= 0) return false;
         Stop();
         _target = target;
+        _canvas = target.GetComponentInParent<Canvas>();
         gameObject.SetActive(true);
         visibility.alpha = 0f;
         visibility.interactable = false;
         visibility.blocksRaycasts = false;
         flash.raycastTarget = ring.raycastTarget = levelText.raycastTarget = false;
         flash.color = ring.color = lightTint;
-        levelText.text = string.Format(levelFormat, level);
+        levelText.text = levelFormat;
         flash.rectTransform.localScale = Vector3.one;
         ring.rectTransform.localScale = Vector3.one * ringStartScale;
         Place();
@@ -65,6 +67,7 @@ public sealed class ProfileLevelUpEffect : MonoBehaviour
         _sequence = null;
         sequence?.Kill();
         _target = null;
+        _canvas = null;
         if (visibility != null) visibility.alpha = 0f;
         if (gameObject.activeSelf) gameObject.SetActive(false);
     }
@@ -81,6 +84,15 @@ public sealed class ProfileLevelUpEffect : MonoBehaviour
     void Place()
     {
         var root = (RectTransform)transform;
+        // 아바타 배율과 무관하게 문구는 캔버스 기준 크기를 유지한다.
+        if (_canvas != null && root.parent != null)
+        {
+            var parentScale = root.parent.lossyScale;
+            var canvasScale = _canvas.transform.lossyScale;
+            root.localScale = new Vector3(
+                canvasScale.x / Mathf.Max(0.0001f, Mathf.Abs(parentScale.x)),
+                canvasScale.y / Mathf.Max(0.0001f, Mathf.Abs(parentScale.y)), 1f);
+        }
         root.position = _target.TransformPoint(_target.rect.center);
         Vector3 size = root.InverseTransformVector(_target.TransformVector(_target.rect.size));
         var diameter = Mathf.Max(Mathf.Abs(size.x), Mathf.Abs(size.y));
