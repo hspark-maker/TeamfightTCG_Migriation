@@ -19,14 +19,14 @@
 - `BalloonPeng_Cutout_Idle.prefab`은 걷기 프리팹의 몸통·팔다리·얼굴 패치를 상속하는 variant입니다. 같은 그림·메시·머티리얼을 공유합니다.
 - `BalloonPeng_Idle_Preview.unity`를 열어 Play로 확인합니다. `Idle.anim`은 2.4초 반복이며, 발은 고정하고 몸통과 날개를 천천히 움직입니다.
 - `Idle.controller`의 `IsWalking`을 켜면 걷기, 끄면 대기로 0.18초 동안 전환합니다. 얼굴 표정은 별도의 4.8초 루프로 계속 재생합니다.
-- 생성·갱신 메뉴: `Tools > Art Prototypes > Build BalloonPeng Cutout Idle`. 기존 걷기 프리팹·컨트롤러·클립과 아트는 보존합니다.
+- 기존 걷기 프리팹·컨트롤러·클립과 아트는 보존합니다. 대기 모션은 Animation 창에서 편집합니다.
 - 대기 미리보기: `output/balloonpeng-idle/BalloonPeng_Idle_Expressions.webp` (4.8초, 96프레임).
 - Unity 검증: 반복 시작·끝 위치/회전 오차 0, 16개 발 고정 샘플·40개 표정 상태 검사 및 대기→걷기→대기 전환 통과. 48개 자세에서 접합부 1,728개 지정 지점 모두 몸통 알파 1로 가려짐. 원본 걷기 프리팹·컨트롤러·클립과 몸통 이미지·메시 해시 보존.
 
 ### 통통 뛰기와 통합 모션
 
 - `Bounce.anim`은 1.2초 루프입니다. 준비 자세 → 몸과 양발이 함께 0.48 높이로 상승 → 착지 → 짧은 휴식 순서입니다. 몸통을 변형하지 않고 파츠 이동·회전만 사용합니다.
-- `Tools > Art Prototypes > Build BalloonPeng Bounce`로 생성·갱신합니다. 통합 컨트롤러의 모션 전환 시간은 0.16초입니다.
+- 통합 컨트롤러의 모션 전환 시간은 0.16초이며 Animator 창에서 편집할 수 있습니다.
 - 비교 미리보기: `output/balloonpeng-motions/BalloonPeng_Idle_Walk_Bounce.webp` (왼쪽부터 대기·걷기·통통 뛰기). 단독 미리보기: `output/balloonpeng-bounce/BalloonPeng_Bounce_Expressions.webp`.
 - 검증: 96프레임 렌더, 루프 시작·끝 오차 0, 접합부 1,728개 지정 지점 가림 통과, 9개 모션 전환 조합 및 40개 표정 상태 검사 통과. 점프 뒤 대기로 돌아오면 양발 원위치 복구. 기존 걷기·대기 클립/원본 프리팹과 몸통 메시 해시 보존. 관련 Unity 콘솔 오류 없음.
 
@@ -42,7 +42,7 @@
 - 오른쪽 날개의 기본각을 -22도로 내려 대기는 ±20도, 걷기는 ±24도 움직이게 했습니다. 통통 뛰기는 준비 시 아래로, 상승 시 위로 펼칩니다. 원래의 짧은 파츠 크기와 앞쪽 배치는 유지합니다.
 - 최신 팔 움직임 미리보기: `output/balloonpeng-wing-swing/BalloonPeng_WingSwing_Motions.webp`. 세 모션의 반복 경계와 전환 중 각도 범위를 Unity Animator로 검사했습니다.
 - 왼쪽 팔도 기본각 +22도로 내리고 오른쪽과 거울 방향으로 함께 파닥이도록 맞췄습니다. 최신 양팔 미리보기: `output/balloonpeng-both-wings/BalloonPeng_BothWings_Motions.webp`. 대기·걷기·통통 뛰기 및 전환 구간에서 1,152회 양팔 각도 동기화 검사를 통과했습니다.
-- 확장된 팔다리의 크기와 피벗은 `HiddenPartSizes`·`HiddenPartPivots`에서 정합니다. 기존 메시의 식별자는 유지하며 실제 정점·UV 버퍼를 갱신합니다.
+- 확장된 팔다리의 크기와 피벗은 기존 메시의 정점·UV에 반영되어 있습니다. 최초 생성 수치는 이 폴더의 Git 이력에서 확인할 수 있습니다.
 
 ## 아트 제작
 
@@ -64,8 +64,5 @@
 
 ## 저작
 
-생성: `Tools > Art Prototypes > Build BalloonPeng Cutout` (기존 에셋 덮어쓰기 거절).
-모션 갱신: `Tools > Art Prototypes > Update BalloonPeng Cutout Motion` (클립 GUID 유지).
-확장 파츠 갱신: `Tools > Art Prototypes > Update BalloonPeng Hidden Parts` (기존 네 팔다리 메시와 프리팹 참조 유지).
-표정 생성·갱신: `Tools > Art Prototypes > Update BalloonPeng Expressions` (`BalloonPengExpressionBuilder.cs`).
-빌더: `../Editor/BalloonPengCutoutBuilder.cs`. 본체가 nominal 3×2 셀 아래로 내려오는 실제 아트 배치를 고려해 파트별 검색 영역을 사용합니다.
+제작이 끝난 에디터 생성기와 메뉴는 정리했습니다. 기존 프리팹·클립·컨트롤러는 Inspector,
+Animation, Animator 창에서 편집하며 최초 생성 코드는 이 폴더의 Git 이력에 남아 있습니다.

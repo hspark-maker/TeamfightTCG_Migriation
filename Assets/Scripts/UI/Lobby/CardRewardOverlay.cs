@@ -160,12 +160,12 @@ public class CardRewardOverlay : PooledOverlay<CardRewardOverlay>
         this.m_choreo.Play();
     }
 
-    /// <summary>서버가 지급한 카드의 신규·중복 여부와 확정 성장 결과를 표시한다.</summary>
+    /// <summary>서버가 지급한 카드의 신규·중복 여부를 표시한다.</summary>
     public void ShowGranted(DrawnCard _card)
     {
         Show("획득한 카드", _card.CardId, null);
         LobbyGainEffectDirector.CancelRewardUnlock(false);
-        if (this.cardView != null) this.cardView.Bind(_card, _showFinalGrowth: true);
+        if (this.cardView != null) this.cardView.Bind(_card);
     }
 
     // 잠금은 등장 안무가 푼다. Show를 거치지 않고 뜨는 경로(부모가 다시 켜짐)에서는 그 안무가 없어

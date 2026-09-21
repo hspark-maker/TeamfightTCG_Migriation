@@ -5,7 +5,7 @@ using Firebase.Firestore;
 [FirestoreData(UnknownPropertyHandling = UnknownPropertyHandling.Ignore)]
 public class CardGrowthSaveData
 {
-    // 진행도가 있는 카드만 담는다(강화·간식·한계돌파). 빈 항목은 CardGrowthManager가 저장 때 거른다.
+    // 강화 진행도가 있는 카드만 담는다. 빈 항목은 저장 때 거른다.
     [FirestoreProperty("entries")] public Dictionary<string, CardGrowthEntry> Entries { get; set; } = new Dictionary<string, CardGrowthEntry>();
 }
 
@@ -17,10 +17,4 @@ public class CardGrowthEntry
 
     // 현재 별 단계에서 다음 진화에 투자한 샤드. 기존 세이브는 0으로 읽는다.
     [FirestoreProperty("shardProgress")] public int ShardProgress { get; set; }
-
-    // 간식 보유량(카드팩 중복으로만 쌓인다). 카드별 재화라 전역 잔액 맵에 못 넣어 여기 얹었다.
-    [FirestoreProperty("snack")] public int Snack { get; set; }
-
-    // 카드별 한계돌파 단계.
-    [FirestoreProperty("limitBreak")] public int LimitBreak { get; set; }
 }

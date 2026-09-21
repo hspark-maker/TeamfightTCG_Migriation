@@ -6,9 +6,7 @@ const {test} = require("node:test");
 const {
   beginMissionBump, missionBumpFromSnapshot, commitMissionBump, commitMissionBumps,
 } = require("../lib/missions/missionStore");
-const {applySnackGrowthProgress} = require("../lib/missions/snackGrowthProgress");
 const {missionPeriod} = require("../lib/missions/period");
-const {EVENTS} = require("../lib/analytics/eventNames");
 
 const period = missionPeriod(Date.parse("2026-09-14T03:00:00Z"));
 const unlockedSave = {profile: {contentUnlocks: {version: 1, unlocked: ["Mission"]}}};
@@ -48,18 +46,6 @@ test("unlocked batch events increment both periods by their amounts", () => {
     assert.equal(bump.state.progress["daily." + event], 3);
     assert.equal(bump.state.progress["weekly." + event], 3);
   }
-});
-
-test("automatic snack growth uses the same unlock gate", () => {
-  const cards = [{snackGrowth: {fromStage: 0, toStage: 2}}];
-  const locked = bumpFor({});
-  applySnackGrowthProgress(locked, cards);
-  assert.deepEqual(locked.state.progress, {});
-  const unlocked = bumpFor(unlockedSave);
-  applySnackGrowthProgress(unlocked, cards);
-  const event = EVENTS.cardLimitBreakCompleted.missionKey;
-  assert.equal(unlocked.state.progress["daily." + event], 2);
-  assert.equal(unlocked.state.progress["weekly." + event], 2);
 });
 
 test("blocked increments preserve stored progress, guide progress, claims, and pass exp", () => {

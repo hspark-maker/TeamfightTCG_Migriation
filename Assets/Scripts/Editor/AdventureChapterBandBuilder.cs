@@ -25,7 +25,6 @@ public static class AdventureChapterBandBuilder
     // 리본 몸통 중심. 끝단 깃이 아래로 더 내려와 rect 중심과 몸통 중심이 어긋난다.
     const float PLATE_Y = 40f;
 
-    [MenuItem("Tools/Adventure/Rebuild ChapterBand Prefab")]
     public static void Build()
     {
         TMP_FontAsset t_font = BorrowFont();

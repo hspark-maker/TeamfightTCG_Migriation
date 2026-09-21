@@ -18,7 +18,6 @@ import {attendanceRef} from "../attendance/attendanceStore";
 import {missionPeriod} from "../missions/period";
 import {readMissionCatalog} from "../missions/missionSpec";
 import {applyGuideProgress} from "../missions/guideMutation";
-import {applySnackGrowthProgress} from "../missions/snackGrowthProgress";
 import {beginMissionBump, commitMissionProgress, missionResponse, MissionResponse} from "../missions/missionStore";
 
 export const claimAttendance = onCall(async (request) => {
@@ -55,7 +54,6 @@ export const claimAttendance = onCall(async (request) => {
       granted = [...reward.currencies, ...items.currencies];
       if (missionBump && itemContext) {
         applyGuideProgress(missionBump, current, items.slots, itemContext.cards, catalog);
-        applySnackGrowthProgress(missionBump, items.cards);
         commitMissionProgress(transaction, missionBump, FieldValue.serverTimestamp());
         missions = missionResponse(missionBump.state, period, catalog);
       }

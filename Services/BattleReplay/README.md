@@ -2,6 +2,15 @@
 
 Unity와 같은 `Assets/Scripts/BattleCore`를 실행하는 비공개 Cloud Run 서비스다. TS 전투 시뮬레이터를 호출하지 않는다.
 
+## 최근 배포 — 2026-09-18 초기 배치 시너지
+
+- `battle-replay-synergy-20260918-190435` 리비전에 트래픽 100% 전환. test/live 공용 서비스이며 IAM 비공개·최소 인스턴스 0·요청 기반 과금을 유지했다.
+- 공유 BattleCore의 흐름·돌보미 `OnPlaced`를 포함한다. 초기 배치와 멀리건 스왑인에서도 등장 효과를 적용한다.
+- Cloud Build: `5f30805a-dcc9-4c07-b962-c6b36458538a`. 이미지 digest: `sha256:5429f13b270b1e59d7e3bfe0c336ca5f5ac33b5abab8707efb6daec782847026`.
+- Release 빌드 오류·경고 0, 초기 배치·멀리건·RNG 관련 로컬 검사 12개, 동일 입력 20회 결정론 검사를 통과했다.
+- test의 실제 고정 스펙을 사용한 흐름 덱 대 돌보미 덱 재생을 배포 전용 URL과 전환 후 기본 URL에서 확인했다. 양측 초기 시너지 발동 3회, 최종 해시 `2e1696466599a7ae`로 로컬과 일치했다. 실제 계정의 매치·보상은 변경하지 않았다.
+- 배포·재생 증거: `.codex_tmp/battle-replay-synergy-20260918-190435/`. 이전 리비전은 `battle-replay-stats-1789376988441`이며 롤백 대상으로 보존했다. 확인용 `synergy-check` 태그는 전환 후 제거했다.
+
 ## 계약
 
 `POST /v1/battle/replay`

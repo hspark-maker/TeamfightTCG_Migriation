@@ -28,7 +28,7 @@ export function buildFreshAccountBalances(): Balances {
 }
 
 /**
- * 신규 계정 문서의 슬롯 9개. 메타 5키(schemaVersion/revision/updatedAt/deviceId/appVersion)는
+ * 신규 계정 문서의 슬롯 8개. 메타 5키(schemaVersion/revision/updatedAt/deviceId/appVersion)는
  * ensureSaveDocument 가 얹는다. 재화는 여기 없다 — v8 부터 잔액은 지갑 문서의 것이고,
  * 최초 지급은 buildFreshAccountBalances 가 같은 트랜잭션에서 낸다.
  *
@@ -37,7 +37,7 @@ export function buildFreshAccountBalances(): Balances {
  * @param {number[]} starterCardIds 지급할 카드 id (STARTER_DECK_SIZE 장)
  * @param {string} nickname 문서에 굳힐 기본 닉네임 (기본: 낱말표에서 한 벌 추첨)
  * @param {ReadonlyMap<number, string>} grades 카드별 등급
- * @return {SlotPatch} 슬롯 9개
+ * @return {SlotPatch} 슬롯 8개
  */
 export function buildFreshAccountSlots(
   starterCardIds: number[],
@@ -57,7 +57,6 @@ export function buildFreshAccountSlots(
     ownership: {cardIds: [...starterCardIds]},
     deck: {slots},
     cardGrowth: growthSlot(applyAcquiredCardGrowth({}, starterCardIds, grades)),
-    keywordGrowth: {levels: {}},
     rank: {points: 0, claimedTiers: []},
     albumReward: {claimedKeys: []},
     adventure: {clearedNodeIds: [], claimedChapterIds: [], pendingRewardNodeId: ""},

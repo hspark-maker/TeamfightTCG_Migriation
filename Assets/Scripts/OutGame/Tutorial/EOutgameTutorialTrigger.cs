@@ -5,7 +5,7 @@ public enum EOutgameTutorialTrigger
     DeckTabFirstEnter,
     CollectionTabFirstEnter,
     FirstEvolutionReady,      // 폐기(첫 진화 안내) — 발화처 0. 뒤 항목이 밀리지 않게 값만 남긴다
-    KeywordGrowthFirstOpen,   // 키워드 강화 챕터 — 미션 연결 전까지 비활성
+    KeywordGrowthFirstOpen,   // 폐기 — 기존 저장·직렬화 값 보존.
     AdventureMapFirstOpen,    // 이전 모험 소개 완료 기록
     AdventureUnlocked,       // 모험 미션에 연결된 소개 챕터
     RankDivisionFirstUp,      // 이전 랭크 단계 상승 안내 식별자
@@ -21,4 +21,5 @@ public enum EOutgameTutorialTrigger
     CaretakerActivation = 17, // 폐기 — 기존 저장값만 보존한다
     SynergyGrowthIntroduction = 18,
     SynergyBattleIntroduction = 19,
+    RankRewardIntroduction = 20, // 첫 랭크 보상 수령 안내 표시 이력
 }

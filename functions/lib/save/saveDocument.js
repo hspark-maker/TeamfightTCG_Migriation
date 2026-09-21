@@ -49,6 +49,8 @@ Object.defineProperty(exports, "isKnownEnv", { enumerable: true, get: function (
 const domainReject_1 = require("./domainReject");
 const receiptCache_1 = require("./receiptCache");
 const wallet_1 = require("../currency/wallet");
+const achievementProgress_1 = require("../achievements/achievementProgress");
+const achievementStore_1 = require("../achievements/achievementStore");
 const walletStore_1 = require("../currency/walletStore");
 /**
  * 서버가 쓰는 세이브 문서 스키마 버전. 클라 쪽 쌍둥이 상수와 짝이다.
@@ -61,6 +63,10 @@ const walletStore_1 = require("../currency/walletStore");
  * v8 = 재화가 currency 슬롯을 떠나 wallet 문서로 옮겨간 판.
  */
 exports.SCHEMA_VERSION = 8;
+// These commands return actual drawn reward packs. Direct-card grants are intentionally absent.
+const PACK_OPENING_COMMANDS = new Set([
+    "openPack", "claimAttendance", "claimMission", "claimReward", "claimPassReward", "claimBattleExperience", "spinRoulette",
+]);
 /**
  * 세이브 문서 참조. 클라 PlayerSaveFirestorePaths 와 같은 경로여야 한다.
  * @param {string} env 환경 id (live/test)
@@ -217,6 +223,10 @@ async function mutateSave(env, uid, source, receipt, mutate, finalize, isLegacyW
             }
         }
         const revision = Number(current.revision ?? 0) + 1;
+        // Read before the mutation queues any writes; receipt replays have already returned above.
+        const achievementReference = (0, achievementStore_1.achievementsRef)(firebaseApp_1.db, env, uid);
+        const achievements = PACK_OPENING_COMMANDS.has(source) ?
+            (0, achievementStore_1.readAchievements)(await transaction.get(achievementReference)) : null;
         const outcome = await mutate(current, transaction, wallet);
         // 응답에 실을 지갑은 **쓰기 전에** 확정한다 — finalize 가 만든 응답 그대로가 영수증에
         // 담겨야 재시도가 같은 답을 받는데, 그 답은 갱신된 잔액을 실어야 하기 때문이다.
@@ -230,6 +240,13 @@ async function mutateSave(env, uid, source, receipt, mutate, finalize, isLegacyW
             updatedSlots: outcome.slots,
             wallet: credited,
         });
+        const packs = response.packs;
+        const opened = source === "openPack" ? 1 : Array.isArray(packs) ? packs.length : 0;
+        if (achievements !== null && opened > 0) {
+            (0, achievementProgress_1.incrementAchievement)(achievements, "OpenPack", opened);
+            (0, achievementStore_1.writeAchievements)(transaction, achievementReference, achievements, firestore_1.FieldValue.serverTimestamp());
+            response.achievements = (0, achievementStore_1.achievementResponse)(achievements);
+        }
         transaction.update(reference, {
             ...outcome.slots,
             revision,

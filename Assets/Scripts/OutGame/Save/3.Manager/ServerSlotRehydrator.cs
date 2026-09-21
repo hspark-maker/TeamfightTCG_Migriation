@@ -14,11 +14,10 @@ internal static class ServerSlotRehydrator
         DataSaveManager.OnServerSlotsAdopted += Rehydrate;
     }
 
-    // 순서는 SaveDependentManagersStep.InstallOnce와 같다 — CardGrowth가 KeywordGrowth 통지를 구독하므로 뒤집으면 안 된다.
+    // 정상 초기화와 같이 소유를 채택한 뒤 카드 성장을 다시 읽는다.
     static void Rehydrate(ESaveSlot _slots)
     {
         if ((_slots & ESaveSlot.Ownership) != 0) RehydrateOwnership();
-        if ((_slots & ESaveSlot.KeywordGrowth) != 0) KeywordGrowthManager.Init();
         if ((_slots & ESaveSlot.CardGrowth) != 0) CardGrowthManager.Init();
 
         // 다른 슬롯과 달리 Init 계열이 아니라 통지뿐이다 — AdventureProgress 는 세이브를 직독하고

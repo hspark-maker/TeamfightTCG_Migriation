@@ -11,6 +11,8 @@ import {ENVIRONMENTS, isKnownEnv} from "./environments";
 import {rejectDomain} from "./domainReject";
 import {cacheableResponse, replayCached} from "./receiptCache";
 import {Balances, normalizeBalances} from "../currency/wallet";
+import {incrementAchievement} from "../achievements/achievementProgress";
+import {achievementResponse, achievementsRef, readAchievements, writeAchievements} from "../achievements/achievementStore";
 import {
   createWallet,
   readReceipt,
@@ -58,7 +60,13 @@ export interface SaveMutationResult {
   revision: number;
   updatedSlots: SlotPatch;
   wallet: WalletPatch;
+  achievements?: ReturnType<typeof achievementResponse>;
 }
+
+// These commands return actual drawn reward packs. Direct-card grants are intentionally absent.
+const PACK_OPENING_COMMANDS = new Set([
+  "openPack", "claimAttendance", "claimMission", "claimReward", "claimPassReward", "claimBattleExperience", "spinRoulette",
+]);
 
 /**
  * 세이브 문서 참조. 클라 PlayerSaveFirestorePaths 와 같은 경로여야 한다.
@@ -269,6 +277,10 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
     }
 
     const revision = Number(current.revision ?? 0) + 1;
+    // Read before the mutation queues any writes; receipt replays have already returned above.
+    const achievementReference = achievementsRef(db, env, uid);
+    const achievements = PACK_OPENING_COMMANDS.has(source) ?
+      readAchievements(await transaction.get(achievementReference)) : null;
     const outcome = await mutate(current, transaction, wallet);
 
     // 응답에 실을 지갑은 **쓰기 전에** 확정한다 — finalize 가 만든 응답 그대로가 영수증에
@@ -283,6 +295,13 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
       updatedSlots: outcome.slots,
       wallet: credited,
     });
+    const packs = (response as SaveMutationResult & {packs?: unknown}).packs;
+    const opened = source === "openPack" ? 1 : Array.isArray(packs) ? packs.length : 0;
+    if (achievements !== null && opened > 0) {
+      incrementAchievement(achievements, "OpenPack", opened);
+      writeAchievements(transaction, achievementReference, achievements, FieldValue.serverTimestamp());
+      response.achievements = achievementResponse(achievements);
+    }
 
     transaction.update(reference, {
       ...outcome.slots,

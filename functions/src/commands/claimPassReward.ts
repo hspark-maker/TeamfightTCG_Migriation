@@ -11,7 +11,6 @@ import {beginMissionBump, commitMissionProgress, missionResponse, MissionRespons
 import {missionPeriod} from "../missions/period";
 import {readMissionCatalog} from "../missions/missionSpec";
 import {applyGuideProgress} from "../missions/guideMutation";
-import {applySnackGrowthProgress} from "../missions/snackGrowthProgress";
 import {db} from "../firebaseApp";
 import {recordEvent} from "../observability/analyticsEvent";
 import {readSpecRows} from "../packs/packSpecReader";
@@ -124,7 +123,6 @@ export const claimPassReward = onCall(async (request) => {
       granted = [...authoredRewards, ...itemGrant.currencies];
       if (missions && itemContext) {
         applyGuideProgress(missions, current, itemGrant.slots, itemContext.cards, catalog);
-        applySnackGrowthProgress(missions, itemGrant.cards);
         commitMissionProgress(transaction, missions, FieldValue.serverTimestamp());
         missionState = missionResponse(missions.state, period, catalog);
       }

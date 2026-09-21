@@ -5,11 +5,11 @@ using UnityEngine;
 /// 조작 패널이 인스펙터에 바로 뜨게 하려는 것. 매번 하이어라키에서 찾아 클릭하는 수고를 없앤다.
 ///
 /// 씬을 가리지 않고 <b>그 씬에 테스터가 있을 때만</b> 동작하므로 전투/로비 씬 플레이에는 영향이 없다.
-/// 메뉴 <c>Tools/연출 테스터/플레이 시 자동 선택</c>으로 끌 수 있다(인스펙터를 다른 데 두고 보고 싶을 때).</summary>
+/// 메뉴 <c>Tools/Card Battle/연출 테스트/플레이 시 자동 선택</c>으로 끌 수 있다(인스펙터를 다른 데 두고 보고 싶을 때).</summary>
 [InitializeOnLoad]
 static class AttackAnimTesterAutoSelect
 {
-    const string MenuPath = "Tools/연출 테스터/플레이 시 자동 선택";
+    const string MenuPath = "Tools/Card Battle/연출 테스트/플레이 시 자동 선택";
     const string PrefKey  = "AttackAnimTester.AutoSelectOnPlay";
 
     static bool Enabled

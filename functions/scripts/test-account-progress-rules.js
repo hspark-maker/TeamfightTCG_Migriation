@@ -39,6 +39,26 @@ test("profile cosmetics and deck saves preserve server XP", async () => {
   await seed(original());
   await assertSucceeds(update({deck: {slots: []}}));
 });
+test("retired keyword growth cannot be restored to a migrated save", async () => {
+  await assertFails(update({keywordGrowth: {levels: {1: 10}}}));
+  await assertSucceeds(update({"profile.nickname": "clean-growth-save"}));
+});
+test("server card growth stays immutable while migrated saves can change profile and deck", async () => {
+  const migrated = original();
+  migrated.cardGrowth = {entries: {1: {level: 3, shardProgress: 4}}};
+  await seed(migrated);
+  for (const patch of [
+    {"cardGrowth.entries.1.snack": 20},
+    {"cardGrowth.entries.1.limitBreak": 3},
+    {"cardGrowth.entries.1.level": 4},
+    {"cardGrowth.entries.1.shardProgress": 8},
+    {cardGrowth: {entries: {}}},
+    {cardGrowth: deleteField()},
+  ]) await assertFails(update(patch));
+  await assertSucceeds(update({"profile.nickname": "migrated"}));
+  await seed(migrated);
+  await assertSucceeds(update({deck: {slots: []}, cardGrowth: migrated.cardGrowth}));
+});
 test("XP increment, decrement, deletion and replacement are denied", async () => {
   for (const value of [351, 0, -1, 350.5, "350", null, deleteField()]) {
     await assertFails(update({"profile.accountExp": value}));

@@ -1,5 +1,6 @@
 ﻿using System;
 using TMPro;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -25,8 +26,6 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     [Tooltip("시즌 랭킹과 내 순위를 여는 버튼.")]
     [SerializeField] Button rankingButton;
 
-    [SerializeField] Button keywordGrowthButton;
-
     [Tooltip("룰렛을 여는 버튼. 콘텐츠 해금과 설정 준비 조건을 함께 따른다.")]
     [SerializeField] Button rouletteButton;
 
@@ -41,6 +40,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
 
     [Tooltip("배틀패스를 여는 버튼. 시즌 공백기에도 눌린다 — 시즌이 없다는 것은 화면이 안내한다.")]
     [SerializeField] Button passButton;
+    [SerializeField] Button achievementButton;
 
     [Header("모험")]
     [Tooltip("모험 맵으로 가는 버튼. 이동 자체는 LobbyRoot가 한다 — 탭 패널은 탭 이동을 모른다.")]
@@ -59,20 +59,20 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (playButton != null) playButton.onClick.AddListener(HandlePlayRequested);
         if (rankRewardButton != null) rankRewardButton.onClick.AddListener(OpenRankRewards);
         if (rankingButton != null) rankingButton.onClick.AddListener(OpenRanking);
-        if (keywordGrowthButton != null) keywordGrowthButton.onClick.AddListener(OpenKeywordGrowth);
         if (rouletteButton != null) rouletteButton.onClick.AddListener(OpenRoulette);
         if (missionButton != null) missionButton.onClick.AddListener(OpenMissions);
         if (guideMissionButton != null) guideMissionButton.onClick.AddListener(OpenGuideMissions);
         if (passButton != null) passButton.onClick.AddListener(OpenPass);
+        if (achievementButton != null) achievementButton.onClick.AddListener(OpenAchievements);
         if (adventureButton != null) adventureButton.onClick.AddListener(HandleAdventureRequested);
 
         if (playLabel != null) m_defaultPlayText = playLabel.text;
 
         // 잠김 룩은 코드로 얹는다 — 기능키↔버튼 짝이 아래 계산식 바로 옆에 있어야 둘이 갈리지 않는다.
         // PlayBtn만 프리팹 저작인 것은 그쪽 잠금 주체가 LobbyMatchLauncher라 중립 지점이 필요했기 때문이다.
-        if (keywordGrowthButton != null) FeatureLockView.Attach(keywordGrowthButton.gameObject, EOutgameFeature.KeywordGrowth);
         if (adventureButton != null) FeatureLockView.Attach(adventureButton.gameObject, EOutgameFeature.Adventure);
         if (missionButton != null) FeatureLockView.Attach(missionButton.gameObject, EOutgameFeature.Mission);
+        if (achievementButton != null) FeatureLockView.Attach(achievementButton.gameObject, EOutgameFeature.Mission);
         if (guideMissionButton != null) FeatureLockView.Attach(guideMissionButton.gameObject, EOutgameFeature.Mission);
         if (rouletteButton != null) FeatureLockView.Attach(rouletteButton.gameObject, EOutgameFeature.Roulette);
         if (attendanceButton != null) FeatureLockView.Attach(attendanceButton.gameObject, EOutgameFeature.Mission);
@@ -107,11 +107,11 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
         if (playButton != null) playButton.onClick.RemoveListener(HandlePlayRequested);
         if (rankRewardButton != null) rankRewardButton.onClick.RemoveListener(OpenRankRewards);
         if (rankingButton != null) rankingButton.onClick.RemoveListener(OpenRanking);
-        if (keywordGrowthButton != null) keywordGrowthButton.onClick.RemoveListener(OpenKeywordGrowth);
         if (rouletteButton != null) rouletteButton.onClick.RemoveListener(OpenRoulette);
         if (missionButton != null) missionButton.onClick.RemoveListener(OpenMissions);
         if (guideMissionButton != null) guideMissionButton.onClick.RemoveListener(OpenGuideMissions);
         if (passButton != null) passButton.onClick.RemoveListener(OpenPass);
+        if (achievementButton != null) achievementButton.onClick.RemoveListener(OpenAchievements);
         if (adventureButton != null) adventureButton.onClick.RemoveListener(HandleAdventureRequested);
 
         OutgameFeatureLock.OnChanged -= ApplyFeatureLocks;
@@ -121,6 +121,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
 
     public override void OnEnter()
     {
+        AchievementCommands.RefreshAsync(_force: true).Forget();
         RefreshPlayLabel();
         ApplyFeatureLocks();
         RefreshGuideMissionButton();
@@ -154,11 +155,9 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     {
         bool t_missionsUnlocked = OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission);
         if (missionButton != null) missionButton.interactable = t_missionsUnlocked;
+        if (achievementButton != null) achievementButton.interactable = t_missionsUnlocked;
         if (guideMissionButton != null) guideMissionButton.interactable = t_missionsUnlocked;
         RefreshGuideMissionButton();
-
-        if (keywordGrowthButton != null)
-            keywordGrowthButton.interactable = OutgameFeatureLock.IsUnlocked(EOutgameFeature.KeywordGrowth);
 
         if (adventureButton != null)
             adventureButton.interactable = OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure);
@@ -174,14 +173,6 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     public void OpenRankRewards() => OpenPooled<RankRewardPanel>();
 
     public void OpenRanking() => OpenPooled<RankingBoardPanel>();
-
-    public void OpenKeywordGrowth()
-    {
-        // 버튼을 죽여 두는 것만으로는 부족하다 — 잠김 표시는 표현 레이어 몫이고, 진입을 실제로 막는 주체는 여기다.
-        if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.KeywordGrowth)) return;
-
-        OpenPooled<KeywordGrowthPanel>();
-    }
 
     /// <summary>룰렛. 버튼을 감추는 것만으로는 부족하다 — 진입을 실제로 막는 주체는 여기다
     /// (감추기는 표현이고, 다른 경로로 이 메서드를 부를 수 있다).</summary>
@@ -212,6 +203,12 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
     /// <summary>배틀패스. 잠금 게이트가 없다 — 활성 시즌이 없으면
     /// 화면이 그 사실을 그린다(빈 목록으로 두지 않는다).</summary>
     public void OpenPass() => OpenPooled<PassPanel>();
+
+    public void OpenAchievements()
+    {
+        if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission)) return;
+        OpenPooled<AchievementPanel>();
+    }
 
     void OpenPooled<T>() where T : PooledUIBase
     {

@@ -12,7 +12,10 @@ const ROOT = path.resolve(__dirname, "../..");
 const PROJECT = "bm-cardbattle";
 const DATABASE = `projects/${PROJECT}/databases/cardbattle/documents`;
 const ALLOWED = ["Reward", "CardEnhance", "RouletteSlot", "PassLevel"];
-const CSV_ONLY = {RankAiEncounter: "Assets/Scripts/OutGame/Spec/RankAiEncounterRow.cs"};
+const CSV_ONLY = {
+  RankAiEncounter: "Assets/Scripts/OutGame/Spec/RankAiEncounterRow.cs",
+  Achievement: "Assets/Scripts/Editor/SpecFirestoreUploader.AccountCsv.cs",
+};
 const sourceFiles = ["Assets/Resources/SpecData.bytes", "Assets/Table/SpecDatas.cs",
   "Assets/Scripts/Editor/SpecLocalCsvImporter.cs", "Assets/Scripts/OutGame/Spec/SpecPayloadCodec.cs",
   "Assets/Scripts/OutGame/Spec/ContentVersion.cs", ...ALLOWED.map((t) => `docs/SpecData/${t}_sheet.csv`),
@@ -86,11 +89,21 @@ function csvOnlyRows(name, fields, text) {
       if (type === "string") return [key, r[i]];
       assert(/^[+-]?\d+$/.test(r[i].trim()), `Invalid CSV integer: ${name}.${key}`);
       const n = Number(r[i]);
-      assert(Number.isSafeInteger(n) && n >= -2147483648 && n <= 2147483647, `CSV integer range: ${name}.${key}`);
+      assert(Number.isSafeInteger(n) && (type === "long" || (n >= -2147483648 && n <= 2147483647)),
+        `CSV integer range: ${name}.${key}`);
       if (key.startsWith("level")) assert(n >= 1 && n <= 4, `CSV level: ${name}.${key}`);
       if (key.startsWith("limitBreak")) assert(n >= 0 && n <= 3, `CSV limit break: ${name}.${key}`);
       return [key, n];
     }));
+    if (name === "Achievement") {
+      assert(row.id > 0 && row.achievementId.trim() && row.groupId.trim() && row.stage > 0 && row.targetCount > 0 &&
+        ["WinBattle", "DestroyCards", "PlaySynergy", "CompleteAlbum", "WinStreak", "OpenPack"].includes(row.eventKey) &&
+        ["Diamond", "Gold", "Shard"].includes(row.rewardCurrency) && row.rewardAmount > 0 &&
+        [0, 1].includes(row.enabled), `Invalid achievement: ${row.achievementId}`);
+      assert(!keys.has(row.achievementId), `Duplicate achievement: ${row.achievementId}`);
+      keys.add(row.achievementId);
+      return row;
+    }
     assert(row.id > 0 && row.deckId.trim().length > 0 && row.tierIndex >= 0 && row.tierIndex <= 19 &&
       row.highlightSlot >= 0 && row.highlightSlot <= 6 &&
       ["Normal", "DivisionFinal", "GradeFinal"].includes(row.battleKind), `Invalid encounter: ${name}`);
@@ -123,8 +136,11 @@ function localSnapshot() {
     .map((m) => [m[1], [...m[2].matchAll(/^\s*public (int|long|string) (\w+);/gm)].map((f) => [f[1], f[2]])]));
   const tables = {};
   for (const name of names) {
+    const csvSource = CSV_ONLY[name] ? read(CSV_ONLY[name]) : "";
+    const rowSource = name === "Achievement"
+      ? csvSource.match(/sealed class AchievementUploadRow\s*\{([\s\S]*?)\n    \}/)?.[1] : csvSource;
     const fields = CSV_ONLY[name]
-      ? [...read(CSV_ONLY[name]).matchAll(/^\s*public (int|long|string) (\w+);/gm)].map((f) => [f[1], f[2]])
+      ? [...(rowSource || "").matchAll(/^\s*public (int|long|string) (\w+);/gm)].map((f) => [f[1], f[2]])
       : classes.get(name);
     assert(fields?.length && fields.some(([t, k]) => t === "int" && k === "id"), `Invalid schema: ${name}`);
     const rows = CSV_ONLY[name] ? csvOnlyRows(name, fields, read(`docs/SpecData/${name}_sheet.csv`)) : data[name];

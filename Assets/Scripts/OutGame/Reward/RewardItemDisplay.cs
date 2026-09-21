@@ -99,7 +99,7 @@ internal static class RewardItemDisplay
         if (_cards != null)
             foreach (var t_card in _cards)
                 if (t_card != null && t_card.CardId > 0)
-                    t_result.Add(new DrawnCard(t_card.CardId, t_card.IsNew, t_card.Snack, t_card.SnackGrowth));
+                    t_result.Add(new DrawnCard(t_card.CardId, t_card.IsNew));
         return t_result;
     }
 
@@ -116,14 +116,7 @@ internal static class RewardItemDisplay
     }
 
     static bool SameCard(DrawnCard _left, DrawnCard _right)
-        => _left.CardId == _right.CardId && _left.IsNew == _right.IsNew && _left.Snack == _right.Snack &&
-            SameGrowth(_left.SnackGrowth, _right.SnackGrowth);
-
-    static bool SameGrowth(SnackGrowthResult _left, SnackGrowthResult _right)
-        => ReferenceEquals(_left, _right) || (_left != null && _right != null &&
-            _left.FromStage == _right.FromStage && _left.ToStage == _right.ToStage &&
-            _left.HpGain == _right.HpGain && _left.SnackCost == _right.SnackCost &&
-            _left.SnackLeft == _right.SnackLeft);
+        => _left.CardId == _right.CardId && _left.IsNew == _right.IsNew;
     internal static string NameOf(string _type, string _id)
     {
         if (_type == "PackChoice") return "해금된 테마 팩 선택";

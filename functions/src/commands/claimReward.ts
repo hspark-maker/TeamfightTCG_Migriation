@@ -13,7 +13,6 @@ import {
 import {missionPeriod} from "../missions/period";
 import {readMissionCatalog} from "../missions/missionSpec";
 import {applyGuideProgress, readGuideCards} from "../missions/guideMutation";
-import {applySnackGrowthProgress} from "../missions/snackGrowthProgress";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {
@@ -485,7 +484,6 @@ export const claimReward = onCall(measuredCallable("claimReward", async (request
       // 올리면 미션 수령이 미션을 낳는 자기참조가 된다.
       const finish = (slots: SlotPatch): SaveMutation => {
         applyGuideProgress(missions, current, slots, guideCards, catalog);
-        applySnackGrowthProgress(missions, itemGrant.cards);
         commitMissionBump(transaction, missions, EVENTS.rewardClaimed.missionKey, 1, FieldValue.serverTimestamp());
         missionState = missionResponse(missions.state, period, catalog);
         return {slots, wallet: paid};

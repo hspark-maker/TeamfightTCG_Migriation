@@ -8,7 +8,7 @@ using Cysharp.Threading.Tasks;
 public static class OutgameTutorialGuide
 {
     // 안내가 대준 무료 한 방을 이미 쓴 스텝(세이브하지 않는다 — 재시작하면 다시 한 방).
-    // 플래그가 아니라 스텝 참조인 이유: 무료를 저작하는 스텝이 여럿이라(카드 강화·키워드 강화)
+    // 플래그가 아니라 스텝 참조인 이유: 무료 카드 강화를 저작하는 스텝이 여럿이라
     // 하나로 묶으면 앞 스텝이 쓴 한 방 때문에 뒤 스텝의 저작이 조용히 무시된다.
     static TutorialStepDef s_freeSpentStep;
     static int s_enhanceCard;
@@ -198,8 +198,7 @@ public static class OutgameTutorialGuide
 
     /// <summary>지금 이 한 방을 안내가 대신 내주는가 = 저작이 무료라고 말한 스텝에 서 있고, 그 스텝이 아직 안 썼다.
     /// 무엇이 무료인지는 코드가 아니라 스텝의 freeOfCharge가 정한다.
-    /// _axis를 받는 이유: 안내가 시킨 것이 카드 강화인데 유저가 키워드 강화를 하면 그쪽이 공짜가 되고
-    /// 소진 표식까지 가져가 정작 안내가 시킨 강화에 값이 붙는다(그 반대도 같다).</summary>
+    /// 현재 스텝의 강화 액션과 요청 액션이 일치해야 한다.</summary>
     // 클라 표식(세션 내·스텝 단위)과 서버 표식(영구·축 단위)을 둘 다 본다 — 응답을 잃으면 서버만 소진을 알기 때문이다.
     public static bool HasFreeShot(EOutgameTutorialAction _axis)
         => TryGetCurrentStep(out var t_step)
@@ -219,7 +218,6 @@ public static class OutgameTutorialGuide
         switch (_axis)
         {
             case EOutgameTutorialAction.WaitEnhance:        return TutorialGrantsCloud.EnhanceCardSpent;
-            case EOutgameTutorialAction.WaitKeywordEnhance: return TutorialGrantsCloud.EnhanceKeywordSpent;
             default:                                        return false;
         }
     }

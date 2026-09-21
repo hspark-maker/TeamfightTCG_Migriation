@@ -69,9 +69,5 @@ Inspector는 FTUE 목록과 가이드 설정을 별도로 보여준다. 전용 �
 
 ## 검증
 
-- `Tools/Tutorial/Validate FTUE Guide Separation`: 분리 저장, 챕터 성격, 편집 좌표, 스텝 ID·직렬화 왕복과 목록 경계 검증.
-- `Tools/Tutorial/Validate Content Unlock Separation`: 별도 SO·카탈로그 참조, AND 조건, 미션 조건 없는 콘텐츠의 독립성 검증.
-- `Tools/Tutorial/Validate Guide Mission Flows`: 연결 중복, 미션 CSV 참조, 챕터·소개 존재, 미션 접근 순환 및 진행 규칙 검증.
-- `Tools/Tutorial/Validate Content Unlock Intro`: 해금 소개 저작과 기존 연출 계약 검증.
-- `Tools/Tutorial/Validate Guidance Integration`: 기존 저장 기록 호환 검증.
+- 수동 회귀 검증 메뉴와 전용 스크립트는 정리했다. 튜토리얼 저작 도구의 `TutorialValidator` 검사는 유지한다.
 - 플레이 회귀: FTUE 졸업, guide.01·guide.03 활성화, 소개 도중 종료, 안내 중단 후 이동 버튼, 재접속, 지난 미션 계정, 팝업·탭 전환과의 순서.

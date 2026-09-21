@@ -115,11 +115,11 @@ public readonly struct TutorialAnchorMeta
         //    (진화는 이 버튼이 얼굴만 갈아입은 것이라 등록 대상이 하나뿐이다)
         new(A.CardDetailEnhanceButton,    F.CardEnhance,        "카드 상세 오버레이",      "UI/CardDetail/CardDetailOverlayView.cs:1522"),
 
-        // 22 UI/Growth/KeywordGrowthCellView.cs:77. UI/Growth/ 전체에 EOutgameFeature 사용 0건 → 잠금 없음
-        new(A.KeywordGrowthCell,          F.None,               "키워드 강화 패널",       "UI/Growth/KeywordGrowthCellView.cs:77"),
+        // 22 폐기 — 저작이 남으면 미등록 앵커로 검증한다.
+        new(A.KeywordGrowthCell,          F.None,               "(폐기)", null),
 
-        // 23 UI/Growth/KeywordGrowthPanel.cs:335(패널이 열려 있는 동안만). 잠금 없음
-        new(A.KeywordGrowthUpgradeButton, F.None,               "키워드 강화 패널",       "UI/Growth/KeywordGrowthPanel.cs:335"),
+        // 23 폐기
+        new(A.KeywordGrowthUpgradeButton, F.None,               "(폐기)", null),
 
         // 24 Tab_Match.prefab의 AdventureBtn(2563422757509691373)에 key: 24.
         //    잠금은 프리팹 저작이 아니라 UI/Lobby/LobbyMatchTabPanel.cs의 Awake가 FeatureLockView.Attach(Adventure)로 건다
@@ -142,9 +142,8 @@ public readonly struct TutorialAnchorMeta
         //    (매치 배리언트에는 이 버튼이 없다 — 그 화면은 이탈 확인 팝업이 저장을 받는다)
         new(A.DeckEditSaveButton,         F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/DeckEditPanel.prefab"),
 
-        // 30 UI/Growth/KeywordGrowthPanel.cs의 ApplyPanelAnchor(패널이 열려 있는 동안만). 누를 대상이 아니라
-        //    "함께 밝힐 영역" 전용이라 Button 없이 등록된다. 잠금 없음
-        new(A.KeywordGrowthPanel,         F.None,               "키워드 강화 패널",       "UI/Growth/KeywordGrowthPanel.cs"),
+        // 30 폐기
+        new(A.KeywordGrowthPanel,         F.None,               "(폐기)", null),
         new(A.CardDetailKeywordDescription, F.None,             "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/CardDetailOverlay.prefab"),
         new(A.CardDetailCardView,         F.None,               "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/CardDetailOverlay.prefab"),
         new(A.DeckSynergyStrip,           F.None,               "덱 편집",               "UI/Deck/DeckEditController.cs"),

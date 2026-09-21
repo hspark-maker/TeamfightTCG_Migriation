@@ -58,7 +58,7 @@ const walletStore_1 = require("../currency/walletStore");
 const cardGrowth_1 = require("../growth/cardGrowth");
 const enhanceRules_1 = require("../growth/enhanceRules");
 const tutorialGrants_1 = require("../growth/tutorialGrants");
-/** 무료 한 방이 걸린 축. 키워드 강화와 다른 축이라 따로 소진된다. */
+/** 카드 강화 튜토리얼의 무료 한 방 축. */
 const FREE_SHOT_AXIS = "enhanceCard";
 /**
  * 도메인 거절. 던지기와 로그는 save/domainReject 한 곳이고, 여기 남은 것은 사유 오타를 막는 타입 관문이다.

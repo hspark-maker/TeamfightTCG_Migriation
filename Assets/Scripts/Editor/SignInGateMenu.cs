@@ -8,7 +8,7 @@ using UnityEngine;
 /// 로그인 화면은 서지 않으므로, 손으로 지울 창구가 없으면 그 인스턴스는 그 계정에 묶인 채로 남는다.</para></summary>
 static class SignInGateMenu
 {
-    const string MENU = "Tools/Account/Clear stored sign-in method";
+    const string MENU = "Tools/Card Battle/계정/Clear stored sign-in method";
 
     [MenuItem(MENU)]
     static void ClearStoredMethod()

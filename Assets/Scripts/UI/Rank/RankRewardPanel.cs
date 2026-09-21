@@ -37,9 +37,17 @@ public class RankRewardPanel : ContentsPooledUI
     Canvas m_guidePopupCanvas;
     int m_guidePopupOrder;
 
-    // 승급 직후 자동으로 열린 목록에서만 수령 → 닫기를 안내한다.
+    // 승급 직후 자동으로 열린 목록에서 계정당 한 번만 수령 → 닫기를 안내한다.
     public void BeginRewardGuide()
     {
+        if (this.m_guiding || OutgameTutorialProgress.IsTriggerDone(EOutgameTutorialTrigger.RankRewardIntroduction)) return;
+        // 표시 이력이 없던 기존 계정도 이미 보상을 받았다면 사용법 안내를 반복하지 않는다.
+        for (int i = 0; i < RankRewardManager.TierCount; i++)
+            if (RankManager.IsTierRewardClaimed(i))
+            {
+                OutgameTutorialProgress.MarkTriggerDone(EOutgameTutorialTrigger.RankRewardIntroduction);
+                return;
+            }
         this.m_guiding = true;
         this.m_guidedRewardReceived = false;
     }
@@ -85,6 +93,8 @@ public class RankRewardPanel : ContentsPooledUI
         }
         this.m_guideTarget = t_target;
         t_gate.ShowGate(this, (RectTransform)t_target.transform, t_target, t_message, null);
+        // 실제 표시한 뒤에만 저장한다. 현재 수령→닫기 안내는 계속하고, 다음 승급부터 생략한다.
+        OutgameTutorialProgress.MarkTriggerDone(EOutgameTutorialTrigger.RankRewardIntroduction);
     }
 
     void ClearRewardGuide()

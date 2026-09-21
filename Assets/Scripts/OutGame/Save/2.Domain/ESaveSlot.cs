@@ -10,7 +10,7 @@ public enum ESaveSlot
     Ownership     = 1 << 1,
     Deck          = 1 << 2,
     CardGrowth    = 1 << 3,
-    KeywordGrowth = 1 << 4,
+    // 1 << 4는 폐기된 키워드 강화 자리다. 다른 슬롯의 비트는 유지하고 이 비트를 재사용하지 않는다.
     Rank          = 1 << 5,
     AlbumReward   = 1 << 6,
     Adventure    = 1 << 7,

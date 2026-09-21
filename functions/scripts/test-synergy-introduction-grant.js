@@ -64,7 +64,7 @@ test("callable charges zero through two stars, preserves the old grant, and reje
     "../missions/guideMutation": {readGuideCards: async () => [], applyGuideProgress() {}},
     "../packs/packSpecReader": {readSpecRows: async (env, table) => table === "CardEnhanceRule" ?
       [{maxLevel, maxLimitBreak: 3, baseEnhanceCost: 25, costGrowthPerLevel: 50}] :
-      table === "KeywordEnhance" ? [{keyword: "Ranged", maxLevel: 10, baseCost: 5, costGrowthPerLevel: 1}] : overrides},
+      overrides},
     "../save/saveDocument": {
       requireUid: () => "player", isKnownEnv: () => true,
       async mutateSave(env, uid, command, receipt, mutate, respond) {
@@ -82,7 +82,6 @@ test("callable charges zero through two stars, preserves the old grant, and reje
     return Object.hasOwn(stubs, request) ? stubs[request] : originalLoad.call(this, request, parent, isMain);
   };
   const file = require.resolve("../lib/commands/enhanceCard");
-  const keywordFile = require.resolve("../lib/commands/enhanceKeyword");
   try {
     delete require.cache[file];
     const {enhanceSynergyIntroduction, enhanceCard} = require(file);
@@ -96,8 +95,8 @@ test("callable charges zero through two stars, preserves the old grant, and reje
     await assert.rejects(enhanceSynergyIntroduction(request(2)), (e) => e.details.reason === "NotReady");
     assert.equal(writes.length, 0);
     assert.equal(wallet.balances.Shard, 0);
-    assert.equal(save.cardGrowth.entries[1].snack, 7);
-    assert.equal(save.cardGrowth.entries[1].limitBreak, 1);
+    assert.equal(save.cardGrowth.entries[1].snack, undefined);
+    assert.equal(save.cardGrowth.entries[1].limitBreak, undefined);
     assert.equal(grants.enhanceCard, true); assert.equal(grants.enhanceKeyword, true);
     assert.deepEqual(grants.packs, {starter: true});
     wallet.balances.Shard = 100;
@@ -118,7 +117,7 @@ test("callable charges zero through two stars, preserves the old grant, and reje
     const resumed = await enhanceSynergyIntroduction(request());
     assert.equal(resumed.level, 3); assert.equal(resumed.appliedShards, 63);
     assert.equal(resumed.cost, 0); assert.equal(wallet.balances.Shard, 99);
-    assert.deepEqual(save.cardGrowth.entries[2], entry(1, 4));
+    assert.deepEqual(save.cardGrowth.entries[2], {level: 1, shardProgress: 4});
 
     for (const [fromLevel, progress, expected] of [[1, 0, 100], [1, 24, 76], [2, 0, 75], [2, 74, 1]]) {
       save.cardGrowth.entries = {1: entry(fromLevel, progress)};
@@ -172,28 +171,8 @@ test("callable charges zero through two stars, preserves the old grant, and reje
     assert.deepEqual({save, grants, wallet}, afterFreeCard);
     assert.equal(writes.length, 0);
 
-    delete require.cache[keywordFile];
-    const {enhanceKeyword} = require(keywordFile);
-    grants.enhanceKeyword = false;
-    wallet.balances.Energy = 100;
-    const keywordRequest = (freeShot = true) => ({auth: {uid: "player"},
-      data: {env: "test", keyword: 1, freeShot}});
-    const freeKeyword = await enhanceKeyword(keywordRequest());
-    assert.equal(freeKeyword.freeShotUsed, true);
-    assert.equal(freeKeyword.level, 1);
-    assert.equal(freeKeyword.cost, 0);
-    const afterFreeKeyword = structuredClone({save, grants, wallet});
-    await assert.rejects(enhanceKeyword(keywordRequest()), (e) => e.details.reason === "NotReady");
-    assert.deepEqual({save, grants, wallet}, afterFreeKeyword);
-    assert.equal(writes.length, 0);
-    const paidKeyword = await enhanceKeyword(keywordRequest(false));
-    assert.equal(paidKeyword.freeShotUsed, false);
-    assert.equal(paidKeyword.level, 2);
-    assert.equal(paidKeyword.cost, 6);
-    assert.equal(wallet.balances.Energy, 94);
   } finally {
     Module._load = originalLoad;
     delete require.cache[file];
-    delete require.cache[keywordFile];
   }
 });

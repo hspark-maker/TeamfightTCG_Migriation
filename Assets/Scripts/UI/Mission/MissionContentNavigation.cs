@@ -41,7 +41,6 @@ internal static class MissionContentNavigation
         {
             case "OpenPack": return EOutgameFeature.LobbyPackTab;
             case "EnhanceCard":
-            case "LimitBreakCard":
             case GuideMissionTrack.EVENT_ENHANCE_COMPLETED:
             case GuideMissionTrack.EVENT_EVOLVE_COMPLETED:
             case GuideMissionTrack.EVENT_STARTER_CARDS_STAR1:

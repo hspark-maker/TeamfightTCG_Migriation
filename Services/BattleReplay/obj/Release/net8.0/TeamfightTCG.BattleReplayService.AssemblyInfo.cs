@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TeamfightTCG.BattleReplayService")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2d1679249c418fc1492c33234a22d43807e2ead8")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+dd170bc5c7295297aeeb5b1fce680cb9e10b0cf8")]
 [assembly: System.Reflection.AssemblyProductAttribute("TeamfightTCG.BattleReplayService")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TeamfightTCG.BattleReplayService")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

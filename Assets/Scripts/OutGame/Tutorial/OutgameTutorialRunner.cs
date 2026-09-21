@@ -491,14 +491,21 @@ public static class OutgameTutorialRunner
     public static bool IsCurrentAction(EOutgameTutorialAction _action)
         => TryGetCurrentStep(out var t_step) && t_step.Action == _action;
 
-    // 이번 스텝이 상점 진열·판매 대상을 지정했으면 true(미지정이면 상점 기본 진열)
+    // 구매 스텝과 그 직전 팩 탭 이동에서 같은 진열·판매 대상을 쓴다(미지정이면 상점 기본 진열).
     // 가격 자리에 띄울 문구도 함께 준다 — 저작이 비면 null이고, 그러면 팩의 실제 가격을 쓴다
     public static bool TryGetForcedPack(out string _packId, out string _priceLabel)
     {
         _packId     = null;
         _priceLabel = null;
 
-        return TryGetCurrentStep(out var t_step) && t_step.TryGetForcedPack(out _packId, out _priceLabel);
+        if (!TryGetCurrentStep(out var t_step)) return false;
+        if (t_step.TryGetForcedPack(out _packId, out _priceLabel)) return true;
+
+        // 탭 버튼의 리스너가 구매 스텝 커밋보다 먼저 화면을 연다. 이때도 다음 구매 팩을 써야
+        // 일반 팩이 한순간 진열되지 않는다. 다른 안내나 다음 챕터의 구매까지 앞당기지는 않는다.
+        return t_step.Anchor == EOutgameTutorialAnchor.LobbyPackTab
+            && TryGetStepAt(OutgameTutorialProgress.ChapterIndex, OutgameTutorialProgress.StepIndex + 1, out var t_next)
+            && t_next.TryGetForcedPack(out _packId, out _priceLabel);
     }
 
     // 이번 스텝이 자동 편성으로 채울 카드를 지정했으면 true(미지정이면 일반 편성 규칙)
