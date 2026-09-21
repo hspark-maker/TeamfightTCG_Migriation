@@ -26,7 +26,6 @@ public class RankingBoardPanel : ContentsPooledUI
 
     protected override void OnInitializeUI()
     {
-        UiSortingOrder.LiftNested(gameObject, UiSortingOrder.PooledOverlay);
         if (closeButton != null) closeButton.onClick.AddListener(Close);
         if (retryButton != null) retryButton.onClick.AddListener(Refresh);
         ClearRows();

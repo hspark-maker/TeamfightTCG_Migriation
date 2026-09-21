@@ -352,6 +352,7 @@ public class MissionPanel : ContentsPooledUI
 
         // 서버에 일괄 수령 창구가 없어 순차 요청하고, 성공한 보상만 모아 한 번 표시한다.
         var t_results = new List<ClaimMissionResult>();
+        var releaseDisplay = CurrencyHud.HoldRewardDisplays();
         ServerWaitOverlay.Hold(this);
         try
         {
@@ -362,6 +363,11 @@ public class MissionPanel : ContentsPooledUI
                 if (t_result != null) t_results.Add(t_result);
             }
         }
+        catch
+        {
+            releaseDisplay();
+            throw;
+        }
         finally
         {
             // 팝업보다 먼저 걷는다 — ClaimAsync 와 같은 계약.
@@ -370,7 +376,7 @@ public class MissionPanel : ContentsPooledUI
             this.RefreshClaimAllButton();
         }
         if (t_results.Exists(t_result => (t_result.Cards?.Count ?? 0) > 0)) this.Close();
-        ShowClaimedRewards(t_results);
+        ShowClaimedRewards(t_results, _onClosed: releaseDisplay);
     }
 
     void HandleClaim(string _missionId)
@@ -382,6 +388,7 @@ public class MissionPanel : ContentsPooledUI
     {
         // 왕복 동안 입력을 막는다. 딤·스피너는 임계 뒤에만 뜨므로 빠른 응답에서는 깜빡이지 않는다.
         ClaimMissionResult t_result = null;
+        var releaseDisplay = CurrencyHud.HoldRewardDisplays();
         ServerWaitOverlay.Hold(this);
         try
         {
@@ -394,12 +401,13 @@ public class MissionPanel : ContentsPooledUI
             // **팝업보다 먼저 걷는다.** 순서를 뒤집으면 안내가 대기 딤에 묻힌다
             // (PackPurchaseFlow 와 같은 계약 — ServerWaitOverlay 는 자기 캔버스가 없다).
             ServerWaitOverlay.Release(this);
+            if (t_result == null) releaseDisplay();
         }
         if (t_result != null)
         {
             // 개봉 화면보다 높은 미션 패널을 먼저 걷는다.
             if ((t_result.Cards?.Count ?? 0) > 0) this.Close();
-            ShowClaimedRewards(new[] { t_result });
+            ShowClaimedRewards(new[] { t_result }, _onClosed: releaseDisplay);
         }
     }
 

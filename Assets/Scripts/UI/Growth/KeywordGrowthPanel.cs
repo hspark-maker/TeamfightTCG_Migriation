@@ -103,12 +103,16 @@ public class KeywordGrowthPanel : ContentsPooledUI
 
     protected override void OnViewShown()
     {
+        OutgameTutorialRunner.OnGuidedChanged += this.LiftToOverlayLayer;
+        this.LiftToOverlayLayer();
         KeywordGrowthManager.OnChanged    += this.RefreshAll;
         CurrencyManager.OnCurrencyChanged += this.HandleCurrencyChanged;
     }
 
     protected override void OnViewHidden()
     {
+        OutgameTutorialRunner.OnGuidedChanged -= this.LiftToOverlayLayer;
+        UiSortingOrder.DropNested(this.m_sortingCanvas);
         this.KillUpgradeFx();
 
         KeywordGrowthManager.OnChanged    -= this.RefreshAll;
@@ -442,7 +446,11 @@ public class KeywordGrowthPanel : ContentsPooledUI
                 this.m_cells[t_i].ApplyTutorialAnchor(false);
     }
 
-    // 이 화면은 튜토리얼 안내가 가리키는 무대라 게이트 아래 층으로 내려앉는다(절차는 UiSortingOrder가 쥔다).
+    // 강화 안내 중에만 게이트 아래로 내리고, 직접 연 화면은 PassOverlay처럼 풀 층을 상속한다.
     void LiftToOverlayLayer()
-        => this.m_sortingCanvas = UiSortingOrder.LiftNested(gameObject, UiSortingOrder.PooledOverlay);
+    {
+        if (this.isShow && OutgameTutorialRunner.GuidedTrigger == EOutgameTutorialTrigger.KeywordGrowthFirstOpen)
+            this.m_sortingCanvas = UiSortingOrder.LiftNested(gameObject, UiSortingOrder.PooledOverlay);
+        else UiSortingOrder.DropNested(this.m_sortingCanvas);
+    }
 }

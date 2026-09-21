@@ -42,6 +42,7 @@ public class RankRewardPanel : ContentsPooledUI
     {
         this.m_guiding = true;
         this.m_guidedRewardReceived = false;
+        this.LiftToOverlayLayer();
     }
 
     void Update()
@@ -130,6 +131,7 @@ public class RankRewardPanel : ContentsPooledUI
     protected override void OnViewHidden()
     {
         this.m_guiding = false;
+        this.LiftToOverlayLayer();
         this.m_claimPending = false;
         this.ClearRewardGuide();
         RankRewardManager.OnChanged -= this.RefreshRows;
@@ -276,8 +278,12 @@ public class RankRewardPanel : ContentsPooledUI
         this.scrollRect.verticalNormalizedPosition = Mathf.Clamp01(1f - t_ratio);
     }
 
-    // 풀 컨테이너(UiSortingOrder.Pool)에서 떨어져 나와 로비 오버레이 층에 내려앉는다(절차는 UiSortingOrder가 쥔다).
+    // 수령 안내 중에만 게이트 아래로 내리고, 직접 연 목록은 PassOverlay처럼 풀 층을 상속한다.
     void LiftToOverlayLayer()
-        => this.m_sortingCanvas = UiSortingOrder.LiftNested(gameObject, UiSortingOrder.PooledOverlay);
+    {
+        if (this.m_guiding)
+            this.m_sortingCanvas = UiSortingOrder.LiftNested(gameObject, UiSortingOrder.PooledOverlay);
+        else UiSortingOrder.DropNested(this.m_sortingCanvas);
+    }
 
 }

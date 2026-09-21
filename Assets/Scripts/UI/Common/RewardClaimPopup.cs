@@ -199,6 +199,19 @@ public class RewardClaimPopup : PooledOverlay<RewardClaimPopup>
 
     void ClaimClicked()
     {
+        var releaseDisplay = CurrencyHud.HoldRewardDisplays();
+        try
+        {
+            this.ClaimAndPresent();
+        }
+        finally
+        {
+            releaseDisplay();
+        }
+    }
+
+    void ClaimAndPresent()
+    {
         // 콜백을 먼저 비워 연타로 두 번 지급되는 경로를 막는다(매니저 가드와 이중 방어).
         var t_callback = this.m_onConfirm;
         if (t_callback == null) return;
