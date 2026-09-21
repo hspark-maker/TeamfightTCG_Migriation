@@ -4,6 +4,7 @@ import type {
   Firestore,
   Transaction,
 } from "firebase-admin/firestore";
+import {isDeepStrictEqual} from "node:util";
 
 export const PASS_SCHEMA_VERSION = 1;
 const PASS_EXP_MAX = 100000000;
@@ -29,6 +30,8 @@ export interface PassProgressResponse {
 export interface PassMutation {
   ref: DocumentReference;
   state: PassState;
+  original: PassState | null;
+  originalSchemaVersion: unknown;
 }
 
 /**
@@ -99,8 +102,10 @@ export async function beginPassMutation(
   seasonId: string,
 ): Promise<PassMutation> {
   const ref = passRef(db, env, uid);
-  const state = applyPassSeason(readPass(await transaction.get(ref)), seasonId);
-  return {ref, state};
+  const snapshot = await transaction.get(ref);
+  const original = snapshot.exists ? readPass(snapshot) : null;
+  const state = applyPassSeason(readPass(snapshot), seasonId);
+  return {ref, state, original, originalSchemaVersion: snapshot.data()?.schemaVersion};
 }
 
 function write(transaction: Transaction, pass: PassMutation, now: unknown): void {
@@ -128,6 +133,8 @@ export function commitPassExp(
 ): void {
   const gain = Number.isSafeInteger(amount) && amount > 0 ? amount : 0;
   pass.state.exp = Math.min(pass.state.exp + gain, PASS_EXP_MAX);
+  // Keep season initialization and schema upgrades, but not an unchanged XP write.
+  if (pass.originalSchemaVersion === PASS_SCHEMA_VERSION && isDeepStrictEqual(pass.original, pass.state)) return;
   write(transaction, pass, now);
 }
 

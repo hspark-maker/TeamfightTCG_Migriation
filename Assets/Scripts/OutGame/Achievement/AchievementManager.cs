@@ -53,7 +53,12 @@ internal static class AchievementManager
 
     internal static long ProgressOf(AchievementDefinition _definition)
     {
-        if (_definition == null || s_snapshot == null) return 0;
+        if (_definition == null) return 0;
+        if (PlayerStatisticsManager.IsReady && (s_snapshot == null ||
+            PlayerStatisticsManager.Snapshot.AchievementRevision >= s_snapshot.Revision))
+            return PlayerStatisticsManager.AchievementProgress(_definition.Event, _definition.SynergyId);
+        // 혼합 배포·롤백 중 더 새 구 서버 응답은 다음 통계 조회까지 호환 사본으로 표시한다.
+        if (s_snapshot == null) return 0;
         string t_key = _definition.Event == "PlaySynergy"
             ? "PlaySynergy:" + _definition.SynergyId : _definition.Event;
         return s_snapshot.Progress.TryGetValue(t_key, out long t_value) ? Math.Max(0, t_value) : 0;
@@ -110,6 +115,12 @@ internal static class AchievementManager
     }
 
     internal static void NotifyCommandStateChanged() => NotifyChanged();
+
+    internal static void NotifyStatisticsChanged()
+    {
+        unchecked { StateVersion++; }
+        NotifyChanged();
+    }
 
     static void NotifyChanged()
     {

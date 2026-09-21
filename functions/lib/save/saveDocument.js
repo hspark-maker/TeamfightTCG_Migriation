@@ -49,8 +49,9 @@ Object.defineProperty(exports, "isKnownEnv", { enumerable: true, get: function (
 const domainReject_1 = require("./domainReject");
 const receiptCache_1 = require("./receiptCache");
 const wallet_1 = require("../currency/wallet");
-const achievementProgress_1 = require("../achievements/achievementProgress");
 const achievementStore_1 = require("../achievements/achievementStore");
+const playerStatistics_1 = require("../statistics/playerStatistics");
+const playerStatisticsStore_1 = require("../statistics/playerStatisticsStore");
 const walletStore_1 = require("../currency/walletStore");
 /**
  * 서버가 쓰는 세이브 문서 스키마 버전. 클라 쪽 쌍둥이 상수와 짝이다.
@@ -223,11 +224,17 @@ async function mutateSave(env, uid, source, receipt, mutate, finalize, isLegacyW
             }
         }
         const revision = Number(current.revision ?? 0) + 1;
-        // Read before the mutation queues any writes; receipt replays have already returned above.
-        const achievementReference = (0, achievementStore_1.achievementsRef)(firebaseApp_1.db, env, uid);
-        const achievements = PACK_OPENING_COMMANDS.has(source) ?
-            (0, achievementStore_1.readAchievements)(await transaction.get(achievementReference)) : null;
-        const outcome = await mutate(current, transaction, wallet);
+        // Producers know the actual award before queuing writes. Currency/direct-card rewards need no statistics read.
+        let statistics;
+        let preparedPacks = 0;
+        const outcome = await mutate(current, transaction, wallet, async (opened) => {
+            if (!Number.isSafeInteger(opened) || opened < 0 || !PACK_OPENING_COMMANDS.has(source)) {
+                throw new Error(`Invalid pack statistics preparation: ${source}`);
+            }
+            preparedPacks = opened;
+            if (opened > 0 && statistics === undefined)
+                statistics = await (0, playerStatisticsStore_1.beginStatistics)(transaction, firebaseApp_1.db, env, uid);
+        });
         // 응답에 실을 지갑은 **쓰기 전에** 확정한다 — finalize 가 만든 응답 그대로가 영수증에
         // 담겨야 재시도가 같은 답을 받는데, 그 답은 갱신된 잔액을 실어야 하기 때문이다.
         // 개설 갈래의 rev 1 은 createWallet 이 세우는 값과 같은 축이다.
@@ -242,10 +249,14 @@ async function mutateSave(env, uid, source, receipt, mutate, finalize, isLegacyW
         });
         const packs = response.packs;
         const opened = source === "openPack" ? 1 : Array.isArray(packs) ? packs.length : 0;
-        if (achievements !== null && opened > 0) {
-            (0, achievementProgress_1.incrementAchievement)(achievements, "OpenPack", opened);
-            (0, achievementStore_1.writeAchievements)(transaction, achievementReference, achievements, firestore_1.FieldValue.serverTimestamp());
-            response.achievements = (0, achievementStore_1.achievementResponse)(achievements);
+        if (PACK_OPENING_COMMANDS.has(source) && opened !== preparedPacks) {
+            throw new Error(`Pack statistics were not prepared before writes: ${source}`);
+        }
+        if (statistics !== undefined && opened > 0) {
+            (0, playerStatistics_1.applyStatisticsPacks)(statistics.state, opened);
+            (0, playerStatisticsStore_1.commitStatistics)(transaction, statistics, firestore_1.FieldValue.serverTimestamp());
+            response.achievements = (0, achievementStore_1.achievementResponse)(statistics.achievements);
+            response.statistics = (0, playerStatistics_1.statisticsResponse)(statistics.state);
         }
         transaction.update(reference, {
             ...outcome.slots,

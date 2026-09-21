@@ -14,8 +14,10 @@ import {recordEvent} from "../observability/analyticsEvent";
 import {commitMissionBumps, missionBumpFromSnapshot, missionsRef} from "../missions/missionStore";
 import {evaluateGuideRankProgress} from "../missions/guideProgress";
 import {completeGuideSynergyBattle} from "../missions/guideSynergyBattle";
-import {activeAchievementSynergies, applyAchievementBattle} from "../achievements/achievementProgress";
-import {achievementsRef, readAchievements, writeAchievements} from "../achievements/achievementStore";
+import {activeAchievementSynergies} from "../achievements/achievementProgress";
+import {achievementsRef} from "../achievements/achievementStore";
+import {applyStatisticsBattle} from "../statistics/playerStatistics";
+import {commitStatistics, playerStatisticsRef, statisticsFromSnapshots} from "../statistics/playerStatisticsStore";
 import {missionPeriod} from "../missions/period";
 import {
   decideMatch,
@@ -154,6 +156,43 @@ type SubmitData = Omit<Submission, "uid" | "submittedAt"> & {
   matchId: string;
 };
 
+/**
+ * 완료 재조회도 최초 정산과 같은 참가자 검증을 거친다.
+ * @param {object | undefined} match 저장된 매치
+ * @param {string} uid 요청자
+ */
+function requireMatchParticipant(match: Record<string, unknown> | undefined, uid: string): void {
+  if (match?.seedSource !== "server" ||
+      !Array.isArray(match.participantUids) || !match.participantUids.includes(uid)) {
+    throw new HttpsError("permission-denied", "server match identity is not registered");
+  }
+}
+
+/**
+ * 현재 Card 표는 스냅샷을 봉인하지 않던 구 solo 계약에서만 필요하다.
+ * @param {object | undefined} match 저장된 매치
+ * @return {boolean} 구 AI 덱 재구성 여부
+ */
+function needsLegacyAiCardSpecs(match: Record<string, unknown> | undefined): boolean {
+  return match?.mode === "solo" && match.resultProtocol === 1 &&
+    (safeInteger(match.expectedParticipants) ?? 2) === 1 && match.aiGrowthVersion == null &&
+    typeof match.adventureNodeId !== "string";
+}
+
+/**
+ * 저장된 완료 결과의 응답은 신규 정산의 부수 효과를 재실행하지 않는다.
+ * @param {object} match 저장된 매치
+ * @param {string} status 저장된 상태
+ * @return {object} 완료 결과
+ */
+function storedMatchResult(match: Record<string, unknown>, status: string) {
+  const simulation = objectRecord(match.serverSimulation);
+  return {status, reason: match.reason ?? null,
+    ...(typeof match.adventureNodeId !== "string" ? {} : {adventureNodeId: match.adventureNodeId,
+      won: simulation?.ok === true && simulation.draw !== true && simulation.winnerOwner === 0,
+      draw: simulation?.draw === true})};
+}
+
 function parseSubmitData(raw: unknown): SubmitData {
   if (raw == null || typeof raw !== "object") throw new HttpsError("invalid-argument", "payload required");
   const data = raw as Record<string, unknown>;
@@ -288,12 +327,19 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
   if (data.seedSource !== "server") {
     throw new HttpsError("failed-precondition", "legacy match results are not authoritative");
   }
+  const matchRef = db.doc(`envs/${data.env}/matches/${data.matchId}`);
+  const initialMatch = (await matchRef.get()).data();
+  requireMatchParticipant(initialMatch, uid);
+  // confirmed/flagged는 종료 상태다. createMatch도 이 문서를 pairing으로 되돌리지 않으며,
+  // findAiMatch는 기존 문서를 재사용한다. 최신 표 장애가 완료 응답 재조회까지 막지 않게 한다.
+  if (initialMatch?.status === "confirmed" || initialMatch?.status === "flagged") {
+    return storedMatchResult(initialMatch, initialMatch.status);
+  }
   // 랭크 재생 토글은 트랜잭션 밖에서 제출당 한 번만 읽는다.
   // 모험 매치는 승리 낙인과 미션이 검증 결과를 요구하므로 토글과 무관하게 재생한다.
   const replayEnabled = await isBattleReplayEnabled(data.env);
-  const matchRef = db.doc(`envs/${data.env}/matches/${data.matchId}`);
-  const initialMatch = (await matchRef.get()).data();
   const adventureMatch = typeof initialMatch?.adventureNodeId === "string";
+  const legacyAiCardSpecs = needsLegacyAiCardSpecs(initialMatch);
   const achievementPins = parseSpecPins(data.env, initialMatch?.specPins);
   const [achievementCards, achievementTiers] = achievementPins === null ? [[], []] : await Promise.all([
     readPinnedSpecRows(data.env, "Card", achievementPins.Card),
@@ -311,7 +357,7 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
     const [rewardSpecRows, rankSpecRows, cardSpecRows, seasonSpecRows] = await Promise.all([
       adventureMatch ? Promise.resolve([]) : readSpecRows(data.env, "Reward"),
       adventureMatch ? Promise.resolve([]) : readSpecRows(data.env, "RankGrade"),
-      readSpecRows(data.env, cardTable),
+      legacyAiCardSpecs ? readSpecRows(data.env, cardTable) : Promise.resolve([]),
       adventureMatch ? Promise.resolve([]) : readSpecRows(data.env, "PassSeason"),
     ]);
     rewardRows = parseRewardRows(rewardSpecRows as Record<string, unknown>[]);
@@ -342,20 +388,13 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
     if ((adventureNodeId != null) !== adventureMatch) {
       throw new HttpsError("unavailable", "match type changed");
     }
-    if (data.seedSource === "server") {
-      const participantUids = match?.participantUids;
-      if (match?.seedSource !== "server" ||
-          !Array.isArray(participantUids) || !participantUids.includes(uid)) {
-        throw new HttpsError("permission-denied", "server match identity is not registered");
-      }
-    }
+    requireMatchParticipant(match, uid);
     const status = typeof match?.status === "string" ? match.status : "pending";
     if (status !== "pending") {
-      const simulation = objectRecord(match?.serverSimulation);
-      return {kind: "done", value: {status, reason: match?.reason ?? null,
-        ...(adventureNodeId == null ? {} : {adventureNodeId,
-          won: simulation?.ok === true && simulation.draw !== true && simulation.winnerOwner === 0,
-          draw: simulation?.draw === true})}};
+      return {kind: "done", value: storedMatchResult(match!, status)};
+    }
+    if (needsLegacyAiCardSpecs(match) !== legacyAiCardSpecs) {
+      throw new HttpsError("unavailable", "match AI contract changed");
     }
 
     const submissions = {...(match?.submissions as Record<string, Submission> | undefined)};
@@ -603,7 +642,8 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
       db.doc(`envs/${data.env}/users/${entry.uid}/save/current`));
     const missionRefs = entries.map((entry) => missionsRef(db, data.env, entry.uid));
     const achievementRefs = entries.map((entry) => achievementsRef(db, data.env, entry.uid));
-    const snapshots = await tx.getAll(...rankRefs, ...rankStateRefs, ...saveRefs, ...missionRefs, ...achievementRefs);
+    const statisticsRefs = entries.map((entry) => playerStatisticsRef(db, data.env, entry.uid));
+    const snapshots = await tx.getAll(...rankRefs, ...rankStateRefs, ...saveRefs, ...missionRefs, ...achievementRefs, ...statisticsRefs);
     const count = entries.length;
     const rankSnapshots = snapshots.slice(0, rankRefs.length);
     const rankStateSnapshots = snapshots.slice(rankRefs.length, rankRefs.length + rankStateRefs.length);
@@ -742,19 +782,25 @@ export const submitMatchResult = onCall({enforceAppCheck: false, timeoutSeconds:
         if (JSON.stringify(achievementPins) !== JSON.stringify(parseSpecPins(data.env, match?.specPins))) {
           throw new HttpsError("unavailable", "Match achievement specs changed; retry settlement.");
         }
-        const state = readAchievements(snapshots[saveOffset + count * 2 + i]);
+        const context = statisticsFromSnapshots(snapshots[saveOffset + count * 3 + i],
+          snapshots[saveOffset + count * 2 + i], settledAt.toMillis());
         const approval = objectRecord(approvals?.[entries[i].uid]);
         const approvedCards = Array.isArray(approval?.cardSnapshots) ? approval.cardSnapshots as CardSnapshot[] : [];
         const simulation = serverReplay.outcome;
-        applyAchievementBattle(state, {
+        applyStatisticsBattle(context.state, {
           verified: true,
           tutorial: match?.tutorial === true || match?.mode === "tutorial",
+          mode: adventureNodeId == null ? "ranked" : "adventure",
           won: simulation.winnerOwner === owner,
           draw: simulation.draw,
           destroyed: destroyedByOwner?.[owner] ?? 0,
+          attacks: replayStats?.attacksByOwner[owner] ?? 0,
+          damageDealt: replayStats?.damageDealtByOwner[owner] ?? 0,
+          healed: replayStats?.healedByOwner[owner] ?? 0,
+          synergyTriggers: replayStats?.synergyFiredByOwner[owner] ?? 0,
           synergies: activeAchievementSynergies(approvedCards, achievementCards, achievementTiers),
         });
-        writeAchievements(tx, achievementRefs[i], state, missionNow);
+        if (match?.tutorial !== true && match?.mode !== "tutorial") commitStatistics(tx, context, missionNow);
       }
     }
 

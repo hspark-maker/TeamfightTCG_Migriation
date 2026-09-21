@@ -16,6 +16,10 @@ const replayConfig = require("../lib/battleReplayConfig");
 const {computeDeckHash} = require("../lib/deckValidation");
 const {claimAchievement} = require("../lib/commands/claimAchievement");
 const {getAchievements} = require("../lib/commands/getAchievements");
+const {getPlayerStatistics} = require("../lib/commands/getPlayerStatistics");
+const {readAchievements, writeAchievements} = require("../lib/achievements/achievementStore");
+const {beginStatistics, commitStatistics} = require("../lib/statistics/playerStatisticsStore");
+const {applyStatisticsBattle} = require("../lib/statistics/playerStatistics");
 const {openPack} = require("../lib/commands/openPack");
 const {submitMatchResult} = require("../lib/commands/submitMatchResult");
 after(() => db.terminate());
@@ -151,7 +155,10 @@ test("all reward-pack commands count each opened pack once and direct card grant
   const {uid, read} = await setup(t, {});
   for (const source of ["claimAttendance", "claimMission", "claimReward", "claimPassReward", "claimBattleExperience", "spinRoulette"]) {
     const receipt = {kind: "client", txId: randomUUID()};
-    const execute = (packs) => saves.mutateSave("test", uid, source, receipt, () => ({slots: {}}),
+    const execute = (packs) => saves.mutateSave("test", uid, source, receipt, async (_current, _tx, _wallet, prepare) => {
+      await prepare(packs.length);
+      return {slots: {}};
+    },
       (adopted) => ({...adopted, cards: [{cardId: 1}], packs}));
     const result = await execute([{packId: "pack", cards: [{cardId: 1}]}, {packId: "pack", cards: [{cardId: 2}]}]);
     await execute([{packId: "pack", cards: [{cardId: 1}]}, {packId: "pack", cards: [{cardId: 2}]}]);
@@ -213,6 +220,12 @@ test("real settlement uses verified kills and starting active synergy, duplicate
   const saved = (await state.read())[2];
   assert.deepEqual(saved.progress, {WinBattle: 1, DestroyCards: 6, WinStreak: 1, "PlaySynergy:Bulk": 1});
   assert.equal(saved.revision, 2);
+  const stats = (await state.root.collection("statistics").doc("current").get()).data();
+  assert.equal(stats.lifetime.wins, 1); assert.equal(stats.lifetime.cardsDestroyed, 6);
+  assert.equal(stats.lifetime.synergyPlays.Bulk, 1); assert.equal(stats.battle.all.battles, 1);
+  assert.equal(stats.battle.adventure.wins, 1); assert.equal(stats.battle.ranked.battles, 0);
+  assert.equal(stats.battle.all.attacks, 7); assert.equal(stats.battle.all.damageDealt, 20);
+  assert.equal(stats.revision, 1);
 });
 
 test("unavailable replay leaves pending and invalid replay flags without any achievement mutation", async (t) => {
@@ -223,6 +236,116 @@ test("unavailable replay leaves pending and invalid replay flags without any ach
     const result = await submitMatchResult.run(input);
     assert.equal(result.status, verdict === "unavailable" ? "pending" : "flagged", JSON.stringify(result));
     assert.deepEqual((await state.read())[2], before);
+    assert.equal((await state.root.collection("statistics").doc("current").get()).exists, false);
   }
 });
 
+test("statistics lazily migrate once, preserve claims and query without Achievement definitions", async (t) => {
+  const {root, request, read} = await setup(t, {WinBattle: 17, DestroyCards: 33, OpenPack: 4, WinStreak: 8,
+    "PlaySynergy:Bulk": 9});
+  await root.collection("achievements").doc("current").update({currentWinStreak: 3, claimed: {"wins.1": true}});
+  t.mock.method(specs, "readSpecRows", async (_env, name) => {
+    assert.notEqual(name, "Achievement"); return table(name);
+  });
+  const first = await getPlayerStatistics.run(request());
+  const second = await getPlayerStatistics.run(request());
+  assert.deepEqual(second, first);
+  assert.equal(first.statistics.revision, 1); assert.equal(first.statistics.achievementRevision, 2);
+  assert.equal(first.statistics.lifetime.wins, 17); assert.equal(first.statistics.lifetime.albumsCompleted, 1);
+  assert.equal(first.statistics.lifetime.currentWinStreak, 3); assert.equal(first.statistics.lifetime.bestWinStreak, 8);
+  for (const bucket of Object.values(first.statistics.battle)) {
+    assert.equal(bucket.battles, 0); assert.equal(bucket.wins, 0); assert.equal(bucket.losses, 0);
+  }
+  assert.equal(first.achievements.claimed["wins.1"], true);
+  assert.equal((await read())[0].revision, 1);
+});
+
+test("mixed old/new transactions keep all increments and claims through conflicts and rollback", async (t) => {
+  const {root, request, uid} = await setup(t, {WinBattle: 10, DestroyCards: 20, WinStreak: 5});
+  await getPlayerStatistics.run(request());
+  const oldRef = root.collection("achievements").doc("current");
+  const oldWrite = () => db.runTransaction(async (tx) => {
+    const old = readAchievements(await tx.get(oldRef));
+    old.progress.WinBattle = (old.progress.WinBattle ?? 0) + 1;
+    old.progress.OpenPack = (old.progress.OpenPack ?? 0) + 1;
+    old.currentWinStreak = 0;
+    old.claimed["wins.1"] = true;
+    writeAchievements(tx, oldRef, old, Date.now());
+  });
+  const newWrite = () => db.runTransaction(async (tx) => {
+    const context = await beginStatistics(tx, db, "test", uid);
+    applyStatisticsBattle(context.state, {verified: true, tutorial: false, mode: "ranked", won: true, draw: false,
+      destroyed: 3, attacks: 4, damageDealt: 20, healed: 2, synergyTriggers: 1, synergies: ["Bulk"]});
+    commitStatistics(tx, context, Date.now());
+  });
+  await Promise.all([oldWrite(), newWrite(), oldWrite(), newWrite()]);
+  const final = await getPlayerStatistics.run(request());
+  assert.equal(final.statistics.lifetime.wins, 14); assert.equal(final.statistics.lifetime.cardsDestroyed, 26);
+  assert.equal(final.statistics.lifetime.packsOpened, 2); assert.equal(final.statistics.battle.all.battles, 2);
+  assert.equal(final.statistics.battle.ranked.wins, 2); assert.equal(final.achievements.claimed["wins.1"], true);
+  assert.deepEqual(await getPlayerStatistics.run(request()), final);
+});
+
+test("old writer loss resets lifetime streak before new wins and does not invent a recorded defeat", async (t) => {
+  const {root, request, uid} = await setup(t, {WinBattle: 10, WinStreak: 7});
+  await root.collection("achievements").doc("current").update({currentWinStreak: 4});
+  const before = await getPlayerStatistics.run(request());
+  await root.collection("achievements").doc("current").update({currentWinStreak: 0, revision: before.achievements.revision + 1});
+  await db.runTransaction(async (tx) => {
+    const context = await beginStatistics(tx, db, "test", uid);
+    applyStatisticsBattle(context.state, {verified: true, tutorial: false, mode: "adventure", won: true, draw: false,
+      destroyed: 0, attacks: 0, damageDealt: 0, healed: 0, synergyTriggers: 0, synergies: []});
+    commitStatistics(tx, context, Date.now());
+  });
+  const after = await getPlayerStatistics.run(request());
+  assert.equal(after.statistics.lifetime.currentWinStreak, 1); assert.equal(after.statistics.lifetime.bestWinStreak, 7);
+  assert.equal(after.statistics.battle.all.losses, 0); assert.equal(after.statistics.battle.all.wins, 1);
+  assert.equal(after.statistics.trackedSinceMs, before.statistics.trackedSinceMs);
+});
+
+test("receipt replay after independent statistics refresh returns its old revision without mutation", async (t) => {
+  const {root, request} = await setup(t, {});
+  const pack = {auth: request().auth, data: {env: "test", packId: "pack", txId: randomUUID()}};
+  const opened = await openPack.run(pack);
+  assert.equal(opened.statistics.lifetime.packsOpened, 1);
+  const ref = root.collection("statistics").doc("current");
+  // Ownership-derived albums are resolved by the separate read endpoint, without a save revision bump.
+  const refreshed = await getPlayerStatistics.run(request());
+  assert.ok(refreshed.statistics.revision > opened.statistics.revision);
+  const stored = (await ref.get()).data();
+  const replayed = await openPack.run(pack);
+  assert.equal(replayed.statistics.revision, opened.statistics.revision);
+  assert.deepEqual((await ref.get()).data(), stored);
+});
+
+test("statistics queries require own authenticated existing account and known environment", async (t) => {
+  const {request} = await setup(t);
+  await assert.rejects(() => getPlayerStatistics.run({data: {env: "test"}}), {code: "unauthenticated"});
+  await assert.rejects(() => getPlayerStatistics.run({...request(), data: {env: "unknown"}}), {code: "invalid-argument"});
+  await assert.rejects(() => getPlayerStatistics.run({auth: {uid: randomUUID()}, data: {env: "test"}}),
+    {code: "failed-precondition"});
+  const actual = await getPlayerStatistics.run({...request(), data: {env: "test", uid: "someone-else"}});
+  assert.equal(actual.statistics.lifetime.wins, 3);
+});
+
+test("normal solo AI settlement without adventureNodeId is counted as ranked", async (t) => {
+  const state = await setup(t, {});
+  const input = await match(t, state);
+  const ref = db.doc(`envs/test/matches/${input.data.matchId}`);
+  const stored = (await ref.get()).data();
+  delete stored.adventureNodeId;
+  await ref.set(stored);
+  t.mock.method(specs, "readSpecRows", async (_env, name) => {
+    if (name === "RankGrade") return [{id: 1, entryPoints: 0, pointsPerDivision: 10, winPoints: 2, losePoints: 1}];
+    if (name === "PassSeason") return [{id: 1, seasonId: "test", displayName: "Test", startAtMs: 1,
+      endAtMs: 4102444800000, maxLevel: 10}];
+    if (name === "Reward") return ["win.perCard", "win.floor", "lose.flat"].map((ownerId, i) =>
+      ({id: i + 1, ownerType: "Battle", ownerId, order: 1, rewardType: "Currency", rewardId: "Gold", amount: 1}));
+    return table(name);
+  });
+  const result = await submitMatchResult.run(input);
+  assert.equal(result.status, "confirmed", JSON.stringify(result));
+  const stats = (await state.root.collection("statistics").doc("current").get()).data();
+  assert.equal(stats.battle.ranked.battles, 1); assert.equal(stats.battle.ranked.wins, 1);
+  assert.equal(stats.battle.adventure.battles, 0); assert.equal(stats.battle.all.battles, 1);
+});

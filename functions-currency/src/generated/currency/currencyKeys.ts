@@ -8,7 +8,7 @@
  */
 
 /** 클라 ECurrencyType 의 이름. 지갑 잔액에 실리는 키는 이 목록이 전부다. */
-export const CURRENCY_KEYS = ["Gold", "Diamond", "Energy", "Shard", "RouletteTicket"] as const;
+export const CURRENCY_KEYS = ["Gold", "Diamond", "Energy", "Shard", "RouletteTicket", "CardDust"] as const;
 
 /** 재화 키 하나. */
 export type CurrencyKey = typeof CURRENCY_KEYS[number];

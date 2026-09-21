@@ -7,6 +7,15 @@ using System.Reflection;
 
 public static partial class SpecFirestoreUploader
 {
+    // 서버 전용 제작 가격. 자동 생성 테이블과 SpecData.bytes에 추가하지 않는다.
+    sealed class CardCraftUploadRow
+    {
+        public int id;
+        public string grade;
+        public int cost;
+        public int enabled;
+    }
+
     // 업적은 CSV에서 서버로만 발행하며 생성 테이블과 bytes에 추가하지 않는다.
     sealed class AchievementUploadRow
     {
@@ -64,7 +73,8 @@ public static partial class SpecFirestoreUploader
     {
         _rows = null;
         _error = null;
-        Type t_type = _table == "Achievement" ? typeof(AchievementUploadRow) :
+        Type t_type = _table == "CardCraft" ? typeof(CardCraftUploadRow) :
+            _table == "Achievement" ? typeof(AchievementUploadRow) :
             _table == "Mission" ? typeof(MissionUploadRow) :
             _table == "AccountLevel" ? typeof(AccountLevel) : _table == "Reward" ? typeof(Reward) : null;
         if (t_type == null || !SpecDocsCsvExporter.TryParseCsv(_csv, out List<List<string>> t_matrix))

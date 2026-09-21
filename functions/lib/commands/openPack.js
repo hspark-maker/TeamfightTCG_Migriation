@@ -128,7 +128,7 @@ exports.openPack = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)("o
     // 기간은 여기서 **한 번만** 잰다 — 트랜잭션 콜백은 재실행되므로 그 안에서 재면
     // 경계에 걸린 호출이 어느 기간에 실릴지가 재실행 운에 달린다.
     const period = (0, period_1.missionPeriod)(Date.now());
-    const result = await (0, saveDocument_1.mutateSave)(env, uid, "openPack", { kind: "client", txId, ...(0, onboardingOperation_1.onboardingReceipt)(request.data, "openPack") }, async (current, transaction, wallet) => {
+    const result = await (0, saveDocument_1.mutateSave)(env, uid, "openPack", { kind: "client", txId, ...(0, onboardingOperation_1.onboardingReceipt)(request.data, "openPack") }, async (current, transaction, wallet, preparePackStatistics) => {
         // 독립 문서는 함께 읽고, 미션·지갑 쓰기 전에 모두 확보한다.
         const missionReference = (0, missionStore_1.missionsRef)(firebaseApp_1.db, env, uid);
         const [missionSnapshot, rankSnapshot] = await transaction.getAll(missionReference, (0, rankStore_1.rankRef)(firebaseApp_1.db, env, uid));
@@ -163,6 +163,7 @@ exports.openPack = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)("o
         (0, guideMutation_1.applyGuideProgress)(missions, current, slots, cardRows, catalog);
         // 진행도는 콜백 **안**에서 올린다 — mutateSave 는 영수증이 히트하면 이 콜백을 통째로 건너뛰므로,
         // 그 덕에 재시도가 진행도를 두 번 올리지 않는다. 콜백 밖으로 옮기면 그 보장이 사라진다.
+        await preparePackStatistics(1);
         (0, missionStore_1.commitMissionBump)(transaction, missions, eventNames_1.EVENTS.packOpened.missionKey, 1, firestore_1.FieldValue.serverTimestamp());
         missionState = (0, missionStore_1.missionResponse)(missions.state, period, catalog);
         return {

@@ -59,5 +59,6 @@ export function onboardingResult(cached: Record<string, unknown>): Record<string
   delete result.wallet;
   delete result.missions;
   delete result.achievements;
+  delete result.statistics;
   return result;
 }

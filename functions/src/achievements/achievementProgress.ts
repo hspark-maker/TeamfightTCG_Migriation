@@ -1,6 +1,4 @@
 import type {CardSnapshot} from "../deckValidation";
-import {albumScopeCardIds, AlbumEntryRow, AlbumThemeRow, isCompleted, lockedThemeIds} from "../completionTable";
-import {readOwnedIds} from "../packs/packSlots";
 import {AchievementDef, achievementProgressKey, SYNERGY_ID} from "./achievementCatalog";
 
 export interface AchievementState {
@@ -12,11 +10,6 @@ export interface AchievementState {
 
 export function achievementCount(value: unknown): number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : 0;
-}
-
-export function incrementAchievement(state: AchievementState, event: string, amount: number): void {
-  state.progress[event] = Math.min(Number.MAX_SAFE_INTEGER,
-    achievementCount(state.progress[event]) + achievementCount(amount));
 }
 
 // Compute active starting-deck synergies from server-approved growth and match-pinned tables.
@@ -40,33 +33,6 @@ export function activeAchievementSynergies(
   return [...new Set(tiers.filter((tier) => Number.isSafeInteger(Number(tier.requiredCount)) &&
     Number(tier.requiredCount) > 0 && (counts.get(String(tier.synergyId))?.size ?? 0) >= Number(tier.requiredCount))
     .map((tier) => String(tier.synergyId)))];
-}
-
-// Only authoritative completed normal matches enter this function. Invalid matches change nothing.
-export function applyAchievementBattle(
-  state: AchievementState,
-  result: {verified: boolean; tutorial: boolean; won: boolean; draw: boolean; destroyed: number; synergies: string[]},
-): void {
-  if (!result.verified || result.tutorial) return;
-  const won = result.won && !result.draw;
-  if (won) incrementAchievement(state, "WinBattle", 1);
-  incrementAchievement(state, "DestroyCards", result.destroyed);
-  state.currentWinStreak = won ? Math.min(Number.MAX_SAFE_INTEGER, state.currentWinStreak + 1) : 0;
-  state.progress.WinStreak = Math.max(achievementCount(state.progress.WinStreak), state.currentWinStreak);
-  for (const synergy of new Set(result.synergies)) {
-    if (SYNERGY_ID.test(synergy)) incrementAchievement(state, `PlaySynergy:${synergy}`, 1);
-  }
-}
-
-// Album completion means all cards in one published, unlocked theme; reward claims are irrelevant.
-export function applyAchievementAlbums(
-  state: AchievementState, save: Record<string, unknown>, entries: AlbumEntryRow[], themes: AlbumThemeRow[],
-): void {
-  const owned = new Set(readOwnedIds(save.ownership));
-  const locked = lockedThemeIds(themes);
-  const completed = [...new Set(themes.filter((theme) => !theme.locked).map((theme) => theme.themeId))]
-    .filter((themeId) => isCompleted(albumScopeCardIds(entries, {kind: "theme", themeId}, locked), owned)).length;
-  state.progress.CompleteAlbum = Math.max(achievementCount(state.progress.CompleteAlbum), completed);
 }
 
 export function judgeAchievementClaim(

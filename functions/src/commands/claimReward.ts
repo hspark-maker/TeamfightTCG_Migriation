@@ -443,7 +443,7 @@ export const claimReward = onCall(measuredCallable("claimReward", async (request
   let rankProgress: RankProgressResponse | undefined;
 
   const result = await mutateSave(env, uid, "claimReward", {kind: "client", txId},
-    async (current, transaction, wallet): Promise<SaveMutation> => {
+    async (current, transaction, wallet, preparePackStatistics): Promise<SaveMutation> => {
       // 미션 읽기가 콜백의 첫 줄이다 — 아래 쓰기보다 반드시 앞이어야 한다(Firestore 트랜잭션 규칙).
       const missions = await beginMissionBump(transaction, db, env, uid, period, current);
       const itemRankSnapshot = itemContext !== null && ownerType !== "Rank" ?
@@ -471,6 +471,7 @@ export const claimReward = onCall(measuredCallable("claimReward", async (request
       itemGrant = itemContext === null ? {slots: {}, cards: [], currencies: []} :
         grantRewardItems(current, items, itemContext, rewardRows, "",
           rankState?.points ?? Number(itemRankSnapshot?.data()?.points ?? (current.rank as {points?: number})?.points ?? 0));
+      await preparePackStatistics(itemGrant.packs?.length ?? 0);
       granted = [...gains, ...itemGrant.currencies];
       const paid = granted.length === 0 ?
         undefined :

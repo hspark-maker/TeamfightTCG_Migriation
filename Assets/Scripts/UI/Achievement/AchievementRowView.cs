@@ -22,6 +22,12 @@ public sealed class AchievementRowView : MonoBehaviour, IUIInitializable
     [SerializeField] GameObject claimedMark;
     [SerializeField] CanvasGroup claimGroup;
     [SerializeField] float disabledAlpha = 0.5f;
+    [SerializeField] Image categoryIcon;
+    [SerializeField] Sprite battleIcon;
+    [SerializeField] Sprite collectionIcon;
+    [SerializeField] Image[] stageMarks;
+    [SerializeField] Sprite stageCompleteSprite;
+    [SerializeField] Sprite stageIncompleteSprite;
 
     AchievementDefinition m_definition;
     Action<AchievementDefinition> m_onClaim;
@@ -49,6 +55,21 @@ public sealed class AchievementRowView : MonoBehaviour, IUIInitializable
         bool t_claimed = AchievementManager.IsClaimed(_definition.Id);
         bool t_canClaim = AchievementManager.CanClaim(_definition);
         bool t_complete = t_progress >= _definition.Target;
+        if (categoryIcon != null)
+            categoryIcon.sprite = _definition.Event == "OpenPack" || _definition.Event == "CompleteAlbum" ? collectionIcon : battleIcon;
+        int t_stages = 0;
+        int t_claimedStages = 0;
+        foreach (var t_stage in AchievementManager.Definitions)
+        {
+            if (t_stage.GroupId != _definition.GroupId) continue;
+            t_stages++;
+            if (AchievementManager.IsClaimed(t_stage.Id)) t_claimedStages++;
+        }
+        for (int i = 0; i < (stageMarks?.Length ?? 0); i++)
+        {
+            stageMarks[i].gameObject.SetActive(i < t_stages);
+            stageMarks[i].sprite = i < t_claimedStages ? stageCompleteSprite : stageIncompleteSprite;
+        }
         progressText.text = $"{Math.Min(t_progress, _definition.Target):N0} / {_definition.Target:N0}";
         filledProgressText.text = progressText.text;
         float t_ratio = _definition.Target > 0 ? Mathf.Clamp01((float)t_progress / _definition.Target) : 0f;

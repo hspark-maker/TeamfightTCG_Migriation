@@ -1,0 +1,7 @@
+고유 번호,카드 등급,CardDust 제작 비용,1 활성 0 비활성,#기획 메모
+id,grade,cost,enabled,#comment
+int,string,int,int,string
+1,Common,20,1,임시 제작 가격; 중복 보상 20회분
+2,Rare,40,1,임시 제작 가격; 중복 보상 20회분
+3,Arcane,100,1,임시 제작 가격; 중복 보상 20회분
+4,Mythic,200,1,임시 제작 가격; 중복 보상 20회분

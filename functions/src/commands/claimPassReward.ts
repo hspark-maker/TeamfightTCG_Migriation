@@ -98,7 +98,7 @@ export const claimPassReward = onCall(async (request) => {
   let granted: CurrencyGain[] = [];
 
   const result = await mutateSave(env, uid, "claimPassReward", {kind: "client", txId},
-    async (current, transaction, wallet): Promise<SaveMutation> => {
+    async (current, transaction, wallet, preparePackStatistics): Promise<SaveMutation> => {
       const pass = await beginPassMutation(transaction, db, env, uid, season.seasonId);
       if (Date.now() >= season.endAtMs) throw new HttpsError("permission-denied", "PASS_NO_ACTIVE_SEASON");
       if (track === "premium" && !pass.state.premiumUnlocked) {
@@ -120,6 +120,7 @@ export const claimPassReward = onCall(async (request) => {
       itemGrant = itemContext === null ? {slots: {}, cards: [], currencies: []} :
         grantRewardItems(current, items, itemContext, rewardRows, String(request.data?.selectedPackId ?? ""),
           Number(rankSnapshot?.data()?.points ?? (current.rank as {points?: number})?.points ?? 0));
+      await preparePackStatistics(itemGrant.packs?.length ?? 0);
       granted = [...authoredRewards, ...itemGrant.currencies];
       if (missions && itemContext) {
         applyGuideProgress(missions, current, itemGrant.slots, itemContext.cards, catalog);

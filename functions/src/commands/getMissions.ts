@@ -50,7 +50,8 @@ export const getMissions = onCall(async (request) => {
     const stored = readMissions(missionSnapshot);
     const progress = evaluateGuideProgress(
       saveSnapshot.data() ?? {}, guideCards, catalog, stored.progress, rankSnapshot.data());
-    if (JSON.stringify(progress) !== JSON.stringify(stored.progress)) {
+    // readMissions는 0을 생략하므로 미달성 가이드의 missing과 0을 같은 값으로 본다.
+    if (Object.entries(progress).some(([key, value]) => value !== (stored.progress[key] ?? 0))) {
       transaction.set(reference, {progress, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
     }
     return applyPeriodReset({...stored, progress}, period);

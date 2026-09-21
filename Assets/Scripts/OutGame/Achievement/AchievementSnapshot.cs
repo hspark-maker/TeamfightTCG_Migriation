@@ -30,6 +30,7 @@ internal sealed class AchievementReward
 
 internal sealed class AchievementGetResponse
 {
+    [JsonProperty("statistics")] public PlayerStatisticsSnapshot Statistics { get; set; }
     [JsonProperty("achievements")] public AchievementSnapshot Achievements { get; set; }
     [JsonProperty("definitions")] public List<AchievementDefinition> Definitions { get; set; }
 }

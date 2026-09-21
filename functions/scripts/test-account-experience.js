@@ -124,9 +124,10 @@ test("XP-only mission works without a pass, survives transaction retry and rejec
     ({ref: {}, unlocked: true, period, state: structuredClone(state)}));
   t.mock.method(saves, "mutateSave", async (_env, _uid, _source, _key, mutate, finalize) => {
     // The first callback loses a transaction conflict. Its writes must not leak into the retry.
-    await mutate(structuredClone(current), {set() {}}, wallet);
+    const prepare = async (opened) => assert.equal(opened, 0);
+    await mutate(structuredClone(current), {set() {}}, wallet, prepare);
     let missionWrite;
-    const mutation = await mutate(structuredClone(current), {set(_ref, data) { missionWrite = data; }}, wallet);
+    const mutation = await mutate(structuredClone(current), {set(_ref, data) { missionWrite = data; }}, wallet, prepare);
     current = {...current, ...mutation.slots};
     state = missionWrite;
     wallet = mutation.wallet?.next ?? wallet;

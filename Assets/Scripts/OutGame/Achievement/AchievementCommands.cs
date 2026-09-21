@@ -77,6 +77,7 @@ internal static class AchievementCommands
                     t_version != AchievementManager.StateVersion || t_saveRevision != PlayerSaveCloud.Revision)
                     continue;
 
+                if (t_result.Statistics != null) PlayerStatisticsManager.Adopt(t_result.Statistics);
                 AchievementManager.Adopt(t_result.Achievements, t_result.Definitions);
                 s_cachedStateVersion = AchievementManager.StateVersion;
                 s_cachedSaveRevision = t_saveRevision;

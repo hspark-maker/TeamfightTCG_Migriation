@@ -5,8 +5,9 @@ import {isKnownEnv, requireUid, saveDocument} from "../save/saveDocument";
 import {readSpecRows} from "../packs/packSpecReader";
 import {parseAlbumEntryRows, parseAlbumThemeRows} from "../completionTable";
 import {readAchievementCatalog} from "../achievements/achievementSpec";
-import {applyAchievementAlbums} from "../achievements/achievementProgress";
-import {achievementResponse, achievementsRef, readAchievements, writeAchievements} from "../achievements/achievementStore";
+import {achievementResponse} from "../achievements/achievementStore";
+import {applyStatisticsAlbums, projectAchievements, statisticsResponse} from "../statistics/playerStatistics";
+import {beginStatistics, commitStatistics, statisticsChanged} from "../statistics/playerStatisticsStore";
 
 export const getAchievements = onCall(async (request) => {
   const uid = requireUid(request.auth);
@@ -15,17 +16,14 @@ export const getAchievements = onCall(async (request) => {
   const [definitions, entries, themes] = await Promise.all([
     readAchievementCatalog(env), readSpecRows(env, "AlbumEntry"), readSpecRows(env, "AlbumThemeInfo"),
   ]);
-  const achievements = await db.runTransaction(async (tx) => {
-    const ref = achievementsRef(db, env, uid);
-    const [snapshot, save] = await tx.getAll(ref, saveDocument(env, uid));
+  const result = await db.runTransaction(async (tx) => {
+    const context = await beginStatistics(tx, db, env, uid);
+    const save = await tx.get(saveDocument(env, uid));
     if (!save.exists) throw new HttpsError("failed-precondition", "Save document does not exist.");
-    const state = readAchievements(snapshot);
-    const previous = state.progress.CompleteAlbum ?? 0;
-    applyAchievementAlbums(state, save.data()!, parseAlbumEntryRows(entries), parseAlbumThemeRows(themes));
-    if ((state.progress.CompleteAlbum ?? 0) !== previous) {
-      writeAchievements(tx, ref, state, FieldValue.serverTimestamp());
-    }
-    return achievementResponse(state);
+    applyStatisticsAlbums(context.state, save.data()!, parseAlbumEntryRows(entries), parseAlbumThemeRows(themes));
+    if (statisticsChanged(context)) commitStatistics(tx, context, FieldValue.serverTimestamp());
+    return {achievements: achievementResponse(projectAchievements(context.state, context.achievements)),
+      statistics: statisticsResponse(context.state)};
   });
-  return {achievements, definitions};
+  return {...result, definitions};
 });

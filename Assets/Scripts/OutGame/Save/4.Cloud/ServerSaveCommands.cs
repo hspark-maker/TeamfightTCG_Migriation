@@ -40,6 +40,7 @@ internal static class ServerSaveCommands
         ContentUnlockManager.ResetSession();
         MissionCommands.ResetSession();
         AchievementCommands.ResetSession();
+        PlayerStatisticsCommands.ResetSession();
         AttendanceCommands.ResetSession();
         AccountRewardHandoff.ResetSession();
         AccountLevelUpHandoff.ResetSession();
@@ -173,6 +174,8 @@ internal static class ServerSaveCommands
             // 새 진행도 생산자가 늘어도 응답의 missions 봉투만 실으면 빠짐없이 같은 캐시로 들어온다.
             if (t_result.Missions != null)
                 MissionManager.Adopt(t_result.Missions);
+            if (t_result.Statistics != null)
+                PlayerStatisticsManager.Adopt(t_result.Statistics);
             if (t_result.Achievements != null)
                 AchievementManager.Adopt(t_result.Achievements);
 

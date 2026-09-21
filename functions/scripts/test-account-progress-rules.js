@@ -5,7 +5,7 @@ const {readFileSync} = require("node:fs");
 const {resolve} = require("node:path");
 const {test, before, after, beforeEach} = require("node:test");
 const {initializeTestEnvironment, assertFails, assertSucceeds} = require("@firebase/rules-unit-testing");
-const {doc, setDoc, updateDoc, deleteDoc, deleteField, serverTimestamp} = require("firebase/firestore");
+const {doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, serverTimestamp} = require("firebase/firestore");
 const {buildFreshAccountSlots} = require("../lib/save/freshAccount");
 
 let env;
@@ -95,4 +95,16 @@ test("clients cannot create saves, delete saves or forge permanent battle XP cla
   await assertFails(setDoc(doc(db(), "envs/test/users/player/accountBattleClaims/match-1"), {claimed: true}));
   await env.clearFirestore();
   await assertFails(setDoc(doc(db(), path), original()));
+});
+
+test("player statistics cannot be read or forged directly, even by their owner", async () => {
+  const statsPath = "envs/test/users/player/statistics/current";
+  await env.withSecurityRulesDisabled((context) => setDoc(doc(context.firestore(), statsPath),
+    {revision: 1, lifetime: {wins: 2}, legacyProgress: {WinBattle: 2}}));
+  for (const firestore of [db(), db("stranger"), env.unauthenticatedContext().firestore()]) {
+    await assertFails(getDoc(doc(firestore, statsPath)));
+    await assertFails(setDoc(doc(firestore, statsPath), {lifetime: {wins: 999}}));
+    await assertFails(updateDoc(doc(firestore, statsPath), {"lifetime.wins": 999}));
+    await assertFails(deleteDoc(doc(firestore, statsPath)));
+  }
 });
