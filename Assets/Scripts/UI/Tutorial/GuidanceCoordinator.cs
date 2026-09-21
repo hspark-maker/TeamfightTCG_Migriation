@@ -136,6 +136,8 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
         m_pauseVersion++;
         CancelMatchMission();
         CancelMissionFlow(false);
+        m_input.Clear();
+        if (m_inputShield != null) m_inputShield.SetActive(false);
         if (s_instance == this) s_instance = null;
     }
 

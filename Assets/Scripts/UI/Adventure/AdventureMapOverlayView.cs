@@ -704,6 +704,7 @@ public class AdventureMapOverlayView : ContentsUIBehaviour, IPointerClickHandler
     // 정점 뷰가 이미 잠긴 버튼을 죽여 두지만, 진입 판정의 주인은 화면이다(저작·상태가 갈려도 새지 않게).
     void OnNodeTapped(int _index)
     {
+        if (!GuidanceCoordinator.AllowsInput(EGuidanceInputAction.Activate, EOutgameTutorialAnchor.AdventureNode)) return;
         // 해금 사슬이 도는 동안의 탭은 스킵이지 도전이 아니다(스킵은 루트가 받는다).
         // 스킵 쪽과 같은 잣대를 쓴다 — 대기 시퀀스가 갈리는 틈에 정점 탭만 통과해 전투로 새지 않게.
         if (this.IsIntroPending) return;

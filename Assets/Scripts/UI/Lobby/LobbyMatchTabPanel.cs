@@ -215,6 +215,7 @@ public sealed class LobbyMatchTabPanel : LobbyTabPanel
 
     void OpenPooled<T>() where T : PooledUIBase
     {
+        if (!GuidanceCoordinator.AllowsInput(EGuidanceInputAction.Navigate)) return;
         if (UIPoolManager.Instance == null)
         {
             Debug.LogError($"[LobbyMatchTabPanel] There is no UIPoolManager, so {typeof(T).Name} cannot be opened — check the initialization (InitializationRunner).");

@@ -175,7 +175,10 @@ public static class GuideResumeValidation
             var t_tabs = t_owner.AddComponent<LobbyTabController>();
             Replace(t_restore, typeof(GuidanceCoordinator), "s_instance", t_coordinator);
             Replace(t_restore, typeof(OutgameTutorialGateUI), "<Instance>k__BackingField", t_gate);
-            SetInstance(t_coordinator, "m_flowLocked", true);
+            typeof(GuidanceCoordinator).GetMethod("HoldMissionInput", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(t_coordinator, null);
+            SetInstance(t_coordinator, "m_flow", new GuideMissionFlow { tutorial = TRIGGER });
+            SetInstance(t_coordinator, "m_flowStarted", true);
             SetInstance(t_coordinator, "m_flowPreparing", true);
             SetInstance(t_coordinator, "m_shell", t_tabs);
             SetInstance(t_tabs, "tabs", new List<LobbyTabController.Tab>
@@ -233,6 +236,7 @@ public static class GuideResumeValidation
             t_gate.Clear(t_coordinator);
             OutgameTutorialRunner.AbortGuided();
             OnboardingSession.SetPhase(EOnboardingPhase.Waiting);
+            SetInstance(t_coordinator, "m_flow", null);
             int t_sessionVersion = OnboardingSession.Version;
             typeof(GuidanceCoordinator).GetMethod("CancelMissionFlow", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(t_coordinator, new object[] { false, true });

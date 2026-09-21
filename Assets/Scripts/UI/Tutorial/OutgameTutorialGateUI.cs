@@ -405,6 +405,8 @@ public class OutgameTutorialGateUI : MonoBehaviour
     // 승격을 남겨 두면 게임이 막으려던 입력이 튜토리얼 때문에 뚫린다.
     void RefreshVisibility()
     {
+        m_blockOtherInput = m_confirmMode || m_dim || GuidanceCoordinator.IsInputLocked;
+        SetBlocker(m_dim, m_blockOtherInput);
         bool t_active = m_target.gameObject.activeInHierarchy && SpotlightActive();
 
         // 메시지 모드엔 누를 타깃이 없다(버튼 없는 순수 영역도 하이라이트한다) → 표시 여부는 활성 여부만으로 판정한다.
