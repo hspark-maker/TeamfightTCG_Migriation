@@ -5,14 +5,15 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 
-// 프로필 편집 팝업(아바타·프레임·감정표현·닉네임). 풀(UIPoolManager)이 수명을 쥐고 로비 위에 덮인다.
+// 프로필 편집 팝업(아바타·프레임·감정표현·닉네임·칭호). 풀(UIPoolManager)이 수명을 쥐고 로비 위에 덮인다.
 //
-// 편집 중에는 드래프트만 바꾸고 저장·닫기·외부 숨김 시 ProfileManager.Apply로 한 번 확정한다.
+// 모든 프로필 선택은 저장·닫기·외부 숨김 시 확정한다.
 public class ProfileEditPanel : ContentsPooledUI, IPointerClickHandler
 {
     const int TAB_AVATAR = 0;
     const int TAB_FRAME  = 1;
     const int TAB_EMOTE  = 2;
+    const int TAB_TITLE  = 3;
 
     // 표시값은 ProfileManager에서 읽고, 호출 화면의 복귀 동작만 전달받는다.
     public override void Initialization(UIData _data)
@@ -40,6 +41,8 @@ public class ProfileEditPanel : ContentsPooledUI, IPointerClickHandler
     [SerializeField] TabButtonView avatarTab;
     [SerializeField] TabButtonView frameTab;
     [SerializeField] TabButtonView emoteTab;
+    [SerializeField] TabButtonView titleTab;
+    [SerializeField] ProfileTitleTab titlePanel;
     [SerializeField] GameObject avatarPanel;
     [SerializeField] GameObject framePanel;
     [SerializeField] GameObject emotePanel;
@@ -104,6 +107,7 @@ public class ProfileEditPanel : ContentsPooledUI, IPointerClickHandler
         this.m_draftAvatarId = ProfileManager.AvatarId;
         this.m_draftFrameId = ProfileManager.FrameId;
         this.m_draftNickname = ProfileManager.Nickname;
+        if (this.titlePanel != null) this.titlePanel.BeginEdit(this.RefreshSaveButton);
         this.m_draftEmoteIds.Clear();
         for (int t_i = 0; t_i < ProfileManager.EmoteIds.Count; t_i++)
             this.m_draftEmoteIds.Add(ProfileManager.EmoteIds[t_i]);
@@ -130,6 +134,18 @@ public class ProfileEditPanel : ContentsPooledUI, IPointerClickHandler
         t_onHide?.Invoke();
     }
 
+    /// <summary>닉네임 연필 진입에서 입력을 바로 시작한다.</summary>
+    public void EditNickname()
+    {
+        if (this.m_sessionOpen) this.BeginNicknameEdit();
+    }
+
+    /// <summary>칭호 변경 진입에서 칭호 탭을 바로 연다.</summary>
+    public void EditTitles()
+    {
+        if (this.m_sessionOpen) this.SetTab(TAB_TITLE);
+    }
+
     protected override void OnInitializeUI()
     {
         this.m_emoteDrag = this.GetComponent<EmoteEditDragController>() ?? this.gameObject.AddComponent<EmoteEditDragController>();
@@ -145,6 +161,7 @@ public class ProfileEditPanel : ContentsPooledUI, IPointerClickHandler
         Rewire(FindButton(this.avatarTab), this.ShowAvatarTab);
         Rewire(FindButton(this.frameTab), this.ShowFrameTab);
         Rewire(FindButton(this.emoteTab), this.ShowEmoteTab);
+        Rewire(FindButton(this.titleTab), this.EditTitles);
 
         if (this.nicknameInput != null)
         {
@@ -165,6 +182,7 @@ public class ProfileEditPanel : ContentsPooledUI, IPointerClickHandler
 
     protected override void OnViewHidden()
     {
+        if (this.titlePanel != null) this.titlePanel.Hide();
         this.CancelEmoteDrag();
         this.data = null;
         this.CommitSession();
@@ -504,6 +522,7 @@ public class ProfileEditPanel : ContentsPooledUI, IPointerClickHandler
         string t_nickname = string.IsNullOrWhiteSpace(this.m_draftNickname)
             || ProfileManager.IsNicknameBlocked(this.m_draftNickname)
             ? ProfileManager.Nickname : this.m_draftNickname;
+        if (this.titlePanel != null) this.titlePanel.Commit();
         ProfileManager.Apply(t_nickname, this.m_draftAvatarId, this.m_draftFrameId, this.m_draftEmoteIds);
     }
 
@@ -512,7 +531,7 @@ public class ProfileEditPanel : ContentsPooledUI, IPointerClickHandler
     {
         this.CancelEmoteDrag();
         this.m_currentTab = _tab;
-        if (this.profileViewRoot != null) this.profileViewRoot.SetActive(_tab != TAB_EMOTE);
+        if (this.profileViewRoot != null) this.profileViewRoot.SetActive(_tab == TAB_AVATAR || _tab == TAB_FRAME);
         if (this.equippedEmotePanel != null) this.equippedEmotePanel.SetActive(_tab == TAB_EMOTE);
         if (this.avatarPanel != null) this.avatarPanel.SetActive(_tab == TAB_AVATAR);
         if (this.framePanel != null) this.framePanel.SetActive(_tab == TAB_FRAME);
@@ -520,6 +539,12 @@ public class ProfileEditPanel : ContentsPooledUI, IPointerClickHandler
         if (this.avatarTab != null) this.avatarTab.SetSelected(_tab == TAB_AVATAR);
         if (this.frameTab != null) this.frameTab.SetSelected(_tab == TAB_FRAME);
         if (this.emoteTab != null) this.emoteTab.SetSelected(_tab == TAB_EMOTE);
+        if (this.titleTab != null) this.titleTab.SetSelected(_tab == TAB_TITLE);
+        if (this.titlePanel != null)
+        {
+            if (_tab == TAB_TITLE) this.titlePanel.Show();
+            else this.titlePanel.Hide();
+        }
     }
 
     void ShowAvatarTab() => this.SetTab(TAB_AVATAR);
@@ -580,11 +605,12 @@ public class ProfileEditPanel : ContentsPooledUI, IPointerClickHandler
         if (this.saveButton != null) this.saveButton.interactable = this.IsDirty;
     }
 
-    // 넷 중 하나라도 현재 프로필과 다르면 저장할 것이 있다.
+    // 선택 중 하나라도 현재 프로필과 다르면 저장할 것이 있다.
     bool IsDirty =>
         this.m_draftAvatarId != ProfileManager.AvatarId
         || this.m_draftFrameId != ProfileManager.FrameId
         || this.m_draftNickname != ProfileManager.Nickname
+        || (this.titlePanel != null && this.titlePanel.IsDirty)
         || !LoadoutsEqual(this.m_draftEmoteIds, ProfileManager.EmoteIds);
 
     static void Rewire(Button _button, UnityEngine.Events.UnityAction _action)

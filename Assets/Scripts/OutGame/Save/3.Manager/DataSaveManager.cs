@@ -171,6 +171,12 @@ public static class DataSaveManager
             // 아직 업로드되지 않은 완료 이력을 응답의 옛 사본으로 덮으면 같은 연출이 다시 열린다.
             if (Data.Profile?.ContentUnlocks != null)
                 _slots.Profile.ContentUnlocks = Data.Profile.ContentUnlocks;
+            // 칭호 선택·명시 지급도 클라이언트 편집이라 응답 대기 중의 변경을 보존한다.
+            if (Data.Profile != null)
+            {
+                _slots.Profile.OwnedTitleIds = Data.Profile.OwnedTitleIds;
+                _slots.Profile.EquippedTitleId = Data.Profile.EquippedTitleId;
+            }
             Data.Profile = _slots.Profile;
             t_touched |= ESaveSlot.Profile;
         }

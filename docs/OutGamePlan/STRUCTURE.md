@@ -2,6 +2,14 @@
 
 2026-09-16. 기존 경로에 구조 문서가 없어 이번에 추가했다. 이 문서는 이번에 변경한 온보딩 경계만 다룬다.
 
+## 칭호 선택·장착
+
+`OutGame/Profile/TitleCatalog`는 칭호 ID·표시 이름·설명·아이콘·색을 제공한다. `ProfileConfig.titleCatalog`를 `OutgameConfigStep`이 `ProfileManager`에 주입한다. 현재 목록은 검증용 8종이며 정식 해금·스펙 데이터와 분리한다.
+
+`ProfileSaveData.ownedTitleIds`와 `equippedTitleId`가 소지·장착의 진실원이다. `ProfileManager`는 슬롯을 직접 조회하고 명시적 지급·장착·해제만 수행한다. 해금 조건이나 집계는 없다. 기존 계정의 필드 부재는 빈 목록·미장착이다. 서버 경험치 응답을 채택할 때 진행 중 로컬 칭호 편집을 보존한다.
+
+`UI/Profile/ProfileTitleTab`은 기존 `ProfileEditPanel`의 칭호 탭에서 목록 선택과 실제 장착을 분리한다. `FrameTab` 복제 탭을 사용하고 별도 선택창 프리팹은 없다. 편집창 안의 비활성 `TitleItemCell` 템플릿을 복제하여 선택 테두리·장착 체크·미보유 자물쇠를 표시한다. `LobbySettingPanel`은 `ProfileEditPanel.EditTitles`로 칭호 탭에 바로 진입하고 팝업 왕복을 관리한다. 칭호 장착은 즉시 저장하며 다른 프로필 탭의 드래프트는 유지한다. `ProfileSummaryView`가 변경 통지로 장착 칭호를 갱신한다. 테스트 지급은 `Editor/TitleSystemTestMenu`의 명시적 플레이 모드 메뉴에서만 실행한다.
+
 ## 실행 구조
 
 - `OutGame/Tutorial/OnboardingSession.cs`: 스텝 실행 수명, 세대별 취소, 중복 완료 방지, 효과 확인과 진행 위치 저장의 경계.

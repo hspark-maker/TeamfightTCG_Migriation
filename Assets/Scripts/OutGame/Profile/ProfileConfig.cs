@@ -50,6 +50,11 @@ public class ProfileFrameEntry
 [CreateAssetMenu(fileName = "ProfileConfig", menuName = "Card Battle/Profile Config")]
 public class ProfileConfig : ScriptableObject
 {
+    [Tooltip("칭호 목록. 미배선이면 칭호 기능만 빈 목록으로 표시한다.")]
+    [SerializeField] TitleCatalog titleCatalog;
+
+    public TitleCatalog TitleCatalog => titleCatalog;
+
     [Tooltip("모든 아바타가 공유하는 원형 마스크 판. 뷰가 이 그림의 알파로 얼굴을 오려내므로 " +
              "이 스프라이트의 모양이 곧 아바타가 잘리는 모양이다 — 원형을 유지하려면 채워진 원판을 넣어라. " +
              "얼굴이 판을 꽉 채우니 판 자체는 평소 보이지 않는다.")]

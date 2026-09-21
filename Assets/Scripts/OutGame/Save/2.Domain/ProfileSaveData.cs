@@ -10,6 +10,8 @@ public class ProfileSaveData
     [FirestoreProperty("avatarId")] public string AvatarId { get; set; }
     [FirestoreProperty("frameId")] public string FrameId { get; set; }
     [FirestoreProperty("emoteIds")] public List<int> EmoteIds { get; set; }
+    [FirestoreProperty("ownedTitleIds")] public List<string> OwnedTitleIds { get; set; } = new List<string>();
+    [FirestoreProperty("equippedTitleId")] public string EquippedTitleId { get; set; } = string.Empty;
 
     // 계정 레벨은 이 누적치의 파생이라 레벨 자체는 저장하지 않는다(AccountLevelManager).
     [FirestoreProperty("accountExp")] public long AccountExp { get; set; }

@@ -15,6 +15,12 @@ public static class ProfileManager
     public static ProfileConfig Config { get; private set; }
     // 프로필 편집은 로비에서 열리는데 그 자리엔 EmoteDirector(전투 씬 전용)가 없어 여기도 표를 든다.
     public static EmoteCatalog EmoteCatalog { get; private set; }
+    public static TitleCatalog TitleCatalog { get; private set; }
+
+    public static IReadOnlyList<string> OwnedTitleIds => Slot.OwnedTitleIds != null
+        ? Slot.OwnedTitleIds.AsReadOnly() : Array.Empty<string>();
+    public static string EquippedTitleId => IsTitleOwned(Slot.EquippedTitleId)
+        ? Slot.EquippedTitleId : string.Empty;
 
     // 비속어 판정기. 미주입이면 아무것도 막지 않는다.
     static INicknameFilter s_nicknameFilter;
@@ -64,6 +70,43 @@ public static class ProfileManager
     public static void SetEmoteCatalog(EmoteCatalog _catalog)
     {
         EmoteCatalog = _catalog;
+    }
+
+    public static void SetTitleCatalog(TitleCatalog _catalog)
+    {
+        TitleCatalog = _catalog;
+    }
+
+    public static bool IsTitleOwned(string _id)
+    {
+        return TitleCatalog != null && TitleCatalog.TryGet(_id, out _)
+            && Slot.OwnedTitleIds != null && Slot.OwnedTitleIds.Contains(_id);
+    }
+
+    /// <summary>빈 ID는 장착 해제. 소지한 칭호만 장착한다.</summary>
+    public static bool TryEquipTitle(string _id)
+    {
+        string t_id = _id ?? string.Empty;
+        if (t_id.Length > 0 && !IsTitleOwned(t_id)) return false;
+        if ((Slot.EquippedTitleId ?? string.Empty) == t_id) return true;
+
+        Slot.EquippedTitleId = t_id;
+        DataSaveManager.Save();
+        OnChanged?.Invoke();
+        return true;
+    }
+
+    /// <summary>명시적으로 지정한 칭호를 지급한다. 조건 판정이나 자동 지급은 하지 않는다.</summary>
+    public static bool GrantTitle(string _id)
+    {
+        if (TitleCatalog == null || !TitleCatalog.TryGet(_id, out _)) return false;
+        if (Slot.OwnedTitleIds == null) Slot.OwnedTitleIds = new List<string>();
+        if (Slot.OwnedTitleIds.Contains(_id)) return true;
+
+        Slot.OwnedTitleIds.Add(_id);
+        DataSaveManager.Save();
+        OnChanged?.Invoke();
+        return true;
     }
 
     // 초기화에서 1회 주입. 미주입(null)이면 어떤 이름도 막히지 않는다 — 판정기가 없는 씬에서도 편집이 서게.

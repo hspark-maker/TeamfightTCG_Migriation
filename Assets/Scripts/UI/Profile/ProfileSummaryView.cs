@@ -24,6 +24,9 @@ public class ProfileSummaryView : MonoBehaviour
     [Tooltip("닉네임 자리. 미배선이면 그 축만 건너뛴다.")]
     [SerializeField] TMP_Text nicknameText;
 
+    [SerializeField] TMP_Text titleText;
+    [SerializeField] Image titleIcon;
+
     [Tooltip("랭크 티어명 자리(\"브론즈 1\"). 미배선이면 그 축만 건너뛴다.")]
     [SerializeField] TMP_Text tierNameText;
 
@@ -67,6 +70,21 @@ public class ProfileSummaryView : MonoBehaviour
     {
         if (this.avatarView != null) this.avatarView.Render(ProfileManager.CurrentLook);
         if (this.nicknameText != null) this.nicknameText.text = ProfileManager.Nickname;
+
+        TitleEntry t_title = null;
+        bool t_hasTitle = ProfileManager.TitleCatalog != null &&
+            ProfileManager.TitleCatalog.TryGet(ProfileManager.EquippedTitleId, out t_title);
+        if (this.titleText != null)
+        {
+            this.titleText.text = t_hasTitle ? t_title.displayName : "칭호 선택";
+            this.titleText.color = t_hasTitle ? t_title.color : Color.white;
+        }
+        if (this.titleIcon != null)
+        {
+            this.titleIcon.sprite = t_hasTitle ? t_title.icon : null;
+            this.titleIcon.color = t_hasTitle ? t_title.color : Color.white;
+            this.titleIcon.enabled = t_hasTitle && t_title.icon != null;
+        }
 
         if (!RankManager.IsConfigured) return;
 
