@@ -1364,8 +1364,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: -25.100098, y: 0}
-  m_SizeDelta: {x: 85.92, y: 86.7}
+  m_AnchoredPosition: {x: -20.3947, y: 0}
+  m_SizeDelta: {x: 81.2146, y: 86.7}
   m_Pivot: {x: 0, y: 0.5}
 --- !u!222 &7872715404197121366
 CanvasRenderer:
@@ -1926,7 +1926,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: -18.200073, y: 0}
+  m_AnchoredPosition: {x: -23.9, y: 0}
   m_SizeDelta: {x: 84.8255, y: 84.9}
   m_Pivot: {x: 0, y: 0.5}
 --- !u!222 &3625849968067702962
@@ -4692,7 +4692,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8370548787059305162, guid: 66ffb7617a312064db3f733154b3f638, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 2220
+      value: 1920
       objectReference: {fileID: 0}
     - target: {fileID: 8370548787059305162, guid: 66ffb7617a312064db3f733154b3f638, type: 3}
       propertyPath: m_LocalPosition.x
@@ -5143,11 +5143,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7902516097386695650, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
       propertyPath: m_CellSize.x
-      value: 265.4183
+      value: 215.83281
       objectReference: {fileID: 0}
     - target: {fileID: 7902516097386695650, guid: 8134ddc58443c3348a644266ea3669ec, type: 3}
       propertyPath: m_CellSize.y
-      value: 353.2809
+      value: 287.2809
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -5383,7 +5383,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1002, guid: 2c98023a88fc48eab8fd67b947bd3981, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 2220
+      value: 1920
       objectReference: {fileID: 0}
     - target: {fileID: 1002, guid: 2c98023a88fc48eab8fd67b947bd3981, type: 3}
       propertyPath: m_AnchoredPosition.y
