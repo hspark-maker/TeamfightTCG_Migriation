@@ -20,7 +20,7 @@ public partial class PassLevelRowView
         if (this.connectorRoot != null) this.connectorRoot.SetActive(this.m_nextRequiredExp.HasValue);
         long span = (this.m_nextRequiredExp ?? this.RequiredExp) - this.RequiredExp;
         float fill = span > 0 ? Mathf.Clamp01((float)((_exp - this.RequiredExp) / span)) : 0f;
-        this.GaugeBar.SetRatio(fill, reached && span > 0);
+        this.GaugeBar.SetRatio(fill, reached && span > 0 && fill > 0f);
     }
 
     internal DG.Tweening.Sequence CreateArrival(float _duration, float _punch) => this.GaugeBar.CreateArrival(_duration, _punch);
