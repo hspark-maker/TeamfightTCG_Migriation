@@ -13,6 +13,10 @@
 
 - APK 등 앱 빌드 산출물은 바탕화면의 `build` 폴더(`C:/Users/cookapps/Desktop/build/`)에 저장한다. 사용자가 별도 경로를 지정하면 그 지시를 따른다. (2026-09-17 사용자 지시)
 
+## Unity 파일 머지
+
+- Git 병합과 충돌 해결에 UnityYAMLMerge/SmartMerge를 사용하지 않는다. 프리팹·씬·에셋 충돌은 base/ours/theirs를 하나씩 비교하고 필요한 변경을 직접 반영한 뒤 Unity에서 검증한다. `.gitattributes`의 자동 병합 비활성 설정을 유지한다. (2026-09-22 사용자 지시)
+
 ## 스펙 데이터 수정 규칙
 
 - 스펙 값의 저장소 진실원은 `docs/SpecData/*_sheet.csv`다. 값 변경은 CSV에만 한다.
