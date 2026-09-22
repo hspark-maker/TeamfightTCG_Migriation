@@ -1,7 +1,8 @@
 # Auto detect text files and perform LF normalization
 * text=auto
 
-# 프리팹은 자동 병합하지 않는다(-merge = 바이너리 취급).
+# 프리팹은 자동 병합하지 않는다(merge=binary = 바이너리 병합 드라이버).
+# GitHub Desktop이 수동 해결 대상으로 인식하도록 -merge 대신 merge=binary를 쓴다.
 #
 # 왜: SmartMerge(UnityYAMLMerge)는 fileID 단위로 "합쳐 놓고" 성공한 것처럼 끝난다 —
 # 마커가 남지 않아 리뷰에서 안 보이고, 중첩 프리팹 오버라이드가 조용히 다른 값으로 굳는다.
@@ -12,7 +13,7 @@
 # 필요하면 SmartMerge 를 그 파일에만 직접 돌린다.
 #     "<Unity>/Editor/Data/Tools/UnityYAMLMerge.exe" merge -p <BASE> <OURS> <THEIRS> <OUT>
 # 어느 쪽을 골랐든 Unity 로 열어 눈으로 확인하고 커밋할 것.
-*.prefab -merge
+*.prefab merge=binary
 
 # 씬·에셋은 계속 SmartMerge 를 태운다 — 프리팹과 달리 중첩 오버라이드 구조가 없어
 # fileID 단위 병합이 비교적 안전하고, 씬은 통째 채택 시 잃는 것이 너무 크다.
