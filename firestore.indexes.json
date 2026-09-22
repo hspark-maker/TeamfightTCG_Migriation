@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "mail",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "claimedAtMs", "order": "ASCENDING" },
+        { "fieldPath": "expiresAtMs", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "rankings",
       "queryScope": "COLLECTION",
       "fields": [
@@ -10,6 +18,16 @@
     }
   ],
   "fieldOverrides": [
+    {
+      "collectionGroup": "mail",
+      "fieldPath": "body",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "mail",
+      "fieldPath": "rewards",
+      "indexes": []
+    },
     {
       "collectionGroup": "receipts",
       "fieldPath": "result",

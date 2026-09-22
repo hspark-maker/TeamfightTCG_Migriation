@@ -71,6 +71,7 @@ export interface SaveMutationResult {
 // These commands return actual drawn reward packs. Direct-card grants are intentionally absent.
 const PACK_OPENING_COMMANDS = new Set([
   "openPack", "claimAttendance", "claimMission", "claimReward", "claimPassReward", "claimBattleExperience", "spinRoulette",
+  "claimMail", "claimAllMail",
 ]);
 
 /**

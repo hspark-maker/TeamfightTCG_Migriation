@@ -846,7 +846,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         if (!t_available || t_shell == null
             || !t_shell.TrySelectFeature(EOutgameFeature.LobbyPackTab, _afterSelect: () =>
             {
-                var t_shop = t_shell.CurrentPanel?.GetComponent<PackShowcaseController>();
+                var t_shop = t_shell.CurrentPanel?.GetComponentInChildren<PackShowcaseController>(true);
                 if (t_shop != null && t_shop.TrySelectPack(_packId)) Hide();
                 else this.acquisitionView.ShowNavigationUnavailable();
             })) this.acquisitionView.ShowNavigationUnavailable();

@@ -10,7 +10,7 @@ using UnityEngine.UI;
 // 챕터 띠와 같은 관용구다 — 손으로 옮긴 좌표가 아니라 이 파일이 진실원이고, 다시 뽑으면 같은 것이 나온다.
 public static class AdventureNodePopupBuilder
 {
-    const string PREFAB_PATH = "Assets/Assets/Prefabs/UI/PooledUI/AdventureNodePopup.prefab";
+    const string PREFAB_PATH = "Assets/Assets/Prefabs/UI/PooledUI/Adventure/AdventureNodePopup.prefab";
     const string NODE_PATH   = "Assets/Assets/Prefabs/UI/LobbyUI/Adventure/AdventureNode.prefab";
     const string UI_LABEL    = "UIPrefab";   // DataLibrary가 이 라벨로 팝업 프리팹을 훑어 타입→프리팹 표를 만든다.
 

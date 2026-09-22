@@ -32,7 +32,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
 
     [Header("팩 비행 (예고 팝업 → 팩 탭)")]
     [Tooltip("팩 탭 인덱스. 0 Shop · 1 Pack · 2 Match · 3 Deck · 4 Collection")]
-    [SerializeField] int packTabIndex = 1;
+    [SerializeField] int packTabIndex = 0;
     [Tooltip("날아가는 팩의 화면 크기(px). 비율은 아트가 지킨다.")]
     [SerializeField] Vector2 packFlightSize = new Vector2(240f, 300f);
     [Tooltip("출발 직후 살짝 솟았다가 탭으로 빨려든다. 0이면 곧장 간다.")]

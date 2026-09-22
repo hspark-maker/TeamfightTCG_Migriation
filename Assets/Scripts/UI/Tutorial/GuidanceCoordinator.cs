@@ -73,7 +73,7 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
         => GuideMissionTrackerView.HasPendingPresentation || ContentUnlockPresentation.IsPlaying || HasForeignGate
         || CardFilterPopup.IsOpen || CollectionFilterResults.IsOpen
         || UnlockIntroOverlay.IsOpen
-        || CardDetailOverlayView.IsRitualPlaying || CardDetailOverlayView.IsUnlockFxPlaying
+        || CardDetailOverlayView.IsRitualPlaying || CardDetailOverlayView.IsUnlockFxPlaying || LobbyEnhanceTabPanel.IsBusy
         || RankPromoteOverlay.IsOpen || RewardClaimPopup.IsOpen || AdventureRewardFlow.IsClaiming
         || PackOpenOverlay.IsOpen || CardRewardOverlay.IsOpen || CardSetRewardOverlay.IsOpen || PackRewardOverlay.IsOpen
         || CurtainView.IsBusy || LoadingCoverView.IsCovering
@@ -98,7 +98,7 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
         || (m_launcher != null && m_launcher.IsRunning)
         || LobbyRankEffectDirector.Playing || (!_allowGainEffects && LobbyGainEffectDirector.Playing)
         || RankPromoteOverlay.IsOpen || RewardClaimPopup.IsOpen || AdventureRewardFlow.IsClaiming
-        || PackOpenOverlay.IsOpen || CardDetailOverlayView.IsOpen || AlbumPageOverlayView.IsOpen
+        || PackOpenOverlay.IsOpen || CardDetailOverlayView.IsOpen || AlbumPageOverlayView.IsOpen || LobbyEnhanceTabPanel.IsBusy
         || CardRewardOverlay.IsOpen || CardSetRewardOverlay.IsOpen || PackRewardOverlay.IsOpen
         || HasForeignGate || UnlockIntroOverlay.IsOpen;
 

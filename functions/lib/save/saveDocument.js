@@ -67,6 +67,7 @@ exports.SCHEMA_VERSION = 8;
 // These commands return actual drawn reward packs. Direct-card grants are intentionally absent.
 const PACK_OPENING_COMMANDS = new Set([
     "openPack", "claimAttendance", "claimMission", "claimReward", "claimPassReward", "claimBattleExperience", "spinRoulette",
+    "claimMail", "claimAllMail",
 ]);
 /**
  * 세이브 문서 참조. 클라 PlayerSaveFirestorePaths 와 같은 경로여야 한다.

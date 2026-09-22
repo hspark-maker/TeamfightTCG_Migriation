@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ensureProfileCosmetics = exports.getReplayDivergence = exports.claimPassRepeatReward = exports.claimPassReward = exports.getPass = exports.syncRankProfile = exports.syncGuideProgress = exports.claimMission = exports.claimAttendance = exports.getAttendance = exports.claimAchievement = exports.getPlayerStatistics = exports.getAchievements = exports.getMissions = exports.spinRoulette = exports.reportAdventureWin = exports.grantTutorialCards = exports.claimBattleExperience = exports.claimBattleReward = exports.enhanceSynergyIntroduction = exports.enhanceCard = exports.claimPayout = exports.aggregateReplayDaily = exports.submitMatchResult = exports.verifyMatchTicket = exports.findAiMatch = exports.getRankLeaderboard = exports.getRankSnapshot = exports.lockDeck = exports.createMatch = exports.claimReward = exports.craftCard = exports.getCardCrafting = exports.openPack = exports.repairSaveSlots = exports.ensureWallet = exports.ensureAccount = exports.devSetRank = exports.devResetDailyMissions = exports.devCompleteMissions = exports.devResetSave = exports.devBumpRevision = exports.getOnboardingOperation = exports.ping = void 0;
+exports.adminDashboardMatches = exports.adminDashboardPlayer = exports.adminDashboardOverview = exports.claimAllMail = exports.claimMail = exports.getMailbox = exports.sendMail = exports.getReplayDivergence = exports.claimPassRepeatReward = exports.claimPassReward = exports.getPass = exports.syncRankProfile = exports.syncGuideProgress = exports.claimMission = exports.claimAttendance = exports.getAttendance = exports.claimAchievement = exports.getPlayerStatistics = exports.getAchievements = exports.getMissions = exports.spinRoulette = exports.reportAdventureWin = exports.grantTutorialCards = exports.claimBattleExperience = exports.claimBattleReward = exports.enhanceSynergyIntroduction = exports.enhanceCard = exports.claimPayout = exports.aggregateReplayDaily = exports.submitMatchResult = exports.verifyMatchTicket = exports.findAiMatch = exports.getRankLeaderboard = exports.getRankSnapshot = exports.lockDeck = exports.createMatch = exports.claimReward = exports.craftCard = exports.getCardCrafting = exports.openPack = exports.repairSaveSlots = exports.ensureWallet = exports.ensureAccount = exports.devSetRank = exports.devResetDailyMissions = exports.devCompleteMissions = exports.devResetSave = exports.devBumpRevision = exports.getOnboardingOperation = exports.ping = void 0;
+exports.ensureTitles = exports.ensureProfileCosmetics = void 0;
 var ping_1 = require("./commands/ping");
 Object.defineProperty(exports, "ping", { enumerable: true, get: function () { return ping_1.ping; } });
 var getOnboardingOperation_1 = require("./commands/getOnboardingOperation");
@@ -86,6 +87,18 @@ var claimPassRepeatReward_1 = require("./commands/claimPassRepeatReward");
 Object.defineProperty(exports, "claimPassRepeatReward", { enumerable: true, get: function () { return claimPassRepeatReward_1.claimPassRepeatReward; } });
 var getReplayDivergence_1 = require("./commands/getReplayDivergence");
 Object.defineProperty(exports, "getReplayDivergence", { enumerable: true, get: function () { return getReplayDivergence_1.getReplayDivergence; } });
+var mailbox_1 = require("./commands/mailbox");
+Object.defineProperty(exports, "sendMail", { enumerable: true, get: function () { return mailbox_1.sendMail; } });
+Object.defineProperty(exports, "getMailbox", { enumerable: true, get: function () { return mailbox_1.getMailbox; } });
+Object.defineProperty(exports, "claimMail", { enumerable: true, get: function () { return mailbox_1.claimMail; } });
+Object.defineProperty(exports, "claimAllMail", { enumerable: true, get: function () { return mailbox_1.claimAllMail; } });
+var adminDashboard_1 = require("./commands/adminDashboard");
+Object.defineProperty(exports, "adminDashboardOverview", { enumerable: true, get: function () { return adminDashboard_1.adminDashboardOverview; } });
+Object.defineProperty(exports, "adminDashboardPlayer", { enumerable: true, get: function () { return adminDashboard_1.adminDashboardPlayer; } });
+var adminDashboardMatches_1 = require("./commands/adminDashboardMatches");
+Object.defineProperty(exports, "adminDashboardMatches", { enumerable: true, get: function () { return adminDashboardMatches_1.adminDashboardMatches; } });
 var ensureProfileCosmetics_1 = require("./commands/ensureProfileCosmetics");
 Object.defineProperty(exports, "ensureProfileCosmetics", { enumerable: true, get: function () { return ensureProfileCosmetics_1.ensureProfileCosmetics; } });
+var ensureTitles_1 = require("./commands/ensureTitles");
+Object.defineProperty(exports, "ensureTitles", { enumerable: true, get: function () { return ensureTitles_1.ensureTitles; } });
 //# sourceMappingURL=index.js.map

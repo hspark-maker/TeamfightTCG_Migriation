@@ -34,6 +34,7 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
     int                                            m_card;
     bool                                           m_inDeck;
     bool                                           m_focusDimmed;
+    float                                          m_focusDimAlpha = FOCUS_DIM_ALPHA;
     Tween                                          m_focusTween;
     PointerEventData                               m_pointerData;
     Action<DeckEditCardTile, PointerEventData>     m_onDragRequest;
@@ -100,9 +101,10 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
 
     // 대상이 아닌 카드를 눌러 강조 대상만 남기고, 대상 카드는 살짝 키워 띄운다.
     // 시너지 아이콘 롱프레스와 슬롯 선택 모드가 함께 쓴다 — 두 강조는 배타라 알파 축(m_focusDimmed)을 공유해도 안전하다.
-    public void SetFocus(bool _focusing, bool _match)
+    public void SetFocus(bool _focusing, bool _match, float _dimAlpha = FOCUS_DIM_ALPHA)
     {
         m_focusDimmed = _focusing && !_match;
+        m_focusDimAlpha = Mathf.Clamp01(_dimAlpha);
         ApplyAlpha();
         ApplyFocusScale(_focusing && _match, false);
     }
@@ -133,7 +135,7 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
     {
         if (canvasGroup == null) return;
 
-        canvasGroup.alpha = m_focusDimmed ? FOCUS_DIM_ALPHA
+        canvasGroup.alpha = m_focusDimmed ? m_focusDimAlpha
                           : m_inDeck      ? IN_DECK_ALPHA
                                           : 1f;
     }

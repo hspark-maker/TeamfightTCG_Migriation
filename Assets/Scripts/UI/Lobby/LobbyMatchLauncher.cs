@@ -353,26 +353,9 @@ public class LobbyMatchLauncher : MonoBehaviour
         return t_result == ESoloMatchSyncResult.Success;
     }
 
-    // 로비에서 전투로 넘어가는 마지막 문. 매칭 화면이 배경 두 판을 맞물린 채 서 있으면 그 화면을 그대로
-    // 데려가고(MatchSceneCarrier), 아니면 커튼을 새로 세운다.
-    //
-    // 데려가는 쪽을 앞에 두는 이유: 커튼은 매칭 화면과 같은 판(CurtainBoards 프리팹을 나눠 쓴다)을 그 위에
-    // 한 번 더 닫는 물건이라, 이미 닫혀 있는 화면 위에서는 판이 두 번 닫히고 그 위의 프로필·배너가 증발한다.
-    // 덱 화면을 거치는 경로(모험)는 판이 이미 갈라져 셸이 스스로 거절하고, 그쪽은 커튼이 맞다.
+    // 전투 씬 진입은 공용 씬 커튼이 담당한다.
     void LoadBattleScene()
     {
-        if (m_matchShell != null && m_matchShell.CanCarryToScene)
-        {
-            // 소유권을 먼저 놓는다 — OnDestroy가 데려간 화면을 로비와 함께 죽이지 않게.
-            MatchmakingShell t_shell = m_matchShell;
-            m_matchShell = null;
-
-            if (MatchSceneCarrier.TryCarry(t_shell, new SceneLoadSwap(BATTLE_SCENE))) return;
-
-            // 못 걸었으면 주인 없이 떠 있게 두지 않는다. 아래 커튼이 이 화면을 덮은 채 씬을 갈아치운다.
-            m_matchShell = t_shell;
-        }
-
         CurtainView.LoadScene(BATTLE_SCENE);
     }
 
@@ -610,14 +593,9 @@ public class LobbyMatchLauncher : MonoBehaviour
         // 대치 화면이 로비를 덮은 채(터치까지 먹는다) 남지 않게 이 구간만 감싼다.
         try
         {
-            MatchHandoffTargets t_targets = DeckShell.PrepareForHandoff();
-
-            // 선택 게이트는 전환이 도는 동안 시작해 첫 대기에서 멈춘다 — 전환이 끝난 프레임엔 이미 서 있어야 한다.
-            UniTask<bool> t_selection = DeckShell.RunSelectionAsync(_ct);
-
-            await _versus.PlayHandoffAsync(t_targets, _ct);
-
-            return await t_selection;
+            DeckShell.PrepareForHandoff();
+            _versus.Close();
+            return await DeckShell.RunSelectionAsync(_ct);
         }
         catch
         {

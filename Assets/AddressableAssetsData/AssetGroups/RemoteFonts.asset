@@ -15,12 +15,6 @@ MonoBehaviour:
   m_GroupName: RemoteFonts
   m_GUID: 05585ec88435d9c44a18be899edf6346
   m_SerializeEntries:
-  - m_GUID: 0f9e80439b7b4ed42a6e1cb7d7793c48
-    m_Address: SharedFonts/Fonts/MalgunGothic_OutlinfFont.asset
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteUI
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 15f03620ce5f5614a9d2dcbd74b8988e
     m_Address: SharedFonts/Fonts/ONE Mobile POP OTF SDF.asset
     m_ReadOnly: 0
