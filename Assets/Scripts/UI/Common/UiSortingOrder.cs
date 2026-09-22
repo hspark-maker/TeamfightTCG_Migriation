@@ -50,6 +50,9 @@ public static class UiSortingOrder
     /// <summary>해금 안내 바로 아래, 승격된 카드 상세 위의 공통 암막.</summary>
     public const int IntroDim = Intro - 1;
 
+    /// <summary>흐름 준비 중 로비 입력만 막고 연출 확인·스킵은 통과시키는 투명 판.</summary>
+    public const int GuidanceInputShield = IntroDim - 1;
+
     /// <summary>전투 튜토리얼 안내(TutorialOverlay.prefab).</summary>
     public const int BattleTutorial = 200;
 

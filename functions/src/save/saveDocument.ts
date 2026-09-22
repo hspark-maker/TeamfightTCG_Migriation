@@ -12,8 +12,10 @@ import {rejectDomain} from "./domainReject";
 import {cacheableResponse, replayCached} from "./receiptCache";
 import {Balances, normalizeBalances} from "../currency/wallet";
 import {achievementResponse} from "../achievements/achievementStore";
-import {applyStatisticsPacks, PlayerStatistics, statisticsResponse} from "../statistics/playerStatistics";
-import {beginStatistics, commitStatistics, StatisticsContext} from "../statistics/playerStatisticsStore";
+import {applyStatisticsAlbums, applyStatisticsPacks, PlayerStatistics, statisticsResponse} from "../statistics/playerStatistics";
+import {beginStatistics, commitStatistics, StatisticsContext, statisticsChanged} from "../statistics/playerStatisticsStore";
+import {AUTOMATIC_TITLE_COMMANDS, grantAutomaticTitles, loadAutomaticTitles} from "../titles/automaticTitles";
+import {GrantedTitle} from "../titles/titleOwnership";
 import {
   createWallet,
   readReceipt,
@@ -63,6 +65,7 @@ export interface SaveMutationResult {
   wallet: WalletPatch;
   achievements?: ReturnType<typeof achievementResponse>;
   statistics?: PlayerStatistics;
+  titles?: GrantedTitle[];
 }
 
 // These commands return actual drawn reward packs. Direct-card grants are intentionally absent.
@@ -280,8 +283,10 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
     }
 
     const revision = Number(current.revision ?? 0) + 1;
-    // Producers know the actual award before queuing writes. Currency/direct-card rewards need no statistics read.
-    let statistics: StatisticsContext | undefined;
+    const automaticTitles = AUTOMATIC_TITLE_COMMANDS.has(source) ? await loadAutomaticTitles(env) : null;
+    // Crafting and achievement claims already own their statistics mutation and return its final state.
+    let statistics: StatisticsContext | undefined = automaticTitles !== null &&
+      source !== "craftCard" && source !== "claimAchievement" ? await beginStatistics(transaction, db, env, uid) : undefined;
     let preparedPacks = 0;
     const outcome = await mutate(current, transaction, wallet, async (opened) => {
       if (!Number.isSafeInteger(opened) || opened < 0 || !PACK_OPENING_COMMANDS.has(source)) {
@@ -308,11 +313,23 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
     if (PACK_OPENING_COMMANDS.has(source) && opened !== preparedPacks) {
       throw new Error(`Pack statistics were not prepared before writes: ${source}`);
     }
-    if (statistics !== undefined && opened > 0) {
-      applyStatisticsPacks(statistics.state, opened);
-      commitStatistics(transaction, statistics, FieldValue.serverTimestamp());
+    if (statistics !== undefined) {
+      if (opened > 0) applyStatisticsPacks(statistics.state, opened);
+      if (automaticTitles !== null && outcome.slots.ownership !== undefined) {
+        applyStatisticsAlbums(statistics.state, {...current, ...outcome.slots}, automaticTitles.entries, automaticTitles.themes);
+      }
+      if (opened > 0 || statisticsChanged(statistics)) commitStatistics(transaction, statistics, FieldValue.serverTimestamp());
       response.achievements = achievementResponse(statistics.achievements);
       response.statistics = statisticsResponse(statistics.state);
+    }
+    if (automaticTitles !== null) {
+      if (response.statistics === undefined) throw new Error(`Missing automatic title statistics: ${source}`);
+      const granted = grantAutomaticTitles(outcome.slots.profile ?? current.profile ?? {}, response.statistics, automaticTitles);
+      if (granted.titles.length > 0) {
+        outcome.slots.profile = granted.profile;
+        response.updatedSlots = outcome.slots;
+        response.titles = [...(response.titles ?? []), ...granted.titles];
+      }
     }
 
     transaction.update(reference, {

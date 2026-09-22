@@ -16,6 +16,8 @@ public class ProfileAvatarView : MonoBehaviour
     [Tooltip("얼굴을 판 모양대로 오려내는 재질(UI/ProfileAvatarMask). 미배선이면 얼굴이 판 밖까지 네모로 그려진다.")]
     [SerializeField] Material faceMaskMaterial;
 
+    [SerializeField] ProfileLevelUpEffect levelUpEffect;
+
     // 같은 번들의 원본끼리만 공유한다. 씬 번들이 내려간 뒤 그 셰이더를 가진 복제본을
     // 다음 씬에서 재사용하면 분홍색으로 그려지므로, 마지막 뷰와 함께 복제본도 해제한다.
     sealed class FaceMaskEntry
@@ -30,6 +32,22 @@ public class ProfileAvatarView : MonoBehaviour
     static readonly int MASK_TEX_ID = Shader.PropertyToID("_MaskTex");
 
     Sequence m_pressSeq;
+
+    /// <summary>아바타의 레벨업 연출 배선 상태.</summary>
+    public bool IsLevelUpWired => levelUpEffect != null && levelUpEffect.IsWired;
+
+    /// <summary>아바타의 레벨업 연출 재생 상태.</summary>
+    public bool IsLevelUpPlaying => levelUpEffect != null && levelUpEffect.IsPlaying;
+
+    /// <summary>이 아바타에서 레벨업 연출을 재생한다.</summary>
+    public bool PlayLevelUp(int level)
+        => levelUpEffect != null && levelUpEffect.Play((RectTransform)transform, level);
+
+    /// <summary>이 아바타의 레벨업 연출을 중단한다.</summary>
+    public void StopLevelUp()
+    {
+        if (levelUpEffect != null) levelUpEffect.Stop();
+    }
 
     /// <summary>세 층을 한 벌로 그린다.</summary>
     public void Render(in ProfileLook _look)

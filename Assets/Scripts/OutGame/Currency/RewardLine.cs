@@ -11,6 +11,7 @@ public readonly struct RewardLine
     public readonly ERewardType Type;
     public readonly string RewardId;
     public readonly long Amount;
+    public readonly bool? IsNewItem;
     public bool IsCurrency => Type == ERewardType.Currency;
 
     /// <summary>아이콘을 저작하지 않으면 재화 표(<see cref="CurrencyLook"/>)의 그림으로 떨어진다 —
@@ -22,6 +23,7 @@ public readonly struct RewardLine
         Type = ERewardType.Currency;
         RewardId = null;
         Amount = _gain.Amount;
+        IsNewItem = null;
     }
 
     /// <summary>아이콘을 저작하지 않는 출처(앨범·모험 보상)용 — 그림은 전적으로 재화 표가 정한다.</summary>
@@ -32,8 +34,30 @@ public readonly struct RewardLine
         Type = _def.rewardType;
         RewardId = _def.rewardId;
         Amount = _def.amount;
+        IsNewItem = null;
         Gain = Type == ERewardType.Currency ? new CurrencyGain(_def.currency, Amount) : default;
         Icon = Type == ERewardType.Currency ? CurrencyLook.IconOf(_def.currency)
-            : Type == ERewardType.Pack ? PackSpec.Art(RewardId) : null;
+            : Type == ERewardType.Pack ? PackSpec.Art(RewardId)
+            : RewardItemDisplay.ItemIcon(Type.ToString(), RewardId);
+    }
+
+    public RewardLine(GrantedCosmetic _cosmetic)
+    {
+        Type = System.Enum.TryParse(_cosmetic.ItemType, out ERewardType t_type) ? t_type : ERewardType.Avatar;
+        RewardId = _cosmetic.ItemId;
+        Amount = 1;
+        Gain = default;
+        Icon = RewardItemDisplay.ItemIcon(_cosmetic.ItemType, RewardId);
+        IsNewItem = _cosmetic.IsNew;
+    }
+
+    public RewardLine(GrantedTitle _title)
+    {
+        Type = ERewardType.Title;
+        RewardId = _title.TitleId;
+        Amount = 1;
+        Gain = default;
+        Icon = RewardItemDisplay.ItemIcon("Title", RewardId);
+        IsNewItem = _title.IsNew;
     }
 }

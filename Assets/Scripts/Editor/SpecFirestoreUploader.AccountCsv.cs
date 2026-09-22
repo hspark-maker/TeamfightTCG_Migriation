@@ -7,6 +7,14 @@ using System.Reflection;
 
 public static partial class SpecFirestoreUploader
 {
+    sealed class CosmeticItemUploadRow
+    {
+        public int id;
+        public string itemType;
+        public string itemId;
+        public int defaultOwned;
+    }
+
     // 서버 전용 제작 가격. 자동 생성 테이블과 SpecData.bytes에 추가하지 않는다.
     sealed class CardCraftUploadRow
     {
@@ -74,6 +82,8 @@ public static partial class SpecFirestoreUploader
         _rows = null;
         _error = null;
         Type t_type = _table == "CardCraft" ? typeof(CardCraftUploadRow) :
+            _table == "CosmeticItem" ? typeof(CosmeticItemUploadRow) :
+            _table == "Title" ? typeof(TitleUploadRow) :
             _table == "Achievement" ? typeof(AchievementUploadRow) :
             _table == "Mission" ? typeof(MissionUploadRow) :
             _table == "AccountLevel" ? typeof(AccountLevel) : _table == "Reward" ? typeof(Reward) : null;
@@ -117,7 +127,33 @@ public static partial class SpecFirestoreUploader
             t_rows.Add(t_row);
         }
         if (t_rows.Count == 0) { _error = $"{_table} CSV 데이터가 비어 있다."; return false; }
+        if (_table == "CosmeticItem" && !ValidateCosmeticItems(t_rows, out _error)) return false;
+        if (_table == "Title" && !ValidateTitles(t_rows, out _error)) return false;
         _rows = t_rows;
+        return true;
+    }
+
+    static bool ValidateCosmeticItems(IList _rows, out string _error)
+    {
+        _error = null;
+        var t_ids = new HashSet<int>();
+        var t_items = new HashSet<string>(StringComparer.Ordinal);
+        foreach (CosmeticItemUploadRow t_row in _rows)
+        {
+            if (t_row.id <= 0 || !t_ids.Add(t_row.id))
+            { _error = $"CosmeticItem id는 중복 없는 양의 정수여야 한다: {t_row.id}"; return false; }
+            if (t_row.itemType != "Avatar" && t_row.itemType != "Frame" && t_row.itemType != "Emote")
+            { _error = $"CosmeticItem {t_row.id} 종류 오류: {t_row.itemType}"; return false; }
+            if (string.IsNullOrWhiteSpace(t_row.itemId) || t_row.itemId != t_row.itemId.Trim() ||
+                !t_items.Add(t_row.itemType + ":" + t_row.itemId))
+            { _error = $"CosmeticItem {t_row.id} 아이템 ID가 비었거나 중복이다."; return false; }
+            if (t_row.itemType == "Emote" &&
+                (!int.TryParse(t_row.itemId, NumberStyles.None, CultureInfo.InvariantCulture, out int t_emoteId) ||
+                 t_emoteId <= 0 || t_emoteId.ToString(CultureInfo.InvariantCulture) != t_row.itemId))
+            { _error = $"CosmeticItem {t_row.id} 이모티콘 ID는 양의 정수 표기여야 한다."; return false; }
+            if (t_row.defaultOwned != 0 && t_row.defaultOwned != 1)
+            { _error = $"CosmeticItem {t_row.id} defaultOwned는 0 또는 1이어야 한다."; return false; }
+        }
         return true;
     }
 }

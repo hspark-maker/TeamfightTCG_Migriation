@@ -1,3 +1,4 @@
+import {CosmeticItem, ensureCosmeticOwnership} from "../profile/cosmetics";
 import {SlotPatch} from "./saveDocument";
 import {Balances, grant} from "../currency/wallet";
 import {generateNickname} from "../profile/generateNickname";
@@ -37,12 +38,14 @@ export function buildFreshAccountBalances(): Balances {
  * @param {number[]} starterCardIds 지급할 카드 id (STARTER_DECK_SIZE 장)
  * @param {string} nickname 문서에 굳힐 기본 닉네임 (기본: 낱말표에서 한 벌 추첨)
  * @param {ReadonlyMap<number, string>} grades 카드별 등급
+ * @param {CosmeticItem[]} cosmetics Published default cosmetic ownership.
  * @return {SlotPatch} 슬롯 8개
  */
 export function buildFreshAccountSlots(
   starterCardIds: number[],
   nickname: string = generateNickname(),
   grades: ReadonlyMap<number, string> = new Map(),
+  cosmetics: readonly CosmeticItem[] = [],
 ): SlotPatch {
   const slots = [];
   for (let i = 0; i < DECK_SLOT_COUNT; i++) {
@@ -74,6 +77,7 @@ export function buildFreshAccountSlots(
     // 닉네임만 값이 실린다 — 계정이 생기는 이 자리에서 한 번 뽑아 굳힌다. 클라가 폴백으로 만들면
     // 저장 전 세션마다 이름이 달라지고, 서버(매칭·랭킹)가 이름을 쓸 때 빈 값을 보게 된다.
     // 아바타·프레임은 null 이 설계다 — 기본 id 를 세이브에 굳히지 않고 ProfileManager 가 폴백한다.
-    profile: {nickname, avatarId: null, frameId: null, accountExp: 0, accountRewardLevel: 1},
+    profile: ensureCosmeticOwnership(
+      {nickname, avatarId: null, frameId: null, accountExp: 0, accountRewardLevel: 1}, cosmetics),
   } as unknown as SlotPatch;
 }

@@ -63,6 +63,6 @@ export const claimAttendance = onCall(async (request) => {
       return {slots: items.slots, wallet: granted.length ?
         nextWallet(wallet, grant(wallet.balances, granted), "claimAttendance") : undefined};
     },
-    (adopted) => ({...adopted, attendance, granted, cards: items.cards, packs: items.packs ?? [],
+    (adopted) => ({...adopted, attendance, granted, cosmetics: items.cosmetics ?? [], cards: items.cards, packs: items.packs ?? [],
       ...(missions ? {missions} : {})}));
 });

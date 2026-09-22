@@ -656,12 +656,14 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
     // 검색어가 바뀌면 목록을 다시 만들지 않고 표시만 거른다 — 그리드가 타일 이름을 캐시하고 있다.
     void OnSearchChanged(string _value)
     {
+        if (!GuidanceCoordinator.AllowsInput(EGuidanceInputAction.EditDeck)) return;
         if (m_holdout > 0) return;
         if (this.collectionGrid != null) this.collectionGrid.SetNameFilter(_value);
     }
 
     void OnFilterClicked()
     {
+        if (!GuidanceCoordinator.AllowsInput(EGuidanceInputAction.EditDeck)) return;
         if (!IsOpen || m_holdout > 0 || (dragController != null && dragController.IsDragging)) return;
         if (searchInput != null) searchInput.DeactivateInputField();
         CardFilterPopup.Open(m_cardFilter, false, searchInput != null ? searchInput.text : null, _filter =>
@@ -698,6 +700,7 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
     // 바꾼 게 있으면 저장 확인을 받고, 허가가 떨어져야 그 덱으로 재바인딩된다.
     void OnDeckStripSlotClicked(int _slotIndex)
     {
+        if (!GuidanceCoordinator.AllowsInput(EGuidanceInputAction.EditDeck)) return;
         if (this.m_mode == EDeckEditMode.Edit && this.m_slotIndex == _slotIndex) return;   // 이미 이 덱을 편집 중
 
         // 확인 팝업 응답을 기다리는 사이 "저장"으로 신규 덱이 맨 앞에 꽂히면 뒤 덱 좌표가 전부 밀린다
@@ -729,6 +732,7 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
     // 하단 바의 신규 생성 칸. 만석은 칸 자체가 비활성이지만, 확인 팝업이 떠 있는 사이 만석이 될 수 있다.
     void OnDeckStripCreateClicked()
     {
+        if (!GuidanceCoordinator.AllowsInput(EGuidanceInputAction.EditDeck)) return;
         if (this.m_mode == EDeckEditMode.Create) return;   // 이미 신규 편집 중
 
         RequestLeave(() =>
@@ -747,6 +751,7 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
     // 삭제는 되돌릴 수 없으므로 로비 목록(DeckListController.OnSlotDeleteClicked)과 같은 확인 절차를 그대로 밟는다.
     void OnDeckStripSlotDelete(int _slotIndex)
     {
+        if (!GuidanceCoordinator.AllowsInput(EGuidanceInputAction.EditDeck)) return;
         if (!DeckSaveManager.IsSlotValid(_slotIndex)) return;
 
         if (this.m_mode == EDeckEditMode.Edit && this.m_slotIndex == _slotIndex)
@@ -838,6 +843,7 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
     // 저장 여부는 나갈 때 실제 입력값과 m_savedName을 비교해 판정한다(발화 순서에 기대지 않는다).
     void OnNameEndEdit(string _value)
     {
+        if (!GuidanceCoordinator.AllowsInput(EGuidanceInputAction.EditDeck)) return;
         // OnDisable로 편집이 내려간 뒤 포커스 해제로 늦게 불릴 수 있다.
         if (!IsOpen || nameInput == null) return;
 
@@ -861,6 +867,7 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
     // 컬렉션 칸에서 드래그가 시작될 때. 스크롤뷰 소유권을 넘겨줘야 드래그와 스크롤이 서로를 잡아먹지 않는다.
     void OnTileDragRequest(DeckEditCardTile _tile, PointerEventData _data)
     {
+        if (_tile == null || !AllowsCardEquip(_tile.Card)) return;
         if (_tile == null || dragController == null) return;
 
         // 6칸이 다 찼으면 어디에 놓든 교체다 — 탭 교체와 같은 신호를 끌고 다니는 동안 켜 둔다.
@@ -895,6 +902,7 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
     // 배치는 AssignSlot에 위임한다 — 덱 내 중복 제거·dirty·재갱신을 드래그 드롭과 같은 경로로 태우기 위함이다.
     void OnTileClicked(DeckEditCardTile _tile)
     {
+        if (_tile == null || !AllowsCardEquip(_tile.Card)) return;
         // 편집이 닫힌 뒤 같은 프레임에 늦게 디스패치될 수 있다(그리드 Clear의 Destroy는 프레임 끝에 반영).
         // 가드가 없으면 닫힌 편집기의 0번 칸에 카드가 꽂히고 m_dirty까지 선다.
         if (!IsOpen) return;
@@ -983,9 +991,19 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
         CancelSlotPick();
     }
 
+    static bool AllowsCardEquip(int _card)
+    {
+        if (!GuidanceCoordinator.AllowsInput(EGuidanceInputAction.Equip, EOutgameTutorialAnchor.DeckEditCollectionCard)) return false;
+        return GuidanceCoordinator.IsInternalNavigation
+            || !OutgameTutorialGuide.TryGetCurrentStep(out var t_step)
+            || t_step.Completion != EOutgameTutorialCompletion.DeckEquip
+            || t_step.AnchorCardId <= 0 || t_step.AnchorCardId == _card;
+    }
+
     // 편성 칸에 카드를 놓는다. 같은 카드가 이미 다른 칸에 있으면 복사가 아니라 이동이다(덱 내 중복 금지).
     public void AssignSlot(int _slotIndex, int _card)
     {
+        if (!IsOpen || !AllowsCardEquip(_card)) return;
         if (_slotIndex < 0 || _slotIndex >= m_working.Length) return;
         if (_card <= 0) return;
 
@@ -1013,6 +1031,8 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
     // 교체 전용 경로를 따로 두지 않는다: AssignSlot의 덧씌우기가 곧 교체다(드래그 드롭도 같은 길을 탄다).
     void OnSlotClicked(int _slotIndex)
     {
+        if (m_pendingSwapCard > 0 ? !AllowsCardEquip(m_pendingSwapCard)
+            : !GuidanceCoordinator.AllowsInput(EGuidanceInputAction.EditDeck)) return;
         if (m_pendingSwapCard <= 0) { ClearSlot(_slotIndex); return; }
 
         int t_card = m_pendingSwapCard;
@@ -1064,6 +1084,7 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
 
     public void ClearAll()
     {
+        if (!GuidanceCoordinator.AllowsInput(EGuidanceInputAction.EditDeck, EOutgameTutorialAnchor.DeckUnequipAllButton)) return;
         // 편성이 통째로 바뀌면 "6칸이 다 차서 고르는 중"이라는 모드의 전제가 사라진다.
         // 남겨두면 빈 칸이 생긴 덱에서 다음 슬롯 탭이 교체가 아니라 이동이 되어 덱에 구멍이 난다.
         CancelSlotPick();
@@ -1082,6 +1103,7 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
     // 채우는 순서는 체력 내림차순이다(마스터 등록 순서가 아니다) — "자동 편성"이 곧 "맨 앞 6장"이 되지 않게.
     public void AutoEquip()
     {
+        if (!GuidanceCoordinator.AllowsInput(EGuidanceInputAction.EditDeck, EOutgameTutorialAnchor.DeckAutoEquipButton)) return;
         CancelSlotPick();   // ClearAll과 같은 이유 — 편성을 갈아엎고 나면 고르는 중이던 전제가 남지 않는다
 
         bool t_changed = false;
@@ -1327,6 +1349,7 @@ public class DeckEditController : ContentsPooledUI, IPointerClickHandler
     // 저장 버튼. 편집 화면에 머문 채 지금까지의 편성을 확정한다(나가기와 달리 화면을 닫지 않는다).
     void OnSaveClicked()
     {
+        if (!GuidanceCoordinator.AllowsInput(EGuidanceInputAction.SaveDeck, EOutgameTutorialAnchor.DeckEditSaveButton)) return;
         if (!IsOpen) return;
 
         CancelSlotPick();   // 저장은 편성을 확정하는 사건이다 — 끝난 화면이 계속 칸을 고르라고 말하지 않게

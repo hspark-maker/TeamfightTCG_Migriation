@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ensureAccount = void 0;
+const cosmetics_1 = require("../profile/cosmetics");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
 const eventNames_1 = require("../analytics/eventNames");
@@ -67,8 +68,8 @@ exports.ensureAccount = (0, https_1.onCall)(async (request) => {
     if (appVersion.length === 0 || appVersion.length > APP_VERSION_MAX_LENGTH) {
         throw new https_1.HttpsError("invalid-argument", `appVersion must be 1..${APP_VERSION_MAX_LENGTH} characters.`);
     }
-    const starter = await (0, starterCards_1.resolveStarterCardIds)(env);
-    const outcome = await (0, saveDocument_1.ensureSaveDocument)(env, uid, deviceId, appVersion, () => (0, freshAccount_1.buildFreshAccountSlots)(starter.cardIds, undefined, starter.grades), (0, freshAccount_1.buildFreshAccountBalances)());
+    const [starter, cosmetics] = await Promise.all([(0, starterCards_1.resolveStarterCardIds)(env), (0, cosmetics_1.loadCosmeticItems)(env)]);
+    const outcome = await (0, saveDocument_1.ensureSaveDocument)(env, uid, deviceId, appVersion, () => (0, freshAccount_1.buildFreshAccountSlots)(starter.cardIds, undefined, starter.grades, cosmetics), (0, freshAccount_1.buildFreshAccountBalances)());
     if (outcome.repaired) {
         // 스키마 밖 문서를 버리고 다시 만들었다. 원인 추적이 되도록 버린 필드 이름을 남긴다.
         logger.warn("ensureAccount repaired", {

@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a5219971656b98e469a060b0513a1df0, type: 3}
   m_Name: ProfileConfig
   m_EditorClassIdentifier: Assembly-CSharp::ProfileConfig
+  titleCatalog: {fileID: 11400000, guid: c9fb0453ec804b86b7030243feb31872, type: 2}
   avatarPlate: {fileID: 21300000, guid: 4d39085bb0991451392165e2e08c0b56, type: 3}
   avatars:
   - id: avatar_00

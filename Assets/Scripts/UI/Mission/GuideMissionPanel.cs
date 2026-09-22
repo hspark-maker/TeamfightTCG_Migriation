@@ -274,6 +274,7 @@ public class GuideMissionPanel : ContentsPooledUI
         if (t_mission == null || (t_tracker != null && t_tracker.IsHoldingClaim)) return;
         int t_version = t_tracker != null ? t_tracker.BeginClaim(t_mission) : 0;
         ClaimMissionResult t_result = null;
+        var releaseDisplay = CurrencyHud.HoldRewardDisplays();
         ServerWaitOverlay.Hold(this);
         try
         {
@@ -283,6 +284,7 @@ public class GuideMissionPanel : ContentsPooledUI
         {
             // **팝업보다 먼저 걷는다.** 순서를 뒤집으면 안내가 대기 딤에 묻힌다.
             ServerWaitOverlay.Release(this);
+            if (t_result == null) releaseDisplay();
             if (t_result == null && t_tracker != null) t_tracker.EndClaim(t_version, false);
         }
         if (t_result != null)
@@ -290,6 +292,7 @@ public class GuideMissionPanel : ContentsPooledUI
             this.Close();
             MissionPanel.ShowClaimedRewards(new[] { t_result }, _onClosed: () =>
             {
+                releaseDisplay();
                 if (t_tracker != null) t_tracker.EndClaim(t_version, true);
             }, _skipDirectCardPresentation: true);
         }

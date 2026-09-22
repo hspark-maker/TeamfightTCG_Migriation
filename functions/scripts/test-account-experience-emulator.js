@@ -27,6 +27,7 @@ const missions = ["daily.first", "daily.second"].map((id, index) => ({id, enable
   passExp: 0, accountExp: 120, sortOrder: index + 1, guideActId: 0, guideActName: ""}));
 
 async function setup(t) {
+  t.mock.method(specs, "readOptionalSpecRows", async () => null);
   assert.equal(DATABASE_ID, "cardbattle");
   const uid = "account-xp-test-" + randomUUID();
   const root = db.doc(`envs/test/users/${uid}`);

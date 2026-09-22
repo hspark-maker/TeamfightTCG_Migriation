@@ -107,7 +107,7 @@ public readonly struct TutorialActionMeta
         new(A.BattleStart,          C.Click,            F.Anchor | F.GuideMessage | F.Dim | F.Spotlight, true),
         new(A.AutoBattle,           C.Auto,             F.Scenario | F.ShowDeckGate, true),
         new(A.AutoPurchase,         C.Auto,             F.Pack | F.FailurePolicy, false, true, EBeatSlot.Pre),
-        new(A.DeckGrant,            C.Auto,             F.Pack | F.Scenario | F.DeckName | F.FailurePolicy, _beatSlot: EBeatSlot.Pre),
+        new(A.DeckGrant,            C.Auto,             F.Pack | F.Cards | F.DeckName | F.FailurePolicy, _beatSlot: EBeatSlot.Pre),
         new(A.WaitAlbumInsert,      C.AlbumInsert,      F.None, _beatSlot: EBeatSlot.Post),
         new(A.WaitEnhance,          C.Enhance,          F.Anchor | F.GuideMessage | F.Dim | F.Spotlight | F.FreeOfCharge | F.WaitUnlockIntro),
         new(A.CloseCardDetail,      C.Auto,             F.None, _beatSlot: EBeatSlot.Post),

@@ -152,7 +152,7 @@ public static class DataSaveManager
     }
 
     /// <summary>서버가 쓴 슬롯만 메모리 세이브에 갈아끼운다. null 슬롯은 서버가 건드리지 않은 것이다.</summary>
-    internal static ESaveSlot AdoptServerSlots(ServerSlotPatch _slots)
+    internal static ESaveSlot AdoptServerSlots(ServerSlotPatch _slots, bool _preserveProfileEquipment = true)
     {
         if (_slots == null) return ESaveSlot.None;
 
@@ -171,6 +171,19 @@ public static class DataSaveManager
             // 아직 업로드되지 않은 완료 이력을 응답의 옛 사본으로 덮으면 같은 연출이 다시 열린다.
             if (Data.Profile?.ContentUnlocks != null)
                 _slots.Profile.ContentUnlocks = Data.Profile.ContentUnlocks;
+            // 닉네임·장착은 편집을 보존하고 소유 목록은 서버 값을 채택한다.
+            if (Data.Profile != null)
+            {
+                _slots.Profile.Nickname = Data.Profile.Nickname;
+                if (_preserveProfileEquipment)
+                {
+                    _slots.Profile.AvatarId = Data.Profile.AvatarId;
+                    _slots.Profile.FrameId = Data.Profile.FrameId;
+                    _slots.Profile.EmoteIds = Data.Profile.EmoteIds;
+                }
+                if (_preserveProfileEquipment)
+                    _slots.Profile.EquippedTitleId = Data.Profile.EquippedTitleId;
+            }
             Data.Profile = _slots.Profile;
             t_touched |= ESaveSlot.Profile;
         }

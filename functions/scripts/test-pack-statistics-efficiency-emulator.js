@@ -8,10 +8,16 @@ if (!/^(127\.0\.0\.1|localhost):\d+$/.test(process.env.FIRESTORE_EMULATOR_HOST ?
 }
 const {db} = require("../lib/firebaseApp");
 const {mutateSave} = require("../lib/save/saveDocument");
+const specs = require("../lib/specs/specBlobReader");
 after(() => db.terminate());
 const commands = ["claimAttendance", "claimMission", "claimReward", "claimPassReward", "claimBattleExperience", "spinRoulette"];
 
 async function setup(t) {
+  t.mock.method(specs, "readOptionalSpecRows", async () => null);
+  t.mock.method(specs, "readSpecRows", async (_env, name) => {
+    if (name === "Reward") return [];
+    throw new Error("Unexpected table without automatic title rewards: " + name);
+  });
   const uid = "pack-efficiency-" + randomUUID();
   const root = db.doc(`envs/test/users/${uid}`);
   await Promise.all([
@@ -34,7 +40,7 @@ async function setup(t) {
   return {uid, root, reads, statsReads};
 }
 
-test("all six reward producers can grant currency/direct cards with zero statistics reads", async (t) => {
+test("without automatic titles, all six reward producers grant currency/direct cards with zero statistics reads", async (t) => {
   const {uid, root, reads, statsReads} = await setup(t);
   for (const source of commands) {
     reads.length = 0;

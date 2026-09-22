@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public enum ERewardOwnerType { Album, Adventure, Rank, Battle }
-public enum ERewardType { Currency, Card, Pack, PackChoice }
+public enum ERewardType { Currency, Card, Pack, PackChoice, Avatar, Frame, Emote, Title }
 
 /// <summary>
 /// Reward 표에 있지만 **클라가 색인하지 않는** 소유 영역. 서버만 소비하는 축이다.
@@ -152,6 +152,7 @@ public static class RewardSpec
             else
             {
                 if (t_row.amount <= 0 || string.IsNullOrEmpty(t_row.rewardId)) continue;
+                if (t_rewardType == ERewardType.Title) continue;
                 t_def = new AlbumRewardDef { rewardType = t_rewardType, rewardId = t_row.rewardId, amount = t_row.amount };
             }
             string t_key = KeyOf(t_ownerType, t_row.ownerId);

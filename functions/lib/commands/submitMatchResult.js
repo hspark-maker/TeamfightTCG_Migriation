@@ -121,20 +121,33 @@ function sameNumbers(left, right) {
     return Array.isArray(left) && left.length === right.length &&
         left.every((value, index) => value === right[index]);
 }
-/** 완료 재조회도 최초 정산과 같은 참가자 검증을 거친다. */
+/**
+ * 완료 재조회도 최초 정산과 같은 참가자 검증을 거친다.
+ * @param {object | undefined} match 저장된 매치
+ * @param {string} uid 요청자
+ */
 function requireMatchParticipant(match, uid) {
     if (match?.seedSource !== "server" ||
         !Array.isArray(match.participantUids) || !match.participantUids.includes(uid)) {
         throw new https_1.HttpsError("permission-denied", "server match identity is not registered");
     }
 }
-/** 현재 Card 표는 스냅샷을 봉인하지 않던 구 solo 계약에서만 필요하다. */
+/**
+ * 현재 Card 표는 스냅샷을 봉인하지 않던 구 solo 계약에서만 필요하다.
+ * @param {object | undefined} match 저장된 매치
+ * @return {boolean} 구 AI 덱 재구성 여부
+ */
 function needsLegacyAiCardSpecs(match) {
     return match?.mode === "solo" && match.resultProtocol === 1 &&
         ((0, payloadGuards_1.safeInteger)(match.expectedParticipants) ?? 2) === 1 && match.aiGrowthVersion == null &&
         typeof match.adventureNodeId !== "string";
 }
-/** 저장된 완료 결과의 응답은 신규 정산의 부수 효과를 재실행하지 않는다. */
+/**
+ * 저장된 완료 결과의 응답은 신규 정산의 부수 효과를 재실행하지 않는다.
+ * @param {object} match 저장된 매치
+ * @param {string} status 저장된 상태
+ * @return {object} 완료 결과
+ */
 function storedMatchResult(match, status) {
     const simulation = (0, payloadGuards_1.objectRecord)(match.serverSimulation);
     return { status, reason: match.reason ?? null,

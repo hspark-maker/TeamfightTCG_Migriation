@@ -208,6 +208,10 @@ public class OutgameTutorialBridge : MonoBehaviour
                 EOutgameTutorialStepResult t_result;
                 try
                 {
+                    if (!GuidedCursor && t_entering != null
+                        && (t_entering.Completion == EOutgameTutorialCompletion.RankEffect
+                            || t_entering.Completion == EOutgameTutorialCompletion.ContentUnlockIntro))
+                        await GuidanceCoordinator.PrepareFirstRankSurfaceAsync(m_stepToken);
                     if (DataSaveManager.Data.Tutorial?.Execution?.Phase == "Confirming"
                         && !await GuideResume.SaveConfirmedAsync(m_stepToken))
                         throw new InvalidOperationException("진행 위치를 저장하지 못했습니다.");

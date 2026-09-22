@@ -18,7 +18,8 @@ internal sealed class ClaimRewardPack
 internal static class RewardItemDisplay
 {
     internal static RewardClaimOutcome ToOutcome(IReadOnlyList<CurrencyGain> _gains,
-        IReadOnlyList<OpenPackCard> _cards, IReadOnlyList<ClaimRewardPack> _packs)
+        IReadOnlyList<OpenPackCard> _cards, IReadOnlyList<ClaimRewardPack> _packs,
+        IReadOnlyList<GrantedCosmetic> _cosmetics = null, IReadOnlyList<GrantedTitle> _titles = null)
     {
         var t_flat = ToDrawn(_cards);
         // 0은 직접 지급, 나머지는 팩 인덱스 + 1. 원본 위치를 유지하며 중복을 한 장씩 배정한다.
@@ -90,7 +91,7 @@ internal static class RewardItemDisplay
             if (!t_presentedPacks[t_i])
                 t_batches.Add(new RewardPresentationBatch(t_packs[t_i].Cards, t_packs[t_i].PackId));
 
-        return new RewardClaimOutcome(_gains, t_direct, t_packs, t_batches);
+        return new RewardClaimOutcome(_gains, t_direct, t_packs, t_batches, _cosmetics: _cosmetics, _titles: _titles);
     }
 
     internal static List<DrawnCard> ToDrawn(IReadOnlyList<OpenPackCard> _cards)
@@ -119,6 +120,16 @@ internal static class RewardItemDisplay
         => _left.CardId == _right.CardId && _left.IsNew == _right.IsNew;
     internal static string NameOf(string _type, string _id)
     {
+        if (_type == "Title")
+            return TitleManager.Catalog != null && TitleManager.Catalog.TryGet(_id, out var t_title)
+                ? t_title.displayName : $"칭호 {_id}";
+        if (_type == "Avatar")
+            return ProfileManager.Config != null && ProfileManager.Config.TryGetAvatar(_id, out var t_avatar) && !string.IsNullOrEmpty(t_avatar.displayName)
+                ? t_avatar.displayName : $"아바타 {_id}";
+        if (_type == "Frame")
+            return ProfileManager.Config != null && ProfileManager.Config.TryGetFrame(_id, out var t_frame) && !string.IsNullOrEmpty(t_frame.displayName)
+                ? t_frame.displayName : $"프레임 {_id}";
+        if (_type == "Emote") return $"이모티콘 {_id}";
         if (_type == "PackChoice") return "해금된 테마 팩 선택";
         if (_type == "Pack")
         {
@@ -129,6 +140,27 @@ internal static class RewardItemDisplay
             return int.TryParse(_id, out int t_id) && CardCatalog.TryGetSpec(t_id, out var t_card)
                 ? t_card.DisplayName : "카드";
         return _id ?? string.Empty;
+    }
+
+    internal static UnityEngine.Sprite ItemIcon(string _type, string _id)
+    {
+        if (_type == "Title" && TitleManager.Catalog != null && TitleManager.Catalog.TryGet(_id, out var t_title))
+            return t_title.icon;
+        if (_type == "Avatar" && ProfileManager.Config != null && ProfileManager.Config.TryGetAvatar(_id, out var t_avatar))
+            return t_avatar.SmallOrLarge;
+        if (_type == "Frame" && ProfileManager.Config != null && ProfileManager.Config.TryGetFrame(_id, out var t_frame))
+            return t_frame.sprite;
+        if (_type == "Emote" && int.TryParse(_id, out int t_id) && ProfileManager.EmoteCatalog != null &&
+            ProfileManager.EmoteCatalog.TryGet(t_id, out var t_emote)) return t_emote.sprite;
+        return null;
+    }
+
+    internal static UnityEngine.Color ItemColor(string _type, string _id)
+    {
+        if (_type == "Title" && TitleManager.Catalog != null && TitleManager.Catalog.TryGet(_id, out var t_title))
+            return t_title.color;
+        return _type == "Frame" && ProfileManager.Config != null && ProfileManager.Config.TryGetFrame(_id, out var t_frame)
+            ? t_frame.color : UnityEngine.Color.white;
     }
 
     internal static void Append(StringBuilder _text, IReadOnlyList<ClaimRewardItem> _items)

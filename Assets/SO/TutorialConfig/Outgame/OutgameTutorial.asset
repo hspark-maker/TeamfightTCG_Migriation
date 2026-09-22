@@ -64,7 +64,7 @@ MonoBehaviour:
       parallelGain: 0
       scenario: {fileID: 0}
       cardId: 0
-      cardIds: 0100000014000000040000000f0000000b000000
+      cardIds: 0100000014000000040000000f00000023000000
       showDeckGate: 0
       deckName: 
       onFailure: 0
@@ -103,18 +103,18 @@ MonoBehaviour:
       unlocksAll: 0
       locks: 
       useDim: 0
-      packId: RangePack
+      packId: StarterPack
       packPriceLabel: 
       anchorCardId: 0
       freeOfCharge: 0
       waitUnlockIntro: 0
       rewardTitle: 
       parallelGain: 0
-      scenario: {fileID: 11400000, guid: 5a5b5c5d5e5f60616263646566676869, type: 2}
+      scenario: {fileID: 0}
       cardId: 0
-      cardIds: 
+      cardIds: 0100000014000000040000000f0000002300000002000000
       showDeckGate: 0
-      deckName: "\uC6D0\uAC70\uB9AC \uB371"
+      deckName: "\uC2A4\uD0C0\uD130 \uB371"
       onFailure: 0
       contentIntros: 
     - stepId: 5
@@ -355,9 +355,9 @@ MonoBehaviour:
       waitUnlockIntro: 0
       rewardTitle: 
       parallelGain: 0
-      scenario: {fileID: 11400000, guid: 7b2c3d4e5f6071829300a4b5c6d7e8f9, type: 2}
+      scenario: {fileID: 0}
       cardId: 0
-      cardIds: 
+      cardIds: 1a00000014000000030000000b0000000400000002000000
       showDeckGate: 0
       deckName: "\uD0A4\uC6CC\uB4DC \uB371"
       onFailure: 0

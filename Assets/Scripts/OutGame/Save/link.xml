@@ -35,6 +35,8 @@
     <type fullname="PlayerBattleStatisticsGroups" preserve="all"/>
     <type fullname="PlayerBattleStatistics" preserve="all"/>
     <type fullname="PlayerStatisticsGetResponse" preserve="all"/>
+    <type fullname="EnsureTitlesResult" preserve="all"/>
+    <type fullname="TitleUnlockDefinition" preserve="all"/>
     <type fullname="AttendanceResponse" preserve="all"/>
     <type fullname="AttendanceState" preserve="all"/>
     <type fullname="AttendanceDay" preserve="all"/>

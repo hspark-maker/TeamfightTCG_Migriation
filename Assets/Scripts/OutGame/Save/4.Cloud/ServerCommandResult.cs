@@ -6,6 +6,8 @@ using Newtonsoft.Json;
 // revision·updatedSlots 키를 아예 싣지 않는다.
 internal class ServerCommandResult
 {
+    [JsonProperty("titles")] public System.Collections.Generic.List<GrantedTitle> Titles { get; set; }
+    [JsonProperty("cosmetics")] public System.Collections.Generic.List<GrantedCosmetic> Cosmetics { get; set; }
     /// <summary>0/누락은 <b>이 명령이 세이브 문서를 쓰지 않았다</b>는 센티널이다.
     /// 세이브는 ensureSaveDocument가 revision 1로 만들고 증가만 하므로 0은 다른 뜻을 가질 수 없다.</summary>
     [JsonProperty("revision")] public long Revision { get; set; }

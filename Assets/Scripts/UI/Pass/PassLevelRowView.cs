@@ -9,7 +9,7 @@ using UnityEngine.UI;
 /// <para>행이 자기 판정을 갖지 않는다 — 도달 여부와 수령 낙인은 <see cref="PassManager"/> 에 묻고,
 /// 최종 판정은 서버(claimPassReward)다. 여기 표시는 왕복을 아끼는 낙관 표시다.</para>
 /// </summary>
-public class PassLevelRowView : MonoBehaviour, IUIInitializable
+public partial class PassLevelRowView : MonoBehaviour, IUIInitializable
 {
     [SerializeField] TMP_Text levelText;
     [SerializeField] TMP_Text lockedLevelText;
@@ -82,9 +82,10 @@ public class PassLevelRowView : MonoBehaviour, IUIInitializable
         this.m_initialized = true;
     }
 
-    internal void Bind(PassLevelDefinition _definition, long? _nextRequiredExp, Action<int> _onClaim, Action<int> _onPremiumClaim = null)
+    internal void Bind(PassLevelDefinition _definition, long? _nextRequiredExp, Action<int> _onClaim, Action<int> _onPremiumClaim = null, double? _displayExp = null)
     {
         this.InitializeUI();
+        this._displayExp = _displayExp;
         this.m_onClaim = _onClaim;
         this.m_onPremiumClaim = _onPremiumClaim;
         bool t_sameDefinition = this.m_hasBound && ReferenceEquals(this.m_definition, _definition);
@@ -119,17 +120,8 @@ public class PassLevelRowView : MonoBehaviour, IUIInitializable
         bool t_canClaim = PassManager.CanClaim(this.m_definition);
         if (this.claimAlertDot != null) this.claimAlertDot.SetActive(t_canClaim);
 
-        if (this.reachedLevelRoot != null) this.reachedLevelRoot.SetActive(t_reached);
-        if (this.lockedLevelRoot != null) this.lockedLevelRoot.SetActive(!t_reached);
         if (this.lockedOverlay != null) this.lockedOverlay.SetActive(!t_reached);
-        if (this.connectorRoot != null) this.connectorRoot.SetActive(this.m_nextRequiredExp.HasValue);
-        if (this.levelFill != null)
-        {
-            long t_span = (this.m_nextRequiredExp ?? this.m_definition.RequiredExp) - this.m_definition.RequiredExp;
-            float t_fill = t_span > 0 ? Mathf.Clamp01((float)(PassManager.Exp - this.m_definition.RequiredExp) / t_span) : 0f;
-            this.levelFill.anchorMin = new Vector2(0f, 1f - t_fill);
-            this.levelFill.gameObject.SetActive(t_fill > 0f);
-        }
+        this.PresentProgress(this._displayExp ?? PassManager.Exp);
 
         if (this.claimedMark != null) this.claimedMark.SetActive(t_claimed);
         if (this.claimButton != null)

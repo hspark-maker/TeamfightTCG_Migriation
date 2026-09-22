@@ -20,6 +20,9 @@ public class LobbySettingPanel : ContentsPooledUI
     [SerializeField] Button editButton;
     [SerializeField] Button statisticsButton;
 
+    [SerializeField] Button titleButton;
+    [SerializeField] Button nicknameEditButton;
+
     [Tooltip("닫기 버튼.")]
     [SerializeField] Button closeButton;
 
@@ -52,6 +55,8 @@ public class LobbySettingPanel : ContentsPooledUI
         // 인스펙터로 걸지 않는 이유는 LobbyProfileButton과 같다 — 가리킬 대상이 풀에서 세워지는 화면이라
         // 저작 시점에는 존재하지 않는다.
         if (this.editButton    != null) this.editButton.onClick.AddListener(OpenProfileEdit);
+        if (this.titleButton != null) this.titleButton.onClick.AddListener(OpenTitles);
+        if (this.nicknameEditButton != null) this.nicknameEditButton.onClick.AddListener(OpenNicknameEdit);
         if (this.statisticsButton != null) this.statisticsButton.onClick.AddListener(OpenStatistics);
         if (this.closeButton   != null) this.closeButton.onClick.AddListener(Hide);
         if (this.dimButton     != null) this.dimButton.onClick.AddListener(Hide);
@@ -65,6 +70,12 @@ public class LobbySettingPanel : ContentsPooledUI
 
     // 이 판은 닫는다 — 편집 팝업이 그 위에 겹쳐 뜨면 뒤로가기의 목적지가 둘이 된다.
     void OpenProfileEdit()
+        => OpenProfileEdit(false);
+
+    void OpenNicknameEdit()
+        => OpenProfileEdit(true);
+
+    void OpenProfileEdit(bool _editNickname)
     {
         if (!this.isShow) return;
         ProfileEditPanel t_panel = UIPoolManager.Instance?.AddOrUpdateUI<ProfileEditPanel>(new UIData
@@ -74,7 +85,28 @@ public class LobbySettingPanel : ContentsPooledUI
                 if (this != null) this.Show();
             }
         });
-        if (t_panel != null) Hide();
+        if (t_panel != null)
+        {
+            Hide();
+            if (_editNickname) t_panel.EditNickname();
+        }
+    }
+
+    void OpenTitles()
+    {
+        if (!this.isShow) return;
+        ProfileEditPanel t_panel = UIPoolManager.Instance?.AddOrUpdateUI<ProfileEditPanel>(new UIData
+        {
+            onHide = () =>
+            {
+                if (this != null && this.gameObject.activeInHierarchy) this.Show();
+            }
+        });
+        if (t_panel != null)
+        {
+            Hide();
+            t_panel.EditTitles();
+        }
     }
 
     void OpenStatistics()

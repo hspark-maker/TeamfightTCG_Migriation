@@ -1,3 +1,4 @@
+import {CosmeticItem, CosmeticGrant, grantCosmetic, isCosmeticType, loadCosmeticItems} from "../profile/cosmetics";
 import {randomInt} from "node:crypto";
 import {HttpsError} from "firebase-functions/v2/https";
 import {RewardGain, RewardItem, RewardRow, resolveRewards} from "../rewardTable";
@@ -11,6 +12,7 @@ import {SlotPatch} from "../save/saveDocument";
 
 export interface RewardPack {pack: CardPackRow; drops: DropRow[]}
 export interface ItemGrantContext {
+  cosmetics?: CosmeticItem[];
   catalog: Set<number>;
   grades: Map<number, string>;
   thresholds: number[];
@@ -26,6 +28,7 @@ export interface ItemGrantContext {
  * @return {Promise<ItemGrantContext>} 트랜잭션에서 재사용할 표
  */
 export async function loadItemGrantContext(env: string, items: RewardItem[]): Promise<ItemGrantContext> {
+  const cosmetics = items.some((item) => isCosmeticType(item.rewardType)) ? await loadCosmeticItems(env) : undefined;
   const [catalog, cards, ranks, packs] = await Promise.all([
     loadCatalogIds(env), readSpecRows(env, "Card"), readRankGradeRows(env), readSpecRows(env, "CardPack"),
   ]);
@@ -42,7 +45,7 @@ export async function loadItemGrantContext(env: string, items: RewardItem[]): Pr
     if (pack === null) throw new HttpsError("failed-precondition", `Reward pack not found: ${id}`);
     prepared.set(id, {pack, drops});
   }));
-  return {catalog, grades: new Map(cards.map((row) => [Number(row.id), String(row.grade)])),
+  return {cosmetics, catalog, grades: new Map(cards.map((row) => [Number(row.id), String(row.grade)])),
     thresholds, packs: prepared, choices, cards};
 }
 
@@ -88,6 +91,7 @@ export function duplicateGains(cards: DrawnCard[], grades: ReadonlyMap<number, s
 }
 
 export interface GrantedItems {
+  cosmetics?: CosmeticGrant[];
   slots: SlotPatch;
   cards: DrawnCard[];
   packs?: {packId: string; cards: DrawnCard[]}[];
@@ -109,6 +113,8 @@ export function grantRewardItems(
   current: Record<string, unknown>, items: RewardItem[], context: ItemGrantContext,
   rewardRows: RewardRow[], selectedPackId: string, points: number, roll: RollFn = randomInt,
 ): GrantedItems {
+  const cosmetics: CosmeticGrant[] = [];
+  let profile = (current.profile ?? {}) as Record<string, unknown>;
   const owned = readOwnedIds(current.ownership);
   const ownedSet = new Set(owned);
   const cards: DrawnCard[] = [];
@@ -117,6 +123,13 @@ export function grantRewardItems(
   for (const item of items) {
     if (!Number.isSafeInteger(item.amount) || item.amount <= 0 || item.amount > 100) {
       throw new HttpsError("failed-precondition", "Invalid reward item amount.");
+    }
+    if (isCosmeticType(item.rewardType)) {
+      if (item.amount !== 1) throw new HttpsError("failed-precondition", "Cosmetic amount must be one.");
+      const granted = grantCosmetic(profile, item.rewardType, item.rewardId, context.cosmetics ?? []);
+      profile = granted.profile;
+      cosmetics.push(granted.cosmetic);
+      continue;
     }
     if (item.rewardType === "Card") {
       const id = Number(item.rewardId);
@@ -150,8 +163,11 @@ export function grantRewardItems(
       if (pack.price > 0) currencies.push(...duplicateGains(drawn, context.grades, rewardRows));
     }
   }
-  return {cards, packs, currencies, slots: cards.length ? {
-    ownership: buildOwnershipSlot(owned, cards),
-    cardGrowth: growthSlot(applyDrawnCardGrowth(readGrowthEntries(current.cardGrowth), cards, context.grades)),
-  } : {}};
+  return {cards, packs, cosmetics, currencies, slots: {
+    ...(cosmetics.length ? {profile} : {}),
+    ...(cards.length ? {
+      ownership: buildOwnershipSlot(owned, cards),
+      cardGrowth: growthSlot(applyDrawnCardGrowth(readGrowthEntries(current.cardGrowth), cards, context.grades)),
+    } : {}),
+  }};
 }

@@ -190,6 +190,7 @@ public class LobbyMatchLauncher : MonoBehaviour
     /// 실제로는 매칭 결과에 따라 실 멀티로도 간다(<see cref="PhotonRankedMatchmaker"/>).</summary>
     public void StartAiBattle()
     {
+        if (!GuidanceCoordinator.AllowsInput(EGuidanceInputAction.Navigate, EOutgameTutorialAnchor.LobbyPlayButton)) return;
         if (m_running) return;
 
         // 버튼을 죽여 두는 것만으로는 부족하다 — 잠김 표시는 표현 레이어 몫이고, 진입을 실제로 막는 주체는 여기다.
@@ -218,6 +219,7 @@ public class LobbyMatchLauncher : MonoBehaviour
     /// AdventureRun.Begin은 모든 가드를 통과한 뒤에 온다 — 중간에 return하며 세워 두면 그게 곧 로비 누수다.</summary>
     public void StartAdventureBattle(int _nodeIndex)
     {
+        if (!GuidanceCoordinator.AllowsInput(EGuidanceInputAction.Navigate, EOutgameTutorialAnchor.AdventureNode)) return;
         if (m_running) return;
         if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure)) return;
 
@@ -698,7 +700,15 @@ public class LobbyMatchLauncher : MonoBehaviour
     {
         if (!isActiveAndEnabled || m_running || adventurePanel == null || matchPanel == null
             || lobbyTabController == null || !OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure)) return false;
-        return lobbyTabController.TrySelectFeature(EOutgameFeature.LobbyMatchTab, _beforeOpen, OpenAdventureMap);
+        bool t_internal = GuidanceCoordinator.IsInternalNavigation;
+        return lobbyTabController.TrySelectFeature(EOutgameFeature.LobbyMatchTab, _beforeOpen, () =>
+        {
+            if (t_internal)
+            {
+                using (GuidanceCoordinator.InternalNavigation()) OpenAdventureMap();
+            }
+            else OpenAdventureMap();
+        });
     }
 
     /// <summary>모험 맵을 열고 정점 하나를 가운데에 둔다. 가이드 미션 "이동"이 부른다. 잠겨 있으면 false.</summary>
@@ -708,15 +718,21 @@ public class LobbyMatchLauncher : MonoBehaviour
             || lobbyTabController == null || !OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure)) return false;
 
         // 덱 저장/이탈 확인을 통과하고 매치 탭에 도착한 뒤에만 맵을 연다.
+        bool t_internal = GuidanceCoordinator.IsInternalNavigation;
         return lobbyTabController.TrySelectFeature(EOutgameFeature.LobbyMatchTab, _onArrived: () =>
         {
-            OpenAdventureMap();
+            if (t_internal)
+            {
+                using (GuidanceCoordinator.InternalNavigation()) OpenAdventureMap();
+            }
+            else OpenAdventureMap();
             if (_nodeIndex >= 0) adventurePanel.FocusNode(_nodeIndex);
         });
     }
 
     void OpenAdventureMap()
     {
+        if (!GuidanceCoordinator.AllowsInput(EGuidanceInputAction.Navigate, EOutgameTutorialAnchor.AdventureButton)) return;
         // 버튼을 죽여 두는 것만으로는 부족하다 — 잠김 표시는 표현 레이어 몫이고, 진입을 실제로 막는 주체는 여기다.
         // 정점 전투 복귀(HandleAdventureReturn)는 이 문을 거치지 않는다 — 거치게 하면 랭크가 복귀를 삼킨다.
         if (!OutgameFeatureLock.IsUnlocked(EOutgameFeature.Adventure)) return;

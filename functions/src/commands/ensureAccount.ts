@@ -1,3 +1,4 @@
+import {loadCosmeticItems} from "../profile/cosmetics";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {EVENTS} from "../analytics/eventNames";
@@ -47,10 +48,10 @@ export const ensureAccount = onCall(async (request) => {
     );
   }
 
-  const starter = await resolveStarterCardIds(env);
+  const [starter, cosmetics] = await Promise.all([resolveStarterCardIds(env), loadCosmeticItems(env)]);
   const outcome = await ensureSaveDocument(
     env, uid, deviceId, appVersion,
-    () => buildFreshAccountSlots(starter.cardIds, undefined, starter.grades),
+    () => buildFreshAccountSlots(starter.cardIds, undefined, starter.grades, cosmetics),
     buildFreshAccountBalances(),
   );
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -41,6 +41,7 @@ internal static class ServerSaveCommands
         MissionCommands.ResetSession();
         AchievementCommands.ResetSession();
         PlayerStatisticsCommands.ResetSession();
+        TitleUnlocks.ResetSession();
         AttendanceCommands.ResetSession();
         AccountRewardHandoff.ResetSession();
         AccountLevelUpHandoff.ResetSession();
@@ -182,7 +183,8 @@ internal static class ServerSaveCommands
             // revision 0/누락 = 이 명령은 세이브를 쓰지 않았다. 그대로 채택에 넘기면 "정확히 +1" 단언이
             // 지갑만 쓴 명령을 RemoteAhead로 읽어 전 세션을 끊는다.
             if (t_result.Revision > 0)
-                PlayerSaveCloud.AdoptServerResult(t_result.Revision, t_result.UpdatedSlots);
+                PlayerSaveCloud.AdoptServerResult(t_result.Revision, t_result.UpdatedSlots,
+                    _preserveProfileEquipment: _commandName != "devResetSave");
 
             if (t_result.AccountExperience != null)
                 t_result.AccountExperience.TotalExp = AccountLevelManager.Exp;

@@ -103,7 +103,7 @@ public sealed class ServerRouletteSpinSource : IRouletteSpinSource
                 foreach (var t_line in _result.Granted)
                     if (t_line != null && t_line.Amount > 0 && CurrencyCode.TryParse(t_line.Currency, out var t_currency))
                         t_granted.Add(new CurrencyGain(t_currency, t_line.Amount));
-            var t_reward = RewardItemDisplay.ToOutcome(t_granted, _result.Cards, _result.Packs);
+            var t_reward = RewardItemDisplay.ToOutcome(t_granted, _result.Cards, _result.Packs, _result.Cosmetics, _result.Titles);
             return RouletteSpinOutcome.CreatePack(_result.SlotIndex, _result.RewardId, _result.Amount,
                 t_reward.Cards, t_granted, t_reward.Packs);
         }

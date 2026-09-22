@@ -54,6 +54,44 @@ service cloud.firestore {
                  resource.data.profile.get('accountRewardLevel', 0);
       }
 
+      function isOwnedEmote(id, owned) {
+        return id is int && (id == 0 || (id > 0 && id in owned));
+      }
+
+      function isValidEmoteEquipment(ids, owned) {
+        return ids is list && ids.size() == 6 && owned is list &&
+               isOwnedEmote(ids[0], owned) && isOwnedEmote(ids[1], owned) &&
+               isOwnedEmote(ids[2], owned) && isOwnedEmote(ids[3], owned) &&
+               isOwnedEmote(ids[4], owned) && isOwnedEmote(ids[5], owned) &&
+               ids.removeAll([0]).toSet().size() == ids.removeAll([0]).size();
+      }
+
+      function preservesCosmeticOwnership() {
+        let previous = resource.data.profile;
+        let next = request.resource.data.profile;
+        let changed = next.diff(previous).affectedKeys();
+        return !changed.hasAny(['ownedAvatarIds', 'ownedFrameIds', 'ownedEmoteIds']) &&
+               (!changed.hasAny(['avatarId']) ||
+                (next.avatarId is string && next.avatarId.size() > 0 &&
+                 next.avatarId in previous.get('ownedAvatarIds', []))) &&
+               (!changed.hasAny(['frameId']) ||
+                (next.frameId is string && next.frameId.size() > 0 &&
+                 next.frameId in previous.get('ownedFrameIds', []))) &&
+               (!changed.hasAny(['emoteIds']) ||
+                isValidEmoteEquipment(next.emoteIds, previous.get('ownedEmoteIds', [])));
+      }
+
+      function preservesTitleOwnership() {
+        let previous = resource.data.profile;
+        let next = request.resource.data.profile;
+        let changed = next.diff(previous).affectedKeys();
+        return next.get('ownedTitleIds', []) == previous.get('ownedTitleIds', []) &&
+               (!changed.hasAny(['equippedTitleId']) ||
+                (next.get('equippedTitleId', '') is string &&
+                 (next.get('equippedTitleId', '') == '' ||
+                  next.equippedTitleId in previous.get('ownedTitleIds', []))));
+      }
+
       // 최상위 필드 전수 검증. 모르는 필드가 하나라도 있으면 거부한다.
       function isValidSave() {
         return request.resource.data.keys().hasOnly([
@@ -96,9 +134,7 @@ service cloud.firestore {
         request.resource.data.albumReward is map && request.resource.data.albumReward.size() <= 128 &&
         request.resource.data.adventure is map && request.resource.data.adventure.size() <= 128 &&
         request.resource.data.tutorial is map && request.resource.data.tutorial.size() <= 128 &&
-        // profile 안쪽은 보지 않는다 — ProfileSaveData 의 nickname/avatarId/frameId 는
-        // 초기값이 없어 신규 계정 첫 업로드에 null 로 실린다(기본 id 를 세이브에 굳히지
-        // 않으려는 설계, ProfileManager.Init 이 IsNullOrEmpty 폴백을 한다).
+        // 구 계정의 null 장착값은 유지할 수 있다. 변경된 장착값은 소유 검증을 거친다.
         request.resource.data.profile is map && request.resource.data.profile.size() <= 64 &&
         request.resource.data.updatedAt == request.time;
       }
@@ -113,7 +149,7 @@ service cloud.firestore {
       allow create: if false;
       // revision 을 정확히 1 올리는 쓰기만 통과 — 되감기·건너뛰기 모두 거부한다.
       allow update: if isOwner() && isKnownEnv(envId) && isKnownDoc() && isValidSave() &&
-                    preservesAccountProgress() &&
+                    preservesAccountProgress() && preservesCosmeticOwnership() && preservesTitleOwnership() &&
                     request.resource.data.cardGrowth == resource.data.cardGrowth &&
                     request.resource.data.schemaVersion == resource.data.schemaVersion &&
                     request.resource.data.revision == resource.data.revision + 1;

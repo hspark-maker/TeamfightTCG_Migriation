@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e16d9314ec5445e9993877d8a8c407d0, type: 3}
+  m_Name: TitleCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::TitleCatalog
+  entries:
+  - id: test_first_step
+    displayName: 첫 발걸음
+    description: 새로운 모험의 첫 장을 펼친 당신에게.
+    icon: {fileID: 21300000, guid: a5c6ad0f09df4fa3a3f70fd32b5d09b0, type: 3}
+    color: {r: 1, g: 1, b: 1, a: 1}
+  - id: test_blue_traveler
+    displayName: 푸른 여행자
+    description: 낯선 길에서도 자신만의 방향을 찾는 여행자.
+    icon: {fileID: 21300000, guid: 35ddd74ab48a4df499ff8aa36806d01d, type: 3}
+    color: {r: 0.42, g: 0.84, b: 1, a: 1}
+  - id: test_golden_collector
+    displayName: 황금 수집가
+    description: 작은 발견 하나도 소중하게 간직하는 수집가.
+    icon: {fileID: 21300000, guid: ef6c5b9873844b6a99c6efc8df4004b1, type: 3}
+    color: {r: 1, g: 0.82, b: 0.3, a: 1}
+  - id: test_dawn_guardian
+    displayName: 새벽의 수호자
+    description: 모두가 잠든 시간에도 새벽을 지키는 마음.
+    icon: {fileID: 21300000, guid: 404ba69c70794455a231f4567022f7ff, type: 3}
+    color: {r: 0.81, g: 0.68, b: 1, a: 1}
+  - id: test_long_journey
+    displayName: 끝없는 여정을 함께하는 별빛의 동반자
+    description: 오래 걸어도 함께라면 빛을 잃지 않는 동반자. 긴 이름과 두 줄 설명의 표시를 확인하는 테스트 칭호입니다.
+    icon: {fileID: 21300000, guid: 42882c96d5cf48a889963af85b5a1898, type: 3}
+    color: {r: 0.64, g: 1, b: 0.79, a: 1}
+  - id: test_silent_sword
+    displayName: 고요한 검
+    description: 흔들리지 않는 한 걸음으로 길을 여는 검.
+    icon: {fileID: 21300000, guid: e830d3e227ff400aba2ddfdee4ecf84b, type: 3}
+    color: {r: 0.72, g: 0.84, b: 1, a: 1}
+  - id: test_small_universe
+    displayName: 작은 우주
+    description: 작은 카드 한 장에 담긴 드넓은 이야기.
+    icon: {fileID: 21300000, guid: b4bada41c9d546b5a265ec0099d735bb, type: 3}
+    color: {r: 1, g: 0.66, b: 0.84, a: 1}
+  - id: test_endless_adventure
+    displayName: 끝나지 않는 모험
+    description: 다음 이야기를 향해 나아가는 모험가.
+    icon: {fileID: 21300000, guid: f246e692fc4949f2bc5f987cf6c5d3fa, type: 3}
+    color: {r: 1, g: 0.76, b: 0.49, a: 1}

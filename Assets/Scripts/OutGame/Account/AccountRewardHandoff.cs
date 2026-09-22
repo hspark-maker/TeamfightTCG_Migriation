@@ -9,6 +9,8 @@ internal static class AccountRewardHandoff
         internal List<ClaimRewardGain> Granted;
         internal List<OpenPackCard> Cards;
         internal List<ClaimRewardPack> Packs;
+        internal List<GrantedCosmetic> Cosmetics;
+        internal List<GrantedTitle> Titles;
         internal AccountExperienceResult Experience;
     }
 
@@ -17,10 +19,12 @@ internal static class AccountRewardHandoff
     internal static bool HasPending => s_pending.Count > 0;
 
     internal static void Enqueue(string _matchId, List<ClaimRewardGain> _granted, List<OpenPackCard> _cards,
-        List<ClaimRewardPack> _packs, AccountExperienceResult _experience)
+        List<ClaimRewardPack> _packs, AccountExperienceResult _experience, List<GrantedCosmetic> _cosmetics = null, List<GrantedTitle> _titles = null)
     {
-        if (_experience == null || (_experience.GrantedExp <= 0 && !_experience.IsLevelUp)) return;
-        s_pending.Add(new Entry { MatchId = _matchId, Granted = _granted, Cards = _cards, Packs = _packs, Experience = _experience });
+        bool t_hasItems = (_granted?.Count ?? 0) > 0 || (_cards?.Count ?? 0) > 0 ||
+            (_packs?.Count ?? 0) > 0 || (_cosmetics?.Count ?? 0) > 0 || (_titles?.Count ?? 0) > 0;
+        if (!t_hasItems && (_experience == null || (_experience.GrantedExp <= 0 && !_experience.IsLevelUp))) return;
+        s_pending.Add(new Entry { MatchId = _matchId, Granted = _granted, Cards = _cards, Packs = _packs, Cosmetics = _cosmetics, Titles = _titles, Experience = _experience });
         if (s_experienceShown.Remove(_matchId)) ConsumeExperience(_matchId);
     }
 
@@ -34,11 +38,11 @@ internal static class AccountRewardHandoff
     static AccountExperienceResult ConsumeExperience(string _matchId)
     {
         if (string.IsNullOrEmpty(_matchId)) return null;
-        int t_index = s_pending.FindIndex(_entry => _entry.MatchId == _matchId && _entry.Experience.GrantedExp > 0);
+        int t_index = s_pending.FindIndex(_entry => _entry.MatchId == _matchId && (_entry.Experience?.GrantedExp ?? 0) > 0);
         if (t_index < 0) return null;
         Entry t_entry = s_pending[t_index];
         AccountExperienceResult t_experience = t_entry.Experience;
-        if ((t_entry.Granted?.Count ?? 0) > 0 || (t_entry.Cards?.Count ?? 0) > 0 || (t_entry.Packs?.Count ?? 0) > 0)
+        if ((t_entry.Granted?.Count ?? 0) > 0 || (t_entry.Cards?.Count ?? 0) > 0 || (t_entry.Packs?.Count ?? 0) > 0 || (t_entry.Cosmetics?.Count ?? 0) > 0 || (t_entry.Titles?.Count ?? 0) > 0)
         {
             // 로비에는 아이템과 레벨업 제목만 남겨 경험치 게이지를 두 번 재생하지 않는다.
             t_entry.Experience = new AccountExperienceResult
