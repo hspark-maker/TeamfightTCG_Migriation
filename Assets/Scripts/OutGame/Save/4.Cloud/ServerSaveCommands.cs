@@ -42,6 +42,7 @@ internal static class ServerSaveCommands
         AchievementCommands.ResetSession();
         PlayerStatisticsCommands.ResetSession();
         AttendanceCommands.ResetSession();
+        MailboxCommands.ResetSession();
         AccountRewardHandoff.ResetSession();
         AccountLevelUpHandoff.ResetSession();
         RankLeaderboardCommands.ResetSession();

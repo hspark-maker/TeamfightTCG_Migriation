@@ -40,3 +40,5 @@ export {getPass} from "./commands/getPass";
 export {claimPassReward} from "./commands/claimPassReward";
 export {claimPassRepeatReward} from "./commands/claimPassRepeatReward";
 export {getReplayDivergence} from "./commands/getReplayDivergence";
+export {sendMail, getMailbox, claimMail, claimAllMail} from "./commands/mailbox";
+export {adminDashboardOverview, adminDashboardPlayer} from "./commands/adminDashboard";

@@ -59,7 +59,7 @@ public readonly struct TutorialAnchorMeta
 
         // 4  PackOpenOverlay.prefab:3668(key: 4), GameObject 이름 AcquireButton. 이 오브젝트에 붙는 잠금 없음
         //    (PackAcquireController가 EOutgameFeature를 쓰는 곳은 retryButton 하나뿐 — PackAcquireController.cs:257)
-        new(A.PackAcquireButton,          F.None,               "팩 개봉 오버레이",       "Assets/Assets/Prefabs/UI/PooledUI/PackOpenOverlay.prefab"),
+        new(A.PackAcquireButton,          F.None,               "팩 개봉 오버레이",       "Assets/Assets/Prefabs/UI/PooledUI/Shop/PackOpenOverlay.prefab"),
 
         // 5  LobbyCanvas.prefab:1941(tutorialAnchor: 5) / :1943(unlockFeature: 4 = LobbyDeckTab)
         new(A.LobbyDeckTab,               F.LobbyDeckTab,       "로비/탭바",            "UI/Lobby/LobbyTabBarView.cs:67"),
@@ -71,17 +71,17 @@ public readonly struct TutorialAnchorMeta
         new(A.DeckCreateSlot,             F.DeckCreate,         "로비/덱 탭(덱 목록)",    "UI/Deck/DeckSlotView.cs:115"),
 
         // 8  DeckEditPanel.prefab:1800(key: 8), GameObject 이름 CollectionArea. 이 오브젝트에 붙는 잠금 없음(화면 진입만 탭에 걸린다)
-        new(A.DeckCollectionArea,         F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/DeckEditPanel.prefab"),
+        new(A.DeckCollectionArea,         F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/Deck/DeckEditPanel.prefab"),
 
         // 9  DeckEditPanel.prefab:3170(key: 9), GameObject 이름 DeckArea. 잠금 없음
-        new(A.DeckSlotArea,               F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/DeckEditPanel.prefab"),
+        new(A.DeckSlotArea,               F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/Deck/DeckEditPanel.prefab"),
 
         // 10 DeckEditPanel.prefab:2424(key: 10)의 GameObject(5057038299696546900) = DeckEditController.autoEquipButton(DeckEditPanel.prefab:2980)
         //    → UI/Deck/DeckEditController.cs:94가 그 GameObject에 FeatureLockView.Attach(DeckAutoEquip)
-        new(A.DeckAutoEquipButton,        F.DeckAutoEquip,      "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/DeckEditPanel.prefab"),
+        new(A.DeckAutoEquipButton,        F.DeckAutoEquip,      "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/Deck/DeckEditPanel.prefab"),
 
         // 11 DeckEditPanel.prefab:3116(key: 11) / MatchDeckEditPanel.prefab:479(key: 11, Btn_MatchBack) — 두 화면이 키를 공유. 잠금 없음
-        new(A.DeckEditBackButton,         F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/DeckEditPanel.prefab"),
+        new(A.DeckEditBackButton,         F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/Deck/DeckEditPanel.prefab"),
 
         // 12 폐기 — 이 키를 등록하는 곳이 없다. 저작이 남아 있으면 검증기가 "미등록"으로 잡는다
         new(A.MatchDeckEditButton,        F.None,               "매치 덱 화면",          null),
@@ -90,7 +90,7 @@ public readonly struct TutorialAnchorMeta
         new(A.MatchDeckBattleButton,      F.None,               "매치 덱 화면",          "Assets/Assets/Prefabs/UI/MatchUI/MatchDeckPanel.prefab"),
 
         // 14 DeckEditPanel.prefab:2696(key: 14), GameObject 이름 Btn_UnequipAll. 잠금 없음
-        new(A.DeckUnequipAllButton,       F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/DeckEditPanel.prefab"),
+        new(A.DeckUnequipAllButton,       F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/Deck/DeckEditPanel.prefab"),
 
         // 15 MatchDeckPanel.prefab:2577(key: 15, MySection) / MatchDeckRoot.prefab:1628. 잠금 없음
         new(A.MatchDeckMySection,         F.None,               "매치 덱 화면",          "Assets/Assets/Prefabs/UI/MatchUI/MatchDeckPanel.prefab"),
@@ -140,16 +140,16 @@ public readonly struct TutorialAnchorMeta
 
         // 29 DeckEditPanel.prefab의 SaveButton(491162578235765114)에 key: 29 = DeckEditController.saveButton. 잠금 없음
         //    (매치 배리언트에는 이 버튼이 없다 — 그 화면은 이탈 확인 팝업이 저장을 받는다)
-        new(A.DeckEditSaveButton,         F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/DeckEditPanel.prefab"),
+        new(A.DeckEditSaveButton,         F.None,               "덱 편집",              "Assets/Assets/Prefabs/UI/PooledUI/Deck/DeckEditPanel.prefab"),
 
         // 30 폐기
         new(A.KeywordGrowthPanel,         F.None,               "(폐기)", null),
-        new(A.CardDetailKeywordDescription, F.None,             "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/CardDetailOverlay.prefab"),
-        new(A.CardDetailCardView,         F.None,               "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/CardDetailOverlay.prefab"),
+        new(A.CardDetailKeywordDescription, F.None,             "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/Card/CardDetailOverlay.prefab"),
+        new(A.CardDetailCardView,         F.None,               "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/Card/CardDetailOverlay.prefab"),
         new(A.DeckSynergyStrip,           F.None,               "덱 편집",               "UI/Deck/DeckEditController.cs"),
-        new(A.CardDetailSynergyDescription, F.None,             "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/CardDetailOverlay.prefab"),
-        new(A.CardDetailShardIcon,        F.None,               "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/CardDetailOverlay.prefab"),
-        new(A.CardDetailShardAmount,      F.None,               "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/CardDetailOverlay.prefab"),
+        new(A.CardDetailSynergyDescription, F.None,             "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/Card/CardDetailOverlay.prefab"),
+        new(A.CardDetailShardIcon,        F.None,               "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/Card/CardDetailOverlay.prefab"),
+        new(A.CardDetailShardAmount,      F.None,               "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/Card/CardDetailOverlay.prefab"),
     };
 
     // 이 구조의 조용한 실패 두 가지를 이 창을 처음 열 때 소리내어 잡는다(에디터 어셈블리라 초기화가 아니다).

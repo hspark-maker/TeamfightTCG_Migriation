@@ -107,7 +107,8 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
     /// <summary>현재 화면이 이미 해당 탭인지 확인한다.</summary>
     public bool IsCurrentAnchorSelected(EOutgameTutorialAnchor _anchor)
         => !IsTransitioning && m_currentIndex >= 0 && m_currentIndex < tabs.Count
-            && tabs[m_currentIndex].tutorialAnchor == _anchor && _anchor != EOutgameTutorialAnchor.None;
+            && tabs[m_currentIndex].tutorialAnchor == _anchor && _anchor != EOutgameTutorialAnchor.None
+            && (!(CurrentPanel is LobbyStoreTabPanel t_store) || t_store.IsPackSelected);
 
     public LobbyTabPanel CurrentPanel
         => m_currentIndex >= 0 && m_currentIndex < tabs.Count
@@ -212,12 +213,36 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
     /// 잠금 검사를 건너뛰는 이유: 기본 탭이 아직 잠긴 온보딩 구간이면 Select가 조용히 물러나 유저가 갇힌다.</summary>
     public void SelectDefault() => Select(defaultIndex, false);
 
-    void HandleTabSelected(int _index) => Select(_index);
+    void HandleTabSelected(int _index)
+    {
+        // 튜토리얼의 팩 앵커도 이 하단 버튼을 누른다. 진입 시 팩 페이지를 연다.
+        if (_index >= 0 && _index < tabs.Count && tabs[_index].panel is LobbyStoreTabPanel t_store)
+        {
+            if (!t_store.CanSelectFeature(EOutgameFeature.LobbyPackTab)) return;
+            SelectInternal(_index, true, () => t_store.ShowFeature(EOutgameFeature.LobbyPackTab), null);
+            return;
+        }
+        Select(_index);
+    }
 
     /// <summary>미션 등 외부 진입도 저작된 탭과 잠금 정책을 따라 선택한다.</summary>
     public bool TrySelectFeature(EOutgameFeature _feature, Action _beforeSelect = null, Action _afterSelect = null, Action _onArrived = null)
     {
         if (!isActiveAndEnabled || _feature == EOutgameFeature.None) return false;
+        if (_feature == EOutgameFeature.LobbyPackTab || _feature == EOutgameFeature.LobbyShopTab)
+        {
+            int t_storeIndex = tabs.FindIndex(_tab => _tab.panel is LobbyStoreTabPanel);
+            if (t_storeIndex >= 0)
+            {
+                var t_store = (LobbyStoreTabPanel)tabs[t_storeIndex].panel;
+                if (!t_store.CanSelectFeature(_feature)) return false;
+                return SelectInternal(t_storeIndex, _feature == EOutgameFeature.LobbyPackTab, () =>
+                {
+                    _beforeSelect?.Invoke();
+                    t_store.ShowFeature(_feature);
+                }, _afterSelect, _onArrived);
+            }
+        }
         int t_index = tabs.FindIndex(_tab => _tab.panel != null &&
             (_feature == EOutgameFeature.LobbyMatchTab
                 ? _tab.panel is LobbyMatchTabPanel : _tab.unlockFeature == _feature));
@@ -228,6 +253,16 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
 
     public void Select(LobbyTabPanel _panel, bool _fireTrigger = true)
     {
+        foreach (Tab t_tab in tabs)
+        {
+            if (!(t_tab.panel is LobbyStoreTabPanel t_store)) continue;
+            if (_panel == t_store.PackPanel || _panel == t_store.ShopPanel)
+            {
+                TrySelectFeature(_panel == t_store.PackPanel
+                    ? EOutgameFeature.LobbyPackTab : EOutgameFeature.LobbyShopTab);
+                return;
+            }
+        }
         int t_index = tabs.FindIndex(_tab => _tab.panel == _panel);
         if (t_index >= 0) Select(t_index, _fireTrigger);
     }
