@@ -8,6 +8,24 @@ internal sealed class OpenPackResult : ServerCommandResult
 
     [JsonProperty("cards")] public List<OpenPackCard> Cards { get; set; }
 
+    [JsonProperty("granted")] public List<ClaimRewardGain> Granted { get; set; }
+
+    // 지급량은 서버 응답만 읽는다. 중복 카드 수나 현재 잔액으로 추정하지 않는다.
+    public CurrencyGain ResolveCardDustGain()
+    {
+        long t_amount = 0;
+        if (Granted != null)
+        {
+            foreach (var t_gain in Granted)
+            {
+                if (t_gain == null || t_gain.Amount <= 0) continue;
+                if (CurrencyCode.TryParse(t_gain.Currency, out var t_type) && t_type == ECurrencyType.CardDust)
+                    t_amount += t_gain.Amount;
+            }
+        }
+        return new CurrencyGain(ECurrencyType.CardDust, t_amount);
+    }
+
     // ECurrencyType 이름 문자열. 미지 표기는 팩 가격 규약을 따라 Gold로 떨어진다.
     [JsonProperty("refundType")] public string RefundType { get; set; }
 

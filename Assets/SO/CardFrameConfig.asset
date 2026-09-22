@@ -14,18 +14,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CardFrameConfig
   entries:
   - grade: 1
+    unowned: {fileID: 21300000, guid: ba468f55b1796144390895552fb2ae12, type: 3}
     noSynergy: {fileID: 21300000, guid: a0f67d2c78a6fa2499f87539eaaf402e, type: 3}
     oneSynergy: {fileID: 21300000, guid: 577119b72ee091d4d9e9550138fc8265, type: 3}
     twoSynergy: {fileID: 21300000, guid: f4e59e7a5db26a2498870186a05a8716, type: 3}
   - grade: 2
+    unowned: {fileID: 21300000, guid: 2215c67812c8de44ab3cb5171822e971, type: 3}
     noSynergy: {fileID: 21300000, guid: 9363c1eda9ae1024ba7350e45ddd2ff0, type: 3}
     oneSynergy: {fileID: 21300000, guid: b53572aaae7e8f241a679ba2a6ad5d6b, type: 3}
     twoSynergy: {fileID: 21300000, guid: 867119a6c572ad64b894216837a0d6b2, type: 3}
   - grade: 3
+    unowned: {fileID: 21300000, guid: d2efff3ad34aa5b4d948bcdc2607c211, type: 3}
     noSynergy: {fileID: 21300000, guid: e87b71b1be88ed74c91971aaa81fff05, type: 3}
     oneSynergy: {fileID: 21300000, guid: 6a12abaeb407ee145b469f28b68a6fbf, type: 3}
     twoSynergy: {fileID: 21300000, guid: 151cd57eba75ced409b5aa59d1d8579c, type: 3}
   - grade: 4
+    unowned: {fileID: 21300000, guid: bc96460f4dd91044b970b72846b194a0, type: 3}
     noSynergy: {fileID: 21300000, guid: a143644fd9d83aa47b368deb97907dc2, type: 3}
     oneSynergy: {fileID: 21300000, guid: 5daeaabacbbd6144b89801b9043361c6, type: 3}
     twoSynergy: {fileID: 21300000, guid: 87f0a72b8b8038d49923b67cd8abd9e0, type: 3}

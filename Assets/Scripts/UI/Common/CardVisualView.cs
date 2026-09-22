@@ -253,7 +253,7 @@ public class CardVisualView : MonoBehaviour
         bool t_synergyUnlocked = _owned && (this.m_instance != null
             ? this.m_instance.synergyEnabled
             : DeckPower.SynergyUnlockedOf(_card, _mine));
-        Sprite t_frame = CardVisualRules.PickFrame(_card, t_synergyUnlocked);
+        Sprite t_frame = CardVisualRules.PickFrame(_card, t_synergyUnlocked, _owned);
         // 표가 미배선이면 프리팹의 기존 그림을 유지한다.
         if (t_frame != null) this.frame.sprite = t_frame;
         this.frame.enabled = this.frame.sprite != null;

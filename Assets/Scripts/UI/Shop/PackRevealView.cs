@@ -261,8 +261,8 @@ public class PackRevealView : MonoBehaviour, IUIInitializable
         if (cardStack != null) cardStack.Clear();
         else Debug.LogWarning("[PackRevealView] cardStack is unwired, so the card display is skipped.");
 
-        // 지난 세션의 합계가 굴러가던 중이었다면 끊는다.
-        KillTotalRefundTween();
+        // 지난 세션의 합계와 연출을 걷는다. 재개봉 중에는 이전 획득량이 남지 않는다.
+        PlayTotalRefund(0, true);
 
         EnterEntering();
     }
@@ -635,24 +635,29 @@ public class PackRevealView : MonoBehaviour, IUIInitializable
 
         if (_instant || totalRefundCountUp <= 0f)
         {
-            totalRefundText.text = $"+{_refund:N0}";
+            totalRefundText.text = RefundAmountText(_refund);
             return;
         }
 
-        totalRefundText.text = "+0";
+        totalRefundText.text = RefundAmountText(0);
 
         // long을 직접 트윈할 플러그인이 없어 float로 굴리고 표시할 때 되돌린다.
         float t_shown = 0f;
         m_totalRefundTween = DOTween.To(() => t_shown, _v =>
                              {
                                  t_shown = _v;
-                                 if (totalRefundText != null) totalRefundText.text = $"+{(long)_v:N0}";
+                                 if (totalRefundText != null) totalRefundText.text = RefundAmountText((long)_v);
                              }, (float)_refund, totalRefundCountUp)
                              .SetEase(Ease.OutCubic)
                              .SetLink(totalRefundText.gameObject)
                              // 굴리다 끊기면 최종 숫자가 아닌 중간값이 남는다 — 마지막 한 번을 못 박는다.
-                             .OnKill(() => { if (totalRefundText != null) totalRefundText.text = $"+{_refund:N0}"; });
+                             .OnKill(() => { if (totalRefundText != null) totalRefundText.text = RefundAmountText(_refund); });
     }
+
+    string RefundAmountText(long _amount)
+        => m_pending != null && m_pending.TotalRefund.Type == ECurrencyType.CardDust
+            ? $"<size=58%>카드 가루</size>\n+{_amount:N0} <size=58%>획득</size>"
+            : $"+{_amount:N0}";
 
     void KillTotalRefundTween()
     {

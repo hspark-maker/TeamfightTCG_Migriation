@@ -63,17 +63,18 @@ public static class CardVisualRules
     public static string BattleArtAddress(CardInstance _card)
         => _card == null ? null : CardArtAddress(_card.cardId, _card.evolutionStage);
 
-    /// <summary>카드 한 장에 그릴 테두리(프레임). 미해금은 키워드 전용(시너지 0개), 해금 후에는 등급 × 시너지 개수로 고른다.
+    /// <summary>카드 한 장에 그릴 테두리(프레임). 미보유는 아이콘 배경 없는 전용 그림을 쓴다.
+    /// 보유 카드의 시너지 미해금은 키워드 전용(시너지 0개), 해금 후에는 등급 × 시너지 개수로 고른다.
     /// 표가 없거나(초기화 프리팹을 거치지 않은 씬) 그 칸이 비면 null — 호출부는 프리팹 저작 그림을 그대로 둔다.</summary>
-    public static Sprite PickFrame(int _cardId, bool _synergyUnlocked)
+    public static Sprite PickFrame(int _cardId, bool _synergyUnlocked, bool _owned = true)
     {
         if (!CardCatalog.TryGetSpec(_cardId, out CardSpec t_spec)) return null;
         int t_synergies = _synergyUnlocked && t_spec.SynergyNames != null ? t_spec.SynergyNames.Count : 0;
-        return PickFrame(_cardId, t_synergies);
+        return PickFrame(_cardId, t_synergies, _owned);
     }
 
     /// <summary>실제로 표시하는 시너지 배지 개수에 맞는 테두리. 인게임은 활성 배지 개수를 넘긴다.</summary>
-    public static Sprite PickFrame(int _cardId, int _visibleSynergyCount)
+    public static Sprite PickFrame(int _cardId, int _visibleSynergyCount, bool _owned = true)
     {
         if (_cardId <= 0) return null;
         if (!CardCatalog.TryGetSpec(_cardId, out CardSpec t_spec)) return null;
@@ -81,7 +82,7 @@ public static class CardVisualRules
         CardFrameConfig t_config = DataLibrary.instance != null ? DataLibrary.instance.cardFrameConfig : null;
         if (t_config == null) return null;
 
-        return t_config.TryGetFrame(t_spec.Grade, _visibleSynergyCount, out Sprite t_frame) ? t_frame : null;
+        return t_config.TryGetFrame(t_spec.Grade, _visibleSynergyCount, out Sprite t_frame, _owned) ? t_frame : null;
     }
 
     /// <summary>표시할 키워드 아이콘 1개 = (어떤 키워드, 어떤 스프라이트).

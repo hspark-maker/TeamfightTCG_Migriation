@@ -21,6 +21,8 @@ public class CardFrameConfig : ScriptableObject
     {
         public ECardGrade grade;
 
+        [Tooltip("미보유 카드 전용. 아이콘 배경이 없는 프레임.")] public Sprite unowned;
+
         [Tooltip("시너지 0개")] public Sprite noSynergy;
         [Tooltip("시너지 1개")] public Sprite oneSynergy;
         [Tooltip("시너지 2개 이상")] public Sprite twoSynergy;
@@ -29,8 +31,9 @@ public class CardFrameConfig : ScriptableObject
     [SerializeField] Entry[] entries;
 
     /// <summary>등급·시너지 개수에 맞는 프레임. 행이 없거나 그 칸이 비었으면 시너지 개수를 낮춰가며
-    /// 폴백하고, 그래도 없으면 false — 호출부는 프리팹에 저작된 그림을 그대로 둔다.</summary>
-    public bool TryGetFrame(ECardGrade _grade, int _synergyCount, out Sprite _frame)
+    /// 폴백하고, 그래도 없으면 false — 호출부는 프리팹에 저작된 그림을 그대로 둔다.
+    /// 미보유는 시너지 수와 무관하게 아이콘 배경 없는 전용 칸을 사용한다.</summary>
+    public bool TryGetFrame(ECardGrade _grade, int _synergyCount, out Sprite _frame, bool _owned = true)
     {
         _frame = null;
         if (this.entries == null) return false;
@@ -39,7 +42,7 @@ public class CardFrameConfig : ScriptableObject
         {
             if (this.entries[t_i].grade != _grade) continue;
 
-            _frame = PickStep(this.entries[t_i], _synergyCount);
+            _frame = _owned ? PickStep(this.entries[t_i], _synergyCount) : this.entries[t_i].unowned;
             return _frame != null;
         }
 

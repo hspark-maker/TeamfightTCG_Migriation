@@ -74,10 +74,7 @@ SpriteAtlas:
     - {fileID: 2800000, guid: 47372f243fe3fdc4b83b289c2a5c181d, type: 3}
     - {fileID: 2800000, guid: a035ef5c251c09948b165be8546811a2, type: 3}
     - {fileID: 2800000, guid: a80df51b4db3216429080b4787dfe2ca, type: 3}
-    - {fileID: 2800000, guid: de9bbd2cb4a6cb94a9c2a87dc91c4083, type: 3}
-    - {fileID: 2800000, guid: 931af39741dd8024182518b1d98fa50f, type: 3}
     - {fileID: 2800000, guid: c918f484f357d3d48b7b557520b6f608, type: 3}
-    - {fileID: 2800000, guid: cda3c083eb1073440b9c2f663dc1a5b8, type: 3}
     - {fileID: 2800000, guid: 73269c39e1ce6f94a85e6e35f2e4ecbe, type: 3}
     - {fileID: 2800000, guid: 5fc5d2b2d5abb4d79bee038cef387cf0, type: 3}
     - {fileID: 2800000, guid: 6c61e840f3f8d4a54bdbcb254e31bdbd, type: 3}
@@ -85,21 +82,20 @@ SpriteAtlas:
     - {fileID: 2800000, guid: 047acbbc02e094090ab6852579e7e7b7, type: 3}
     - {fileID: 2800000, guid: 3e42bc34e49be4b1187fcb5951f29aef, type: 3}
     - {fileID: 2800000, guid: 2045cafd4c10456dbccf84b877834d8a, type: 3}
+    - {fileID: 2800000, guid: fa88982bbfb14654aa257b36174de6b3, type: 3}
     bindAsDefault: 1
     isAtlasV2: 0
     cachedData: {fileID: 0}
     packedSpriteRenderDataKeys:
     - 6c61e840f3f8d4a54bdbcb254e31bdbd: 21300000
     - 5fc5d2b2d5abb4d79bee038cef387cf0: 21300000
-    - cda3c083eb1073440b9c2f663dc1a5b8: 21300000
     - 47372f243fe3fdc4b83b289c2a5c181d: 21300000
     - 3e42bc34e49be4b1187fcb5951f29aef: 21300000
     - c918f484f357d3d48b7b557520b6f608: 21300000
     - e3a3f6e5da08f46c895f632eccceb676: 21300000
-    - 931af39741dd8024182518b1d98fa50f: 21300000
     - 73269c39e1ce6f94a85e6e35f2e4ecbe: 21300000
     - a80df51b4db3216429080b4787dfe2ca: 21300000
-    - de9bbd2cb4a6cb94a9c2a87dc91c4083: 21300000
+    - fa88982bbfb14654aa257b36174de6b3: 21300000
     - a035ef5c251c09948b165be8546811a2: 21300000
     - 047acbbc02e094090ab6852579e7e7b7: 21300000
     - 2045cafd4c10456dbccf84b877834d8a: 21300000
@@ -107,30 +103,26 @@ SpriteAtlas:
   m_PackedSprites:
   - {fileID: 21300000, guid: 6c61e840f3f8d4a54bdbcb254e31bdbd, type: 3}
   - {fileID: 21300000, guid: 5fc5d2b2d5abb4d79bee038cef387cf0, type: 3}
-  - {fileID: 21300000, guid: cda3c083eb1073440b9c2f663dc1a5b8, type: 3}
   - {fileID: 21300000, guid: 47372f243fe3fdc4b83b289c2a5c181d, type: 3}
   - {fileID: 21300000, guid: 3e42bc34e49be4b1187fcb5951f29aef, type: 3}
   - {fileID: 21300000, guid: c918f484f357d3d48b7b557520b6f608, type: 3}
   - {fileID: 21300000, guid: e3a3f6e5da08f46c895f632eccceb676, type: 3}
-  - {fileID: 21300000, guid: 931af39741dd8024182518b1d98fa50f, type: 3}
   - {fileID: 21300000, guid: 73269c39e1ce6f94a85e6e35f2e4ecbe, type: 3}
   - {fileID: 21300000, guid: a80df51b4db3216429080b4787dfe2ca, type: 3}
-  - {fileID: 21300000, guid: de9bbd2cb4a6cb94a9c2a87dc91c4083, type: 3}
+  - {fileID: 21300000, guid: fa88982bbfb14654aa257b36174de6b3, type: 3}
   - {fileID: 21300000, guid: a035ef5c251c09948b165be8546811a2, type: 3}
   - {fileID: 21300000, guid: 047acbbc02e094090ab6852579e7e7b7, type: 3}
   - {fileID: 21300000, guid: 2045cafd4c10456dbccf84b877834d8a, type: 3}
   m_PackedSpriteNamesToIndex:
   - Icon_Coin
   - Itemicon_Coin_Gold_Star
-  - Item_Shard
   - Coin_icon
   - Spin_Icon_Ticket
   - Item_Energy
   - ResourceBar_Single_Icon_Coin
-  - Item_Diamond
   - Shard_Icon
   - Energy_Icon_Currency
-  - Item_Coin
+  - CardDust_Icon
   - Diamond_icon
   - ResourceBar_Single_Icon_Gem
   - Item_AccountExp
