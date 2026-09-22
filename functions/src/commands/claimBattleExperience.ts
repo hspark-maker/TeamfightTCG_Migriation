@@ -13,7 +13,6 @@ import {applyGuideProgress} from "../missions/guideMutation";
 import {readMissionCatalog} from "../missions/missionSpec";
 import {beginMissionBump, commitMissionProgress, missionResponse, MissionResponse} from "../missions/missionStore";
 import {missionPeriod} from "../missions/period";
-import {applySnackGrowthProgress} from "../missions/snackGrowthProgress";
 import {rankRef} from "../rank/rankStore";
 import {clientReceiptId} from "../save/receiptId";
 import {isKnownEnv, mutateSave, requireUid} from "../save/saveDocument";
@@ -40,7 +39,7 @@ export const claimBattleExperience = onCall(async (request) => {
   let alreadyClaimed = false;
 
   return mutateSave(env, uid, "claimBattleExperience", {kind: "client", txId},
-    async (current, transaction, wallet) => {
+    async (current, transaction, wallet, preparePackStatistics) => {
       // Reset callback output on transaction retries. All reads precede any write.
       credited = undefined;
       missions = undefined;
@@ -63,9 +62,9 @@ export const claimBattleExperience = onCall(async (request) => {
       credited = grantAccountExperience(current,
         battleAccountExperience(current, outcome.won, context), context,
         Number(rank?.data()?.points ?? current.rank?.points ?? 0));
+      await preparePackStatistics(credited.packs?.length ?? 0);
       if (missionBump !== null && context.itemContext !== null && credited.cards.length > 0) {
         applyGuideProgress(missionBump, current, credited.slots, context.itemContext.cards, catalog);
-        applySnackGrowthProgress(missionBump, credited.cards);
         commitMissionProgress(transaction, missionBump, FieldValue.serverTimestamp());
         missions = missionResponse(missionBump.state, period, catalog);
       }

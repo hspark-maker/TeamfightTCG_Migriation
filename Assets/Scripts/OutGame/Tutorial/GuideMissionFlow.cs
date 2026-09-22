@@ -26,7 +26,9 @@ public static class GuideMissionFlows
         => TryGet(All, _tutorial, out _flow);
 
     public static bool IsEligible(GuideMissionFlow _flow)
-        => IsEligible(_flow, OutgameTutorialProgress.IsCompleted, GuideMissionProgress.Current?.Id);
+        => (_flow?.tutorial == EOutgameTutorialTrigger.CollectionTabFirstEnter
+                && OutgameTutorialRunner.IsDefeatEnhanceInterlude)
+            || IsEligible(_flow, OutgameTutorialProgress.IsCompleted, GuideMissionProgress.Current?.Id);
 
     internal static bool TryGet(IReadOnlyList<GuideMissionFlow> _flows,
         EOutgameTutorialTrigger _tutorial, out GuideMissionFlow _flow)

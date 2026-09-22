@@ -13,12 +13,9 @@
  * Firestore 도 HttpsError 도 모른다(scripts/test-open-pack.js 가 직접 부른다).
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SNACK_PER_DUPLICATE = void 0;
 exports.resolveDropPool = resolveDropPool;
 exports.drawPack = drawPack;
 const rankGrade_1 = require("./rankGrade");
-/** 중복 1장이 주는 간식 수. 클라 CardPackOpener.SnackPerDuplicate 와 같아야 한다. */
-exports.SNACK_PER_DUPLICATE = 1;
 /**
  * 가중치 0·음수를 균등 1로 읽는다. 클라 WeightedCard.EffectiveWeight 와 같다.
  * @param {number} weight 저작 가중치
@@ -79,7 +76,7 @@ function pickWeightedCandidate(pool, candidates, roll) {
     return candidates.length - 1;
 }
 /**
- * 신규면 소유만, 중복이면 간식. 클라 CardPackOpener.GrantAndReward 재현이다.
+ * 신규·중복 소유 여부를 판정한다.
  * ownedIds 를 그 자리에서 늘린다 — 한 팩 안에서 같은 카드를 두 번 뽑으면 두 번째는 중복이어야 한다.
  * @param {number} cardId 카드 번호
  * @param {Set<number>} ownedIds 소유 집합(갱신된다)
@@ -88,9 +85,9 @@ function pickWeightedCandidate(pool, candidates, roll) {
 function grantAndReward(cardId, ownedIds) {
     if (!ownedIds.has(cardId)) {
         ownedIds.add(cardId);
-        return { cardId, isNew: true, snack: 0 };
+        return { cardId, isNew: true };
     }
-    return { cardId, isNew: false, snack: exports.SNACK_PER_DUPLICATE };
+    return { cardId, isNew: false };
 }
 /**
  * 팩 한 개를 뽑는다. ownedIds 는 뽑는 도중 갱신되며, 호출부는 이 집합을 그대로 새 ownership 으로 쓴다.

@@ -39,8 +39,12 @@ internal static class ServerSaveCommands
         s_service = _service;
         ContentUnlockManager.ResetSession();
         MissionCommands.ResetSession();
+        AchievementCommands.ResetSession();
+        PlayerStatisticsCommands.ResetSession();
         AttendanceCommands.ResetSession();
+        MailboxCommands.ResetSession();
         AccountRewardHandoff.ResetSession();
+        AccountLevelUpHandoff.ResetSession();
         RankLeaderboardCommands.ResetSession();
     }
 
@@ -117,6 +121,7 @@ internal static class ServerSaveCommands
                     TResponse t_replayed = OnboardingCommands.ReadResult<TResponse>(t_record);
                     if (t_replayed.AccountExperience != null)
                         t_replayed.AccountExperience.TotalExp = AccountLevelManager.Exp;
+                    AccountLevelUpHandoff.Enqueue(t_replayed.Revision, t_replayed.AccountExperience);
                     OnboardingCommands.Consume(t_record);
                     return t_replayed;
                 }
@@ -145,6 +150,7 @@ internal static class ServerSaveCommands
                 TResponse t_recovered = OnboardingCommands.ReadResult<TResponse>(t_record);
                 if (t_recovered.AccountExperience != null)
                     t_recovered.AccountExperience.TotalExp = AccountLevelManager.Exp;
+                AccountLevelUpHandoff.Enqueue(t_recovered.Revision, t_recovered.AccountExperience);
                 OnboardingCommands.Consume(t_record);
                 return t_recovered;
             }
@@ -169,6 +175,10 @@ internal static class ServerSaveCommands
             // 새 진행도 생산자가 늘어도 응답의 missions 봉투만 실으면 빠짐없이 같은 캐시로 들어온다.
             if (t_result.Missions != null)
                 MissionManager.Adopt(t_result.Missions);
+            if (t_result.Statistics != null)
+                PlayerStatisticsManager.Adopt(t_result.Statistics);
+            if (t_result.Achievements != null)
+                AchievementManager.Adopt(t_result.Achievements);
 
             // revision 0/누락 = 이 명령은 세이브를 쓰지 않았다. 그대로 채택에 넘기면 "정확히 +1" 단언이
             // 지갑만 쓴 명령을 RemoteAhead로 읽어 전 세션을 끊는다.
@@ -177,6 +187,7 @@ internal static class ServerSaveCommands
 
             if (t_result.AccountExperience != null)
                 t_result.AccountExperience.TotalExp = AccountLevelManager.Exp;
+            AccountLevelUpHandoff.Enqueue(t_result.Revision, t_result.AccountExperience);
 
             OnboardingCommands.Complete(t_record, t_result);
             OnboardingCommands.Consume(t_record);

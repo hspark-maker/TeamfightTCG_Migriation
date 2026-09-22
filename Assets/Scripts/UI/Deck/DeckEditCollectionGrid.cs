@@ -17,6 +17,9 @@ public class DeckEditCollectionGrid : MonoBehaviour
     [SerializeField] RectTransform    content;     // GridLayoutGroup 3열
     [SerializeField] DeckEditCardTile tilePrefab;
     [SerializeField] GameObject       emptyHint;
+    [Tooltip("덱 편집 밖에서 재사용할 때는 덱 튜토리얼 앵커를 건드리지 않는다.")]
+    [SerializeField] bool manageTutorialAnchor = true;
+    [SerializeField, Range(0f, 1f)] float pickedCardDimAlpha = 0.2f;
 
     [Tooltip("빈 목록 안내 문구. 배선하면 소유 0과 검색 무결과를 다른 문구로 가른다(미배선이면 저작 문구 그대로).")]
     [SerializeField] TMP_Text emptyHintText;
@@ -99,7 +102,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
             return;
         }
         m_buildPending = false;
-        TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.DeckEditCollectionCard);
+        if (manageTutorialAnchor) TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.DeckEditCollectionCard);
         m_anchorCard = 0;
         if (content == null || tilePrefab == null)
         {
@@ -284,7 +287,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
         t_tile.Bind(_entry.Card, m_onDragRequest, m_onClick);
         t_tile.SetInDeck(m_deck != null && Contains(m_deck, _entry.Card));
         if (m_synergy != null) t_tile.SetFocus(true, SynergyPreview.Has(_entry.Card, m_synergy));
-        else t_tile.SetFocus(m_pickedCard > 0, _entry.Card == m_pickedCard);
+        else t_tile.SetFocus(m_pickedCard > 0, _entry.Card == m_pickedCard, pickedCardDimAlpha);
         _entry.Tile = t_tile;
         t_tile.gameObject.SetActive(true);
     }
@@ -355,7 +358,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
             var t_tile = m_tiles[t_i];
             if (t_tile == null || t_tile.Card <= 0) continue;
 
-            t_tile.SetFocus(_card > 0, t_tile.Card == _card);
+            t_tile.SetFocus(_card > 0, t_tile.Card == _card, pickedCardDimAlpha);
         }
     }
 
@@ -392,6 +395,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
     /// 타일이 런타임 생성이라 프리팹에 TutorialAnchor를 저작할 수 없다 — AlbumCardSlotView와 같은 관용구다.</summary>
     public void ApplyTutorialAnchor(int _card)
     {
+        if (!manageTutorialAnchor) return;
         // 검색어가 안내 대상을 숨기는 것을 막는다 — 컨트롤러의 입력 잠금과 별개로 두는 2차 방어다.
         if (m_anchorCard != _card)
         {
@@ -459,7 +463,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
 
     public void Clear()
     {
-        TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.DeckEditCollectionCard);
+        if (manageTutorialAnchor) TutorialAnchorRegistry.Unregister(EOutgameTutorialAnchor.DeckEditCollectionCard);
 
         SetScrollLocked(false);
         ReleaseTiles();

@@ -261,7 +261,7 @@ public class TutorialStepDef
     // 이 액션이 값을 무는가(안내가 대신 내줄 수 있는 자리 = 성장 한 방을 시키는 스텝)
     public static bool UsesFreeOfCharge(EOutgameTutorialAction _action) => Uses(_action, EStepField.FreeOfCharge);
 
-    // 이 액션이 해금 연출을 여는가(카드 강화만 — 키워드 강화는 잠금판을 여는 자리가 아니다)
+    // 이 액션이 해금 연출을 여는가(카드 강화)
     public static bool UsesWaitUnlockIntro(EOutgameTutorialAction _action) => Uses(_action, EStepField.WaitUnlockIntro);
 
     // 이 액션이 보상 화면을 세우는가(예고 팝업도 같은 자리에 제목을 쓴다)

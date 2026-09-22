@@ -42,7 +42,7 @@ export function parseRankAiEncounters(
       throw new Error(`invalid RankAiEncounter deck or duplicate key:${key}`);
     }
     const cardGrowth = parseAiCardGrowth(deck.cardIds, deck.cardIds.map((cardId, index) => ({
-      cardId, level: row[`level${index + 1}`], limitBreak: row[`limitBreak${index + 1}`],
+      cardId, level: row[`level${index + 1}`],
     })));
     if (cardGrowth == null) throw new Error(`invalid RankAiEncounter growth:${id}`);
     ids.add(id);

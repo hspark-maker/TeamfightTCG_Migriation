@@ -287,7 +287,8 @@ public class CardInstance
         if (this.reviveUsed || IsAlive) return false;
         this.reviveUsed = true;
         this.hp = BattleMath.Max(1, BattleMath.FloorToInt(this.maxHp * 0.5f));
-        BattleEventStream.Emit(new BattleEvent(BattleEventKind.Heal, this.ownerIndex, this.slotIndex, this.hp));
+        BattleEventStream.Emit(new BattleEvent(BattleEventKind.Heal, this.ownerIndex, this.slotIndex, this.hp,
+            _flags: BattleEventFlags.Revival));
         return true;
     }
 

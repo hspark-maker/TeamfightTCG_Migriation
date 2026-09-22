@@ -157,6 +157,8 @@ public sealed class MissionCutInView : ContentsPooledUI
 
     bool CanShow => GameInitialization.IsReady
         && !ContentUnlockPresentation.IsPlaying
+        // 강화·진화 중에는 현재 알림을 일시정지하고 새 알림도 소비하지 않는다.
+        && !CardDetailOverlayView.IsGrowthPresentationFocused
         && SceneManager.GetActiveScene().name == "LobbyScene"
         && !CurtainView.IsBusy
         // 튜토리얼 완료 여부나 풀 UI는 진행 알림을 막지 않는다. 현재 재생 중인 소개만 기다린다.
@@ -221,10 +223,10 @@ public sealed class MissionCutInView : ContentsPooledUI
             hintText.text = _complete ? "미션에서 보상을 받아 주세요" : "목표까지 차근차근!";
         accent.gameObject.SetActive(_complete);
         accent.color = t_color;
-        progressFill.color = t_color;
         float t_before = _target > 0 ? Mathf.Clamp01((float)_previous / _target) : 0f;
         float t_after = _target > 0 ? Mathf.Clamp01((float)_progress / _target) : 1f;
         progressFill.rectTransform.anchorMax = new Vector2(t_before, 1f);
+        progressFill.gameObject.SetActive(t_before > 0f);
         canvasGroup.alpha = 1f;
         panel.localScale = Vector3.one;
 
@@ -235,7 +237,8 @@ public sealed class MissionCutInView : ContentsPooledUI
         panel.anchoredPosition = new Vector2(t_outX, m_home.y);
         m_sequence = DOTween.Sequence().SetUpdate(true).SetTarget(this);
         m_sequence.Append(panel.DOAnchorPosX(m_home.x, enterSeconds).SetEase(Ease.OutCubic));
-        m_sequence.Append(progressFill.rectTransform.DOAnchorMax(new Vector2(t_after, 1f), 0.3f).SetEase(Ease.OutQuad));
+        m_sequence.Append(progressFill.rectTransform.DOAnchorMax(new Vector2(t_after, 1f), 0.3f).SetEase(Ease.OutQuad)
+            .OnUpdate(() => progressFill.gameObject.SetActive(progressFill.rectTransform.anchorMax.x > 0f)));
         if (_complete)
             m_sequence.Join(panel.DOPunchScale(Vector3.one * 0.035f, 0.3f, 1, 0.3f));
         m_sequence.AppendInterval(holdSeconds);

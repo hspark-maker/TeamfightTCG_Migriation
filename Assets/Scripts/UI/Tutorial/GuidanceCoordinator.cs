@@ -20,6 +20,16 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
 #endif
         && !OutgameTutorialRunner.IsRunning;
 
+    /// <summary>재화·카드 획득과 함께 재생할 프로필 연출의 무대 준비 상태.</summary>
+    public static bool CanPresentAlongsideGains => !ContentUnlockPresentation.IsPlaying
+        && !HasPendingMissionFlow && !GuideMissionTrackerView.HasPendingPresentation
+        && s_instance != null && !s_instance.HasPriorityActivityExceptGains(true)
+        && !OutgameTutorialRunner.IsRunning && !OutgameTutorialRunner.IsGuidedRunning
+#if UNITY_EDITOR
+        && !OnboardingPlayTest.IsActive && !OnboardingPlayTest.IsPreparing
+#endif
+        && UIPoolManager.instance != null && !HasBlockingPopup();
+
     /// <summary>해금 소개 스텝과 소개 화면 자신은 무대 점유로 세지 않는다.</summary>
     public static bool CanRunContentIntro
     {
@@ -41,6 +51,14 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
         && !s_instance.AdventureMapOpen && !ContentUnlockPresentation.IsPlaying
         && !OutgameTutorialRunner.IsRunning && s_instance.SafeToPresent(false, _notification);
 
+    /// <summary>공통 가이드 바는 모험 맵과 덱 탭의 편집 화면에서도 실행할 수 있다.</summary>
+    public static bool CanUseGuideMissionPreview => !IsInputLocked
+        && s_instance != null && s_instance.m_shell != null && s_instance.m_shell.CanSwipe
+        && s_instance.m_shell.CurrentPanel != null && s_instance.m_shell.CurrentPanel.IsViewVisible
+        && !ContentUnlockPresentation.IsPlaying && !OutgameTutorialRunner.IsRunning
+        && s_instance.SafeToPresent(_except: s_instance.m_shell.CurrentPanel is DeckTabController
+            ? DeckEditController.OpenEditor : null);
+
     /// <summary>매치 탭이 제자리에 있고 로비 진입 조건을 만족할 때 화면 이동을 허용한다.</summary>
     public static bool CanNavigateFromMatchTab(PooledUIBase _notification)
         => CanNavigateFromLobby(_notification)
@@ -55,7 +73,7 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
         => GuideMissionTrackerView.HasPendingPresentation || ContentUnlockPresentation.IsPlaying || HasForeignGate
         || CardFilterPopup.IsOpen || CollectionFilterResults.IsOpen
         || UnlockIntroOverlay.IsOpen
-        || CardDetailOverlayView.IsRitualPlaying || CardDetailOverlayView.IsUnlockFxPlaying
+        || CardDetailOverlayView.IsRitualPlaying || CardDetailOverlayView.IsUnlockFxPlaying || LobbyEnhanceTabPanel.IsBusy
         || RankPromoteOverlay.IsOpen || RewardClaimPopup.IsOpen || AdventureRewardFlow.IsClaiming
         || PackOpenOverlay.IsOpen || CardRewardOverlay.IsOpen || CardSetRewardOverlay.IsOpen || PackRewardOverlay.IsOpen
         || CurtainView.IsBusy || LoadingCoverView.IsCovering
@@ -71,13 +89,16 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
         m_shell = GetComponent<LobbyTabController>();
     }
 
-    bool HasPriorityActivity => !GameInitialization.IsReady || !isActiveAndEnabled
+    bool HasPriorityActivity => HasPriorityActivityExceptGains(false);
+
+    bool HasPriorityActivityExceptGains(bool _allowGainEffects) => !GameInitialization.IsReady || !isActiveAndEnabled
+        || (m_shell != null && m_shell.IsTransitioning)
         || CurtainView.IsBusy || LoadingCoverView.IsCovering
         || (SceneTransitionVideo.Instance != null && SceneTransitionVideo.Instance.IsPlaying)
         || (m_launcher != null && m_launcher.IsRunning)
-        || LobbyRankEffectDirector.Playing || LobbyGainEffectDirector.Playing
+        || LobbyRankEffectDirector.Playing || (!_allowGainEffects && LobbyGainEffectDirector.Playing)
         || RankPromoteOverlay.IsOpen || RewardClaimPopup.IsOpen || AdventureRewardFlow.IsClaiming
-        || PackOpenOverlay.IsOpen || CardDetailOverlayView.IsOpen || AlbumPageOverlayView.IsOpen
+        || PackOpenOverlay.IsOpen || CardDetailOverlayView.IsOpen || AlbumPageOverlayView.IsOpen || LobbyEnhanceTabPanel.IsBusy
         || CardRewardOverlay.IsOpen || CardSetRewardOverlay.IsOpen || PackRewardOverlay.IsOpen
         || HasForeignGate || UnlockIntroOverlay.IsOpen;
 

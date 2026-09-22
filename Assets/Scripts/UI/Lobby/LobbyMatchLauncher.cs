@@ -42,6 +42,7 @@ public class LobbyMatchLauncher : MonoBehaviour
     public bool IsAdventureMapOpen => adventurePanel != null && adventurePanel.IsOpen;
 
     IMatchmaker      m_matchmaker;
+    IMatchmaker      m_bronzeOneMatchmaker;
     MatchmakingShell m_matchShell;
     MatchDeckShell m_deckShell;
 
@@ -62,10 +63,20 @@ public class LobbyMatchLauncher : MonoBehaviour
     }
 
 
-    // 실 상대를 먼저 찾고, 못 만나면 안쪽 AI 매칭으로 내려간다. 멀티/싱글 판정은 이 결과가 소유한다 —
+    // 브론즈 1은 COM으로 바로 연결한다. 이후에는 실 상대를 먼저 찾고, 없으면 AI로 내려간다.
+    // 멀티/싱글 판정은 이 결과가 소유한다 —
     // 여기서 갈리는 것이 DeckConfig.IsMultiplayer 이고, 씬 로드·랭크 정산·보상 경로가 전부 그 값을 따른다.
-    IMatchmaker Matchmaker => m_matchmaker ??=
-        new PhotonRankedMatchmaker(new ServerMatchmaker(profilePool));
+    IMatchmaker Matchmaker
+    {
+        get
+        {
+            // 런처가 살아 있는 동안 승급해도 현재 티어로 다시 고른다.
+            RankInfo t_rank = RankManager.GetInfo();
+            if (RankManager.IsRanked && t_rank.Grade == ERankGrade.Bronze && t_rank.Division == 1)
+                return m_bronzeOneMatchmaker ??= new ServerMatchmaker(profilePool, 0.5f, 0.5f);
+            return m_matchmaker ??= new PhotonRankedMatchmaker(new ServerMatchmaker(profilePool));
+        }
+    }
 
     // 프리팹 자체는 동기 UI 카탈로그의 의존성이라 부팅 때 이미 적재돼 있다 — 미루는 것은 생성뿐이다.
     // 로비 캔버스에 미리 얹지 않고 첫 매칭 때 띄우는 이유는 로비 프리팹을 저장할 때마다 SafeArea가
@@ -374,11 +385,27 @@ public class LobbyMatchLauncher : MonoBehaviour
         m_matchShell?.Close();
         m_running = false;
         MissionCutInView.SetMatchEntry(false);
+        RestoreTutorialAfterEntryFailureAsync().Forget();
         UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
         {
             titleText = _message,
             yesText = "확인",
         });
+    }
+
+    async UniTaskVoid RestoreTutorialAfterEntryFailureAsync()
+    {
+        var t_ct = this.GetCancellationTokenOnDestroy();
+        int t_version = m_entryVersion;
+        try
+        {
+            // 버튼의 완료 리스너가 먼저 저장하던 좌표를 덮어쓰지 않게 그 왕복까지 기다린다.
+            await UniTask.NextFrame(cancellationToken: t_ct);
+            await UniTask.WaitUntil(() => !OnboardingSession.IsBusy, cancellationToken: t_ct);
+            if (this == null || m_running || t_version != m_entryVersion) return;
+            OutgameTutorialRunner.RestorePendingBattleEntry();
+        }
+        catch (System.OperationCanceledException) { }
     }
 
     // 각 클라가 씬을 열기 직전, 대치 연출·콘텐츠 확인 중 매칭이 취소되지 않았는지 확인한다.
@@ -458,6 +485,8 @@ public class LobbyMatchLauncher : MonoBehaviour
                 {
                     AdventureRun.End();
                     MissionCutInView.SetMatchEntry(false);
+                    if (this != null && !t_ct.IsCancellationRequested && t_version == m_entryVersion)
+                        RestoreTutorialAfterEntryFailureAsync().Forget();
                 }
             }
             t_cancellation.Dispose();
@@ -656,6 +685,12 @@ public class LobbyMatchLauncher : MonoBehaviour
     {
         adventurePanel?.Close();   // 맵이 떠 있는 채로 덱 탭에 가면 오버레이가 덱 화면을 가린다
         if (deckPanel != null) lobbyTabController?.Select(deckPanel);
+    }
+
+    /// <summary>가이드 미션으로 이동하기 전에 현재 모험 맵을 닫는다.</summary>
+    public void CloseAdventureMapForGuide()
+    {
+        if (IsAdventureMapOpen) adventurePanel.Close();
     }
 
     /// <summary>미션에서 모험 선택 화면을 연다. 정점 선택과 전투 시작은 사용자가 한다.</summary>

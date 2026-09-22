@@ -18,6 +18,7 @@ public class LobbySettingPanel : ContentsPooledUI
 
     [Tooltip("프로필 편집으로 가는 버튼. 미배선이면 그 길만 없다 — 판은 그대로 뜬다.")]
     [SerializeField] Button editButton;
+    [SerializeField] Button statisticsButton;
 
     [Tooltip("닫기 버튼.")]
     [SerializeField] Button closeButton;
@@ -51,6 +52,7 @@ public class LobbySettingPanel : ContentsPooledUI
         // 인스펙터로 걸지 않는 이유는 LobbyProfileButton과 같다 — 가리킬 대상이 풀에서 세워지는 화면이라
         // 저작 시점에는 존재하지 않는다.
         if (this.editButton    != null) this.editButton.onClick.AddListener(OpenProfileEdit);
+        if (this.statisticsButton != null) this.statisticsButton.onClick.AddListener(OpenStatistics);
         if (this.closeButton   != null) this.closeButton.onClick.AddListener(Hide);
         if (this.dimButton     != null) this.dimButton.onClick.AddListener(Hide);
     }
@@ -73,6 +75,16 @@ public class LobbySettingPanel : ContentsPooledUI
             }
         });
         if (t_panel != null) Hide();
+    }
+
+    void OpenStatistics()
+    {
+        if (!this.isShow) return;
+        UIPoolManager.Instance?.RequestUI<PlayerStatisticsPanel>(this, new UIData
+        {
+            showCustomMethod = Hide,
+            onHide = () => { if (this != null) Show(); },
+        });
     }
 
     void RefreshAccount()

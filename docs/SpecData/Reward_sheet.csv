@@ -7,14 +7,14 @@ int,string,string,int,string,string,long,string
 8,Album,b,2,Currency,Diamond,30,앨범 전체 완성
 9,Album,b,3,Currency,Shard,300,앨범 전체 완성
 10,Adventure,node_01,1,Currency,Gold,80,
-11,Adventure,node_02,1,Currency,Shard,20,
+11,Adventure,node_02,1,Currency,Shard,15,
 13,Adventure,node_04,1,Currency,Gold,80,
-14,Adventure,node_05,1,Currency,Shard,40,
+14,Adventure,node_05,1,Currency,Shard,25,
 16,Adventure,chapter_01,1,Currency,Gold,80,
 18,Adventure,node_07,1,Currency,Gold,110,
-19,Adventure,node_08,1,Currency,Shard,30,
+19,Adventure,node_08,1,Currency,Shard,25,
 21,Adventure,node_10,1,Currency,Gold,110,
-22,Adventure,node_11,1,Currency,Shard,50,
+22,Adventure,node_11,1,Currency,Shard,40,
 24,Adventure,chapter_02,1,Currency,Gold,110,
 26,Adventure,node_13,1,Currency,Gold,140,
 27,Adventure,node_14,1,Currency,Shard,40,
@@ -60,16 +60,16 @@ int,string,string,int,string,string,long,string
 106,Pass,S1:6,1,Currency,Gold,300,시즌 1 무료 트랙 레벨 6
 107,Pass,S1:7,1,Currency,Shard,100,시즌 1 무료 트랙 레벨 7
 110,Pass,S1:10,1,Currency,Diamond,50,시즌 1 무료 트랙 레벨 10
-111,Adventure,node_01,2,Currency,Shard,20,
-112,Adventure,node_03,2,Currency,Shard,20,
-113,Adventure,node_04,2,Currency,Shard,50,
-114,Adventure,node_06,1,Currency,Shard,30,
+111,Adventure,node_01,2,Currency,Shard,15,
+112,Adventure,node_03,2,Currency,Shard,15,
+113,Adventure,node_04,2,Currency,Shard,30,
+114,Adventure,node_06,1,Currency,Shard,20,
 115,Adventure,chapter_01,2,Currency,Diamond,10,
 116,Adventure,chapter_01,3,Pack,NormalPack_TEST,1,팩 지급 구현 대기
-117,Adventure,node_07,2,Currency,Shard,30,
-118,Adventure,node_09,2,Currency,Shard,30,
-119,Adventure,node_10,2,Currency,Shard,50,
-120,Adventure,node_12,1,Currency,Shard,40,
+117,Adventure,node_07,2,Currency,Shard,20,
+118,Adventure,node_09,2,Currency,Shard,25,
+119,Adventure,node_10,2,Currency,Shard,35,
+120,Adventure,node_12,1,Currency,Shard,35,
 121,Adventure,chapter_02,2,Currency,Diamond,15,
 122,Adventure,chapter_02,3,Pack,NormalPack_TEST,1,팩 지급 구현 대기
 123,Adventure,node_13,2,Currency,Shard,40,
@@ -114,23 +114,23 @@ int,string,string,int,string,string,long,string
 165,Pass,S1:10,2,PackChoice,UnlockedThemePack,1,시즌 1 무료 트랙 레벨 10; 팩 지급 구현 대기
 166,Guide,guide.02,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
 167,Guide,guide.03,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
-168,Guide,guide.16,1,Currency,Shard,10,guide.04 보상을 신규 실전 미션으로 이전; 과거 guide.04 수령 여부와 무관하게 guide.16 계정당 1회 지급
+168,Guide,guide.16,1,Currency,Shard,5,guide.04 보상을 신규 실전 미션으로 이전; 과거 guide.04 수령 여부와 무관하게 guide.16 계정당 1회 지급
 169,Guide,guide.06,1,Currency,Gold,30,계정당 1회 가이드 지급 구현 대기
-170,Guide,guide.07,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
+170,Guide,guide.07,1,Currency,Shard,5,계정당 1회 가이드 지급 구현 대기
 171,Guide,guide.07,2,Card,9,1,계정당 1회 가이드 지급 구현 대기
-172,Guide,guide.08,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
-173,Guide,guide.09,1,Currency,Shard,25,계정당 1회 가이드 지급 구현 대기
+172,Guide,guide.08,1,Currency,Shard,5,계정당 1회 가이드 지급 구현 대기
+173,Guide,guide.09,1,Currency,Shard,20,계정당 1회 가이드 지급 구현 대기
 174,Guide,guide.10,1,Currency,Gold,40,계정당 1회 가이드 지급 구현 대기
 175,Guide,guide.11,1,Currency,Shard,5,계정당 1회 가이드 지급 구현 대기
-176,Guide,guide.12,1,Currency,Shard,10,계정당 1회 가이드 지급 구현 대기
-177,Guide,guide.13,1,Currency,Shard,20,계정당 1회 가이드 지급 구현 대기
+176,Guide,guide.12,1,Currency,Shard,5,계정당 1회 가이드 지급 구현 대기
+177,Guide,guide.13,1,Currency,Shard,15,계정당 1회 가이드 지급 구현 대기
 178,Guide,guide.14,1,Pack,NormalPack_TEST,1,계정당 1회 가이드 지급 구현 대기
 179,Guide,guide.15,1,Currency,Diamond,10,계정당 1회 가이드 지급 구현 대기
 180,Guide,guide.15,2,Currency,RouletteTicket,1,계정당 1회 가이드 지급 구현 대기
-181,CardDuplicate,Common,1,Currency,Shard,1,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
-182,CardDuplicate,Rare,1,Currency,Shard,2,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
-183,CardDuplicate,Arcane,1,Currency,Shard,5,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
-184,CardDuplicate,Mythic,1,Currency,Shard,10,중복 추가 조각 구현 대기; 기존 간식1 유지; 0원 튜토리얼팩 제외
+181,CardDuplicate,Common,1,Currency,CardDust,1,중복 카드 제작 재화; 0원 튜토리얼팩 제외
+182,CardDuplicate,Rare,1,Currency,CardDust,2,중복 카드 제작 재화; 0원 튜토리얼팩 제외
+183,CardDuplicate,Arcane,1,Currency,CardDust,5,중복 카드 제작 재화; 0원 튜토리얼팩 제외
+184,CardDuplicate,Mythic,1,Currency,CardDust,10,중복 카드 제작 재화; 0원 튜토리얼팩 제외
 185,Mission,daily.completeMissions5,1,Currency,RouletteTicket,1,일일 미션 5개 완료 추가 보상
 186,Mission,daily.completeMissions5,2,Currency,Diamond,10,일일 미션 5개 완료 추가 보상
 187,Mission,weekly.completeMissions5,1,Currency,RouletteTicket,3,주간 미션 5개 완료 추가 보상

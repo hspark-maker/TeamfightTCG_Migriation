@@ -46,6 +46,8 @@ public static class OutgameFeatureLock
     public static bool IsUnlocked(EOutgameFeature _feature)
     {
         if (_feature == EOutgameFeature.None) return true;
+        if (_feature == EOutgameFeature.LobbyPlay && OutgameTutorialRunner.IsDefeatEnhanceInterlude) return false;
+        if (_feature == EOutgameFeature.LobbyCollectionTab && OutgameTutorialRunner.IsDefeatEnhanceInterlude) return true;
         if (ContentUnlockManager.TryGetKey(_feature, out string t_content))
             return s_forceUnlockAll || ContentUnlockManager.IsUnlocked(t_content);
 
@@ -122,7 +124,7 @@ public static class OutgameFeatureLock
         s_unlocked.Clear();
         s_locked.Clear();
 
-        s_all = s_forceUnlockAll || s_stalled || !t_running;
+        s_all = s_forceUnlockAll || s_stalled || (!t_running && !OutgameTutorialRunner.IsDefeatEnhanceInterlude);
 
         // 일시 잠금은 해금 계산과 무관하게 지금 스텝 하나만 본다(전체 해금 상태에서도 걸린다).
         // 디버그 전체 해금과 정지 판정은 예외 — 막힌 스텝이 닫아 둔 옆길까지 걷어야 탈출로가 실제로 열린다.

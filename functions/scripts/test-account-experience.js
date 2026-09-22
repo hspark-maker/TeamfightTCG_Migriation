@@ -72,12 +72,11 @@ test("bad automatic reward authoring fails instead of consuming the reached leve
     {...context, rewardRows: []}, 0), /Missing or invalid AccountLevel reward/);
 });
 
-test("mission card followed by level card keeps ownership and grants duplicate snack growth", () => {
+test("mission card followed by level card keeps ownership and only authored duplicate currency", () => {
   const duplicateRows = [{id: 99, ownerType: "CardDuplicate", ownerId: "Common", order: 1,
     rewardType: "Currency", rewardId: "Gold", amount: 2}];
   const itemContext = {catalog: new Set([1, 2]), grades: new Map([[1, "Common"], [2, "Common"]]),
-    thresholds: [0], packs: new Map(), choices: [], cards: [],
-    snackGrowthCurve: {maxStage: 1, steps: new Map([[1, {stage: 1, hpGain: 1, snackCost: 100}]])}};
+    thresholds: [0], packs: new Map(), choices: [], cards: []};
   const current = {profile: {accountExp: 90}, ownership: {cardIds: [2]}};
   const mission = grantRewardItems(current, [{rewardType: "Card", rewardId: "1", amount: 1}],
     itemContext, duplicateRows, "", 0, () => 0);
@@ -85,7 +84,8 @@ test("mission card followed by level card keeps ownership and grants duplicate s
     {levels, rewardRows: [...duplicateRows, reward(2, "Card", "1")], itemContext}, 0, () => 0);
   assert.deepEqual(result.slots.ownership.cardIds, [2, 1]);
   assert.equal(result.cards[0].isNew, false);
-  assert.equal(result.slots.cardGrowth.entries["1"].snack, result.cards[0].snack);
+  assert.deepEqual(result.slots.cardGrowth.entries, {});
+  assert.deepEqual(result.cards, [{cardId: 1, isNew: false}]);
   assert.deepEqual(result.currencies, [{currency: "Gold", amount: 2}]);
 });
 
@@ -124,9 +124,10 @@ test("XP-only mission works without a pass, survives transaction retry and rejec
     ({ref: {}, unlocked: true, period, state: structuredClone(state)}));
   t.mock.method(saves, "mutateSave", async (_env, _uid, _source, _key, mutate, finalize) => {
     // The first callback loses a transaction conflict. Its writes must not leak into the retry.
-    await mutate(structuredClone(current), {set() {}}, wallet);
+    const prepare = async (opened) => assert.equal(opened, 0);
+    await mutate(structuredClone(current), {set() {}}, wallet, prepare);
     let missionWrite;
-    const mutation = await mutate(structuredClone(current), {set(_ref, data) { missionWrite = data; }}, wallet);
+    const mutation = await mutate(structuredClone(current), {set(_ref, data) { missionWrite = data; }}, wallet, prepare);
     current = {...current, ...mutation.slots};
     state = missionWrite;
     wallet = mutation.wallet?.next ?? wallet;

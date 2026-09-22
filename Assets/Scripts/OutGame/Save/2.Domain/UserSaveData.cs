@@ -19,7 +19,6 @@ public class UserSaveData
     [FirestoreProperty("ownership")] public OwnershipSaveData Ownership { get; set; } = new OwnershipSaveData();
     [FirestoreProperty("deck")] public DeckSaveData Deck { get; set; } = new DeckSaveData();
     [FirestoreProperty("cardGrowth")] public CardGrowthSaveData CardGrowth { get; set; } = new CardGrowthSaveData();
-    [FirestoreProperty("keywordGrowth")] public KeywordGrowthSaveData KeywordGrowth { get; set; } = new KeywordGrowthSaveData();
     [FirestoreProperty("rank")] public RankSaveData Rank { get; set; } = new RankSaveData();
     [FirestoreProperty("albumReward")] public AlbumRewardSaveData AlbumReward { get; set; } = new AlbumRewardSaveData();
     [FirestoreProperty("adventure")] public AdventureSaveData Adventure { get; set; } = new AdventureSaveData();

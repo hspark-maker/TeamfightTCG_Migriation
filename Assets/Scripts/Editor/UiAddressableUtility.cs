@@ -36,7 +36,7 @@ static class UiAddressableUtility
         return true;
     }
 
-    [MenuItem("Tools/Addressables/Normalize UI Addresses")]
+    [MenuItem("Tools/Card Battle/UI/Normalize UI Addresses")]
     static void NormalizeUiAddresses()
     {
         AddressableAssetSettings t_settings = AddressableAssetSettingsDefaultObject.Settings;

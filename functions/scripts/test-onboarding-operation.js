@@ -13,10 +13,11 @@ class Ref {
 async function runTransaction(callback, options) {
   const staged = [];
   const transaction = {
+    async get(ref) { return (await this.getAll(ref))[0]; },
     async getAll(...refs) {
       assert.equal(staged.length, 0, "Firestore reads must precede writes");
       reads += refs.length;
-      return refs.map((ref) => ({exists: docs.has(ref.path), data: () => docs.get(ref.path)}));
+      return refs.map((ref) => ({ref, exists: docs.has(ref.path), data: () => docs.get(ref.path)}));
     },
     update(ref, value) { staged.push(() => docs.set(ref.path, {...docs.get(ref.path), ...value})); },
     set(ref, value) { staged.push(() => docs.set(ref.path, value)); },
@@ -48,7 +49,8 @@ const data = {onboarding: true, txId: "onboard-test-001", packId: "starter"};
 const receipt = {kind: "client", txId: data.txId, ...onboardingReceipt(data, "openPack")};
 let executions = 0;
 async function purchase(key = receipt, source = "openPack") {
-  return mutateSave("test", "test-user", source, key, () => {
+  return mutateSave("test", "test-user", source, key, async (_current, _tx, _wallet, prepare) => {
+    await prepare(1);
     executions++;
     return {slots: {ownership: {cardIds: [17]}}};
   }, (state) => ({...state, cards: [{cardId: 17}], missions: {stale: true}}));
@@ -91,6 +93,7 @@ async function recover(args = {packId: "starter"}, uid = "test-user") {
   assert.equal(recovered.operation.result.wallet, undefined);
   assert.equal(recovered.operation.result.updatedSlots, undefined);
   assert.equal(recovered.operation.result.missions, undefined);
+  assert.equal(recovered.operation.result.achievements, undefined);
   assert.equal(recovered.current.save.revision, 9);
   assert.equal(recovered.current.wallet.rev, 7);
   assert.deepEqual(recovered.current.save.ownership.cardIds, [17, 22]);

@@ -1,11 +1,9 @@
 import {randomInt} from "node:crypto";
 import {HttpsError} from "firebase-functions/v2/https";
 import {RewardGain, RewardItem, RewardRow, resolveRewards} from "../rewardTable";
-import {DrawnCard, drawPack, resolveDropPool, DropRow, RollFn, SNACK_PER_DUPLICATE} from "../packs/packDraw";
+import {DrawnCard, drawPack, resolveDropPool, DropRow, RollFn} from "../packs/packDraw";
 import {buildOwnershipSlot, readOwnedIds} from "../packs/packSlots";
-import {addSnackAndGrow, applyAcquiredCardGrowth, growthSlot, readGrowthEntries, GrowthEntries} from "../growth/cardGrowth";
-import {LimitBreakCurve} from "../growth/limitBreakTable";
-import {requireSnackGrowthCurve} from "../growth/snackGrowthSpec";
+import {applyAcquiredCardGrowth, growthSlot, readGrowthEntries, GrowthEntries} from "../growth/cardGrowth";
 import {CardPackRow, readCardPackRow, readDropRows, readRankGradeRows, readSpecRows} from "../packs/packSpecReader";
 import {loadCatalogIds} from "../packs/cardCatalog";
 import {entryPointsFromRows, gradeOf, parseRequiredGrade, isRanked} from "../packs/rankGrade";
@@ -19,7 +17,6 @@ export interface ItemGrantContext {
   packs: Map<string, RewardPack>;
   choices: string[];
   cards: Record<string, unknown>[];
-  snackGrowthCurve: LimitBreakCurve;
 }
 
 /**
@@ -29,11 +26,9 @@ export interface ItemGrantContext {
  * @return {Promise<ItemGrantContext>} 트랜잭션에서 재사용할 표
  */
 export async function loadItemGrantContext(env: string, items: RewardItem[]): Promise<ItemGrantContext> {
-  const [catalog, cards, ranks, packs, ruleRows, curveRows] = await Promise.all([
+  const [catalog, cards, ranks, packs] = await Promise.all([
     loadCatalogIds(env), readSpecRows(env, "Card"), readRankGradeRows(env), readSpecRows(env, "CardPack"),
-    readSpecRows(env, "CardEnhanceRule"), readSpecRows(env, "CardLimitBreak"),
   ]);
-  const snackGrowthCurve = requireSnackGrowthCurve(ruleRows, curveRows);
   const thresholds = entryPointsFromRows(ranks);
   if (thresholds === null) throw new HttpsError("failed-precondition", "Reward rank spec is unreadable.");
   const choices = items.some((item) => item.rewardType === "PackChoice") ? packs
@@ -48,27 +43,20 @@ export async function loadItemGrantContext(env: string, items: RewardItem[]): Pr
     prepared.set(id, {pack, drops});
   }));
   return {catalog, grades: new Map(cards.map((row) => [Number(row.id), String(row.grade)])),
-    thresholds, packs: prepared, choices, cards, snackGrowthCurve};
+    thresholds, packs: prepared, choices, cards};
 }
 
 /**
- * 실제 지급 순서대로 성장한다. 팩별 목록과 flat 목록이 공유하는 카드 객체에 결과를 붙인다.
+ * 신규 카드의 등급별 초기 성장만 적용한다. 중복 카드는 저장된 성장값을 바꾸지 않는다.
  * @param {GrowthEntries} entries 기존 성장
  * @param {DrawnCard[]} cards 이번 지급 카드 (호출마다 새 추첨 객체)
- * @param {LimitBreakCurve} curve 사전 검증한 단계표
  * @param {ReadonlyMap<number, string>} grades 카드별 등급
  * @return {GrowthEntries} 지급 이후 성장
  */
-export function applyDrawnSnackGrowth(
-  entries: GrowthEntries, cards: DrawnCard[], curve: LimitBreakCurve, grades: ReadonlyMap<number, string>,
+export function applyDrawnCardGrowth(
+  entries: GrowthEntries, cards: DrawnCard[], grades: ReadonlyMap<number, string>,
 ): GrowthEntries {
-  entries = applyAcquiredCardGrowth(entries, cards.filter((card) => card.isNew).map((card) => card.cardId), grades);
-  for (const card of cards) {
-    const result = addSnackAndGrow(entries, card.cardId, card.snack, curve);
-    entries = result.entries;
-    if (result.snackGrowth) card.snackGrowth = result.snackGrowth;
-  }
-  return entries;
+  return applyAcquiredCardGrowth(entries, cards.filter((card) => card.isNew).map((card) => card.cardId), grades);
 }
 
 export function unlockedRewardPacks(context: ItemGrantContext, points: number): string[] {
@@ -81,7 +69,7 @@ export function unlockedRewardPacks(context: ItemGrantContext, points: number): 
 }
 
 /**
- * 중복 간식은 추첨이 지급한다. 추가 재화만 Reward/CardDuplicate에서 가져온다.
+ * 명시적으로 저작된 중복 재화만 Reward/CardDuplicate에서 가져온다.
  * @param {DrawnCard[]} cards 이번 추첨 카드
  * @param {ReadonlyMap<number, string>} grades 카드별 등급
  * @param {RewardRow[]} rows 통합 보상 표
@@ -137,7 +125,7 @@ export function grantRewardItems(
       for (let i = 0; i < item.amount; i++) {
         const isNew = !ownedSet.has(id);
         ownedSet.add(id);
-        direct.push({cardId: id, isNew, snack: isNew ? 0 : SNACK_PER_DUPLICATE});
+        direct.push({cardId: id, isNew});
       }
       cards.push(...direct);
       currencies.push(...duplicateGains(direct, context.grades, rewardRows));
@@ -164,7 +152,6 @@ export function grantRewardItems(
   }
   return {cards, packs, currencies, slots: cards.length ? {
     ownership: buildOwnershipSlot(owned, cards),
-    cardGrowth: growthSlot(applyDrawnSnackGrowth(readGrowthEntries(current.cardGrowth), cards,
-      context.snackGrowthCurve, context.grades)),
+    cardGrowth: growthSlot(applyDrawnCardGrowth(readGrowthEntries(current.cardGrowth), cards, context.grades)),
   } : {}};
 }

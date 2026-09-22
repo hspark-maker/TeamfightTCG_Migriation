@@ -18,6 +18,10 @@ internal class ServerCommandResult
     /// <summary>null이면 이 명령은 미션 진행도를 바꾸지 않았다.</summary>
     [JsonProperty("missions")] public MissionSnapshot Missions { get; set; }
 
+    [JsonProperty("achievements")] public AchievementSnapshot Achievements { get; set; }
+
+    [JsonProperty("statistics")] public PlayerStatisticsSnapshot Statistics { get; set; }
+
     [JsonProperty("accountExperience")] public AccountExperienceResult AccountExperience { get; set; }
 }
 

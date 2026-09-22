@@ -78,11 +78,11 @@ public readonly struct TutorialActionMeta
         || Action == A.AutoBattle || Action == A.BattleEntry || Action == A.BattleStart;
 
     public bool RequiresCompletionConfirmation => RequiresEntryConfirmation || LeavesScene
-        || Action == A.WaitEnhance || Action == A.WaitKeywordEnhance
+        || Action == A.WaitEnhance
         || Action == A.WaitDeckSave || Action == A.WaitSynergyDeck || Action == A.EnterFirstRank;
 
     public bool HasExecutionContract => (int)Action >= 0 && (int)Action < s_table.Length
-        && s_table[(int)Action].Action == Action;
+        && s_table[(int)Action].Action == Action && Action != A.WaitKeywordEnhance;
 
     /// <summary>액션의 메타. 테이블에 없는 값은 "아무 필드도 안 쓰는 자동 스텝"으로 본다(진행은 막지 않는다).
     /// 여기 닿는 것은 아래 static 생성자가 이미 오류로 잡은 뒤다.</summary>
@@ -116,7 +116,7 @@ public readonly struct TutorialActionMeta
         new(A.CardGrant,            C.CardGain,         F.RewardTitle | F.ParallelGain | F.Pack | F.FailurePolicy | F.Card, _beatSlot: EBeatSlot.Pre),
         new(A.WaitCardDetailReturn, C.CardDetailReturn, F.None, _beatSlot: EBeatSlot.Post),
         new(A.CardSetGrant,         C.CardGain,         F.RewardTitle | F.ParallelGain | F.Pack | F.FailurePolicy | F.Cards, _beatSlot: EBeatSlot.Pre),
-        new(A.WaitKeywordEnhance,   C.KeywordEnhance,   F.Anchor | F.GuideMessage | F.Dim | F.Spotlight | F.FreeOfCharge),
+        new(A.WaitKeywordEnhance,   C.Auto,             F.None), // 폐기 슬롯(직렬화 값 보존).
         new(A.PackNotice,           C.CardGain,         F.RewardTitle | F.ParallelGain | F.Pack | F.FailurePolicy),
         new(A.CloseAlbumPage,       C.Auto,             F.None, _beatSlot: EBeatSlot.Post),
         // 장착으로 슬롯 내용이 갱신되는 스텝이라 F.Spotlight를 주지 않는다 — 승격은 첫 프레임에 한 번만 걸린다.

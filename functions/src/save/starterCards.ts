@@ -63,9 +63,7 @@ export async function resolveStarterCardIds(
       [];
 
     if (cardIds.length === 0) throw new Error("StarterPack does not contain a complete valid deck.");
-    if (cardIds.some((id) => grades.get(id) !== "Common")) {
-      throw new Error("StarterPack must contain only Common cards.");
-    }
+    // 지급 구성과 등급은 표가 정한다. 우드혼처럼 희귀 카드가 저작돼도 정상 지급한다.
     return {cardIds, source: "spec", grades};
   } catch (error) {
     logger.error("starter card spec read failed", {

@@ -4,11 +4,11 @@ using Cysharp.Threading.Tasks;
 // "지금 안내가 시키고 있는 일"을 묻는 단일 창구.
 // 강제 커서와 자율 커서를 합쳐서 보는 이유: 같은 안내가 강제 챕터에서 자율 챕터로 옮겨 다니는데,
 // 묻는 쪽(성장 비용·도감 화면·결과 화면)은 그것이 어느 커서의 것인지 알 필요가 없다.
-// 자율 안내는 졸업 뒤에만 열리므로 두 커서가 동시에 서는 일은 없다 — 자율을 먼저 묻는 것은 순서 규약일 뿐이다.
+// 첫 패배 강화 중에는 강제 커서가 멈춘다. 자율을 먼저 조회해 진행 중인 안내만 사용한다.
 public static class OutgameTutorialGuide
 {
     // 안내가 대준 무료 한 방을 이미 쓴 스텝(세이브하지 않는다 — 재시작하면 다시 한 방).
-    // 플래그가 아니라 스텝 참조인 이유: 무료를 저작하는 스텝이 여럿이라(카드 강화·키워드 강화)
+    // 플래그가 아니라 스텝 참조인 이유: 무료 카드 강화를 저작하는 스텝이 여럿이라
     // 하나로 묶으면 앞 스텝이 쓴 한 방 때문에 뒤 스텝의 저작이 조용히 무시된다.
     static TutorialStepDef s_freeSpentStep;
     static int s_enhanceCard;
@@ -92,12 +92,20 @@ public static class OutgameTutorialGuide
                     && (s_enhanceCard == 0 || t_card < s_enhanceCard)) s_enhanceCard = t_card;
             return true;
         }
+        if (_chapter.Trigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
+            && DataSaveManager.Data.Tutorial?.DefeatEnhancePending == true)
+        {
+            int t_slot = DeckSaveManager.SelectedSlot;
+            if (t_slot >= 0 && DeckSaveManager.GetSlot(t_slot) is { } t_deck)
+                foreach (int t_card in t_deck)
+                    if (CanGuideEnhance(t_card)) { s_enhanceCard = t_card; return true; }
+        }
         string t_event = GuideMissionTrack.Current?.Event;
         bool t_starters = t_event == GuideMissionTrack.EVENT_STARTER_CARDS_STAR1
             || t_event == GuideMissionTrack.EVENT_STARTER_CARDS_STAR2
             || t_event == GuideMissionTrack.EVENT_CARETAKER_CARDS_STAR1;
         if (t_starters)
-            foreach (int t_card in new[] { 1, 3, 4 })
+            foreach (int t_card in GuideMissionPreparation.CardIds)
                 if (GuideMissionTrack.StarOf(t_card) < (t_event == GuideMissionTrack.EVENT_STARTER_CARDS_STAR2 ? 2 : 1)
                     && CanGuideEnhance(t_card)) { s_enhanceCard = t_card; return true; }
         int t_growth = GuideMissionTrack.PickGrowthCard(GuideMissionTrack.Current);
@@ -175,16 +183,22 @@ public static class OutgameTutorialGuide
 
     /// <summary>강화 문구의 비용 설명을 현재 무료 자격으로 해석한다.</summary>
     public static string MessageOf(TutorialStepDef _step)
-        => SynergyBattleGuide.MessageOf((_step?.GuideMessage ?? string.Empty).Replace("{enhanceCost}",
+    {
+        string t_message = SynergyBattleGuide.MessageOf((_step?.GuideMessage ?? string.Empty).Replace("{enhanceCost}",
             HasFreeShot(EOutgameTutorialAction.WaitEnhance) ? "이번 강화는 무료예요." : "샤드를 사용해 카드를 성장시켜요.")
             .Replace("{growthStatus}", s_growthAlreadyReached
                 ? "이미 시너지가 해금된 2성 카드를 보유하고 있어요."
                 : "카드를 2성으로 성장시키면 그 카드의 시너지가 해금돼요."));
+        if (DataSaveManager.Data.Tutorial?.DefeatEnhancePending == true
+            && OutgameTutorialRunner.GuidedTrigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
+            && _step?.Anchor == EOutgameTutorialAnchor.AlbumThemeCell)
+            return "다음 전투 전에 카드를 강화해 봐요!\n" + t_message;
+        return t_message;
+    }
 
     /// <summary>지금 이 한 방을 안내가 대신 내주는가 = 저작이 무료라고 말한 스텝에 서 있고, 그 스텝이 아직 안 썼다.
     /// 무엇이 무료인지는 코드가 아니라 스텝의 freeOfCharge가 정한다.
-    /// _axis를 받는 이유: 안내가 시킨 것이 카드 강화인데 유저가 키워드 강화를 하면 그쪽이 공짜가 되고
-    /// 소진 표식까지 가져가 정작 안내가 시킨 강화에 값이 붙는다(그 반대도 같다).</summary>
+    /// 현재 스텝의 강화 액션과 요청 액션이 일치해야 한다.</summary>
     // 클라 표식(세션 내·스텝 단위)과 서버 표식(영구·축 단위)을 둘 다 본다 — 응답을 잃으면 서버만 소진을 알기 때문이다.
     public static bool HasFreeShot(EOutgameTutorialAction _axis)
         => TryGetCurrentStep(out var t_step)
@@ -204,7 +218,6 @@ public static class OutgameTutorialGuide
         switch (_axis)
         {
             case EOutgameTutorialAction.WaitEnhance:        return TutorialGrantsCloud.EnhanceCardSpent;
-            case EOutgameTutorialAction.WaitKeywordEnhance: return TutorialGrantsCloud.EnhanceKeywordSpent;
             default:                                        return false;
         }
     }

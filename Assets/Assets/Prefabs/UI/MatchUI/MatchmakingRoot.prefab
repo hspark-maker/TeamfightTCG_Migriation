@@ -1328,7 +1328,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 652920c52c4285b469546e06bf73afb8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MatchProfileView
-  searchingRoot: {fileID: 0}
+  searchingRoot: {fileID: 3734034756995640208}
   foundRoot: {fileID: 3856477715837340027}
   searchingNickname: ???
   profileView: {fileID: 7108033471561608438}
@@ -1530,9 +1530,9 @@ MonoBehaviour:
   foundRoot: {fileID: 3258554938163674342}
   searchingNickname: ???
   profileView: {fileID: 445807360594169866}
-  nicknameText: {fileID: 0}
-  rankBadge: {fileID: 0}
-  rankNameText: {fileID: 0}
+  nicknameText: {fileID: 8968125485998074327}
+  rankBadge: {fileID: 2051683357517267254}
+  rankNameText: {fileID: 3659904244070674459}
 --- !u!1 &3258554938163674342
 GameObject:
   m_ObjectHideFlags: 0
@@ -3685,7 +3685,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &7430627218883468218
 RectTransform:
   m_ObjectHideFlags: 0
@@ -4801,7 +4801,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4060012856340049326, guid: 5546f9bfd73e1fe4d9747b69a1bd53c3, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

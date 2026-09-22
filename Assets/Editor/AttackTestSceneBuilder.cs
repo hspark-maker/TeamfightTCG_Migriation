@@ -15,7 +15,7 @@ public static class AttackTestSceneBuilder
     static readonly int[] PlayerCardIds = { 12, 18, 0 };
     static readonly int[] EnemyCardIds = { 27, 6, 9 };
 
-    [MenuItem("Tools/Build Attack Test Scene")]
+    [MenuItem("Tools/Card Battle/연출 테스트/Build Attack Test Scene")]
     public static void Build()
     {
         var t_battle = EditorSceneManager.OpenScene(BattlePath, OpenSceneMode.Single);

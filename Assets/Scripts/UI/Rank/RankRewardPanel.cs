@@ -30,6 +30,80 @@ public class RankRewardPanel : ContentsPooledUI
 
     // 행 생성 여부. 티어 수는 런타임 불변이라 최초 1회만 만들고 이후엔 Refresh로만 갱신한다.
     bool m_built;
+    bool m_guiding;
+    bool m_claimPending;
+    bool m_guidedRewardReceived;
+    Button m_guideTarget;
+    Canvas m_guidePopupCanvas;
+    int m_guidePopupOrder;
+
+    // 승급 직후 자동으로 열린 목록에서 계정당 한 번만 수령 → 닫기를 안내한다.
+    public void BeginRewardGuide()
+    {
+        if (this.m_guiding || OutgameTutorialProgress.IsTriggerDone(EOutgameTutorialTrigger.RankRewardIntroduction)) return;
+        // 표시 이력이 없던 기존 계정도 이미 보상을 받았다면 사용법 안내를 반복하지 않는다.
+        for (int i = 0; i < RankRewardManager.TierCount; i++)
+            if (RankManager.IsTierRewardClaimed(i))
+            {
+                OutgameTutorialProgress.MarkTriggerDone(EOutgameTutorialTrigger.RankRewardIntroduction);
+                return;
+            }
+        this.m_guiding = true;
+        this.m_guidedRewardReceived = false;
+    }
+
+    void Update()
+    {
+        if (!this.m_guiding || !this.isShow || this.m_claimPending) return;
+        Button t_target;
+        string t_message;
+        Canvas t_popupCanvas = null;
+        if (RewardClaimPopup.IsOpen)
+        {
+            if (!RewardClaimPopup.TryGet(out var t_popup)) return;
+            t_target = t_popup.ClaimButton;
+            t_popupCanvas = t_popup.GetComponent<Canvas>();
+            t_message = "보상받기를 눌러 승급 보상을 받아보세요!";
+        }
+        else if (!this.m_guidedRewardReceived && RankRewardManager.TopClaimableIndex >= 0)
+        {
+            int t_index = RankRewardManager.TopClaimableIndex;
+            if (t_index >= this.m_rows.Count) return;
+            t_target = this.m_rows[t_index].RewardButton;
+            t_message = "도달한 랭크의 보상을 눌러 받아보세요!";
+        }
+        else
+        {
+            t_target = this.closeButton;
+            t_message = "닫기를 눌러 다음 안내로 이동하세요!";
+        }
+        if (t_target == null || !t_target.isActiveAndEnabled || !t_target.interactable) return;
+        if (this.m_guideTarget == t_target && OutgameTutorialGateUI.IsShowing) return;
+        this.ClearRewardGuide();
+        // 다른 안내가 먼저 무대를 잡았다면 덮어쓰지 않는다.
+        if (OutgameTutorialGateUI.IsShowing) return;
+        var t_gate = OutgameTutorialBridge.EnsureGateForGuidance();
+        if (t_gate == null) return;
+        if (t_popupCanvas != null)
+        {
+            // 기본 팝업 층(410)은 손가락(352)을 덮는다. 안내 중에만 내리고 수령 연출 전에 복원한다.
+            this.m_guidePopupCanvas = t_popupCanvas;
+            this.m_guidePopupOrder = t_popupCanvas.sortingOrder;
+            t_popupCanvas.sortingOrder = UiSortingOrder.GuidedRewardClaim;
+        }
+        this.m_guideTarget = t_target;
+        t_gate.ShowGate(this, (RectTransform)t_target.transform, t_target, t_message, null);
+        // 실제 표시한 뒤에만 저장한다. 현재 수령→닫기 안내는 계속하고, 다음 승급부터 생략한다.
+        OutgameTutorialProgress.MarkTriggerDone(EOutgameTutorialTrigger.RankRewardIntroduction);
+    }
+
+    void ClearRewardGuide()
+    {
+        OutgameTutorialGateUI.Instance?.Clear(this);
+        this.m_guideTarget = null;
+        if (this.m_guidePopupCanvas != null) this.m_guidePopupCanvas.sortingOrder = this.m_guidePopupOrder;
+        this.m_guidePopupCanvas = null;
+    }
 
     // 씬 버튼 UnityEvent가 인자 없는 이 시그니처에 바인딩돼 있다 — 매개변수를 붙이면 배선이 끊긴다(진입점을 따로 추가할 것).
     public void Open()
@@ -65,6 +139,9 @@ public class RankRewardPanel : ContentsPooledUI
 
     protected override void OnViewHidden()
     {
+        this.m_guiding = false;
+        this.m_claimPending = false;
+        this.ClearRewardGuide();
         RankRewardManager.OnChanged -= this.RefreshRows;
         // 정상 닫기는 판의 퇴장이 끝난 뒤 상단바를 내린다.
         LobbyShellBars.DropTopAfter(this, this.transition.CloseDuration);
@@ -138,6 +215,7 @@ public class RankRewardPanel : ContentsPooledUI
     void OnRowClicked(int _tierIndex)
     {
         if (!RankRewardManager.CanClaim(_tierIndex)) return;
+        this.ClearRewardGuide();
 
         if (!RewardClaimPopup.TryGet(out var t_popup))
         {
@@ -166,7 +244,20 @@ public class RankRewardPanel : ContentsPooledUI
     // 팝업은 왕복을 기다리지 않으므로, 서버까지 가서 거절당한 수령은 연출이 이미 다 돈 뒤에 잔액으로만 드러난다.
     async UniTask<RewardClaimOutcome> ClaimAsync(int _tierIndex)
     {
-        var t_outcome = await RankRewardManager.ClaimAsync(_tierIndex);
+        this.ClearRewardGuide();
+        this.m_claimPending = true;
+        int t_version = this.VisibilityVersion;
+        RewardClaimOutcome t_outcome;
+        try
+        {
+            t_outcome = await RankRewardManager.ClaimAsync(_tierIndex);
+            if (this != null && this.VisibilityVersion == t_version && t_outcome.Succeeded)
+                this.m_guidedRewardReceived = true;
+        }
+        finally
+        {
+            if (this != null && this.VisibilityVersion == t_version) this.m_claimPending = false;
+        }
         if (t_outcome.HasCards && this != null)
         {
             // 팩 개봉보다 높은 목록만 걷는다. 공용 보상 팝업의 합산 연출은 계속 재생한다.

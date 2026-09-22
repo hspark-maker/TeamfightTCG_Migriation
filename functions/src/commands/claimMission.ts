@@ -18,7 +18,6 @@ import {CurrencyGain, grant} from "../currency/wallet";
 import {nextWallet} from "../currency/walletStore";
 import {GrantedItems, grantRewardItems, loadItemGrantContext} from "../rewards/itemGrant";
 import {applyGuideProgress} from "../missions/guideMutation";
-import {applySnackGrowthProgress} from "../missions/snackGrowthProgress";
 import {findMission, MAX_MISSION_ID_LENGTH} from "../missions/catalog";
 import {readMissionCatalog} from "../missions/missionSpec";
 import {rankRef} from "../rank/rankStore";
@@ -89,7 +88,7 @@ function rejectMessage(
 /**
  * 미션 보상 수령. 달성 판정·지급·낙인을 서버가 소유한다.
  *
- * 진행도는 이 명령이 만들지 않는다 — openPack·enhanceCard·limitBreakCard·claimReward 가
+ * 진행도는 이 명령이 만들지 않는다 — openPack·enhanceCard·claimReward 가
  * 성공 트랜잭션의 부수효과로 올린 값을 여기서 읽기만 한다.
  *
  * **`ClaimReward` 카운터를 올리지 않는다.** 올리면 미션 수령이 미션을 낳는 자기참조가 되고,
@@ -163,7 +162,7 @@ export const claimMission = onCall(async (request) => {
   let passProgress: PassProgressResponse | undefined;
 
   const result = await mutateSave(env, uid, "claimMission", {kind: "client", txId},
-    async (current, transaction, wallet): Promise<SaveMutation> => {
+    async (current, transaction, wallet, preparePackStatistics): Promise<SaveMutation> => {
       // 읽기가 콜백의 첫 줄이고, 아래 쓰기보다 앞이다(Firestore 트랜잭션 규칙).
       // beginMissionBump 이 기간 리셋까지 반영하므로, 어제 진행도로 오늘 보상을 타는 경로가 없다.
       const missions = await beginMissionBump(transaction, db, env, uid, period, current);
@@ -230,11 +229,11 @@ export const claimMission = onCall(async (request) => {
           packs: [...(itemGrant.packs ?? []), ...(experienceGrant.packs ?? [])],
         };
       }
+      await preparePackStatistics(itemGrant.packs?.length ?? 0);
       grantedCurrencies = [...rewardJudgement.gains, ...itemGrant.currencies];
       grantedPassExp = mission.passExp;
       const grantCards = itemContext?.cards ?? accountContext?.itemContext?.cards;
       if (grantCards) applyGuideProgress(missions, current, itemGrant.slots, grantCards, catalog);
-      applySnackGrowthProgress(missions, itemGrant.cards);
 
       // 낙인과 패스 경험치를 함께 찍는다 — 카운터는 깎지 않는다.
       // 깎으면 같은 이벤트를 세는 주간 미션이 함께 무너진다.

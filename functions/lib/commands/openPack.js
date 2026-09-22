@@ -57,8 +57,6 @@ const rewardTable_1 = require("../rewardTable");
 const rankStore_1 = require("../rank/rankStore");
 const walletStore_1 = require("../currency/walletStore");
 const cardGrowth_1 = require("../growth/cardGrowth");
-const snackGrowthSpec_1 = require("../growth/snackGrowthSpec");
-const snackGrowthProgress_1 = require("../missions/snackGrowthProgress");
 const domainReject_1 = require("../save/domainReject");
 const receiptId_1 = require("../save/receiptId");
 const packSpecReader_1 = require("../packs/packSpecReader");
@@ -97,20 +95,17 @@ exports.openPack = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)("o
         reject("PackNotFound", `Pack '${packId}' is not authored in the CardPack spec.`, { uid, env, packId });
     }
     if (pack.refundAmount > 0) {
-        // 환급 경로는 클라·서버 양쪽에서 죽어 있다(중복 보상은 간식). 저작 실수를 조용히 삼키지 않는다.
+        // 이 환급 필드는 사용하지 않는다. 명시된 중복 재화는 Reward 표에서 별도로 읽는다.
         logger.warn("pack authors a refund that is never paid out", { env, packId, refundAmount: pack.refundAmount });
     }
-    const [dropRows, gradeRows, catalogIds, cardRows, rawRewards, catalog, ruleRows, curveRows] = await Promise.all([
+    const [dropRows, gradeRows, catalogIds, cardRows, rawRewards, catalog] = await Promise.all([
         (0, packSpecReader_1.readDropRows)(env, packId),
         (0, packSpecReader_1.readRankGradeRows)(env),
         (0, cardCatalog_1.loadCatalogIds)(env),
         (0, packSpecReader_1.readSpecRows)(env, "Card"),
         pack.price > 0 ? (0, packSpecReader_1.readSpecRows)(env, "Reward") : Promise.resolve([]),
         (0, missionSpec_1.readMissionCatalog)(env),
-        (0, packSpecReader_1.readSpecRows)(env, "CardEnhanceRule"),
-        (0, packSpecReader_1.readSpecRows)(env, "CardLimitBreak"),
     ]);
-    const snackGrowthCurve = (0, snackGrowthSpec_1.requireSnackGrowthCurve)(ruleRows, curveRows);
     const duplicateRows = (0, rewardTable_1.parseRewardRows)(rawRewards);
     const cardGrades = new Map(cardRows.map((row) => [Number(row.id), String(row.grade)]));
     let granted = [];
@@ -133,7 +128,7 @@ exports.openPack = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)("o
     // 기간은 여기서 **한 번만** 잰다 — 트랜잭션 콜백은 재실행되므로 그 안에서 재면
     // 경계에 걸린 호출이 어느 기간에 실릴지가 재실행 운에 달린다.
     const period = (0, period_1.missionPeriod)(Date.now());
-    const result = await (0, saveDocument_1.mutateSave)(env, uid, "openPack", { kind: "client", txId, ...(0, onboardingOperation_1.onboardingReceipt)(request.data, "openPack") }, async (current, transaction, wallet) => {
+    const result = await (0, saveDocument_1.mutateSave)(env, uid, "openPack", { kind: "client", txId, ...(0, onboardingOperation_1.onboardingReceipt)(request.data, "openPack") }, async (current, transaction, wallet, preparePackStatistics) => {
         // 독립 문서는 함께 읽고, 미션·지갑 쓰기 전에 모두 확보한다.
         const missionReference = (0, missionStore_1.missionsRef)(firebaseApp_1.db, env, uid);
         const [missionSnapshot, rankSnapshot] = await transaction.getAll(missionReference, (0, rankStore_1.rankRef)(firebaseApp_1.db, env, uid));
@@ -163,12 +158,12 @@ exports.openPack = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)("o
         goldAfter = paid[pack.priceType];
         const slots = {
             ownership: (0, packSlots_1.buildOwnershipSlot)(owned, drawn),
-            cardGrowth: (0, cardGrowth_1.growthSlot)((0, itemGrant_1.applyDrawnSnackGrowth)((0, cardGrowth_1.readGrowthEntries)(current.cardGrowth), drawn, snackGrowthCurve, cardGrades)),
+            cardGrowth: (0, cardGrowth_1.growthSlot)((0, itemGrant_1.applyDrawnCardGrowth)((0, cardGrowth_1.readGrowthEntries)(current.cardGrowth), drawn, cardGrades)),
         };
         (0, guideMutation_1.applyGuideProgress)(missions, current, slots, cardRows, catalog);
-        (0, snackGrowthProgress_1.applySnackGrowthProgress)(missions, drawn);
         // 진행도는 콜백 **안**에서 올린다 — mutateSave 는 영수증이 히트하면 이 콜백을 통째로 건너뛰므로,
         // 그 덕에 재시도가 진행도를 두 번 올리지 않는다. 콜백 밖으로 옮기면 그 보장이 사라진다.
+        await preparePackStatistics(1);
         (0, missionStore_1.commitMissionBump)(transaction, missions, eventNames_1.EVENTS.packOpened.missionKey, 1, firestore_1.FieldValue.serverTimestamp());
         missionState = (0, missionStore_1.missionResponse)(missions.state, period, catalog);
         return {

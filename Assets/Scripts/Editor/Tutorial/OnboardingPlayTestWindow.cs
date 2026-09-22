@@ -10,7 +10,7 @@ public sealed class OnboardingPlayTestWindow : EditorWindow
     bool m_starting;
     string m_error;
 
-    [MenuItem("Tools/Tutorial/Play Test Act 2 Onboarding")]
+    [MenuItem("Tools/Card Battle/튜토리얼/Play Test Act 2 Onboarding")]
     public static void Open() => GetWindow<OnboardingPlayTestWindow>("2막 온보딩 테스트");
 
     void OnInspectorUpdate() => Repaint();

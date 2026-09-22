@@ -160,6 +160,8 @@ public static class ContentUnlockManager
 
     static ContentUnlockEvaluation EvaluateRule(ContentUnlockRule _rule)
     {
+        if (_rule.ContentKey == CARD_ENHANCE && OutgameTutorialRunner.IsDefeatEnhanceInterlude)
+            return new ContentUnlockEvaluation(EContentUnlockRequirement.None);
         int t_requiredTier = -1;
         if (_rule.RequireRank && RankManager.IsConfigured)
             for (int t_i = 0; RankManager.TryGetTier(t_i, out RankTier t_tier); t_i++)

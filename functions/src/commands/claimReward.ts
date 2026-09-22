@@ -13,7 +13,6 @@ import {
 import {missionPeriod} from "../missions/period";
 import {readMissionCatalog} from "../missions/missionSpec";
 import {applyGuideProgress, readGuideCards} from "../missions/guideMutation";
-import {applySnackGrowthProgress} from "../missions/snackGrowthProgress";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {
@@ -444,7 +443,7 @@ export const claimReward = onCall(measuredCallable("claimReward", async (request
   let rankProgress: RankProgressResponse | undefined;
 
   const result = await mutateSave(env, uid, "claimReward", {kind: "client", txId},
-    async (current, transaction, wallet): Promise<SaveMutation> => {
+    async (current, transaction, wallet, preparePackStatistics): Promise<SaveMutation> => {
       // 미션 읽기가 콜백의 첫 줄이다 — 아래 쓰기보다 반드시 앞이어야 한다(Firestore 트랜잭션 규칙).
       const missions = await beginMissionBump(transaction, db, env, uid, period, current);
       const itemRankSnapshot = itemContext !== null && ownerType !== "Rank" ?
@@ -472,6 +471,7 @@ export const claimReward = onCall(measuredCallable("claimReward", async (request
       itemGrant = itemContext === null ? {slots: {}, cards: [], currencies: []} :
         grantRewardItems(current, items, itemContext, rewardRows, "",
           rankState?.points ?? Number(itemRankSnapshot?.data()?.points ?? (current.rank as {points?: number})?.points ?? 0));
+      await preparePackStatistics(itemGrant.packs?.length ?? 0);
       granted = [...gains, ...itemGrant.currencies];
       const paid = granted.length === 0 ?
         undefined :
@@ -485,7 +485,6 @@ export const claimReward = onCall(measuredCallable("claimReward", async (request
       // 올리면 미션 수령이 미션을 낳는 자기참조가 된다.
       const finish = (slots: SlotPatch): SaveMutation => {
         applyGuideProgress(missions, current, slots, guideCards, catalog);
-        applySnackGrowthProgress(missions, itemGrant.cards);
         commitMissionBump(transaction, missions, EVENTS.rewardClaimed.missionKey, 1, FieldValue.serverTimestamp());
         missionState = missionResponse(missions.state, period, catalog);
         return {slots, wallet: paid};

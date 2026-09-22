@@ -5,7 +5,7 @@ const {readFileSync} = require("node:fs");
 const {resolve} = require("node:path");
 const {test, before, after, beforeEach} = require("node:test");
 const {initializeTestEnvironment, assertFails, assertSucceeds} = require("@firebase/rules-unit-testing");
-const {doc, setDoc, updateDoc, deleteDoc, deleteField, serverTimestamp} = require("firebase/firestore");
+const {doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, serverTimestamp} = require("firebase/firestore");
 const {buildFreshAccountSlots} = require("../lib/save/freshAccount");
 
 let env;
@@ -38,6 +38,26 @@ test("profile cosmetics and deck saves preserve server XP", async () => {
   await assertSucceeds(update({"profile.nickname": "renamed"}));
   await seed(original());
   await assertSucceeds(update({deck: {slots: []}}));
+});
+test("retired keyword growth cannot be restored to a migrated save", async () => {
+  await assertFails(update({keywordGrowth: {levels: {1: 10}}}));
+  await assertSucceeds(update({"profile.nickname": "clean-growth-save"}));
+});
+test("server card growth stays immutable while migrated saves can change profile and deck", async () => {
+  const migrated = original();
+  migrated.cardGrowth = {entries: {1: {level: 3, shardProgress: 4}}};
+  await seed(migrated);
+  for (const patch of [
+    {"cardGrowth.entries.1.snack": 20},
+    {"cardGrowth.entries.1.limitBreak": 3},
+    {"cardGrowth.entries.1.level": 4},
+    {"cardGrowth.entries.1.shardProgress": 8},
+    {cardGrowth: {entries: {}}},
+    {cardGrowth: deleteField()},
+  ]) await assertFails(update(patch));
+  await assertSucceeds(update({"profile.nickname": "migrated"}));
+  await seed(migrated);
+  await assertSucceeds(update({deck: {slots: []}, cardGrowth: migrated.cardGrowth}));
 });
 test("XP increment, decrement, deletion and replacement are denied", async () => {
   for (const value of [351, 0, -1, 350.5, "350", null, deleteField()]) {
@@ -75,4 +95,16 @@ test("clients cannot create saves, delete saves or forge permanent battle XP cla
   await assertFails(setDoc(doc(db(), "envs/test/users/player/accountBattleClaims/match-1"), {claimed: true}));
   await env.clearFirestore();
   await assertFails(setDoc(doc(db(), path), original()));
+});
+
+test("player statistics cannot be read or forged directly, even by their owner", async () => {
+  const statsPath = "envs/test/users/player/statistics/current";
+  await env.withSecurityRulesDisabled((context) => setDoc(doc(context.firestore(), statsPath),
+    {revision: 1, lifetime: {wins: 2}, legacyProgress: {WinBattle: 2}}));
+  for (const firestore of [db(), db("stranger"), env.unauthenticatedContext().firestore()]) {
+    await assertFails(getDoc(doc(firestore, statsPath)));
+    await assertFails(setDoc(doc(firestore, statsPath), {lifetime: {wins: 999}}));
+    await assertFails(updateDoc(doc(firestore, statsPath), {"lifetime.wins": 999}));
+    await assertFails(deleteDoc(doc(firestore, statsPath)));
+  }
 });

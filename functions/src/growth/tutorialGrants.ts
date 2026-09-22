@@ -1,7 +1,7 @@
 /**
  * 튜토리얼 무료 한 방 문서(`envs/{env}/users/{uid}/grants/current`)를 아는 유일한 파일.
  *
- * 신규 계정 지급은 Gold 뿐이라 온보딩이 시키는 카드 강화(Shard)·키워드 강화(Energy)는 낼 돈이 없다.
+ * 신규 계정 지급은 Gold 뿐이라 온보딩이 시키는 카드 강화(Shard)는 낼 돈이 없다.
  * 그 한 방을 클라 정적 필드가 들고 있으면 앱 재시작으로 되살아나므로 계정당 1회를 서버가 소유한다.
  *
  * 같은 문서가 튜토리얼 무료 팩의 지급 낙인(`packs`)도 든다 — 계정당 팩 1회라는 축이 같고,
@@ -22,12 +22,11 @@ import type {
 export const GRANT_SCHEMA_VERSION = 1;
 
 /** 무료 한 방이 걸린 성장 축. 축마다 계정당 1회다. */
-export type GrantAxis = "enhanceCard" | "enhanceKeyword";
+export type GrantAxis = "enhanceCard";
 
 /** 축별 소진 여부. true 면 그 축의 무료 한 방은 이미 썼다. */
 export interface TutorialGrants {
   enhanceCard: boolean;
-  enhanceKeyword: boolean;
 }
 
 /**
@@ -51,7 +50,6 @@ export function readGrants(snapshot: DocumentSnapshot): TutorialGrants {
   const data = snapshot.exists ? snapshot.data() : undefined;
   return {
     enhanceCard: data?.enhanceCard === true,
-    enhanceKeyword: data?.enhanceKeyword === true,
   };
 }
 

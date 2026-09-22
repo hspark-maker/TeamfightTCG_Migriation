@@ -22,6 +22,9 @@ public static class OutgameTutorialRunner
     // 진행도가 다음 스텝으로 넘어갈 때 발화
     public static event Action OnStepChanged;
 
+    /// <summary>전투 진입 실패·취소 후 같은 로비에서 안내를 재개한다.</summary>
+    public static event Action OnBattleEntryRestored;
+
     /// <summary>강제 온보딩을 처음 졸업한 순간.</summary>
     public static event Action OnSequenceCompleted;
 
@@ -32,7 +35,12 @@ public static class OutgameTutorialRunner
     public static event Action OnGuidedChanged;
 
     // 데이터가 주입됐고 강제 시퀀스가 아직 완료 전인가
-    public static bool IsRunning => s_data != null && !OutgameTutorialProgress.IsCompleted;
+    public static bool IsRunning => s_data != null && !OutgameTutorialProgress.IsCompleted && !IsDefeatEnhanceInterlude;
+
+    // 강제 좌표는 그대로 보관한다. 완료 저장이 끝날 때까지 GuideResume도 유지한다.
+    public static bool IsDefeatEnhanceInterlude => !OutgameTutorialProgress.IsCompleted
+        && DataSaveManager.Data.Tutorial?.DefeatEnhancePending == true
+        && GuideResume.Trigger == EOutgameTutorialTrigger.CollectionTabFirstEnter;
 
     public static bool IsGuidedRunning => s_guidedChapter >= 0;
 
@@ -40,9 +48,8 @@ public static class OutgameTutorialRunner
     public static EOutgameTutorialTrigger GuidedTrigger
         => IsGuidedRunning && TryGetChapterRaw(s_guidedChapter, out var t_chapter) ? t_chapter.Trigger : EOutgameTutorialTrigger.None;
 
-    // 졸업 전에는 자율 안내가 통째로 잠긴다 — 게이트는 하나뿐이라 두 안내가 겹치면 서로를 가로채고,
-    // 첫시작 동선 밖의 탭으로 부르는 점은 아직 못 가는 곳을 가리킨다. 문은 졸업 낙인 하나다.
-    static bool IsGuidedOpen => OutgameTutorialProgress.IsCompleted;
+    // 첫 패배 강화만 강제 커서를 멈추고 먼저 실행한다. 그 밖의 자율 안내는 졸업 뒤에 열린다.
+    static bool IsGuidedOpen => OutgameTutorialProgress.IsCompleted || IsDefeatEnhanceInterlude;
 
     // 저작된 챕터("N편") 총수 — 강제·자율을 다 센다(미주입·빈 시퀀스는 0). 강제 커서의 범위는 ForcedChapterCount다
     public static int ChapterCount => s_data != null && s_data.Chapters != null ? s_data.Chapters.Count : 0;
@@ -275,6 +282,8 @@ public static class OutgameTutorialRunner
         s_data = _data;
         TutorialConfig.BattleFinished -= NotifyScriptedBattleFinished;
         TutorialConfig.BattleFinished += NotifyScriptedBattleFinished;
+        TutorialConfig.BattleResult -= NotifyDefeatForEnhance;
+        TutorialConfig.BattleResult += NotifyDefeatForEnhance;
         s_forcedCount = _data.FtueChapterCount;
         WarnOnMisauthoredChapters();
     }
@@ -482,14 +491,21 @@ public static class OutgameTutorialRunner
     public static bool IsCurrentAction(EOutgameTutorialAction _action)
         => TryGetCurrentStep(out var t_step) && t_step.Action == _action;
 
-    // 이번 스텝이 상점 진열·판매 대상을 지정했으면 true(미지정이면 상점 기본 진열)
+    // 구매 스텝과 그 직전 팩 탭 이동에서 같은 진열·판매 대상을 쓴다(미지정이면 상점 기본 진열).
     // 가격 자리에 띄울 문구도 함께 준다 — 저작이 비면 null이고, 그러면 팩의 실제 가격을 쓴다
     public static bool TryGetForcedPack(out string _packId, out string _priceLabel)
     {
         _packId     = null;
         _priceLabel = null;
 
-        return TryGetCurrentStep(out var t_step) && t_step.TryGetForcedPack(out _packId, out _priceLabel);
+        if (!TryGetCurrentStep(out var t_step)) return false;
+        if (t_step.TryGetForcedPack(out _packId, out _priceLabel)) return true;
+
+        // 탭 버튼의 리스너가 구매 스텝 커밋보다 먼저 화면을 연다. 이때도 다음 구매 팩을 써야
+        // 일반 팩이 한순간 진열되지 않는다. 다른 안내나 다음 챕터의 구매까지 앞당기지는 않는다.
+        return t_step.Anchor == EOutgameTutorialAnchor.LobbyPackTab
+            && TryGetStepAt(OutgameTutorialProgress.ChapterIndex, OutgameTutorialProgress.StepIndex + 1, out var t_next)
+            && t_next.TryGetForcedPack(out _packId, out _priceLabel);
     }
 
     // 이번 스텝이 자동 편성으로 채울 카드를 지정했으면 true(미지정이면 일반 편성 규칙)
@@ -595,6 +611,20 @@ public static class OutgameTutorialRunner
         OutgameTutorialProgress.Save();
     }
 
+    /// <summary>전투 진입을 취소하거나 거절당했으면 저장된 진입 스텝에서 안내를 다시 건다.</summary>
+    public static void RestorePendingBattleEntry()
+    {
+        int t_pendingId = DataSaveManager.Data.Tutorial?.Execution?.BattleEntryStepId ?? 0;
+        if (t_pendingId <= 0 || !TryFindStepId(t_pendingId, out int t_chapter, out int t_step)
+            || t_chapter >= ForcedChapterCount
+            || (!OutgameTutorialProgress.IsCompleted && OutgameTutorialProgress.StepId == t_pendingId)) return;
+
+        DataSaveManager.Data.Tutorial.OutgameCompleted = false;
+        OutgameTutorialProgress.CommitStep(t_chapter, t_step);
+        OutgameFeatureLock.Refresh();
+        OnBattleEntryRestored?.Invoke();
+    }
+
     /// <summary>버튼 리스너의 완료 저장이 끝난 뒤에만 씬을 떠난다.</summary>
     public static async UniTask<bool> ConfirmBattleDepartureAsync(CancellationToken _ct)
     {
@@ -611,6 +641,39 @@ public static class OutgameTutorialRunner
         if (t_execution == null || t_execution.BattleEntryStepId == 0) return;
         t_execution.BattleEntryStepId = 0;
         OutgameTutorialProgress.Save();
+    }
+
+    static void NotifyDefeatForEnhance(bool _defeated)
+    {
+        if (!_defeated || !IsRunning
+            || OutgameTutorialProgress.IsTriggerDone(EOutgameTutorialTrigger.CollectionTabFirstEnter)) return;
+        DataSaveManager.Data.Tutorial.DefeatEnhancePending = true;
+        OutgameTutorialProgress.Save();
+    }
+
+    /// <summary>카드 지급·덱 편집을 마친 다음 전투 진입점에서 첫 패배의 강화 안내를 끼운다.</summary>
+    public static bool TryBeginDefeatEnhance()
+    {
+        if (!IsRunning || DataSaveManager.Data.Tutorial?.DefeatEnhancePending != true
+            || OutgameTutorialProgress.IsTriggerDone(EOutgameTutorialTrigger.CollectionTabFirstEnter)
+            || !TryGetCurrentStep(out var t_step) || t_step.Action != EOutgameTutorialAction.BattleEntry
+            || (DataSaveManager.Data.Tutorial.Execution?.BattleEntryStepId ?? 0) != 0
+            || !GuideMissionFlows.TryGet(EOutgameTutorialTrigger.CollectionTabFirstEnter, out var t_flow)) return false;
+        GuideResume.Begin(t_flow);
+        ContentUnlockManager.RequestRefresh();
+        return true;
+    }
+
+    /// <summary>강화 안내 완료 저장과 로비 복귀를 마친 뒤 보관한 강제 안내를 재개한다.</summary>
+    public static void ResumeAfterDefeatEnhance()
+    {
+        if (!IsDefeatEnhanceInterlude
+            || !OutgameTutorialProgress.IsTriggerDone(EOutgameTutorialTrigger.CollectionTabFirstEnter)) return;
+        DataSaveManager.Data.Tutorial.DefeatEnhancePending = false;
+        GuideResume.Clear();
+        OutgameFeatureLock.Refresh();
+        OutgameFeatureLock.NotifyContentChanged();
+        OnBattleEntryRestored?.Invoke();
     }
 
     // 시퀀스 처음부터 지정 좌표까지(그 칸 포함) 스텝을 순서대로 훑는다
@@ -677,6 +740,10 @@ public static class OutgameTutorialRunner
 
         if (t_chapter >= ForcedChapterCount)
         {
+            // 클릭 완료는 전투 결과가 아니다. 덱 선택/매칭 중 다른 UI 이벤트가 안내를 갱신해도
+            // 실제 결과 통지로 pending이 해제되기 전에는 졸업하지 않는다.
+            if ((DataSaveManager.Data.Tutorial?.Execution?.BattleEntryStepId ?? 0) > 0)
+                return EOutgameTutorialStepResult.Gated;
             // 끝 좌표(마지막 강제 스텝 바로 다음 자리)는 정상이다 — 전투로 나간 마지막 스텝이 미뤄 둔 졸업을 여기서 확정한다.
             // 브리지 Start에서 도는 자리라 로비 랭크 연출 디렉터의 캐리어 소비(다음 프레임)보다 앞선다.
             // 저작이 강제 챕터를 줄여 좌표가 자율 챕터 안에 남은 세이브도 여기로 온다 — 그 안내는 낙인이 없으니 알림 점이 다시 부른다.

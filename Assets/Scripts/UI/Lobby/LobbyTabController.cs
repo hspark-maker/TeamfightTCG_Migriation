@@ -42,21 +42,23 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
     int m_currentIndex = -1;
     int m_swipeVersion;
     int m_selectionRequest;
+    int m_requestedIndex = -1;
 
     public int SwipeVersion => m_swipeVersion;
 
     /// <summary>이탈 확인 대기를 포함한 최신 화면 이동 요청.</summary>
     public int SelectionRequestVersion => m_selectionRequest;
 
+    public bool IsTransitioning => m_pendingStart != null || m_startSlides != null
+        || m_pendingArrive != null || m_leaving != null;
 
     public bool CanSwipe => isActiveAndEnabled && m_currentIndex >= 0
         && (dragController == null || !dragController.IsDragging)
-        && m_pendingStart == null && m_startSlides == null
-        && m_pendingArrive == null && m_leaving == null
+        && !IsTransitioning
         // 미완주 상태라도 전체 해금된 로비는 자유 조작을 허용한다.
         && (!OutgameTutorialRunner.IsRunning || OutgameFeatureLock.IsFtueFreeNavigation)
         && !OutgameTutorialRunner.IsGuidedRunning && !GuidanceCoordinator.IsInputLocked
-        && !GuidanceCoordinator.IsContentIntroBlockingNavigation;
+        && !GuidanceCoordinator.IsLobbyPresentationBlockingNavigation;
 
     /// <summary>Moves one adjacent tab through the same policy as a tab button.</summary>
     public void TrySwipe(int _direction)
@@ -104,8 +106,9 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
 
     /// <summary>현재 화면이 이미 해당 탭인지 확인한다.</summary>
     public bool IsCurrentAnchorSelected(EOutgameTutorialAnchor _anchor)
-        => m_currentIndex >= 0 && m_currentIndex < tabs.Count
-            && tabs[m_currentIndex].tutorialAnchor == _anchor && _anchor != EOutgameTutorialAnchor.None;
+        => !IsTransitioning && m_currentIndex >= 0 && m_currentIndex < tabs.Count
+            && tabs[m_currentIndex].tutorialAnchor == _anchor && _anchor != EOutgameTutorialAnchor.None
+            && (!(CurrentPanel is LobbyStoreTabPanel t_store) || t_store.IsPackSelected);
 
     public LobbyTabPanel CurrentPanel
         => m_currentIndex >= 0 && m_currentIndex < tabs.Count
@@ -115,6 +118,24 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
     bool m_initialized;
 
     void Awake() => InitializeUI();
+
+    void LateUpdate()
+    {
+        if (tabBar != null) tabBar.SetInputBlockedVisual(!CanUseTabBar());
+    }
+
+    bool CanUseTabBar()
+    {
+        if (m_currentIndex < 0) return true; // 초기 배치 전에는 잠금 연출을 시작하지 않는다.
+        for (int t_i = 0; t_i < tabs.Count; t_i++)
+        {
+            var t_tab = tabs[t_i];
+            if (t_i == m_currentIndex || t_tab.panel == null) continue;
+            if (OutgameFeatureLock.IsUnlocked(t_tab.unlockFeature)
+                && GuidanceCoordinator.AllowsUserNavigation(t_tab.tutorialAnchor)) return true;
+        }
+        return false;
+    }
 
     public void InitializeUI()
     {
@@ -192,23 +213,56 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
     /// 잠금 검사를 건너뛰는 이유: 기본 탭이 아직 잠긴 온보딩 구간이면 Select가 조용히 물러나 유저가 갇힌다.</summary>
     public void SelectDefault() => Select(defaultIndex, false);
 
-    void HandleTabSelected(int _index) => Select(_index);
+    void HandleTabSelected(int _index)
+    {
+        // 튜토리얼의 팩 앵커도 이 하단 버튼을 누른다. 진입 시 팩 페이지를 연다.
+        if (_index >= 0 && _index < tabs.Count && tabs[_index].panel is LobbyStoreTabPanel t_store)
+        {
+            if (!t_store.CanSelectFeature(EOutgameFeature.LobbyPackTab)) return;
+            SelectInternal(_index, true, () => t_store.ShowFeature(EOutgameFeature.LobbyPackTab), null);
+            return;
+        }
+        Select(_index);
+    }
 
     /// <summary>미션 등 외부 진입도 저작된 탭과 잠금 정책을 따라 선택한다.</summary>
     public bool TrySelectFeature(EOutgameFeature _feature, Action _beforeSelect = null, Action _afterSelect = null, Action _onArrived = null)
     {
         if (!isActiveAndEnabled || _feature == EOutgameFeature.None) return false;
+        if (_feature == EOutgameFeature.LobbyPackTab || _feature == EOutgameFeature.LobbyShopTab)
+        {
+            int t_storeIndex = tabs.FindIndex(_tab => _tab.panel is LobbyStoreTabPanel);
+            if (t_storeIndex >= 0)
+            {
+                var t_store = (LobbyStoreTabPanel)tabs[t_storeIndex].panel;
+                if (!t_store.CanSelectFeature(_feature)) return false;
+                return SelectInternal(t_storeIndex, _feature == EOutgameFeature.LobbyPackTab, () =>
+                {
+                    _beforeSelect?.Invoke();
+                    t_store.ShowFeature(_feature);
+                }, _afterSelect, _onArrived);
+            }
+        }
         int t_index = tabs.FindIndex(_tab => _tab.panel != null &&
             (_feature == EOutgameFeature.LobbyMatchTab
                 ? _tab.panel is LobbyMatchTabPanel : _tab.unlockFeature == _feature));
         if (t_index < 0 || !OutgameFeatureLock.IsUnlocked(tabs[t_index].unlockFeature)) return false;
 
-        SelectInternal(t_index, true, _beforeSelect, _afterSelect, _onArrived);
-        return true;
+        return SelectInternal(t_index, true, _beforeSelect, _afterSelect, _onArrived);
     }
 
     public void Select(LobbyTabPanel _panel, bool _fireTrigger = true)
     {
+        foreach (Tab t_tab in tabs)
+        {
+            if (!(t_tab.panel is LobbyStoreTabPanel t_store)) continue;
+            if (_panel == t_store.PackPanel || _panel == t_store.ShopPanel)
+            {
+                TrySelectFeature(_panel == t_store.PackPanel
+                    ? EOutgameFeature.LobbyPackTab : EOutgameFeature.LobbyShopTab);
+                return;
+            }
+        }
         int t_index = tabs.FindIndex(_tab => _tab.panel == _panel);
         if (t_index >= 0) Select(t_index, _fireTrigger);
     }
@@ -216,36 +270,40 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
     public void Select(int _index, bool _fireTrigger = true)
         => SelectInternal(_index, _fireTrigger, null, null);
 
-    void SelectInternal(int _index, bool _fireTrigger, Action _beforeSelect, Action _afterSelect, Action _onArrived = null)
+    bool SelectInternal(int _index, bool _fireTrigger, Action _beforeSelect, Action _afterSelect, Action _onArrived = null)
     {
         InitializeUI();
-        if (_index < 0 || _index >= tabs.Count) return;
-        if (m_currentIndex >= 0 && !GuidanceCoordinator.AllowsUserNavigation(tabs[_index].tutorialAnchor)) return;
+        if (_index < 0 || _index >= tabs.Count) return false;
+        if (m_currentIndex >= 0 && !GuidanceCoordinator.AllowsUserNavigation(tabs[_index].tutorialAnchor)) return false;
         if (_fireTrigger &&
             !OutgameFeatureLock.IsUnlocked(tabs[_index].unlockFeature))
-            return;
-        int t_request = ++m_selectionRequest;
+            return false;
         if (_index == m_currentIndex)
         {
+            // 같은 목적지를 다시 눌러도 진행 중인 안내의 도착 콜백을 무효화하지 않는다.
+            int t_existingRequest = m_requestedIndex == _index ? m_selectionRequest : ++m_selectionRequest;
+            m_requestedIndex = _index;
             _beforeSelect?.Invoke();
             // 출발을 기다리는 중이면 손대지 않는다 — 여기서 알약을 먼저 보내면 콘텐츠와 박자가 갈라진다.
             if (m_pendingStart == null) tabBar?.SetSelected(_index);
             _afterSelect?.Invoke();
             if (m_pendingArrive != null) m_pendingArrive += () =>
             {
-                if (t_request == m_selectionRequest && isActiveAndEnabled) _onArrived?.Invoke();
+                if (t_existingRequest == m_selectionRequest && isActiveAndEnabled) _onArrived?.Invoke();
             };
             else _onArrived?.Invoke();
-            return;
+            return true;
         }
 
+        int t_request = ++m_selectionRequest;
+        m_requestedIndex = _index;
         LobbyTabPanel t_current = CurrentPanel;
         if (t_current == null)
         {
             _beforeSelect?.Invoke();
             CommitSelection(_index, _fireTrigger, _onArrived);
             _afterSelect?.Invoke();
-            return;
+            return true;
         }
 
         bool t_internal = GuidanceCoordinator.IsInternalNavigation;
@@ -257,6 +315,7 @@ public class LobbyTabController : MonoBehaviour, IUIInitializable
             CommitSelection(_index, _fireTrigger, _onArrived);
             _afterSelect?.Invoke();
         });
+        return true;
     }
 
     /// <summary>탭을 실제로 갈아 끼운다. 슬라이드도 여기서만 시작한다 —

@@ -55,7 +55,7 @@ import {
  */
 type EnhanceReject = "MaxLevel" | "NotAffordable" | "RuleUnavailable" | "NotReady";
 
-/** 무료 한 방이 걸린 축. 키워드 강화와 다른 축이라 따로 소진된다. */
+/** 카드 강화 튜토리얼의 무료 한 방 축. */
 const FREE_SHOT_AXIS = "enhanceCard";
 
 /**

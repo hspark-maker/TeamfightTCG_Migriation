@@ -76,6 +76,9 @@ public class EnhanceResultPanelView : ContentsUIBehaviour
 
     [Header("타이틀")]
     [SerializeField] TMP_Text titleText;
+    [Tooltip("제목과 결과 행 묶음. 중앙에 내려온 진화 카드 아래에 맞춰 축소한다.")]
+    [SerializeField] RectTransform resultLayout;
+    [SerializeField, Range(0.4f, 1f)] float centeredCardResultScale = 0.62f;
     [SerializeField] Color    successColor   = new Color(0.45f, 1f, 0.55f, 1f);
     [SerializeField] Color    failColor      = new Color(1f, 0.45f, 0.4f, 1f);
     [SerializeField] string   successMessage = "강화 성공!";
@@ -87,8 +90,8 @@ public class EnhanceResultPanelView : ContentsUIBehaviour
     [SerializeField] CanvasGroup[] rows;
     [Tooltip("오른 체력 \"체력 71 → 73\". 뒤 숫자가 굴러 오른다.")]
     [SerializeField] TMP_Text effectValueText;
-    [Tooltip("오른 성급 \"1성 → 2성\".")]
-    [SerializeField] TMP_Text gradeValueText;
+    [Tooltip("강화 후 별 채움. 새로 얻은 별은 행 등장 뒤 강조한다.")]
+    [SerializeField] GrowthStarStrip growthStars;
 
     [Header("한 번 더 (선택)")]
     [Tooltip("결과판에서 곧바로 다음 강화로 잇는다 — 연타가 이 시스템의 본체라 여기서 손이 끊기면 안 된다.")]
@@ -147,7 +150,7 @@ public class EnhanceResultPanelView : ContentsUIBehaviour
     /// **어느 결과가 그 대상인지는 성장 규칙을 아는 호출부 몫**이고 여기는 켬/끔만 받는다
     /// (<see cref="EnhanceResultLine.UnlockText"/>와 같은 규약) — 머무는 박자만 이쪽 저작값이다.</summary>
     public void Show(EnhanceResultLine _line, Action _onClose, Action _onRetry,
-                     Action _onRowsDone = null, bool _autoReturn = false)
+                     Action _onRowsDone = null, bool _autoReturn = false, bool _centeredCard = false)
     {
         this.m_onRowsDone = _onRowsDone;
         this.m_rowsDone   = false;
@@ -163,6 +166,8 @@ public class EnhanceResultPanelView : ContentsUIBehaviour
         EnsureBase();
         KillSeq();
         KillAutoReturn();   // 앞 판의 예약이 살아 있으면 이제 막 뜬 이 판을 닫는다
+        if (this.resultLayout != null)
+            this.resultLayout.localScale = Vector3.one * (_centeredCard ? this.centeredCardResultScale : 1f);
 
         this.m_onClose      = _onClose;
         this.m_onRetry      = _onRetry;
@@ -180,9 +185,8 @@ public class EnhanceResultPanelView : ContentsUIBehaviour
                                                                          : this.failMessage;
         }
 
-        if (this.gradeValueText != null)
-            this.gradeValueText.text = t_success ? GrowthStar.TransitionLabel(_line.FromLevel, _line.ToLevel)
-                                                 : $"{GrowthStar.Label(_line.FromLevel)} 유지";
+        if (this.growthStars != null)
+            this.growthStars.SetLevel(t_success ? _line.ToLevel : _line.FromLevel);
 
         if (this.retryButton != null) this.retryButton.interactable = _line.CanRetry;
         if (this.retryNoticeText != null) this.retryNoticeText.text = _line.RetryNotice;
@@ -328,6 +332,9 @@ public class EnhanceResultPanelView : ContentsUIBehaviour
                 _seq.Insert(t_at, t_row.DOFade(1f, this.rowRiseDuration));
                 if (t_rect != null)
                     _seq.Insert(t_at, t_rect.DOAnchorPos(this.m_rowBase[t_i], this.rowRiseDuration).SetEase(Ease.OutCubic));
+                if (this.growthStars != null && this.growthStars.transform.IsChildOf(t_row.transform))
+                    _seq.InsertCallback(t_at + this.rowRiseDuration,
+                        () => this.growthStars.PulseGained(_line.FromLevel, _line.ToLevel));
             }
 
         if (!_success || this.effectValueText == null || _line.ToHp <= _line.FromHp) return;

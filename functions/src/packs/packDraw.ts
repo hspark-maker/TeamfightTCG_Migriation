@@ -13,10 +13,6 @@
  */
 
 import {parsePoolGrade} from "./rankGrade";
-import type {SnackGrowth} from "../growth/cardGrowth";
-
-/** 중복 1장이 주는 간식 수. 클라 CardPackOpener.SnackPerDuplicate 와 같아야 한다. */
-export const SNACK_PER_DUPLICATE = 1;
 
 /** CardPackDrop 표의 한 행. 업로더가 만드는 필드 그대로다. */
 export interface DropRow {
@@ -33,13 +29,10 @@ export interface WeightedCard {
   weight: number;
 }
 
-/** 뽑힌 카드 1장. 클라 DrawnCard(cardId, isNew, snack) 생성자와 1:1이다. */
+/** 뽑힌 카드 1장. 소유 여부를 결과에 보존한다. */
 export interface DrawnCard {
   cardId: number;
   isNew: boolean;
-  snack: number;
-  /** 존재하면 클라는 이 카드의 간식 성장 연출을 생략하지 않는다. */
-  snackGrowth?: SnackGrowth;
 }
 
 /** 난수원. 0 이상 max 미만의 정수를 낸다(crypto.randomInt 형태). */
@@ -108,7 +101,7 @@ function pickWeightedCandidate(pool: WeightedCard[], candidates: number[], roll:
 }
 
 /**
- * 신규면 소유만, 중복이면 간식. 클라 CardPackOpener.GrantAndReward 재현이다.
+ * 신규·중복 소유 여부를 판정한다.
  * ownedIds 를 그 자리에서 늘린다 — 한 팩 안에서 같은 카드를 두 번 뽑으면 두 번째는 중복이어야 한다.
  * @param {number} cardId 카드 번호
  * @param {Set<number>} ownedIds 소유 집합(갱신된다)
@@ -117,9 +110,9 @@ function pickWeightedCandidate(pool: WeightedCard[], candidates: number[], roll:
 function grantAndReward(cardId: number, ownedIds: Set<number>): DrawnCard {
   if (!ownedIds.has(cardId)) {
     ownedIds.add(cardId);
-    return {cardId, isNew: true, snack: 0};
+    return {cardId, isNew: true};
   }
-  return {cardId, isNew: false, snack: SNACK_PER_DUPLICATE};
+  return {cardId, isNew: false};
 }
 
 /**

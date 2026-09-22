@@ -18,6 +18,7 @@ public static class SpecPayloadCodec
 {
     // 기존 메타·구클라이언트와의 호환 alias. 값의 의미는 앱 콘텐츠 호환 세대다.
     public const int SchemaVersion = ContentVersion.Major;
+    // KeywordEnhance·CardLimitBreak는 폐기됐지만 기존 스냅샷 지문·정식 스키마 호환을 위해 유지한다. 성장 계산은 읽지 않는다.
     public static readonly string[] TableNames =
     {
         "Card", "CardPack", "CardPackDrop", "AIDeck", "Reward",
@@ -38,15 +39,18 @@ public static class SpecPayloadCodec
     /// <para><c>Mission</c> — 서버의 발행 인덱스에는 포함하되, 클라는 <c>getMissions</c> 응답으로만
     /// 정의를 받는다. 클라이언트 동기화 제외가 서버 발행 제외를 뜻하지는 않는다.</para>
     /// <para><c>RankAiEncounter</c> — 에디터가 CSV에서 직접 발행한다. 클라는 매치 응답의 성장 스냅샷만 받는다.</para>
+    /// <para><c>Achievement</c> — CSV에서 발행하며 클라는 <c>getAchievements</c> 응답으로만 정의를 받는다.</para>
+    /// <para><c>CardCraft</c> — CSV에서 발행하는 서버 전용 등급별 제작 가격이다.</para>
     ///
     /// <para>목록으로 거르는 이유는 <see cref="ServerOwnedRewardOwners"/> 와 같다 — 통째로 조용히
     /// 만들면 진짜로 빠뜨린 표까지 묻힌다. 제외는 이름을 적는 의도적 행위여야 한다.</para>
     /// </summary>
-    public static readonly string[] ServerOnlyTableNames = { "Mission", "RankAiEncounter" };
+    public static readonly string[] ServerOnlyTableNames = { "Mission", "RankAiEncounter", "Achievement", "CardCraft" };
 
-    // AIDeck.card1~card6로 대체된 구형 자식 표. 생성 타입은 남아 있지만 소비자가 없으므로
+    // AIDeckCard는 AIDeck.card1~card6, AdventureReward는 Reward(ownerType=Adventure)로 대체됐다.
+    // 생성 타입은 남아 있지만 소비자가 없으므로
     // 동기화·서버 발행에는 포함하지 않고, 미등록 표 경고에서만 제외한다.
-    static readonly string[] RetiredTableNames = { "AIDeckCard" };
+    static readonly string[] RetiredTableNames = { "AIDeckCard", "AdventureReward" };
 
     /// <summary>서버 발행·롤백 검증 대상. 클라이언트 동기화 목록과 구분한다.</summary>
     public static IEnumerable<string> PublishedTableNames

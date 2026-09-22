@@ -87,8 +87,7 @@ public sealed class SpecSheetPreloadStep : MainInitializer
             GameInitialization.MarkRecoveryRequired();
         }
 
-        // 카드 강화 규칙·한계돌파 곡선이 비면 서버 lockDeck이 덱 잠금을 통째로 거절해 전투 진입이 막힌다.
-        // 키워드 강화 표는 여기서 보지 않는다 — 그 축만 조용히 닫히고 전투는 선다.
+        // 카드 강화 규칙이 비면 서버 lockDeck이 덱 잠금을 거절해 전투 진입이 막힌다.
         if (!GrowthSpec.TryValidateRequired(out string t_growthError))
         {
             Debug.LogError($"[SpecSheetPreloadStep] {t_growthError}");

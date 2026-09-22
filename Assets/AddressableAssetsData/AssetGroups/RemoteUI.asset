@@ -118,6 +118,13 @@ MonoBehaviour:
     - RemoteUI
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2d190845db3641e28ab71bf380f4d0de
+    m_Address: AchievementPanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2e0475eb8d64d1449916d99de758135a
     m_Address: Config/keywordIconConfig
     m_ReadOnly: 0
@@ -135,13 +142,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteUI
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 4124b08d48d20e947a8ce81242bc1032
-    m_Address: KeywordGrowthPanel
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - RemoteUI
-    - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 433bc64ee546c684e85071d606a25a87
     m_Address: SyncUiPrefabCatalog
@@ -227,6 +227,13 @@ MonoBehaviour:
     - RemoteUI
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 879745ceb6053eb459e71f8291a0b6dc
+    m_Address: MailboxPanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 89e5ccc4ebffa9547a10d9ea5b9a0f13
     m_Address: SettingsPanel
     m_ReadOnly: 0
@@ -280,6 +287,13 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a6b490a5a78a4b4a94efa42a069973ee
     m_Address: AttendancePanel
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    - UIPrefab
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a9dc1c04d3b64deea0ef2dc9957eb126
+    m_Address: PlayerStatisticsPanel
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteUI

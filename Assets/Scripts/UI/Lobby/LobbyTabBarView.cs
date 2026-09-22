@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>Owns every visual and input detail inside the lobby bottom tab bar.</summary>
-public sealed class LobbyTabBarView : MonoBehaviour, IUIInitializable
+public sealed class LobbyTabBarView : MonoBehaviour, IUIInitializable, ICanvasRaycastFilter
 {
     [SerializeField] RectTransform focus;
     [SerializeField] Image focusIcon;
@@ -17,6 +17,10 @@ public sealed class LobbyTabBarView : MonoBehaviour, IUIInitializable
     [Tooltip("알약이 선택 탭 자리로 미끄러지는 시간(초). 0이면 즉시 이동")]
     [SerializeField] float focusSlideSeconds = 0.35f;
 
+    [Header("입력 잠금 표시")]
+    [SerializeField, Range(0f, 1f)] float blockedOpacity = 0.55f;
+    [SerializeField, Min(0f)] float blockedTransitionSeconds = 0.18f;
+
     /// <summary>알약 아이콘 표시 박스. 탭 아이콘 크기를 따라가지 않는다.</summary>
     static readonly Vector2 FOCUS_ICON_SIZE = new Vector2(150f, 150f);
 
@@ -24,9 +28,18 @@ public sealed class LobbyTabBarView : MonoBehaviour, IUIInitializable
     TabButtonView[] m_views;
     int m_previousIndex = -1;
     bool m_focusResolved;
+    CanvasGroup m_blockedGroup;
+    Tween m_blockedTween;
+    float m_normalAlpha;
+    float m_blockedLevel;
+    bool m_inputBlocked;
 
     public event Action<int> Selected;
     public int Count { get { EnsureViews(); return m_views.Length; } }
+
+    // 탭바가 딤보다 위로 승격되어 있어도 연출 뒤의 버튼이 터치를 받지 않는다.
+    public bool IsRaycastLocationValid(Vector2 _position, Camera _camera)
+        => !GuidanceCoordinator.IsLobbyPresentationBlockingNavigation;
 
     void Awake() => InitializeUI();
 
@@ -56,6 +69,40 @@ public sealed class LobbyTabBarView : MonoBehaviour, IUIInitializable
     void OnDisable()
     {
         if (focusHighlight != null) DOTween.Kill(focusHighlight);
+        m_blockedTween?.Kill();
+        m_blockedTween = null;
+        m_inputBlocked = false;
+        ApplyBlockedLevel(0f);
+    }
+
+    /// <summary>입력 정책은 셸이 판정한다. 바의 위치를 유지하고 시각적으로만 흐리게 한다.</summary>
+    public void SetInputBlockedVisual(bool _blocked)
+    {
+        if (m_inputBlocked == _blocked) return;
+        m_inputBlocked = _blocked;
+        if (m_blockedGroup == null)
+        {
+            // 셸의 표시/숨김은 부모 BottomBar에서 처리하므로 여기서는 자식 바의 알파만 다룬다.
+            m_blockedGroup = GetComponent<CanvasGroup>();
+            if (m_blockedGroup == null) m_blockedGroup = gameObject.AddComponent<CanvasGroup>();
+            m_normalAlpha = m_blockedGroup.alpha;
+        }
+        m_blockedTween?.Kill();
+        float t_target = _blocked ? 1f : 0f;
+        if (!isActiveAndEnabled || blockedTransitionSeconds <= 0f)
+        {
+            ApplyBlockedLevel(t_target);
+            return;
+        }
+        m_blockedTween = DOTween.To(() => m_blockedLevel, ApplyBlockedLevel, t_target, blockedTransitionSeconds)
+            .SetEase(Ease.OutCubic).SetUpdate(true).SetLink(gameObject);
+    }
+
+    void ApplyBlockedLevel(float _level)
+    {
+        m_blockedLevel = _level;
+        if (m_blockedGroup != null)
+            m_blockedGroup.alpha = m_normalAlpha * Mathf.Lerp(1f, blockedOpacity, _level);
     }
 
     public void ConfigureItem(int _index, string _label, EOutgameTutorialAnchor _anchor,

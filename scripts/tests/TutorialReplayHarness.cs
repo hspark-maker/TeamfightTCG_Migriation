@@ -50,6 +50,7 @@ public static class Harness
         GuideResume.FailNextSave = false;
         GuideResume.FailAtSave = 0;
         GuideResume.PendingSave = null;
+        GuidanceCoordinator.TabSettled = false;
         return new OutgameTutorialBridge();
     }
     public static void Main()
@@ -100,7 +101,17 @@ public static class Harness
         pending.SetResult(true);
         Require(bridge.Advances == 1 && bridge.Entries == 2 && GuideResume.SaveCalls == 2,
             "Confirmed asynchronous completion did not advance exactly once.");
-        Console.WriteLine("PASS: same-step/reentrant notifications, changed cursor, first/second-save failure retry without replay, concurrent completion, asynchronous confirmation.");
+        bridge = Fresh();
+        Current.Completion = EOutgameTutorialCompletion.Click;
+        Current.Anchor = EOutgameTutorialAnchor.LobbyDeckTab;
+        bridge.Apply();
+        bridge.Satisfy();
+        Require(bridge.Advances == 0 && GuideResume.SaveCalls == 0,
+            "A tab click advanced before the destination arrived.");
+        GuidanceCoordinator.TabSettled = true;
+        bridge.Satisfy();
+        Require(bridge.Advances == 1, "Settled tab did not complete the waiting navigation step.");
+        Console.WriteLine("PASS: same-step/reentrant notifications, changed cursor, first/second-save failure retry without replay, concurrent completion, asynchronous confirmation, tab arrival before completion.");
     }
 }
 
@@ -113,8 +124,9 @@ public static class TaskExtensions
     }
 }
 public enum EOutgameTutorialStepResult { Failed, Gated, Advanced }
-public enum EOutgameTutorialCompletion { Other, SynergyDeckEditor }
-public sealed class TutorialStepDef { public int StepId; public int Action; public bool LeavesScene; public EOutgameTutorialCompletion Completion; }
+public enum EOutgameTutorialCompletion { Other, SynergyDeckEditor, Click }
+public enum EOutgameTutorialAnchor { None, LobbyDeckTab }
+public sealed class TutorialStepDef { public int StepId; public int Action; public bool LeavesScene; public EOutgameTutorialCompletion Completion; public EOutgameTutorialAnchor Anchor; }
 public sealed class TutorialActionMeta
 {
     public bool RequiresEntryConfirmation => true;
@@ -157,7 +169,13 @@ public static class DataSaveManager { public static UserSaveData Data = new User
 public static class OutgameTutorialProgress { public static void Save() { } }
 public static class OutgameFeatureLock { public static void Refresh() { } }
 public static class LoadingCoverView { public static bool OwnsLobbyPreparation => false; }
-public static class GuidanceCoordinator { public static bool IsRestoring => false; }
+public static class GuidanceCoordinator
+{
+    public static bool IsRestoring => false;
+    public static bool TabSettled;
+    public static bool IsLobbyTabAnchor(EOutgameTutorialAnchor anchor) => anchor == EOutgameTutorialAnchor.LobbyDeckTab;
+    public static bool IsCurrentTabAnchor(EOutgameTutorialAnchor anchor) => IsLobbyTabAnchor(anchor) && TabSettled;
+}
 public static class ServerWaitOverlay { public static void Hold(object owner) { } public static void Release(object owner) { } }
 public static class Time { public static float unscaledTime => 1; }
 namespace Firebase.Firestore

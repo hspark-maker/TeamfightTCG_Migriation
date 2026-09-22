@@ -9,6 +9,8 @@ public class TutorialSaveData
     [FirestoreProperty("onboardingCommand")] public OnboardingCommandSaveData OnboardingCommand { get; set; }
     // 완료 여부 — 진행 좌표보다 항상 우선
     [FirestoreProperty("outgameCompleted")] public bool OutgameCompleted { get; set; }
+    // 첫 패배 뒤 다음 전투 전에 기존 무료 강화 안내를 진행한다.
+    [FirestoreProperty("defeatEnhancePending")] public bool DefeatEnhancePending { get; set; }
 
     // 진행 좌표(챕터, 챕터 내 스텝) — 스텝 실행 전에 커밋. 런타임 커서일 뿐 세이브의 앵커는 아래 StepId다.
     [FirestoreProperty("chapterIndex")] public int ChapterIndex { get; set; }

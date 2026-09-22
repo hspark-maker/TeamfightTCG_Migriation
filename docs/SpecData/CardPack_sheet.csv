@@ -3,7 +3,7 @@ id,packId,displayName,channel,priceType,price,drawCount,uniqueDraw,refundType,re
 int,string,string,string,string,long,int,int,string,long,string,int,string
 1,NormalPack_TEST,일반 팩,Live,Gold,220,3,0,Shard,0,,1,NormalPack
 3,UltraPack,울트라 팩,Live,Diamond,30,3,1,Shard,0,,0,UltraPack
-4,KeywordDeck,키워드덱,Live,Gold,0,6,1,Shard,0,,0,TutorialPack
+4,KeywordDeck,키워드덱,Live,Gold,0,3,1,Shard,0,,0,TutorialPack
 5,StarterPack,스타터팩,Live,Gold,0,6,1,Shard,0,,0,TutorialPack
 6,SynergyPack,시너지팩,Live,Gold,0,6,1,Shard,0,,0,TutorialPack
 7,HuntingBrandPack,낙인의 비늘,Live,Diamond,30,3,0,Shard,0,Platinum,3,UltraPack
@@ -12,5 +12,5 @@ int,string,string,string,string,long,int,int,string,long,string,int,string
 10,GiantsGardenPack,거인의 사냥,Live,Diamond,30,3,0,Shard,0,Gold,6,UltraPack
 11,ElementalFlowPack,원소의 흐름,Live,Diamond,30,3,0,Shard,0,Bronze,7,UltraPack
 12,RangePack,원거리덱,Live,Gold,0,6,1,Shard,0,,0,TutorialPack
-13,TutorialStarterGrant,튜토리얼 스타터 지급,Live,Gold,0,7,1,Shard,0,,0,TutorialPack
+13,TutorialStarterGrant,튜토리얼 스타터 지급,Live,Gold,0,5,1,Shard,0,,0,TutorialPack
 14,TutorialFirstCard,튜토리얼 첫 카드,Live,Gold,0,1,1,Shard,0,,0,TutorialPack

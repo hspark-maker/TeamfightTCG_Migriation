@@ -44,7 +44,6 @@ const missionStore_1 = require("../missions/missionStore");
 const period_1 = require("../missions/period");
 const missionSpec_1 = require("../missions/missionSpec");
 const guideMutation_1 = require("../missions/guideMutation");
-const snackGrowthProgress_1 = require("../missions/snackGrowthProgress");
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
 const saveDocument_1 = require("../save/saveDocument");
@@ -366,7 +365,7 @@ exports.claimReward = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
     let replayed = true;
     let missionState;
     let rankProgress;
-    const result = await (0, saveDocument_1.mutateSave)(env, uid, "claimReward", { kind: "client", txId }, async (current, transaction, wallet) => {
+    const result = await (0, saveDocument_1.mutateSave)(env, uid, "claimReward", { kind: "client", txId }, async (current, transaction, wallet, preparePackStatistics) => {
         // 미션 읽기가 콜백의 첫 줄이다 — 아래 쓰기보다 반드시 앞이어야 한다(Firestore 트랜잭션 규칙).
         const missions = await (0, missionStore_1.beginMissionBump)(transaction, firebaseApp_1.db, env, uid, period, current);
         const itemRankSnapshot = itemContext !== null && ownerType !== "Rank" ?
@@ -388,6 +387,7 @@ exports.claimReward = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
         // 해금 수령이 빈 지급으로 rev 만 올리면 클라가 달라진 것 없는 잔액을 채택하고 사고를 못 알아챈다.
         itemGrant = itemContext === null ? { slots: {}, cards: [], currencies: [] } :
             (0, itemGrant_1.grantRewardItems)(current, items, itemContext, rewardRows, "", rankState?.points ?? Number(itemRankSnapshot?.data()?.points ?? current.rank?.points ?? 0));
+        await preparePackStatistics(itemGrant.packs?.length ?? 0);
         granted = [...gains, ...itemGrant.currencies];
         const paid = granted.length === 0 ?
             undefined :
@@ -400,7 +400,6 @@ exports.claimReward = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
         // 올리면 미션 수령이 미션을 낳는 자기참조가 된다.
         const finish = (slots) => {
             (0, guideMutation_1.applyGuideProgress)(missions, current, slots, guideCards, catalog);
-            (0, snackGrowthProgress_1.applySnackGrowthProgress)(missions, itemGrant.cards);
             (0, missionStore_1.commitMissionBump)(transaction, missions, eventNames_1.EVENTS.rewardClaimed.missionKey, 1, firestore_1.FieldValue.serverTimestamp());
             missionState = (0, missionStore_1.missionResponse)(missions.state, period, catalog);
             return { slots, wallet: paid };

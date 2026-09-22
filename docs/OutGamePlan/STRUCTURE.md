@@ -37,3 +37,9 @@
 `LoadingCoverView`는 `BattleReturnLoadingCover`를 로비 씬 활성화 뒤에도 유지한다. `OutgameTutorialBridge.PrepareLobbyReturnAsync`로 첫 안내의 지급·진행 저장·첫 랭크 확인을 기다린 뒤 커버를 걷는다. 사용자 입력과 연출 종료는 대기 대상이 아니다. 복귀 준비 실패는 같은 커버의 재시도·종료로 처리하며 로비 씬을 다시 로드하지 않는다.
 
 복귀 준비가 소유한 요청은 `ServerWaitOverlay`를 중복 생성하지 않는다. 자동 구매는 `PackPurchaseFlow`의 호출자 대기 소유 옵션을 사용한다. 로비가 열린 뒤 사용자 구매·강화의 대기 표시는 기존 경로를 유지한다. 미래 스텝의 지급을 앞당겨 실행하지 않는다.
+
+## 프로필 레벨업 연출
+
+서버 응답 채택 후 ServerSaveCommands가 AccountLevelUpHandoff에 레벨업만 기록한다. 일반·온보딩 재생·복구 경로가 같은 revision 중복 제거를 사용하며, 서비스 교체 시 대기열과 재생을 초기화한다. 초기 로그인 데이터 로드는 연출을 만들지 않는다.
+
+LobbyGainEffectDirector는 재화·카드 획득과 동시에 로비 전용 ProfileLevelUpEffect.prefab을 재생한다. 획득 시퀀스 조립 시 같은 프레임에 시작하고, 늦게 도착한 레벨업도 획득 종료를 기다리지 않는다. 팝업·튜토리얼·매치·삽입 진행 중에는 대기한다. 누적 레벨업은 최종 레벨 하나로 합친다. 기존 Playing에 포함하지만 OnAnyFinished는 발행하지 않는다. 공용 ProfileAvatarView.prefab과 사운드·보상 지급은 변경하지 않는다.

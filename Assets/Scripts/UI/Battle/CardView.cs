@@ -202,6 +202,7 @@ public class CardView : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
     // 아직 화면에 안 올린 회복량. 0보다 크면 "표기 유예 중" — 이 사이 Render가 최신 hp로 덮으면
     // 숫자만 먼저 올라간다. 힐러가 둘이면 몫이 둘 쌓이고, 투사체가 도착할 때마다 자기 몫씩 빠진다.
     int hpPendingHeal;
+    bool hpRevivalPending; // 불사 사망·디졸브 동안은 모델의 복구된 체력을 아직 표시하지 않는다.
     Sequence hpRollSeq;
     Sequence shieldBreakSeq;
     Vector3  shieldIndicatorScale;
@@ -325,6 +326,7 @@ public class CardView : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
             // 표기 굴림/유예도 카드에 속한 상태다 — 이월되면 새 카드가 남의 체력에서 굴러 내려온다.
             KillHpRoll();
             this.hpPendingHeal = 0;
+            this.hpRevivalPending = false;
         }
 
         this.boundCard = _card;
@@ -354,9 +356,10 @@ public class CardView : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
             this.deferredHealEffectCount = 0;
             KillHpRoll();
             this.hpPendingHeal = 0;
+            this.hpRevivalPending = false;
             SetHpDisplay("?", "");
         }
-        else if (this.hpPendingHeal > 0 || (this.hpRollSeq != null && this.hpRollSeq.IsActive()))
+        else if (this.hpRevivalPending || this.hpPendingHeal > 0 || (this.hpRollSeq != null && this.hpRollSeq.IsActive()))
             WriteHpDisplay(this.shownHp, this.shownBonusHp);
         else SnapHpDisplay(_card);
         if (this.nameText != null)
@@ -655,11 +658,28 @@ public class CardView : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
     /// (합계로 두면 첫 투사체가 남의 몫까지 올려버려 두 번째 투사체는 숫자가 안 움직인다).</summary>
     public void DeferHpDisplay(int _amount) => this.hpPendingHeal += Mathf.Max(0, _amount);
 
+    /// <summary>불사 치사 피해는 먼저 0까지 표시하고, 카드가 다시 나타날 때 회복 체력을 공개한다.</summary>
+    public void BeginRevivalHpDisplay()
+    {
+        if (this.hpRevivalPending) return;
+        this.hpRevivalPending = true;
+        AnimateHpDisplay(0, 0);
+    }
+
+    public void CompleteRevivalHpDisplay()
+    {
+        if (!this.hpRevivalPending) return;
+        this.hpRevivalPending = false;
+        if (this.boundCard != null) AnimateHpDisplay(this.boundCard.hp, this.boundCard.bonusHp);
+    }
+
     /// <summary>HP 표기를 _hp까지 **굴린다**: 아이콘이 커지고 → 숫자가 빠르게 오르내리고 → 다시 작아진다.
     /// 시작점은 모델이 아니라 현재 표기값(shownHp) — 규칙은 이미 끝나 있고 여기선 그 차이를 보여줄 뿐이다.
     /// 순수 연출: RNG/게임상태 무관, 활성 클라 표시만.</summary>
     void AnimateHpDisplay(int _hp, int _bonusHp, bool _clearPending = true)
     {
+        // 피격·회복 갱신이 끼어도 부활 전에는 0을 유지한다. 전투 모델은 바꾸지 않는다.
+        if (this.hpRevivalPending) { _hp = 0; _bonusHp = 0; }
         if (_clearPending) this.hpPendingHeal = 0;
         this.hpDisplayTarget = _hp;
 
@@ -992,6 +1012,7 @@ public class CardView : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
         this.cardAnim.ResetToSlotPose();   // 남은 어긋남이 있으면 여기서 확정한다
 
         float t_duration = GameTiming.Battle.ImmortalRestoreDuration;
+        CompleteRevivalHpDisplay();
         this.cardAnim.FadeView(1f, t_duration);
         if (t_duration > 0f)
             await UniTask.Delay((int)(t_duration * 1000)).SuppressCancellationThrow();
@@ -1035,8 +1056,8 @@ public class CardView : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
         => BattleVfx.PlayAttached(BattleVfxId.Heal, transform, IsEnemySide, VfxSortingLayerId);
 
     /// <summary>회복 파티클 + HP 표기 갱신. CardInstance.Heal/ReviveAtHalf가 실제 회복량으로 호출.
-    /// 회복이면 경로(힐러/돌보미/포식자/유산/부활) 불문 여기 하나로 수렴한다.</summary>
-    public void PlayHealEffect(int _amount, bool _consumeDeferred = false)
+    /// 부활은 HP 표기만 갱신하고 전용 부활 연출을 사용한다.</summary>
+    public void PlayHealEffect(int _amount, bool _consumeDeferred = false, bool _playParticles = true)
     {
         // 힐러 경로는 여기가 **표기의 발화점**이다 — 수치는 턴 시작에 이미 들어갔고(결정론),
         // 숫자는 투사체가 닿는 지금부터 굴러 오른다(그때까지는 DeferHpDisplay가 붙잡고 있었다).
@@ -1054,6 +1075,7 @@ public class CardView : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
             int t_target    = Mathf.Min(this.hpDisplayTarget + t_step, t_revealed);
             AnimateHpDisplay(t_target, this.boundCard.bonusHp, _clearPending: false);
         }
+        if (!_playParticles) return;
         if (this.deferHealEffect)
         {
             if (this.boundCard == this.deferredHealEffectCard) this.deferredHealEffectCount++;

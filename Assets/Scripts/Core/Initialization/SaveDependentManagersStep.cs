@@ -85,7 +85,6 @@ public sealed class SaveDependentManagersStep : MainInitializer
             OutgameTutorialRunner.AbortGuided();
             OutgameFeatureLock.ClearStall();
             OutgameTutorialProgress.Init();
-            KeywordGrowthManager.Init();
             CardGrowthManager.Init();
             DeckSaveManager.LoadFromSave();
             StarterDeck.GrantIfNoDeck(starterDeckPackId);

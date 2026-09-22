@@ -26,7 +26,8 @@ public static class BattleEventPresenter
         switch (_event.Kind)
         {
             case BattleEventKind.Heal:
-                if ((_event.Flags & BattleEventFlags.Deferred) != 0) t_view.DeferHpDisplay(_event.Value);
+                if ((_event.Flags & BattleEventFlags.Revival) != 0) t_view.BeginRevivalHpDisplay();
+                else if ((_event.Flags & BattleEventFlags.Deferred) != 0) t_view.DeferHpDisplay(_event.Value);
                 else t_view.PlayHealEffect(_event.Value);
                 break;
             case BattleEventKind.ShieldChanged:

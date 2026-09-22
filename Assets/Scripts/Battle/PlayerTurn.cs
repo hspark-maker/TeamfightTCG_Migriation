@@ -376,10 +376,26 @@ public class PlayerTurn : TurnBase
             t_overlay.ShowFieldFocus(t_view.ScreenBounds(GuidedFocusPadding), t_msg, t_anchor);
         }
 
-        // 지정 핸드는 그 진영 단계에서만 적용 — 아군 고르는 중에 적 슬롯을 가리키면 안 된다.
-        var t_wantSide = t_pickEnemy ? TutorialScenarioData.CardFocusSide.Enemy
-                                     : TutorialScenarioData.CardFocusSide.Player;
-        if (this.guidedStep.handSide == t_wantSide) ApplyHandOverride(this.guidedStep);
+        if (t_pickEnemy)
+        {
+            // 필드 중앙 슬롯이 비어도 손은 남아 있는 적을 가리킨다.
+            CardView t_hand = this.guidedStep.handSide == TutorialScenarioData.CardFocusSide.Enemy
+                ? ResolveSlotView(this.guidedStep.handSide, this.guidedStep.handSlot) : null;
+            if (t_hand == null || t_hand.BoundCard == null || !t_hand.BoundCard.IsAlive)
+            {
+                t_hand = null;
+                for (int i = 0; i < BattleField.SLOT_COUNT; i++)
+                {
+                    CardView t_candidate = t_view.GetSlotView(i);
+                    if (t_candidate == null || t_candidate.BoundCard == null || !t_candidate.BoundCard.IsAlive) continue;
+                    t_hand = t_candidate;
+                    break;
+                }
+            }
+            t_overlay.ShowHandOn(t_hand);
+        }
+        else if (this.guidedStep.handSide == TutorialScenarioData.CardFocusSide.Player)
+            ApplyHandOverride(this.guidedStep);
     }
 
     /// <summary>자유 선택 1단계를 좁힐 지정 아군. cardFocusSide가 Player일 때만 의미가 있다

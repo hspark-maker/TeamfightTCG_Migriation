@@ -16,7 +16,7 @@ using UnityEngine.UI;
 //
 // 경계: 지급·저장은 각 씬이 이미 끝냈다. 이 클래스는 표시만 하고 재화를 건드리지 않는다.
 // 배선을 비워두면 이름으로 자동 탐색한다 — 로비 프리팹 수정 없이도 동작하게(자동 탐색 실패 시 그 단계만 건너뛴다).
-public class LobbyGainEffectDirector : MonoBehaviour
+public partial class LobbyGainEffectDirector : MonoBehaviour
 {
     [Header("배선 (비우면 자동 탐색)")]
     [Tooltip("카드가 빨려들 도감 탭의 시각 앵커를 제공한다.")]
@@ -32,7 +32,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
 
     [Header("팩 비행 (예고 팝업 → 팩 탭)")]
     [Tooltip("팩 탭 인덱스. 0 Shop · 1 Pack · 2 Match · 3 Deck · 4 Collection")]
-    [SerializeField] int packTabIndex = 1;
+    [SerializeField] int packTabIndex = 0;
     [Tooltip("날아가는 팩의 화면 크기(px). 비율은 아트가 지킨다.")]
     [SerializeField] Vector2 packFlightSize = new Vector2(240f, 300f);
     [Tooltip("출발 직후 살짝 솟았다가 탭으로 빨려든다. 0이면 곧장 간다.")]
@@ -79,7 +79,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
     /// <summary>이 씬에서 획득 연출을 재생할 수 있는가. 꺼져 있으면 코루틴이 돌지 못해
     /// 통지가 영영 오지 않으므로, 있기만 한 것으로는 부족하다.</summary>
     public static bool Exists => s_instance != null && s_instance.isActiveAndEnabled;
-    public static bool Playing => Exists && s_instance.m_runId != s_instance.m_finishedRunId;
+    public static bool Playing => Exists && (s_instance.m_runId != s_instance.m_finishedRunId || s_instance.IsLevelUpPlaying);
 
     /// <summary>실제 해금될 보상 탭의 잠금 표현을 도착까지 유지한다.</summary>
     public static void HoldRewardUnlock(bool pack)
@@ -158,6 +158,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
 
     void OnEnable()
     {
+        AccountLevelUpHandoff.OnReset += StopLevelUp;
         PackOpenOverlay.OnClosed += OnPackOpenClosed;
         BattleRewardHandoff.OnGainAdded += OnBattleRewardArrived;
     }
@@ -167,6 +168,8 @@ public class LobbyGainEffectDirector : MonoBehaviour
         CancelRewardUnlock(false);
         CancelRewardUnlock(true);
         // static 이벤트에 죽은 씬 오브젝트가 남으면 다음 씬에서 오발화한다.
+        AccountLevelUpHandoff.OnReset -= StopLevelUp;
+        StopLevelUp();
         PackOpenOverlay.OnClosed -= OnPackOpenClosed;
         BattleRewardHandoff.OnGainAdded -= OnBattleRewardArrived;
 
@@ -182,14 +185,20 @@ public class LobbyGainEffectDirector : MonoBehaviour
 
     void Update()
     {
+        TryPlayLevelUpAlongsideGains();
         // 풀 밖의 팩 개봉·매치 진입·랭크 연출도 기존 로비 무대 판정으로 기다린다.
-        if (!AccountRewardHandoff.HasPending || !GuidanceCoordinator.CanPresent ||
+        if ((!AccountRewardHandoff.HasPending && !AccountLevelUpHandoff.HasPending) || !GuidanceCoordinator.CanPresent ||
             AlbumInsertSession.IsRunning || AlbumInsertQueue.HasPending)
             return;
         var t_pool = UIPoolManager.Instance;
         if (t_pool == null || t_pool.HasVisibleUIExcept()) return;
-        if (!RewardClaimPopup.TryGet(out var t_popup) || t_popup.RewardSlotCount <= 0) return;
-        MissionPanel.ShowAccountExperienceRewards(AccountRewardHandoff.Consume());
+        if (AccountRewardHandoff.HasPending)
+        {
+            if (!RewardClaimPopup.TryGet(out var t_popup) || t_popup.RewardSlotCount <= 0) return;
+            MissionPanel.ShowAccountExperienceRewards(AccountRewardHandoff.Consume());
+            return;
+        }
+        TryPlayLevelUp();
     }
 
     // 오버레이 개봉은 로비를 재로드하지 않는다 — 닫힘 신호가 Start를 대신하는 두 번째 진입점이다.
@@ -285,6 +294,7 @@ public class LobbyGainEffectDirector : MonoBehaviour
 
         bool t_gainStaged = !t_gains.IsEmpty && TryStageGains(m_master, t_gains);
         bool t_cardStaged = t_cardCount > 0 && TryStageCards(m_master, t_cards, t_origin);
+        TryPlayLevelUpAlongsideGains();
 
         // 카드 연출이 안 붙었으면 착지 콜백도 없다 — 위장을 여기서 되돌리지 않으면 카드가 영영 빈 칸이다.
         // 재화만 온 경우까지 Clear하면 돌고 있는 세션의 위장을 벗긴다 — 이번에 건 위장이 있을 때만 되돌린다.

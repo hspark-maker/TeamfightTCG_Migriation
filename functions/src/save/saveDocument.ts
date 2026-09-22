@@ -11,6 +11,9 @@ import {ENVIRONMENTS, isKnownEnv} from "./environments";
 import {rejectDomain} from "./domainReject";
 import {cacheableResponse, replayCached} from "./receiptCache";
 import {Balances, normalizeBalances} from "../currency/wallet";
+import {achievementResponse} from "../achievements/achievementStore";
+import {applyStatisticsPacks, PlayerStatistics, statisticsResponse} from "../statistics/playerStatistics";
+import {beginStatistics, commitStatistics, StatisticsContext} from "../statistics/playerStatisticsStore";
 import {
   createWallet,
   readReceipt,
@@ -58,7 +61,15 @@ export interface SaveMutationResult {
   revision: number;
   updatedSlots: SlotPatch;
   wallet: WalletPatch;
+  achievements?: ReturnType<typeof achievementResponse>;
+  statistics?: PlayerStatistics;
 }
+
+// These commands return actual drawn reward packs. Direct-card grants are intentionally absent.
+const PACK_OPENING_COMMANDS = new Set([
+  "openPack", "claimAttendance", "claimMission", "claimReward", "claimPassReward", "claimBattleExperience", "spinRoulette",
+  "claimMail", "claimAllMail",
+]);
 
 /**
  * 세이브 문서 참조. 클라 PlayerSaveFirestorePaths 와 같은 경로여야 한다.
@@ -186,6 +197,7 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
     current: DocumentData,
     transaction: Transaction,
     wallet: WalletState,
+    preparePackStatistics: (opened: number) => Promise<void>,
   ) => Promise<SaveMutation> | SaveMutation,
   finalize: (result: SaveMutationResult) => TResponse,
   isLegacyWalletReceipt?: (cached: unknown) => boolean,
@@ -269,7 +281,16 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
     }
 
     const revision = Number(current.revision ?? 0) + 1;
-    const outcome = await mutate(current, transaction, wallet);
+    // Producers know the actual award before queuing writes. Currency/direct-card rewards need no statistics read.
+    let statistics: StatisticsContext | undefined;
+    let preparedPacks = 0;
+    const outcome = await mutate(current, transaction, wallet, async (opened) => {
+      if (!Number.isSafeInteger(opened) || opened < 0 || !PACK_OPENING_COMMANDS.has(source)) {
+        throw new Error(`Invalid pack statistics preparation: ${source}`);
+      }
+      preparedPacks = opened;
+      if (opened > 0 && statistics === undefined) statistics = await beginStatistics(transaction, db, env, uid);
+    });
 
     // 응답에 실을 지갑은 **쓰기 전에** 확정한다 — finalize 가 만든 응답 그대로가 영수증에
     // 담겨야 재시도가 같은 답을 받는데, 그 답은 갱신된 잔액을 실어야 하기 때문이다.
@@ -283,6 +304,17 @@ export async function mutateSave<TResponse extends SaveMutationResult>(
       updatedSlots: outcome.slots,
       wallet: credited,
     });
+    const packs = (response as SaveMutationResult & {packs?: unknown}).packs;
+    const opened = source === "openPack" ? 1 : Array.isArray(packs) ? packs.length : 0;
+    if (PACK_OPENING_COMMANDS.has(source) && opened !== preparedPacks) {
+      throw new Error(`Pack statistics were not prepared before writes: ${source}`);
+    }
+    if (statistics !== undefined && opened > 0) {
+      applyStatisticsPacks(statistics.state, opened);
+      commitStatistics(transaction, statistics, FieldValue.serverTimestamp());
+      response.achievements = achievementResponse(statistics.achievements);
+      response.statistics = statisticsResponse(statistics.state);
+    }
 
     transaction.update(reference, {
       ...outcome.slots,

@@ -18,6 +18,7 @@ public class RewardClaimPopup : PooledOverlay<RewardClaimPopup>
 
     [SerializeField] TMP_Text titleText;  // 티어 표시명(선택)
     [SerializeField] Button claimButton;  // [획득]
+    public Button ClaimButton => this.claimButton;
 
     [Tooltip("보상 칸(아이콘 + 수량). 저작한 보상이 칸 수보다 적으면 남는 칸은 꺼진다.")]
     [SerializeField] CurrencyRewardSlotView[] rewardSlots;
@@ -272,6 +273,7 @@ public class RewardClaimPopup : PooledOverlay<RewardClaimPopup>
         // 마스터에 SetLink를 걸지 않는 이유는 기존과 같다: 팝업이 꺼질 때 죽으면 빛이 허공에 굳는다.
         var t_burst = DOTween.Sequence();
         this.reveal.BuildOutro(t_burst, this.dimTint);
+        this.experienceReward.BuildOutro(t_burst, this.reveal.LaunchAt, this.reveal.LaunchDuration);
         t_burst.Insert(this.reveal.LaunchAt, t_gain);
 
         this.m_burst = t_burst;

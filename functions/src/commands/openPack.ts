@@ -27,13 +27,11 @@ import {loadCatalogIds} from "../packs/cardCatalog";
 import {DrawnCard, drawPack, resolveDropPool} from "../packs/packDraw";
 import {buildOwnershipSlot, readOwnedIds} from "../packs/packSlots";
 import {canAfford, spend, grant, CurrencyGain} from "../currency/wallet";
-import {applyDrawnSnackGrowth, duplicateGains} from "../rewards/itemGrant";
+import {applyDrawnCardGrowth, duplicateGains} from "../rewards/itemGrant";
 import {parseRewardRows} from "../rewardTable";
 import {rankRef} from "../rank/rankStore";
 import {nextWallet} from "../currency/walletStore";
 import {growthSlot, readGrowthEntries} from "../growth/cardGrowth";
-import {requireSnackGrowthCurve} from "../growth/snackGrowthSpec";
-import {applySnackGrowthProgress} from "../missions/snackGrowthProgress";
 import {rejectDomain} from "../save/domainReject";
 import {clientReceiptId, isClientReceiptId} from "../save/receiptId";
 import {
@@ -93,21 +91,18 @@ export const openPack = onCall(measuredCallable("openPack", async (request) => {
     reject("PackNotFound", `Pack '${packId}' is not authored in the CardPack spec.`, {uid, env, packId});
   }
   if (pack.refundAmount > 0) {
-    // 환급 경로는 클라·서버 양쪽에서 죽어 있다(중복 보상은 간식). 저작 실수를 조용히 삼키지 않는다.
+    // 이 환급 필드는 사용하지 않는다. 명시된 중복 재화는 Reward 표에서 별도로 읽는다.
     logger.warn("pack authors a refund that is never paid out", {env, packId, refundAmount: pack.refundAmount});
   }
 
-  const [dropRows, gradeRows, catalogIds, cardRows, rawRewards, catalog, ruleRows, curveRows] = await Promise.all([
+  const [dropRows, gradeRows, catalogIds, cardRows, rawRewards, catalog] = await Promise.all([
     readDropRows(env, packId),
     readRankGradeRows(env),
     loadCatalogIds(env),
     readSpecRows(env, "Card"),
     pack.price > 0 ? readSpecRows(env, "Reward") : Promise.resolve([]),
     readMissionCatalog(env),
-    readSpecRows(env, "CardEnhanceRule"),
-    readSpecRows(env, "CardLimitBreak"),
   ]);
-  const snackGrowthCurve = requireSnackGrowthCurve(ruleRows, curveRows);
   const duplicateRows = parseRewardRows(rawRewards);
   const cardGrades = new Map(cardRows.map((row) => [Number(row.id), String(row.grade)]));
   let granted: CurrencyGain[] = [];
@@ -136,7 +131,7 @@ export const openPack = onCall(measuredCallable("openPack", async (request) => {
   const period = missionPeriod(Date.now());
 
   const result = await mutateSave(env, uid, "openPack", {kind: "client", txId, ...onboardingReceipt(request.data, "openPack")},
-    async (current, transaction, wallet): Promise<SaveMutation> => {
+    async (current, transaction, wallet, preparePackStatistics): Promise<SaveMutation> => {
       // 독립 문서는 함께 읽고, 미션·지갑 쓰기 전에 모두 확보한다.
       const missionReference = missionsRef(db, env, uid);
       const [missionSnapshot, rankSnapshot] = await transaction.getAll(
@@ -176,13 +171,13 @@ export const openPack = onCall(measuredCallable("openPack", async (request) => {
 
       const slots = {
         ownership: buildOwnershipSlot(owned, drawn),
-        cardGrowth: growthSlot(applyDrawnSnackGrowth(readGrowthEntries(current.cardGrowth), drawn, snackGrowthCurve, cardGrades)),
+        cardGrowth: growthSlot(applyDrawnCardGrowth(readGrowthEntries(current.cardGrowth), drawn, cardGrades)),
       };
       applyGuideProgress(missions, current, slots, cardRows, catalog);
-      applySnackGrowthProgress(missions, drawn);
 
       // 진행도는 콜백 **안**에서 올린다 — mutateSave 는 영수증이 히트하면 이 콜백을 통째로 건너뛰므로,
       // 그 덕에 재시도가 진행도를 두 번 올리지 않는다. 콜백 밖으로 옮기면 그 보장이 사라진다.
+      await preparePackStatistics(1);
       commitMissionBump(transaction, missions, EVENTS.packOpened.missionKey, 1, FieldValue.serverTimestamp());
       missionState = missionResponse(missions.state, period, catalog);
 

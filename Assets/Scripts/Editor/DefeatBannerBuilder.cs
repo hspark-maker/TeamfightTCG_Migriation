@@ -33,7 +33,6 @@ public static class DefeatBannerBuilder
     private const float DropHeight = 260f;
     private const float DropScale = 1.12f;
 
-    [MenuItem("Tools/Result Banner/Rebuild Defeat Banner")]
     public static void Build()
     {
         Sprite face = AssetDatabase.LoadAssetAtPath<Sprite>(DefeatSpritePath);

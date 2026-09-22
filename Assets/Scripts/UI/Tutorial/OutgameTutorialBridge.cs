@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 // 아웃게임 튜토리얼의 씬 수명 브리지(씬당 1개). 강제 시퀀스(세이브 커서)와 자율 안내(메모리 커서)를 같은 코드로 그린다 —
-// 둘은 시간상 겹치지 않으므로(자율은 졸업 뒤에만 열린다) "지금 어느 커서인가"는 러너에게 매번 묻는다.
+// 첫 패배 강화 중에는 강제 커서가 멈춘다. "지금 어느 커서인가"는 러너에게 매번 묻는다.
 // 개봉은 씬이 아니라 로비 오버레이라 재개해 줄 다른 브리지가 없다 — 오버레이 열림/닫힘도 이 브리지가 직접 이어받는다.
 // 씬 이름을 보지 않는다 — 현재 스텝의 앵커가 이 씬에 등록되는 순간에만 게이트가 켜지고, 없으면 조용히 대기한다.
 // 스텝 타입도 보지 않는다 — 어떤 신호를 기다릴지는 스텝의 Completion 하나로 갈린다.
@@ -52,6 +52,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     float m_anchorMissingSince = -1f;
     int m_anchorRestoreStepId;
     bool m_restoringSurface;
+    bool m_freeBattleHintSuspended;
     int m_contentIntroVersion;
 
     static OutgameTutorialBridge s_rankEntryOwner;
@@ -85,7 +86,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     bool SuppressGuideUI => suppressGuideUI || PackOpenOverlay.IsOpen;
 
     // ── 커서 창구 4개. 이 넷 밖에서는 강제/자율을 구분하지 않는다 — 나머지 코드는 스텝의 Completion만 본다.
-    // 자율 세션이 도는 동안은 강제 시퀀스가 끝난 뒤라(졸업이 문이다) 두 커서가 동시에 서지 않는다.
+    // 자율 세션 동안 강제 시퀀스는 완료되었거나 첫 패배 강화로 멈춰 있다.
     static bool GuidedCursor => OutgameTutorialRunner.IsGuidedRunning;
 
     static bool CursorRunning => OutgameTutorialRunner.IsGuidedRunning || OutgameTutorialRunner.IsRunning;
@@ -125,7 +126,13 @@ public class OutgameTutorialBridge : MonoBehaviour
     public static async UniTask PrepareLobbyReturnAsync(CancellationToken _ct)
     {
         await OnboardingCommands.RecoverPendingAsync(_ct);
+        _ct.ThrowIfCancellationRequested();
+        // 결과 없이 돌아온 무효 경기는 안내를 전투 진입점으로 복원한다.
+        // 정상 결과는 TurnRunner의 결과 통지에서 pending을 이미 해제했다.
+        OutgameTutorialRunner.RestorePendingBattleEntry();
         if (!CursorRunning) return;
+        if (OutgameTutorialRunner.IsRunning && !await GuideResume.SaveConfirmedAsync(_ct))
+            throw new InvalidOperationException("전투 안내 진행을 저장하지 못했습니다. 다시 시도해 주세요.");
         var t_owner = s_instance;
         if (t_owner == null) throw new InvalidOperationException("로비 안내 화면을 찾지 못했습니다.");
         t_owner.m_returnPreparing = true;
@@ -189,6 +196,7 @@ public class OutgameTutorialBridge : MonoBehaviour
             {
                 m_pendingApply = false;
                 CloseGate();
+                if (OutgameTutorialRunner.TryBeginDefeatEnhance()) return;
                 OutgameFeatureLock.Refresh();
                 TryGetCursorStep(out var t_entering);
                 m_stepToken = OnboardingSession.Begin(t_entering, this.GetCancellationTokenOnDestroy());
@@ -293,6 +301,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         if (m_step == null) return;
         if (m_enhancing || m_awaitingUnlockFx || GuidanceCoordinator.IsRestoring) return;
+        if (SuspendFreeBattleHint()) return;
         if (!PackOpenOverlay.IsOpen && (m_step.Completion == EOutgameTutorialCompletion.PackOpen
             || m_step.Anchor == EOutgameTutorialAnchor.PackAcquireButton))
         {
@@ -433,7 +442,6 @@ public class OutgameTutorialBridge : MonoBehaviour
         // 화면은 이 스텝보다 먼저 열리므로(같은 클릭이 창을 먼저 띄운다) 옛 비용을 띄운 채다 —
         // 다시 읽게 하지 않으면 잔액이 그에 못 미치는 유저의 강화 버튼이 비활성으로 굳는다.
         if (m_step.Completion == EOutgameTutorialCompletion.Enhance)             CardGrowthManager.NotifyCostRuleChanged();
-        else if (m_step.Completion == EOutgameTutorialCompletion.KeywordEnhance) KeywordGrowthManager.NotifyCostRuleChanged();
 
         // 설명 스텝은 앵커가 없어도 정상이다(강조 없이 문구만) — 완료가 딤 탭이라 진행이 막히지 않는다.
         // 억제 씬에서도 띄운다: 억제하면 완료 신호인 딤 자체가 사라져 진행이 영구히 멈춘다.
@@ -459,6 +467,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     void TryOpenGate()
     {
         if (m_step == null || m_step.Anchor == EOutgameTutorialAnchor.None || GuidanceCoordinator.IsRestoring) return;
+        if (SuspendFreeBattleHint()) return;
         if (!TutorialAnchorRegistry.TryGet(m_step.Anchor, out var t_rect, out var t_button))
         {
             if (GuidedCursor && GuideResume.Record?.GoalReached == true
@@ -483,7 +492,6 @@ public class OutgameTutorialBridge : MonoBehaviour
         // 완료는 성공 신호가 확정하며, 버튼이 잠기면 게이트가 알아서 딤을 걷는다(탈출로 겸 연출 관람로).
         Action t_onSatisfied = m_step.Completion == EOutgameTutorialCompletion.Purchase
                             || m_step.Completion == EOutgameTutorialCompletion.Enhance
-                            || m_step.Completion == EOutgameTutorialCompletion.KeywordEnhance
                             || m_step.Completion == EOutgameTutorialCompletion.DeckEquip
                             || m_step.Completion == EOutgameTutorialCompletion.DeckSave
             ? null
@@ -617,7 +625,6 @@ public class OutgameTutorialBridge : MonoBehaviour
         switch (_completion)
         {
             case EOutgameTutorialCompletion.Enhance:        return OutgameTutorialGuide.IsFreeShotSpentOnServer(EOutgameTutorialAction.WaitEnhance);
-            case EOutgameTutorialCompletion.KeywordEnhance: return OutgameTutorialGuide.IsFreeShotSpentOnServer(EOutgameTutorialAction.WaitKeywordEnhance);
             default:                                        return false;
         }
     }
@@ -871,14 +878,6 @@ public class OutgameTutorialBridge : MonoBehaviour
         return false;
     }
 
-    // 키워드 강화 성공. 카드 강화와 달리 무대를 쥐는 결과판이 없어 기다릴 것 없이 바로 넘긴다.
-    void OnKeywordEnhanced(CardKeyword _keyword)
-    {
-        if (m_step == null || m_step.Completion != EOutgameTutorialCompletion.KeywordEnhance) return;
-
-        OnGateSatisfied();
-    }
-
     // 자율 안내 발화 통지. 탭 전환 도중에 켜지므로 이 씬이 그대로 이어받는다.
     void OnGuidedActivated()
     {
@@ -915,6 +914,10 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_step == null || m_completing || GuidanceCoordinator.IsRestoring
             || !OnboardingSession.CanAcceptCompletion
             || !TryGetCursorStep(out var t_current) || t_current != m_step) return;
+        // 탭 버튼의 클릭은 이동 요청이다. 이탈 확인·슬라이드까지 끝나야 다음 안내로 넘어간다.
+        if (m_step.Completion == EOutgameTutorialCompletion.Click
+            && GuidanceCoordinator.IsLobbyTabAnchor(m_step.Anchor)
+            && !GuidanceCoordinator.IsCurrentTabAnchor(m_step.Anchor)) return;
         m_satisfiedStep = m_step;
         CompleteStepAsync(m_step).Forget();
     }
@@ -959,6 +962,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     {
         m_stepVersion++;
         m_anchorMissingSince = -1f;
+        m_freeBattleHintSuspended = false;
         m_enhanceResultClose?.Kill();
         m_enhanceResultClose = null;
         m_enhancing = false;
@@ -982,6 +986,24 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (OutgameTutorialGateUI.Instance != null) OutgameTutorialGateUI.Instance.Clear(this);
     }
 
+    // 해금 이후의 전투 안내는 자유 이동을 허용한다. 다른 화면에서 플레이 버튼이
+    // 사라진 것은 정상 이탈이므로, 차단판/5초 복구를 걸지 않고 안내 표시만 보류한다.
+    bool SuspendFreeBattleHint()
+    {
+        if (m_step == null || GuidedCursor || !OutgameFeatureLock.IsFtueFreeNavigation
+            || m_step.Action != EOutgameTutorialAction.BattleEntry
+            || m_step.Anchor != EOutgameTutorialAnchor.LobbyPlayButton) return false;
+        if (GuidanceCoordinator.IsCurrentTabAnchor(EOutgameTutorialAnchor.LobbyMatchTab)
+            && DeckEditController.OpenEditor == null && !CardDetailOverlayView.IsOpen
+            && !PackOpenOverlay.IsOpen) return false;
+
+        m_anchorMissingSince = -1f;
+        m_anchorRestoreStepId = 0;
+        HideGuide();
+        m_freeBattleHintSuspended = true;
+        return true;
+    }
+
     void Update()
     {
         if (LoadingCoverView.OwnsLobbyPreparation && !m_returnPreparing) return;
@@ -989,6 +1011,19 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (!TryGetCursorStep(out var t_current) || !ReferenceEquals(t_current, m_step))
         {
             CloseGate();
+            return;
+        }
+        if (SuspendFreeBattleHint()) return;
+        if (m_freeBattleHintSuspended)
+        {
+            m_freeBattleHintSuspended = false;
+            PresentStep();
+            return;
+        }
+        if (m_step.Completion == EOutgameTutorialCompletion.Click
+            && GuidanceCoordinator.IsCurrentTabAnchor(m_step.Anchor))
+        {
+            OnGateSatisfied();
             return;
         }
         if (m_step.Completion == EOutgameTutorialCompletion.SynergyDeckEditor)
@@ -1027,6 +1062,7 @@ public class OutgameTutorialBridge : MonoBehaviour
             }
         }
         if (!m_enhancing && !m_awaitingUnlockFx
+            && !GuidanceCoordinator.IsLobbyPresentationBlockingNavigation
             && !CardDetailOverlayView.IsRitualPlaying && !CardDetailOverlayView.IsUnlockFxPlaying
             && !UnlockIntroOverlay.IsOpen && !SuppressGuideUI && m_step.Anchor != EOutgameTutorialAnchor.None
             && !(GuideResume.Record?.GoalReached == true && OutgameTutorialGuide.TargetCardId == 0
@@ -1041,6 +1077,7 @@ public class OutgameTutorialBridge : MonoBehaviour
             if (t_available)
             {
                 m_anchorMissingSince = -1f;
+                m_anchorRestoreStepId = 0;
                 if (OutgameTutorialGateUI.Instance != null && OutgameTutorialGateUI.Instance.IsTransitionOnly) TryOpenGate();
             }
             else if (m_anchorMissingSince < 0f)
@@ -1070,7 +1107,8 @@ public class OutgameTutorialBridge : MonoBehaviour
                 throw new InvalidOperationException("안내 대상을 찾지 못했습니다. 다시 시도해 주세요.");
             m_anchorRestoreStepId = _step.StepId;
             if (GuidedCursor) await GuidanceCoordinator.TryRestoreCurrentSurfaceAsync(m_stepToken);
-            else if (TryRestoreForcedSurface()) return;
+            else if (!await GuidanceCoordinator.TryRestoreForcedSurfaceAsync(_step, m_stepToken))
+                throw new InvalidOperationException("안내 화면을 복구하지 못했습니다. 다시 시도해 주세요.");
             m_stepToken.ThrowIfCancellationRequested();
             if (!OnboardingSession.IsCurrent(t_version, _step.StepId)) return;
             m_anchorMissingSince = Time.unscaledTime;
@@ -1079,26 +1117,6 @@ public class OutgameTutorialBridge : MonoBehaviour
         catch (OperationCanceledException) { }
         catch (Exception t_error) { ShowStepFailure(t_error); }
         finally { m_restoringSurface = false; }
-    }
-
-    bool TryRestoreForcedSurface()
-    {
-        int t_chapter = OutgameTutorialProgress.ChapterIndex;
-        for (int t_i = OutgameTutorialProgress.StepIndex - 1; t_i >= 0; t_i--)
-        {
-            if (!OutgameTutorialRunner.TryGetStepAt(t_chapter, t_i, out var t_step)) continue;
-            if (t_step.LeavesScene || t_step.Action == EOutgameTutorialAction.WaitPurchase
-                || t_step.Action == EOutgameTutorialAction.AutoPurchase) break;
-            if (t_step.Action != EOutgameTutorialAction.WaitClick) continue;
-            if (t_step.Anchor != EOutgameTutorialAnchor.LobbyDeckTab
-                && t_step.Anchor != EOutgameTutorialAnchor.LobbyPackTab
-                && t_step.Anchor != EOutgameTutorialAnchor.LobbyCollectionTab
-                && t_step.Anchor != EOutgameTutorialAnchor.LobbyMatchTab) continue;
-            OutgameTutorialProgress.CommitStep(t_chapter, t_i);
-            ApplyCurrentStep();
-            return true;
-        }
-        return false;
     }
 
     void TryPresentContentIntro()
@@ -1140,8 +1158,8 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (m_subscribed) return;
 
         TutorialAnchorRegistry.OnRegistered   += OnAnchorRegistered;
+        OutgameTutorialRunner.OnBattleEntryRestored += ApplyCurrentStep;
         OutgameTutorialRunner.OnGuidedActivated += OnGuidedActivated;
-        KeywordGrowthManager.OnEnhanced       += OnKeywordEnhanced;
         PackRevealView.OnAnyPackOpened        += OnPackOpened;
         PackShowcaseController.OnAnyPurchased += OnPurchased;
         PackOpenOverlay.OnOpened              += OnPackOverlayOpened;
@@ -1170,8 +1188,8 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (!m_subscribed) return;
 
         TutorialAnchorRegistry.OnRegistered   -= OnAnchorRegistered;
+        OutgameTutorialRunner.OnBattleEntryRestored -= ApplyCurrentStep;
         OutgameTutorialRunner.OnGuidedActivated -= OnGuidedActivated;
-        KeywordGrowthManager.OnEnhanced       -= OnKeywordEnhanced;
         PackRevealView.OnAnyPackOpened        -= OnPackOpened;
         PackShowcaseController.OnAnyPurchased -= OnPurchased;
         PackOpenOverlay.OnOpened              -= OnPackOverlayOpened;

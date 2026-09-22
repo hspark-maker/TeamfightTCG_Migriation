@@ -9,7 +9,7 @@ public sealed class LocalSaveMatchGrowthSource : IMatchGrowthSource
     public UniTask<CardGrowth[]> ResolveMyGrowth(IReadOnlyList<int> _deck, CancellationToken _ct)
     {
         if (_ct.IsCancellationRequested) return UniTask.FromResult<CardGrowth[]>(null);
-        if (!CardGrowthManager.IsReady || !CardGrowthManager.IsConfigReady || !KeywordGrowthManager.IsReady)
+        if (!CardGrowthManager.IsReady || !CardGrowthManager.IsConfigReady)
         {
             Debug.LogError("[MatchGrowth] The local growth cache/config is not ready, so the multiplayer growth snapshot cannot be built.");
             return UniTask.FromResult<CardGrowth[]>(null);

@@ -17,7 +17,6 @@ public sealed class RemoteAudioBuildValidation : IPreprocessBuildWithReport
 
     public void OnPreprocessBuild(BuildReport _report) => Validate();
 
-    [MenuItem("Tools/Addressables/Validate Remote Audio")]
     public static void Validate()
     {
         var t_settings = AddressableAssetSettingsDefaultObject.Settings;

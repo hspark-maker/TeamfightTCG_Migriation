@@ -20,6 +20,7 @@ public static class UiPrefabCache
         { typeof(LobbySettingPanel), "LobbySettingPanel" },
         { typeof(MissionPanel), "MissionPanel" },
         { typeof(AttendancePanel), "AttendancePanel" },
+        { typeof(MailboxPanel), "MailboxPanel" },
         { typeof(PassPanel), "PassPanel" },
         { typeof(RankingBoardPanel), "RankingBoardPanel" },
         { typeof(RoulettePanel), "RouletteOverlay" }

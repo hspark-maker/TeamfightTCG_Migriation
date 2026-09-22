@@ -53,7 +53,7 @@ stub("../lib/missions/missionSpec", {readMissionCatalog: async () => []});
 stub("../lib/rewards/itemGrant", {
   loadItemGrantContext: async () => ({cards: []}),
   grantRewardItems: () => ({slots: {ownership: {cardIds: [1]}}, currencies: [],
-    cards: [{cardId: 1, isNew: false, snackGrowth: {fromStage: 0, toStage: 1}}]}),
+    cards: [{cardId: 1, isNew: false}]}),
 });
 stub("../lib/packs/packSpecReader", {readSpecRows: async (_env, table) => table === "AccountLevel" ? [
   {id: 1, requiredExp: 0, winExp: 100, loseExp: 50},
@@ -121,14 +121,12 @@ async function test(name, run) { reset(); await run(); console.log("PASS " + nam
     assert.equal(documents.get(savePath).profile.accountExp, 0);
     assert.equal(documents.has(markerPath), false);
   });
-  await test("card level bonus writes automatic growth mission progress in the same transaction", async () => {
+  await test("card level bonus preserves ownership without retired growth mission progress", async () => {
     cardReward = true;
     documents.get(savePath).profile.contentUnlocks = {unlocked: ["Mission"]};
     const result = await request("battle-test-card-bonus");
-    const {EVENTS} = require("../lib/analytics/eventNames");
-    const key = "daily." + EVENTS.cardLimitBreakCompleted.missionKey;
-    assert.equal(result.missions.progress[key], 1);
-    assert.equal(documents.get(root + "/missions/current").progress[key], 1);
+    assert.equal(result.missions.progress["daily.LimitBreakCard"], undefined);
+    assert.equal(documents.get(root + "/missions/current").progress["daily.LimitBreakCard"], undefined);
     assert.deepEqual(documents.get(savePath).ownership.cardIds, [1]);
     assert.equal(documents.has(markerPath), true);
   });

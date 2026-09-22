@@ -3,6 +3,9 @@ using TeamfightTCG.BattleCore;
 
 // 돌보미 시너지(덱 4장↑ 활성). 순수 스폰 트리거형 — 정적 스탯 없음.
 // 돌보미 카드가 전장에 나올 때, 필드의 모든 돌보미(자신 포함)에게 amount만큼 Heal + bonusHp 부여.
+// "나올 때" = 오프닝 배치(Placed, 멀리건 스왑-인 포함) + 런타임 스폰(Entered) 전부.
+// 오프닝은 슬롯이 전부 찬 뒤 ApplyDeckSynergy가 슬롯 순서로 발화하므로, 오프닝 돌보미 N장이면
+// N회 발화 × 전원 수혜 — 배치 순서와 무관하게 전원이 같은 값을 받는다(대칭).
 // 회복/보너스HP 규칙은 CardInstance(Heal/GrantBonusHp)에 위임(단일 진실원). 결정론: RNG 미소비, 순수 산술.
 public class CaretakerSynergyEffect : SynergyEffect
 {
@@ -21,8 +24,15 @@ public class CaretakerSynergyEffect : SynergyEffect
         return _key == nameof(amount);
     }
 
+    // [Placed] 오프닝 배치(멀리건 스왑-인 포함). 디스패처가 self 소속만 발화하지만
+    // 공용 몸통이 소속을 재판정하므로 그대로 태운다.
+    public override void OnPlaced(SpawnCtx _ctx) => HealAndGrant(_ctx);
+
+    // [Entered] 런타임 등장. **이 디스패처는 BelongsTo 필터를 안 걸므로** 소속을 직접 판정해야 한다.
+    public override void OnEntered(SpawnCtx _ctx) => HealAndGrant(_ctx);
+
     // 동기 완결: 메서드가 반환되기 전에 상태변이를 모두 끝낸다.
-    public override void OnEntered(SpawnCtx _ctx)
+    void HealAndGrant(SpawnCtx _ctx)
     {
         // 디스패처는 비소속 카드에도 발화하므로 스폰 주체가 돌보미일 때만 동작(소속 자기판정).
         if (_ctx.self == null || !_ctx.self.IsAlive || _ctx.field == null) return;

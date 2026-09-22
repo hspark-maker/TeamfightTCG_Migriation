@@ -53,7 +53,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     [SerializeField] ScrollRect     detailScroll;
 
     [Header("성장 (선택 — 미배선이면 성장 표시 없이 지금까지와 동일하게 동작)")]
-    [SerializeField] TMP_Text levelValueText;
+    [SerializeField] GrowthStarStrip growthStars;
 
     [Header("강화 조작 (선택 — 미배선이면 조작 없이 표시만 한다)")]
     [SerializeField] Button     enhanceButton;
@@ -178,6 +178,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     /// <summary>지금 해금 연출이 도는 중인가.</summary>
     public static bool IsUnlockFxPlaying => s_instance != null && s_instance.m_unlockFxPlaying;
     public static bool IsRitualPlaying => s_instance != null && (s_instance.m_ritualPlaying || s_instance.m_enhanceRequestPending);
+    public static bool IsGrowthPresentationFocused => s_instance != null && s_instance.isShow && IsRitualPlaying;
 
     static CardDetailOverlayView s_instance;
     protected override int SortingOrder => UiSortingOrder.CardDetail;
@@ -197,6 +198,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
 
     // 연출 중에는 값 갱신을 미룬다 — 서버 왕복이 끝나는 순간 통지가 와서 공개 전에 Lv·HP가 튄다.
     bool m_ritualPlaying;
+    bool m_growthHudHidden;
 
     // 진화 연출에 넘길 문양 재사용 버퍼(연타하는 조작이라 매번 새 List를 만들지 않는다).
     readonly List<Graphic> m_emblemBuffer = new List<Graphic>();
@@ -263,6 +265,9 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     public static void Open(IReadOnlyList<int> _cards, int _index, CardDetailOpenOptions _options = default)
     {
         if (_cards == null || _cards.Count == 0) return;
+        // 팩 결과 등 자체 입력을 쓰는 화면에서도 강제 안내 밖의 상세 진입을 막는다.
+        // 닫기가 제한된 안내 중 다른 카드를 열면 획득 버튼으로 돌아갈 수 없다.
+        if (!GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.AlbumCardSlot)) return;
 
         CardDetailOverlayView t_view = Resolve();
         if (t_view == null) return;
@@ -393,11 +398,21 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         RefreshArrows();
     }
 
+    void LateUpdate()
+    {
+        bool t_focused = this.isShow && (this.m_ritualPlaying || this.m_enhanceRequestPending);
+        if (this.m_growthHudHidden == t_focused) return;
+        this.m_growthHudHidden = t_focused;
+        if (this.isShow)
+            LobbyShellBars.Hide(this, transform, t_focused ? EShellBars.All : EShellBars.Bottom);
+    }
+
     protected override void OnViewHidden()
     {
         this.acquisitionView?.Hide();
         this.m_viewVersion++;
         StopShardAbsorb();
+        this.m_growthHudHidden = false;
         LobbyShellBars.Show(this);
 
         ScreenDim.Hide(this, EDimLayer.Content);
@@ -511,7 +526,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     /// <summary>지금 도는 연출을 한 박 당긴다. 당길 것이 있었으면 true — 부른 쪽은 자기 일(닫기)을 하지 않는다.</summary>
     bool SkipPlayingFx()
     {
-        // 당길 무대가 없으면(한계돌파처럼 유예만 선 왕복) 탭을 삼키지 않는다 — 나가는 문이 왕복 내내 막힌다.
+        // 당길 무대가 없으면 탭을 삼키지 않는다 — 나가는 문이 왕복 내내 막힌다.
         if (this.m_ritualPlaying && this.m_activeRitual != null) { SkipRitual(); return true; }
         if (this.m_unlockFxPlaying) { SkipUnlockFx(); return true; }
 
@@ -827,7 +842,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         if (!t_available || t_shell == null
             || !t_shell.TrySelectFeature(EOutgameFeature.LobbyPackTab, _afterSelect: () =>
             {
-                var t_shop = t_shell.CurrentPanel?.GetComponent<PackShowcaseController>();
+                var t_shop = t_shell.CurrentPanel?.GetComponentInChildren<PackShowcaseController>(true);
                 if (t_shop != null && t_shop.TrySelectPack(_packId)) Hide();
                 else this.acquisitionView.ShowNavigationUnavailable();
             })) this.acquisitionView.ShowNavigationUnavailable();
@@ -925,6 +940,8 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     // 걷힌 줄로 스크롤을 옮기고 내용을 들여보낸 뒤, 이번에 열린 개념을 전면 안내로 넘긴다.
     void RevealUnlockedSections(GameObject _focus, CardKeyword _keywords, bool _synergy)
     {
+        // 이미 확인을 기다리는 소개를 늦게 도착한 연출 콜백으로 교체하지 않는다.
+        if (m_introOwned) return;
         ScrollTo(_focus);
 
         // 마지막 축을 잡아 둔다 — 안내가 서지 않는 판에서는 이 안무가 끝나야 탭이 닫기로 돌아온다.
@@ -1053,10 +1070,9 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     // 값이 없어도 행을 끄지 않는다 — 카드마다 패널 높이가 흔들린다.
     void ApplyGrowth(int _card, bool _owned)
     {
-        if (this.levelValueText == null) return;
-
-        if (_owned) SetLevelText(CardGrowthManager.GrowthOf(_card).Level);
-        else        this.levelValueText.text = LockedValue;
+        if (this.growthStars == null) return;
+        this.growthStars.gameObject.SetActive(_owned);
+        if (_owned) SetGrowthStars(CardGrowthManager.GrowthOf(_card).Level);
     }
 
     // 규칙·비용·성공률은 전부 CardGrowthManager가 정본이고 여기선 표시만 한다.
@@ -1662,13 +1678,13 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
                                   OnAnyEnhanceResultReady?.Invoke(_result);
                               },
                               // 이을 것이 없는 판이라 탭을 기다리지 않는다 — 읽을 것이 다 나오면 스스로 상세로 돌아간다.
-                              _autoReturn: t_selfReturn);
+                              _autoReturn: t_selfReturn,
+                              _centeredCard: _evolve && this.m_activeRitual == this.evolveRitual);
     }
 
-    void SetLevelText(int _level)
+    void SetGrowthStars(int _level)
     {
-        if (this.levelValueText != null)
-            this.levelValueText.text = GrowthStar.ProgressLabel(_level, CardGrowthManager.MaxLevel);
+        if (this.growthStars != null) this.growthStars.SetLevel(_level);
     }
 
     void BuildKeywordSection(int _card, bool _owned)
@@ -1875,6 +1891,10 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     /// <summary>개념 안내를 전면에 다시 세운다(해금 순간의 자동 안내와 같은 화면).</summary>
     void ShowIntros(List<UnlockIntro> _intros)
     {
+        // 해금 직후 설명 띠도 클릭 가능해진다. 자동 소개보다 먼저 수동 소개를 열면
+        // 뒤늦은 자동 Show가 기존 창을 Cancel하여 진행 중인 강화 안내까지 중단한다.
+        if (m_enhanceRequestPending || m_ritualPlaying || m_unlockFxPlaying
+            || m_introOwned || UnlockIntroOverlay.IsOpen) return;
         if (_intros == null || _intros.Count == 0) return;
         if (!UnlockIntroOverlay.TryGet(out UnlockIntroOverlay t_overlay)) return;
 
@@ -1900,7 +1920,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         return true;
     }
 
-    // 칩은 런타임에 만들지 않는다 — 깔아 두는 쪽은 Tools/UI/도감 상세창 칩 박기다.
+    // 칩은 런타임에 만들지 않는다 — 깔아 두는 쪽은 Tools/Card Battle/UI/도감 상세창 칩 박기다.
     /// <summary>줄에 미리 깔아 둔 _index번째 칩을 채워 켠다. 칩이 모자라면 false — 호출부는 거기서 멈춘다.</summary>
     static bool TryShowChip(Transform _root, int _index, string _what,
                             Sprite _icon, string _name, float _iconScale, bool _open)
@@ -1909,7 +1929,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         if (_index >= _root.childCount)
         {
             Debug.LogWarning($"[CardDetailOverlay] Not enough {_what} chips — only the {_root.childCount} laid out in the prefab are visible. " +
-                             "Increase the count with Tools/UI/Bake album detail chips");
+                             "Increase the count with Tools/Card Battle/UI/Bake album detail chips");
             return false;
         }
 

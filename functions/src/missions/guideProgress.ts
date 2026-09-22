@@ -58,9 +58,11 @@ export function evaluateGuideProgress(
         levelOfCard(growth, id) > BASE_LEVEL) ? 1 : 0;
     } else if (event === "Guide.EvolveCompleted") {
       progress = [...owned].some((id) => star(id) >= 2) ? 1 : 0;
-    } else if (event === "Guide.StarterCardsAtStar1" || event === "Guide.StarterCardsAtStar2") {
-      const targetStar = event === "Guide.StarterCardsAtStar1" ? 1 : 2;
-      progress = STARTER_CARD_IDS.filter((id) => owned.has(id) && star(id) >= targetStar).length;
+    } else if (event === "Guide.StarterCardsAtStar1") {
+      progress = STARTER_CARD_IDS.filter((id) => owned.has(id) && star(id) >= 1).length;
+    } else if (event === "Guide.StarterCardsAtStar2") {
+      // 기존 이벤트 키와 최고 진행도는 보존하되, 돌보미라면 어떤 카드든 인정한다.
+      progress = [...owned].filter((id) => caretaker.has(id) && star(id) >= 2).length;
     } else if (event === "Guide.DeckSaved6") progress = validDecks.length ? 1 : 0;
     else if (/^Guide\.AdventureNode\d+$/.test(event)) {
       progress = cleared.has("node_" + event.slice("Guide.AdventureNode".length)) ? 1 : 0;
