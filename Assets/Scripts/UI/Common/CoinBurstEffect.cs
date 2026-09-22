@@ -40,6 +40,9 @@ public class CoinBurstEffect : MonoBehaviour
     /// <summary>연출 전체 길이(초).</summary>
     public float TotalDuration => BuildSettings().TotalDuration;
 
+    /// <summary>저작된 궤적과 목적지를 유지하며 재화 아이콘만 갱신한다.</summary>
+    public void SetSprite(Sprite _sprite) => this.coinSprite = _sprite;
+
     /// <summary>
     /// 배선을 런타임에 갈아 끼운다(프리팹에 미리 꽂아둘 수 없는 상황용 — 로비 획득 연출이 이 경로를 쓴다).
     /// 넘기지 않은 값(_coinCount 음수, 각도 null)은 직렬화된 값을 유지한다.

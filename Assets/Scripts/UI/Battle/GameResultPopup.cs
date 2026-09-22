@@ -128,6 +128,17 @@ public class GameResultPopup : MonoBehaviour
 
         KillTweens();
 
+        Sprite t_rewardIcon = CurrencyLook.IconOf(_reward.Type);
+        if (t_rewardIcon != null)
+        {
+            if (this.goldIconRect != null && this.goldIconRect.TryGetComponent<Image>(out var t_icon))
+            {
+                t_icon.sprite = t_rewardIcon;
+                t_icon.preserveAspect = true;
+            }
+            this.coinBurst?.SetSprite(t_rewardIcon);
+        }
+
         this.m_revealDone = false;
         this.m_leaving = false;
 
