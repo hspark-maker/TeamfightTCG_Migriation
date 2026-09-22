@@ -92,6 +92,8 @@ public class EnhanceResultPanelView : ContentsUIBehaviour
     [SerializeField] TMP_Text effectValueText;
     [Tooltip("강화 후 별 채움. 새로 얻은 별은 행 등장 뒤 강조한다.")]
     [SerializeField] GrowthStarStrip growthStars;
+    [Tooltip("선택 사항. 진화 전후 별 단계를 함께 표시한다.")]
+    [SerializeField] TMP_Text starChangeText;
 
     [Header("한 번 더 (선택)")]
     [Tooltip("결과판에서 곧바로 다음 강화로 잇는다 — 연타가 이 시스템의 본체라 여기서 손이 끊기면 안 된다.")]
@@ -187,6 +189,11 @@ public class EnhanceResultPanelView : ContentsUIBehaviour
 
         if (this.growthStars != null)
             this.growthStars.SetLevel(t_success ? _line.ToLevel : _line.FromLevel);
+
+        if (this.starChangeText != null)
+            this.starChangeText.text = t_success
+                ? GrowthStar.TransitionLabel(_line.FromLevel, _line.ToLevel)
+                : GrowthStar.Label(_line.FromLevel);
 
         if (this.retryButton != null) this.retryButton.interactable = _line.CanRetry;
         if (this.retryNoticeText != null) this.retryNoticeText.text = _line.RetryNotice;

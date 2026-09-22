@@ -1354,7 +1354,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &3258554938092359117
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1369,10 +1369,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 8906000000000000111}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 458}
-  m_SizeDelta: {x: 875.5, y: 253.7}
+  m_AnchorMin: {x: 0.5, y: 1}
+  m_AnchorMax: {x: 0.5, y: 1}
+  m_AnchoredPosition: {x: 0, y: -155}
+  m_SizeDelta: {x: 875.5, y: 90}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &3258554938092359123
 CanvasRenderer:
@@ -1669,6 +1669,7 @@ MonoBehaviour:
   cancelButton: {fileID: 6038824283178262344}
   versusRoot: {fileID: 3258554939077957295}
   modeTitleText: {fileID: 6447828062816482280}
+  matchStatusText: {fileID: 3258554938092359122}
   searchClockRoot: {fileID: 8839123712607203661}
   searchElapsedText: {fileID: 6957087590346425542}
   searchingHintRoot: {fileID: 5759112833629124418}
@@ -2583,7 +2584,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &5398248119669312030
 RectTransform:
   m_ObjectHideFlags: 0
@@ -3859,7 +3860,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: -3.5}
-  m_SizeDelta: {x: 344.5656, y: 50}
+  m_SizeDelta: {x: 600, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &4474337067584119598
 CanvasRenderer:
@@ -3995,10 +3996,10 @@ RectTransform:
   - {fileID: 6179339381388446275}
   m_Father: {fileID: 8906000000000000111}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0}
-  m_AnchorMax: {x: 0.5, y: 0}
-  m_AnchoredPosition: {x: 0, y: 11.245}
-  m_SizeDelta: {x: 448.7975, y: 50}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: -1960.8}
+  m_SizeDelta: {x: -913.30066, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &2130774833170658886
 CanvasRenderer:
@@ -4028,7 +4029,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\uB300\uC804 \uC900\uBE44 \uC911 ...."
+  m_text: "대전 준비중"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 24b4aa79c7c8fee41b59a42f8ae762ec, type: 2}
   m_sharedMaterial: {fileID: -4999335185947324146, guid: 24b4aa79c7c8fee41b59a42f8ae762ec, type: 2}

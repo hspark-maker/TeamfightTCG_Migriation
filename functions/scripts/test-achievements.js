@@ -1,16 +1,22 @@
 ﻿"use strict";
 const assert = require("node:assert/strict");
+const {resolve} = require("node:path");
+const output = process.env.TITLE_TEST_BUILD || "../lib";
+const built = name => require(resolve(__dirname, output, name));
 const {test} = require("node:test");
-const {parseAchievementCatalog, achievementProgressKey} = require("../lib/achievements/achievementCatalog");
-const {activeAchievementSynergies, judgeAchievementClaim} = require("../lib/achievements/achievementProgress");
+const {parseAchievementCatalog, achievementProgressKey} = built("achievements/achievementCatalog");
+const {activeAchievementSynergies, judgeAchievementClaim} = built("achievements/achievementProgress");
 const {readStatistics, projectAchievements, applyStatisticsBattle, applyStatisticsAlbums, applyStatisticsPacks} =
-  require("../lib/statistics/playerStatistics");
-const {achievementsRef, readAchievements, writeAchievements, achievementResponse} = require("../lib/achievements/achievementStore");
-const {parseAlbumEntryRows, parseAlbumThemeRows} = require("../lib/completionTable");
+  built("statistics/playerStatistics");
+const {achievementsRef, readAchievements, writeAchievements, achievementResponse} = built("achievements/achievementStore");
+const {parseAlbumEntryRows, parseAlbumThemeRows} = built("completionTable");
 
 const row = (stage = 1, extra = {}) => ({id: stage, achievementId: `wins.${stage}`, groupId: "wins", stage,
   eventKey: "WinBattle", synergyId: "", targetCount: stage * 10, title: "Wins", description: "Total wins",
-  rewardCurrency: "Gold", rewardAmount: 10, sortOrder: 1, enabled: 1, ...extra});
+  sortOrder: 1, enabled: 1, ...extra});
+const rewards = (rows, extra = {}) => rows.map((r, i) => ({id: i + 1, ownerType: "Achievement",
+  ownerId: r.achievementId, order: 1, rewardType: "Currency", rewardId: "Gold", amount: 10, ...extra}));
+const catalogOf = rows => parseAchievementCatalog(rows, rewards(rows));
 const fresh = () => readAchievements({data: () => undefined});
 const mutateStatistics = (state, mutate) => {
   const statistics = readStatistics(undefined, state, 1);
@@ -24,24 +30,33 @@ const applyAchievementAlbums = (state, save, entries, themes) =>
   mutateStatistics(state, (statistics) => applyStatisticsAlbums(statistics, save, entries, themes));
 
 test("catalog exposes strict existing currency rewards, stages and parameterized keys", () => {
-  const catalog = parseAchievementCatalog([row(2), row(1)]);
+  const catalog = catalogOf([row(2), row(1)]);
   assert.deepEqual(catalog.map((d) => d.stage), [1, 2]);
   for (const currency of ["Gold", "Diamond", "Shard"]) {
-    assert.equal(parseAchievementCatalog([row(1, {rewardCurrency: currency})])[0].reward.currencies[0].currency, currency);
+    assert.equal(parseAchievementCatalog([row()], rewards([row()], {rewardId: currency}))[0].reward.currencies[0].currency, currency);
   }
   assert.equal(achievementProgressKey({event: "PlaySynergy", synergyId: "Bulk"}), "PlaySynergy:Bulk");
   assert.equal(achievementProgressKey(catalog[0]), "WinBattle");
 });
 
 test("malformed reward, event, duplicate id and stage definitions fail closed", () => {
-  for (const extra of [{rewardCurrency: "Gem"}, {rewardCurrency: "ProfileFrame"}, {rewardAmount: -1},
-    {rewardAmount: 1.5}, {rewardAmount: Number.MAX_SAFE_INTEGER}, {targetCount: 0}, {eventKey: "Unknown"},
+  for (const extra of [{targetCount: 0}, {eventKey: "Unknown"},
     {synergyId: "Bulk"}, {eventKey: "PlaySynergy", synergyId: ""}, {achievementId: "bad/key"}]) {
-    assert.throws(() => parseAchievementCatalog([row(1, extra)]), /Invalid Achievement/);
+    assert.throws(() => catalogOf([row(1, extra)]), /Invalid Achievement/);
   }
   for (const rows of [[row(), row()], [row(2)], [row(), row(2, {targetCount: 9})],
-    [row(), row(2, {eventKey: "OpenPack"})]]) assert.throws(() => parseAchievementCatalog(rows));
-  assert.deepEqual(parseAchievementCatalog([row(1, {enabled: 0, rewardCurrency: "ProfileFrame"})]), []);
+    [row(), row(2, {eventKey: "OpenPack"})]]) assert.throws(() => catalogOf(rows));
+  assert.deepEqual(parseAchievementCatalog([row(1, {enabled: 0})], []), []);
+});
+
+test("Reward entries must exist and reject invalid amounts, unsupported items and duplicate order", () => {
+  assert.throws(() => parseAchievementCatalog([row()], []));
+  for (const patch of [{rewardId: "Gem"}, {rewardType: "Frame"}, {rewardType: "Card", rewardId: "1"},
+    {rewardType: "Pack", rewardId: "pack"}, {amount: -1}, {amount: 1.5}, {amount: Number.MAX_SAFE_INTEGER},
+    {rewardType: "Title", rewardId: "title", amount: 2}, {rewardType: "Title", rewardId: "", amount: 1}]) {
+    assert.throws(() => parseAchievementCatalog([row()], rewards([row()], patch)));
+  }
+  assert.throws(() => parseAchievementCatalog([row()], [...rewards([row()]), ...rewards([row()], {id: 2})]));
 });
 
 test("wins, destroys and synergy plays accrue across claims and dates without resets", () => {
@@ -103,7 +118,7 @@ test("album counts complete published themes, excludes locked/empty/unknown them
 });
 
 test("tier claims require earlier stages but do not consume progress", () => {
-  const catalog = parseAchievementCatalog([row(), row(2)]);
+  const catalog = catalogOf([row(), row(2)]);
   const state = fresh(); state.progress.WinBattle = 25;
   assert.equal(judgeAchievementClaim("wins.2", state, catalog), "NotEligible");
   assert.equal(judgeAchievementClaim("wins.1", state, catalog), null);

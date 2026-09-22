@@ -1031,7 +1031,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\uB371 \uD3B8\uC9D1 \uC885\uB8CC"
+  m_text: "\uC548\uB0B4"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 24b4aa79c7c8fee41b59a42f8ae762ec, type: 2}
   m_sharedMaterial: {fileID: -4999335185947324146, guid: 24b4aa79c7c8fee41b59a42f8ae762ec, type: 2}
@@ -1166,7 +1166,7 @@ MonoBehaviour:
   noButton: {fileID: 2891130075327043854}
   yesText: {fileID: 2891130074404170393}
   noText: {fileID: 2891130075425129316}
-  titleText: {fileID: 2891130075826822054}
+  titleText: {fileID: 6592560374749364818}
 --- !u!1 &2891130076024587039
 GameObject:
   m_ObjectHideFlags: 0

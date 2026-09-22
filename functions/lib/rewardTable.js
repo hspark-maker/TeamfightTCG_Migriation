@@ -85,12 +85,8 @@ function resolveRewards(rows, ownerType, ownerId) {
             drop("NonPositiveAmount");
             continue;
         }
-        if (["Avatar", "Frame", "Emote"].includes(row.rewardType) && row.amount !== 1) {
+        if (["Avatar", "Frame", "Emote", "Title"].includes(row.rewardType) && row.amount !== 1) {
             drop("InvalidCosmeticAmount");
-            continue;
-        }
-        if (row.rewardType === "Title" && row.amount !== 1) {
-            drop("InvalidTitleAmount");
             continue;
         }
         if (row.rewardType === "Emote" && (!/^[1-9][0-9]*$/.test(row.rewardId) ||
@@ -99,7 +95,7 @@ function resolveRewards(rows, ownerType, ownerId) {
             continue;
         }
         if (row.rewardType !== "Currency") {
-            if (!row.rewardId.trim() || (row.rewardType === "Card" &&
+            if (!row.rewardId.trim() || (row.rewardType === "Title" && row.rewardId.trim() !== row.rewardId) || (row.rewardType === "Card" &&
                 (!Number.isSafeInteger(Number(row.rewardId)) || Number(row.rewardId) <= 0))) {
                 drop("InvalidRewardId");
                 continue;

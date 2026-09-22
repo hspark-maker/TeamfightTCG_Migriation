@@ -19,7 +19,7 @@ export type RewardRow = {
 export type RewardGain = {currency: CurrencyKey; amount: number};
 
 /** 비재화 보상. 수령 트랜잭션에서 카드로 지급하며 재화와 함께 확정한다. */
-export type RewardItem = {rewardType: "Card" | "Pack" | "PackChoice" | "Avatar" | "Frame" | "Emote"; rewardId: string; amount: number};
+export type RewardItem = {rewardType: "Card" | "Pack" | "PackChoice" | "Avatar" | "Frame" | "Emote" | "Title"; rewardId: string; amount: number};
 
 /** 버려진 보상 줄. 저작 실수를 조용히 삼키지 않으려고 사유를 들고 나온다. */
 export type DroppedReward = {
@@ -100,7 +100,7 @@ export function resolveRewards(rows: RewardRow[], ownerType: string, ownerId: st
     });
 
     // 카드 보상이 저작되면 여기서 드러나야 한다. 조용히 재화로 바꾸지 않는다.
-    if (!["Currency", "Card", "Pack", "PackChoice", "Avatar", "Frame", "Emote"].includes(row.rewardType)) {
+    if (!["Currency", "Card", "Pack", "PackChoice", "Avatar", "Frame", "Emote", "Title"].includes(row.rewardType)) {
       drop("UnknownRewardType");
       continue;
     }
@@ -114,7 +114,7 @@ export function resolveRewards(rows: RewardRow[], ownerType: string, ownerId: st
       drop("NonPositiveAmount");
       continue;
     }
-    if (["Avatar", "Frame", "Emote"].includes(row.rewardType) && row.amount !== 1) {
+    if (["Avatar", "Frame", "Emote", "Title"].includes(row.rewardType) && row.amount !== 1) {
       drop("InvalidCosmeticAmount");
       continue;
     }
@@ -124,7 +124,7 @@ export function resolveRewards(rows: RewardRow[], ownerType: string, ownerId: st
       continue;
     }
     if (row.rewardType !== "Currency") {
-      if (!row.rewardId.trim() || (row.rewardType === "Card" &&
+      if (!row.rewardId.trim() || (row.rewardType === "Title" && row.rewardId.trim() !== row.rewardId) || (row.rewardType === "Card" &&
         (!Number.isSafeInteger(Number(row.rewardId)) || Number(row.rewardId) <= 0))) {
         drop("InvalidRewardId");
         continue;

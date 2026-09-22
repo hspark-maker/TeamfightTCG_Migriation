@@ -10,6 +10,7 @@ public static class OutgameDebugActions
     public const long DEBUG_DIAMOND_AMOUNT = 1000;
     public const long DEBUG_ENERGY_AMOUNT  = 1000;
     public const long DEBUG_SHARD_AMOUNT   = 1000;
+    public const long DEBUG_CARD_DUST_AMOUNT = 1000;
 
     // 1회 회전 비용이 티켓 1장이라 10장이면 충분하다 — 큰 수는 잔액 대조를 흐린다.
     public const long DEBUG_ROULETTE_TICKET_AMOUNT = 10;
@@ -21,6 +22,8 @@ public static class OutgameDebugActions
     public static void GrantEnergy() => GrantCurrency(ECurrencyType.Energy, DEBUG_ENERGY_AMOUNT);
 
     public static void GrantShard() => GrantCurrency(ECurrencyType.Shard, DEBUG_SHARD_AMOUNT);
+
+    public static void GrantCardDust() => GrantCurrency(ECurrencyType.CardDust, DEBUG_CARD_DUST_AMOUNT);
 
     public static void GrantRouletteTicket() => GrantCurrency(ECurrencyType.RouletteTicket, DEBUG_ROULETTE_TICKET_AMOUNT);
 
@@ -247,6 +250,47 @@ public static class OutgameDebugActions
             Debug.LogError($"[OutgameDebug] devCompleteMissions failed — {t_exception.GetBaseException().Message}");
         }
     }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    // 진행도만 달성시킨다. 업적 보상과 칭호는 기존 보상 받기 흐름에서 수령한다.
+    public static void CompleteAchievements() => CompleteAchievementsAsync().Forget();
+
+    static async UniTaskVoid CompleteAchievementsAsync()
+    {
+        if (ContentProfileConfig.Active == null || ContentProfileConfig.Active.CloudEnvId != "test")
+        {
+            Debug.LogWarning("[OutgameDebug] 전체 업적 달성은 테스트 환경에서만 사용할 수 있습니다.");
+            return;
+        }
+        try
+        {
+            var t_session = PlayerSaveCloud.CaptureCommandSession();
+            await ServerSaveCommands.InvokeAsync<ServerCommandResult>(
+                "devCompleteAchievements", new { env = "test" });
+            if (!PlayerSaveCloud.IsCommandSessionCurrent(t_session)) return;
+
+            // 통계와 진행도는 명령 응답에서 채택한다. 업적 창을 열기 전에도 정의와 보상을 함께 갱신한다.
+            bool t_refreshed = await AchievementCommands.RefreshAsync(_force: true);
+            if (!PlayerSaveCloud.IsCommandSessionCurrent(t_session)) return;
+            if (t_refreshed)
+                Debug.Log("[OutgameDebug] 전체 업적 달성 완료 — 업적 화면에서 단계별 보상을 수령하세요.");
+            else
+                Debug.LogWarning("[OutgameDebug] 업적 달성은 적용됐지만 목록을 갱신하지 못했습니다. 업적 창을 다시 열어 주세요.");
+        }
+        catch (ServerCommandRejectedException t_rejected)
+        {
+            Debug.LogWarning($"[OutgameDebug] devCompleteAchievements rejected — {t_rejected.Message}");
+        }
+        catch (ServerAdoptionException t_adoption)
+        {
+            Debug.LogWarning($"[OutgameDebug] Adopting the achievement response closed the session — {t_adoption.Message}");
+        }
+        catch (System.Exception t_exception)
+        {
+            Debug.LogError($"[OutgameDebug] devCompleteAchievements failed — {t_exception.GetBaseException().Message}");
+        }
+    }
+#endif
 
     public static void ResetDailyMissions() => ResetDailyMissionsAsync().Forget();
 

@@ -26,6 +26,7 @@ internal sealed class AchievementDefinition
 internal sealed class AchievementReward
 {
     [JsonProperty("currencies")] public List<ClaimRewardGain> Currencies { get; set; }
+    [JsonProperty("items")] public List<ClaimRewardItem> Items { get; set; }
 }
 
 internal sealed class AchievementGetResponse

@@ -369,7 +369,8 @@ public class CardView : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
         string t_artAddress = CardVisualRules.BattleArtAddress(_card);
         // 프레임 교체는 SetFaceDownLook보다 **먼저** 한다 — 뒷면 일러스트 배율을 테두리 높이에서 재기 때문에
         // 순서가 뒤집히면 한 프레임 동안 옛 테두리 크기로 계산된다.
-        ApplyFrame(_card);
+        int t_visibleSynergies = Decor.Refresh(_card, _synergy);
+        ApplyFrame(_card, t_visibleSynergies);
         CardArtBinding.Bind(gameObject, t_artAddress, sprite =>
             SetFaceDownLook(this.boundCard != null && !this.boundCard.isRevealed, sprite));
         SetShieldVisible(!t_isFaceDown && _card.hasShield);
@@ -379,8 +380,6 @@ public class CardView : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
         // 배치 엠블럼이 볼 스냅샷. CardDecorView는 배지 슬롯을 키워드가 쓰면 즉시 return 해서
         // LastBadgeState를 못 채운다 — 그 경로에서도 엠블럼은 떠야 하므로 별도 필드에 따로 잡는다.
         this.activeSynergyState = _synergy;
-
-        Decor.Refresh(_card, _synergy);   // 뒷면 은닉·표시 대상 판정은 CardDecorView 안에서.
     }
 
     // 이 카드가 속한 필드의 확정 시너지 스냅샷(BattleFieldView가 Render로 주입). 배치 엠블럼 판정용.
@@ -393,9 +392,9 @@ public class CardView : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
     SpriteRenderer frameRenderer;
     bool           frameRendererSearched;
 
-    /// <summary>시너지 해금 여부와 등급 × 시너지 개수에 맞는 테두리로 갈아 끼운다(표는 CardFrameConfig 하나).
+    /// <summary>등급 × 실제 표시 중인 시너지 배지 개수에 맞는 테두리로 갈아 끼운다(표는 CardFrameConfig 하나).
     /// 못 고르면 프리팹에 저작된 테두리를 그대로 둔다 — 표가 없는 씬에서 테두리가 사라지지 않게.</summary>
-    void ApplyFrame(CardInstance _card)
+    void ApplyFrame(CardInstance _card, int _visibleSynergyCount)
     {
         if (!this.frameRendererSearched)
         {
@@ -405,7 +404,7 @@ public class CardView : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
 
         if (this.frameRenderer == null) return;
 
-        Sprite t_frame = CardVisualRules.PickFrame(_card.cardId, _card.synergyEnabled);
+        Sprite t_frame = CardVisualRules.PickFrame(_card.cardId, _visibleSynergyCount);
         if (t_frame != null) this.frameRenderer.sprite = t_frame;
     }
 

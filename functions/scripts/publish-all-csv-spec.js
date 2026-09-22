@@ -17,6 +17,7 @@ const DATABASE = `projects/${PROJECT}/databases/cardbattle/documents`;
 const CODEC = "Assets/Scripts/OutGame/Spec/SpecPayloadCodec.cs";
 const GENERATED = "Assets/Table/SpecDatas.cs";
 const ACCOUNT = "Assets/Scripts/Editor/SpecFirestoreUploader.AccountCsv.cs";
+const TITLE = "Assets/Scripts/Editor/SpecFirestoreUploader.TitleCsv.cs";
 const RANK = "Assets/Scripts/OutGame/Spec/RankAiEncounterRow.cs";
 const VERSION = "Assets/Scripts/OutGame/Spec/ContentVersion.cs";
 const SETTINGS = "ProjectSettings/ProjectSettings.asset";
@@ -39,7 +40,7 @@ function publishedNames(text = read(CODEC)) {
 }
 
 function snapshotSources(names = publishedNames()) {
-  const sources = [CODEC, GENERATED, ACCOUNT, RANK, VERSION, SETTINGS,
+  const sources = [CODEC, GENERATED, ACCOUNT, TITLE, RANK, VERSION, SETTINGS,
     "functions/scripts/publish-local-spec.js", "functions/scripts/publish-all-csv-spec.js",
     ...names.map((name) => `docs/SpecData/${name}_sheet.csv`)];
   return Object.fromEntries(sources.map((file) => [file, digest(fs.readFileSync(path.join(ROOT, file)))]));
@@ -89,8 +90,9 @@ function localSnapshot() {
   const classes = new Map([...read(GENERATED).matchAll(/public partial class (\w+)\s*\{([\s\S]*?)^\}/gm)]
     .map((m) => [m[1], m[2]]));
   const account = read(ACCOUNT);
-  for (const name of ["Mission", "Achievement", "CardCraft"])
+  for (const name of ["Mission", "Achievement", "CardCraft", "CosmeticItem"])
     classes.set(name, account.match(new RegExp(`sealed class ${name}UploadRow\\s*\\{([\\s\\S]*?)\\n    \\}`))?.[1]);
+  classes.set("Title", read(TITLE).match(/sealed class TitleUploadRow\s*\{([\s\S]*?)\n    \}/)?.[1]);
   classes.set("RankAiEncounter", read(RANK));
   const version = read(VERSION);
   const major = Number(version.match(/const int Major\s*=\s*(\d+)/)?.[1]);

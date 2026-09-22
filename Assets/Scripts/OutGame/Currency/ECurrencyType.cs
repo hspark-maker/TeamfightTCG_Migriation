@@ -6,6 +6,7 @@ public enum ECurrencyType
     Energy,
     Shard,  // 카드 강화 재화. 중복 카드 전용 재화와는 별개다
     RouletteTicket,  // 룰렛 1회 회전 비용. 서버 지갑 키(CURRENCY_KEYS)에도 열려 있다
+    CardDust,  // 카드 제작 재화. 서버 지갑의 CardDust 키와 대응한다
 
     Count,
 }

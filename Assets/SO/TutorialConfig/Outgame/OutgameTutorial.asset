@@ -592,7 +592,7 @@ MonoBehaviour:
     - missionId: guide.01
       tutorial: 2
       contentIntros: 05000000
-      destination: 0
+      destination: 14
     - missionId: guide.03
       tutorial: 6
       contentIntros: 03000000
@@ -600,7 +600,7 @@ MonoBehaviour:
     - missionId: guide.05
       tutorial: 18
       contentIntros: 
-      destination: 0
+      destination: 14
     - missionId: guide.06
       tutorial: 0
       contentIntros: 04000000
@@ -615,10 +615,10 @@ MonoBehaviour:
       prerequisite: 14
       stepDefs:
       - stepId: 60
-        action: 0
-        anchor: 18
-        spotlight: 18
-        guideMessage: 
+        action: 1
+        anchor: 37
+        spotlight: 0
+        guideMessage: "\uac15\ud654 \ud328\ub110\uc5d0\uc11c \ubcf4\uc720 \uce74\ub4dc\ub97c \uc131\uc7a5\uc2dc\ud0ac \uc218 \uc788\uc5b4\uc694."
         messageAtBottom: 0
         unlocks: 
         unlocksAll: 0
@@ -639,10 +639,10 @@ MonoBehaviour:
         onFailure: 0
         contentIntros: 
       - stepId: 28
-        action: 0
-        anchor: 19
-        spotlight: 19
-        guideMessage: "\uCE74\uB4DC\uB97C \uAC15\uD654\uD574\uBD05\uC2DC\uB2E4."
+        action: 1
+        anchor: 37
+        spotlight: 0
+        guideMessage: "\uc774\ubc88\uc5d0 \uac15\ud654\ud560 \uce74\ub4dc\uac00 \uc120\ud0dd\ub418\uc5b4 \uc788\uc5b4\uc694."
         messageAtBottom: 0
         unlocks: 
         unlocksAll: 0
@@ -663,11 +663,10 @@ MonoBehaviour:
         onFailure: 0
         contentIntros: 
       - stepId: 29
-        action: 0
-        anchor: 20
+        action: 1
+        anchor: 37
         spotlight: 0
-        guideMessage: "\uCE74\uB4DC\uB97C \uB20C\uB7EC \uAC15\uD654 \uD654\uBA74\uC744
-          \uC5F4\uC5B4 \uBCF4\uC138\uC694."
+        guideMessage: "\uac15\ud654\ud560 \ub54c \uc774 \uce74\ub4dc\uac00 \ud06c\uac8c \ub098\ud0c0\ub098 \uc131\uc7a5 \uacb0\uacfc\ub97c \ubcf4\uc5ec\uc918\uc694."
         messageAtBottom: 0
         unlocks: 
         unlocksAll: 0
@@ -689,8 +688,8 @@ MonoBehaviour:
         contentIntros: 
       - stepId: 83
         action: 1
-        anchor: 35
-        spotlight: 35
+        anchor: 41
+        spotlight: 0
         guideMessage: "\uC0E4\uB4DC\uB294 \uAC15\uD654\uC5D0 \uC0AC\uC6A9\uB418\uB294
           \uC7AC\uD654\uC608\uC694."
         messageAtBottom: 0
@@ -714,8 +713,8 @@ MonoBehaviour:
         contentIntros: 
       - stepId: 84
         action: 1
-        anchor: 36
-        spotlight: 36
+        anchor: 42
+        spotlight: 0
         guideMessage: "\uC0AC\uC6A9\uD560 \uC0E4\uB4DC \uAC1C\uC218\uB97C \uC815\uD574
           \uAC15\uD654\uD560 \uC218 \uC788\uC5B4\uC694.\n\uD544\uC694\uB7C9\uC744
           \uCC44\uC6B0\uBA74 \uBCC4\uC774 \uB298\uACE0 \uCE74\uB4DC\uAC00 \uAC15\uD574\uC838\uC694."
@@ -740,7 +739,7 @@ MonoBehaviour:
         contentIntros: 
       - stepId: 30
         action: 11
-        anchor: 21
+        anchor: 40
         spotlight: 0
         guideMessage: "{enhanceCost}\n\uAC15\uD654 \uBC84\uD2BC\uC744 \uB20C\uB7EC
           \uBCF4\uC138\uC694."
@@ -753,7 +752,7 @@ MonoBehaviour:
         packPriceLabel: 
         anchorCardId: 0
         freeOfCharge: 1
-        waitUnlockIntro: 1
+        waitUnlockIntro: 0
         rewardTitle: 
         parallelGain: 0
         scenario: {fileID: 0}
@@ -765,8 +764,8 @@ MonoBehaviour:
         contentIntros: 
       - stepId: 61
         action: 1
-        anchor: 31
-        spotlight: 32
+        anchor: 38
+        spotlight: 37
         guideMessage: "\uCE74\uB4DC\uAC00 \uC131\uC7A5\uD558\uBA74 \uACE0\uC720 \uD0A4\uC6CC\uB4DC
           \uB2A5\uB825\uC774 \uD574\uAE08\uB3FC\uC694."
         messageAtBottom: 1
@@ -995,7 +994,7 @@ MonoBehaviour:
       stepDefs:
       - stepId: 62
         action: 1
-        anchor: 0
+        anchor: 37
         spotlight: 0
         guideMessage: "\uCE74\uB4DC\uB4E4\uC774 \uD568\uAED8 \uB9CC\uB4DC\uB294 \uD6A8\uACFC,
           '\uC2DC\uB108\uC9C0'\uB97C \uC54C\uC544\uBCFC\uAC8C\uC694."
@@ -1020,10 +1019,9 @@ MonoBehaviour:
         contentIntros: 
       - stepId: 63
         action: 1
-        anchor: 0
+        anchor: 37
         spotlight: 0
-        guideMessage: "\uCE74\uB4DC\uB97C 2\uC131\uC73C\uB85C \uC131\uC7A5\uC2DC\uD0A4\uBA74
-          \uADF8 \uCE74\uB4DC\uC758 \uC2DC\uB108\uC9C0\uAC00 \uD574\uAE08\uB3FC\uC694."
+        guideMessage: "\ubcc4 \ub450 \uac1c\ub97c \ucc44\uc6b4 \uce74\ub4dc\ub294 \uc2dc\ub108\uc9c0\uac00 \ud574\uae08\ub3fc\uc694."
         messageAtBottom: 0
         unlocks: 
         unlocksAll: 0
@@ -1044,11 +1042,10 @@ MonoBehaviour:
         onFailure: 1
         contentIntros: 
       - stepId: 64
-        action: 0
-        anchor: 18
+        action: 1
+        anchor: 37
         spotlight: 0
-        guideMessage: "\uB3C4\uAC10\uC5D0\uC11C \uC2DC\uB108\uC9C0\uB97C \uD574\uAE08\uD560
-          \uCE74\uB4DC\uB97C \uCC3E\uC544\uBCF4\uC138\uC694."
+        guideMessage: "\uc120\ud0dd\ud55c \uce74\ub4dc\uc758 \uc2dc\ub108\uc9c0\ub97c \ud574\uae08\ud574 \ubcfc\uac8c\uc694."
         messageAtBottom: 1
         unlocks: 
         unlocksAll: 0
@@ -1069,10 +1066,10 @@ MonoBehaviour:
         onFailure: 1
         contentIntros: 
       - stepId: 65
-        action: 0
-        anchor: 19
+        action: 1
+        anchor: 41
         spotlight: 0
-        guideMessage: 
+        guideMessage: "\uc0e4\ub4dc\ub97c \uc0ac\uc6a9\ud558\uba74 \uce74\ub4dc\uc758 \uc9c4\ud654 \uc9c4\ud589\ub3c4\uac00 \uc62c\ub77c\uac00\uc694."
         messageAtBottom: 1
         unlocks: 
         unlocksAll: 0
@@ -1093,10 +1090,10 @@ MonoBehaviour:
         onFailure: 1
         contentIntros: 
       - stepId: 66
-        action: 0
-        anchor: 20
+        action: 1
+        anchor: 42
         spotlight: 0
-        guideMessage: 
+        guideMessage: "\uc0ac\uc6a9\ud560 \uc0e4\ub4dc \uc218\ub7c9\uc744 \uc815\ud574 \uac15\ud654\ud560 \uc218 \uc788\uc5b4\uc694."
         messageAtBottom: 1
         unlocks: 
         unlocksAll: 0
@@ -1118,7 +1115,7 @@ MonoBehaviour:
         contentIntros: 
       - stepId: 67
         action: 11
-        anchor: 21
+        anchor: 40
         spotlight: 0
         guideMessage: "\uC774\uBC88 \uAC15\uD654\uB294 \uBB34\uB8CC\uC608\uC694.
           \n\uAC15\uD654\uD558\uC5EC \uC2DC\uB108\uC9C0\uB97C \uD574\uAE08\uD574
@@ -1132,7 +1129,7 @@ MonoBehaviour:
         packPriceLabel: 
         anchorCardId: 0
         freeOfCharge: 1
-        waitUnlockIntro: 1
+        waitUnlockIntro: 0
         rewardTitle: 
         parallelGain: 0
         scenario: {fileID: 0}
@@ -1144,11 +1141,9 @@ MonoBehaviour:
         contentIntros: 
       - stepId: 68
         action: 1
-        anchor: 34
-        spotlight: 32
-        guideMessage: "\uC2DC\uB108\uC9C0\uAC00 \uD574\uAE08\uB410\uC5B4\uC694!\n\uC2DC\uB108\uC9C0
-          \uD6A8\uACFC\uC640 \uD544\uC694\uD55C \uCE74\uB4DC \uC218\uB97C \uD655\uC778\uD574
-          \uBCF4\uC138\uC694."
+        anchor: 39
+        spotlight: 37
+        guideMessage: "\uce74\ub4dc\uc5d0 \uc2dc\ub108\uc9c0 \ubb38\uc591\uc774 \ub098\ud0c0\ub0ac\uc5b4\uc694!\n\uc774\uc81c \uc774 \uce74\ub4dc\ub97c \ub371\uc758 \uc2dc\ub108\uc9c0 \uc870\ud569\uc5d0 \uc0ac\uc6a9\ud560 \uc218 \uc788\uc5b4\uc694."
         messageAtBottom: 0
         unlocks: 
         unlocksAll: 0
@@ -1170,8 +1165,8 @@ MonoBehaviour:
         contentIntros: 
       - stepId: 69
         action: 1
-        anchor: 34
-        spotlight: 32
+        anchor: 39
+        spotlight: 37
         guideMessage: "\uAC19\uC740 \uC2DC\uB108\uC9C0\uAC00 \uD574\uAE08\uB41C \uCE74\uB4DC\uB97C
           \uD544\uC694\uD55C \uC218\uB9CC\uD07C \uB371\uC5D0 \uD3B8\uC131\uD558\uBA74
           \uD6A8\uACFC\uAC00 \uD65C\uC131\uD654\uB3FC\uC694."
@@ -1195,15 +1190,15 @@ MonoBehaviour:
         onFailure: 1
         contentIntros: 
       - stepId: 70
-        action: 12
-        anchor: 0
+        action: 1
+        anchor: 37
         spotlight: 0
-        guideMessage: 
+        guideMessage: "\ubcc4\uc774 \ub298\uc5b4\ub09c \uce74\ub4dc \ubaa8\uc2b5\uc744 \uc5ec\uae30\uc11c \ud655\uc778\ud560 \uc218 \uc788\uc5b4\uc694."
         messageAtBottom: 0
         unlocks: 
         unlocksAll: 0
         locks: 
-        useDim: 0
+        useDim: 1
         packId: 
         packPriceLabel: 
         anchorCardId: 0
@@ -1219,15 +1214,15 @@ MonoBehaviour:
         onFailure: 1
         contentIntros: 
       - stepId: 71
-        action: 20
-        anchor: 0
+        action: 1
+        anchor: 37
         spotlight: 0
-        guideMessage: 
+        guideMessage: "\uce74\ub4dc\ub9c8\ub2e4 \ud0a4\uc6cc\ub4dc\uc640 \uc2dc\ub108\uc9c0\uac00 \ub2e4\ub974\ub2c8 \uac15\ud654\ud560 \uce74\ub4dc\ub97c \uace8\ub77c \ubcf4\uc138\uc694."
         messageAtBottom: 0
         unlocks: 
         unlocksAll: 0
         locks: 
-        useDim: 0
+        useDim: 1
         packId: 
         packPriceLabel: 
         anchorCardId: 0

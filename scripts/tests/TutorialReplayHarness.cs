@@ -14,6 +14,7 @@ public sealed class OutgameTutorialBridge
     public int Entries, Presentations, Failures, Advances;
     public bool SignalDuringEntry;
     bool CursorRunning => Harness.Current != null;
+    bool GuidedCursor => OutgameTutorialRunner.IsGuidedRunning;
     bool TryGetCursorStep(out TutorialStepDef step) { step = Harness.Current; return step != null; }
     CancellationToken GetCancellationTokenOnDestroy() => CancellationToken.None;
     Task<EOutgameTutorialStepResult> EnterCursorStepAsync(CancellationToken token)
@@ -124,7 +125,7 @@ public static class TaskExtensions
     }
 }
 public enum EOutgameTutorialStepResult { Failed, Gated, Advanced }
-public enum EOutgameTutorialCompletion { Other, SynergyDeckEditor, Click }
+public enum EOutgameTutorialCompletion { Other, SynergyDeckEditor, Click, RankEffect, ContentUnlockIntro }
 public enum EOutgameTutorialAnchor { None, LobbyDeckTab }
 public sealed class TutorialStepDef { public int StepId; public int Action; public bool LeavesScene; public EOutgameTutorialCompletion Completion; public EOutgameTutorialAnchor Anchor; }
 public sealed class TutorialActionMeta
@@ -143,6 +144,7 @@ public static class OutgameTutorialRunner
 {
     public static bool IsRunning => Harness.Current != null;
     public static bool IsGuidedRunning => false;
+    public static bool TryBeginDefeatEnhance() => false;
     public static TutorialData Data => null;
 }
 public static class OutgameTutorialGuide { public static bool TryGetCurrentStep(out TutorialStepDef step) { step = Harness.Current; return step != null; } }
@@ -169,9 +171,12 @@ public static class DataSaveManager { public static UserSaveData Data = new User
 public static class OutgameTutorialProgress { public static void Save() { } }
 public static class OutgameFeatureLock { public static void Refresh() { } }
 public static class LoadingCoverView { public static bool OwnsLobbyPreparation => false; }
+public static class GameInitialization { public static bool IsReady => true; }
 public static class GuidanceCoordinator
 {
     public static bool IsRestoring => false;
+    public static Task PrepareGrowthSurfaceAsync(TutorialStepDef step, CancellationToken token) => Task.CompletedTask;
+    public static Task PrepareFirstRankSurfaceAsync(CancellationToken token) => Task.CompletedTask;
     public static bool TabSettled;
     public static bool IsLobbyTabAnchor(EOutgameTutorialAnchor anchor) => anchor == EOutgameTutorialAnchor.LobbyDeckTab;
     public static bool IsCurrentTabAnchor(EOutgameTutorialAnchor anchor) => IsLobbyTabAnchor(anchor) && TabSettled;

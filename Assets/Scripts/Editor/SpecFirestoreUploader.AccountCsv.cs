@@ -36,8 +36,6 @@ public static partial class SpecFirestoreUploader
         public int targetCount;
         public string title;
         public string description;
-        public string rewardCurrency;
-        public long rewardAmount;
         public int sortOrder;
         public int enabled;
     }

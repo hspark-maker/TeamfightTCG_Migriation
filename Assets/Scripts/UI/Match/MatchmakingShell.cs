@@ -14,6 +14,7 @@ public class MatchmakingShell : ContentsUIBehaviour
     [SerializeField] Button           cancelButton;
     [SerializeField] GameObject       versusRoot;
     [SerializeField] TMP_Text         modeTitleText;
+    [SerializeField] TMP_Text         matchStatusText;
     [SerializeField] GameObject       searchClockRoot;
     [SerializeField] TMP_Text         searchElapsedText;
     [SerializeField] GameObject       searchingHintRoot;
@@ -33,9 +34,6 @@ public class MatchmakingShell : ContentsUIBehaviour
     const float FOUND_DURATION = 1.9f;
     Sequence m_foundSequence;
     Image m_foundFlash;
-    TMP_Text m_statusLabel;
-    string m_searchHintText;
-    Color m_searchHintColor;
     CancellationTokenSource m_cts;
     bool m_cancelAllowed;
     bool m_running;
@@ -45,23 +43,13 @@ public class MatchmakingShell : ContentsUIBehaviour
     bool m_statusAnimating;
     float m_searchStartedAt;
     int m_searchSeconds;
-    Quaternion m_loadingHome;
     Color[] m_searchDotColors;
     int m_searchDotPhase = -1;
 
     protected override void OnInitializeUI()
     {
         FitToParent();
-        if (searchingHintRoot != null)
-        {
-            m_statusLabel = searchingHintRoot.GetComponent<TMP_Text>();
-            if (m_statusLabel != null)
-            {
-                m_searchHintText = m_statusLabel.text;
-                m_searchHintColor = m_statusLabel.color;
-            }
-        }
-        if (loadingSpinner != null) m_loadingHome = loadingSpinner.localRotation;
+        if (loadingSpinner != null) loadingSpinner.gameObject.SetActive(false);
         m_searchDotColors = new Color[searchDots.Length];
         for (int t_i = 0; t_i < searchDots.Length; t_i++)
             if (searchDots[t_i] != null) m_searchDotColors[t_i] = searchDots[t_i].color;
@@ -106,7 +94,6 @@ public class MatchmakingShell : ContentsUIBehaviour
     {
         StopFoundSequence();
         SetContentsVisible(true);
-        if (loadingSpinner != null) loadingSpinner.localRotation = m_loadingHome;
         if (myProfile != null) myProfile.Render(MatchProfile.OfLocalPlayer());
     }
 
@@ -411,18 +398,16 @@ public class MatchmakingShell : ContentsUIBehaviour
         m_statusAnimating = true;
 
         if (modeTitleText != null) modeTitleText.text = m_versusMode ? versusTitle : rankedTitle;
-        // 상대 확정 전후에도 저작된 구도를 유지한다. 타이머는 확정된 시각에서 멈춘다.
-        if (searchClockRoot != null) searchClockRoot.SetActive(!m_versusMode);
-        if (searchingHintRoot != null) searchingHintRoot.SetActive(true);
-        if (preparingHintRoot != null) preparingHintRoot.SetActive(false);
-        if (battleStartingRoot != null) battleStartingRoot.SetActive(false);
-        if (loadingSpinner != null) loadingSpinner.gameObject.SetActive(_searching || m_versusMode);
-        if (m_statusLabel != null)
+        if (matchStatusText != null)
         {
-            bool t_found = !_searching && !m_versusMode;
-            m_statusLabel.text = t_found ? "매칭 완료" : m_searchHintText;
-            m_statusLabel.color = t_found ? new Color(0.64f, 0.36f, 0.1f, 1f) : m_searchHintColor;
+            matchStatusText.gameObject.SetActive(!m_versusMode);
+            matchStatusText.text = _searching ? "상대를 찾는 중.." : "매칭완료!";
         }
+        if (searchClockRoot != null) searchClockRoot.SetActive(_searching);
+        if (searchingHintRoot != null) searchingHintRoot.SetActive(_searching);
+        if (preparingHintRoot != null) preparingHintRoot.SetActive(!_searching);
+        if (battleStartingRoot != null) battleStartingRoot.SetActive(!_searching);
+        if (loadingSpinner != null) loadingSpinner.gameObject.SetActive(false);
 
         if (_searching)
         {
@@ -436,9 +421,6 @@ public class MatchmakingShell : ContentsUIBehaviour
     void Update()
     {
         if (!m_statusAnimating || !IsViewVisible) return;
-
-        if (loadingSpinner != null)
-            loadingSpinner.Rotate(0f, 0f, -180f * Time.unscaledDeltaTime);
 
         if (m_searching)
         {

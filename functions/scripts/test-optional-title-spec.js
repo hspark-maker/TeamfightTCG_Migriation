@@ -9,8 +9,7 @@ const {clearSpecCache, readOptionalSpecRows, readSpecRows, specPayloadHash} = bu
 after(() => db.terminate());
 const indexPath = "envs/test/specs/_index";
 const blobPath = "envs/test/specs/_release_6_99_Title";
-const matrix = [["id", "titleId", "eventKey", "synergyId", "targetCount", "description"],
-  ["1", "title", "WinBattle", "", "1", "Win once"]];
+const matrix = [["id", "titleId"], ["1", "title"]];
 function blob(rows = matrix) {
   const payload = JSON.stringify(rows);
   return {major: 6, payload, payloadHash: specPayloadHash(payload), rowCount: rows.length - 1};
@@ -53,13 +52,13 @@ test("published missing or hash-damaged blobs fail; valid blobs are read and cac
   t.mock.restoreAll();
   const seen = install(t, {[indexPath]: index(data), [blobPath]: data});
   const first = await readOptionalSpecRows("test", "Title");
-  assert.equal(first[0].targetCount, 1);
+  assert.equal(first[0].titleId, "title");
   assert.deepEqual(await readOptionalSpecRows("test", "Title"), first);
   assert.equal(seen.length, 2);
 });
 
 test("optional title reads reject invalid IDs even when a non-strict caller already cached filtered rows", async t => {
-  const data = blob([...matrix, ["bad", "other", "WinBattle", "", "1", "Win once"]]);
+  const data = blob([...matrix, ["bad", "other"]]);
   install(t, {[indexPath]: index(data), [blobPath]: data});
   assert.equal((await readSpecRows("test", "Title")).length, 1);
   await assert.rejects(readOptionalSpecRows("test", "Title"), /Invalid Title row identifiers/);

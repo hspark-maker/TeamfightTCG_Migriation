@@ -6,13 +6,13 @@
 
 `OutGame/Title/TitleCatalog`는 칭호 ID·표시 이름·설명·아이콘·색을 제공한다. `ProfileConfig.titleCatalog`를 `OutgameConfigStep`이 `TitleManager`에 주입한다. 서버 지급 검증은 `docs/SpecData/Title_sheet.csv`의 `id`·`titleId`로 한다. 기존 테스트 8종만 등록하며 기본 지급은 없다. 칭호는 `CosmeticType`·`CosmeticItem`에 포함하지 않는다.
 
-서버 profile 슬롯의 `ownedTitleIds`가 소유의 진실원이다. `functions/src/titles/titleOwnership`이 영구 소유를 지급하고 `automaticTitles`가 Title 전용 표의 eventKey·synergyId·targetCount·description을 읽어 기존 서버 통계로 판정한다. Reward·Achievement 표와 공통 `grantRewardItems`에는 칭호를 넣지 않는다. 기존 카드·팩·꾸미기 보상은 유지한다. 중복은 소유 유지, 장착은 변경하지 않는다. 결과는 꾸미기와 별도 `titles` 배열로 전달하며 기존 표시 UI를 재사용한다. 공개 인덱스에 Title 표가 없을 때만 자동 칭호 처리를 생략하고, 표 손상·조회 실패는 오류로 처리한다.
+서버 profile 슬롯의 `ownedTitleIds`가 소유의 진실원이다. 업적 조건은 Achievement 표, 지급물은 Reward 표에 저작한다. `ownerType=Achievement`, `ownerId=achievementId`로 보상을 연결하고 칭호는 `rewardType=Title`, `rewardId=titleId`, `amount=1`로 등록한다. Title 표는 `id`·`titleId`만 가진 ID 목록이며 업적과 조건을 비교하는 실행 시 조인은 없다. `claimAchievement`가 해당 단계의 수령 자격을 확인하고 `grantAchievementTitles → grantTitle`로 칭호를 지급하며 재화·칭호·영구 수령 기록을 같은 트랜잭션에서 확정한다. 공통 `grantRewardItems`도 Title 항목을 같은 `grantTitle`로 처리한다. 집계나 부팅만으로 지급하지 않는다. 기존 소유·장착은 보존하며 결과는 별도 `titles` 배열과 `updatedSlots.profile`로 전달한다. 보상에서 참조하는 표나 ID가 없거나 손상된 경우 수령 전에 오류로 처리한다.
 
 `TitleManager`는 소유 조회와 장착·해제를 담당한다. 클라이언트 직접 지급은 없고 장착 `equippedTitleId`만 업로드한다. Firestore 규칙이 소유 변경을 막고 장착을 기존 서버 소유로 검증한다. 서버 응답 채택은 소유를 갱신하며 로컬 장착 후보를 보존한다. 명시적 서버 세이브 초기화에서는 칭호 소유·장착도 초기화한다. `ServerSlotRehydrator`가 저장 없이 칭호 변경을 통지한다. 필드 부재는 빈 소유·미장착이며 표시 데이터가 없는 소유 ID도 삭제하지 않는다.
 
 `UI/Profile/ProfileTitleTab`은 전체 칭호를 표시하고 미보유도 잠금·미리보기를 제공한다. 편집창 내부 `TitleItemCell` 템플릿을 사용한다. 선택 후보는 저장·닫기에서 확정하며 지급 통지는 후보·스크롤을 유지한 채 잠금만 갱신한다. `ProfileSummaryView`도 `TitleManager.OnChanged`를 구독한다. 기존 공통 보상 팝업은 칭호 이름·아이콘을 표시한다. 에디터 직접 지급 메뉴는 제거했고, `TitleOwnershipValidation`은 외부 저장 없이 실제 프리팹을 검사한다.
 
-`PlayerSaveCloud`는 초기 채택 전에 `ensureTitles`로 이미 달성한 칭호를 보완하고 변경된 문서를 다시 읽는다. `OutGame/Title/TitleUnlocks`는 서버가 준 조건 문구를 세션 동안 보관하며 `ProfileTitleTab`이 표시한다. 전투 칭호는 `claimBattleExperience`에서 본인의 저장 직렬화 경로로 지급한다. `submitMatchResult`에서 상대 세이브 revision을 변경하지 않는다.
+`PlayerSaveCloud`가 초기 채택 전에 부르는 `ensureTitles`는 기존 응답 계약을 유지하되 소유·revision을 변경하지 않고 조건 안내만 반환한다. 안내는 Reward의 업적 칭호 연결을 따라 Achievement 조건에서 얻는다. `OutGame/Title/TitleUnlocks`는 해당 안내를 보관하며 `ProfileTitleTab`이 업적 보상 수령 안내와 함께 표시한다. `getAchievements`의 `reward.items`는 업적 행에 칭호를 표시하고, 수령 후 재화 팝업이 닫히면 공용 칭호 획득 연출을 이어서 보여준다.
 
 ## 실행 구조
 

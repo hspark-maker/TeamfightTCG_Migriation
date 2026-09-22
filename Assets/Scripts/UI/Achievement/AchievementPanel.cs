@@ -188,7 +188,11 @@ public sealed class AchievementPanel : ContentsPooledUI
         // 표시 목록도 서버가 확정한 실지급량만 사용한다. 팝업 확인은 재지급을 요청하지 않는다.
         var t_lines = new List<RewardLine>();
         foreach (var t_gain in t_outcome.Granted) t_lines.Add(new RewardLine(t_gain));
-        if (RewardClaimPopup.TryGet(out var t_popup))
-            t_popup.Show(_definition.Title, t_lines, () => UniTask.FromResult(t_outcome));
+        if (t_lines.Count > 0 && RewardClaimPopup.TryGet(out var t_popup))
+            t_popup.Show(_definition.Title, t_lines,
+                () => UniTask.FromResult(new RewardClaimOutcome(t_outcome.Granted)),
+                _onClosed: () => RewardPackPresentation.Show(t_outcome));
+        else
+            RewardPackPresentation.Show(t_outcome);
     }
 }

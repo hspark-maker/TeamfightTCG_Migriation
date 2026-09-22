@@ -15,14 +15,24 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
     [SerializeField] TMP_Text hintText;
     [SerializeField] Button includeLockedButton;
     [SerializeField] TMP_Text includeLockedText;
+    [SerializeField] Image includeLockedTrack;
+    [SerializeField] RectTransform includeLockedKnob;
     [SerializeField] ScrollRect scroll;
     [SerializeField] RectTransform optionContent;
     [SerializeField] Button optionTemplate;
     [SerializeField] TMP_Text sectionTemplate;
-    [SerializeField] Color selectedColor = new Color(1f, 0.79f, 0.28f);
-    [SerializeField] Color unselectedColor = new Color(0.22f, 0.27f, 0.36f);
-    [SerializeField] Color selectedTextColor = new Color(0.12f, 0.14f, 0.20f);
-    [SerializeField] Color unselectedTextColor = Color.white;
+    [SerializeField] RectTransform sectionPanelTemplate;
+    [SerializeField] Color selectedColor = new Color32(212, 255, 206, 255);
+    [SerializeField] Color unselectedColor = Color.white;
+    [SerializeField] Color selectedTextColor = new Color32(60, 23, 0, 255);
+    [SerializeField] Color unselectedTextColor = new Color32(60, 23, 0, 255);
+    [SerializeField] Color lockedOffColor = new Color32(212, 181, 137, 255);
+    [SerializeField] Color lockedOnColor = new Color32(236, 220, 197, 255);
+
+    const int OptionColumns = 2;
+    const float OptionStartX = 248f;
+    const float OptionGap = 16f;
+    const float OptionHeight = 92f;
 
     sealed class Option
     {
@@ -43,6 +53,9 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
     HashSet<int> m_cardScope;
     float m_y;
     int m_column;
+    RectTransform m_sectionPanel;
+    TMP_Text m_sectionHeader;
+    float m_sectionY;
 
     protected override int SortingOrder => UiSortingOrder.CardFilter;
 
@@ -82,6 +95,7 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
         includeLockedButton.onClick.AddListener(ToggleIncludeLocked);
         optionTemplate.gameObject.SetActive(false);
         sectionTemplate.gameObject.SetActive(false);
+        sectionPanelTemplate.gameObject.SetActive(false);
     }
 
     protected override void OnViewHidden()
@@ -187,8 +201,8 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
             AddOption(SynergyText.Name(pair.Value), () => m_edit.SynergyIds.Contains(value),
                 () => Toggle(m_edit.SynergyIds, value));
         }
-        FinishRow();
-        optionContent.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, m_y + 20f);
+        FinishSection();
+        optionContent.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, m_y);
     }
 
     void AddOwnership(CardOwnershipFilter value, string label)
@@ -196,22 +210,38 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
 
     void AddSection(string caption)
     {
+        FinishSection();
+        m_sectionY = m_y;
+        m_sectionPanel = Instantiate(sectionPanelTemplate, optionContent);
+        m_sectionPanel.gameObject.SetActive(true);
+        Place(m_sectionPanel, 0f, m_y, optionContent.rect.width, 0f);
+        m_generated.Add(m_sectionPanel.gameObject);
+        m_sectionHeader = Instantiate(sectionTemplate, optionContent);
+        m_sectionHeader.text = caption;
+        m_sectionHeader.gameObject.SetActive(true);
+        m_generated.Add(m_sectionHeader.gameObject);
+        m_y += 24f;
+    }
+
+    void FinishSection()
+    {
+        if (m_sectionPanel == null) return;
         FinishRow();
-        if (m_y > 0f) m_y += 32f;
-        TMP_Text header = Instantiate(sectionTemplate, optionContent);
-        header.text = caption;
-        header.gameObject.SetActive(true);
-        Place(header.rectTransform, 0f, m_y, optionContent.rect.width, 66f);
-        m_generated.Add(header.gameObject);
-        m_y += 78f;
+        float height = Mathf.Max(OptionHeight + 48f, m_y - m_sectionY + 8f);
+        m_sectionPanel.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
+        Place(m_sectionHeader.rectTransform, 48f, m_sectionY + (height - 66f) * 0.5f, 184f, 66f);
+        m_y = m_sectionY + height + 24f;
+        m_sectionPanel = null;
+        m_sectionHeader = null;
     }
 
     void AddOption(string caption, Func<bool> isSelected, Action toggle)
     {
         Button button = Instantiate(optionTemplate, optionContent);
         button.gameObject.SetActive(true);
-        float width = (optionContent.rect.width - 32f) / 3f;
-        Place((RectTransform)button.transform, m_column * (width + 16f), m_y, width, 92f);
+        float width = (optionContent.rect.width - OptionStartX - 24f - OptionGap) / OptionColumns;
+        Place((RectTransform)button.transform, OptionStartX + m_column * (width + OptionGap),
+            m_y, width, OptionHeight);
         var option = new Option
         {
             Button = button,
@@ -222,13 +252,13 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
         button.onClick.AddListener(() => { toggle(); RefreshSelection(); });
         m_options.Add(option);
         m_generated.Add(button.gameObject);
-        if (++m_column == 3) FinishRow();
+        if (++m_column == OptionColumns) FinishRow();
     }
 
     void FinishRow()
     {
         if (m_column == 0) return;
-        m_y += 108f;
+        m_y += OptionHeight + OptionGap;
         m_column = 0;
     }
 
@@ -242,11 +272,16 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
     void RefreshSelection()
     {
         bool includeLocked = m_edit.IncludeLockedAbilities;
-        includeLockedButton.targetGraphic.color = includeLocked ? selectedColor : unselectedColor;
-        includeLockedText.color = includeLocked ? selectedTextColor : unselectedTextColor;
-        includeLockedText.text = "미개방 시너지·키워드 포함 " + (includeLocked ? "ON" : "OFF");
-        hintText.text = "같은 항목은 하나만 맞아도 표시 · 다른 항목은 모두 일치\n"
-            + (includeLocked ? "미개방 시너지·키워드도 조건에 포함합니다." : "개방된 시너지·키워드만 조건에 포함합니다.");
+        includeLockedTrack.color = includeLocked ? lockedOnColor : lockedOffColor;
+        includeLockedText.text = includeLocked ? "ON" : "OFF";
+        float travel = (includeLockedTrack.rectTransform.rect.width - includeLockedKnob.rect.width) * 0.5f - 3f;
+        includeLockedKnob.anchoredPosition = new Vector2(includeLocked ? travel : -travel,
+            includeLockedKnob.anchoredPosition.y);
+        RectTransform stateRect = includeLockedText.rectTransform;
+        stateRect.anchorMin = new Vector2(includeLocked ? 0f : 0.45f, 0f);
+        stateRect.anchorMax = new Vector2(includeLocked ? 0.55f : 1f, 1f);
+        stateRect.offsetMin = stateRect.offsetMax = Vector2.zero;
+        hintText.text = "같은 항목은 하나만 맞아도 표시 · 다른 항목은 모두 일치";
         foreach (Option option in m_options)
         {
             bool selected = option.IsSelected();

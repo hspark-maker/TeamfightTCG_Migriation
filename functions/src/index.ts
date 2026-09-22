@@ -3,6 +3,7 @@ export {getOnboardingOperation} from "./commands/getOnboardingOperation";
 export {devBumpRevision} from "./commands/devBumpRevision";
 export {devResetSave} from "./commands/devResetSave";
 export {devCompleteMissions} from "./commands/devCompleteMissions";
+export {devCompleteAchievements} from "./commands/devCompleteAchievements";
 export {devResetDailyMissions} from "./commands/devResetDailyMissions";
 export {devSetRank} from "./commands/devSetRank";
 export {ensureAccount} from "./commands/ensureAccount";

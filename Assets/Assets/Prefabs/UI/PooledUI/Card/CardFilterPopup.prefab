@@ -66,16 +66,21 @@ MonoBehaviour:
   applyButton: {fileID: 7100056}
   resultCountText: {fileID: 7100042}
   hintText: {fileID: 7100030}
-  includeLockedButton: {fileID: 0}
-  includeLockedText: {fileID: 7100108}
+  includeLockedButton: {fileID: 1871492257067697575}
+  includeLockedText: {fileID: 4229500308605349997}
+  includeLockedTrack: {fileID: 7100103}
+  includeLockedKnob: {fileID: 3027335285265730665}
   scroll: {fileID: 7100038}
   optionContent: {fileID: 7100037}
   optionTemplate: {fileID: 7100067}
   sectionTemplate: {fileID: 7100075}
-  selectedColor: {r: 1, g: 0.79, b: 0.28, a: 1}
-  unselectedColor: {r: 0.22, g: 0.27, b: 0.36, a: 1}
-  selectedTextColor: {r: 0.12, g: 0.14, b: 0.2, a: 1}
-  unselectedTextColor: {r: 1, g: 1, b: 1, a: 1}
+  sectionPanelTemplate: {fileID: 7745646644932581991}
+  selectedColor: {r: 0.83137256, g: 1, b: 0.80784315, a: 1}
+  unselectedColor: {r: 1, g: 1, b: 1, a: 1}
+  selectedTextColor: {r: 0.23529412, g: 0.09019608, b: 0, a: 1}
+  unselectedTextColor: {r: 0.23529412, g: 0.09019608, b: 0, a: 1}
+  lockedOffColor: {r: 0.83137256, g: 0.70980394, b: 0.5372549, a: 1}
+  lockedOnColor: {r: 0.9254902, g: 0.8627451, b: 0.77254903, a: 1}
 --- !u!1 &7100003
 GameObject:
   m_ObjectHideFlags: 0
@@ -1538,7 +1543,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &7100062
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1933,7 +1938,7 @@ MonoBehaviour:
   m_fontSizeBase: 42
   m_fontWeight: 400
   m_enableAutoSizing: 1
-  m_fontSizeMin: 24
+  m_fontSizeMin: 30
   m_fontSizeMax: 42
   m_fontStyle: 0
   m_HorizontalAlignment: 1
@@ -2010,7 +2015,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 0.5}
   m_AnchorMax: {x: 1, y: 0.5}
-  m_AnchoredPosition: {x: -0.6000061, y: 2}
+  m_AnchoredPosition: {x: 58, y: 0}
   m_SizeDelta: {x: 104.8996, y: 42.302612}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &7100102
@@ -2034,7 +2039,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.9245283, g: 0.86347455, b: 0.7718939, a: 1}
+  m_Color: {r: 0.83137256, g: 0.70980394, b: 0.5372549, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -2062,6 +2067,7 @@ GameObject:
   - component: {fileID: 7100106}
   - component: {fileID: 7100107}
   - component: {fileID: 7100108}
+  - component: {fileID: 1871492257067697575}
   m_Layer: 5
   m_Name: Label
   m_TagString: Untagged
@@ -2084,10 +2090,10 @@ RectTransform:
   - {fileID: 7100101}
   m_Father: {fileID: 7100011}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 135.8, y: -572}
-  m_SizeDelta: {x: -459.19995, y: -1472}
+  m_AnchorMin: {x: 0.43, y: 0}
+  m_AnchorMax: {x: 0.82, y: 0}
+  m_AnchoredPosition: {x: 0, y: 193}
+  m_SizeDelta: {x: 0, y: 72}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &7100107
 CanvasRenderer:
@@ -2111,7 +2117,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 0
+  m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -2148,7 +2154,7 @@ MonoBehaviour:
   m_fontSizeBase: 32
   m_fontWeight: 400
   m_enableAutoSizing: 1
-  m_fontSizeMin: 28
+  m_fontSizeMin: 22
   m_fontSizeMax: 32
   m_fontStyle: 0
   m_HorizontalAlignment: 2
@@ -2221,10 +2227,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 7100011}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -510}
-  m_SizeDelta: {x: 853.7, y: 56.3654}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 0}
+  m_AnchoredPosition: {x: 0, y: 256}
+  m_SizeDelta: {x: -104, y: 56.3654}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &4198871735600143728
 CanvasRenderer:
@@ -2276,7 +2282,6 @@ GameObject:
   - component: {fileID: 5816682743862364458}
   - component: {fileID: 2249545630990965790}
   - component: {fileID: 2958627464866865874}
-  - component: {fileID: 1871492257067697575}
   m_Layer: 5
   m_Name: Button
   m_TagString: Untagged
@@ -2325,7 +2330,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 1
+  m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -2362,7 +2367,7 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 723835056590420054}
+  m_GameObject: {fileID: 7100105}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
@@ -2375,7 +2380,7 @@ MonoBehaviour:
     m_SelectOnDown: {fileID: 0}
     m_SelectOnLeft: {fileID: 0}
     m_SelectOnRight: {fileID: 0}
-  m_Transition: 1
+  m_Transition: 0
   m_Colors:
     m_NormalColor: {r: 1, g: 1, b: 1, a: 1}
     m_HighlightedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
@@ -2396,7 +2401,7 @@ MonoBehaviour:
     m_SelectedTrigger: Selected
     m_DisabledTrigger: Disabled
   m_Interactable: 1
-  m_TargetGraphic: {fileID: 2249545630990965790}
+  m_TargetGraphic: {fileID: 7100103}
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
@@ -2432,10 +2437,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 7100101}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 1, y: 0.5}
-  m_AnchorMax: {x: 1, y: 0.5}
-  m_AnchoredPosition: {x: -35, y: -2.8}
-  m_SizeDelta: {x: 200, y: 50}
+  m_AnchorMin: {x: 0.45, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &5051658175325120656
 CanvasRenderer:
@@ -2459,7 +2464,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 1
+  m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -2596,7 +2601,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 1
+  m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -2720,9 +2725,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 7100011}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -84.9, y: -570.74}
+  m_AnchorMin: {x: 0.39, y: 0}
+  m_AnchorMax: {x: 0.39, y: 0}
+  m_AnchoredPosition: {x: 0, y: 193}
   m_SizeDelta: {x: 4.5876, y: 61.476}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &533362403126860437
@@ -2897,7 +2902,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 0.93333334, g: 0.87266666, b: 0.81200004, a: 0.29803923}
-  m_RaycastTarget: 1
+  m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:

@@ -53,8 +53,8 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
         m_onDragRequest = _onDragRequest;
         m_onClick       = _onClick;
 
-        // 그리드에는 소유 카드만 올라오므로 owned는 true 고정(잠김 실루엣 경로가 아니다).
-        if (view != null) view.Bind(_card, true);
+        // 강화 목록의 미소유 카드는 잠김 외형으로 표시하되 상세 선택은 허용한다.
+        if (view != null) view.Bind(_card, OwnershipManager.IsOwned(_card));
 
         if (longPress != null)
         {
@@ -96,7 +96,7 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
         ApplyAlpha();
 
         // 발화 시점 가드(OnLongPressFired)와 별개로 타이머 자체를 꺼두는 2중 가드.
-        if (longPress != null) longPress.enabled = !_on;
+        if (longPress != null) longPress.enabled = !_on && m_card > 0 && OwnershipManager.IsOwned(m_card);
     }
 
     // 대상이 아닌 카드를 눌러 강조 대상만 남기고, 대상 카드는 살짝 키워 띄운다.
@@ -171,7 +171,7 @@ public class DeckEditCardTile : MonoBehaviour, IPointerDownHandler, IPointerClic
 
     void OnLongPressFired()
     {
-        if (m_inDeck || m_card <= 0 || m_pointerData == null) return;
+        if (m_inDeck || m_card <= 0 || !OwnershipManager.IsOwned(m_card) || m_pointerData == null) return;
 
         m_onDragRequest?.Invoke(this, m_pointerData);
     }

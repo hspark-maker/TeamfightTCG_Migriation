@@ -12,6 +12,8 @@ public sealed class OutgameTutorialBridge
     int m_anchorRestoreStepId;
     object gatePrefab;
     public bool GuidedCursor, SuppressGuideUI;
+    // This harness exercises battle navigation; a completed growth explanation is a separate UI boundary.
+    bool CanExplainGrowthWithoutCard => false;
     public int Hidden, Presentations, Restores, Completions, Closed;
     public TutorialStepDef Cursor;
     public OutgameTutorialBridge(TutorialStepDef step) { m_step = Cursor = step; }
@@ -160,6 +162,7 @@ public static class GuidanceCoordinator {
 public static class LoadingCoverView { public static bool OwnsLobbyPreparation; }
 public static class DeckEditController { public static object OpenEditor; }
 public static class CardDetailOverlayView { public static bool IsOpen, IsRitualPlaying, IsUnlockFxPlaying; }
+public static class LobbyEnhanceTabPanel { public static bool IsPresenting; }
 public static class PackOpenOverlay { public static bool IsOpen; }
 public static class UnlockIntroOverlay { public static bool IsOpen; }
 public static class SynergyBattleGuide { public static bool IsEditorOpen, IsDeckReady; }

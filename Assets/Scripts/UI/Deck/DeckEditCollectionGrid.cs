@@ -5,8 +5,8 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-// 덱 편집 화면 하단의 컬렉션 그리드(ScrollView에 부착). 소유 카드만 3열로 나열한다.
-// 도감과 달리 미소유 카드는 아예 만들지 않는다 — 덱에 넣을 수 없는 카드라 자리만 차지한다.
+// 덱 편집 화면 하단의 컬렉션 그리드(ScrollView에 부착). 기본은 소유 카드만 3열로 나열한다.
+// 강화 화면에서 재사용할 때는 Build 옵션으로 미소유 카드도 표시할 수 있다.
 //
 // OnEnable에서 스스로 Build 하지 않는다. 유일한 트리거는 DeckEditController.Open()이다 —
 // 타일의 "장착중 딤"은 현재 편집중인 덱 상태를 알아야 정해지는데, 그 상태를 아는 쪽은 컨트롤러뿐이라
@@ -48,6 +48,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
     int[] m_deck;
     SynergyData m_synergy;
     int m_pickedCard;
+    bool m_includeUnowned;
     bool m_buildPending;
     bool m_dirty;
     Vector2 m_lastPosition;
@@ -92,10 +93,12 @@ public class DeckEditCollectionGrid : MonoBehaviour
         }
     }
 
-    public void Build(Action<DeckEditCardTile, PointerEventData> _onDragRequest, Action<DeckEditCardTile> _onClick)
+    public void Build(Action<DeckEditCardTile, PointerEventData> _onDragRequest, Action<DeckEditCardTile> _onClick,
+                      bool _includeUnowned = false)
     {
         m_onDragRequest = _onDragRequest;
         m_onClick = _onClick;
+        m_includeUnowned = _includeUnowned;
         if (HasPressedTile())
         {
             m_buildPending = true;
@@ -124,7 +127,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
         {
             var t_card = t_cards[t_i];
             if (t_card <= 0) continue;
-            if (!OwnershipManager.IsOwned(t_card)) continue;  // 소유 카드만 편성 가능
+            if (!m_includeUnowned && !OwnershipManager.IsOwned(t_card)) continue;
 
             if (m_entryCount == m_entries.Count)
             {
@@ -213,7 +216,7 @@ public class DeckEditCollectionGrid : MonoBehaviour
         if (m_buildPending && !HasPressedTile())
         {
             int t_anchor = m_anchorCard;
-            Build(m_onDragRequest, m_onClick);
+            Build(m_onDragRequest, m_onClick, m_includeUnowned);
             ApplyTutorialAnchor(t_anchor);
             if (t_anchor > 0) EnsureVisible(t_anchor);
         }

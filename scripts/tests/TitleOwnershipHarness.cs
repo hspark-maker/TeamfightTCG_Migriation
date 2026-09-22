@@ -8,7 +8,7 @@ public static class TitleOwnershipHarness
 
     public static void Main()
     {
-        SpecFirestoreUploader.TestTitleConditions();
+        SpecFirestoreUploader.TestTitleIdentifiers();
         TitleManager.SetCatalog(new TitleCatalog());
         Require(!TitleManager.IsOwned("first") && !TitleManager.TryEquip("first"), "Unowned title equipped.");
         var profile = DataSaveManager.Data.Profile;
@@ -54,28 +54,31 @@ public static class TitleOwnershipHarness
 
 public static partial class SpecFirestoreUploader
 {
-    public static void TestTitleConditions()
+    public static void TestTitleIdentifiers()
     {
         var rows = new System.Collections.ArrayList();
         foreach (string line in System.IO.File.ReadAllLines("docs/SpecData/Title_sheet.csv").Skip(3))
         {
             if (string.IsNullOrWhiteSpace(line)) continue;
             string[] fields = line.Split(',');
-            if (fields.Length != 6) throw new Exception("Title must contain six columns.");
-            rows.Add(new TitleUploadRow { id = int.Parse(fields[0]), titleId = fields[1], eventKey = fields[2],
-                synergyId = fields[3], targetCount = int.Parse(fields[4]), description = fields[5] });
+            if (fields.Length != 2) throw new Exception("Title must contain only id and titleId.");
+            rows.Add(new TitleUploadRow { id = int.Parse(fields[0]), titleId = fields[1] });
         }
         if (rows.Count != 8 || !ValidateTitles(rows, out string error)) throw new Exception("Invalid title CSV.");
         var first = (TitleUploadRow)rows[0];
-        first.targetCount = 0;
-        if (ValidateTitles(rows, out _)) throw new Exception("Automatic title accepted zero target.");
-        first.targetCount = 1;
-        first.eventKey = "Unknown";
-        if (ValidateTitles(rows, out _)) throw new Exception("Title accepted unknown event.");
-        first.eventKey = "";
-        first.targetCount = 0;
-        if (!ValidateTitles(rows, out error)) throw new Exception("Manual title rejected: " + error);
-        Console.WriteLine("Title CSV validation: PASS (8 independent definitions, invalid targets/events, manual grant)");
+        first.id = 0;
+        if (ValidateTitles(rows, out _)) throw new Exception("Title accepted zero ID.");
+        first.id = 1;
+        string originalId = first.titleId;
+        first.titleId = ((TitleUploadRow)rows[1]).titleId;
+        if (ValidateTitles(rows, out _)) throw new Exception("Title accepted duplicate identifier.");
+        first.titleId = " " + originalId;
+        if (ValidateTitles(rows, out _)) throw new Exception("Title accepted identifier whitespace.");
+        first.titleId = "";
+        if (ValidateTitles(rows, out _)) throw new Exception("Title accepted blank identifier.");
+        first.titleId = originalId;
+        if (!ValidateTitles(rows, out error)) throw new Exception("Registered title rejected: " + error);
+        Console.WriteLine("Title CSV validation: PASS (8 identifiers, invalid IDs, duplicates, whitespace)");
     }
 }
 

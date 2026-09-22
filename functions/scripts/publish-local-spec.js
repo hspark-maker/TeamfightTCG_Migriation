@@ -15,6 +15,7 @@ const ALLOWED = ["Reward", "CardEnhance", "RouletteSlot", "PassLevel"];
 const CSV_ONLY = {
   RankAiEncounter: "Assets/Scripts/OutGame/Spec/RankAiEncounterRow.cs",
   Achievement: "Assets/Scripts/Editor/SpecFirestoreUploader.AccountCsv.cs",
+  Title: "Assets/Scripts/Editor/SpecFirestoreUploader.TitleCsv.cs",
 };
 const sourceFiles = ["Assets/Resources/SpecData.bytes", "Assets/Table/SpecDatas.cs",
   "Assets/Scripts/Editor/SpecLocalCsvImporter.cs", "Assets/Scripts/OutGame/Spec/SpecPayloadCodec.cs",
@@ -98,10 +99,15 @@ function csvOnlyRows(name, fields, text) {
     if (name === "Achievement") {
       assert(row.id > 0 && row.achievementId.trim() && row.groupId.trim() && row.stage > 0 && row.targetCount > 0 &&
         ["WinBattle", "DestroyCards", "PlaySynergy", "CompleteAlbum", "WinStreak", "OpenPack"].includes(row.eventKey) &&
-        ["Diamond", "Gold", "Shard"].includes(row.rewardCurrency) && row.rewardAmount > 0 &&
         [0, 1].includes(row.enabled), `Invalid achievement: ${row.achievementId}`);
       assert(!keys.has(row.achievementId), `Duplicate achievement: ${row.achievementId}`);
       keys.add(row.achievementId);
+      return row;
+    }
+    if (name === "Title") {
+      assert(row.id > 0 && row.titleId && row.titleId.trim() === row.titleId, `Invalid title: ${row.titleId}`);
+      assert(!keys.has(row.titleId), `Duplicate title: ${row.titleId}`);
+      keys.add(row.titleId);
       return row;
     }
     assert(row.id > 0 && row.deckId.trim().length > 0 && row.tierIndex >= 0 && row.tierIndex <= 19 &&
@@ -137,8 +143,8 @@ function localSnapshot() {
   const tables = {};
   for (const name of names) {
     const csvSource = CSV_ONLY[name] ? read(CSV_ONLY[name]) : "";
-    const rowSource = name === "Achievement"
-      ? csvSource.match(/sealed class AchievementUploadRow\s*\{([\s\S]*?)\n    \}/)?.[1] : csvSource;
+    const rowSource = ["Achievement", "Title"].includes(name)
+      ? csvSource.match(new RegExp(`sealed class ${name}UploadRow\\s*\\{([\\s\\S]*?)\\n    \\}`))?.[1] : csvSource;
     const fields = CSV_ONLY[name]
       ? [...(rowSource || "").matchAll(/^\s*public (int|long|string) (\w+);/gm)].map((f) => [f[1], f[2]])
       : classes.get(name);

@@ -110,10 +110,10 @@ public class CardDecorView
     /// 롱프레스 시너지 팝업(CardInputController)이 CardView.LastBadgeState 셰임을 거쳐 읽는다.</summary>
     public SynergyState LastBadgeState => this.lastBadgeState;
 
-    /// <summary>장식 전체 갱신. CardView.Render가 카드 본체를 그린 **뒤** 한 번만 부른다 —
-    /// 순서(아이콘 → 프레임 → 배지)는 그대로 유지한다.
+    /// <summary>장식 전체 갱신. CardView.Render가 한 번 호출하고 반환된 배지 수로 본체 테두리를 고른다.
+    /// 장식 순서(아이콘 → 프레임 → 배지)는 그대로 유지한다.
     /// 빈 슬롯/뒷면 은닉 판정은 각 항목이 스스로 한다(정보 은닉 규칙의 단일 지점).</summary>
-    public void Refresh(CardInstance _card, SynergyState _synergy)
+    public int Refresh(CardInstance _card, SynergyState _synergy)
     {
         // 배경판 선택과 배지 생성이 **같은 목록**을 보게 여기서 한 번만 뽑아 둘에 나눠 준다.
         // 따로 계산하면 "배지는 없는데 시너지 칸이 있는 판" 같은 어긋남이 생긴다.
@@ -123,6 +123,7 @@ public class CardDecorView
         RefreshKeywordBg(t_badges.Count > 0);
         RefreshKeywordFrames(_card);
         RefreshSynergyBadges(_card, _synergy, t_badges);
+        return t_badges.Count;
     }
 
     /// <summary>소유자(CardView) 파괴 시 정리. 장식 자식들의 트윈을 끊고 참조를 놓는다 —

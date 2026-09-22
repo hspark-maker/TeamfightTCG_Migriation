@@ -80,7 +80,8 @@ public sealed class MissionRewardStrip : MonoBehaviour, IUIInitializable
             {
                 if (t_item == null || t_item.Amount <= 0) continue;
                 this.m_entries.Add(new Entry(RewardItemDisplay.NameOf(t_item.RewardType, t_item.RewardId),
-                    t_item.Amount, t_item.RewardType == "Pack" ? PackSpec.Art(t_item.RewardId) : null,
+                    t_item.Amount, t_item.RewardType == "Pack" ? PackSpec.Art(t_item.RewardId)
+                        : RewardItemDisplay.ItemIcon(t_item.RewardType, t_item.RewardId),
                     this.backgroundColors != null ? this.backgroundColors.Item(t_item.RewardType) : FallbackColor));
             }
 

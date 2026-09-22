@@ -139,6 +139,7 @@ async function claim(request: CallableRequest, all: boolean) {
     for (const snapshot of selected) tx.update(snapshot.ref, {claimedAtMs});
     return {slots: items.slots, wallet: granted.length ? nextWallet(wallet, grant(wallet.balances, granted), command) : undefined};
   }, (adopted) => ({...adopted, claimedMailIds, granted, cards: items.cards, packs: items.packs ?? [], hasMore,
+    titles: items.titles ?? [],
     ...(missions ? {missions} : {})}));
   if (!all && (result.claimedMailIds.length !== 1 || result.claimedMailIds[0] !== mailId)) {
     rejectDomain("TxIdReused", "Claim txId was used for another mail.", {uid, env, mailId, txId});

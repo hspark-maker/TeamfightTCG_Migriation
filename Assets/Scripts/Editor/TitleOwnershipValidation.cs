@@ -25,9 +25,23 @@ public static class TitleOwnershipValidation
         Require(t_rows.Count == 8, "Expected eight test titles.");
         Require(!SpecFirestoreUploader.TryParseAccountCsv("Title", t_csv.Replace("2,test_blue_traveler", "2,test_first_step"), out _, out _), "Duplicate title accepted.");
         Require(!SpecFirestoreUploader.TryParseAccountCsv("Title", t_csv.Replace(
-            "test_first_step,WinBattle,,1,", "test_first_step,WinBattle,,0,"), out _, out _), "Zero target accepted.");
+            "1,test_first_step", "0,test_first_step"), out _, out _), "Zero title ID accepted.");
         Require(!SpecFirestoreUploader.TryParseAccountCsv("Title", t_csv.Replace(
-            "test_first_step,WinBattle,,1,", "test_first_step,Unknown,,1,"), out _, out _), "Unknown title event accepted.");
+            "1,test_first_step", "1, test_first_step"), out _, out _), "Title ID whitespace accepted.");
+        Require(!SpecFirestoreUploader.TryParseAccountCsv("Title",
+            "id,titleId,eventKey\nint,string,string\n1,test_first_step,WinBattle", out _, out _),
+            "Legacy title condition column accepted.");
+        Require(SpecFirestoreUploader.TryParseAccountCsv("Achievement",
+            File.ReadAllText("docs/SpecData/Achievement_sheet.csv"), out IList t_achievements, out t_error), t_error);
+        Require(t_achievements.Count > 0 && t_achievements[0].GetType().GetField("rewardCurrency") == null &&
+            t_achievements[0].GetType().GetField("rewardAmount") == null, "Achievement still carries inline rewards.");
+        Require(SpecFirestoreUploader.TryParseAccountCsv("Reward",
+            File.ReadAllText("docs/SpecData/Reward_sheet.csv"), out IList t_rewards, out t_error), t_error);
+        bool t_hasTitleReward = false;
+        foreach (Reward t_reward in t_rewards)
+            if (t_reward.ownerType == "Achievement" && t_reward.rewardType == "Title" && t_reward.amount == 1)
+                t_hasTitleReward = true;
+        Require(t_hasTitleReward && ServerOwnedRewardOwners.Contains("Achievement"), "Achievement Reward rows missing or read locally.");
         ValidateView();
         Debug.Log("[TitleOwnershipValidation] PASS: CSV, all locked entries, preview, server ownership refresh, draft/scroll preservation, restore and reward DTO.");
     }
@@ -49,7 +63,7 @@ public static class TitleOwnershipValidation
             TitleManager.NotifyRehydrated();
             DataSaveManager.OnSaved += OnSaved;
             GameObject t_root = UnityEngine.Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(
-                "Assets/Assets/Prefabs/UI/PooledUI/ProfileEditPanel.prefab"));
+                "Assets/Assets/Prefabs/UI/PooledUI/Profile/ProfileEditPanel.prefab"));
             SceneManager.MoveGameObjectToScene(t_root, t_scene);
             t_root.SetActive(false);
             t_panel = t_root.GetComponent<ProfileEditPanel>();

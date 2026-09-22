@@ -52,6 +52,8 @@ const wallet_1 = require("../currency/wallet");
 const achievementStore_1 = require("../achievements/achievementStore");
 const playerStatistics_1 = require("../statistics/playerStatistics");
 const playerStatisticsStore_1 = require("../statistics/playerStatisticsStore");
+const specBlobReader_1 = require("../specs/specBlobReader");
+const completionTable_1 = require("../completionTable");
 const walletStore_1 = require("../currency/walletStore");
 /**
  * 서버가 쓰는 세이브 문서 스키마 버전. 클라 쪽 쌍둥이 상수와 짝이다.
@@ -68,6 +70,10 @@ exports.SCHEMA_VERSION = 8;
 const PACK_OPENING_COMMANDS = new Set([
     "openPack", "claimAttendance", "claimMission", "claimReward", "claimPassReward", "claimBattleExperience", "spinRoulette",
     "claimMail", "claimAllMail",
+]);
+const OWNERSHIP_STATISTICS_COMMANDS = new Set([
+    "openPack", "claimAttendance", "claimMission", "claimReward", "claimPassReward", "claimBattleExperience",
+    "spinRoulette", "grantTutorialCards",
 ]);
 /**
  * 세이브 문서 참조. 클라 PlayerSaveFirestorePaths 와 같은 경로여야 한다.
@@ -225,8 +231,13 @@ async function mutateSave(env, uid, source, receipt, mutate, finalize, isLegacyW
             }
         }
         const revision = Number(current.revision ?? 0) + 1;
-        // Producers know the actual award before queuing writes. Currency/direct-card rewards need no statistics read.
-        let statistics;
+        // Ownership/pack statistics remain independent of cosmetic rewards. Crafting and achievement
+        // claims already own their statistics mutation and return its final state.
+        const tracksOwnership = OWNERSHIP_STATISTICS_COMMANDS.has(source);
+        const albums = tracksOwnership ? await Promise.all([
+            (0, specBlobReader_1.readSpecRows)(env, "AlbumEntry"), (0, specBlobReader_1.readSpecRows)(env, "AlbumThemeInfo"),
+        ]) : null;
+        let statistics = tracksOwnership ? await (0, playerStatisticsStore_1.beginStatistics)(transaction, firebaseApp_1.db, env, uid) : undefined;
         let preparedPacks = 0;
         const outcome = await mutate(current, transaction, wallet, async (opened) => {
             if (!Number.isSafeInteger(opened) || opened < 0 || !PACK_OPENING_COMMANDS.has(source)) {
@@ -253,9 +264,14 @@ async function mutateSave(env, uid, source, receipt, mutate, finalize, isLegacyW
         if (PACK_OPENING_COMMANDS.has(source) && opened !== preparedPacks) {
             throw new Error(`Pack statistics were not prepared before writes: ${source}`);
         }
-        if (statistics !== undefined && opened > 0) {
-            (0, playerStatistics_1.applyStatisticsPacks)(statistics.state, opened);
-            (0, playerStatisticsStore_1.commitStatistics)(transaction, statistics, firestore_1.FieldValue.serverTimestamp());
+        if (statistics !== undefined) {
+            if (opened > 0)
+                (0, playerStatistics_1.applyStatisticsPacks)(statistics.state, opened);
+            if (albums !== null && outcome.slots.ownership !== undefined) {
+                (0, playerStatistics_1.applyStatisticsAlbums)(statistics.state, { ...current, ...outcome.slots }, (0, completionTable_1.parseAlbumEntryRows)(albums[0]), (0, completionTable_1.parseAlbumThemeRows)(albums[1]));
+            }
+            if (opened > 0 || (0, playerStatisticsStore_1.statisticsChanged)(statistics))
+                (0, playerStatisticsStore_1.commitStatistics)(transaction, statistics, firestore_1.FieldValue.serverTimestamp());
             response.achievements = (0, achievementStore_1.achievementResponse)(statistics.achievements);
             response.statistics = (0, playerStatistics_1.statisticsResponse)(statistics.state);
         }

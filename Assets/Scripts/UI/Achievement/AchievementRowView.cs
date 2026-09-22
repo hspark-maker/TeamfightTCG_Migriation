@@ -50,7 +50,11 @@ public sealed class AchievementRowView : MonoBehaviour, IUIInitializable
         m_onClaim = _onClaim;
         titleText.text = _definition.Title;
         if (descriptionText != null) descriptionText.text = _definition.Description;
-        rewardStrip.BindCurrencies(_definition.Reward?.Currencies);
+        rewardStrip.Bind(new MissionReward
+        {
+            Currencies = _definition.Reward?.Currencies,
+            Items = _definition.Reward?.Items,
+        });
         long t_progress = AchievementManager.ProgressOf(_definition);
         bool t_claimed = AchievementManager.IsClaimed(_definition.Id);
         bool t_canClaim = AchievementManager.CanClaim(_definition);

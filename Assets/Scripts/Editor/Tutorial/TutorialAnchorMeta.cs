@@ -150,6 +150,12 @@ public readonly struct TutorialAnchorMeta
         new(A.CardDetailSynergyDescription, F.None,             "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/Card/CardDetailOverlay.prefab"),
         new(A.CardDetailShardIcon,        F.None,               "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/Card/CardDetailOverlay.prefab"),
         new(A.CardDetailShardAmount,      F.None,               "카드 상세 오버레이",     "Assets/Assets/Prefabs/UI/PooledUI/Card/CardDetailOverlay.prefab"),
+        new(A.LobbyEnhanceCardView, F.CardEnhance, "로비/강화 탭", "UI/Lobby/LobbyEnhanceTabPanel.cs"),
+        new(A.LobbyEnhanceKeywordDescription, F.CardEnhance, "로비/강화 탭", "UI/Lobby/LobbyEnhanceTabPanel.cs"),
+        new(A.LobbyEnhanceSynergyDescription, F.CardEnhance, "로비/강화 탭", "UI/Lobby/LobbyEnhanceTabPanel.cs"),
+        new(A.LobbyEnhanceButton, F.CardEnhance, "로비/강화 탭", "UI/Lobby/LobbyEnhanceTabPanel.cs"),
+        new(A.LobbyEnhanceShardIcon, F.CardEnhance, "로비/강화 탭", "UI/Lobby/LobbyEnhanceTabPanel.cs"),
+        new(A.LobbyEnhanceShardAmount, F.CardEnhance, "로비/강화 탭", "UI/Lobby/LobbyEnhanceTabPanel.cs"),
     };
 
     // 이 구조의 조용한 실패 두 가지를 이 창을 처음 열 때 소리내어 잡는다(에디터 어셈블리라 초기화가 아니다).

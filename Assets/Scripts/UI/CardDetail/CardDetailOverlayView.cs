@@ -91,6 +91,9 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     [SerializeField] Button acquisitionButton;
     [SerializeField] CardAcquisitionView acquisitionView;
 
+    [Header("강화 화면 이동")]
+    [SerializeField] Button openEnhanceButton;
+
     [Header("강화 연출 (선택 — 미배선이면 연출 없이 지금까지처럼 값만 즉시 갱신)")]
     [SerializeField] CardEnhanceRitualView ritual;
 
@@ -347,17 +350,13 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     {
         s_instance = this;
 
-        if (this.enhanceButton != null)
-        {
-            this.enhanceButton.onClick.AddListener(OnEnhancePressed);
-        }
-
         if (this.artOnlyButton != null)
         {
             this.artOnlyButton.onClick.AddListener(ToggleArtOnly);
         }
 
         if (this.acquisitionButton != null) this.acquisitionButton.onClick.AddListener(OpenAcquisition);
+        if (this.openEnhanceButton != null) this.openEnhanceButton.onClick.AddListener(OpenEnhancePanel);
 
 
         if (this.enhanceButton != null) this.m_enhanceTone = this.enhanceButton.GetComponent<UIEffect>();
@@ -791,6 +790,34 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
             this.acquisitionButton.gameObject.SetActive(!this.m_readOnly && !this.m_artOnly);
         if (this.artOnlyIcon != null)
             this.artOnlyIcon.color = this.m_artOnly ? this.artOnlyOnColor : this.artOnlyOffColor;
+        RefreshEnhanceNavigation();
+    }
+
+    void RefreshEnhanceNavigation()
+    {
+        if (this.openEnhanceButton == null) return;
+        this.openEnhanceButton.gameObject.SetActive(!this.m_readOnly && !this.m_artOnly);
+        this.openEnhanceButton.interactable = LobbyEnhanceTabPanel.CanOpenForCard(CardAt(this.m_index));
+    }
+
+    bool CanOpenEnhancePanel()
+        => IsViewVisible && !this.m_readOnly && !this.m_artOnly && !this.m_ritualPlaying
+            && !this.m_enhanceRequestPending && !this.m_unlockFxPlaying
+            && !DOTween.IsTweening(this) && !LobbyEnhanceTabPanel.IsBusy
+            && GuidanceCoordinator.CanCloseCardDetail
+            && GuidanceCoordinator.AllowsUserNavigation(EOutgameTutorialAnchor.None)
+            && LobbyEnhanceTabPanel.CanOpenForCard(CardAt(this.m_index));
+
+    void OpenEnhancePanel()
+    {
+        if (!CanOpenEnhancePanel()) return;
+        int t_card = CardAt(this.m_index);
+        LobbyEnhanceTabPanel.TryOpenForCard(t_card, () =>
+        {
+            // 덱 편집 이탈 확인이 취소되면 상세도 그대로 둔다. 실제 탭 선택 뒤에만 닫는다.
+            AlbumPageOverlayView.CloseOpen();
+            if (this != null && IsViewVisible) Hide();
+        });
     }
 
     // 카드가 바뀔 때의 전량 갱신. 조건 없는 칩 재생성은 여기뿐이다.
@@ -1079,48 +1106,18 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         if (_owned) SetGrowthStars(CardGrowthManager.GrowthOf(_card).Level);
     }
 
-    // 규칙·비용·성공률은 전부 CardGrowthManager가 정본이고 여기선 표시만 한다.
+    // 성장 조작은 로비 강화 탭이 소유한다. 상세에는 해당 카드의 강화 화면으로 가는 버튼만 둔다.
     void RefreshGrowthActions(int _card, bool _owned)
     {
-        GrowthStep t_step = default;
-        bool t_hasStep = _owned && CardGrowthManager.TryGetNextStep(_card, out t_step);
-
-        // 열람 전용도 같은 길로 내린다 — 알파만 0인 채 살아 있는 버튼은 탭을 먹는다.
-        bool t_showGrowth = _owned && !this.m_readOnly;
-        bool t_finalEvolution = _owned && CardGrowthManager.IsConfigReady
-            && CardGrowthManager.GrowthOf(_card).Level >= CardGrowthManager.MaxLevel;
-        bool t_actions = t_showGrowth && !t_finalEvolution;
-        if (this.finalEvolutionRoot != null) this.finalEvolutionRoot.SetActive(t_showGrowth && t_finalEvolution);
-        if (this.enhanceButton != null) this.enhanceButton.gameObject.SetActive(t_actions);
-        if (this.shardAmountRoot != null) this.shardAmountRoot.SetActive(t_showGrowth);
-        if (this.enhanceCostText != null) this.enhanceCostText.gameObject.SetActive(t_actions);
-        if (this.enhanceCostIcon != null) this.enhanceCostIcon.gameObject.SetActive(t_actions);
-        if (this.successRateText != null) this.successRateText.gameObject.SetActive(t_showGrowth);
-        RefreshShardAmount(_card);
-
-        // 샤드는 항상 강화로 투입하며, 필요량을 채운 결과에서 자동으로 진화한다.
-        ApplyGrowthFace(false);
-
-        // 안내 타깃은 지금 서 있는 성장 버튼을 따라간다 — 열릴 때마다 새로 서서 프리팹 표식으로는 잡을 수 없다.
-        ApplyGrowthAnchor(t_actions ? this.enhanceButton : null);
-
-        // 연출 중에는 공개 시점의 갱신이 버튼을 되살리지 않게 눌러둔다(복귀에서 다시 판정된다).
-        bool t_unlocked = OutgameFeatureLock.IsUnlocked(EOutgameFeature.CardEnhance);
-
-        bool t_canPayEnhance = t_hasStep && this.m_shardAmountMax > 0
-            && CurrencyManager.CanAfford(t_step.Currency, t_step.Cost * this.m_shardAmount);
-        SetActionsEnabled(t_actions && !this.m_ritualPlaying && t_unlocked
-            && !this.m_enhanceRequestPending && t_canPayEnhance);
-
-        ApplyCost(t_hasStep, t_step);
-
-        // 결과판이 걷힌 뒤(또는 평상시)엔 다시 각자의 글자다 — 값 갱신이 지나는 이 길이 곧 글자의 복귀 지점이다.
-        SetActionLabel(false);
-        if (this.successRateText != null)
-        {
-            this.successRateText.text = ShardProgressLabel(_card, t_hasStep);
-            this.successRateText.alignment = TextAlignmentOptions.Center;
-        }
+        if (this.finalEvolutionRoot != null) this.finalEvolutionRoot.SetActive(false);
+        if (this.enhanceButton != null) this.enhanceButton.gameObject.SetActive(false);
+        if (this.shardAmountRoot != null) this.shardAmountRoot.SetActive(false);
+        if (this.enhanceCostText != null) this.enhanceCostText.gameObject.SetActive(false);
+        if (this.enhanceCostIcon != null) this.enhanceCostIcon.gameObject.SetActive(false);
+        if (this.successRateText != null) this.successRateText.gameObject.SetActive(false);
+        ApplyGrowthAnchor(null);
+        SetActionsEnabled(false);
+        RefreshEnhanceNavigation();
     }
 
     string ShardProgressLabel(int _card, bool _hasStep)
@@ -1330,6 +1327,7 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
 
     bool CanFeedShard(int _card)
         => GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.CardDetailEnhanceButton)
+            && this.enhanceButton != null && this.enhanceButton.gameObject.activeInHierarchy
             && IsViewVisible && !this.m_readOnly && _card > 0 && OwnershipManager.IsOwned(_card)
             && OutgameFeatureLock.IsUnlocked(EOutgameFeature.CardEnhance)
             && CardGrowthManager.Precheck(_card) == EEnhanceOutcome.Success;
