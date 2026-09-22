@@ -115,11 +115,15 @@ public class OutgameTutorialBridge : MonoBehaviour
         Subscribe();
     }
 
-    void Start()
+    void Start() => ResumeWhenReadyAsync().Forget();
+
+    async UniTask ResumeWhenReadyAsync()
     {
-        // 씬 재진입 재개. 자율 발화 자체는 OnGuidedActivated가 잡으므로 여기서는 이미 도는 커서만 이어받는다.
-        // 초기화 로딩 완료는 LoadingScene이 보장하고 넘겨준다 — 여기서 대기할 것이 없다.
-        if (CursorRunning && !LoadingCoverView.OwnsLobbyPreparation) ApplyCurrentStep();
+        // 로비 직접 실행 시 서버 표식이 UI 선로드·세이브 채택보다 먼저 도착할 수 있다.
+        // 초기화 실패 후 같은 씬에서 재시도하더라도 Ready가 되면 최신 커서를 한 번 이어받는다.
+        await UniTask.WaitUntil(() => GameInitialization.IsReady,
+            cancellationToken: this.GetCancellationTokenOnDestroy());
+        ApplyCurrentStep();
     }
 
     /// <summary>복귀 커버 아래 첫 스텝의 서버 확정과 화면 준비를 끝낸다. 사용자 입력·연출 종료는 기다리지 않는다.</summary>
@@ -171,6 +175,7 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 그 시점엔 이미 다음 스텝으로 커밋된 뒤라 버리면 개봉 대기 스텝이 영영 적용되지 않는다.
     void ApplyCurrentStep()
     {
+        if (!GameInitialization.IsReady) return;
         if (LoadingCoverView.OwnsLobbyPreparation && !m_returnPreparing) return;
         if (GuidanceCoordinator.IsRestoring || !CursorRunning) return;
         if (m_completing) return;

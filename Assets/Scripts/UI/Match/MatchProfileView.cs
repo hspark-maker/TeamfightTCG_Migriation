@@ -12,6 +12,9 @@ public class MatchProfileView : MonoBehaviour
     [Tooltip("상대를 찾는 동안 보일 빈 틀. 내 쪽은 처음부터 확정이라 비워 둔다 — 비면 탐색중 표시를 건너뛴다.")]
     [SerializeField] GameObject searchingRoot;
 
+    [Tooltip("상대를 찾는 동안 실제 프로필과 같은 자리에 표시할 미확정 아이콘.")]
+    [SerializeField] GameObject searchingProfile;
+
     [Tooltip("상대가 확정된 뒤 보일 채워진 틀. 비우면 항상 보이는 것으로 친다.")]
     [SerializeField] GameObject foundRoot;
 
@@ -59,6 +62,7 @@ public class MatchProfileView : MonoBehaviour
     public void ShowSearching()
     {
         if (searchingRoot != null) searchingRoot.SetActive(true);
+        if (searchingProfile != null) searchingProfile.SetActive(true);
         if (foundRoot     != null) foundRoot.SetActive(false);
 
         // 이름·랭크는 foundRoot 밖에 있어 틀과 함께 감춰지지 않는다 — 여기서 직접 비우지 않으면
@@ -75,6 +79,7 @@ public class MatchProfileView : MonoBehaviour
     public void Render(in MatchProfile _profile)
     {
         if (searchingRoot != null) searchingRoot.SetActive(false);
+        if (searchingProfile != null) searchingProfile.SetActive(false);
         if (foundRoot     != null) foundRoot.SetActive(true);
 
         if (nicknameText != null) nicknameText.text = _profile.Nickname;

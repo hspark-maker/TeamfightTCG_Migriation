@@ -223,7 +223,7 @@ tbody tr:hover { background: #202735; }
   .sidebar { position: static; width: 100%; height: auto; padding: 18px 24px 14px; border-right: 0; border-bottom: 1px solid var(--border); }
   .sidebar .brand { margin: 0 0 20px; }
   .nav-label, .scope-note { display: none; }
-  .sidebar nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .sidebar nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .sidebar nav button { justify-content: center; gap: 8px; padding: 10px 6px; font-size: 12px; min-height: 42px; }
   .sidebar nav button svg { width: 17px; height: 17px; }
   .nav-dot { display: none; }

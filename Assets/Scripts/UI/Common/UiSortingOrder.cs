@@ -78,10 +78,11 @@ public static class UiSortingOrder
     /// <summary>매칭·대치 화면(MatchmakingRoot.prefab). 로비를 전부 덮는 전면 화면이라 로비(<see cref="Lobby"/>) 위지만,
     /// 진입이 막혔을 때 뜨는 안내는 이 화면 위에 서야 하므로 풀(<see cref="Pool"/>) 아래다 —
     /// 안내를 띄우기 전에 화면을 먼저 닫는 순서에만 기대지 않으려고 층으로도 보장한다.
-    ///
-    /// 전투로 넘어가는 순간에는 이 화면이 곧 커튼이 되어 <see cref="Curtain"/>으로 승격한다(MatchSceneCarrier).
-    /// 그때 배틀 씬의 어떤 캔버스보다도 위여야 하는데, 이 층(320) 자체로도 이미 그 조건을 만족한다.</summary>
+    /// 상단바(<see cref="LobbyBarsLifted"/>)와 매칭 딤보다 위에서 표시한다.</summary>
     public const int Matchmaking = 320;
+
+    /// <summary>매칭 화면 바로 아래의 공용 딤. 승격된 상·하단바도 덮고 입력을 차단한다.</summary>
+    public const int MatchmakingDim = Matchmaking - 1;
 
     /// <summary>덱·도감이 공유하는 카드 필터 팝업. 튜토리얼 게이트 아래에 둔다.</summary>
     public const int CardFilter = 340;
