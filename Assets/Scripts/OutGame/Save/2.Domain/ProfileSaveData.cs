@@ -10,6 +10,9 @@ public class ProfileSaveData
     [FirestoreProperty("avatarId")] public string AvatarId { get; set; }
     [FirestoreProperty("frameId")] public string FrameId { get; set; }
     [FirestoreProperty("emoteIds")] public List<int> EmoteIds { get; set; }
+    [FirestoreProperty("ownedAvatarIds")] public List<string> OwnedAvatarIds { get; set; }
+    [FirestoreProperty("ownedFrameIds")] public List<string> OwnedFrameIds { get; set; }
+    [FirestoreProperty("ownedEmoteIds")] public List<int> OwnedEmoteIds { get; set; }
     [FirestoreProperty("ownedTitleIds")] public List<string> OwnedTitleIds { get; set; } = new List<string>();
     [FirestoreProperty("equippedTitleId")] public string EquippedTitleId { get; set; } = string.Empty;
 

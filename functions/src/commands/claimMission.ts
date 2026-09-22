@@ -225,6 +225,7 @@ export const claimMission = onCall(async (request) => {
         itemGrant = {
           slots: {...itemGrant.slots, ...experienceGrant.slots},
           currencies: [...itemGrant.currencies, ...experienceGrant.currencies],
+          cosmetics: [...(itemGrant.cosmetics ?? []), ...(experienceGrant.cosmetics ?? [])],
           cards: [...itemGrant.cards, ...experienceGrant.cards],
           packs: [...(itemGrant.packs ?? []), ...(experienceGrant.packs ?? [])],
         };
@@ -262,7 +263,7 @@ export const claimMission = onCall(async (request) => {
         ...adopted,
         missionId,
         granted: grantedCurrencies,
-        cards: itemGrant.cards,
+        cosmetics: itemGrant.cosmetics ?? [], cards: itemGrant.cards,
         packs: itemGrant.packs ?? [],
         grantedPassExp,
         grantedAccountExp: accountExperience?.grantedExp ?? 0,

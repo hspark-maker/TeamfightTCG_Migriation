@@ -47,7 +47,7 @@ public sealed class OutgameConfigStep : MainInitializer
         }
         AdventureProgress.SetConfig(t_runtimeAdventure);
         ProfileManager.SetConfig(profileConfig);
-        ProfileManager.SetTitleCatalog(profileConfig != null ? profileConfig.TitleCatalog : null);
+        TitleManager.SetCatalog(profileConfig != null ? profileConfig.TitleCatalog : null);
         ProfileManager.SetEmoteCatalog(emoteCatalog);
         ProfileManager.SetNicknameFilter(new BadWordNicknameFilter());
 

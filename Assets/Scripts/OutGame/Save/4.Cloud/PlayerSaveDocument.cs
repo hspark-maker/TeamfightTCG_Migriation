@@ -4,8 +4,7 @@ using Firebase.Firestore;
 using UnityEngine;
 
 // Firestore 세이브 문서의 필드명·변환 단일 창구. 문서 구조를 아는 코드는 여기뿐이다.
-// 클라이언트가 문서 전체를 소유한다(쓰기는 변경된 최상위 슬롯만 담은 Transaction.Update) — 서버가 소유할
-// 필드가 생기면 같은 문서가 아니라 형제 문서 ".../save/server"로 분리한다.
+// profile은 서버 소유와 편집 필드를 공유하므로 클라이언트 편집 필드만 부분 갱신한다.
 static class PlayerSaveDocument
 {
     const string DEVICE_ID_KEY = "firebase.playerSave.deviceId";
@@ -44,8 +43,7 @@ static class PlayerSaveDocument
         s_appVersion = Application.version;
     }
 
-    /// <summary>메타 5개와 dirty 최상위 슬롯만 담은 Update용 필드 맵. 슬롯 8개를 전부 넘기면
-    /// 예전 전체 덮어쓰기와 같은 맵이 나온다 — 전체 재전송에 별도 경로가 필요 없는 이유다.</summary>
+    /// <summary>메타와 변경 슬롯을 보낸다. profile은 편집 필드만 보내 서버 소유를 보존한다.</summary>
     internal static Dictionary<string, object> ToSlotFieldMap(
         UserSaveData _data,
         ESaveSlot _dirtySlots,
@@ -69,7 +67,17 @@ static class PlayerSaveDocument
         {
             ESaveSlot t_slot = DataSaveManager.SaveSlotAt(i);
             if ((_dirtySlots & t_slot) == 0) continue;
-            t_fields[FieldNameForSlot(t_slot)] = DataSaveManager.GetSlotValue(_data, t_slot);
+            if (t_slot == ESaveSlot.Profile)
+            {
+                var t_profile = _data.Profile;
+                t_fields["profile.nickname"] = t_profile.Nickname;
+                if (t_profile.AvatarId != null) t_fields["profile.avatarId"] = t_profile.AvatarId;
+                if (t_profile.FrameId != null) t_fields["profile.frameId"] = t_profile.FrameId;
+                if (t_profile.EmoteIds != null) t_fields["profile.emoteIds"] = t_profile.EmoteIds;
+                if (t_profile.EquippedTitleId != null) t_fields["profile.equippedTitleId"] = t_profile.EquippedTitleId;
+                t_fields["profile.contentUnlocks"] = t_profile.ContentUnlocks;
+            }
+            else t_fields[FieldNameForSlot(t_slot)] = DataSaveManager.GetSlotValue(_data, t_slot);
             t_remainingSlots &= ~t_slot;
         }
 

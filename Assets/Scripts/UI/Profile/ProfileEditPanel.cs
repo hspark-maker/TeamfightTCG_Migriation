@@ -78,7 +78,7 @@ public class ProfileEditPanel : ContentsPooledUI, IPointerClickHandler
     readonly List<EmoteItemCell> m_emoteCells = new List<EmoteItemCell>();
     readonly List<int> m_draftEmoteIds = new List<int>(EmoteCatalog.SLOT_COUNT);
 
-    // 칸 생성 여부. 목록은 런타임 불변이라 최초 1회만 만들고 이후엔 선택 표시만 갱신한다.
+    // 고정 장착 칸과 템플릿 정리는 한 번만 한다.
     bool m_built;
     EmoteEditDragController m_emoteDrag;
     int m_currentTab;
@@ -114,7 +114,9 @@ public class ProfileEditPanel : ContentsPooledUI, IPointerClickHandler
         while (this.m_draftEmoteIds.Count < EmoteCatalog.SLOT_COUNT) this.m_draftEmoteIds.Add(0);
         this.m_pendingEmoteId = 0;
 
-        if (!this.m_built) this.Build();
+        this.Build();
+        ProfileManager.OnOwnershipChanged -= this.OnOwnershipChanged;
+        ProfileManager.OnOwnershipChanged += this.OnOwnershipChanged;
 
         this.SetTab(TAB_AVATAR);           // 열 때마다 아바타 탭부터 — 이전 세션의 탭이 남지 않게.
         this.RefreshSelection();
@@ -182,6 +184,7 @@ public class ProfileEditPanel : ContentsPooledUI, IPointerClickHandler
 
     protected override void OnViewHidden()
     {
+        ProfileManager.OnOwnershipChanged -= this.OnOwnershipChanged;
         if (this.titlePanel != null) this.titlePanel.Hide();
         this.CancelEmoteDrag();
         this.data = null;
@@ -190,77 +193,108 @@ public class ProfileEditPanel : ContentsPooledUI, IPointerClickHandler
         if (this.nicknameInput != null) this.nicknameInput.DeactivateInputField();
     }
 
-    // 세 그리드를 한 번에 세운다. 설정이 아직 없으면(초기화 배선 전) 그 축만 조용히 비운다 — 씬이 죽지 않게.
+    void OnOwnershipChanged()
+    {
+        if (!this.m_sessionOpen) return;
+        this.Build();
+        this.RefreshSelection();
+    }
+
     void Build()
     {
-        this.CancelEmoteDrag();
-        this.m_avatarCells.Clear();
-        this.m_frameCells.Clear();
-        this.m_equippedEmoteCells.Clear();
-        this.m_emoteCells.Clear();
-        this.ClearContent(this.avatarContent, this.cellPrefab != null ? this.cellPrefab.gameObject : null);
-        this.ClearContent(this.frameContent, this.cellPrefab != null ? this.cellPrefab.gameObject : null);
-        this.ClearContent(this.equippedEmoteContent, this.emoteCellPrefab != null ? this.emoteCellPrefab.gameObject : null);
-        this.ClearContent(this.emoteContent, this.emoteCellPrefab != null ? this.emoteCellPrefab.gameObject : null);
-
+        Vector2 t_avatarPosition = ScrollPosition(this.avatarScroll);
+        Vector2 t_framePosition = ScrollPosition(this.frameScroll);
+        Vector2 t_emotePosition = ScrollPosition(this.emoteScroll);
+        if (!this.m_built)
+        {
+            this.ClearContent(this.avatarContent, this.cellPrefab != null ? this.cellPrefab.gameObject : null);
+            this.ClearContent(this.frameContent, this.cellPrefab != null ? this.cellPrefab.gameObject : null);
+            this.ClearContent(this.emoteContent, this.emoteCellPrefab != null ? this.emoteCellPrefab.gameObject : null);
+            this.ClearContent(this.equippedEmoteContent, this.emoteCellPrefab != null ? this.emoteCellPrefab.gameObject : null);
+        }
+        for (int t_i = this.m_equippedEmoteCells.Count; t_i < EmoteCatalog.SLOT_COUNT; t_i++)
+        {
+            EmoteItemCell t_cell = this.CreateEmoteCell(this.equippedEmoteContent);
+            if (t_cell != null) this.m_equippedEmoteCells.Add(t_cell);
+        }
+        var t_avatarIds = new HashSet<string>();
+        var t_frameIds = new HashSet<string>();
+        var t_emoteIds = new HashSet<int>();
         ProfileConfig t_config = ProfileManager.Config;
-        if (t_config != null && this.cellPrefab != null)
+        if (t_config != null)
         {
-            var t_avatars = t_config.Avatars;
-            for (int t_i = 0; t_i < t_avatars.Count; t_i++)
+            foreach (ProfileAvatarEntry t_entry in t_config.Avatars)
             {
-                var t_entry = t_avatars[t_i];
-                if (t_entry == null) continue;
-                ProfileItemCell t_cell = this.CreateProfileCell(this.avatarContent);
-                if (t_cell == null) continue;
-                // 아바타 칸은 아바타 그림만 보여준다 — 프레임과 겹친 실제 조합은 위쪽 미리보기가 맡는다.
-                t_cell.Bind(t_entry.id, t_config.LookOf(t_entry.id, null), EProfileAxis.Avatar,
-                    ProfileManager.IsAvatarOwned(t_entry.id), this.OnAvatarClicked);
-                this.m_avatarCells.Add(t_cell);
+                if (t_entry == null || t_entry.large == null || !ProfileManager.IsAvatarOwned(t_entry.id) || !t_avatarIds.Add(t_entry.id)) continue;
+                ProfileItemCell t_cell = this.m_avatarCells.Find(_cell => _cell != null && _cell.Id == t_entry.id);
+                if (t_cell == null)
+                {
+                    t_cell = this.CreateProfileCell(this.avatarContent);
+                    if (t_cell == null) continue;
+                    t_cell.Bind(t_entry.id, t_config.LookOf(t_entry.id, null), EProfileAxis.Avatar, true, this.OnAvatarClicked);
+                    this.m_avatarCells.Add(t_cell);
+                }
+                t_cell.transform.SetSiblingIndex(t_avatarIds.Count - 1);
             }
-
-            var t_frames = t_config.Frames;
-            for (int t_i = 0; t_i < t_frames.Count; t_i++)
+            foreach (ProfileFrameEntry t_entry in t_config.Frames)
             {
-                var t_entry = t_frames[t_i];
-                if (t_entry == null) continue;
-                ProfileItemCell t_cell = this.CreateProfileCell(this.frameContent);
-                if (t_cell == null) continue;
-                // 프레임 칸은 링만 보여준다.
-                t_cell.Bind(t_entry.id, t_config.LookOf(null, t_entry.id), EProfileAxis.Frame,
-                    ProfileManager.IsFrameOwned(t_entry.id), this.OnFrameClicked);
-                this.m_frameCells.Add(t_cell);
+                if (t_entry == null || t_entry.sprite == null || !ProfileManager.IsFrameOwned(t_entry.id) || !t_frameIds.Add(t_entry.id)) continue;
+                ProfileItemCell t_cell = this.m_frameCells.Find(_cell => _cell != null && _cell.Id == t_entry.id);
+                if (t_cell == null)
+                {
+                    t_cell = this.CreateProfileCell(this.frameContent);
+                    if (t_cell == null) continue;
+                    t_cell.Bind(t_entry.id, t_config.LookOf(null, t_entry.id), EProfileAxis.Frame, true, this.OnFrameClicked);
+                    this.m_frameCells.Add(t_cell);
+                }
+                t_cell.transform.SetSiblingIndex(t_frameIds.Count - 1);
             }
         }
-
         EmoteCatalog t_catalog = ProfileManager.EmoteCatalog;
-        if (t_catalog != null && this.emoteCellPrefab != null)
+        if (t_catalog != null)
         {
-            // 장착 줄은 칸 수가 고정이라 빈 채로 먼저 세우고 내용은 RefreshEmotes가 채운다.
-            for (int t_i = 0; t_i < EmoteCatalog.SLOT_COUNT; t_i++)
+            foreach (EmoteEntry t_entry in t_catalog.Pool)
             {
-                EmoteItemCell t_cell = this.CreateEmoteCell(this.equippedEmoteContent);
-                if (t_cell != null) this.m_equippedEmoteCells.Add(t_cell);
-            }
-
-            // 풀은 저작 순서대로 깔되 id 미저작(0) 칸은 건너뛴다 — 눌러도 장착할 수 없는 칸이라.
-            for (int t_i = 0; t_i < t_catalog.Count; t_i++)
-            {
-                EmoteEntry t_entry = t_catalog.PoolAt(t_i);
-                if (t_entry == null || t_entry.id <= 0) continue;
-                EmoteItemCell t_cell = this.CreateEmoteCell(this.emoteContent);
-                if (t_cell == null) continue;
-                t_cell.BindEmote(t_entry.id, t_entry, ProfileManager.IsEmoteOwned(t_entry.id), this.OnEmoteClicked);
-                this.m_emoteCells.Add(t_cell);
+                if (t_entry == null || t_entry.sprite == null || !ProfileManager.IsEmoteOwned(t_entry.id) || !t_emoteIds.Add(t_entry.id)) continue;
+                EmoteItemCell t_cell = this.m_emoteCells.Find(_cell => _cell != null && _cell.Key == t_entry.id);
+                if (t_cell == null)
+                {
+                    t_cell = this.CreateEmoteCell(this.emoteContent);
+                    if (t_cell == null) continue;
+                    t_cell.BindEmote(t_entry.id, t_entry, true, this.OnEmoteClicked);
+                    this.m_emoteCells.Add(t_cell);
+                }
+                t_cell.transform.SetSiblingIndex(t_emoteIds.Count - 1);
             }
         }
+        RemoveMissing(this.m_avatarCells, _cell => t_avatarIds.Contains(_cell.Id));
+        RemoveMissing(this.m_frameCells, _cell => t_frameIds.Contains(_cell.Id));
+        RemoveMissing(this.m_emoteCells, _cell => t_emoteIds.Contains(_cell.Key));
+        RestoreScroll(this.avatarScroll, t_avatarPosition);
+        RestoreScroll(this.frameScroll, t_framePosition);
+        RestoreScroll(this.emoteScroll, t_emotePosition);
+        this.m_built = true;
+    }
 
-        // 이전 세션의 스크롤 위치가 남아 첫 화면이 중간부터 보이는 것을 막는다.
-        ResetScroll(this.avatarScroll);
-        ResetScroll(this.frameScroll);
-        ResetScroll(this.emoteScroll);
-        // 하나도 못 만들었으면 다음 열기에서 다시 시도한다 — 빈 팝업으로 세션 내내 고착되지 않게.
-        this.m_built = this.m_avatarCells.Count > 0 || this.m_frameCells.Count > 0 || this.m_emoteCells.Count > 0;
+    static void RemoveMissing<T>(List<T> _cells, System.Predicate<T> _keep) where T : Component
+    {
+        for (int t_i = _cells.Count - 1; t_i >= 0; t_i--)
+        {
+            T t_cell = _cells[t_i];
+            if (t_cell != null && _keep(t_cell)) continue;
+            if (t_cell != null) { t_cell.gameObject.SetActive(false); Destroy(t_cell.gameObject); }
+            _cells.RemoveAt(t_i);
+        }
+    }
+
+    static Vector2 ScrollPosition(ScrollRect _scroll) => _scroll != null && _scroll.content != null
+        ? _scroll.content.anchoredPosition : Vector2.zero;
+
+    static void RestoreScroll(ScrollRect _scroll, Vector2 _position)
+    {
+        if (_scroll == null || _scroll.content == null) return;
+        LayoutRebuilder.ForceRebuildLayoutImmediate(_scroll.content);
+        _scroll.content.anchoredPosition = _position;
     }
 
     ProfileItemCell CreateProfileCell(Transform _content)
@@ -295,6 +329,7 @@ public class ProfileEditPanel : ContentsPooledUI, IPointerClickHandler
 
     void OnAvatarClicked(string _id)
     {
+        if (!ProfileManager.IsAvatarOwned(_id)) return;
         this.m_draftAvatarId = _id;
         SetSelectedIn(this.m_avatarCells, _id);
         this.RefreshPreview();
@@ -303,6 +338,7 @@ public class ProfileEditPanel : ContentsPooledUI, IPointerClickHandler
 
     void OnFrameClicked(string _id)
     {
+        if (!ProfileManager.IsFrameOwned(_id)) return;
         this.m_draftFrameId = _id;
         SetSelectedIn(this.m_frameCells, _id);
         this.RefreshPreview();
@@ -640,8 +676,4 @@ public class ProfileEditPanel : ContentsPooledUI, IPointerClickHandler
         return true;
     }
 
-    static void ResetScroll(ScrollRect _scroll)
-    {
-        if (_scroll != null) _scroll.verticalNormalizedPosition = 1f;
-    }
 }

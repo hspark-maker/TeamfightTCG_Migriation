@@ -420,7 +420,7 @@ exports.claimReward = (0, https_1.onCall)((0, requestMetrics_1.measuredCallable)
         return finish({ ...itemGrant.slots, adventure: claimAdventureNode(current, chapterNodes, context) });
     }, (adopted) => {
         replayed = false;
-        return { ...adopted, granted, cards: itemGrant.cards, packs: itemGrant.packs ?? [],
+        return { ...adopted, granted, cosmetics: itemGrant.cosmetics ?? [], titles: itemGrant.titles ?? [], cards: itemGrant.cards, packs: itemGrant.packs ?? [],
             missions: missionState, rankProgress };
     });
     if (replayed) {

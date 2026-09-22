@@ -72,7 +72,7 @@ function resolveRewards(rows, ownerType, ownerId) {
             id: row.id, reason, rewardType: row.rewardType, rewardId: row.rewardId, amount: row.amount,
         });
         // 카드 보상이 저작되면 여기서 드러나야 한다. 조용히 재화로 바꾸지 않는다.
-        if (!["Currency", "Card", "Pack", "PackChoice"].includes(row.rewardType)) {
+        if (!["Currency", "Card", "Pack", "PackChoice", "Avatar", "Frame", "Emote", "Title"].includes(row.rewardType)) {
             drop("UnknownRewardType");
             continue;
         }
@@ -83,6 +83,19 @@ function resolveRewards(rows, ownerType, ownerId) {
         seenOrders.add(row.order);
         if (row.amount <= 0) {
             drop("NonPositiveAmount");
+            continue;
+        }
+        if (["Avatar", "Frame", "Emote"].includes(row.rewardType) && row.amount !== 1) {
+            drop("InvalidCosmeticAmount");
+            continue;
+        }
+        if (row.rewardType === "Title" && row.amount !== 1) {
+            drop("InvalidTitleAmount");
+            continue;
+        }
+        if (row.rewardType === "Emote" && (!/^[1-9][0-9]*$/.test(row.rewardId) ||
+            !Number.isSafeInteger(Number(row.rewardId)) || Number(row.rewardId) > 2147483647)) {
+            drop("InvalidRewardId");
             continue;
         }
         if (row.rewardType !== "Currency") {

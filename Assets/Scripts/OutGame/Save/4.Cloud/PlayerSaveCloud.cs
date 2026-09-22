@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -210,7 +210,7 @@ static class PlayerSaveCloud
     }
 
     /// <summary>서버가 쓴 문서를 채택한다 — 슬롯을 갈아끼우고 revision과 업로드 기준선을 맞춘다.</summary>
-    internal static void AdoptServerResult(long _revision, ServerSlotPatch _updatedSlots)
+    internal static void AdoptServerResult(long _revision, ServerSlotPatch _updatedSlots, bool _preserveProfileEquipment = true)
     {
         // 통화 도중 Shutdown → Initialize가 끼면 여기 기준선은 남의 세션 것이다. 채택도 성공 반환도 하지 않는다.
         if (!s_initialized || s_serverCommandGeneration != s_generation)
@@ -227,7 +227,7 @@ static class PlayerSaveCloud
             throw new ServerAdoptionException(t_message);
         }
 
-        DataSaveManager.AdoptServerSlots(_updatedSlots);
+        DataSaveManager.AdoptServerSlots(_updatedSlots, _preserveProfileEquipment);
         Revision = _revision;
 
         // 이 창구가 세운 Offline은 성공 업로드로만 풀렸다 — 호출 뒤 로컬 변경이 없으면 업로드가 예약되지 않아
@@ -718,6 +718,58 @@ static class PlayerSaveCloud
             return;
         }
 
+        if (t_remote.Profile?.OwnedAvatarIds == null || t_remote.Profile.OwnedFrameIds == null ||
+            t_remote.Profile.OwnedEmoteIds == null)
+        {
+            try
+            {
+                await ServerSaveCommands.InvokeInitAsync<ServerCommandResult>(
+                    "ensureProfileCosmetics", new { env = s_envId });
+                if (_generation != s_generation) return;
+                t_document = await ReadAsync(_generation, t_userId);
+                if (_generation != s_generation) return;
+                if (!PlayerSaveDocument.TryReadMeta(t_document, out t_schemaVersion, out t_revision) ||
+                    t_schemaVersion != UserSaveData.VERSION || t_revision < 1)
+                    throw new InvalidOperationException("Invalid save metadata after cosmetic ownership repair.");
+                t_remote = t_document.ConvertTo<UserSaveData>();
+                if (t_remote?.Profile?.OwnedAvatarIds == null || t_remote.Profile.OwnedFrameIds == null ||
+                    t_remote.Profile.OwnedEmoteIds == null)
+                    throw new InvalidOperationException("Cosmetic ownership is missing after repair.");
+            }
+            catch (Exception t_exception)
+            {
+                if (_generation != s_generation) return;
+                Fail($"Cosmetic ownership initialization failed: {t_exception.GetBaseException().Message}");
+                return;
+            }
+        }
+
+        try
+        {
+            EnsureTitlesResult t_titles = await ServerSaveCommands.InvokeInitAsync<EnsureTitlesResult>(
+                "ensureTitles", new { env = s_envId });
+            if (_generation != s_generation) return;
+            if (t_titles == null) throw new InvalidOperationException("Title initialization returned nothing.");
+            if (t_titles.Changed || t_titles.Revision != t_revision)
+            {
+                t_document = await ReadAsync(_generation, t_userId);
+                if (_generation != s_generation) return;
+                if (t_document == null || !t_document.Exists ||
+                    !PlayerSaveDocument.TryReadMeta(t_document, out t_schemaVersion, out t_revision) ||
+                    t_schemaVersion != UserSaveData.VERSION || t_revision < 1)
+                    throw new InvalidOperationException("Invalid save metadata after title unlock reconciliation.");
+                t_remote = t_document.ConvertTo<UserSaveData>();
+                if (t_remote == null) throw new InvalidOperationException("Save is missing after title reconciliation.");
+            }
+            TitleUnlocks.Adopt(t_titles.Definitions);
+        }
+        catch (Exception t_exception)
+        {
+            if (_generation != s_generation) return;
+            Fail($"Title initialization failed: {t_exception.GetBaseException().Message}");
+            return;
+        }
+
         AdoptRemote(t_userId, t_remote, t_revision);
     }
 
@@ -1180,9 +1232,7 @@ static class PlayerSaveCloud
         ESaveSlot _dirtySlots,
         long _nextRevision)
     {
-        // 키는 반드시 "ownership" 같은 최상위 한 칸이어야 한다. 최상위 필드에 맵을 통째로 주면 그 필드는 교체돼
-        // 삭제가 전파되지만, "ownership.someCard" 같은 중첩 경로를 쓰는 순간 지운 항목이 원격에 영원히 남는다.
-        // (같은 이유로 SetOptions.MergeAll도 쓸 수 없다.)
+        // 슬롯은 삭제 전파를 위해 통째로 교체한다. profile만 서버 소유 필드를 보존하도록 편집 필드를 쓴다.
         //
         // revision CAS는 여기서 읽어 확인하지 않는다 — firestore.rules 의 update 조건
         // (revision == resource.data.revision + 1, schemaVersion 일치)이 서버에서 강제한다.

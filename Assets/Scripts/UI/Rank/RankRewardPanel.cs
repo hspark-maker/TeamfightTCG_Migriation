@@ -260,7 +260,7 @@ public class RankRewardPanel : ContentsPooledUI
         {
             if (this != null && this.VisibilityVersion == t_version) this.m_claimPending = false;
         }
-        if (t_outcome.HasCards && this != null)
+        if (t_outcome.HasItems && this != null)
         {
             // 팩 개봉보다 높은 목록만 걷는다. 공용 보상 팝업의 합산 연출은 계속 재생한다.
             this.SetContentsVisible(false);

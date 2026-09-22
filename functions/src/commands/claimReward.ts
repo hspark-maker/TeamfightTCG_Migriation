@@ -517,7 +517,7 @@ export const claimReward = onCall(measuredCallable("claimReward", async (request
     },
     (adopted) => {
       replayed = false;
-      return {...adopted, granted, cards: itemGrant.cards, packs: itemGrant.packs ?? [],
+      return {...adopted, granted, cosmetics: itemGrant.cosmetics ?? [], cards: itemGrant.cards, packs: itemGrant.packs ?? [],
         missions: missionState, rankProgress};
     });
 

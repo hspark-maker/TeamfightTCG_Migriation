@@ -80,6 +80,7 @@ export const claimBattleExperience = onCall(async (request) => {
     },
     (adopted) => ({
       ...adopted, matchId, alreadyClaimed,
+      cosmetics: credited?.cosmetics ?? [],
       granted: credited?.currencies ?? [], cards: credited?.cards ?? [], packs: credited?.packs ?? [],
       ...(credited === undefined ? {} : {accountExperience: credited.accountExperience}),
       ...(missions === undefined ? {} : {missions}),

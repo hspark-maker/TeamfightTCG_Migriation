@@ -126,7 +126,7 @@ public sealed class AttendancePanel : ContentsPooledUI
                     t_gains.Add(t_value);
                     t_lines.Add(new RewardLine(t_value));
                 }
-        var t_outcome = RewardItemDisplay.ToOutcome(t_gains, t_result.Cards, t_result.Packs);
+        var t_outcome = RewardItemDisplay.ToOutcome(t_gains, t_result.Cards, t_result.Packs, t_result.Cosmetics, t_result.Titles);
         if (t_outcome.Packs != null)
             foreach (var t_pack in t_outcome.Packs)
                 t_lines.Add(new RewardLine(new AlbumRewardDef { rewardType = ERewardType.Pack,
@@ -136,7 +136,8 @@ public sealed class AttendancePanel : ContentsPooledUI
                 t_lines.Add(new RewardLine(new AlbumRewardDef { rewardType = ERewardType.Card,
                     rewardId = t_card.CardId.ToString(), amount = 1 }));
         Hide();
-        if (RewardClaimPopup.TryGet(out var t_popup))
+        if (t_lines.Count == 0) RewardPackPresentation.Show(t_outcome);
+        else if (RewardClaimPopup.TryGet(out var t_popup))
             t_popup.Show("출석 보상", t_lines, () => UniTask.FromResult(t_outcome), _claimOnDim: true);
         else RewardClaimPopup.ClaimWithoutPopup(() => UniTask.FromResult(t_outcome)).Forget();
         // 이전 날짜의 영수증을 복원했을 수도 있으므로 현재 날짜를 다시 조회한다.

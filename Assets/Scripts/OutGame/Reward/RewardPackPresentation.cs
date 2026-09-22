@@ -9,6 +9,7 @@ public static class RewardPackPresentation
 {
     static Queue<(string PackId, List<DrawnCard> Cards, bool IsPack, bool Individually)> s_pending = new();
     static List<(CurrencyGain Refund, List<int> Cards)> s_lobbyRewards = new();
+    static Queue<(string Heading, RewardLine Line)> s_items = new();
     static CancellationToken s_lifetime;
     static bool s_running;
 
@@ -22,6 +23,7 @@ public static class RewardPackPresentation
         {
             s_pending = new();
             s_lobbyRewards = new();
+            s_items = new();
             s_lifetime = t_token;
             s_running = false;
         }
@@ -45,9 +47,19 @@ public static class RewardPackPresentation
                 s_pending.Enqueue((null, new List<DrawnCard>(outcome.Cards), false, outcome.ShowCardsIndividually));
         }
 
-        if (s_running || s_pending.Count == 0) return;
+        if (outcome.Cosmetics != null)
+            foreach (var t_cosmetic in outcome.Cosmetics)
+                if (t_cosmetic != null)
+                    s_items.Enqueue(("꾸미기 아이템", new RewardLine(t_cosmetic)));
+
+        if (outcome.Titles != null)
+            foreach (var t_title in outcome.Titles)
+                if (t_title != null)
+                    s_items.Enqueue(("칭호 획득", new RewardLine(t_title)));
+
+        if (s_running || (s_pending.Count == 0 && s_items.Count == 0)) return;
         s_running = true;
-        RunAsync(s_pending, s_lobbyRewards, t_token).Forget();
+        RunAsync(s_pending, s_lobbyRewards, s_items, t_token).Forget();
     }
 
     // 보상 개봉의 [획득]은 로비 인계만 미룬다. 중간 OnClosed가 빈 캐리어를 지나가므로
@@ -61,6 +73,7 @@ public static class RewardPackPresentation
 
     static async UniTask RunAsync(Queue<(string PackId, List<DrawnCard> Cards, bool IsPack, bool Individually)> _queue,
                                  List<(CurrencyGain Refund, List<int> Cards)> _lobbyRewards,
+                                 Queue<(string Heading, RewardLine Line)> _items,
                                  CancellationToken _token)
     {
         bool t_waitingForLobby = CardPackRewardHandoff.HasPending && LobbyGainEffectDirector.Exists;
@@ -90,6 +103,24 @@ public static class RewardPackPresentation
 
                 if (_queue.Count == 0)
                 {
+                    if (_items.Count > 0)
+                    {
+                        if (!RewardClaimPopup.TryGet(out var t_itemPopup) || t_itemPopup.RewardSlotCount == 0)
+                        {
+                            Debug.LogWarning("[RewardPackPresentation] No reward popup — keeping item rewards queued.");
+                            return;
+                        }
+                        string t_heading = _items.Peek().Heading;
+                        var t_lines = new List<RewardLine>();
+                        while (_items.Count > 0 && _items.Peek().Heading == t_heading && t_lines.Count < t_itemPopup.RewardSlotCount)
+                            t_lines.Add(_items.Dequeue().Line);
+                        bool t_closed = false;
+                        t_itemPopup.Show(t_heading, t_lines,
+                            () => UniTask.FromResult(new RewardClaimOutcome(Array.Empty<CurrencyGain>())),
+                            _claimOnDim: true, _onClosed: () => t_closed = true);
+                        await UniTask.WaitUntil(() => t_closed, cancellationToken: _token);
+                        continue;
+                    }
                     if (_lobbyRewards.Count == 0) return;
                     foreach (var t_reward in _lobbyRewards)
                         CardPackRewardHandoff.Set(t_reward.Refund, t_reward.Cards);
@@ -137,6 +168,7 @@ public static class RewardPackPresentation
         {
             _queue.Clear();
             _lobbyRewards.Clear();
+            _items.Clear();
         }
         finally
         {

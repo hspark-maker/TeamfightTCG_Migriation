@@ -80,6 +80,7 @@ public sealed class SaveDependentManagersStep : MainInitializer
             // 정상 초기화의 스타터는 서버(ensureAccount)가 이미 문서에 넣어 왔다.
             // 아래 Init과 GrantIfNoDeck은 위 되감기가 슬롯을 비웠을 때만 서는 안전망이다.
             ProfileManager.Init();
+            TitleManager.NotifyRehydrated();
             OwnershipManager.Init();
             // 정지 예외와 트리거의 메모리 진행은 이전 계정의 값이다. 새 세이브로 정지를 판정하기 전에 걷는다.
             OutgameTutorialRunner.AbortGuided();

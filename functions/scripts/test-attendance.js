@@ -10,12 +10,14 @@ let commits = 0, retries = 0, beforeCommit = null;
 let clock = Date.parse("2026-09-14T20:00:00Z");
 Date.now = () => clock;
 function reference(key) {
-  return {path: key, collection: (name) => ({doc: (id) => reference(`${key}/${name}/${id}`)}),
+  return {path: key, id: key.split("/").at(-1),
+    get parent() {return reference(key.split("/").slice(0, -1).join("/"));},
+    collection: (name) => ({doc: (id) => reference(`${key}/${name}/${id}`)}),
     get: async () => snapshot(key)};
 }
 function snapshot(key) {
   const value = clone(documents.get(key));
-  return {exists: value !== undefined, data: () => clone(value)};
+  return {ref: reference(key), exists: value !== undefined, data: () => clone(value)};
 }
 const db = {
   doc: reference,
@@ -67,6 +69,11 @@ stub("../lib/rewards/itemGrant", {
   loadItemGrantContext: async () => ({cards: []}),
   grantRewardItems: (current, items) => {
     if (failItemGrant) throw new Error("pack grant failed");
+    if (items[0]?.rewardType === "Avatar") {
+      assert.deepEqual(items, [{rewardType: "Avatar", rewardId: "reward-avatar", amount: 1}]);
+      return {slots: {profile: {...current.profile, ownedAvatarIds: ["reward-avatar"]}}, cards: [],
+        packs: [], currencies: [], cosmetics: [{itemType: "Avatar", itemId: "reward-avatar", isNew: true}]};
+    }
     assert.deepEqual(items, [{rewardType: "Pack", rewardId: "NormalPack_TEST", amount: 1}]);
     const cards = [{cardId: 1, isNew: true, snack: 0}];
     return {slots: {ownership: {cardIds: [1]}}, cards,
@@ -200,6 +207,19 @@ const test = async (name, run) => { reset(); await run(); console.log("PASS " + 
     assert.equal(documents.get(attendancePath).claimedDays, 6);
     assert.equal(commits, 0);
   });
+  await test("cosmetic attendance response and receipt replay retain ownership and grant details", async () => {
+    authoredRows = rows.map(row => row.ownerId === "day_1" ?
+      {...row, rewardType: "Avatar", rewardId: "reward-avatar", amount: 1} : row);
+    const view = (await get()).attendance;
+    const result = await claim(view, "attendance-cosmetic");
+    assert.deepEqual(result.cosmetics, [{itemType: "Avatar", itemId: "reward-avatar", isNew: true}]);
+    assert.deepEqual(result.updatedSlots.profile.ownedAvatarIds, ["reward-avatar"]);
+    assert.deepEqual(documents.get(savePath).profile.ownedAvatarIds, ["reward-avatar"]);
+    assert.deepEqual(await claim(view, "attendance-cosmetic"), result);
+    assert.equal(commits, 1);
+    assert.equal(documents.get(walletPath).balances.Gold, 0);
+    authoredRows = rows;
+  });
   await test("invalid persisted state fails closed", async () => {
     assert.throws(() => readAttendance({cycle: 0, claimedDays: 0, lastClaimDailyKey: ""}));
     assert.throws(() => readAttendance({cycle: 1, claimedDays: 8, lastClaimDailyKey: "2026-09-14"}));
@@ -208,5 +228,5 @@ const test = async (name, run) => { reset(); await run(); console.log("PASS " + 
     assert.equal(attendanceResponse(future, clock).canClaim, false);
     assert.equal(judgeAttendanceClaim(future, {dailyKey: "2026-09-15", cycle: 1, day: 7}, clock).allow, false);
   });
-  console.log("Attendance: 11 focused regression scenarios passed.");
+  console.log("Attendance: 12 focused regression scenarios passed.");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

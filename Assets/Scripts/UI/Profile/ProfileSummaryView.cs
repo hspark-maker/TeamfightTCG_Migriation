@@ -72,8 +72,8 @@ public class ProfileSummaryView : MonoBehaviour
         if (this.nicknameText != null) this.nicknameText.text = ProfileManager.Nickname;
 
         TitleEntry t_title = null;
-        bool t_hasTitle = ProfileManager.TitleCatalog != null &&
-            ProfileManager.TitleCatalog.TryGet(ProfileManager.EquippedTitleId, out t_title);
+        bool t_hasTitle = TitleManager.Catalog != null &&
+            TitleManager.Catalog.TryGet(TitleManager.EquippedId, out t_title);
         if (this.titleText != null)
         {
             this.titleText.text = t_hasTitle ? t_title.displayName : "칭호 선택";
@@ -178,6 +178,7 @@ public class ProfileSummaryView : MonoBehaviour
     {
         this.m_hasShownExp = false;
         ProfileManager.OnChanged      += this.Refresh;
+        TitleManager.OnChanged        += this.Refresh;
         RankManager.OnChanged         += this.Refresh;
         AccountLevelManager.OnChanged += this.Refresh;
         this.Refresh();
@@ -186,6 +187,7 @@ public class ProfileSummaryView : MonoBehaviour
     void OnDisable()
     {
         ProfileManager.OnChanged      -= this.Refresh;
+        TitleManager.OnChanged        -= this.Refresh;
         RankManager.OnChanged         -= this.Refresh;
         AccountLevelManager.OnChanged -= this.Refresh;
         this.StopLevelAnimation();

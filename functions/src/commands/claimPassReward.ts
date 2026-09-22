@@ -137,7 +137,7 @@ export const claimPassReward = onCall(async (request) => {
     (adopted) => {
       replayed = false;
       return {...adopted, seasonId: season.seasonId, level, track, granted,
-        cards: itemGrant.cards, packs: itemGrant.packs ?? [], progress,
+        cosmetics: itemGrant.cosmetics ?? [], cards: itemGrant.cards, packs: itemGrant.packs ?? [], progress,
         ...(missionState ? {missions: missionState} : {})};
     });
 

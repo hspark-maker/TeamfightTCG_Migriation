@@ -228,7 +228,7 @@ public class RewardClaimPopup : PooledOverlay<RewardClaimPopup>
                 var t_outcome = t_claim.GetAwaiter().GetResult();
                 if (!t_outcome.Succeeded) { this.Hide(); return; }
                 // 재화 합산 연출을 끝낸 뒤 팩 개봉·카드 표시를 잇는다.
-                if (t_outcome.HasCards) this.PresentCardsAfterClose(t_outcome);
+                if (t_outcome.HasItems) this.PresentCardsAfterClose(t_outcome);
             }
             else
             {
@@ -306,7 +306,7 @@ public class RewardClaimPopup : PooledOverlay<RewardClaimPopup>
         try
         {
             var t_outcome = await _claim;
-            if (!t_outcome.Succeeded || !t_outcome.HasCards) return;
+            if (!t_outcome.Succeeded || !t_outcome.HasItems) return;
 
             if (this != null && this.m_showVersion == _showVersion) this.PresentCardsAfterClose(t_outcome);
             else RewardPackPresentation.Show(t_outcome);

@@ -24,19 +24,19 @@ public sealed class ProfileTitleTab : MonoBehaviour
     bool m_visible;
 
     /// <summary>저장 전 칭호 변경 여부.</summary>
-    public bool IsDirty => this.m_draftTitleId != ProfileManager.EquippedTitleId;
+    public bool IsDirty => this.m_draftTitleId != TitleManager.EquippedId;
 
     /// <summary>프로필 편집 세션의 칭호 선택을 준비한다.</summary>
     public void BeginEdit(System.Action _onSelectionChanged)
     {
-        this.m_draftTitleId = ProfileManager.EquippedTitleId;
+        this.m_draftTitleId = TitleManager.EquippedId;
         this.m_onSelectionChanged = _onSelectionChanged;
     }
 
     /// <summary>프로필 확정 시 선택한 칭호를 저장한다.</summary>
     public void Commit()
     {
-        if (this.IsDirty) ProfileManager.TryEquipTitle(this.m_draftTitleId);
+        if (this.IsDirty) TitleManager.TryEquip(this.m_draftTitleId);
     }
 
     /// <summary>프로필 편집 안에서 칭호 목록을 표시한다.</summary>
@@ -48,7 +48,7 @@ public sealed class ProfileTitleTab : MonoBehaviour
         if (string.IsNullOrEmpty(this.m_selectedId) && this.m_cells.Count > 0)
             this.m_selectedId = this.m_cells[0].Id;
         this.m_visible = true;
-        ProfileManager.OnChanged += this.Refresh;
+        TitleManager.OnChanged += this.Refresh;
         this.gameObject.SetActive(true);
         if (this.previewRoot != null) this.previewRoot.SetActive(true);
         this.Refresh();
@@ -71,7 +71,7 @@ public sealed class ProfileTitleTab : MonoBehaviour
 
     void Unsubscribe()
     {
-        ProfileManager.OnChanged -= this.Refresh;
+        TitleManager.OnChanged -= this.Refresh;
         this.m_visible = false;
         if (this.previewRoot != null) this.previewRoot.SetActive(false);
     }
@@ -79,7 +79,7 @@ public sealed class ProfileTitleTab : MonoBehaviour
     void Build()
     {
         if (this.cellPrefab != null) this.cellPrefab.gameObject.SetActive(false);
-        TitleCatalog t_catalog = ProfileManager.TitleCatalog;
+        TitleCatalog t_catalog = TitleManager.Catalog;
         if (this.m_builtCatalog == t_catalog) return;
         foreach (TitleItemCell t_cell in this.m_cells)
         {
@@ -104,7 +104,7 @@ public sealed class ProfileTitleTab : MonoBehaviour
     {
         if (!this.m_visible) return;
         this.m_selectedId = _id;
-        if (ProfileManager.IsTitleOwned(_id))
+        if (TitleManager.CanEquip(_id))
         {
             this.m_draftTitleId = _id == this.m_draftTitleId ? string.Empty : _id;
             this.m_onSelectionChanged?.Invoke();
@@ -115,8 +115,8 @@ public sealed class ProfileTitleTab : MonoBehaviour
     void Refresh()
     {
         TitleEntry t_entry = null;
-        bool t_known = ProfileManager.TitleCatalog != null &&
-            ProfileManager.TitleCatalog.TryGet(this.m_selectedId, out t_entry);
+        bool t_known = TitleManager.Catalog != null &&
+            TitleManager.Catalog.TryGet(this.m_selectedId, out t_entry);
         if (this.previewName != null)
         {
             this.previewName.text = t_known ? t_entry.displayName : string.Empty;
@@ -127,10 +127,11 @@ public sealed class ProfileTitleTab : MonoBehaviour
             this.previewIcon.enabled = t_known && t_entry.icon != null;
         }
         if (this.previewDescription != null)
-            this.previewDescription.text = t_known ? t_entry.description : string.Empty;
+            this.previewDescription.text = t_known
+                ? TitleUnlocks.Description(t_entry.id, t_entry.description) : string.Empty;
         if (this.emptyText != null) this.emptyText.gameObject.SetActive(this.m_cells.Count == 0);
         foreach (TitleItemCell t_cell in this.m_cells)
             t_cell.Refresh(t_cell.Id == this.m_selectedId, t_cell.Id == this.m_draftTitleId,
-                ProfileManager.IsTitleOwned(t_cell.Id));
+                TitleManager.CanEquip(t_cell.Id));
     }
 }

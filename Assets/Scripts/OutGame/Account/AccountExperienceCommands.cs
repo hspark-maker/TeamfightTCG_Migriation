@@ -23,7 +23,7 @@ internal static class AccountExperienceCommands
                 "claimBattleExperience", new { env = _env, matchId = _matchId });
             if (t_result.MatchId != _matchId)
                 throw new InvalidOperationException("Battle experience response has a different matchId.");
-            AccountRewardHandoff.Enqueue(_matchId, t_result.Granted, t_result.Cards, t_result.Packs, t_result.AccountExperience);
+            AccountRewardHandoff.Enqueue(_matchId, t_result.Granted, t_result.Cards, t_result.Packs, t_result.AccountExperience, t_result.Cosmetics, t_result.Titles);
             return true;
         }
         catch (ServerCommandRejectedException)

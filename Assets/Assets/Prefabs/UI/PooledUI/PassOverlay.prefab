@@ -4516,6 +4516,14 @@ MonoBehaviour:
   repeatStatusText: {fileID: 408492479985500862}
   repeatClaimButton: {fileID: 5151408865101933870}
   repeatClaimText: {fileID: 8271908310765916897}
+  expLevelBadge: {fileID: 2726177669676993740}
+  progressFillDuration: 0.45
+  progressMinFillDuration: 0.15
+  progressMaxDuration: 2.5
+  progressArrivalDuration: 0.25
+  progressBoundaryHoldDuration: 0.12
+  progressNodePunch: 0.12
+  progressScroll: {fileID: 8300000010000000025}
 --- !u!1 &8095052321658813754
 GameObject:
   m_ObjectHideFlags: 0
@@ -4699,6 +4707,7 @@ GameObject:
   - component: {fileID: 8300000010000000019}
   - component: {fileID: 8300000010000000020}
   - component: {fileID: 8300000010000000025}
+  - component: {fileID: 8300000010000000090}
   m_Layer: 0
   m_Name: LevelScrollView
   m_TagString: Untagged
@@ -4808,6 +4817,51 @@ MonoBehaviour:
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &8300000010000000090
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8300000010000000016}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0b148fe25e99eb48b9724523833bab1, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.EventSystems.EventTrigger
+  m_Delegates:
+  - eventID: 13
+    callback:
+      m_PersistentCalls:
+        m_Calls:
+        - m_Target: {fileID: 2000878403631995868}
+          m_TargetAssemblyTypeName: PassPanel, Assembly-CSharp
+          m_MethodName: StopProgressFollow
+          m_Mode: 1
+          m_Arguments:
+            m_ObjectArgument: {fileID: 0}
+            m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+            m_IntArgument: 0
+            m_FloatArgument: 0
+            m_StringArgument:
+            m_BoolArgument: 0
+          m_CallState: 2
+  - eventID: 7
+    callback:
+      m_PersistentCalls:
+        m_Calls:
+        - m_Target: {fileID: 2000878403631995868}
+          m_TargetAssemblyTypeName: PassPanel, Assembly-CSharp
+          m_MethodName: StopProgressFollow
+          m_Mode: 1
+          m_Arguments:
+            m_ObjectArgument: {fileID: 0}
+            m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+            m_IntArgument: 0
+            m_FloatArgument: 0
+            m_StringArgument:
+            m_BoolArgument: 0
+          m_CallState: 2
 --- !u!1 &8300000010000000021
 GameObject:
   m_ObjectHideFlags: 0
