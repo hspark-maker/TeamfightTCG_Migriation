@@ -517,17 +517,65 @@ public partial class LoadingTip
 }
 
 [GeneratorSpecData]
-public partial class AdventureReward
+public partial class Achievement
+{
+    /// 행 고유 번호 변경 금지
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 업적 단계 안정 키 변경 금지
+    public string achievementId;
+    /// 동일 누적 진행도를 공유하는 그룹
+    public string groupId;
+    /// 그룹 안 단계 순서 1부터
+    public int stage;
+    /// 집계 이벤트
+    public string eventKey;
+    /// PlaySynergy 전용 SynergyDef.synergyId
+    public string synergyId;
+    /// 누적 목표
+    public int targetCount;
+    /// 표시 제목
+    public string title;
+    /// 표시 설명
+    public string description;
+    /// Diamond 또는 Gold 또는 Shard
+    public string rewardCurrency;
+    /// 단계 1회 지급량
+    public long rewardAmount;
+    /// 그룹 표시 순서
+    public int sortOrder;
+    /// 1 활성 0 비활성
+    public int enabled;
+}
+
+[GeneratorSpecData]
+public partial class CosmeticItem
 {
     /// 행 고유 번호(부여 후 변경 금지)
     [GeneratorId(nameof(id), typeof(int))]
     public int id;
-    /// 보상을 받는 대상 — AdventureNode.nodeId 또는 AdventureChapter.chapterId
-    public string ownerKey;
-    /// 같은 ownerKey 안에서의 표시 순서
-    public int order;
-    /// 지급 재화(Gold/Diamond/Energy/Shard)
-    public string currency;
-    /// 지급량(0 이하는 지급도 표시도 되지 않는다)
-    public long amount;
+    /// 아이템 종류(Avatar/Frame/Emote)
+    public string itemType;
+    /// 종류별 영구 ID(Emote는 양의 정수 문자열)
+    public string itemId;
+    /// 기본 소유 여부(1=기본 소유/0=지급 후 소유; 신규 획득형은 0)
+    public int defaultOwned;
+}
+
+[GeneratorSpecData]
+public partial class Title
+{
+    /// 고유번호
+    [GeneratorId(nameof(id), typeof(int))]
+    public int id;
+    /// 칭호 영구 식별자
+    public string titleId;
+    /// 서버 통계 이벤트
+    public string eventKey;
+    /// PlaySynergy 전용 시너지 ID
+    public string synergyId;
+    /// 해금 목표값
+    public int targetCount;
+    /// 해금 조건 설명
+    public string description;
 }

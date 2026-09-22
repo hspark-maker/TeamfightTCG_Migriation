@@ -13,9 +13,6 @@ public sealed class ProfileLevelUpEffect : MonoBehaviour
     [Header("표현")]
     [SerializeField] Color lightTint = new Color(1f, 0.87f, 0.45f, 1f);
     [SerializeField] string levelFormat = "LEVEL UP";
-    [SerializeField, Min(0f)] float labelGap = 20f;
-    [SerializeField, Min(0f)] float edgePadding = 20f;
-    [SerializeField, Min(0.1f)] float flashSize = 1.5f;
     [SerializeField, Min(0.1f)] float ringStartScale = 1.02f;
     [SerializeField, Min(0.1f)] float ringEndScale = 1.9f;
     [Header("박자")]
@@ -26,18 +23,16 @@ public sealed class ProfileLevelUpEffect : MonoBehaviour
 
     Sequence _sequence;
     RectTransform _target;
-    Canvas _canvas;
 
     public bool IsPlaying => _sequence != null && _sequence.IsActive();
     public bool IsWired => visibility != null && flash != null && ring != null && levelText != null;
 
-    /// <summary>대상 프로필 주변에서 확정 레벨을 표시한다.</summary>
+    /// <summary>프리팹에 설정된 위치와 크기로 레벨업 연출을 재생한다.</summary>
     public bool Play(RectTransform target, int level)
     {
         if (!IsWired || target == null || !target.gameObject.activeInHierarchy || level <= 0) return false;
         Stop();
         _target = target;
-        _canvas = target.GetComponentInParent<Canvas>();
         gameObject.SetActive(true);
         visibility.alpha = 0f;
         visibility.interactable = false;
@@ -47,7 +42,6 @@ public sealed class ProfileLevelUpEffect : MonoBehaviour
         levelText.text = levelFormat;
         flash.rectTransform.localScale = Vector3.one;
         ring.rectTransform.localScale = Vector3.one * ringStartScale;
-        Place();
 
         _sequence = DOTween.Sequence().SetUpdate(true).SetLink(gameObject);
         _sequence.Append(visibility.DOFade(1f, appearDuration));
@@ -67,7 +61,6 @@ public sealed class ProfileLevelUpEffect : MonoBehaviour
         _sequence = null;
         sequence?.Kill();
         _target = null;
-        _canvas = null;
         if (visibility != null) visibility.alpha = 0f;
         if (gameObject.activeSelf) gameObject.SetActive(false);
     }
@@ -76,28 +69,8 @@ public sealed class ProfileLevelUpEffect : MonoBehaviour
     {
         if (!IsPlaying) return;
         if (_target == null || !_target.gameObject.activeInHierarchy) { Stop(); return; }
-        Place();
     }
 
     void OnDisable() => Stop();
 
-    void Place()
-    {
-        var root = (RectTransform)transform;
-        // 아바타 배율과 무관하게 문구는 캔버스 기준 크기를 유지한다.
-        if (_canvas != null && root.parent != null)
-        {
-            var parentScale = root.parent.lossyScale;
-            var canvasScale = _canvas.transform.lossyScale;
-            root.localScale = new Vector3(
-                canvasScale.x / Mathf.Max(0.0001f, Mathf.Abs(parentScale.x)),
-                canvasScale.y / Mathf.Max(0.0001f, Mathf.Abs(parentScale.y)), 1f);
-        }
-        root.position = _target.TransformPoint(_target.rect.center);
-        Vector3 size = root.InverseTransformVector(_target.TransformVector(_target.rect.size));
-        var diameter = Mathf.Max(Mathf.Abs(size.x), Mathf.Abs(size.y));
-        flash.rectTransform.sizeDelta = Vector2.one * diameter * flashSize;
-        ring.rectTransform.sizeDelta = Vector2.one * diameter;
-        PopupPlacer.PlaceBelowAnchor(levelText.rectTransform, _target, labelGap, edgePadding);
-    }
 }
