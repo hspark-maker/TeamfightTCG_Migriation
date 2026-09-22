@@ -650,7 +650,6 @@ public sealed class LobbyEnhanceTabPanel : LobbyTabPanel
         bool synergy = m_unlockSynergy;
         if (keywords == CardKeyword.None && !synergy) return;
 
-        LobbyShellBars.Hide(this, transform, EShellBars.All);
         RefreshSelection(); // 진화한 외형 아래 잠김 판은 해금 연출까지 유지한다.
         var rows = new List<AbilityDescriptionRow>();
         if (keywords != CardKeyword.None) rows.Add(keywordDescription);
@@ -720,6 +719,7 @@ public sealed class LobbyEnhanceTabPanel : LobbyTabPanel
             return;
         }
         m_presenting = true;
+        UiSortingOrder.LiftNested(presentationRoot, UiSortingOrder.CardGrowthPresentation);
         presentationRoot.SetActive(true);
         presentationRoot.transform.SetAsLastSibling();
         Canvas.ForceUpdateCanvases();
@@ -737,7 +737,6 @@ public sealed class LobbyEnhanceTabPanel : LobbyTabPanel
         presentationMotion.localScale = Vector3.one * fromScale;
         cardView.gameObject.SetActive(false);
         m_sourceHidden = true;
-        LobbyShellBars.Hide(this, transform, EShellBars.All);
 
         m_presentationMove = DOTween.Sequence().SetLink(gameObject)
             .Join(presentationMotion.DOLocalMove(parent.rect.center, .25f).SetEase(Ease.OutCubic))
@@ -804,7 +803,6 @@ public sealed class LobbyEnhanceTabPanel : LobbyTabPanel
         if (presentationRoot != null) presentationRoot.SetActive(false);
         if (m_sourceHidden && cardView != null) cardView.gameObject.SetActive(true);
         m_sourceHidden = false;
-        LobbyShellBars.Show(this);
     }
 
     void ShowEnhanceStatus(EnhanceResult result, int fromLevel)

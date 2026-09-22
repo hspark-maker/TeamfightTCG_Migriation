@@ -84,6 +84,9 @@ public static class UiSortingOrder
     /// 상단바(<see cref="LobbyBarsLifted"/>)와 매칭 딤보다 위에서 표시한다.</summary>
     public const int Matchmaking = 320;
 
+    /// <summary>카드 강화·제작 연출. 상·하단바를 숨기지 않고 전체 화면 딤으로 덮는다.</summary>
+    public const int CardGrowthPresentation = 315;
+
     /// <summary>매칭 화면 바로 아래의 공용 딤. 승격된 상·하단바도 덮고 입력을 차단한다.</summary>
     public const int MatchmakingDim = Matchmaking - 1;
 

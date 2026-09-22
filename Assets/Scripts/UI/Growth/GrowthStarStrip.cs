@@ -9,6 +9,8 @@ public sealed class GrowthStarStrip : MonoBehaviour
     public static readonly Color EmptyColor = new Color(0.25f, 0.28f, 0.34f, 1f);
 
     [SerializeField] Image[] stars;
+    [SerializeField] Sprite filledStar;
+    [SerializeField] Sprite emptyStar;
 
     public void SetLevel(int _level)
     {
@@ -19,7 +21,10 @@ public sealed class GrowthStarStrip : MonoBehaviour
             Image t_star = this.stars[t_i];
             if (t_star == null) continue;
             t_star.transform.DOKill(true);
-            t_star.color = t_i < t_count ? FilledColor : EmptyColor;
+            bool t_filled = t_i < t_count;
+            Sprite t_sprite = t_filled ? this.filledStar : this.emptyStar;
+            if (t_sprite != null) t_star.sprite = t_sprite;
+            t_star.color = t_sprite != null ? Color.white : t_filled ? FilledColor : EmptyColor;
         }
     }
 

@@ -11,6 +11,14 @@ public sealed class AttendanceDayView : MonoBehaviour
     [SerializeField] CanvasGroup rewardGroup;
     [SerializeField] CurrencyRewardSlotView[] rewardSlots;
 
+    internal void MoveHighlightHere(RectTransform _highlight)
+    {
+        if (_highlight.parent == transform) return;
+        _highlight.SetParent(transform, false);
+        // 배경 위, 날짜·보상 아래에 놓는다. 7일차의 넓은 칸은 스트레치로 채운다.
+        _highlight.SetSiblingIndex(dayLabel != null ? dayLabel.transform.GetSiblingIndex() : 0);
+    }
+
     public void Bind(int _day, IReadOnlyList<RewardLine> _rewards,
         bool _claimed, bool _today, bool _claimable)
     {
