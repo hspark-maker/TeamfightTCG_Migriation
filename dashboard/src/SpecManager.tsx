@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, errorMessage, type Env } from "./api";
 import "./spec.css";
 
-type TableInfo = { name: string; file: string; rows: number; columns: number; editable: boolean; error?: string };
+type TableInfo = { name: string; file: string; rows: number; columns: number; editable: boolean; published?: boolean; error?: string };
 type Listing = { tables: TableInfo[]; generated: { bytes: { exists: boolean; hash: string | null }; csvOnly: true } };
 type Sheet = {
   name: string; file: string; hash: string;
@@ -199,7 +199,7 @@ export function SpecManager({ env, onDirtyChange, onPublished, onBusyChange }: {
       </div>
       <span className={`badge ${env === "test" ? "success" : "warning"}`}><i />{env.toUpperCase()} 서버</span>
     </div>
-    <p className="spec-intro">로컬 CSV를 편집·저장하고, 저장한 전체 스펙을 서버와 비교해 발행합니다.</p>
+    <p className="spec-intro">로컬 CSV를 편집·저장하고, 발행 대상 스펙을 서버와 비교해 발행합니다.</p>
     {error && <div className="error" role="alert"><span>{error.message}{mutating && " 처리 결과를 다시 확인해 주세요."}</span><div className="spec-actions">
       {sheet && mode === "edit" && <button disabled={!!busy} onClick={() => loadTable(sheet.name)}>CSV 다시 읽기</button>}
       {!listing && <button disabled={!!busy} onClick={() => void run<Listing>("list", {}, setListing)}>다시 연결</button>}
@@ -212,7 +212,7 @@ export function SpecManager({ env, onDirtyChange, onPublished, onBusyChange }: {
         <div className="panel-heading"><h2>스펙 테이블</h2><span>{listing?.tables.length ?? "—"}개</span></div>
         <input aria-label="테이블 검색" placeholder="테이블 이름 검색" value={tableQuery} onChange={(event) => setTableQuery(event.target.value)} />
         <div className="spec-table-list">{tableList.map((table) => <button key={table.name} className={sheet?.name === table.name ? "active" : ""} disabled={!!busy} onClick={() => loadTable(table.name)} title={table.error || table.file}>
-          <span><strong>{table.name}</strong><small>{table.rows.toLocaleString("ko-KR")}행 · {table.columns}열</small></span><span className={`spec-table-dot ${table.error ? "invalid" : table.editable ? "editable" : ""}`} aria-label={table.error ? "오류" : table.editable ? "편집 가능" : "읽기 전용"} />
+          <span><strong>{table.name}</strong><small>{table.rows.toLocaleString("ko-KR")}행 · {table.columns}열</small>{table.published === false && <small>로컬 전용 · 서버 발행 제외</small>}</span><span className={`spec-table-dot ${table.error ? "invalid" : table.editable ? "editable" : ""}`} aria-label={table.error ? "오류" : table.editable ? "편집 가능" : "읽기 전용"} />
         </button>)}</div>
         {listing && !tableList.length && <p className="spec-muted">검색 결과가 없습니다.</p>}
       </aside>
@@ -220,6 +220,7 @@ export function SpecManager({ env, onDirtyChange, onPublished, onBusyChange }: {
         {!sheet ? <div className="empty"><h3>편집할 테이블을 선택하세요</h3><p>기존 행의 값을 수정할 수 있습니다. ID와 테이블 구조는 읽기 전용입니다.</p></div> : <>
           <div className="panel-heading"><div><h2>{sheet.name}</h2><span>{sheet.file}</span></div><span className={`badge ${dirty ? "warning" : "success"}`}><i />{dirty ? `${changes.length}개 값 변경 중` : "저장된 CSV"}</span></div>
           {!sheet.editable && <div className="notice">읽기 전용: {sheet.reason || "이 테이블은 현재 편집을 지원하지 않습니다."}</div>}
+          {listing?.tables.find((table) => table.name === sheet.name)?.published === false && <div className="notice">로컬 전용 테이블입니다. CSV 편집·저장은 가능하며 서버 발행에는 포함되지 않습니다.</div>}
           <div className="spec-grid-toolbar"><input aria-label="행 검색" placeholder="ID 또는 값 검색" value={rowQuery} onChange={(event) => { setRowQuery(event.target.value); setPage(0); }} /><button onClick={() => loadTable(sheet.name)} disabled={!!busy}>다시 읽기</button></div>
           <div className="table-scroll spec-grid"><table><thead><tr>{sheet.columns.map((column) => <th key={column.name} title={column.description}><strong>{column.name}</strong><small>{column.type}{column.name.toLowerCase() === "id" ? " · 고정" : ""}</small>{column.description && <span>{column.description}</span>}</th>)}</tr></thead><tbody>{visibleRows.map((row) => <tr key={row.id}>{sheet.columns.map((column, index) => {
             const original = row.cells[index] ?? "";
@@ -236,14 +237,14 @@ export function SpecManager({ env, onDirtyChange, onPublished, onBusyChange }: {
         </>}
       </section>
     </div> : <section className="panel spec-publish">
-      <div className="panel-heading"><div><h2>로컬 CSV ↔ {env.toUpperCase()} 서버</h2><span>저장된 전체 CSV를 기준으로 비교합니다.</span></div><button disabled={!!busy || dirty} onClick={() => { setPlan(null); setConfirmation(""); void run<Comparison>("compare", { env }, setComparison); }}>서버와 비교</button></div>
+      <div className="panel-heading"><div><h2>로컬 CSV ↔ {env.toUpperCase()} 서버</h2><span>저장된 발행 대상 CSV를 기준으로 비교합니다.</span></div><button disabled={!!busy || dirty} onClick={() => { setPlan(null); setConfirmation(""); void run<Comparison>("compare", { env }, setComparison); }}>서버와 비교</button></div>
       {dirty && <div className="notice">저장하지 않은 변경이 {changes.length}개 있습니다. CSV 편집에서 먼저 검토·저장해 주세요.</div>}
       {env === "live" && <div className="notice">LIVE는 비교만 지원합니다. 이번 버전의 발행 기능은 TEST 전용입니다.</div>}
       {comparison ? <>
         <div className="spec-compare-summary"><div><small>서버 콘텐츠 버전</small><strong>{comparison.contentVersion || "미발행"}</strong></div><div><small>비교한 테이블</small><strong>{comparison.tables.length}</strong></div><div><small>차이가 있는 테이블</small><strong className={changedTables ? "spec-amber" : ""}>{changedTables}</strong></div></div>
         <div className="table-scroll spec-compare-table"><table><thead><tr><th>테이블</th><th>로컬 행 수</th><th>비교 결과</th><th>로컬 해시</th><th>서버 해시</th></tr></thead><tbody>{comparison.tables.map((table) => <tr key={table.name}><td><strong>{table.name}</strong></td><td>{table.localRows.toLocaleString("ko-KR")}</td><td><span className={`badge ${table.state === "same" ? "success" : "warning"}`}><i />{{ same: "일치", different: "변경 있음", unpublished: "미발행" }[table.state]}</span></td><td className="hash" title={table.localHash}>{table.localHash.slice(0, 12)}</td><td className="hash" title={table.remoteHash || ""}>{table.remoteHash?.slice(0, 12) || "—"}</td></tr>)}</tbody></table></div>
       </> : <p className="spec-muted">서버와 비교하면 테이블별 일치 여부와 현재 콘텐츠 버전을 확인할 수 있습니다.</p>}
-      <div className="spec-savebar"><p>TEST의 전체 스펙을 하나의 콘텐츠 버전으로 발행합니다.</p><button className="primary" disabled={!!busy || dirty || env !== "test"} onClick={() => { setPlan(null); setConfirmation(""); void run<Plan>("plan", { env: "test" }, setPlan); }}>TEST 발행 계획 만들기</button></div>
+      <div className="spec-savebar"><p>TEST의 발행 대상 스펙을 하나의 콘텐츠 버전으로 발행합니다.</p><button className="primary" disabled={!!busy || dirty || env !== "test"} onClick={() => { setPlan(null); setConfirmation(""); void run<Plan>("plan", { env: "test" }, setPlan); }}>TEST 발행 계획 만들기</button></div>
       {plan && <section className="spec-review" aria-label="서버 발행 계획">
         <div className="panel-heading"><div><h2>TEST 발행 계획</h2><span>{plan.from || "미발행"} → {plan.to}</span></div><span className={`badge ${expired ? "danger" : "warning"}`}><i />{expired ? "계획 만료 · 다시 생성하세요" : `${Math.ceil((plan.expiresAtMs - now) / 60000)}분 이내 발행 가능`}</span></div>
         <p className="spec-muted">변경 테이블 {plan.changes.length}개 · 서버 쓰기 {plan.writes}건. 아래 내용은 계획 생성 시점의 스냅샷입니다.</p>

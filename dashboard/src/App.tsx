@@ -28,11 +28,17 @@ import {
   type ReplayDay,
 } from "./api";
 import { SpecManager } from "./SpecManager";
+import { MatchStats } from "./MatchStats";
 
-type Page = "overview" | "players" | "content" | "replay" | "specs";
+type Page = "overview" | "players" | "content" | "replay" | "specs" | "matches";
 type IconName = Page | "arrow" | "refresh" | "shield" | "logout" | "search";
 const number = new Intl.NumberFormat("ko-KR");
 const nav: { id: Page; label: string; caption: string }[] = [
+  {
+    id: "matches",
+    label: "매치 통계",
+    caption: "최근 매치의 결과와 플레이 추이를 확인하세요.",
+  },
   {
     id: "overview",
     label: "종합 현황",
@@ -62,7 +68,17 @@ const nav: { id: Page; label: string; caption: string }[] = [
 
 function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, ReactNode> = {
-    specs: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 9v12M15 9v12M3 15h18" /></>,
+    matches: (
+      <>
+        <path d="M4 3v18h17M8 16v-5M13 16V7M18 16V4" />
+      </>
+    ),
+    specs: (
+      <>
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path d="M3 9h18M9 9v12M15 9v12M3 15h18" />
+      </>
+    ),
     overview: (
       <>
         <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -466,7 +482,11 @@ function Workspace({
   const [specBusy, setSpecBusy] = useState(false);
   function leave(action: () => void) {
     if (specBusy) return;
-    if (hasDraft && !window.confirm("저장하지 않은 CSV 변경을 버리고 이동할까요?")) return;
+    if (
+      hasDraft &&
+      !window.confirm("저장하지 않은 CSV 변경을 버리고 이동할까요?")
+    )
+      return;
     setHasDraft(false);
     action();
   }
@@ -503,7 +523,9 @@ function Workspace({
               disabled={specBusy}
               className={page === item.id ? "active" : ""}
               aria-current={page === item.id ? "page" : undefined}
-              onClick={() => { if (page !== item.id) leave(() => setPage(item.id)); }}
+              onClick={() => {
+                if (page !== item.id) leave(() => setPage(item.id));
+              }}
             >
               <Icon name={item.id} />
               {item.label}
@@ -555,7 +577,9 @@ function Workspace({
                   disabled={specBusy}
                   className={env === value ? `selected ${value}` : ""}
                   aria-pressed={env === value}
-                  onClick={() => { if (env !== value) leave(() => onEnv(value)); }}
+                  onClick={() => {
+                    if (env !== value) leave(() => onEnv(value));
+                  }}
                 >
                   {value === "test" ? "TEST" : "LIVE"}
                 </button>
@@ -573,7 +597,7 @@ function Workspace({
               <h1>{current.label}</h1>
               <p>{current.caption}</p>
             </div>
-            {page !== "players" && page !== "specs" && (
+            {page !== "players" && page !== "specs" && page !== "matches" && (
               <button
                 onClick={() => setRefresh((value) => value + 1)}
                 disabled={busy}
@@ -583,8 +607,15 @@ function Workspace({
               </button>
             )}
           </div>
-          {page === "specs" ? (
-            <SpecManager env={env} onDirtyChange={setHasDraft} onBusyChange={setSpecBusy} onPublished={() => setRefresh(value => value + 1)} />
+          {page === "matches" ? (
+            <MatchStats env={env} />
+          ) : page === "specs" ? (
+            <SpecManager
+              env={env}
+              onDirtyChange={setHasDraft}
+              onBusyChange={setSpecBusy}
+              onPublished={() => setRefresh((value) => value + 1)}
+            />
           ) : page === "players" ? (
             <PlayerSearch env={env} />
           ) : (
@@ -624,7 +655,7 @@ function Workspace({
             <span>
               {projectId} <b>·</b> 서울 리전 <b>·</b> cardbattle
             </span>
-            <span>Card Battle Operations / 02</span>
+            <span>Card Battle Operations / 03</span>
           </footer>
         </main>
       </div>

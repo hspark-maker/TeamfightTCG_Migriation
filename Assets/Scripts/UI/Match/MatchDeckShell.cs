@@ -137,15 +137,12 @@ public class MatchDeckShell : ContentsUIBehaviour
     }
 
     /// <summary>
-    /// 매칭 화면 밑에 이 화면을 미리 세운다. 게이트(RunSelectionAsync)보다 앞서는 유일한 진입이다 —
-    /// 전환이 옮겨 앉힐 자리를 읽으려면 레이아웃이 이미 계산돼 있어야 한다.
+    /// 모험 상대 정보를 표시할 덱 화면을 미리 연다. 다음 선택 게이트에서 다시 열지 않는다.
     /// </summary>
-    public MatchHandoffTargets PrepareForHandoff()
+    public void PrepareForHandoff()
     {
         Open(_forHandoff: true);
         m_prepared = true;
-
-        return panelView != null ? panelView.BuildHandoffTargets() : default;
     }
 
     // 덱 화면 진입. 게이트를 쓰지 않고 직접 열 때(디버그·후속 진입점)의 창구다.

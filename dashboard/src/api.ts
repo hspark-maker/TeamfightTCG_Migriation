@@ -55,6 +55,57 @@ export type Player = {
   wallet: Doc | null;
 };
 
+export type MatchMode = "ai" | "adventure" | "pvp" | "unknown";
+export type MatchPeriod = number | { startDate: string; endDate: string };
+export type MatchStatsData = {
+  env: Env;
+  days: number;
+  startDate: string;
+  endDate: string;
+  detailFromMs: number | null;
+  detailToMs: number | null;
+  detailLimited: boolean;
+  detailAvailable: boolean;
+  fromMs: number;
+  toMs: number;
+  fetchedAtMs: number;
+  limit: number;
+  hasMore: boolean;
+  sampleSize: number;
+  summary: {
+    confirmed: number;
+    flagged: number;
+    other: number;
+    replayed: number;
+    averageTurns: number | null;
+    turnSamples: number;
+    aiWins: number;
+    aiLosses: number;
+    aiDraws: number;
+    aiUnknown: number;
+  };
+  modes: {
+    mode: MatchMode;
+    total: number;
+    confirmed: number;
+    flagged: number;
+    wins: number;
+    losses: number;
+    draws: number;
+    unknown: number;
+  }[];
+  daily: { day: string; exists: boolean; settled: number | null }[];
+  recent: {
+    id: string;
+    mode: MatchMode;
+    status: "confirmed" | "flagged" | "other";
+    settledAtMs: number;
+    reason: string | null;
+    turns: number | null;
+    outcome: "win" | "loss" | "draw" | "pvp" | "unknown";
+  }[];
+};
+
 export const projectId =
   import.meta.env.VITE_FIREBASE_PROJECT_ID || "bm-cardbattle";
 export const emulator =
@@ -93,6 +144,16 @@ function connect() {
   return {
     auth,
     ready,
+    matches: async (env: Env, period: MatchPeriod) =>
+      (
+        await httpsCallable<
+          { env: Env; days?: number; startDate?: string; endDate?: string },
+          MatchStatsData
+        >(functions, "adminDashboardMatches", { timeout: 30_000 })({
+          env,
+          ...(typeof period === "number" ? { days: period } : period),
+        })
+      ).data,
     overview: async (env: Env) =>
       (
         await httpsCallable<{ env: Env }, Overview>(
@@ -139,7 +200,7 @@ export function errorMessage(error: unknown): string {
     "functions/unauthenticated":
       "로그인이 만료되었습니다. 다시 로그인해 주세요.",
     "functions/not-found": "해당 UID의 계정과 게임 데이터를 찾지 못했습니다.",
-    "functions/invalid-argument": "조회 환경과 UID를 확인해 주세요.",
+    "functions/invalid-argument": "조회 조건과 입력값을 확인해 주세요.",
     "functions/deadline-exceeded":
       "조회 시간이 초과되었습니다. 다시 시도해 주세요.",
     "functions/unavailable":

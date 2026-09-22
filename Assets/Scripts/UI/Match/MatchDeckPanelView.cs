@@ -144,31 +144,6 @@ public class MatchDeckPanelView : MonoBehaviour, IUIInitializable
         m_enemyPowerValue = SetPower(enemyPowerText, t_enemyCards, _mine: false);
     }
 
-    /// <summary>
-    /// 매칭 화면이 이 화면으로 넘어올 때 쓸 자리들과, 이 화면이 스스로 서는 안무를 함께 건넨다.
-    /// 부품을 아는 것은 이 뷰뿐이라 좌표도 안무도 여기서 나간다 — 매칭 셸은 덱 화면의 타입을 몰라도 된다.
-    /// </summary>
-    public MatchHandoffTargets BuildHandoffTargets()
-    {
-        // 섹션 좌표는 레이아웃 그룹이 정한다 — 열자마자 읽으면 아직 계산되지 않은 자리를 집는다.
-        Canvas.ForceUpdateCanvases();
-
-        SetInteractable(false);
-
-        var t_intro = introFx.BuildIntro(enemySlots, mySlots,
-                                         enemyPowerText, m_enemyPowerValue,
-                                         myPowerText,    m_myPowerValue,
-                                         battleButton);
-
-        // 전환 시퀀스에 얹히기 전에 세워 둔다 — 만들자마자 스스로 돌기 시작하면 얹히는 순간 진행분이 잘린다.
-        t_intro.Pause();
-
-        // OnComplete가 아니라 OnKill이다. 씬이 내려가며 안무가 잘리면 완료 콜백은 오지 않아 화면이 손을 못 받는 채로 남는다.
-        t_intro.OnKill(() => SetInteractable(true));
-
-        // 루트를 통째로 넘긴다 — 전환이 이 화면을 당겨 들이는(확대→1) 축의 대상이 이것이다.
-        return new MatchHandoffTargets(introFx.VersusSeat, (RectTransform)transform, t_intro);
-    }
 
     /// <summary>
     /// 전투 시작에 대한 응답 한 박. 버튼이 튀고 화면이 한 발 앞으로 나간다 —

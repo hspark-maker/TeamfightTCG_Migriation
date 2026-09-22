@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const specFixtures = mkdtempSync(join(tmpdir(), "cardbattle-dashboard-specs-"));
-writeFileSync(join(specFixtures, "Card_sheet.csv"), "번호,이름,생명력\r\nid,displayName,maxHp\r\nint,string,int\r\n1,테스트 카드,3\r\n2,다른 카드,4\r\n");
+writeFileSync(
+  join(specFixtures, "Card_sheet.csv"),
+  "번호,이름,생명력\r\nid,displayName,maxHp\r\nint,string,int\r\n1,테스트 카드,3\r\n2,다른 카드,4\r\n",
+);
 
 export default defineConfig({
   testDir: "./tests",

@@ -1,0 +1,260 @@
+.match-stats {
+  min-width: 0;
+}
+.match-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.match-period.segmented button {
+  min-width: 63px;
+  font-size: 12px;
+  padding: 8px 13px;
+}
+.match-period.segmented button.selected {
+  color: #edc58e;
+  background: #302b25;
+  border-color: #514231;
+}
+.match-period.segmented {
+  flex-wrap: wrap;
+}
+.match-custom-range {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 17px;
+  margin: -4px 0 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.match-custom-range label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.match-custom-range input {
+  color-scheme: dark;
+  min-width: 145px;
+  padding: 9px;
+}
+.match-custom-range .match-period-note {
+  line-height: 1.8;
+  padding-bottom: 6px;
+}
+.match-range-error {
+  width: 100%;
+  margin-bottom: 0;
+}
+.match-detail-range {
+  color: #aebbd0;
+  font-size: 11px;
+  line-height: 1.8;
+  margin: 0 0 16px;
+}
+.match-chart-heading {
+  flex-wrap: wrap;
+}
+.match-unit.segmented button.selected {
+  color: #edc58e;
+  background: #302b25;
+  border-color: #514231;
+}
+.match-chart-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 10px;
+}
+.match-period-note {
+  color: var(--muted);
+  font-size: 11px;
+}
+.match-refresh {
+  margin-left: auto;
+}
+.match-metrics .metric > strong em {
+  margin-left: 5px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: 0;
+}
+.match-metrics .match-flagged > strong,
+.match-attention {
+  color: var(--red);
+}
+.match-chart {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  width: max-content;
+  min-width: 100%;
+  gap: 18px;
+  min-height: 206px;
+  padding: 0 4px;
+  margin-bottom: 22px;
+}
+.match-chart-column {
+  display: flex;
+  flex: 1;
+  max-width: 130px;
+  flex-direction: column;
+  align-items: center;
+  gap: 11px;
+  min-width: 43px;
+  color: #a7b3c6;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.match-chart-grouped .match-chart-column {
+  min-width: 118px;
+}
+.match-partial {
+  color: #edc58e;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.match-chart-column.partial .match-bar {
+  background: repeating-linear-gradient(
+    135deg,
+    #ad8b62,
+    #ad8b62 5px,
+    #746144 5px,
+    #746144 9px
+  );
+}
+.match-chart-column > strong {
+  font-weight: 500;
+  font-size: 12px;
+}
+.match-bar-track {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 156px;
+  width: 100%;
+  border-bottom: 1px solid #4b5362;
+  background: #202835;
+  border-radius: 4px 4px 0 0;
+}
+.match-bar {
+  width: 65%;
+  max-width: 42px;
+  background: #ad8b62;
+  border-radius: 3px 3px 0 0;
+}
+.match-chart-column:last-child:not(.partial) .match-bar {
+  background: #edc187;
+}
+.match-chart-column.unavailable .match-bar-track {
+  background: repeating-linear-gradient(
+    135deg,
+    #202835,
+    #202835 6px,
+    #1b2330 6px,
+    #1b2330 12px
+  );
+}
+.match-bar-missing {
+  margin-bottom: 58px;
+  color: #7c8b9f;
+}
+.match-note,
+.match-retention {
+  color: #8f9eb4;
+  font-size: 11px;
+  line-height: 1.9;
+  word-break: keep-all;
+  margin: 19px 0 0;
+}
+.match-retention {
+  margin: -3px 0 24px;
+}
+.match-stats tbody th {
+  background: transparent;
+  color: #dce4ef;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 500;
+}
+.match-id {
+  display: block;
+  max-width: 240px;
+  min-width: 160px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  color: #aebbd0;
+  line-height: 1.6;
+  user-select: all;
+}
+.match-reason {
+  min-width: 170px;
+  max-width: 330px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  line-height: 1.7;
+}
+@media (max-width: 600px) {
+  .match-toolbar {
+    gap: 10px;
+  }
+  .match-period-note {
+    font-size: 10px;
+  }
+  .match-period.segmented button {
+    min-width: 48px;
+    padding: 8px;
+  }
+  .match-custom-range {
+    gap: 10px;
+    padding: 12px;
+  }
+  .match-custom-range label {
+    flex: 1;
+    min-width: 120px;
+  }
+  .match-custom-range input {
+    min-width: 0;
+    width: 100%;
+  }
+  .match-refresh {
+    padding: 9px 11px;
+    font-size: 11px;
+    margin-left: 0;
+  }
+  .match-chart {
+    gap: 8px;
+    padding: 0;
+  }
+  .match-chart-column {
+    font-size: 9px;
+    gap: 10px;
+  }
+  .match-chart-column > strong {
+    font-size: 10px;
+  }
+  .match-bar {
+    width: 75%;
+  }
+  .match-metrics .metric {
+    padding: 17px;
+  }
+  .match-metrics .metric > span {
+    font-size: 11px;
+  }
+  .match-metrics .metric > strong {
+    font-size: 26px;
+  }
+  .match-metrics .metric > small {
+    font-size: 10px;
+  }
+}
