@@ -65,9 +65,9 @@ public static class ContentUnlockManager
         ResetSession();
         s_canPersist = _canPersist;
         s_initialized = true;
-        RankManager.OnChanged += RequestRefresh;
         AccountLevelManager.OnChanged += RequestRefresh;
-        MissionManager.OnChanged += RequestRefresh;
+        RankManager.OnChanged += RequestRefresh;
+        OutgameTutorialRunner.OnSequenceCompleted += RequestRefresh;
         OutgameTutorialRunner.OnGuidedChanged += RequestRefresh;
         DataSaveManager.OnSaved += HandleSaved;
         RequestRefresh();
@@ -114,7 +114,12 @@ public static class ContentUnlockManager
                     || (t_key == ADVENTURE && DataSaveManager.Data.Tutorial?.AdventureUnlocked == true));
                 if (!t_legacy && !EvaluateRule(t_rule).IsUnlocked) continue;
                 t_slot.Unlocked.Add(t_key);
-                if (!t_seed && !t_slot.Pending.Contains(t_key)) t_slot.Pending.Add(t_key);
+                // 초기 Lv1 해금도 소개를 예약해야 FTUE 뒤 온보딩만 단독으로 시작하지 않는다.
+                bool t_firstIntro = !OutgameTutorialProgress.IsCompleted
+                    && (t_key == MISSION || (t_key == CARD_ENHANCE
+                        && !OutgameTutorialProgress.IsTriggerDone(EOutgameTutorialTrigger.CollectionTabFirstEnter)));
+                if ((!t_seed || t_firstIntro) && !t_slot.Pending.Contains(t_key))
+                    t_slot.Pending.Add(t_key);
                 t_changed = true;
             }
             t_slot.Version = 1;
@@ -145,9 +150,9 @@ public static class ContentUnlockManager
     public static void ResetSession()
     {
         SessionVersion++;
-        RankManager.OnChanged -= RequestRefresh;
         AccountLevelManager.OnChanged -= RequestRefresh;
-        MissionManager.OnChanged -= RequestRefresh;
+        RankManager.OnChanged -= RequestRefresh;
+        OutgameTutorialRunner.OnSequenceCompleted -= RequestRefresh;
         OutgameTutorialRunner.OnGuidedChanged -= RequestRefresh;
         DataSaveManager.OnSaved -= HandleSaved;
         s_initialized = false;
@@ -160,17 +165,14 @@ public static class ContentUnlockManager
 
     static ContentUnlockEvaluation EvaluateRule(ContentUnlockRule _rule)
     {
-        if (_rule.ContentKey == CARD_ENHANCE && OutgameTutorialRunner.IsDefeatEnhanceInterlude)
+        if (_rule.ContentKey == CARD_ENHANCE && DataSaveManager.Data.Tutorial?.DefeatEnhancePending == true)
             return new ContentUnlockEvaluation(EContentUnlockRequirement.None);
         int t_requiredTier = -1;
-        if (_rule.RequireRank && RankManager.IsConfigured)
-            for (int t_i = 0; RankManager.TryGetTier(t_i, out RankTier t_tier); t_i++)
-                if (t_tier.Grade == _rule.MinRankGrade && t_tier.Division == _rule.MinRankDivision)
-                { t_requiredTier = t_tier.Index; break; }
-        return ContentUnlockRules.Evaluate(_rule, OutgameTutorialProgress.IsCompleted,
-            RankManager.IsConfigured, RankManager.IsRanked, RankManager.BestTierIndex, t_requiredTier,
-            AccountLevelManager.IsConfigured, AccountLevelManager.Level,
-            GuideMissionProgress.IsReady, GuideMissionProgress.HasReached(_rule.GuideMissionId));
+        if (_rule.Condition == EContentUnlockCondition.Rank)
+            ContentUnlockConfig.TryGetRequiredTier(_rule, out t_requiredTier);
+        return ContentUnlockRules.Evaluate(_rule, AccountLevelManager.IsConfigured, AccountLevelManager.Level,
+            OutgameTutorialProgress.IsCompleted, RankManager.IsConfigured, RankManager.IsRanked,
+            RankManager.BestTierIndex, t_requiredTier);
     }
 
     static void HandleSaved(ESaveUploadTiming _timing) => RequestRefresh();

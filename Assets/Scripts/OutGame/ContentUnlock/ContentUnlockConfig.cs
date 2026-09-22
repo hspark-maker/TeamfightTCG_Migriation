@@ -2,47 +2,39 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>콘텐츠 해금 SO에서 저작하는 콘텐츠별 AND 조건.</summary>
+public enum EContentUnlockCondition { AccountLevel = 0, Rank = 1, FtueCompleted = 2 }
+
+/// <summary>콘텐츠마다 하나만 선택하는 해금 조건.</summary>
 [Serializable]
 public sealed class ContentUnlockDef
 {
     [Tooltip("Mission, Adventure, Roulette, CardEnhance 중 하나. 콘텐츠당 한 항목만 등록한다.")]
     public EOutgameFeature feature;
-    [Tooltip("강제 선형 FTUE 전체 완료를 요구한다. 자율 안내 완료는 포함하지 않는다.")]
-    public bool requireFtue;
-    [Tooltip("체크하면 최소 랭크 조건을 사용한다. 최고 도달 랭크로 평가한다.")]
-    public bool requireRank;
-    [Tooltip("랭크 조건을 사용할 때 요구하는 최소 등급.")]
+    public EContentUnlockCondition condition;
+    [Tooltip("콘텐츠가 해금되는 최소 계정 레벨. 1부터 계정 레벨 표의 최대 레벨까지 설정한다.")]
+    public int minAccountLevel = 1;
     public ERankGrade minRankGrade = ERankGrade.Bronze;
-    [Tooltip("최소 랭크 단계. 랭크 조건을 사용하지 않으면 0.")]
-    public int minRankDivision;
-    [Tooltip("최소 계정 레벨. 0이면 계정 레벨 조건을 사용하지 않는다.")]
-    public int minAccountLevel;
-    [Tooltip("필요한 가이드 미션 도달 ID. 비워 두면 미션 진행을 요구하지 않는다. 다른 해금 조건과 AND로 평가한다.")]
-    public string guideMissionId;
+    [Tooltip("최고 도달 랭크로 판정한다. 등급 내 단계는 1부터 시작한다.")]
+    public int minRankDivision = 1;
 }
 
 /// <summary>저작값에서 복사한 콘텐츠 해금 조건.</summary>
 public readonly struct ContentUnlockRule
 {
     public string ContentKey { get; }
-    public bool RequireFtue { get; }
-    public bool RequireRank { get; }
+    public EContentUnlockCondition Condition { get; }
+    public int MinAccountLevel { get; }
     public ERankGrade MinRankGrade { get; }
     public int MinRankDivision { get; }
-    public int MinAccountLevel { get; }
-    public string GuideMissionId { get; }
 
     public ContentUnlockRule(ContentUnlockDef _row)
     {
         ContentUnlockManager.TryGetKey(_row.feature, out string t_key);
         ContentKey = t_key;
-        RequireFtue = _row.requireFtue;
-        RequireRank = _row.requireRank;
+        Condition = _row.condition;
+        MinAccountLevel = _row.minAccountLevel;
         MinRankGrade = _row.minRankGrade;
         MinRankDivision = _row.minRankDivision;
-        MinAccountLevel = _row.minAccountLevel;
-        GuideMissionId = _row.guideMissionId;
     }
 }
 
@@ -97,16 +89,14 @@ public static class ContentUnlockConfig
         {
             if (t_row == null || !ContentUnlockManager.TryGetKey(t_row.feature, out string t_key) || !t_keys.Add(t_key))
                 return Fail("미등록 또는 중복 콘텐츠입니다.", out _error);
-            if (!t_row.requireRank)
-            {
-                if (t_row.minRankDivision != 0) return Fail($"{t_key}: 랭크 미사용 단계는 0이어야 합니다.", out _error);
-            }
-            else if (!Enum.IsDefined(typeof(ERankGrade), t_row.minRankGrade)
-                || t_row.minRankDivision < 1 || t_row.minRankDivision > RankConfig.DivisionsPerGrade)
-                return Fail($"{t_key}: 잘못된 랭크 조건입니다.", out _error);
-            if (t_row.minAccountLevel < 0) return Fail($"{t_key}: 계정 레벨은 0 이상이어야 합니다.", out _error);
-            if (t_key == ContentUnlockManager.MISSION && !string.IsNullOrEmpty(t_row.guideMissionId))
-                return Fail("미션 콘텐츠는 가이드 미션 도달을 요구할 수 없습니다.", out _error);
+            if (!Enum.IsDefined(typeof(EContentUnlockCondition), t_row.condition))
+                return Fail($"{t_key}: 해금 조건을 선택하세요.", out _error);
+            if (t_row.condition == EContentUnlockCondition.AccountLevel && t_row.minAccountLevel < 1)
+                return Fail($"{t_key}: 계정 레벨은 1 이상이어야 합니다.", out _error);
+            if (t_row.condition == EContentUnlockCondition.Rank
+                && (!Enum.IsDefined(typeof(ERankGrade), t_row.minRankGrade)
+                    || t_row.minRankDivision < 1 || t_row.minRankDivision > RankConfig.DivisionsPerGrade))
+                return Fail($"{t_key}: 랭크 등급·단계를 확인하세요.", out _error);
         }
         foreach (string t_key in s_requiredKeys)
             if (!t_keys.Contains(t_key)) return Fail($"필수 콘텐츠 누락: {t_key}", out _error);
@@ -120,20 +110,22 @@ public static class ContentUnlockConfig
         if (!IsReady) return Fail("해금 설정이 초기화되지 않았습니다.", out _error);
         foreach (ContentUnlockRule t_rule in s_rules)
         {
-            if (t_rule.RequireRank)
-            {
-                bool t_found = false;
-                var t_ranks = SpecSource.Manager?.RankGrade?.All;
-                if (t_ranks != null)
-                    foreach (RankGrade t_rank in t_ranks)
-                        if (t_rank != null && Enum.TryParse(t_rank.gradeKey, out ERankGrade t_grade)
-                            && t_grade == t_rule.MinRankGrade) { t_found = true; break; }
-                if (!t_found) return Fail($"{t_rule.ContentKey}: 랭크 표에 조건 등급이 없습니다.", out _error);
-            }
-            if (t_rule.MinAccountLevel > (SpecSource.Manager?.AccountLevel?.All?.Count ?? 0))
+            if (t_rule.Condition == EContentUnlockCondition.AccountLevel && t_rule.MinAccountLevel > AccountLevelSpec.MaxLevel)
                 return Fail($"{t_rule.ContentKey}: 계정 레벨 조건이 표 범위를 벗어납니다.", out _error);
+            if (t_rule.Condition == EContentUnlockCondition.Rank && !TryGetRequiredTier(t_rule, out _))
+                return Fail($"{t_rule.ContentKey}: 랭크 표에 요구 등급·단계가 없습니다.", out _error);
         }
         return true;
+    }
+
+    public static bool TryGetRequiredTier(ContentUnlockRule _rule, out int _tierIndex)
+    {
+        _tierIndex = -1;
+        if (!RankManager.IsConfigured) return false;
+        for (int t_i = 0; RankManager.TryGetTier(t_i, out RankTier t_tier); t_i++)
+            if (t_tier.Grade == _rule.MinRankGrade && t_tier.Division == _rule.MinRankDivision)
+            { _tierIndex = t_tier.Index; return true; }
+        return false;
     }
 
     static bool Fail(string _message, out string _error)

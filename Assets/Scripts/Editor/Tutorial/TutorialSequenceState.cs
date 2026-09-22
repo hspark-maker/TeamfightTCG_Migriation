@@ -50,7 +50,7 @@ public sealed class TutorialSequenceState
             {
                 if (m_ftueCompleted && m_prerequisite == _feature) return true;
                 if (!ContentUnlockConfig.TryGet(m_contentUnlocks, t_key, out ContentUnlockRule t_rule)) return false;
-                return ContentUnlockRules.Evaluate(t_rule, m_ftueCompleted, true, false, -1, 0, true, 1).IsUnlocked;
+                return ContentUnlockRules.Evaluate(t_rule, true, 1, m_ftueCompleted).IsUnlocked;
             }
 
             // 일시 잠금이 해금보다 우선한다 — 이미 열린 기능도, 전체 해금 상태에서도 그 스텝 동안은 닫힌다

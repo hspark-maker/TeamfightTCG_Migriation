@@ -51,13 +51,13 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
         && !s_instance.AdventureMapOpen && !ContentUnlockPresentation.IsPlaying
         && !OutgameTutorialRunner.IsRunning && s_instance.SafeToPresent(false, _notification);
 
-    /// <summary>공통 가이드 바는 모험 맵과 덱 탭의 편집 화면에서도 실행할 수 있다.</summary>
+    /// <summary>공통 가이드 바는 모험 맵·도감 페이지·덱 편집 화면에서도 실행할 수 있다.</summary>
     public static bool CanUseGuideMissionPreview => !IsInputLocked
         && s_instance != null && s_instance.m_shell != null && s_instance.m_shell.CanSwipe
         && s_instance.m_shell.CurrentPanel != null && s_instance.m_shell.CurrentPanel.IsViewVisible
         && !ContentUnlockPresentation.IsPlaying && !OutgameTutorialRunner.IsRunning
         && s_instance.SafeToPresent(_except: s_instance.m_shell.CurrentPanel is DeckTabController
-            ? DeckEditController.OpenEditor : null);
+            ? DeckEditController.OpenEditor : null, _allowAlbumPage: true);
 
     /// <summary>매치 탭이 제자리에 있고 로비 진입 조건을 만족할 때 화면 이동을 허용한다.</summary>
     public static bool CanNavigateFromMatchTab(PooledUIBase _notification)
@@ -89,16 +89,15 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
         m_shell = GetComponent<LobbyTabController>();
     }
 
-    bool HasPriorityActivity => HasPriorityActivityExceptGains(false);
-
-    bool HasPriorityActivityExceptGains(bool _allowGainEffects) => !GameInitialization.IsReady || !isActiveAndEnabled
+    bool HasPriorityActivityExceptGains(bool _allowGainEffects, bool _allowAlbumPage = false) => !GameInitialization.IsReady || !isActiveAndEnabled
         || (m_shell != null && m_shell.IsTransitioning)
         || CurtainView.IsBusy || LoadingCoverView.IsCovering
         || (SceneTransitionVideo.Instance != null && SceneTransitionVideo.Instance.IsPlaying)
         || (m_launcher != null && m_launcher.IsRunning)
         || LobbyRankEffectDirector.Playing || (!_allowGainEffects && LobbyGainEffectDirector.Playing)
         || RankPromoteOverlay.IsOpen || RewardClaimPopup.IsOpen || AdventureRewardFlow.IsClaiming
-        || PackOpenOverlay.IsOpen || CardDetailOverlayView.IsOpen || AlbumPageOverlayView.IsOpen || LobbyEnhanceTabPanel.IsBusy
+        || PackOpenOverlay.IsOpen || CardDetailOverlayView.IsOpen
+        || (!_allowAlbumPage && AlbumPageOverlayView.IsOpen) || LobbyEnhanceTabPanel.IsBusy
         || CardRewardOverlay.IsOpen || CardSetRewardOverlay.IsOpen || PackRewardOverlay.IsOpen
         || HasForeignGate || UnlockIntroOverlay.IsOpen;
 
@@ -106,8 +105,8 @@ public sealed partial class GuidanceCoordinator : MonoBehaviour
         && !(s_instance != null && s_instance.m_flowPreparing
             && OutgameTutorialGateUI.Instance != null && OutgameTutorialGateUI.Instance.IsTransitionOnly);
 
-    bool SafeToPresent(bool _contentIntro = false, PooledUIBase _except = null)
-        => !HasPriorityActivity && (_contentIntro || !OutgameTutorialRunner.IsGuidedRunning)
+    bool SafeToPresent(bool _contentIntro = false, PooledUIBase _except = null, bool _allowAlbumPage = false)
+        => !HasPriorityActivityExceptGains(false, _allowAlbumPage) && (_contentIntro || !OutgameTutorialRunner.IsGuidedRunning)
         && UIPoolManager.instance != null
         && !HasBlockingPopup(_except: _except);
 

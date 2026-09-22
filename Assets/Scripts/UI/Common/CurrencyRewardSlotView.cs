@@ -28,13 +28,21 @@ public class CurrencyRewardSlotView
     public RectTransform VisualTransform => this.cardGroup != null && this.cardGroup.gameObject.activeSelf
         ? (RectTransform)this.cardGroup.transform : this.icon != null ? this.icon.rectTransform : null;
 
-    public void Bind(Sprite _icon, long _amount)
+    /// <summary>저작한 아이콘을 유지하고 보상 수량만 표시한다.</summary>
+    public void BindAmount(long _amount)
     {
         if (amountLabel != null)
         {
             if (!m_hasAmountColor) { m_amountColor = amountLabel.color; m_hasAmountColor = true; }
             amountLabel.color = m_amountColor;
         }
+        if (root != null) root.SetActive(true);
+        if (amountLabel != null) amountLabel.text = _amount.ToString("N0");
+    }
+
+    public void Bind(Sprite _icon, long _amount)
+    {
+        BindAmount(_amount);
         if (icon != null)
         {
             if (!m_hasIconColor) { m_iconColor = icon.color; m_hasIconColor = true; }
@@ -43,10 +51,8 @@ public class CurrencyRewardSlotView
         if (icon != null) CardArtBinding.Clear(icon.gameObject);
         if (cardGroup != null) cardGroup.gameObject.SetActive(false);
         if (cardVisual != null) cardVisual.gameObject.SetActive(false);
-        if (root != null) root.SetActive(true);
         if (icon != null) icon.enabled = true;
         if (icon != null && _icon != null) icon.sprite = _icon;   // null이면 목업 스프라이트 보존
-        if (amountLabel != null) amountLabel.text = _amount.ToString("N0");
     }
 
     public void Hide()

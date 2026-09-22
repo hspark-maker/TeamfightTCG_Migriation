@@ -519,7 +519,7 @@ MonoBehaviour:
       messageAtBottom: 0
       unlocks: 0d000000
       unlocksAll: 1
-      locks: 0e00000010000000
+      locks: 060000000e00000010000000
       useDim: 1
       packId: 
       packPriceLabel: 
@@ -543,7 +543,7 @@ MonoBehaviour:
       messageAtBottom: 0
       unlocks: 
       unlocksAll: 0
-      locks: 0e00000010000000
+      locks: 060000000e00000010000000
       useDim: 1
       packId: 
       packPriceLabel: 
@@ -585,27 +585,39 @@ MonoBehaviour:
       contentIntros: 
   guide:
     guideFlows:
-    - missionId: 
+    - activation: 1
+      content: 17
+      missionId:
       tutorial: 0
       contentIntros: 02000000
       destination: 0
-    - missionId: guide.01
+    - activation: 1
+      content: 14
+      missionId:
       tutorial: 2
       contentIntros: 05000000
       destination: 0
-    - missionId: guide.03
+    - activation: 1
+      content: 16
+      missionId:
       tutorial: 6
       contentIntros: 03000000
       destination: 0
-    - missionId: guide.05
+    - activation: 0
+      content: 0
+      missionId: guide.05
       tutorial: 18
       contentIntros: 
       destination: 0
-    - missionId: guide.06
+    - activation: 1
+      content: 18
+      missionId:
       tutorial: 0
       contentIntros: 04000000
       destination: 0
-    - missionId: guide.16
+    - activation: 0
+      content: 0
+      missionId: guide.16
       tutorial: 19
       contentIntros: 
       destination: 4

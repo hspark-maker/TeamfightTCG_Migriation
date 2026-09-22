@@ -645,10 +645,12 @@ public static class OutgameTutorialRunner
 
     static void NotifyDefeatForEnhance(bool _defeated)
     {
-        if (!_defeated || !IsRunning
+        if (!_defeated || s_data == null || DataSaveManager.Data.Tutorial?.DefeatEnhancePending == true
             || OutgameTutorialProgress.IsTriggerDone(EOutgameTutorialTrigger.CollectionTabFirstEnter)) return;
+        if (DataSaveManager.Data.Tutorial == null) DataSaveManager.Data.Tutorial = new TutorialSaveData();
         DataSaveManager.Data.Tutorial.DefeatEnhancePending = true;
         OutgameTutorialProgress.Save();
+        ContentUnlockManager.RequestRefresh();
     }
 
     /// <summary>카드 지급·덱 편집을 마친 다음 전투 진입점에서 첫 패배의 강화 안내를 끼운다.</summary>
