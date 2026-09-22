@@ -8,7 +8,6 @@ public enum EContentUnlockRequirement
     Ftue = 2,
     Rank = 4,
     AccountLevel = 8,
-    GuideMission = 16,
 }
 
 /// <summary>콘텐츠 접근 가능 여부와 아직 충족하지 못한 조건.</summary>
@@ -20,30 +19,22 @@ public readonly struct ContentUnlockEvaluation
     public ContentUnlockEvaluation(EContentUnlockRequirement _missing) => Missing = _missing;
 }
 
-/// <summary>진행 사실과 표의 AND 조건을 비교한다.</summary>
+/// <summary>선택한 해금 조건 하나만 평가한다.</summary>
 public static class ContentUnlockRules
 {
-    public static ContentUnlockEvaluation Evaluate(ContentUnlockRule _rule, bool _ftueCompleted,
-        bool _rankReady, bool _isRanked, int _bestTier, int _requiredTier, bool _levelReady, int _level,
-        bool _missionReady = false, bool _missionReached = false)
+    public static ContentUnlockEvaluation Evaluate(ContentUnlockRule _rule, bool _levelReady, int _level,
+        bool _ftueCompleted = false, bool _rankReady = false, bool _isRanked = false,
+        int _bestTier = -1, int _requiredTier = -1)
     {
-        EContentUnlockRequirement t_missing = EContentUnlockRequirement.None;
-        if (!string.IsNullOrEmpty(_rule.GuideMissionId))
+        EContentUnlockRequirement t_missing = _rule.Condition switch
         {
-            if (!_missionReady) t_missing |= EContentUnlockRequirement.Data;
-            else if (!_missionReached) t_missing |= EContentUnlockRequirement.GuideMission;
-        }
-        if (_rule.RequireFtue && !_ftueCompleted) t_missing |= EContentUnlockRequirement.Ftue;
-        if (_rule.RequireRank)
-        {
-            if (!_rankReady || _requiredTier < 0) t_missing |= EContentUnlockRequirement.Data;
-            else if (!_isRanked || _bestTier < _requiredTier) t_missing |= EContentUnlockRequirement.Rank;
-        }
-        if (_rule.MinAccountLevel > 0)
-        {
-            if (!_levelReady) t_missing |= EContentUnlockRequirement.Data;
-            else if (_level < _rule.MinAccountLevel) t_missing |= EContentUnlockRequirement.AccountLevel;
-        }
+            EContentUnlockCondition.AccountLevel => !_levelReady ? EContentUnlockRequirement.Data
+                : _level < _rule.MinAccountLevel ? EContentUnlockRequirement.AccountLevel : EContentUnlockRequirement.None,
+            EContentUnlockCondition.Rank => !_rankReady || _requiredTier < 0 ? EContentUnlockRequirement.Data
+                : !_isRanked || _bestTier < _requiredTier ? EContentUnlockRequirement.Rank : EContentUnlockRequirement.None,
+            EContentUnlockCondition.FtueCompleted => !_ftueCompleted ? EContentUnlockRequirement.Ftue : EContentUnlockRequirement.None,
+            _ => EContentUnlockRequirement.Data,
+        };
         return new ContentUnlockEvaluation(t_missing);
     }
 }

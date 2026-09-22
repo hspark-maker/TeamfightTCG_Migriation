@@ -12,7 +12,7 @@ public class OutgameTutorialData : ScriptableObject, ISerializationCallbackRecei
     public List<OutgameTutorialChapter> ftueChapters = new List<OutgameTutorialChapter>();
 
     [Header("가이드 미션 · 안내")]
-    [Tooltip("미션 연결과 콘텐츠 안내 순서. 실제 해금 조건은 ContentUnlockConfig 에셋에서 저작한다.")]
+    [Tooltip("미션·콘텐츠 해금별 안내 연결. 실제 해금 조건은 ContentUnlockConfig 에셋에서 저작한다.")]
     public GuideTutorialData guide = new GuideTutorialData();
 
     ChapterCollection m_chapters;
@@ -143,7 +143,7 @@ public class OutgameTutorialData : ScriptableObject, ISerializationCallbackRecei
 public sealed class GuideTutorialData
 {
     [Header("FTUE 이후 가이드 흐름")]
-    [Tooltip("미션별 해금 소개 → 화면 이동 → 자율 챕터. 같은 콘텐츠와 자율 챕터는 한 흐름에만 연결한다.")]
+    [Tooltip("콘텐츠 해금 또는 미션 도달 → 소개 → 화면 이동 → 자율 챕터. 같은 콘텐츠와 자율 챕터는 한 흐름에만 연결한다.")]
     public List<GuideMissionFlow> guideFlows = new List<GuideMissionFlow>();
 
     [Header("가이드 — FTUE 이후 콘텐츠 안내")]

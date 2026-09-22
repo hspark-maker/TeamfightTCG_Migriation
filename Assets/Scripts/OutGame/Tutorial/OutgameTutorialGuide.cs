@@ -189,12 +189,6 @@ public static class OutgameTutorialGuide
             .Replace("{growthStatus}", s_growthAlreadyReached
                 ? "이미 시너지가 해금된 2성 카드를 보유하고 있어요."
                 : "카드를 2성으로 성장시키면 그 카드의 시너지가 해금돼요."));
-        if (DataSaveManager.Data.Tutorial?.DefeatEnhancePending == true
-            && OutgameTutorialRunner.GuidedTrigger == EOutgameTutorialTrigger.CollectionTabFirstEnter
-            && OutgameTutorialRunner.TryGetGuidedChapter(EOutgameTutorialTrigger.CollectionTabFirstEnter,
-                out _, out var t_chapter)
-            && t_chapter.TryGetStep(0, out var t_first) && ReferenceEquals(_step, t_first))
-            return "다음 전투 전에 카드를 강화해 봐요!\n" + t_message;
         return t_message;
     }
 

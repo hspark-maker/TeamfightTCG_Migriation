@@ -75,14 +75,10 @@ public class ProfileSummaryView : MonoBehaviour
         bool t_hasTitle = TitleManager.Catalog != null &&
             TitleManager.Catalog.TryGet(TitleManager.EquippedId, out t_title);
         if (this.titleText != null)
-        {
             this.titleText.text = t_hasTitle ? t_title.displayName : "칭호 선택";
-            this.titleText.color = t_hasTitle ? t_title.color : Color.white;
-        }
         if (this.titleIcon != null)
         {
             this.titleIcon.sprite = t_hasTitle ? t_title.icon : null;
-            this.titleIcon.color = t_hasTitle ? t_title.color : Color.white;
             this.titleIcon.enabled = t_hasTitle && t_title.icon != null;
         }
 

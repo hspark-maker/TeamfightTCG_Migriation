@@ -13,34 +13,26 @@ MonoBehaviour:
   m_Name: ContentUnlockConfig
   m_EditorClassIdentifier: Assembly-CSharp::ContentUnlockData
   contentUnlocks:
-  - feature: 14
-    requireFtue: 1
-    requireRank: 0
-    minRankGrade: 0
-    minRankDivision: 0
-    minAccountLevel: 0
-    guideMissionId: guide.01
   - feature: 17
-    requireFtue: 1
-    requireRank: 0
+    condition: 2
+    minAccountLevel: 1
     minRankGrade: 0
-    minRankDivision: 0
-    minAccountLevel: 0
-    guideMissionId: 
-  - feature: 18
-    requireFtue: 1
-    requireRank: 0
+    minRankDivision: 1
+  - feature: 14
+    condition: 0
+    minAccountLevel: 2
     minRankGrade: 0
-    minRankDivision: 0
-    minAccountLevel: 0
-    guideMissionId: guide.06
+    minRankDivision: 1
   - feature: 16
-    requireFtue: 1
-    requireRank: 0
+    condition: 0
+    minAccountLevel: 2
     minRankGrade: 0
-    minRankDivision: 0
-    minAccountLevel: 0
-    guideMissionId: guide.03
+    minRankDivision: 1
+  - feature: 18
+    condition: 0
+    minAccountLevel: 4
+    minRankGrade: 0
+    minRankDivision: 1
   contentIntros:
   - content: 1
     description: "\uB2E4\uB978 \uC720\uC800\uB4E4\uACFC \uACBD\uC7C1\uD558\uC138\uC694!"
@@ -69,7 +61,9 @@ MonoBehaviour:
       icon: {fileID: 21300000, guid: 7a72c74924ba2434889a09c3d1d9dbd4, type: 3}
       destination: 4
   - content: 4
-    description: "카드 강화에 조각이 부족한가요? 룰렛에서 조각을 비롯한 다양한 보상을 획득하세요!"
+    description: "\uCE74\uB4DC \uAC15\uD654\uC5D0 \uC870\uAC01\uC774 \uBD80\uC871\uD55C\uAC00\uC694?
+      \uB8F0\uB81B\uC5D0\uC11C \uC870\uAC01\uC744 \uBE44\uB86F\uD55C \uB2E4\uC591\uD55C
+      \uBCF4\uC0C1\uC744 \uD68D\uB4DD\uD558\uC138\uC694!"
     items:
     - name: "\uB8F0\uB81B"
       icon: {fileID: 21300000, guid: 52d6b52ffa3f0ca429846b662c006ea7, type: 3}

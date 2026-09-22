@@ -119,7 +119,7 @@ public sealed partial class GuidanceCoordinator
             return s_instance.CanRequestMatchMission() ? EMissionGuideAction.Start : EMissionGuideAction.None;
         foreach (var t_flow in GuideMissionFlows.All)
         {
-            if (t_flow == null || t_flow.missionId != _missionId) continue;
+            if (t_flow == null || t_flow.activation != EGuideFlowActivation.Mission || t_flow.missionId != _missionId) continue;
             if (GuideResume.IsFor(t_flow.tutorial)) return EMissionGuideAction.Resume;
             return PendingIntros(t_flow).Count > 0 || OutgameTutorialRunner.HasPending(t_flow.tutorial, _includeDeferred: true)
                 ? EMissionGuideAction.Start : EMissionGuideAction.None;
@@ -147,10 +147,10 @@ public sealed partial class GuidanceCoordinator
                 if (t_flow != null && t_flow.missionId == m_requestedMissionId
                     && GuideResume.IsFor(t_flow.tutorial)) return t_flow;
         }
-        foreach (var t_flow in GuideMissionFlows.All)
+        foreach (var t_flow in GuideMissionFlows.InPresentationOrder())
         {
             if (t_flow == null || !GuideMissionFlows.IsEligible(t_flow)) continue;
-            // 플레이로 현재 미션에 도달하면 클릭 없이 시작한다. 중단한 안내의 재시도는 별도로 처리한다.
+            // 해금 소개를 마쳤어도 미완료 챕터는 별도로 이어간다.
             if (PendingIntros(t_flow).Count > 0 || OutgameTutorialRunner.HasPending(t_flow.tutorial)) return t_flow;
         }
         return null;
@@ -183,7 +183,7 @@ public sealed partial class GuidanceCoordinator
             return true;
         }
         if (m_flowDeferred && !m_retryRequested) return false;
-        if (m_retryRequested && m_unconfirmedIntroFlow == null
+        if (m_retryRequested && m_unconfirmedIntroFlow == null && m_resumeFlow == null
             && !GuideMissionProgress.IsCurrent(m_requestedMissionId))
         {
             m_retryRequested = false;

@@ -50,6 +50,14 @@
 
 복귀 준비가 소유한 요청은 `ServerWaitOverlay`를 중복 생성하지 않는다. 자동 구매는 `PackPurchaseFlow`의 호출자 대기 소유 옵션을 사용한다. 로비가 열린 뒤 사용자 구매·강화의 대기 표시는 기존 경로를 유지한다. 미래 스텝의 지급을 앞당겨 실행하지 않는다.
 
+## 계정 레벨 콘텐츠 해금·안내
+
+`ContentUnlockConfig`는 콘텐츠별 계정 레벨·최고 도달 랭크·FTUE 졸업 중 조건 하나만 선택한다. `ContentUnlockDefDrawer`는 선택한 조건의 수치만 표시하고 검증·판정도 그 조건만 읽는다. 콘텐츠별 현재 조건과 수치는 `Assets/SO/ContentUnlockConfig.asset`이 소유한다. `ContentUnlockManager`가 선택한 조건과 서버 채택 상태를 기준으로 영구 해금과 소개 대기를 갱신한다. 카드 강화는 설정된 조건 또는 첫 패배로 해금한다. 첫 패배는 FTUE 졸업 여부와 무관하게 DefeatEnhancePending에 저장하며, FTUE 도중에는 기존 안전한 전투 진입점에서 강화 안내를 끼우고 졸업 후에는 로비에서 시작한다. 완료한 강화 안내는 반복하지 않는다. 신규 계정의 초기 해금은 소개를 예약하고 기존 계정의 영구 해금과 대기 이력은 보존한다.
+
+`OutgameTutorialData.guide.guideFlows`의 `GuideMissionFlow.activation`은 미션 도달과 콘텐츠 해금을 구분한다. 콘텐츠형은 `content`, 미션형은 `missionId`를 사용한다. 미션·강화·모험·룰렛은 콘텐츠형이며 시너지 성장·전투는 기존 미션형이다. `GuidanceCoordinator`가 재개 안내를 우선한 뒤 졸업형 → 레벨형(레벨순) → 랭크형(티어순), 같은 조건값은 저작 순서로 콘텐츠 안내를 실행하고 마지막에 미션형을 처리한다. 일반 안내는 FTUE 졸업 뒤 매치 탭의 안전한 무대에서 시작하고, 첫 패배 강화만 FTUE를 잠시 중단한다.
+
+소개 완료는 콘텐츠 `Pending`, 챕터 완료는 기존 트리거 기록, 재개 위치·대상 카드는 `GuideResume`에 보관한다. 콘텐츠형은 과거 재개 기록의 `MissionId`에 의존하지 않는다. 해금 소개가 끝나도 미완료 챕터는 계속 실행 대상이며, 첫 패배 강화 완료 후 Lv2에 도달해도 반복하지 않는다.
+
 ## 프로필 레벨업 연출
 
 서버 응답 채택 후 ServerSaveCommands가 AccountLevelUpHandoff에 레벨업만 기록한다. 일반·온보딩 재생·복구 경로가 같은 revision 중복 제거를 사용하며, 서비스 교체 시 대기열과 재생을 초기화한다. 초기 로그인 데이터 로드는 연출을 만들지 않는다.

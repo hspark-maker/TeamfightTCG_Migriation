@@ -101,6 +101,7 @@ public static class TutorialValidator
                 t_unlockError, "SO 최상위 콘텐츠 해금 조건을 수정하세요."));
 
         ValidateContentIntroDefinitions(_unlocks, t_issues);
+        ValidateGuideFlows(_data, _unlocks, t_issues);
 
         var t_state    = TutorialSequenceState.Build(_data);
         var t_ids      = new Dictionary<int, string>();
@@ -114,10 +115,11 @@ public static class TutorialValidator
             if (t_chapter != null) ValidateChapterKind(t_chapter, t_c, t_triggers, t_issues);
             if (t_guided && (_data.guide.guideFlows == null
                 || !_data.guide.guideFlows.Exists(_flow => _flow != null
-                    && !string.IsNullOrEmpty(_flow.missionId) && _flow.tutorial == t_chapter.Trigger)))
-                t_issues.Add(new TutorialIssue(ETutorialIssueLevel.Info, t_c, 0, 0, "미션 미연결",
-                    "연결된 가이드 미션이 없어 이 챕터는 실행하지 않습니다.",
-                    "실행하려면 가이드 미션 흐름에 미션 ID와 챕터 식별자를 연결하세요."));
+                    && (_flow.activation == EGuideFlowActivation.ContentUnlock
+                        || !string.IsNullOrEmpty(_flow.missionId)) && _flow.tutorial == t_chapter.Trigger)))
+                t_issues.Add(new TutorialIssue(ETutorialIssueLevel.Info, t_c, 0, 0, "안내 흐름 미연결",
+                    "연결된 안내 흐름이 없어 이 챕터는 실행하지 않습니다.",
+                    "실행하려면 미션형 또는 콘텐츠 해금형 흐름에 챕터 식별자를 연결하세요."));
 
             // (8) 스텝이 없는 챕터. 진행이 막히지는 않는다 — OutgameTutorialRunner.TryGetNext가 빈 챕터를 건너뛰고,
             //     좌표가 서더라도 CloseOrWarnOnMissingStep이 다음 좌표로 정정해 Advanced를 준다(런타임 판정도 Warning이다).
@@ -166,6 +168,75 @@ public static class TutorialValidator
     }
 
     // ── 챕터 성격 규칙 ──────────────────────────────────────────────────────
+
+    internal static void ValidateGuideFlows(OutgameTutorialData _data, ContentUnlockData _unlocks, List<TutorialIssue> _issues)
+    {
+        var t_contents = new HashSet<EOutgameFeature>();
+        var t_tutorials = new HashSet<EOutgameTutorialTrigger>();
+        var t_intros = new HashSet<EContentUnlockIntro>();
+        var t_flows = _data.guide.guideFlows;
+        if (t_flows != null)
+            for (int t_i = 0; t_i < t_flows.Count; t_i++)
+            {
+                var t_flow = t_flows[t_i];
+                if (t_flow == null)
+                {
+                    GuideFlowError(_issues, t_i, "안내 흐름이 비어 있습니다.");
+                    continue;
+                }
+                bool t_contentFlow = t_flow.activation == EGuideFlowActivation.ContentUnlock;
+                if (!Enum.IsDefined(typeof(EGuideFlowActivation), t_flow.activation))
+                    GuideFlowError(_issues, t_i, "발동 유형이 유효하지 않습니다.");
+                if (t_contentFlow)
+                {
+                    if (!ContentUnlockManager.TryGetKey(t_flow.content, out _))
+                        GuideFlowError(_issues, t_i, "콘텐츠 해금형에 유효한 콘텐츠가 필요합니다.");
+                    else if (!t_contents.Add(t_flow.content))
+                        GuideFlowError(_issues, t_i, $"{t_flow.content} 콘텐츠 연결이 중복입니다.");
+                    if (!string.IsNullOrEmpty(t_flow.missionId))
+                        GuideFlowError(_issues, t_i, "콘텐츠 해금형의 미션 ID는 비워야 합니다.");
+                    if (t_flow.contentIntros == null || t_flow.contentIntros.Count == 0)
+                        GuideFlowError(_issues, t_i, "콘텐츠 해금형에 해금 소개가 필요합니다.");
+                }
+                else if (t_flow.activation == EGuideFlowActivation.Mission)
+                {
+                    if (string.IsNullOrWhiteSpace(t_flow.missionId))
+                        GuideFlowError(_issues, t_i, "미션형의 미션 ID가 비어 있습니다.");
+                    if (t_flow.content != EOutgameFeature.None)
+                        GuideFlowError(_issues, t_i, "미션형의 콘텐츠는 None이어야 합니다.");
+                }
+                if (t_flow.tutorial != EOutgameTutorialTrigger.None)
+                {
+                    if (!t_tutorials.Add(t_flow.tutorial))
+                        GuideFlowError(_issues, t_i, $"{t_flow.tutorial} 챕터 연결이 중복입니다.");
+                    bool t_found = false;
+                    foreach (var t_chapter in _data.Chapters)
+                        if (t_chapter != null && t_chapter.IsGuided && t_chapter.Trigger == t_flow.tutorial)
+                        { t_found = true; break; }
+                    if (!t_found) GuideFlowError(_issues, t_i, $"{t_flow.tutorial} 자율 챕터가 없습니다.");
+                }
+                if (t_flow.contentIntros == null) continue;
+                foreach (var t_intro in t_flow.contentIntros)
+                {
+                    if (t_intro == EContentUnlockIntro.None || _unlocks == null
+                        || !_unlocks.TryGetContentIntro(t_intro, out _))
+                        GuideFlowError(_issues, t_i, $"{t_intro} 해금 소개 정의가 없습니다.");
+                    if (!t_intros.Add(t_intro))
+                        GuideFlowError(_issues, t_i, $"{t_intro} 해금 소개 연결이 중복입니다.");
+                    if (t_contentFlow && (!Enum.TryParse(t_intro.ToString(), out EOutgameFeature t_feature)
+                        || t_feature != t_flow.content))
+                        GuideFlowError(_issues, t_i, $"{t_intro} 소개가 대상 콘텐츠 {t_flow.content}와 다릅니다.");
+                }
+            }
+        foreach (var t_feature in new[] { EOutgameFeature.Mission, EOutgameFeature.CardEnhance,
+                     EOutgameFeature.Adventure, EOutgameFeature.Roulette })
+            if (!t_contents.Contains(t_feature))
+                GuideFlowError(_issues, -1, $"{t_feature} 콘텐츠 해금 안내 연결이 없습니다.");
+    }
+
+    static void GuideFlowError(List<TutorialIssue> _issues, int _index, string _message)
+        => _issues.Add(new TutorialIssue(ETutorialIssueLevel.Error, 0, 0, 0, "안내 흐름",
+            $"흐름 {_index}: {_message}", "가이드 흐름의 발동 조건·콘텐츠·소개·챕터 연결을 수정하세요."));
 
     static void ValidateContentIntroDefinitions(ContentUnlockData _data, List<TutorialIssue> _issues)
     {
@@ -267,7 +338,7 @@ public static class TutorialValidator
         if (_chapter.Prerequisite == EOutgameFeature.None
          && t_trigger != EOutgameTutorialTrigger.ContentUnlocksAvailable)
             _issues.Add(new TutorialIssue(ETutorialIssueLevel.Info, _index, 0, 0, "선행 기능 없음",
-                                          "prerequisite가 None이라 연결된 미션 활성화 외에 선행 기능을 검사하지 않습니다.",
+                                          "prerequisite가 None이라 안내 흐름 발동 조건 외에 선행 기능을 검사하지 않습니다.",
                                           "안내가 가리키는 화면을 여는 기능을 선행 기능으로 두면 잠긴 동안 점이 숨습니다."));
     }
 

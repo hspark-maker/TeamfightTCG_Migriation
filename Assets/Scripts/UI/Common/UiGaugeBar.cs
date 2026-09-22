@@ -13,7 +13,7 @@ public sealed class UiGaugeBar
 
     public float Ratio { get; private set; }
 
-    /// <summary>채움은 부모를 기준으로 스트레치한 사각을 전달한다. 새 UI 오브젝트는 생성하지 않는다.</summary>
+    /// <summary>채움은 부모 기준 스트레치 사각이며, 진행 축의 sizeDelta는 최소 표시 길이다. 시작점은 저작 오프셋으로 고정한다.</summary>
     public UiGaugeBar(RectTransform fill, Direction direction, Transform node = null)
     {
         this._fill = fill;
@@ -22,7 +22,7 @@ public sealed class UiGaugeBar
         this._nodeScale = node != null ? node.localScale : Vector3.one;
     }
 
-    /// <summary>실제 진행 비율을 즉시 표시한다. 0이면 채움을 숨긴다.</summary>
+    /// <summary>실제 진행 비율을 표시하며 0에서도 저작된 최소 길이를 유지한다. 사용 불가 상태는 숨긴다.</summary>
     public void SetRatio(float ratio, bool available = true)
     {
         this.ApplyRatio(ratio, available);
@@ -52,6 +52,13 @@ public sealed class UiGaugeBar
         this.Ratio = Mathf.Clamp01(ratio);
         if (this._fill == null) return;
         float visible = available ? this.Ratio : 0f;
+        bool horizontal = this._direction == Direction.LeftToRight || this._direction == Direction.RightToLeft;
+        float minimumLength = Mathf.Max(0f, horizontal ? this._fill.sizeDelta.x : this._fill.sizeDelta.y);
+        if (minimumLength > 0f && this._fill.parent is RectTransform track)
+        {
+            float trackLength = horizontal ? track.rect.width : track.rect.height;
+            visible *= trackLength > 0f ? Mathf.Clamp01(1f - minimumLength / trackLength) : 0f;
+        }
         switch (this._direction)
         {
             case Direction.LeftToRight:
@@ -71,7 +78,7 @@ public sealed class UiGaugeBar
                 this._fill.anchorMax = new Vector2(1f, visible);
                 break;
         }
-        this._fill.gameObject.SetActive(visible > 0f);
+        this._fill.gameObject.SetActive(available && (this.Ratio > 0f || minimumLength > 0f));
     }
 
 }

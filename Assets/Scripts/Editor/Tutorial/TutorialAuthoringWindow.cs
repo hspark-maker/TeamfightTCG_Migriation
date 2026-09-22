@@ -268,7 +268,7 @@ public class TutorialAuthoringWindow : EditorWindow
 
     void DrawModeTabs()
     {
-        int t_mode = GUILayout.Toolbar(this.guideMode ? 1 : 0, new[] { "FTUE · 첫 실행", "가이드 · 미션 온보딩" });
+        int t_mode = GUILayout.Toolbar(this.guideMode ? 1 : 0, new[] { "FTUE · 첫 실행", "가이드 · 콘텐츠 온보딩" });
         if ((t_mode == 1) == this.guideMode) return;
         this.guideMode = t_mode == 1;
         this.selectedOuter = -1;
@@ -282,9 +282,9 @@ public class TutorialAuthoringWindow : EditorWindow
     void DrawGuideSettings()
     {
         if (!this.guideMode || this.serialized == null) return;
-        this.showGuideSettings = EditorGUILayout.Foldout(this.showGuideSettings, "가이드 미션 · 안내", true);
+        this.showGuideSettings = EditorGUILayout.Foldout(this.showGuideSettings, "콘텐츠 해금 · 미션 안내", true);
         if (!this.showGuideSettings) return;
-        EditorGUILayout.PropertyField(this.serialized.FindProperty("guide.guideFlows"), new GUIContent("가이드 미션 해금·온보딩"), true);
+        EditorGUILayout.PropertyField(this.serialized.FindProperty("guide.guideFlows"), new GUIContent("발동 조건·해금 소개·온보딩"), true);
         if (GUILayout.Button("콘텐츠 해금 설정 열기"))
             Selection.activeObject = ContentUnlockAuthoring.Data;
     }
@@ -554,7 +554,7 @@ public class TutorialAuthoringWindow : EditorWindow
             string t_edited = EditorGUILayout.DelayedTextField("편 이름", t_label);
             if (t_edited != t_label) Defer(() => TutorialSequenceEditOps.SetChapterLabel(this.data, _chapter, t_edited));
 
-            EditorGUILayout.LabelField("성격", t_chapter.IsGuided ? "가이드 · 미션 온보딩" : "FTUE · 첫 실행");
+            EditorGUILayout.LabelField("성격", t_chapter.IsGuided ? "가이드 · 콘텐츠 온보딩" : "FTUE · 첫 실행");
 
             if (t_chapter.IsGuided)
             {

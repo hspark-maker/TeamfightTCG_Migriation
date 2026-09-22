@@ -68,7 +68,7 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
         && s_visible.m_expanded && s_visible.m_drawerReveal > 0.99f
         && s_visible.m_displayed?.Id == _missionId
         && (s_visible.canvasGroup == null || s_visible.canvasGroup.alpha > 0.99f)
-        && GuidanceCoordinator.CanNavigateFromLobby(null);
+        && GuidanceCoordinator.CanUseGuideMissionPreview;
 
     internal void SetSettled(bool _settled)
     {
@@ -180,7 +180,7 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
 
     void ToggleDrawer()
     {
-        if (!m_visible || !m_settled || IsHoldingClaim || !GuidanceCoordinator.CanNavigateFromLobby(null)) return;
+        if (!m_visible || !m_settled || IsHoldingClaim || !GuidanceCoordinator.CanUseGuideMissionPreview) return;
         SetDrawerExpanded(!m_expanded, true);
     }
 
@@ -224,7 +224,7 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
     {
         if (!m_settled || Time.unscaledTime < m_nextRefresh) return;
         m_nextRefresh = Time.unscaledTime + 0.1f;
-        bool t_ready = GuidanceCoordinator.CanNavigateFromLobby(null);
+        bool t_ready = GuidanceCoordinator.CanUseGuideMissionPreview;
         if (t_ready && !m_ready && OutgameFeatureLock.IsUnlocked(EOutgameFeature.Mission))
             RefreshMissionsAsync().Forget();
         m_ready = t_ready;
@@ -290,7 +290,7 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
         m_displayed = t_definition;
         m_progress = t_progress;
         m_complete = t_complete;
-        RefreshInteractable(m_settled && GuidanceCoordinator.CanNavigateFromLobby(null));
+        RefreshInteractable(m_settled && GuidanceCoordinator.CanUseGuideMissionPreview);
         this.ApplyReward(t_definition);
     }
 
@@ -319,7 +319,7 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
 
     void HandleClick()
     {
-        if (!m_visible || !m_expanded || m_drawerReveal < 0.99f || IsHoldingClaim || !GuidanceCoordinator.CanNavigateFromLobby(null)) return;
+        if (!m_visible || !m_expanded || m_drawerReveal < 0.99f || IsHoldingClaim || !GuidanceCoordinator.CanUseGuideMissionPreview) return;
         MissionDefinition t_current = GuideMissionTrack.Current;
         var t_state = GuideMissionPreviewState.Of(t_current);
         if (!t_state.CanExecute) return;
