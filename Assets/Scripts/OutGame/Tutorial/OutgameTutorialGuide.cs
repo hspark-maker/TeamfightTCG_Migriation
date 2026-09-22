@@ -260,17 +260,6 @@ public static class OutgameTutorialGuide
     static bool CanExplainEnhance(int _cardId) => _cardId > 0 && OwnershipManager.IsOwned(_cardId)
         && CanShowGrowthCard(_cardId) && CardVisualRules.InfoKeywords(_cardId) != CardKeyword.None;
 
-    static bool CanShowGrowthCard(int _cardId)
-    {
-        bool t_inAlbum = false;
-        foreach (var t_theme in CardAlbum.Themes)
-        {
-            if (t_theme.IsLocked) continue;
-            foreach (int t_card in t_theme.CardIds)
-                if (t_card == _cardId) { t_inAlbum = true; break; }
-            if (t_inAlbum) break;
-        }
-        return t_inAlbum;
-    }
+    static bool CanShowGrowthCard(int _cardId) => CardCatalog.IsReady && CardCatalog.Contains(_cardId);
 
 }

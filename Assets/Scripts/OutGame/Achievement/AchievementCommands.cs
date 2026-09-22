@@ -113,7 +113,7 @@ internal static class AchievementCommands
             var t_result = await ServerSaveCommands.InvokeAsync<ClaimAchievementResult>(
                 "claimAchievement", new { env = ContentProfileConfig.Active.CloudEnvId, achievementId = t_id });
             if (t_session != s_session || t_result == null) return default;
-            return new RewardClaimOutcome(AchievementManager.ToGains(t_result.Granted));
+            return new RewardClaimOutcome(AchievementManager.ToGains(t_result.Granted), _titles: t_result.Titles);
         }
         catch (Exception t_error)
         {

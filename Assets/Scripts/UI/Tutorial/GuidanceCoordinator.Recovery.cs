@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -32,6 +31,11 @@ public sealed partial class GuidanceCoordinator
     internal static async UniTask<bool> TryRestoreForcedSurfaceAsync(TutorialStepDef _step, CancellationToken _ct)
     {
         if (_step == null) return false;
+        if (UsesEnhancePanel(_step))
+        {
+            await PrepareGrowthSurfaceAsync(_step, _ct);
+            return true;
+        }
         EOutgameFeature t_tab;
         switch (_step.Anchor)
         {
@@ -73,6 +77,41 @@ public sealed partial class GuidanceCoordinator
         await s_instance.SelectFlowTabAsync(EOutgameFeature.LobbyMatchTab, token);
     }
 
+    static bool UsesEnhancePanel(TutorialStepDef _step)
+        => _step != null && (_step.Action == EOutgameTutorialAction.WaitEnhance
+            || _step.Anchor == EOutgameTutorialAnchor.LobbyEnhanceButton
+            || _step.Anchor == EOutgameTutorialAnchor.LobbyEnhanceShardIcon
+            || _step.Anchor == EOutgameTutorialAnchor.LobbyEnhanceShardAmount
+            || _step.Anchor == EOutgameTutorialAnchor.LobbyEnhanceCardView
+            || _step.Anchor == EOutgameTutorialAnchor.LobbyEnhanceKeywordDescription
+            || _step.Anchor == EOutgameTutorialAnchor.LobbyEnhanceSynergyDescription);
+
+    // 일반 스텝 진입과 저장 위치 복구가 같은 강화 화면을 준비한다.
+    internal static async UniTask PrepareGrowthSurfaceAsync(TutorialStepDef _step, CancellationToken _ct)
+    {
+        if (!UsesEnhancePanel(_step)) return;
+        await OpenGrowthSurfaceAsync(_ct);
+    }
+
+    static async UniTask OpenGrowthSurfaceAsync(CancellationToken _ct)
+    {
+        while (LobbyEnhanceTabPanel.IsPresenting) await UniTask.Yield(_ct);
+        _ct.ThrowIfCancellationRequested();
+        if (s_instance == null) throw new InvalidOperationException("강화 안내 화면을 찾을 수 없습니다.");
+        using (InternalNavigation())
+        {
+            CardDetailOverlayView.Close();
+            AlbumPageOverlayView.CloseOpen();
+        }
+        await s_instance.SelectFlowTabAsync(EOutgameFeature.CardEnhance, _ct);
+        int t_card = OutgameTutorialGuide.TargetCardId;
+        // 이미 목표를 달성했으나 대상 카드가 없는 저장 기록도 강화 화면에서 설명을 이어간다.
+        if (t_card <= 0) return;
+        using (InternalNavigation())
+            if (!LobbyEnhanceTabPanel.TryOpenForCard(t_card))
+                throw new InvalidOperationException("안내할 카드를 강화 화면에 표시하지 못했습니다.");
+    }
+
     async UniTask SelectFlowTabAsync(EOutgameFeature _feature, CancellationToken _ct)
     {
         _ct.ThrowIfCancellationRequested();
@@ -104,16 +143,6 @@ public sealed partial class GuidanceCoordinator
         if (!t_chapter.TryGetStep(t_index, out var t_step))
             throw new InvalidOperationException("안내 재개 위치를 찾을 수 없습니다.");
 
-        // 첫 강화 안내는 컬렉션으로 자동 이동한다. 예전 탭 클릭 단계에 저장된 계정도 다음 안내로 잇는다.
-        if (_flow.tutorial == EOutgameTutorialTrigger.CollectionTabFirstEnter
-            && t_step.Action == EOutgameTutorialAction.WaitClick
-            && t_step.Anchor == EOutgameTutorialAnchor.LobbyCollectionTab)
-        {
-            t_index++;
-            if (!t_chapter.TryGetStep(t_index, out t_step))
-                throw new InvalidOperationException("컬렉션 이동 후 안내 단계를 찾을 수 없습니다.");
-        }
-
         bool t_growth = _flow.tutorial == EOutgameTutorialTrigger.CollectionTabFirstEnter
             || _flow.tutorial == EOutgameTutorialTrigger.SynergyGrowthIntroduction;
         if (t_growth)
@@ -129,36 +158,7 @@ public sealed partial class GuidanceCoordinator
                 t_chapter.TryGetStep(t_index, out t_step);
             }
             if (t_step == null) throw new InvalidOperationException("성장 안내의 설명 단계가 없습니다.");
-            bool t_detail = (t_index >= t_enhance && t_enhance >= 0
-                || t_step.Anchor == EOutgameTutorialAnchor.CardDetailShardIcon
-                || t_step.Anchor == EOutgameTutorialAnchor.CardDetailShardAmount)
-                && t_step.Action != EOutgameTutorialAction.CloseAlbumPage
-                && !(t_step.Completion == EOutgameTutorialCompletion.Confirm
-                    && t_step.Anchor == EOutgameTutorialAnchor.None
-                    && t_index == t_chapter.StepCount - 1);
-            bool t_page = t_detail || t_step.Anchor == EOutgameTutorialAnchor.AlbumCardSlot;
-            await SelectFlowTabAsync(EOutgameFeature.LobbyCollectionTab, _ct);
-            int t_card = OutgameTutorialGuide.TargetCardId;
-            if (t_page && t_card > 0)
-            {
-                if (!(m_shell.CurrentPanel is AlbumTabController t_album))
-                    throw new InvalidOperationException("도감 화면을 준비하지 못했습니다.");
-                bool t_found = false;
-                foreach (var t_theme in CardAlbum.Themes)
-                {
-                    if (t_theme.IsLocked) continue;
-                    for (int t_pageIndex = 0; t_pageIndex < t_theme.Pages.Count; t_pageIndex++)
-                    {
-                        if (!t_theme.Pages[t_pageIndex].CardIds.Contains(t_card)) continue;
-                        using (InternalNavigation()) t_album.OpenThemePage(t_theme, t_pageIndex);
-                        t_found = true;
-                        break;
-                    }
-                    if (t_found) break;
-                }
-                if (!t_found) throw new InvalidOperationException("안내 대상 카드의 도감 페이지가 없습니다.");
-                if (t_detail) using (InternalNavigation()) CardDetailOverlayView.Open(t_card);
-            }
+            await OpenGrowthSurfaceAsync(_ct);
         }
         else if (_flow.tutorial == EOutgameTutorialTrigger.AdventureUnlocked)
         {

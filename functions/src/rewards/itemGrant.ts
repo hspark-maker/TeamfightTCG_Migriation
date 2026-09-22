@@ -9,10 +9,13 @@ import {CardPackRow, readCardPackRow, readDropRows, readRankGradeRows, readSpecR
 import {loadCatalogIds} from "../packs/cardCatalog";
 import {entryPointsFromRows, gradeOf, parseRequiredGrade, isRanked} from "../packs/rankGrade";
 import {SlotPatch} from "../save/saveDocument";
+import {GrantedTitle, grantTitle, TitleDefinition} from "../titles/titleOwnership";
+import {loadAchievementTitles} from "../titles/achievementTitles";
 
 export interface RewardPack {pack: CardPackRow; drops: DropRow[]}
 export interface ItemGrantContext {
   cosmetics?: CosmeticItem[];
+  titles?: TitleDefinition[];
   catalog: Set<number>;
   grades: Map<number, string>;
   thresholds: number[];
@@ -29,6 +32,7 @@ export interface ItemGrantContext {
  */
 export async function loadItemGrantContext(env: string, items: RewardItem[]): Promise<ItemGrantContext> {
   const cosmetics = items.some((item) => isCosmeticType(item.rewardType)) ? await loadCosmeticItems(env) : undefined;
+  const titles = items.some((item) => item.rewardType === "Title") ? await loadAchievementTitles(env) : undefined;
   const [catalog, cards, ranks, packs] = await Promise.all([
     loadCatalogIds(env), readSpecRows(env, "Card"), readRankGradeRows(env), readSpecRows(env, "CardPack"),
   ]);
@@ -45,7 +49,7 @@ export async function loadItemGrantContext(env: string, items: RewardItem[]): Pr
     if (pack === null) throw new HttpsError("failed-precondition", `Reward pack not found: ${id}`);
     prepared.set(id, {pack, drops});
   }));
-  return {cosmetics, catalog, grades: new Map(cards.map((row) => [Number(row.id), String(row.grade)])),
+  return {cosmetics, titles, catalog, grades: new Map(cards.map((row) => [Number(row.id), String(row.grade)])),
     thresholds, packs: prepared, choices, cards};
 }
 
@@ -92,6 +96,7 @@ export function duplicateGains(cards: DrawnCard[], grades: ReadonlyMap<number, s
 
 export interface GrantedItems {
   cosmetics?: CosmeticGrant[];
+  titles?: GrantedTitle[];
   slots: SlotPatch;
   cards: DrawnCard[];
   packs?: {packId: string; cards: DrawnCard[]}[];
@@ -114,6 +119,7 @@ export function grantRewardItems(
   rewardRows: RewardRow[], selectedPackId: string, points: number, roll: RollFn = randomInt,
 ): GrantedItems {
   const cosmetics: CosmeticGrant[] = [];
+  const titles: GrantedTitle[] = [];
   let profile = (current.profile ?? {}) as Record<string, unknown>;
   const owned = readOwnedIds(current.ownership);
   const ownedSet = new Set(owned);
@@ -129,6 +135,13 @@ export function grantRewardItems(
       const granted = grantCosmetic(profile, item.rewardType, item.rewardId, context.cosmetics ?? []);
       profile = granted.profile;
       cosmetics.push(granted.cosmetic);
+      continue;
+    }
+    if (item.rewardType === "Title") {
+      if (item.amount !== 1) throw new HttpsError("failed-precondition", "Title amount must be one.");
+      const granted = grantTitle(profile, item.rewardId, context.titles ?? []);
+      profile = granted.profile;
+      titles.push(granted.title);
       continue;
     }
     if (item.rewardType === "Card") {
@@ -163,8 +176,8 @@ export function grantRewardItems(
       if (pack.price > 0) currencies.push(...duplicateGains(drawn, context.grades, rewardRows));
     }
   }
-  return {cards, packs, cosmetics, currencies, slots: {
-    ...(cosmetics.length ? {profile} : {}),
+  return {cards, packs, cosmetics, titles, currencies, slots: {
+    ...(cosmetics.length || titles.length ? {profile} : {}),
     ...(cards.length ? {
       ownership: buildOwnershipSlot(owned, cards),
       cardGrowth: growthSlot(applyDrawnCardGrowth(readGrowthEntries(current.cardGrowth), cards, context.grades)),

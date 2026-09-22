@@ -82,10 +82,20 @@ async function main() {
   };
   try {
     const local = publisher.localSnapshot();
-    check(local.names.length === 26 && local.names.includes("LoadingTip") && local.names.includes("Achievement") &&
-      local.names.includes("CardCraft"), "26 published CSVs required");
+    check(isDeepStrictEqual(local.names, publisher.publishedNames()) &&
+      ["LoadingTip", "Achievement", "CardCraft", "CosmeticItem", "Title"].every((name) => local.names.includes(name)),
+    "Every registered CSV, including server-only DTOs, must be snapshotted");
     check(local.tables.Mission.columns.includes("accountExp") && local.tables.Achievement.rows.length === 61,
       "CSV-only DTO schema mismatch");
+    check(isDeepStrictEqual(local.tables.Achievement.columns,
+      ["id", "achievementId", "groupId", "stage", "eventKey", "synergyId", "targetCount", "title", "description", "sortOrder", "enabled"]),
+    "Achievement conditions must not include inline rewards");
+    check(isDeepStrictEqual(local.tables.Title.columns, ["id", "titleId"]) && local.tables.Title.rows.length > 0,
+      "Title must publish only permanent identifiers");
+    check(isDeepStrictEqual(local.tables.CosmeticItem.columns, ["id", "itemType", "itemId", "defaultOwned"]),
+      "CosmeticItem must use its server-only DTO schema");
+    check(Object.hasOwn(publisher.snapshotSources(), "Assets/Scripts/Editor/SpecFirestoreUploader.TitleCsv.cs"),
+      "Title schema changes must invalidate a prepared source snapshot");
     const schema = [["int", "id"], ["string", "text"], ["long", "amount"]];
     check(isDeepStrictEqual(publisher.typedRows("Fixture", schema,
       'id,amount,text,#memo\nint,long,string,string\n2,3,"A,B",note\n1,4,"line\nnext",note\n'),

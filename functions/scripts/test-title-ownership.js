@@ -5,14 +5,13 @@ const path = require("node:path");
 const {readFileSync} = require("node:fs");
 const output = process.env.TITLE_TEST_BUILD || "../lib";
 const {parseTitles, grantTitle} = require(path.resolve(__dirname, output, "titles/titleOwnership"));
-const manual = row => ({eventKey: "", synergyId: "", targetCount: 0, description: "Manual award", ...row});
-const catalog = parseTitles([manual({id: 1, titleId: "first"}), manual({id: 2, titleId: "second"})]);
+const catalog = parseTitles([{id: 1, titleId: "first"}, {id: 2, titleId: "second"}]);
 
 test("title catalog rejects malformed and duplicate identifiers", () => {
   for (const rows of [[], [{id: 0, titleId: "a"}], [{id: 1, titleId: " a"}],
     [{id: 1, titleId: ""}], [{id: 2147483648, titleId: "a"}],
     [{id: 1, titleId: "a"}, {id: 2, titleId: "a"}],
-    [{id: 1, titleId: "a"}, {id: 1, titleId: "b"}]]) assert.throws(() => parseTitles(rows.map(manual)));
+    [{id: 1, titleId: "a"}, {id: 1, titleId: "b"}]]) assert.throws(() => parseTitles(rows));
 });
 
 test("grants preserve profile and unknown ownership without equipping or mutating input", () => {
@@ -39,23 +38,26 @@ test("Title CSV preserves all authored display IDs", () => {
   const csv = readFileSync(path.join(root, "docs/SpecData/Title_sheet.csv"), "utf8");
   assert.equal(csv.charCodeAt(0), 0xfeff);
   const rows = csv.trim().split(/\r?\n/).slice(3).map((line) => {
-    const [id, titleId, eventKey, synergyId, targetCount, description] = line.split(",");
-    return {id: Number(id), titleId, eventKey, synergyId, targetCount: Number(targetCount), description};
+    const [id, titleId] = line.split(",");
+    return {id: Number(id), titleId};
   });
   const display = readFileSync(path.join(root, "Assets/SO/Profile/TitleCatalog.asset"), "utf8");
   assert.deepEqual(parseTitles(rows).map((row) => row.titleId),
     [...display.matchAll(/^  - id: (.+)$/gm)].map((match) => match[1].trim()));
 });
 
-test("Title is rejected by the shared Reward table and item grant", () => {
+test("Title resolves from the shared Reward table and item grant preserves profile ownership", () => {
   const {resolveRewards} = require(path.resolve(__dirname, output, "rewardTable"));
   const row = {id: 1, ownerType: "Achievement", ownerId: "win.1", order: 1, rewardType: "Title", rewardId: "first", amount: 1};
   const parsed = resolveRewards([row], "Achievement", "win.1");
-  assert.deepEqual(parsed.items, []);
-  assert.equal(parsed.dropped[0].reason, "UnknownRewardType");
+  assert.deepEqual(parsed.items, [{rewardType: "Title", rewardId: "first", amount: 1}]);
+  assert.deepEqual(parsed.dropped, []);
   const {grantRewardItems} = require(path.resolve(__dirname, output, "rewards/itemGrant"));
-  const context = {catalog: new Set(), grades: new Map(), thresholds: [], packs: new Map(), choices: [], cards: []};
-  assert.throws(() => grantRewardItems({}, [row], context, [], "", 0));
+  const context = {titles: catalog, catalog: new Set(), grades: new Map(), thresholds: [], packs: new Map(), choices: [], cards: []};
+  const granted = grantRewardItems({profile: {nickname: "kept"}}, parsed.items, context, [], "", 0);
+  assert.deepEqual(granted.titles, [{titleId: "first", isNew: true}]);
+  assert.deepEqual(granted.slots.profile, {nickname: "kept", ownedTitleIds: ["first"]});
+  assert.throws(() => grantRewardItems({}, [{...parsed.items[0], amount: 2}], context, [], "", 0));
 });
 
 test("independent title grants retain shared cosmetic and experience profile fields", () => {

@@ -149,7 +149,7 @@ export const spinRoulette = onCall(async (request) => {
         amount: drawn.amount,
         gain: drawn.currency === null ? null : {currency: drawn.currency, amount: drawn.amount},
         granted,
-        cosmetics: itemGrant.cosmetics ?? [], cards: itemGrant.cards,
+        titles: itemGrant.titles ?? [], cosmetics: itemGrant.cosmetics ?? [], cards: itemGrant.cards,
         packs: itemGrant.packs ?? [],
         ...(missionState ? {missions: missionState} : {}),
       };

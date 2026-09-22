@@ -33,6 +33,9 @@ public partial class SROptions
     [Category("재화"), DisplayName("조각 +1,000")]
     public void GrantShard() => OutgameDebugActions.GrantShard();
 
+    [Category("재화"), DisplayName("카드 가루 +1,000")]
+    public void GrantCardDust() => OutgameDebugActions.GrantCardDust();
+
     [Category("재화"), DisplayName("룰렛 티켓 +10")]
     public void GrantRouletteTicket() => OutgameDebugActions.GrantRouletteTicket();
 
@@ -72,11 +75,17 @@ public partial class SROptions
     [Category("미션"), DisplayName("일일 미션 초기화 (서버·테스트 전용)")]
     public void ResetDailyMissions() => OutgameDebugActions.ResetDailyMissions();
 
+    [Category("업적"), DisplayName("전체 업적 달성 (서버·테스트 전용)")]
+    public void CompleteAchievements() => OutgameDebugActions.CompleteAchievements();
+
     [Category("카드"), DisplayName("소유 카드")]
     public string OwnedCards => $"{OwnershipManager.OwnedCount} / {CardCatalog.Count}";
 
     [Category("재화"), DisplayName("잔액")]
     public string CurrencyBalances => $"G {CurrencyManager.Gold} / D {CurrencyManager.Diamond} / E {CurrencyManager.Energy} / S {CurrencyManager.Shard} / T {CurrencyManager.GetBalance(ECurrencyType.RouletteTicket)}";
+
+    [Category("재화"), DisplayName("카드 가루 잔액")]
+    public long CardDustBalance => CurrencyManager.GetBalance(ECurrencyType.CardDust);
 
     [Category("튜토리얼"), DisplayName("기능 잠금 무시")]
     public bool IgnoreFeatureLocks

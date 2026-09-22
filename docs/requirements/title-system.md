@@ -1,6 +1,6 @@
 # 칭호 선택·장착 시스템
 
-2026-09-22 갱신. 칭호를 꾸미기와 별도 도메인으로 분리하고 서버 지급·소유로 전환한다. 기존 테스트 칭호 8종은 서버 통계의 달성 조건에 따라 자동 지급한다.
+2026-09-22 갱신. 칭호를 꾸미기와 별도 도메인으로 분리하고 서버 지급·소유로 전환한다. 기존 테스트 칭호 8종은 대응하는 업적 단계의 보상을 수령할 때 지급한다. 집계 달성·부팅 자동 지급은 중단하며 기존 소유는 유지한다.
 
 ## Overview
 
@@ -23,8 +23,8 @@
 
 - 칭호 책임은 OutGame/Title/TitleManager에 둔다. CosmeticType·CosmeticItem에는 포함하지 않는다.
 - 소지·장착 정보는 기존 profile 슬롯에 저장한다. 서버 응답의 ownedTitleIds를 채택하며 편집 중인 장착 후보는 보존한다. 명시적 devResetSave는 소유·장착을 모두 초기화한다.
-- 칭호의 안정적 ID는 Title_sheet.csv의 titleId다. 전용 표 열은 id(int), titleId(string), eventKey(string), synergyId(string), targetCount(int), description(string)이다. 기존 테스트 8종을 유지한다. TitleCatalog는 표시 이름·기본 설명·아이콘·색·표시 순서를 담당한다.
-- 칭호는 Reward 표와 공통 아이템 지급 분기를 사용하지 않는다. 서버의 칭호 전용 모듈이 해금 조건을 판정하고 영구 소유를 지급한다. 공개 임의 지급 API는 없고 중복 지급은 소유 유지, 자동 장착은 없다. 결과 표시용 Title 종류와 titles 응답은 기존 공통 보상 UI에 전달할 수 있다.
+- 칭호의 안정적 ID는 Title_sheet.csv의 titleId다. 전용 표 열은 id(int), titleId(string)이며 기존 테스트 8종을 유지한다. 조건은 Achievement에만 저작하고 지급물은 Reward에만 저작한다. TitleCatalog는 표시 이름·기본 설명·아이콘·색·표시 순서를 담당한다.
+- 칭호는 Reward 표와 공통 아이템 지급 분기를 사용한다. `ownerType=Achievement`, `ownerId=achievementId`, `rewardType=Title`, `rewardId=titleId`, `amount=1`로 해당 업적 보상에 등록한다. 업적의 기존 재화 보상도 같은 owner의 Currency 행으로 저작한다. claimAchievement의 수령 자격 판정 후 영구 소유를 지급한다. 공개 임의 지급 API는 없고 중복 지급은 소유 유지, 자동 장착은 없다. 결과 표시용 Title 종류와 titles 응답은 기존 공통 보상 UI에 전달한다.
 - 소유·수령 기록은 기존 트랜잭션으로 확정한다. 응답 titles 배열(titleId, isNew)을 공통 보상 전달·표시까지 유지한다.
 - 클라이언트 소유 목록 쓰기를 금지하고 장착은 서버 기존 소유로 검증한다. 빈 ID는 해제다. 기존 계정의 필드 부재는 빈 소유·미장착이며 기존 소유 기록은 보존한다.
 - 서버 Title 표는 칭호 보상 처리 시에만 로드한다. 클라이언트 필수 초기화 표에 추가하지 않는다. 표시 카탈로그에 없는 소유 ID는 보존한다.
@@ -46,7 +46,7 @@
 - [ ] 재접속 후 소지·장착 상태가 복원된다.
 - [x] 기존 프로필 편집이나 서버 응답 채택으로 칭호 정보가 사라지지 않는다.
 - [x] 긴 칭호와 스크롤 목록이 잘리거나 겹치지 않는다.
-- [x] 기존 계정도 접속 시 달성한 칭호를 지급받으며, 미달성 칭호는 잠금 상태를 유지한다(로컬 서버·클라이언트 검증).
+- [x] 접속·집계 달성으로는 칭호를 지급하지 않고 해당 업적 보상 수령 시 지급한다. 기존 소유는 보존한다(로컬 검증).
 
 2026-09-21 검증: 전체 런타임·에디터 컴파일, 도메인 9항목, 전체/슬롯 스냅샷과 JSON 복원, 서버 응답 채택 검증 통과. 프로필 프리팹의 목록·잠금·장착·스크롤·닫기 복귀와 렌더 확인 완료.
 
@@ -54,9 +54,9 @@
 
 기존 직접 지급 메뉴는 서버 소유 전환으로 제거했다. 화면은 로비 설정 또는 `Tools > 칭호 > 칭호 선택창 열기`로 확인한다. 독립 칭호 테스트는 `scripts/test-title-ownership.ps1`, 서버 단위 테스트는 `functions/scripts/test-title-ownership.js`, 로컬 Firestore 테스트는 `functions/scripts/test-title-ownership-emulator.js`다. 에디터 `Tools > 검증 > 칭호 서버 소유 회귀`는 저장·통신 없이 임시 프리팹과 CSV를 검사한다.
 
-배포 시 Title 전용 조건 표를 불변 스펙 릴리스로 발행한다. 기존 6.61의 Reward 칭호 행은 제거한다. 칭호 응답을 이해하는 클라이언트와 서버·규칙을 함께 검증한다. 원격 배포 대상은 test이며 아래 구현 기록과 원격 반영 결과를 구분한다.
+배포 시 Achievement 조건 표·Title ID 표·Reward 지급물 표를 같은 불변 스펙 릴리스로 발행하고 새 구조를 읽는 서버를 함께 반영한다. 기존 Reward 213행은 보존하고 업적 재화 61행·칭호 8행을 추가한다. 새 ID는 276~344이며 과거 제거한 268~275는 재사용하지 않는다. 칭호 응답을 이해하는 클라이언트와 서버·규칙을 함께 검증한다. 원격 배포 대상은 test이며 아래 구현 기록과 원격 반영 결과를 구분한다.
 
-## 자동 지급 조건 초안
+## 이전 자동 지급 조건 초안 (업적 수령 방식으로 대체됨)
 
 `Title` 표가 해금 이벤트·시너지 ID·목표값·조건 문구의 진실원이다. Reward·Achievement 표를 읽지 않는다. 누적 집계는 기존 서버 통계를 재사용하며 업적 재화 보상 수령 여부와 이전 단계 수령 여부는 칭호 지급에 영향을 주지 않는다. 빈 eventKey·빈 synergyId·targetCount=0은 자동 해금이 없는 수동 지급용 항목이며 현재 8종은 모두 자동 해금 조건을 갖는다.
 
@@ -93,4 +93,8 @@ Functions 14개 배포 후 ACTIVE 확인: ensureTitles, openPack, claimAttendanc
 
 ## Open Questions
 
-없음. 테스트 조건 초안·달성 즉시 자동 지급·test만 배포 승인. 이후 수정 지시로 칭호만 Reward에서 분리한다. 기존 카드·팩 보상은 유지한다. live 스펙은 변경하지 않는다. 프로젝트 공용 Functions는 Title 표가 미발행인 환경에서 칭호 지급을 생략하며, 원격 규칙의 칭호 소유 검증은 test에만 적용한다.
+2026-09-22 업적 수령 전환 로컬 검증: TypeScript 빌드·변경 파일 ESLint, 서버 단위 22개·Firestore 에뮬레이터 30개·선택적 Title 파서 4개(총 56개) 통과. Unity 컴파일·업적 보상/수령 JSON DTO·실제 업적 행의 칭호 이름/아이콘 렌더 확인. 조건 미달·이전 단계 미수령·동시 수령·영수증 재생/만료·중단 롤백과 부팅/통계/팩/경험치 자동 지급 금지를 확인했다. 원격 서버·실제 계정에는 적용하지 않았다.
+
+현재 구현은 업적 보상 수령 방식이며 위 자동 지급·배포 기록은 이전 동작의 이력이다. 2026-09-22 후속 변경으로 업적 재화와 칭호를 Reward에 통합했다. 기존 Title 조건과 Achievement의 이벤트·시너지 ID·목표값 대조는 데이터 이관 시 한 번만 사용했다. 실행 시에는 Reward의 명시적 업적 ID·칭호 ID 연결을 따르며 조건 조인을 하지 않는다. 기존 61단계의 조건·수령 키와 칭호 8종 ID, 재화 합계(Gold 7,300 / Shard 240 / Diamond 300), 기존 Reward 213행을 보존했다. 기존 수령 마커와 칭호 소유는 초기화하지 않는다. 이번 변경은 로컬 코드·CSV에만 반영하며 서버 배포·시트 발행·SpecData.bytes 갱신은 수행하지 않는다.
+
+2026-09-22 후속 배포: 사용자 요청으로 test `6.64`를 발행해 위 로컬 변경을 서버에 반영했다. Achievement·Title·Reward만 변경했고 다른 25표는 유지했다. `ensureTitles`, `openPack`, `claimAttendance`, `claimMission`, `claimReward`, `claimPassReward`, `claimBattleExperience`, `spinRoulette`, `craftCard`, `grantTutorialCards`, `claimAchievement`, `getMissions`, `getAttendance`, `getPass`, `getAchievements`, `devCompleteAchievements` 16개 모두 ACTIVE를 확인했다. 업적 조회·수령·칭호 초기화·업적 디버그의 미인증 호출은 HTTP 401이었다. 원격 28표 payload, 세 표 행 미러, 칭호 연결 8개를 확인했으며 실제 플레이어 데이터는 변경하지 않았다. live 스펙은 `6.11` 그대로, 규칙과 생성 산출물도 그대로다. Functions 배포는 test/live 공용이며 live의 기존 AlbumEntry·AlbumThemeInfo·Reward 무결성과 Title 미발행 경로를 확인했다.

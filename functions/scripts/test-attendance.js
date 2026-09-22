@@ -64,6 +64,10 @@ const rows = lines.filter((line) => line.includes(",Attendance,")).map((line) =>
 let authoredRows = rows, failItemGrant = false;
 stub("../lib/firebaseApp", {db});
 stub("../lib/packs/packSpecReader", {readSpecRows: async () => authoredRows});
+stub("../lib/specs/specBlobReader", {readSpecRows: async (_env, table) => {
+  assert.ok(["AlbumEntry", "AlbumThemeInfo"].includes(table));
+  return [];
+}});
 stub("../lib/missions/missionSpec", {readMissionCatalog: async () => []});
 stub("../lib/rewards/itemGrant", {
   loadItemGrantContext: async () => ({cards: []}),

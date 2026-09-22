@@ -213,6 +213,7 @@ public class OutgameTutorialBridge : MonoBehaviour
                 EOutgameTutorialStepResult t_result;
                 try
                 {
+                    await GuidanceCoordinator.PrepareGrowthSurfaceAsync(t_entering, m_stepToken);
                     if (!GuidedCursor && t_entering != null
                         && (t_entering.Completion == EOutgameTutorialCompletion.RankEffect
                             || t_entering.Completion == EOutgameTutorialCompletion.ContentUnlockIntro))
@@ -473,20 +474,23 @@ public class OutgameTutorialBridge : MonoBehaviour
     }
 
     // 타깃이 이미 등록돼 있으면 즉시 게이트, 아니면 등록 통지를 기다린다.
+    bool CanExplainGrowthWithoutCard => GuidedCursor && GuideResume.Record?.GoalReached == true
+        && OutgameTutorialGuide.TargetCardId == 0 && m_step?.Completion == EOutgameTutorialCompletion.Confirm
+        && (m_step.Anchor == EOutgameTutorialAnchor.LobbyEnhanceKeywordDescription
+            || m_step.Anchor == EOutgameTutorialAnchor.LobbyEnhanceSynergyDescription
+            || m_step.Anchor == EOutgameTutorialAnchor.LobbyEnhanceCardView);
+
     void TryOpenGate()
     {
         if (m_step == null || m_step.Anchor == EOutgameTutorialAnchor.None || GuidanceCoordinator.IsRestoring) return;
         if (SuspendFreeBattleHint()) return;
-        if (!TutorialAnchorRegistry.TryGet(m_step.Anchor, out var t_rect, out var t_button))
+        if (CanExplainGrowthWithoutCard)
         {
-            if (GuidedCursor && GuideResume.Record?.GoalReached == true
-                && OutgameTutorialGuide.TargetCardId == 0 && m_step.Completion == EOutgameTutorialCompletion.Confirm
-                && (m_step.Anchor == EOutgameTutorialAnchor.CardDetailKeywordDescription
-                    || m_step.Anchor == EOutgameTutorialAnchor.CardDetailCardView))
-                OutgameTutorialGateUI.Ensure(gatePrefab).ShowMessageGate(this, null,
-                    OutgameTutorialGuide.MessageOf(m_step), OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
+            OutgameTutorialGateUI.Ensure(gatePrefab).ShowMessageGate(this, null,
+                OutgameTutorialGuide.MessageOf(m_step), OnGateSatisfied, m_step.MessageAtBottom, m_step.UseDim);
             return;
         }
+        if (!TutorialAnchorRegistry.TryGet(m_step.Anchor, out var t_rect, out var t_button)) return;
 
         // 설명 스텝은 앵커를 "강조할 영역"으로만 쓴다 — 누를 대상이 아니라 Button이 없어도 되고 완료는 딤 탭이다.
         // 억제 씬에서도 예외적으로 띄운다(딤이 없으면 완료 신호가 없어 진행이 멈춘다).
@@ -603,9 +607,10 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 오버레이 하나가 닫혔다. 기다리던 화면이 아직 남아 있으면 계속 기다린다 — 어디까지 걷혀야 하는지는 완료 조건이 정한다.
     void OnOverlayClosed()
     {
-        if (GuidanceCoordinator.IsRestoring) return;
+        if (m_applying || m_restoringSurface || GuidanceCoordinator.IsRestoring
+            || GuidanceCoordinator.IsInternalNavigation) return;
         if (m_step != null && m_step.Completion == EOutgameTutorialCompletion.Enhance
-            && !CardDetailOverlayView.IsOpen)
+            && !CardDetailOverlayView.IsOpen && !LobbyEnhanceTabPanel.IsOpen)
         {
             OnUnlockIntroCancelled();
             return;
@@ -908,7 +913,8 @@ public class OutgameTutorialBridge : MonoBehaviour
     // 다시 적용하면 PresentStep의 프리체크가 통과 판정을 한다(응답을 잃어 완료 신호만 못 받은 자리).
     void OnServerFreeShotSpentChanged()
     {
-        if (m_enhancing || m_awaitingUnlockFx || CardDetailOverlayView.IsRitualPlaying) return;
+        if (m_enhancing || m_awaitingUnlockFx || CardDetailOverlayView.IsRitualPlaying
+            || LobbyEnhanceTabPanel.IsPresenting) return;
         ApplyCurrentStep();
     }
 
@@ -1057,7 +1063,7 @@ public class OutgameTutorialBridge : MonoBehaviour
         }
         if (m_step.Completion == EOutgameTutorialCompletion.Enhance && !m_enhancing && !m_awaitingUnlockFx)
         {
-            if (CardDetailOverlayView.IsRitualPlaying)
+            if (CardDetailOverlayView.IsRitualPlaying || LobbyEnhanceTabPanel.IsPresenting)
             {
                 if (!m_waitingEnhanceRequest) HideGuide();
                 m_waitingEnhanceRequest = true;
@@ -1073,11 +1079,9 @@ public class OutgameTutorialBridge : MonoBehaviour
         if (!m_enhancing && !m_awaitingUnlockFx
             && !GuidanceCoordinator.IsLobbyPresentationBlockingNavigation
             && !CardDetailOverlayView.IsRitualPlaying && !CardDetailOverlayView.IsUnlockFxPlaying
+            && !LobbyEnhanceTabPanel.IsPresenting
             && !UnlockIntroOverlay.IsOpen && !SuppressGuideUI && m_step.Anchor != EOutgameTutorialAnchor.None
-            && !(GuideResume.Record?.GoalReached == true && OutgameTutorialGuide.TargetCardId == 0
-                && m_step.Completion == EOutgameTutorialCompletion.Confirm
-                && (m_step.Anchor == EOutgameTutorialAnchor.CardDetailKeywordDescription
-                    || m_step.Anchor == EOutgameTutorialAnchor.CardDetailCardView)))
+            && !CanExplainGrowthWithoutCard)
         {
             bool t_available = TutorialAnchorRegistry.TryGet(m_step.Anchor, out var t_rect, out var t_button)
                 && t_rect != null && t_rect.gameObject.activeInHierarchy
@@ -1179,6 +1183,8 @@ public class OutgameTutorialBridge : MonoBehaviour
         CardDetailOverlayView.OnAnyEnhanceStarted     += OnEnhanceStarted;
         CardDetailOverlayView.OnAnyEnhanceResultReady += OnEnhanceResultReady;
         CardDetailOverlayView.OnAnyEnhanceSettled     += OnEnhanceSettled;
+        LobbyEnhanceTabPanel.OnEnhanceStarted        += OnEnhanceStarted;
+        LobbyEnhanceTabPanel.OnEnhanceSettled        += OnEnhanceSettled;
         CardDetailOverlayView.OnAnyUnlockFxFinished   += OnUnlockFxFinished;
         CardDetailOverlayView.OnUnlockIntroCancelled  += OnUnlockIntroCancelled;
         LobbyRankEffectDirector.OnAnyFinished     += OnRankEffectFinished;
@@ -1209,6 +1215,8 @@ public class OutgameTutorialBridge : MonoBehaviour
         CardDetailOverlayView.OnAnyEnhanceStarted     -= OnEnhanceStarted;
         CardDetailOverlayView.OnAnyEnhanceResultReady -= OnEnhanceResultReady;
         CardDetailOverlayView.OnAnyEnhanceSettled     -= OnEnhanceSettled;
+        LobbyEnhanceTabPanel.OnEnhanceStarted        -= OnEnhanceStarted;
+        LobbyEnhanceTabPanel.OnEnhanceSettled        -= OnEnhanceSettled;
         CardDetailOverlayView.OnAnyUnlockFxFinished   -= OnUnlockFxFinished;
         CardDetailOverlayView.OnUnlockIntroCancelled  -= OnUnlockIntroCancelled;
         LobbyRankEffectDirector.OnAnyFinished     -= OnRankEffectFinished;

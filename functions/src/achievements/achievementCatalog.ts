@@ -1,5 +1,6 @@
 import type {CurrencyGain} from "../currency/wallet";
 import {CURRENCY_MAX} from "../currency/currencyKeys";
+import {resolveRewards, RewardRow} from "../rewardTable";
 
 export const ACHIEVEMENT_EVENTS = [
   "WinBattle", "DestroyCards", "PlaySynergy", "CompleteAlbum", "WinStreak", "OpenPack",
@@ -15,7 +16,7 @@ export interface AchievementDef {
   title: string;
   description: string;
   sortOrder: number;
-  reward: {currencies: CurrencyGain[]};
+  reward: {currencies: CurrencyGain[]; items?: {rewardType: "Title"; rewardId: string; amount: number}[]};
 }
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$/;
@@ -24,8 +25,8 @@ export function isAchievementId(value: unknown): value is string {
   return typeof value === "string" && ID.test(value);
 }
 
-// Invalid authored rewards fail closed; disabled future cosmetic rewards are ignored.
-export function parseAchievementCatalog(rows: readonly Record<string, unknown>[]): AchievementDef[] {
+// Conditions live in Achievement; every reward is authored in Reward by the permanent achievement ID.
+export function parseAchievementCatalog(rows: readonly Record<string, unknown>[], rewards: RewardRow[]): AchievementDef[] {
   const ids = new Set<string>();
   const groups = new Map<string, AchievementDef[]>();
   const result: AchievementDef[] = [];
@@ -37,22 +38,25 @@ export function parseAchievementCatalog(rows: readonly Record<string, unknown>[]
     const synergyId = String(row.synergyId ?? "");
     const stage = Number(row.stage);
     const target = Number(row.targetCount);
-    const amount = Number(row.rewardAmount);
-    const currency = String(row.rewardCurrency ?? "");
     const sortOrder = Number(row.sortOrder);
     if (!isAchievementId(id) || !isAchievementId(groupId) || ids.has(id) ||
         !ACHIEVEMENT_EVENTS.includes(event) || !Number.isSafeInteger(stage) || stage < 1 ||
         !Number.isSafeInteger(target) || target < 1 || !Number.isSafeInteger(sortOrder) ||
-        !Number.isSafeInteger(amount) || amount <= 0 || amount > CURRENCY_MAX ||
-        !["Diamond", "Gold", "Shard"].includes(currency) ||
         (event === "PlaySynergy" ? !SYNERGY_ID.test(synergyId) : synergyId !== "") ||
         typeof row.title !== "string" || row.title.trim().length === 0) {
       throw new Error(`Invalid Achievement row: ${id || row.id}`);
     }
+    const reward = resolveRewards(rewards, "Achievement", id);
+    if (reward.dropped.length > 0 || reward.gains.length + reward.items.length === 0 ||
+        reward.gains.some((gain) => !Number.isSafeInteger(gain.amount) || gain.amount > CURRENCY_MAX) ||
+        reward.items.some((item) => item.rewardType !== "Title")) {
+      throw new Error(`Missing or invalid Achievement reward: ${id}`);
+    }
     const definition: AchievementDef = {
       id, groupId, stage, event, synergyId, target, title: row.title,
       description: String(row.description ?? ""), sortOrder,
-      reward: {currencies: [{currency: currency as CurrencyGain["currency"], amount}]},
+      reward: {currencies: reward.gains,
+        items: reward.items.map((item) => ({rewardType: "Title", rewardId: item.rewardId, amount: item.amount}))},
     };
     ids.add(id);
     result.push(definition);

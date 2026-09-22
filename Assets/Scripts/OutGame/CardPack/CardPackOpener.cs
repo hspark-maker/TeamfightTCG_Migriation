@@ -130,6 +130,6 @@ public static class CardPackOpener
             }
         }
 
-        return OpenedPack.CreateSuccess(t_drawn, _result.ResolveRefundType());
+        return OpenedPack.CreateSuccess(t_drawn, _result.ResolveCardDustGain());
     }
 }

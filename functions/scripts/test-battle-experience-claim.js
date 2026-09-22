@@ -21,7 +21,7 @@ const db = {
           assert.equal(writes.length, 0, "read after write");
           reads.set(reference.path, versions.get(reference.path) || 0);
           const value = clone(documents.get(reference.path));
-          return {exists: value !== undefined, data: () => clone(value)};
+          return {ref: reference, exists: value !== undefined, data: () => clone(value)};
         },
         async getAll(...refs) { return Promise.all(refs.map((r) => this.get(r))); },
         set(reference, value, options) { writes.push({reference, value, merge: options?.merge}); },
@@ -49,6 +49,10 @@ function stub(modulePath, exports) {
   require.cache[filename] = {id: filename, filename, loaded: true, exports};
 }
 stub("../lib/firebaseApp", {db});
+stub("../lib/specs/specBlobReader", {readSpecRows: async (_env, table) => {
+  assert.ok(["AlbumEntry", "AlbumThemeInfo"].includes(table));
+  return [];
+}});
 stub("../lib/missions/missionSpec", {readMissionCatalog: async () => []});
 stub("../lib/rewards/itemGrant", {
   loadItemGrantContext: async () => ({cards: []}),

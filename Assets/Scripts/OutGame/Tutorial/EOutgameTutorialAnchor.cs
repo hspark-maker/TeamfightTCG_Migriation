@@ -39,4 +39,10 @@ public enum EOutgameTutorialAnchor
     CardDetailSynergyDescription = 34,
     CardDetailShardIcon          = 35,
     CardDetailShardAmount        = 36,
+    LobbyEnhanceCardView         = 37,
+    LobbyEnhanceKeywordDescription = 38,
+    LobbyEnhanceSynergyDescription = 39,
+    LobbyEnhanceButton           = 40,
+    LobbyEnhanceShardIcon        = 41,
+    LobbyEnhanceShardAmount      = 42,
 }

@@ -1,35 +1,41 @@
 ﻿"use strict";
 // Only a local emulator and disposable demo project are allowed.
 const assert = require("node:assert/strict");
+const {resolve} = require("node:path");
+const output = process.env.TITLE_TEST_BUILD || "../lib";
+const built = name => require(resolve(__dirname, output, name));
 const {test, after} = require("node:test");
 const {randomUUID, createHash} = require("node:crypto");
 if (!/^(127\.0\.0\.1|localhost):\d+$/.test(process.env.FIRESTORE_EMULATOR_HOST ?? "") ||
     !String(process.env.GCLOUD_PROJECT ?? "").startsWith("demo-")) {
   throw new Error("A local Firestore emulator and demo-* project are required.");
 }
-const {db} = require("../lib/firebaseApp");
-const specs = require("../lib/specs/specBlobReader");
-const saves = require("../lib/save/saveDocument");
-const missions = require("../lib/missions/missionSpec");
-const replay = require("../lib/battleReplayService");
-const replayConfig = require("../lib/battleReplayConfig");
-const {computeDeckHash} = require("../lib/deckValidation");
-const {claimAchievement} = require("../lib/commands/claimAchievement");
-const {getAchievements} = require("../lib/commands/getAchievements");
-const {getPlayerStatistics} = require("../lib/commands/getPlayerStatistics");
-const {readAchievements, writeAchievements} = require("../lib/achievements/achievementStore");
-const {beginStatistics, commitStatistics} = require("../lib/statistics/playerStatisticsStore");
-const {applyStatisticsBattle} = require("../lib/statistics/playerStatistics");
-const {openPack} = require("../lib/commands/openPack");
-const {submitMatchResult} = require("../lib/commands/submitMatchResult");
+const {db} = built("firebaseApp");
+const specs = built("specs/specBlobReader");
+const saves = built("save/saveDocument");
+const missions = built("missions/missionSpec");
+const replay = built("battleReplayService");
+const replayConfig = built("battleReplayConfig");
+const {computeDeckHash} = built("deckValidation");
+const {claimAchievement} = built("commands/claimAchievement");
+const {getAchievements} = built("commands/getAchievements");
+const {getPlayerStatistics} = built("commands/getPlayerStatistics");
+const {readAchievements, writeAchievements} = built("achievements/achievementStore");
+const {beginStatistics, commitStatistics} = built("statistics/playerStatisticsStore");
+const {applyStatisticsBattle} = built("statistics/playerStatistics");
+const {openPack} = built("commands/openPack");
+const {submitMatchResult} = built("commands/submitMatchResult");
 after(() => db.terminate());
 
 const definitions = [1, 2].map((stage) => ({id: stage, achievementId: `wins.${stage}`, groupId: "wins", stage,
   eventKey: "WinBattle", synergyId: "", targetCount: stage, title: "Wins", description: "Total wins",
-  rewardCurrency: stage === 1 ? "Gold" : "Diamond", rewardAmount: 10, sortOrder: 1, enabled: 1}));
+  sortOrder: 1, enabled: 1}));
 const albumDef = {id: 3, achievementId: "album.1", groupId: "album", stage: 1, eventKey: "CompleteAlbum",
-  synergyId: "", targetCount: 1, title: "Albums", description: "Complete themes", rewardCurrency: "Shard", rewardAmount: 3,
+  synergyId: "", targetCount: 1, title: "Albums", description: "Complete themes",
   sortOrder: 2, enabled: 1};
+const rewards = [["wins.1", "Gold", 10], ["wins.2", "Diamond", 10], ["album.1", "Shard", 3]]
+  .map(([ownerId, rewardId, amount], i) => ({id: i + 1, ownerType: "Achievement", ownerId, order: 1,
+    rewardType: "Currency", rewardId, amount}));
 const cards = Array.from({length: 6}, (_, i) => ({id: i + 1, channel: "Live", grade: "Common", maxHp: 5,
   keywords: 0, keywordUnlockLevel: 1, hp2: 6, hp3: 7, hp4: 8, synergies: "Data_Synergy_Bulk"}));
 const table = (name) => {
@@ -40,7 +46,8 @@ const table = (name) => {
   if (name === "CardPack") return [{id: 1, packId: "pack", price: 10, priceType: "Gold", drawCount: 1}];
   if (name === "CardPackDrop") return [{id: 1, packId: "pack", cardId: 2, weight: 1}];
   if (name === "RankGrade") return [];
-  if (name === "Reward" || name === "PassSeason") return [];
+  if (name === "Reward") return rewards;
+  if (name === "PassSeason") return [];
   if (name === "CardEnhanceRule") return [{id: 1, maxLevel: 4, maxLimitBreak: 1}];
   if (name === "CardLimitBreak") return [{id: 1, stage: 1, hpGain: 1, snackCost: 3}];
   if (name === "SynergyTierDef") return [{id: 1, synergyId: "Bulk", requiredCount: 2}];
@@ -51,6 +58,7 @@ async function setup(t, progress = {WinBattle: 3}) {
   const uid = "achievement-test-" + randomUUID();
   const root = db.doc(`envs/test/users/${uid}`);
   t.mock.method(specs, "readSpecRows", async (_env, name) => table(name));
+  t.mock.method(specs, "readOptionalSpecRows", async (_env, name) => {assert.equal(name, "Title"); return null;});
   t.mock.method(specs, "readPinnedSpecRows", async (_env, name) => table(name));
   t.mock.method(missions, "readMissionCatalog", async () => []);
   await Promise.all([
@@ -166,7 +174,8 @@ test("all reward-pack commands count each opened pack once and direct card grant
     assert.equal(result.achievements.progress.OpenPack, before.progress.OpenPack);
     const direct = await saves.mutateSave("test", uid, source, {kind: "client", txId: randomUUID()},
       () => ({slots: {}}), (adopted) => ({...adopted, cards: [{cardId: 3}], packs: []}));
-    assert.equal(direct.achievements, undefined);
+    assert.equal(direct.achievements.progress.OpenPack, before.progress.OpenPack);
+    assert.equal(direct.achievements.revision, before.revision);
     assert.deepEqual((await read())[2], before);
   }
   assert.equal((await read())[2].progress.OpenPack, 12);
@@ -309,7 +318,10 @@ test("receipt replay after independent statistics refresh returns its old revisi
   const opened = await openPack.run(pack);
   assert.equal(opened.statistics.lifetime.packsOpened, 1);
   const ref = root.collection("statistics").doc("current");
-  // Ownership-derived albums are resolved by the separate read endpoint, without a save revision bump.
+  // A later legacy writer is reconciled by the statistics query without changing the pack receipt.
+  await root.collection("achievements").doc("current").update({
+    "progress.OpenPack": 2, revision: opened.achievements.revision + 1,
+  });
   const refreshed = await getPlayerStatistics.run(request());
   assert.ok(refreshed.statistics.revision > opened.statistics.revision);
   const stored = (await ref.get()).data();

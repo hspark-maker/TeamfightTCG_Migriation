@@ -19,7 +19,8 @@ public static class ServerOwnedRewardOwners
 {
     // Pass 도 같은 성격이다 — 지급은 claimPassReward 가 하고, 화면 값은 getPass 응답의 levels[].reward 로 온다.
     // AccountLevel 보상은 서버 grantAccountExperience가 지급하고, 클라는 지급 응답을 표시한다.
-    static readonly string[] NAMES = { "Mission", "Pass", "Guide", "CardDuplicate", "Attendance", "AccountLevel" };
+    // Achievement도 서버가 Reward 행을 해석한 getAchievements 응답만 표시한다.
+    static readonly string[] NAMES = { "Mission", "Pass", "Guide", "CardDuplicate", "Attendance", "AccountLevel", "Achievement" };
 
     public static bool Contains(string _ownerType)
     {
@@ -152,7 +153,11 @@ public static class RewardSpec
             else
             {
                 if (t_row.amount <= 0 || string.IsNullOrEmpty(t_row.rewardId)) continue;
-                if (t_rewardType == ERewardType.Title) continue;
+                if (t_rewardType == ERewardType.Title && t_row.amount != 1)
+                {
+                    Debug.LogWarning($"[RewardSpec] Reward id {t_row.id}: a title reward must have amount 1.");
+                    continue;
+                }
                 t_def = new AlbumRewardDef { rewardType = t_rewardType, rewardId = t_row.rewardId, amount = t_row.amount };
             }
             string t_key = KeyOf(t_ownerType, t_row.ownerId);

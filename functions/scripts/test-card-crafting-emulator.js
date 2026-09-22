@@ -39,11 +39,12 @@ async function setup(t, options = {}) {
     if (name === "AlbumThemeInfo") return [{id: 1, themeId: "crafted", locked: 0}];
     if (name === "Achievement") return [{id: 1, achievementId: "album.1", groupId: "album", stage: 1,
       eventKey: "CompleteAlbum", synergyId: "", targetCount: 1, title: "Albums", description: "Complete themes",
-      rewardCurrency: "Shard", rewardAmount: 3, sortOrder: 1, enabled: 1}];
+      sortOrder: 1, enabled: 1}];
     if (name === "CardPack") return [{id: 1, packId: "craft-race", price: 10, priceType: "Gold", drawCount: 1}];
     if (name === "CardPackDrop") return [{id: 1, packId: "craft-race", cardId: 2, weight: 1}];
     if (name === "Reward") return [{id: 1, ownerType: "CardDuplicate", ownerId: "Common", amount: 1,
-      rewardType: "Currency", rewardId: "CardDust", order: 1}];
+      rewardType: "Currency", rewardId: "CardDust", order: 1},
+      {id: 2, ownerType: "Achievement", ownerId: "album.1", order: 1, rewardType: "Currency", rewardId: "Shard", amount: 3}];
     if (name === "RankGrade") return ["Bronze", "Silver", "Gold", "Platinum", "Diamond"].map((gradeKey, index) => ({
       id: index + 1, gradeKey, entryPoints: 100 + index * 160,
     }));

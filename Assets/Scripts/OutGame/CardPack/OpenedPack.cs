@@ -62,8 +62,14 @@ public class OpenedPack
             for (int t_i = 0; t_i < _cards.Count; t_i++) t_totalRefund += _cards[t_i].Refund;
         }
 
+        return CreateSuccess(_cards, new CurrencyGain(_refundType, t_totalRefund));
+    }
+
+    // 서버가 확정한 중복 보상 합계. 낱장 연출에 가상의 환급액을 배분하지 않는다.
+    public static OpenedPack CreateSuccess(List<DrawnCard> _cards, CurrencyGain _totalRefund)
+    {
         var t_cards = _cards != null ? _cards.AsReadOnly() : (IReadOnlyList<DrawnCard>)System.Array.Empty<DrawnCard>();
-        return new OpenedPack(EPackOpenResult.Success, t_cards, new CurrencyGain(_refundType, t_totalRefund));
+        return new OpenedPack(EPackOpenResult.Success, t_cards, _totalRefund);
     }
 
     // 실패 결과 조립 — 카드 없음·환급 0

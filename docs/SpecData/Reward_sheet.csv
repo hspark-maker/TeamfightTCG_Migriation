@@ -214,3 +214,72 @@ int,string,string,int,string,string,long,string
 265,AccountLevel,48,1,Currency,Gold,30,계정 레벨 48 달성; 자동 지급; 이전 레벨 소급 없음
 266,AccountLevel,49,1,Currency,Gold,30,계정 레벨 49 달성; 자동 지급; 이전 레벨 소급 없음
 267,AccountLevel,50,1,Currency,Gold,30,계정 레벨 50 달성; 자동 지급; 이전 레벨 소급 없음
+276,Achievement,win.1,1,Currency,Gold,100,승리의 기록
+277,Achievement,win.2,1,Currency,Shard,20,승리의 기록
+278,Achievement,win.3,1,Currency,Diamond,5,승리의 기록
+279,Achievement,win.4,1,Currency,Gold,500,승리의 기록
+280,Achievement,win.5,1,Currency,Diamond,20,승리의 기록
+281,Achievement,destroy.1,1,Currency,Gold,100,파괴의 기록
+282,Achievement,destroy.2,1,Currency,Shard,20,파괴의 기록
+283,Achievement,destroy.3,1,Currency,Diamond,5,파괴의 기록
+284,Achievement,destroy.4,1,Currency,Gold,500,파괴의 기록
+285,Achievement,destroy.5,1,Currency,Diamond,20,파괴의 기록
+286,Achievement,synergy.Brand.1,1,Currency,Gold,100,낙인의 동료
+287,Achievement,synergy.Brand.2,1,Currency,Shard,20,낙인의 동료
+288,Achievement,synergy.Brand.3,1,Currency,Diamond,5,낙인의 동료
+289,Achievement,synergy.Brand.4,1,Currency,Gold,500,낙인의 동료
+290,Achievement,synergy.Brand.5,1,Currency,Diamond,20,낙인의 동료
+291,Achievement,synergy.Bulk.1,1,Currency,Gold,100,덩치의 동료
+292,Achievement,synergy.Bulk.2,1,Currency,Shard,20,덩치의 동료
+293,Achievement,synergy.Bulk.3,1,Currency,Diamond,5,덩치의 동료
+294,Achievement,synergy.Bulk.4,1,Currency,Gold,500,덩치의 동료
+295,Achievement,synergy.Bulk.5,1,Currency,Diamond,20,덩치의 동료
+296,Achievement,synergy.Caretaker.1,1,Currency,Gold,100,돌보미의 동료
+297,Achievement,synergy.Caretaker.2,1,Currency,Shard,20,돌보미의 동료
+298,Achievement,synergy.Caretaker.3,1,Currency,Diamond,5,돌보미의 동료
+299,Achievement,synergy.Caretaker.4,1,Currency,Gold,500,돌보미의 동료
+300,Achievement,synergy.Caretaker.5,1,Currency,Diamond,20,돌보미의 동료
+301,Achievement,synergy.Flow.1,1,Currency,Gold,100,흐름의 동료
+302,Achievement,synergy.Flow.2,1,Currency,Shard,20,흐름의 동료
+303,Achievement,synergy.Flow.3,1,Currency,Diamond,5,흐름의 동료
+304,Achievement,synergy.Flow.4,1,Currency,Gold,500,흐름의 동료
+305,Achievement,synergy.Flow.5,1,Currency,Diamond,20,흐름의 동료
+306,Achievement,synergy.Legacy.1,1,Currency,Gold,100,유산의 동료
+307,Achievement,synergy.Legacy.2,1,Currency,Shard,20,유산의 동료
+308,Achievement,synergy.Legacy.3,1,Currency,Diamond,5,유산의 동료
+309,Achievement,synergy.Legacy.4,1,Currency,Gold,500,유산의 동료
+310,Achievement,synergy.Legacy.5,1,Currency,Diamond,20,유산의 동료
+311,Achievement,synergy.Predator.1,1,Currency,Gold,100,포식자의 동료
+312,Achievement,synergy.Predator.2,1,Currency,Shard,20,포식자의 동료
+313,Achievement,synergy.Predator.3,1,Currency,Diamond,5,포식자의 동료
+314,Achievement,synergy.Predator.4,1,Currency,Gold,500,포식자의 동료
+315,Achievement,synergy.Predator.5,1,Currency,Diamond,20,포식자의 동료
+316,Achievement,synergy.Scale.1,1,Currency,Gold,100,비늘의 동료
+317,Achievement,synergy.Scale.2,1,Currency,Shard,20,비늘의 동료
+318,Achievement,synergy.Scale.3,1,Currency,Diamond,5,비늘의 동료
+319,Achievement,synergy.Scale.4,1,Currency,Gold,500,비늘의 동료
+320,Achievement,synergy.Scale.5,1,Currency,Diamond,20,비늘의 동료
+321,Achievement,synergy.Trace.1,1,Currency,Gold,100,추적의 동료
+322,Achievement,synergy.Trace.2,1,Currency,Shard,20,추적의 동료
+323,Achievement,synergy.Trace.3,1,Currency,Diamond,5,추적의 동료
+324,Achievement,synergy.Trace.4,1,Currency,Gold,500,추적의 동료
+325,Achievement,synergy.Trace.5,1,Currency,Diamond,20,추적의 동료
+326,Achievement,album.1,1,Currency,Gold,100,앨범 수집가
+327,Achievement,streak.1,1,Currency,Gold,100,멈추지 않는 승리
+328,Achievement,streak.2,1,Currency,Shard,20,멈추지 않는 승리
+329,Achievement,streak.3,1,Currency,Diamond,5,멈추지 않는 승리
+330,Achievement,streak.4,1,Currency,Gold,500,멈추지 않는 승리
+331,Achievement,streak.5,1,Currency,Diamond,20,멈추지 않는 승리
+332,Achievement,pack.1,1,Currency,Gold,100,팩 탐험가
+333,Achievement,pack.2,1,Currency,Shard,20,팩 탐험가
+334,Achievement,pack.3,1,Currency,Diamond,5,팩 탐험가
+335,Achievement,pack.4,1,Currency,Gold,500,팩 탐험가
+336,Achievement,pack.5,1,Currency,Diamond,20,팩 탐험가
+337,Achievement,win.1,2,Title,test_first_step,1,업적 칭호 보상
+338,Achievement,win.2,2,Title,test_blue_traveler,1,업적 칭호 보상
+339,Achievement,pack.2,2,Title,test_golden_collector,1,업적 칭호 보상
+340,Achievement,streak.1,2,Title,test_dawn_guardian,1,업적 칭호 보상
+341,Achievement,win.4,2,Title,test_long_journey,1,업적 칭호 보상
+342,Achievement,destroy.2,2,Title,test_silent_sword,1,업적 칭호 보상
+343,Achievement,album.1,2,Title,test_small_universe,1,업적 칭호 보상
+344,Achievement,win.5,2,Title,test_endless_adventure,1,업적 칭호 보상

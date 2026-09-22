@@ -55,6 +55,7 @@ exports.specPayloadHash = specPayloadHash;
 exports.parseSpecPayload = parseSpecPayload;
 exports.readSpecRows = readSpecRows;
 exports.readSpecRowsWithContentMajor = readSpecRowsWithContentMajor;
+exports.readOptionalSpecRows = readOptionalSpecRows;
 exports.clearSpecCache = clearSpecCache;
 const node_crypto_1 = require("node:crypto");
 const logger = __importStar(require("firebase-functions/logger"));
@@ -117,12 +118,12 @@ async function loadPublishedIndex(env) {
         throw new Error(`published content ${major}.${minor} is incompatible`);
     }
     const rawTables = data.tables;
-    if (rawTables == null || typeof rawTables !== "object") {
+    if (rawTables == null || typeof rawTables !== "object" || Array.isArray(rawTables)) {
         throw new Error("published content index has no tables map");
     }
     const tables = {};
     for (const [name, raw] of Object.entries(rawTables)) {
-        if (raw == null || typeof raw !== "object") {
+        if (raw == null || typeof raw !== "object" || Array.isArray(raw)) {
             throw new Error(`published content index entry ${name} is invalid`);
         }
         const entry = raw;
@@ -343,7 +344,14 @@ async function readSpecRowsWithContentMajor(env, table) {
     const rows = await readCachedBlob(env, table, published.blobPath, published.payloadHash);
     return { major: index.major, rows };
 }
-async function readCachedBlob(env, table, blobPath, payloadHash, pinned = false) {
+// Only an absent index entry disables an optional feature. Corrupt published data fails closed.
+async function readOptionalSpecRows(env, table) {
+    const published = (await readIndex(env)).tables[table];
+    if (published === undefined)
+        return null;
+    return readCachedBlob(env, table, published.blobPath, published.payloadHash, false, true);
+}
+async function readCachedBlob(env, table, blobPath, payloadHash, pinned = false, strictIds = false) {
     const currentKey = `${env}/${table}`;
     const pinnedKey = `${env}/${table}/${payloadHash}`;
     const key = pinned ? pinnedKey : currentKey;
@@ -352,6 +360,8 @@ async function readCachedBlob(env, table, blobPath, payloadHash, pinned = false)
     const cached = [cache.get(key), cache.get(pinned ? currentKey : pinnedKey)].find((entry) => entry !== undefined && (payloadHash === null ? entry.expiresAt !== null && entry.expiresAt > Date.now() :
         entry.expiresAt === null && entry.payloadHash === payloadHash));
     if (cached !== undefined) {
+        if (strictIds && cached.sourceRowCount !== cached.rows.length)
+            throw new Error(`Invalid ${table} row identifiers`);
         (0, requestMetrics_1.recordMetric)("specBlobCacheHits");
         cache.set(key, cached);
         return cached.rows;
@@ -364,7 +374,7 @@ async function readCachedBlob(env, table, blobPath, payloadHash, pinned = false)
         const read = await readFromBlob(env, table, blobPath, payloadHash);
         const rows = sortById(read.rows);
         const entry = {
-            payloadHash: read.payloadHash, rows,
+            payloadHash: read.payloadHash, rows, sourceRowCount: read.rows.length,
             expiresAt: payloadHash === null ? now + UNINDEXED_CACHE_TTL_MS : null,
         };
         if (generation === cacheGeneration)
@@ -374,6 +384,8 @@ async function readCachedBlob(env, table, blobPath, payloadHash, pinned = false)
         });
         return entry;
     }, "specBlob");
+    if (strictIds && loaded.sourceRowCount !== loaded.rows.length)
+        throw new Error(`Invalid ${table} row identifiers`);
     // 같은 조회를 기다린 current/pin 소비자 각각의 캐시에도 검증된 결과를 채운다.
     if (generation === cacheGeneration)
         cache.set(key, loaded);

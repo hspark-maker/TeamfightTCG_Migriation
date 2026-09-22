@@ -1,14 +1,8 @@
 import {HttpsError} from "firebase-functions/v2/https";
 
-export const TITLE_EVENTS = ["WinBattle", "DestroyCards", "PlaySynergy", "CompleteAlbum", "WinStreak", "OpenPack"] as const;
-export type TitleEvent = typeof TITLE_EVENTS[number] | "";
 export interface TitleDefinition {
   id: number;
   titleId: string;
-  eventKey: TitleEvent;
-  synergyId: string;
-  targetCount: number;
-  description: string;
 }
 export interface GrantedTitle {titleId: string; isNew: boolean}
 
@@ -17,22 +11,14 @@ export function parseTitles(rows: readonly Record<string, unknown>[]): TitleDefi
   const ids = new Set<number>();
   const titles = new Set<string>();
   return rows.map((row) => {
-    const {id, titleId, eventKey, synergyId, targetCount, description} = row;
+    const {id, titleId} = row;
     if (typeof id !== "number" || !Number.isSafeInteger(id) || id <= 0 || id > 2147483647 || ids.has(id) ||
         typeof titleId !== "string" || !titleId || titleId.trim() !== titleId || titles.has(titleId)) {
       throw new Error(`Invalid Title: ${String(id)}`);
     }
-    if (typeof eventKey !== "string" || typeof synergyId !== "string" ||
-        typeof targetCount !== "number" || !Number.isSafeInteger(targetCount) || targetCount > 2147483647 ||
-        typeof description !== "string" || !description.trim() || description.trim() !== description ||
-        (eventKey === "" ? targetCount !== 0 || synergyId !== "" :
-          !TITLE_EVENTS.includes(eventKey as Exclude<TitleEvent, "">) || targetCount < 1 ||
-          (eventKey === "PlaySynergy" ? !/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(synergyId) : synergyId !== ""))) {
-      throw new Error(`Invalid Title condition: ${String(id)}`);
-    }
     ids.add(id);
     titles.add(titleId);
-    return {id, titleId, eventKey: eventKey as TitleEvent, synergyId, targetCount, description};
+    return {id, titleId};
   });
 }
 

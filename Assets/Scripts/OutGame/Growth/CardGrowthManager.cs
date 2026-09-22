@@ -99,13 +99,19 @@ public static class CardGrowthManager
 
     /// <summary>다음 한 번의 샤드 투입 결과. 튜토리얼 무료 강화는 남은 양을 채워 진화한다.</summary>
     public static CardGrowth PreviewGrowthAfterEnhance(int _id)
+        => PreviewGrowthAfterEnhance(_id, 1);
+
+    /// <summary>선택한 샤드 수량의 성장 결과. 지갑으로 제한한 수량은 호출부가 넘기며 성장 기록은 변경하지 않는다.</summary>
+    public static CardGrowth PreviewGrowthAfterEnhance(int _id, int _amount)
     {
         int t_level = LevelOf(_id);
         int t_required = ShardRequiredOf(_id);
         if (t_required <= 0) return GrowthOf(_id);
+        int t_amount = ResolveEnhanceAmount(_amount, t_required - ShardProgressOf(_id), long.MaxValue);
+        if (t_amount <= 0) return GrowthOf(_id);
         if (OutgameTutorialGuide.HasFreeCardEnhance(_id) && OutgameTutorialGuide.CanUseFreeSynergyGrowth(_id))
             return PreviewGrowthAtLevel(_id, GrowthRules.FirstEvolutionLevel);
-        int t_progress = ShardProgressOf(_id) + 1;
+        int t_progress = ShardProgressOf(_id) + t_amount;
         if (t_progress >= t_required || OutgameTutorialGuide.HasFreeCardEnhance(_id))
             return PreviewGrowthAtLevel(_id, t_level + 1);
         return Snapshot(_id, t_level, t_progress);
