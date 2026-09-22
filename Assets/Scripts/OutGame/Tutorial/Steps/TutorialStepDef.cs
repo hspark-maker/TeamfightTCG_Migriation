@@ -93,13 +93,14 @@ public class TutorialStepDef
            + "⚠ 다음 스텝이 또 보상 화면을 세우는 자리에는 켜지 마라 — 아직 날고 있는 카드 위를 그 화면이 덮는다")]
     [SerializeField] bool parallelGain;
 
-    [Tooltip("BattleEntry·AutoBattle: 전투에 넘길 시나리오 / DeckGrant: 지급할 덱의 정본")]
+    [Tooltip("BattleEntry·AutoBattle: 전투에 넘길 시나리오. 저장 덱 구성과는 독립적이다")]
     [SerializeField] TutorialScenarioData scenario;
 
     [Tooltip("CardGrant: 지급할 카드 한 장. 이미 소유한 카드를 꽂아도 안전하지만 획득 연출은 그대로 돈다")]
     [SerializeField, CardId] int cardId;
 
-    [Tooltip("CardSetGrant: 한 묶음으로 지급할 카드들. 순서 = 패널 격자에 놓이는 순서.\n"
+    [Tooltip("DeckGrant: 저장할 서로 다른 카드 6장. 기존 소유 카드와 지급 팩 카드를 조합한다. 전투 시나리오와 별개다.\n"
+           + "CardSetGrant: 한 묶음으로 지급할 카드들. 순서 = 패널 격자에 놓이는 순서.\n"
            + "· 이미 소유한 카드를 넣어도 안전하다. 다만 획득 연출은 그대로 돈다(중복 표시 없이 새 카드처럼 보인다).\n"
            + "· 빈 칸(None)은 건너뛴다 — 격자 자리도 차지하지 않는다.\n"
            + "· 소유권만 준다. 덱에는 편성되지 않는다(덱 저작은 DeckGrant 몫이다).")]

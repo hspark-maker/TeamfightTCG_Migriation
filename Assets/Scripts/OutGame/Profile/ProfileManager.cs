@@ -11,6 +11,11 @@ public static class ProfileManager
 
     // 프로필 변경 통지 — UI 갱신용
     public static event Action OnChanged;
+    public static event Action OnOwnershipChanged;
+
+    static readonly HashSet<string> s_ownedAvatarIds = new HashSet<string>();
+    static readonly HashSet<string> s_ownedFrameIds = new HashSet<string>();
+    static readonly HashSet<int> s_ownedEmoteIds = new HashSet<int>();
 
     public static ProfileConfig Config { get; private set; }
     // 프로필 편집은 로비에서 열리는데 그 자리엔 EmoteDirector(전투 씬 전용)가 없어 여기도 표를 든다.
@@ -87,12 +92,15 @@ public static class ProfileManager
     public static void Init()
     {
         ProfileSaveData t_slot = Slot;
+        NotifyOwnershipRehydrated();
 
         // 닉네임은 서버가 계정 문서를 만들 때 낱말표에서 뽑아 굳힌다(functions/src/profile/generateNickname.ts).
         // 여기 DEFAULT_NICKNAME 폴백은 그 전에 만들어진 옛 계정(nickname=null)만 받는 안전망이다.
         Nickname = RestoreNickname(t_slot.Nickname);
-        AvatarId = IsKnownAvatar(t_slot.AvatarId) ? t_slot.AvatarId : DefaultAvatarId;
-        FrameId  = IsKnownFrame(t_slot.FrameId)   ? t_slot.FrameId  : DefaultFrameId;
+        AvatarId = IsKnownAvatar(t_slot.AvatarId) && IsAvatarOwned(t_slot.AvatarId) ? t_slot.AvatarId
+            : IsAvatarOwned(DefaultAvatarId) ? DefaultAvatarId : string.Empty;
+        FrameId = IsKnownFrame(t_slot.FrameId) && IsFrameOwned(t_slot.FrameId) ? t_slot.FrameId
+            : IsFrameOwned(DefaultFrameId) ? DefaultFrameId : string.Empty;
         s_emoteIds = t_slot.EmoteIds == null ? BuildDefaultLoadout() : BuildLoadout(t_slot.EmoteIds);
 
         // 로비는 세이브 의존 설치보다 먼저 그려진다 — 통지가 없으면 프로필 버튼이 기본값으로 굳는다.
@@ -106,8 +114,8 @@ public static class ProfileManager
     public static void Apply(string _nickname, string _avatarId, string _frameId, IReadOnlyList<int> _emoteIds)
     {
         string t_nickname = ResolveNickname(_nickname);
-        string t_avatarId = IsKnownAvatar(_avatarId) ? _avatarId : AvatarId;
-        string t_frameId  = IsKnownFrame(_frameId)   ? _frameId  : FrameId;
+        string t_avatarId = IsKnownAvatar(_avatarId) && IsAvatarOwned(_avatarId) ? _avatarId : AvatarId;
+        string t_frameId = IsKnownFrame(_frameId) && IsFrameOwned(_frameId) ? _frameId : FrameId;
         List<int> t_emoteIds = BuildLoadout(_emoteIds);
 
         if (t_nickname == Nickname && t_avatarId == AvatarId && t_frameId == FrameId
@@ -122,14 +130,32 @@ public static class ProfileManager
         OnChanged?.Invoke();
     }
 
-    // 해금 훅 자리 — 아바타 해금이 붙으면 여기서 소유 여부를 판정한다(지금은 전부 열려 있다).
-    public static bool IsAvatarOwned(string _id) => true;
+    public static bool IsAvatarOwned(string _id) => !string.IsNullOrEmpty(_id) && Slot.OwnedAvatarIds != null && Slot.OwnedAvatarIds.Contains(_id);
 
-    // 해금 훅 자리 — 프레임 해금이 붙으면 여기서 소유 여부를 판정한다(지금은 전부 열려 있다).
-    public static bool IsFrameOwned(string _id) => true;
+    public static bool IsFrameOwned(string _id) => !string.IsNullOrEmpty(_id) && Slot.OwnedFrameIds != null && Slot.OwnedFrameIds.Contains(_id);
 
-    // 해금 훅 자리 — 감정표현 해금이 붙으면 여기서 소유 여부를 판정한다(지금은 전부 열려 있다).
-    public static bool IsEmoteOwned(int _id) => true;
+    public static bool IsEmoteOwned(int _id) => _id > 0 && Slot.OwnedEmoteIds != null && Slot.OwnedEmoteIds.Contains(_id);
+
+    /// <summary>서버 소유만 재수화한다. 편집값과 저장 통지는 건드리지 않는다.</summary>
+    public static void NotifyOwnershipRehydrated()
+    {
+        bool t_changed = ReplaceOwnership(s_ownedAvatarIds, Slot.OwnedAvatarIds);
+        t_changed |= ReplaceOwnership(s_ownedFrameIds, Slot.OwnedFrameIds);
+        t_changed |= ReplaceOwnership(s_ownedEmoteIds, Slot.OwnedEmoteIds);
+        foreach (string t_id in s_ownedAvatarIds)
+            if (Config != null && (!Config.TryGetAvatar(t_id, out var t_avatar) || t_avatar.large == null))
+                Debug.LogWarning($"[ProfileManager] Owned Avatar has no display asset: {t_id}. Ownership retained.");
+        foreach (string t_id in s_ownedFrameIds)
+            if (Config != null && (!Config.TryGetFrame(t_id, out var t_frame) || t_frame.sprite == null))
+                Debug.LogWarning($"[ProfileManager] Owned Frame has no display asset: {t_id}. Ownership retained.");
+        foreach (int t_id in s_ownedEmoteIds)
+            if (EmoteCatalog != null && (!EmoteCatalog.TryGet(t_id, out var t_emote) || t_emote.sprite == null))
+                Debug.LogWarning($"[ProfileManager] Owned Emote has no display asset: {t_id}. Ownership retained.");
+        if (!t_changed) return;
+        try { OnOwnershipChanged?.Invoke(); }
+        catch (Exception t_exception) { Debug.LogException(t_exception); }
+    }
+
 
     // Apply가 받은 이름을 실제로 굳힐 값으로 바꾼다. 세 갈래다.
     //
@@ -169,6 +195,21 @@ public static class ProfileManager
     }
 
     // 세이브 복원(Init)과 사용자 선택(Apply)이 같은 판정을 쓰게 하는 자리 — 폴백만 호출부가 정한다.
+    static bool ReplaceOwnership<T>(HashSet<T> _current, List<T> _incoming)
+    {
+        if (_incoming == null)
+        {
+            bool t_changed = _current.Count > 0;
+            _current.Clear();
+            return t_changed;
+        }
+        if (_current.SetEquals(_incoming)) return false;
+        _current.Clear();
+        _current.UnionWith(_incoming);
+        return true;
+    }
+
+
     static bool IsKnownAvatar(string _id) => Config != null && Config.TryGetAvatar(_id, out _);
 
     static bool IsKnownFrame(string _id) => Config != null && Config.TryGetFrame(_id, out _);
@@ -182,7 +223,7 @@ public static class ProfileManager
         for (int t_i = 0; t_i < global::EmoteCatalog.SLOT_COUNT; t_i++)
         {
             int t_id = _source != null && t_i < _source.Count ? _source[t_i] : 0;
-            if (EmoteCatalog == null || !EmoteCatalog.TryGet(t_id, out _) || !t_used.Add(t_id))
+            if (EmoteCatalog == null || !EmoteCatalog.TryGet(t_id, out _) || !IsEmoteOwned(t_id) || !t_used.Add(t_id))
                 t_id = 0;
             t_result.Add(t_id);
         }
@@ -202,7 +243,7 @@ public static class ProfileManager
             while (EmoteCatalog != null && t_poolIndex < EmoteCatalog.Count)
             {
                 EmoteEntry t_entry = EmoteCatalog.PoolAt(t_poolIndex++);
-                if (t_entry == null || t_entry.id <= 0 || !t_used.Add(t_entry.id)) continue;
+                if (t_entry == null || !IsEmoteOwned(t_entry.id) || !t_used.Add(t_entry.id)) continue;
                 t_result[t_i] = t_entry.id;
                 break;
             }

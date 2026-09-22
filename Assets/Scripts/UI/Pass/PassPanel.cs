@@ -71,6 +71,7 @@ public partial class PassPanel : ContentsPooledUI
     // 씬 버튼 UnityEvent 가 인자 없는 이 시그니처에 바인딩된다 — 매개변수를 붙이면 배선이 끊긴다.
     public void Open()
     {
+        this._followProgress = true;
         this.m_scrollOnOpen = true;
         this.m_openGeneration++;
         this.m_waitForOpeningRefresh = false;
@@ -133,6 +134,7 @@ public partial class PassPanel : ContentsPooledUI
 
     protected override void OnViewHidden()
     {
+        this.StopProgress();
         this.m_scrollOnOpen = false;
         this.m_waitForOpeningRefresh = false;
         this.m_openGeneration++;
@@ -158,13 +160,14 @@ public partial class PassPanel : ContentsPooledUI
 
     void LateUpdate()
     {
+        this.UpdateProgressPresentation();
         if (!this.m_scrollOnOpen || this.m_waitForOpeningRefresh || !this.isShow || !PassManager.HasSeason || this.levelContent == null) return;
-        int t_index = FindOpeningRowIndex();
+        int t_index = this.HasProgressToPlay ? this.ProgressRowIndex() : FindOpeningRowIndex();
         if (t_index < 0 || t_index >= this.m_rows.Count || this.m_rows[t_index] == null) return;
         Transform t_targetTransform = this.m_rows[t_index].transform;
-        if (this.repeatRoot != null && this.repeatRoot.activeSelf && PassManager.Exp >= PassManager.MaxRequiredExp
+        if (!this.HasProgressToPlay && this.repeatRoot != null && this.repeatRoot.activeSelf && PassManager.Exp >= PassManager.MaxRequiredExp
             && !HasUnclaimedLevel()) t_targetTransform = this.repeatRoot.transform;
-        ScrollRect t_scroll = this.levelContent.GetComponentInParent<ScrollRect>();
+        ScrollRect t_scroll = this.progressScroll;
         if (t_scroll == null || t_scroll.content == null)
         {
             this.m_scrollOnOpen = false;
@@ -203,6 +206,7 @@ public partial class PassPanel : ContentsPooledUI
 
     void Rebuild()
     {
+        this.SynchronizeProgress();
         this.BuildRows();
         this.RefreshHeader();
     }
@@ -226,7 +230,7 @@ public partial class PassPanel : ContentsPooledUI
             PassLevelRowView t_row = this.m_rows[t_count];
             if (t_row == null) this.m_rows[t_count] = t_row = Instantiate(this.rowPrefab, this.levelContent);
             long? t_next = i + 1 < t_levels.Count ? t_levels[i + 1]?.RequiredExp : null;
-            t_row.Bind(t_level, t_next, this.m_claimHandler, this.m_premiumClaimHandler);
+            t_row.Bind(t_level, t_next, this.m_claimHandler, this.m_premiumClaimHandler, this._displayExp);
             if (!t_row.gameObject.activeSelf) t_row.gameObject.SetActive(true);
             t_count++;
         }
@@ -245,58 +249,13 @@ public partial class PassPanel : ContentsPooledUI
             this.seasonText.text = t_season != null ? t_season.DisplayName
                 : PassManager.IsReady ? "진행 중인 시즌이 없다" : "불러오는 중…";
 
-        if (this.levelText != null)
-            this.levelText.text = t_season != null
-                ? PassManager.CurrentLevel.ToString()
-                : string.Empty;
-
-        long t_exp = PassManager.Exp;
-        long? t_next = PassManager.NextRequiredExp;
-        long t_floor = FloorOf(t_exp);
-        if (this.expText != null)
-            this.expText.text = t_season == null ? string.Empty
-                : t_next.HasValue ? $"{t_exp - t_floor:N0} / {t_next.Value - t_floor:N0}"
-                : PassManager.HasRepeatReward ? $"{PassManager.RepeatProgressExp:N0} / {PassManager.Repeat.RequiredExp:N0}" : "MAX";
-
-        if (this.expFill != null)
-        {
-            float t_fill = t_season == null ? 0f : FillOf(t_exp, t_next);
-            if (t_season != null && !t_next.HasValue && PassManager.HasRepeatReward)
-                t_fill = (float)PassManager.RepeatProgressExp / PassManager.Repeat.RequiredExp;
-            this.expFill.rectTransform.anchorMax = new Vector2(t_fill, 1f);
-            this.expFill.gameObject.SetActive(t_fill > 0f);
-        }
+        this.PresentHeaderProgress();
         bool t_claimable = !this.m_claiming && PassManager.HasAnyClaimable;
         if (this.claimAllButton != null) this.claimAllButton.interactable = t_claimable;
         if (this.claimAllAlertDot != null) this.claimAllAlertDot.SetActive(t_claimable);
 
         this.RefreshRemainLabel(t_season);
         this.RefreshExtras();
-    }
-
-    // 게이지는 현재 레벨 문턱과 다음 문턱 사이 비율이다 — 0 부터 재면 뒷레벨에서 거의 안 움직인다.
-    static float FillOf(long _exp, long? _next)
-    {
-        if (!_next.HasValue) return 1f;
-
-        long t_floor = FloorOf(_exp);
-        long t_span = _next.Value - t_floor;
-        if (t_span <= 0L) return 1f;
-        return Mathf.Clamp01((float)(_exp - t_floor) / t_span);
-    }
-
-    static long FloorOf(long _exp)
-    {
-        long t_floor = 0L;
-        IReadOnlyList<PassLevelDefinition> t_levels = PassManager.Levels;
-        for (int i = 0; i < t_levels.Count; i++)
-        {
-            PassLevelDefinition t_level = t_levels[i];
-            if (t_level == null || t_level.RequiredExp > _exp) break;
-            t_floor = t_level.RequiredExp;
-        }
-
-        return t_floor;
     }
 
     // 종료 시각의 진실원은 서버가 준 epoch ms 다. 남은 시간 표시에만 기기 시계를 쓴다 —
@@ -372,7 +331,7 @@ public partial class PassPanel : ContentsPooledUI
                 finally { ServerWaitOverlay.Release(this); }
                 // 실패 이후 요청을 계속 보내지 않는다. 앞서 성공한 보상은 아래에서 표시한다.
                 if (t_result == null) { t_continue = false; break; }
-                t_rewards.Add(new ClaimMissionResult { Granted = t_result.Granted, Cards = t_result.Cards, Packs = t_result.Packs });
+                t_rewards.Add(new ClaimMissionResult { Granted = t_result.Granted, Cards = t_result.Cards, Packs = t_result.Packs, Cosmetics = t_result.Cosmetics, Titles = t_result.Titles });
             }
             if (_includeRepeat && t_continue && PassManager.Season?.SeasonId == t_season && PassManager.CanClaimRepeat)
             {

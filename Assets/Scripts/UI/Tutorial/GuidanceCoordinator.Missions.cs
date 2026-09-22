@@ -8,17 +8,12 @@ public sealed partial class GuidanceCoordinator
 {
     public enum EMissionGuideAction { None, Start, Resume }
 
-    sealed class GuidePreparationException : Exception
-    {
-        public GuidePreparationException()
-            : base("강화 가능한 카드나 샤드가 부족합니다. 준비되면 안내를 이어갈 수 있어요.") { }
-    }
-
     GuideMissionFlow m_flow;
     GuideMissionFlow m_unconfirmedIntroFlow;
     bool m_flowStarted;
     bool m_flowPreparing;
-    bool m_flowLocked;
+    GuidanceInputPolicy.Lease m_flowInput;
+    GuideMissionFlow m_resumeFlow;
     bool m_flowDeferred;
     bool m_retryRequested;
     string m_requestedMissionId;
@@ -29,11 +24,7 @@ public sealed partial class GuidanceCoordinator
     string m_lastFlowFailure;
     CancellationTokenSource m_flowCancellation;
 
-    public static bool IsInputLocked => GuideMissionTrackerView.IsShowingNextMission
-        || OutgameTutorialRunner.IsDefeatEnhanceInterlude
-        || (OutgameTutorialRunner.IsRunning && !OutgameFeatureLock.IsFtueFreeNavigation
-            && OutgameTutorialRunner.TryGetCurrentStep(out _))
-        || (s_instance != null && s_instance.m_flowLocked);
+    public static bool IsInputLocked => InputMode != EGuidanceInputMode.Free;
     public static bool IsRestoring => s_instance != null && s_instance.m_flowPreparing;
     public static bool IsInternalNavigation => s_instance != null && s_instance.m_internalNavigation > 0;
     public static bool IsCurrentTabAnchor(EOutgameTutorialAnchor _anchor)
@@ -48,24 +39,10 @@ public sealed partial class GuidanceCoordinator
 
     /// <summary>현재 안내가 허용한 사용자 조작만 통과시킨다.</summary>
     public static bool AllowsUserAction(EOutgameTutorialAnchor _anchor)
-        => !IsInputLocked || IsInternalNavigation
-            || (!IsRestoring && (OutgameTutorialGateUI.Instance == null || !OutgameTutorialGateUI.Instance.IsTransitionOnly)
-                && _anchor != EOutgameTutorialAnchor.None
-                && OutgameTutorialGuide.TryGetCurrentStep(out var t_step) && t_step.Anchor == _anchor);
+        => AllowsInput(EGuidanceInputAction.Activate, _anchor);
 
-    /// <summary>안내가 허용한 이동만 통과시킨다.</summary>
     public static bool AllowsUserNavigation(EOutgameTutorialAnchor _anchor)
-        => IsInternalNavigation || (!IsLobbyPresentationBlockingNavigation
-            && !OnboardingSession.IsBusy && AllowsUserAction(_anchor)
-            && AllowsFtueTabNavigation(_anchor));
-
-    // 해금된 탭이라도 강제 튜토리얼의 현재 단계에서 요구한 이동만 허용한다.
-    // useDim=false 단계도 동일하다. 자유 이동 구간과 조정기의 내부 복구 이동은 유지한다.
-    static bool AllowsFtueTabNavigation(EOutgameTutorialAnchor _anchor)
-        => !OutgameTutorialRunner.IsRunning || OutgameFeatureLock.IsFtueFreeNavigation
-            || (OutgameTutorialRunner.TryGetCurrentStep(out var t_step)
-                && t_step.Completion == EOutgameTutorialCompletion.Click
-                && _anchor != EOutgameTutorialAnchor.None && t_step.Anchor == _anchor);
+        => AllowsInput(EGuidanceInputAction.Navigate, _anchor);
 
     /// <summary>소개 무대 준비 후부터 아이콘 도착까지 이탈을 막는다. 다른 탭에 있으면 무대로 복귀할 수 있다.</summary>
     public static bool IsContentIntroBlockingNavigation => ContentUnlockPresentation.IsPlaying
@@ -101,7 +78,9 @@ public sealed partial class GuidanceCoordinator
     public static void DeferCurrentGuide(string _reason)
     {
         if (s_instance == null) return;
+        s_instance.m_resumeFlow = s_instance.m_flow ?? s_instance.m_resumeFlow;
         s_instance.CancelMissionFlow(true);
+        s_instance.HoldMissionInput();
         s_instance.ShowFlowFailure(_reason);
     }
 
@@ -154,6 +133,10 @@ public sealed partial class GuidanceCoordinator
         if (OutgameTutorialRunner.IsDefeatEnhanceInterlude
             && GuideMissionFlows.TryGet(EOutgameTutorialTrigger.CollectionTabFirstEnter, out var t_defeatFlow))
             return t_defeatFlow;
+        if (m_retryRequested && m_resumeFlow != null) return m_resumeFlow;
+        if (GuideResume.HasPending && !m_flowDeferred)
+            foreach (var savedFlow in GuideMissionFlows.All)
+                if (savedFlow != null && GuideResume.IsFor(savedFlow.tutorial)) return savedFlow;
         // 안내 시작은 매치 탭에서만 허용하고, 시작 후 목적지 이동은 기존 흐름을 따른다.
         if (!IsCurrentTabAnchor(EOutgameTutorialAnchor.LobbyMatchTab) || AdventureMapOpen) return null;
         // 마지막 소개가 끝나 pending이 비어도, 실패한 완료 저장은 재시도할 수 있어야 한다.
@@ -196,7 +179,7 @@ public sealed partial class GuidanceCoordinator
         {
             if (OutgameTutorialRunner.IsGuidedRunning) return true;
             if (OutgameTutorialProgress.IsTriggerDone(m_flow.tutorial)) CompleteFlowAsync(m_flowVersion).Forget();
-            else CancelMissionFlow(true);
+            else DeferCurrentGuide("안내가 중단되었습니다. 다시 시도해 주세요.");
             return true;
         }
         if (m_flowDeferred && !m_retryRequested) return false;
@@ -216,7 +199,7 @@ public sealed partial class GuidanceCoordinator
         m_retryRequested = false;
         m_flowDeferred = false;
         m_flow = t_flow;
-        m_flowLocked = true;
+        m_flowInput = m_input.Acquire(this);
         m_flowPreparing = true;
         int t_version = ++m_flowVersion;
         m_flowCancellation = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
@@ -278,7 +261,7 @@ public sealed partial class GuidanceCoordinator
                 return;
             }
             if (!PrepareFlowTarget(t_flow))
-                throw new GuidePreparationException();
+                throw new InvalidOperationException("안내 대상 카드를 준비하지 못했습니다.");
             if (t_flow.tutorial == EOutgameTutorialTrigger.CollectionTabFirstEnter
                 || t_flow.tutorial == EOutgameTutorialTrigger.SynergyGrowthIntroduction)
                 GuideResume.SetTarget(OutgameTutorialGuide.TargetCardId, OutgameTutorialGuide.TargetLevel);
@@ -298,12 +281,6 @@ public sealed partial class GuidanceCoordinator
             m_lastFlowFailure = null;
         }
         catch (OperationCanceledException) { }
-        catch (GuidePreparationException t_exception)
-        {
-            if (_version != m_flowVersion) return;
-            CancelMissionFlow(true);
-            ShowPreparationFailure(t_exception.Message);
-        }
         catch (Exception t_exception)
         {
             if (_version == m_flowVersion) DeferCurrentGuide(t_exception.Message);
@@ -390,6 +367,8 @@ public sealed partial class GuidanceCoordinator
         bool t_ownedAdventure = m_flow != null && m_flow.tutorial == EOutgameTutorialTrigger.AdventureUnlocked;
         bool t_ownedGrowth = m_flow != null && (m_flow.tutorial == EOutgameTutorialTrigger.CollectionTabFirstEnter
             || m_flow.tutorial == EOutgameTutorialTrigger.SynergyGrowthIntroduction);
+        if (_defer) m_resumeFlow = m_flow ?? m_resumeFlow;
+        else m_resumeFlow = null;
         m_flowVersion++;
         m_flowCancellation?.Cancel();
         m_flowCancellation?.Dispose();
@@ -397,7 +376,7 @@ public sealed partial class GuidanceCoordinator
         m_flow = null;
         m_flowPreparing = false;
         m_flowStarted = false;
-        m_flowLocked = false;
+        if (!_defer) ReleaseMissionInput();
         m_flowDeferred = _defer;
         m_retryRequested = false;
         ClearTransition();
@@ -414,23 +393,6 @@ public sealed partial class GuidanceCoordinator
                 AlbumPageOverlayView.CloseOpen();
             }
         }
-    }
-
-    void ShowPreparationFailure(string _reason)
-    {
-        UIPoolManager.Instance?.AddOrUpdateUI<SimpleYNPopup>(new SimpleYNPopupData
-        {
-            titleText = _reason,
-            yesText = "재시도",
-            yesAction = RequestCurrentMission,
-            noText = OutgameTutorialRunner.IsDefeatEnhanceInterlude ? "종료" : "나중에",
-            noAction = OutgameTutorialRunner.IsDefeatEnhanceInterlude ? QuitAfterFlowFailure : ReturnToMatchAfterPreparationFailure,
-        });
-    }
-
-    void ReturnToMatchAfterPreparationFailure()
-    {
-        using (InternalNavigation()) m_shell?.TrySelectFeature(EOutgameFeature.LobbyMatchTab);
     }
 
     void ShowFlowFailure(string _reason)

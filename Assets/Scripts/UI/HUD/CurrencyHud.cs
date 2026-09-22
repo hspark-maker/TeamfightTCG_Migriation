@@ -78,6 +78,7 @@ public class CurrencyHud : MonoBehaviour
 
     // 연출이 도는 동안에는 실제 잔액 대신 연출이 지정한 표시값을 보여준다.
     bool m_held;
+    int _rewardDisplayHolds;
     long m_displayedValue;
     int m_displayRevision;
     Tweener m_spendTween;
@@ -152,7 +153,7 @@ public class CurrencyHud : MonoBehaviour
                                             float _punch = UiPunch.DEFAULT_SCALE)
     {
         long t_target = CurrencyManager.GetBalance(this.type);
-        long t_start = m_held ? m_displayedValue : t_target - _gain;
+        long t_start = m_held || _rewardDisplayHolds > 0 ? m_displayedValue : t_target - _gain;
 
         this.KillSpendTween();
 
@@ -169,6 +170,28 @@ public class CurrencyHud : MonoBehaviour
             else this.HoldDisplay(t_start + (long)((t_target - t_start) * (_arrived / (float)_total)));
 
             UiPunch.Play(this.PunchRect, _punch);
+        };
+    }
+
+    /// <summary>지급 전에 대표 HUD의 증가 표시를 보류한다. 보상 표시 종료·실패 시 반환된 콜백을 호출한다.</summary>
+    public static Action HoldRewardDisplays()
+    {
+        var held = new List<CurrencyHud>(s_huds.Values);
+        foreach (var hud in held)
+            if (hud != null) hud._rewardDisplayHolds++;
+
+        bool released = false;
+        return () =>
+        {
+            if (released) return;
+            released = true;
+            foreach (var hud in held)
+            {
+                if (hud == null) continue;
+                hud._rewardDisplayHolds--;
+                if (hud._rewardDisplayHolds == 0 && !hud.m_held)
+                    hud.Render(CurrencyManager.GetBalance(hud.type));
+            }
         };
     }
 
@@ -259,13 +282,14 @@ public class CurrencyHud : MonoBehaviour
         this.Render(_value);
     }
 
-    void ReleaseDisplay(int _revision)
+    void ReleaseDisplay(int _revision, bool _revealGain = true)
     {
         if (_revision != m_displayRevision) return;
 
         m_displayRevision++;
         m_held = false;
-        this.Render(CurrencyManager.GetBalance(this.type));
+        long balance = CurrencyManager.GetBalance(this.type);
+        this.Render(!_revealGain && _rewardDisplayHolds > 0 ? Math.Min(balance, m_displayedValue) : balance);
 
         // 연출이 멎은 지금이 "충분히 보여줄" 시간의 시작점이다. 여기서 안 감으면 코인이 날아온 만큼 대여가 짧아진다.
         this.ArmLendRelease();
@@ -300,7 +324,7 @@ public class CurrencyHud : MonoBehaviour
         // 소비 통지(OnCurrencySpent)는 서버 응답이 아니라 낙관 차감을 거는 순간 온다 — 왕복을 기다리지 않고
         // 그 프레임에 롤다운을 시작하고, 뒤이어 오는 잔액 통지가 목표만 갈아끼운다.
         CurrencyManager.OnCurrencySpent += this.HandleCurrencySpent;
-        this.Render(CurrencyManager.GetBalance(this.type));
+        if (_rewardDisplayHolds == 0) this.Render(CurrencyManager.GetBalance(this.type));
     }
 
     void OnDisable()
@@ -342,6 +366,7 @@ public class CurrencyHud : MonoBehaviour
 
         if (m_spendTween != null && m_spendTween.IsActive())
         {
+            if (_rewardDisplayHolds > 0 && _balance > m_spendTarget) return;
             if (_balance != m_spendTarget)
             {
                 m_spendTarget = _balance;
@@ -351,6 +376,7 @@ public class CurrencyHud : MonoBehaviour
         }
 
         if (m_held) return;
+        if (_rewardDisplayHolds > 0 && _balance > m_displayedValue) return;
         this.Render(_balance);
     }
 
@@ -395,7 +421,7 @@ public class CurrencyHud : MonoBehaviour
         // 끊긴 롤은 내려오는 연출 없이 즉시 되돌린다 — 커진 채로 굳는 것만은 막아야 한다.
         if (_settle) this.PlaySettle();
         else this.KillSpendMotion();
-        this.ReleaseDisplay(_revision);
+        this.ReleaseDisplay(_revision, _revealGain: false);
     }
 
     // 확대 배율까지 튀어 올라 **그대로 머문다** — 롤이 도는 내내 커져 있어야 어느 재화가 빠지는지 눈이 놓치지 않는다.

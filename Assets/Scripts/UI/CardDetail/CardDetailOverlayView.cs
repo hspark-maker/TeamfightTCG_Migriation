@@ -66,6 +66,10 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
     [SerializeField] Image      enhanceCostIcon;
     [SerializeField] TMP_Text   successRateText;
 
+    [Header("최종 진화 표시")]
+    [Tooltip("최종 진화의 이미지·아이콘·문구를 담은 클릭 없는 표시. 강화 버튼과 같은 부모 아래 별도 오브젝트로 연결한다. 강화 버튼·수량 조절의 자식으로 두지 않는다. 미배선이어도 최종 진화 시 강화 조작은 숨긴다.")]
+    [SerializeField] GameObject finalEvolutionRoot;
+
     [Header("진화 얼굴 (선택 — 미배선이면 진화 관문에도 강화 얼굴이 그대로 선다)")]
     [Tooltip("진화 관문 레벨에서 강화 버튼이 갈아입는 글자와 그림. 누르는 결과는 언제나 같은 레벨업 1회다.")]
     [SerializeField] TMP_Text   evolveLabelText;
@@ -1082,9 +1086,16 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         bool t_hasStep = _owned && CardGrowthManager.TryGetNextStep(_card, out t_step);
 
         // 열람 전용도 같은 길로 내린다 — 알파만 0인 채 살아 있는 버튼은 탭을 먹는다.
-        bool t_actions = _owned && !this.m_readOnly;
+        bool t_showGrowth = _owned && !this.m_readOnly;
+        bool t_finalEvolution = _owned && CardGrowthManager.IsConfigReady
+            && CardGrowthManager.GrowthOf(_card).Level >= CardGrowthManager.MaxLevel;
+        bool t_actions = t_showGrowth && !t_finalEvolution;
+        if (this.finalEvolutionRoot != null) this.finalEvolutionRoot.SetActive(t_showGrowth && t_finalEvolution);
         if (this.enhanceButton != null) this.enhanceButton.gameObject.SetActive(t_actions);
-        if (this.shardAmountRoot != null) this.shardAmountRoot.SetActive(t_actions);
+        if (this.shardAmountRoot != null) this.shardAmountRoot.SetActive(t_showGrowth);
+        if (this.enhanceCostText != null) this.enhanceCostText.gameObject.SetActive(t_actions);
+        if (this.enhanceCostIcon != null) this.enhanceCostIcon.gameObject.SetActive(t_actions);
+        if (this.successRateText != null) this.successRateText.gameObject.SetActive(t_showGrowth);
         RefreshShardAmount(_card);
 
         // 샤드는 항상 강화로 투입하며, 필요량을 채운 결과에서 자동으로 진화한다.
@@ -1106,14 +1117,15 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
         // 결과판이 걷힌 뒤(또는 평상시)엔 다시 각자의 글자다 — 값 갱신이 지나는 이 길이 곧 글자의 복귀 지점이다.
         SetActionLabel(false);
         if (this.successRateText != null)
+        {
             this.successRateText.text = ShardProgressLabel(_card, t_hasStep);
+            this.successRateText.alignment = TextAlignmentOptions.Center;
+        }
     }
 
     string ShardProgressLabel(int _card, bool _hasStep)
     {
         if (!_hasStep) return NoValue;
-        if (OutgameTutorialGuide.HasFreeCardEnhance(_card) && OutgameTutorialGuide.CanUseFreeSynergyGrowth(_card))
-            return "한 번에 2성 달성";
         int t_progress = CardGrowthManager.ShardProgressOf(_card);
         int t_required = CardGrowthManager.ShardRequiredOf(_card);
         return $"{t_progress:N0}/{t_required:N0}";

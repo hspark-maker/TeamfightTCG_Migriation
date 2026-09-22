@@ -199,6 +199,19 @@ public class RewardClaimPopup : PooledOverlay<RewardClaimPopup>
 
     void ClaimClicked()
     {
+        var releaseDisplay = CurrencyHud.HoldRewardDisplays();
+        try
+        {
+            this.ClaimAndPresent();
+        }
+        finally
+        {
+            releaseDisplay();
+        }
+    }
+
+    void ClaimAndPresent()
+    {
         // 콜백을 먼저 비워 연타로 두 번 지급되는 경로를 막는다(매니저 가드와 이중 방어).
         var t_callback = this.m_onConfirm;
         if (t_callback == null) return;
@@ -215,7 +228,7 @@ public class RewardClaimPopup : PooledOverlay<RewardClaimPopup>
                 var t_outcome = t_claim.GetAwaiter().GetResult();
                 if (!t_outcome.Succeeded) { this.Hide(); return; }
                 // 재화 합산 연출을 끝낸 뒤 팩 개봉·카드 표시를 잇는다.
-                if (t_outcome.HasCards) this.PresentCardsAfterClose(t_outcome);
+                if (t_outcome.HasItems) this.PresentCardsAfterClose(t_outcome);
             }
             else
             {
@@ -293,7 +306,7 @@ public class RewardClaimPopup : PooledOverlay<RewardClaimPopup>
         try
         {
             var t_outcome = await _claim;
-            if (!t_outcome.Succeeded || !t_outcome.HasCards) return;
+            if (!t_outcome.Succeeded || !t_outcome.HasItems) return;
 
             if (this != null && this.m_showVersion == _showVersion) this.PresentCardsAfterClose(t_outcome);
             else RewardPackPresentation.Show(t_outcome);

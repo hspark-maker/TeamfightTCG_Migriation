@@ -7,16 +7,8 @@ using UnityEngine;
 public sealed partial class GuidanceCoordinator
 {
     int m_pauseVersion;
-    public static bool CanCloseCardDetail => IsInternalNavigation || (!OnboardingSession.IsBusy && !IsInputLocked)
-        || (CanAcceptGuideReturn && OutgameTutorialGuide.TryGetCurrentStep(out var t_step)
-            && (t_step.Completion == EOutgameTutorialCompletion.CardDetailReturn
-                || t_step.Completion == EOutgameTutorialCompletion.LobbyReturn));
-    public static bool CanCloseAlbum => IsInternalNavigation || (!OnboardingSession.IsBusy && !IsInputLocked)
-        || (CanAcceptGuideReturn && OutgameTutorialGuide.TryGetCurrentStep(out var t_step)
-            && t_step.Completion == EOutgameTutorialCompletion.LobbyReturn);
-
-    static bool CanAcceptGuideReturn => !IsRestoring && !OnboardingSession.IsBusy
-        && (OutgameTutorialGateUI.Instance == null || !OutgameTutorialGateUI.Instance.IsTransitionOnly);
+    public static bool CanCloseCardDetail => AllowsInput(EGuidanceInputAction.ReturnCardDetail);
+    public static bool CanCloseAlbum => AllowsInput(EGuidanceInputAction.ReturnAlbum);
 
     /// <summary>현재 안내의 화면만 한 번 복구한다. 실패 처리는 호출자가 맡는다.</summary>
     public static async UniTask<bool> TryRestoreCurrentSurfaceAsync(CancellationToken _ct)
@@ -73,6 +65,12 @@ public sealed partial class GuidanceCoordinator
                 t_album.PageOverlay?.Close();
         }
         return true;
+    }
+
+    internal static async UniTask PrepareFirstRankSurfaceAsync(CancellationToken token)
+    {
+        if (s_instance == null) throw new InvalidOperationException("랭크 안내 화면을 찾을 수 없습니다.");
+        await s_instance.SelectFlowTabAsync(EOutgameFeature.LobbyMatchTab, token);
     }
 
     async UniTask SelectFlowTabAsync(EOutgameFeature _feature, CancellationToken _ct)
@@ -200,7 +198,7 @@ public sealed partial class GuidanceCoordinator
             m_pauseVersion++;
             m_applicationPaused = true;
             CancelMatchMission();
-            if (m_flow != null || m_retryRequested) CancelMissionFlow(true, false);
+            if (m_flow != null || m_retryRequested || m_flowInput != null) CancelMissionFlow(true, false);
             return;
         }
         if (!m_applicationPaused) return;
@@ -209,14 +207,12 @@ public sealed partial class GuidanceCoordinator
 
     async UniTask ResumeAfterPauseAsync(int _version)
     {
+        bool recovered = false;
         try
         {
             var t_ct = this.GetCancellationTokenOnDestroy();
-            if (!GuideResume.HasPending)
-            {
-                return;
-            }
-            m_flowLocked = true;
+            if (m_resumeFlow == null && !GuideResume.HasPending) return;
+            HoldMissionInput();
             m_flowPreparing = true;
             ShowTransition();
             while (ServerSaveCommands.IsInFlight)
@@ -227,27 +223,36 @@ public sealed partial class GuidanceCoordinator
             await OnboardingCommands.RecoverPendingAsync(t_ct);
             await OutgameTutorialGuide.RefreshFreeShotSpentAsync().AttachExternalCancellation(t_ct);
             if (_version != m_pauseVersion) return;
-            if (GuideResume.IsFor(EOutgameTutorialTrigger.CollectionTabFirstEnter)
-                || GuideResume.IsFor(EOutgameTutorialTrigger.SynergyGrowthIntroduction))
+            using (InternalNavigation())
             {
-                using (InternalNavigation())
+                if (GuideResume.IsFor(EOutgameTutorialTrigger.CollectionTabFirstEnter)
+                    || GuideResume.IsFor(EOutgameTutorialTrigger.SynergyGrowthIntroduction))
                 {
                     CardDetailOverlayView.Close();
                     AlbumPageOverlayView.CloseOpen();
                 }
+                if (m_resumeFlow?.tutorial == EOutgameTutorialTrigger.AdventureUnlocked)
+                    m_launcher?.CancelGuidedAdventureEntry();
             }
+            recovered = true;
         }
         catch (OperationCanceledException) { }
-        catch (Exception t_exception) { if (_version == m_pauseVersion) ShowFlowFailure(t_exception.Message); }
+        catch (Exception t_exception)
+        {
+            if (_version == m_pauseVersion) DeferCurrentGuide(t_exception.Message);
+        }
         finally
         {
             if (_version == m_pauseVersion)
             {
                 m_applicationPaused = false;
                 m_flowPreparing = false;
-                m_flowLocked = false;
                 ClearTransition();
-                if (OutgameTutorialRunner.IsDefeatEnhanceInterlude) RequestCurrentMission();
+                if (recovered || OutgameTutorialRunner.IsDefeatEnhanceInterlude)
+                {
+                    RequestCurrentMission();
+                    AdvanceMissionFlow();
+                }
             }
         }
     }

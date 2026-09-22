@@ -352,6 +352,7 @@ public class MissionPanel : ContentsPooledUI
 
         // 서버에 일괄 수령 창구가 없어 순차 요청하고, 성공한 보상만 모아 한 번 표시한다.
         var t_results = new List<ClaimMissionResult>();
+        var releaseDisplay = CurrencyHud.HoldRewardDisplays();
         ServerWaitOverlay.Hold(this);
         try
         {
@@ -362,6 +363,11 @@ public class MissionPanel : ContentsPooledUI
                 if (t_result != null) t_results.Add(t_result);
             }
         }
+        catch
+        {
+            releaseDisplay();
+            throw;
+        }
         finally
         {
             // 팝업보다 먼저 걷는다 — ClaimAsync 와 같은 계약.
@@ -370,7 +376,7 @@ public class MissionPanel : ContentsPooledUI
             this.RefreshClaimAllButton();
         }
         if (t_results.Exists(t_result => (t_result.Cards?.Count ?? 0) > 0)) this.Close();
-        ShowClaimedRewards(t_results);
+        ShowClaimedRewards(t_results, _onClosed: releaseDisplay);
     }
 
     void HandleClaim(string _missionId)
@@ -382,6 +388,7 @@ public class MissionPanel : ContentsPooledUI
     {
         // 왕복 동안 입력을 막는다. 딤·스피너는 임계 뒤에만 뜨므로 빠른 응답에서는 깜빡이지 않는다.
         ClaimMissionResult t_result = null;
+        var releaseDisplay = CurrencyHud.HoldRewardDisplays();
         ServerWaitOverlay.Hold(this);
         try
         {
@@ -394,12 +401,13 @@ public class MissionPanel : ContentsPooledUI
             // **팝업보다 먼저 걷는다.** 순서를 뒤집으면 안내가 대기 딤에 묻힌다
             // (PackPurchaseFlow 와 같은 계약 — ServerWaitOverlay 는 자기 캔버스가 없다).
             ServerWaitOverlay.Release(this);
+            if (t_result == null) releaseDisplay();
         }
         if (t_result != null)
         {
             // 개봉 화면보다 높은 미션 패널을 먼저 걷는다.
             if ((t_result.Cards?.Count ?? 0) > 0) this.Close();
-            ShowClaimedRewards(new[] { t_result });
+            ShowClaimedRewards(new[] { t_result }, _onClosed: releaseDisplay);
         }
     }
 
@@ -416,6 +424,8 @@ public class MissionPanel : ContentsPooledUI
         var t_bucket = new CurrencyGainBucket();
         var t_cards = new List<OpenPackCard>();
         var t_packs = new List<ClaimRewardPack>();
+        var t_cosmetics = new List<GrantedCosmetic>();
+        var t_titles = new List<GrantedTitle>();
         long t_passExp = 0;
         long t_accountExp = 0;
         long t_totalExp = 0;
@@ -430,6 +440,8 @@ public class MissionPanel : ContentsPooledUI
                         t_bucket.Add(t_type, t_gain.Amount);
             if (t_result.Cards != null) t_cards.AddRange(t_result.Cards);
             if (t_result.Packs != null) t_packs.AddRange(t_result.Packs);
+            if (t_result.Cosmetics != null) t_cosmetics.AddRange(t_result.Cosmetics);
+            if (t_result.Titles != null) t_titles.AddRange(t_result.Titles);
             t_passExp += t_result.GrantedPassExp;
             t_accountExp += t_result.AccountExperience?.GrantedExp ?? t_result.GrantedAccountExp;
             t_totalExp = Math.Max(t_totalExp, t_result.AccountExperience?.TotalExp ?? AccountLevelManager.Exp);
@@ -452,7 +464,7 @@ public class MissionPanel : ContentsPooledUI
         }
 
         // 이미 지급된 응답이다. 팝업 확인에서는 서버 수령을 다시 호출하지 않는다.
-        var t_outcome = RewardItemDisplay.ToOutcome(t_gains, t_cards, t_packs);
+        var t_outcome = RewardItemDisplay.ToOutcome(t_gains, t_cards, t_packs, t_cosmetics, t_titles);
         var t_packCounts = new Dictionary<string, long>();
         foreach (var t_pack in t_outcome.Packs)
             t_packCounts[t_pack.PackId] = t_packCounts.TryGetValue(t_pack.PackId, out long t_count) ? t_count + 1 : 1;
@@ -471,10 +483,11 @@ public class MissionPanel : ContentsPooledUI
             foreach (var t_batch in t_outcome.PresentationBatches)
                 if (t_batch.IsPack) t_packBatches.Add(t_batch);
             t_outcome = new RewardClaimOutcome(t_outcome.Granted, _packs: t_outcome.Packs,
-                _presentationBatches: t_packBatches);
+                _presentationBatches: t_packBatches, _cosmetics: t_outcome.Cosmetics, _titles: t_outcome.Titles);
         }
         if (t_lines.Count == 0 && t_passExp <= 0 && t_accountExp <= 0)
         {
+            RewardPackPresentation.Show(t_outcome);
             _onClosed?.Invoke();
             return;
         }
@@ -496,6 +509,8 @@ public class MissionPanel : ContentsPooledUI
             Granted = _entry.Granted,
             Cards = _entry.Cards,
             Packs = _entry.Packs,
+            Cosmetics = _entry.Cosmetics,
+            Titles = _entry.Titles,
             AccountExperience = _entry.Experience,
         } }, "전투 보상");
     }
@@ -510,7 +525,7 @@ public class MissionPanel : ContentsPooledUI
         // 카드 상세는 마지막 페이지를 확인한 뒤에만 연다.
         var t_pageOutcome = new RewardClaimOutcome(_outcome.Granted, t_hasNext ? null : _outcome.Cards,
             t_hasNext ? null : _outcome.Packs, t_hasNext ? null : _outcome.PresentationBatches,
-            _outcome.ShowCardsIndividually);
+            _outcome.ShowCardsIndividually, t_hasNext ? null : _outcome.Cosmetics, t_hasNext ? null : _outcome.Titles);
         int t_pages = Math.Max(1, (_lines.Count + _popup.RewardSlotCount - 1) / _popup.RewardSlotCount);
         string t_page = t_pages > 1 ? $" ({_offset / _popup.RewardSlotCount + 1}/{t_pages})" : string.Empty;
         int t_break = _title.IndexOf('\n');

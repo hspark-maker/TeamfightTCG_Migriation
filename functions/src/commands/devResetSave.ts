@@ -1,3 +1,4 @@
+import {loadCosmeticItems} from "../profile/cosmetics";
 import {randomUUID} from "node:crypto";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
@@ -32,7 +33,7 @@ export const devResetSave = onCall(async (request) => {
     );
   }
 
-  const starter = await resolveStarterCardIds(env);
+  const [starter, cosmetics] = await Promise.all([resolveStarterCardIds(env), loadCosmeticItems(env)]);
 
   // txId 가 없거나 형식을 벗어나면 서버가 발급한다 — 구 클라를 거절하면 세션이 끊긴다.
   const txId = clientReceiptId(request.data?.txId, randomUUID());
@@ -50,7 +51,7 @@ export const devResetSave = onCall(async (request) => {
       // 세이브 변이와 같은 트랜잭션이다 — 한쪽만 성공한 계정이 생기지 않는다(enhanceCard 선례).
       clearGrants(transaction, grantsRef(db, env, uid));
 
-      return {slots: buildFreshAccountSlots(starter.cardIds, nickname, starter.grades)} as SaveMutation;
+      return {slots: buildFreshAccountSlots(starter.cardIds, nickname, starter.grades, cosmetics)} as SaveMutation;
     },
     (adopted) => {
       replayed = false;

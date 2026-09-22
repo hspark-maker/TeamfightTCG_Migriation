@@ -16,7 +16,7 @@ using UnityEngine.UI;
 //
 // 경계: 지급·저장은 각 씬이 이미 끝냈다. 이 클래스는 표시만 하고 재화를 건드리지 않는다.
 // 배선을 비워두면 이름으로 자동 탐색한다 — 로비 프리팹 수정 없이도 동작하게(자동 탐색 실패 시 그 단계만 건너뛴다).
-public partial class LobbyGainEffectDirector : MonoBehaviour
+public class LobbyGainEffectDirector : MonoBehaviour
 {
     [Header("배선 (비우면 자동 탐색)")]
     [Tooltip("카드가 빨려들 도감 탭의 시각 앵커를 제공한다.")]
@@ -44,6 +44,9 @@ public partial class LobbyGainEffectDirector : MonoBehaviour
     [SerializeField] float packGatherScale = 0.15f;
     [Tooltip("수렴 궤적이 직선에서 부푸는 폭(px). 0이면 직선.")]
     [SerializeField] float packArcHeight = 160f;
+
+    [Header("프로필 레벨업")]
+    [SerializeField] ProfileAvatarView levelUpAvatar;
 
     // 런타임에 만든 하위 연출기(직렬화 배선이 있으면 그것을 쓴다).
     CardGainFlightEffect m_cardFlight;
@@ -80,6 +83,8 @@ public partial class LobbyGainEffectDirector : MonoBehaviour
     /// 통지가 영영 오지 않으므로, 있기만 한 것으로는 부족하다.</summary>
     public static bool Exists => s_instance != null && s_instance.isActiveAndEnabled;
     public static bool Playing => Exists && (s_instance.m_runId != s_instance.m_finishedRunId || s_instance.IsLevelUpPlaying);
+
+    bool IsLevelUpPlaying => levelUpAvatar != null && levelUpAvatar.IsLevelUpPlaying;
 
     /// <summary>실제 해금될 보상 탭의 잠금 표현을 도착까지 유지한다.</summary>
     public static void HoldRewardUnlock(bool pack)
@@ -499,6 +504,34 @@ public partial class LobbyGainEffectDirector : MonoBehaviour
 
         ((RectTransform)t_go.transform).sizeDelta = this.packFlightSize;
         return t_go;
+    }
+
+    void TryPlayLevelUpAlongsideGains()
+    {
+        if (!AccountLevelUpHandoff.HasPending || !GuidanceCoordinator.CanPresentAlongsideGains) return;
+        if (AlbumInsertSession.IsRunning) return;
+        if (AlbumInsertQueue.HasPending && m_runId == m_finishedRunId) return;
+        var pool = UIPoolManager.Instance;
+        if (pool == null || pool.HasVisibleUIExcept()) return;
+        TryPlayLevelUp();
+    }
+
+    void TryPlayLevelUp()
+    {
+        if (!AccountLevelUpHandoff.HasPending || IsLevelUpPlaying) return;
+        if (levelUpAvatar == null || !levelUpAvatar.IsLevelUpWired)
+        {
+            AccountLevelUpHandoff.Consume();
+            Debug.LogWarning("[LobbyGainEffectDirector] Profile level-up presentation is not wired.");
+            return;
+        }
+        if (!levelUpAvatar.gameObject.activeInHierarchy) return;
+        levelUpAvatar.PlayLevelUp(AccountLevelUpHandoff.Consume());
+    }
+
+    void StopLevelUp()
+    {
+        if (levelUpAvatar != null) levelUpAvatar.StopLevelUp();
     }
 
     CardGainFlightEffect EnsureCardFlight()

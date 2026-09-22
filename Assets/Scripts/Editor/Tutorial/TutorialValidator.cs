@@ -457,17 +457,9 @@ public static class TutorialValidator
                 $"{t_action}는 지목할 타깃이 있어야 하는데 앵커가 None입니다 — 브리지가 게이트를 걸지 못하고 안내가 그 자리에서 닫힙니다.",
                 "anchor를 고르세요.");
 
-        // (10) 같은 미배선이라도 결말이 갈린다.
-        //      DeckGrant는 시나리오가 덱의 정본이라 없으면 Fail로 빠지고(TutorialStepExecutor.EnterDeckGrant),
-        //      전투 진입 계열은 실패로 치지 않고 대본 없는 일반 전투가 열린다("저하된 성공").
         if (TutorialStepDef.UsesScenario(t_action) && _def.Scenario == null)
         {
-            if (t_action == EOutgameTutorialAction.DeckGrant)
-                Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "덱 정본 미배선",
-                    "DeckGrant에 시나리오가 없습니다 — 덱이 지급되지 않고 조용히 지나갑니다(기본 Skip이면 경고 한 줄뿐입니다).",
-                    "scenario에 덱의 정본이 될 TutorialScenarioData를 배선하세요.");
-            else
-                Add(_issues, ETutorialIssueLevel.Warning, _def, _chapter, _index, "시나리오 미배선",
+            Add(_issues, ETutorialIssueLevel.Warning, _def, _chapter, _index, "시나리오 미배선",
                     $"{t_action}에 시나리오가 없습니다 — 실패로 치지 않고 대본 없는 일반 전투가 열립니다.",
                     "scenario에 TutorialScenarioData를 배선하세요.");
         }
@@ -504,6 +496,19 @@ public static class TutorialValidator
     static void ValidateCards(TutorialStepDef _def, int _chapter, int _index, List<TutorialIssue> _issues)
     {
         var t_cards = _def.CardIds;
+
+        if (_def.Action == EOutgameTutorialAction.DeckGrant)
+        {
+            var t_unique = new HashSet<int>();
+            bool t_valid = t_cards != null && t_cards.Count == DeckSaveManager.DECK_SIZE;
+            if (t_cards != null)
+                foreach (int t_card in t_cards)
+                    if (t_card <= 0 || !t_unique.Add(t_card)) t_valid = false;
+            if (!t_valid)
+                Add(_issues, ETutorialIssueLevel.Error, _def, _chapter, _index, "저장 덱 구성 오류",
+                    "DeckGrant는 서로 다른 카드 6장이 필요합니다.", "cardIds에 저장할 카드 6장을 배선하세요.");
+            return;
+        }
 
         if (t_cards != null)
             for (int t_i = 0; t_i < t_cards.Count; t_i++)

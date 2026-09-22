@@ -16,11 +16,15 @@ public readonly struct RewardClaimOutcome
     // null이면 기존 팩 → 직접 지급 순서. 서버 flat 순서가 있으면 그 순서로 재생한다.
     public readonly IReadOnlyList<RewardPresentationBatch> PresentationBatches;
     public readonly bool ShowCardsIndividually;
+    public readonly IReadOnlyList<GrantedCosmetic> Cosmetics;
+    public readonly IReadOnlyList<GrantedTitle> Titles;
     public bool HasCards => (Cards?.Count ?? 0) > 0 || (Packs?.Count ?? 0) > 0;
+    public bool HasItems => HasCards || (Cosmetics?.Count ?? 0) > 0 || (Titles?.Count ?? 0) > 0;
 
     public RewardClaimOutcome(IReadOnlyList<CurrencyGain> _granted, IReadOnlyList<DrawnCard> _cards = null,
         IReadOnlyList<GrantedRewardPack> _packs = null,
-        IReadOnlyList<RewardPresentationBatch> _presentationBatches = null, bool _showCardsIndividually = false)
+        IReadOnlyList<RewardPresentationBatch> _presentationBatches = null, bool _showCardsIndividually = false,
+        IReadOnlyList<GrantedCosmetic> _cosmetics = null, IReadOnlyList<GrantedTitle> _titles = null)
     {
         Succeeded = true;
         Granted = _granted;
@@ -28,6 +32,8 @@ public readonly struct RewardClaimOutcome
         Packs = _packs;
         PresentationBatches = _presentationBatches;
         ShowCardsIndividually = _showCardsIndividually;
+        Cosmetics = _cosmetics;
+        Titles = _titles;
     }
 }
 

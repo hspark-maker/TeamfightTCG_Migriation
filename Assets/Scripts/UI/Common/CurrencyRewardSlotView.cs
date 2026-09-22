@@ -14,6 +14,10 @@ public class CurrencyRewardSlotView
     [SerializeField] CanvasGroup cardGroup;
     [Tooltip("보상 아이콘 뒤의 파티클 묶음. 아이콘 퇴장과 같은 시간에 함께 숨긴다.")]
     [SerializeField] CanvasGroup backgroundEffects;
+    Color m_amountColor;
+    bool m_hasAmountColor;
+    Color m_iconColor;
+    bool m_hasIconColor;
 
     // 칸 '안'을 안무하는 쪽(랭크 보상 오버레이)을 위한 손잡이. 같은 노드를 저쪽에서 또 배선하면 진실원이 갈린다.
     public GameObject Root => this.root;
@@ -26,6 +30,16 @@ public class CurrencyRewardSlotView
 
     public void Bind(Sprite _icon, long _amount)
     {
+        if (amountLabel != null)
+        {
+            if (!m_hasAmountColor) { m_amountColor = amountLabel.color; m_hasAmountColor = true; }
+            amountLabel.color = m_amountColor;
+        }
+        if (icon != null)
+        {
+            if (!m_hasIconColor) { m_iconColor = icon.color; m_hasIconColor = true; }
+            icon.color = m_iconColor;
+        }
         if (icon != null) CardArtBinding.Clear(icon.gameObject);
         if (cardGroup != null) cardGroup.gameObject.SetActive(false);
         if (cardVisual != null) cardVisual.gameObject.SetActive(false);
@@ -56,6 +70,29 @@ public class CurrencyRewardSlotView
         }
         if (!_line.IsCurrency && _line.Icon == null && amountLabel != null)
             amountLabel.text = RewardItemDisplay.NameOf(_line.Type.ToString(), _line.RewardId) + " ×" + _line.Amount;
+
+        if (_line.Type == ERewardType.Title)
+        {
+            if (icon != null) icon.color = RewardItemDisplay.ItemColor("Title", _line.RewardId);
+            if (amountLabel != null)
+            {
+                amountLabel.text = RewardItemDisplay.NameOf("Title", _line.RewardId);
+                if (_line.IsNewItem.HasValue)
+                    amountLabel.color = _line.IsNewItem.Value ? new Color(1f, 0.78f, 0.22f) : Color.gray;
+            }
+        }
+
+        if (_line.Type == ERewardType.Avatar || _line.Type == ERewardType.Frame || _line.Type == ERewardType.Emote)
+        {
+            if (icon != null) icon.color = RewardItemDisplay.ItemColor(_line.Type.ToString(), _line.RewardId);
+            if (amountLabel != null && _line.IsNewItem.HasValue)
+            {
+                string t_status = _line.IsNewItem.Value ? "NEW" : "보유 중";
+                amountLabel.text = _line.Icon != null ? t_status
+                    : RewardItemDisplay.NameOf(_line.Type.ToString(), _line.RewardId) + " · " + t_status;
+                amountLabel.color = _line.IsNewItem.Value ? new Color(1f, 0.78f, 0.22f) : Color.gray;
+            }
+        }
 
         // 카드 아트는 비동기 로드된다. 슬롯의 활성 수명에 묶어 숨김·재사용 시 이전 요청을 해제한다.
         if (_line.Type == ERewardType.Card && icon != null &&

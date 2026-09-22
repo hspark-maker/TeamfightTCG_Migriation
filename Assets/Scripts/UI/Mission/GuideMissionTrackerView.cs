@@ -416,10 +416,11 @@ public sealed class GuideMissionTrackerView : MonoBehaviour
     void FinishNextMission()
     {
         if (!m_transitioning) return;
+        m_showingNextMission = m_holdingClaim = m_rewardsClosed = m_transitioning = false;
+        GuidanceCoordinator.ReserveNextMissionInput();
         OutgameTutorialGateUI.Instance?.Clear(this);
         m_transition?.Kill();
         m_transition = null;
-        m_showingNextMission = m_holdingClaim = m_rewardsClosed = m_transitioning = false;
         m_displayed = null;
         Rebind();
         PresentationFinished?.Invoke();

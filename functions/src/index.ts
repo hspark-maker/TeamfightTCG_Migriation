@@ -43,3 +43,5 @@ export {getReplayDivergence} from "./commands/getReplayDivergence";
 export {sendMail, getMailbox, claimMail, claimAllMail} from "./commands/mailbox";
 export {adminDashboardOverview, adminDashboardPlayer} from "./commands/adminDashboard";
 export {adminDashboardMatches} from "./commands/adminDashboardMatches";
+export {ensureProfileCosmetics} from "./commands/ensureProfileCosmetics";
+export {ensureTitles} from "./commands/ensureTitles";

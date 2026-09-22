@@ -2,6 +2,18 @@
 
 2026-09-16. 기존 경로에 구조 문서가 없어 이번에 추가했다. 이 문서는 이번에 변경한 온보딩 경계만 다룬다.
 
+## 칭호 선택·장착
+
+`OutGame/Title/TitleCatalog`는 칭호 ID·표시 이름·설명·아이콘·색을 제공한다. `ProfileConfig.titleCatalog`를 `OutgameConfigStep`이 `TitleManager`에 주입한다. 서버 지급 검증은 `docs/SpecData/Title_sheet.csv`의 `id`·`titleId`로 한다. 기존 테스트 8종만 등록하며 기본 지급은 없다. 칭호는 `CosmeticType`·`CosmeticItem`에 포함하지 않는다.
+
+서버 profile 슬롯의 `ownedTitleIds`가 소유의 진실원이다. `functions/src/titles/titleOwnership`이 영구 소유를 지급하고 `automaticTitles`가 Title 전용 표의 eventKey·synergyId·targetCount·description을 읽어 기존 서버 통계로 판정한다. Reward·Achievement 표와 공통 `grantRewardItems`에는 칭호를 넣지 않는다. 기존 카드·팩·꾸미기 보상은 유지한다. 중복은 소유 유지, 장착은 변경하지 않는다. 결과는 꾸미기와 별도 `titles` 배열로 전달하며 기존 표시 UI를 재사용한다. 공개 인덱스에 Title 표가 없을 때만 자동 칭호 처리를 생략하고, 표 손상·조회 실패는 오류로 처리한다.
+
+`TitleManager`는 소유 조회와 장착·해제를 담당한다. 클라이언트 직접 지급은 없고 장착 `equippedTitleId`만 업로드한다. Firestore 규칙이 소유 변경을 막고 장착을 기존 서버 소유로 검증한다. 서버 응답 채택은 소유를 갱신하며 로컬 장착 후보를 보존한다. 명시적 서버 세이브 초기화에서는 칭호 소유·장착도 초기화한다. `ServerSlotRehydrator`가 저장 없이 칭호 변경을 통지한다. 필드 부재는 빈 소유·미장착이며 표시 데이터가 없는 소유 ID도 삭제하지 않는다.
+
+`UI/Profile/ProfileTitleTab`은 전체 칭호를 표시하고 미보유도 잠금·미리보기를 제공한다. 편집창 내부 `TitleItemCell` 템플릿을 사용한다. 선택 후보는 저장·닫기에서 확정하며 지급 통지는 후보·스크롤을 유지한 채 잠금만 갱신한다. `ProfileSummaryView`도 `TitleManager.OnChanged`를 구독한다. 기존 공통 보상 팝업은 칭호 이름·아이콘을 표시한다. 에디터 직접 지급 메뉴는 제거했고, `TitleOwnershipValidation`은 외부 저장 없이 실제 프리팹을 검사한다.
+
+`PlayerSaveCloud`는 초기 채택 전에 `ensureTitles`로 이미 달성한 칭호를 보완하고 변경된 문서를 다시 읽는다. `OutGame/Title/TitleUnlocks`는 서버가 준 조건 문구를 세션 동안 보관하며 `ProfileTitleTab`이 표시한다. 전투 칭호는 `claimBattleExperience`에서 본인의 저장 직렬화 경로로 지급한다. `submitMatchResult`에서 상대 세이브 revision을 변경하지 않는다.
+
 ## 실행 구조
 
 - `OutGame/Tutorial/OnboardingSession.cs`: 스텝 실행 수명, 세대별 취소, 중복 완료 방지, 효과 확인과 진행 위치 저장의 경계.
@@ -43,3 +55,17 @@
 서버 응답 채택 후 ServerSaveCommands가 AccountLevelUpHandoff에 레벨업만 기록한다. 일반·온보딩 재생·복구 경로가 같은 revision 중복 제거를 사용하며, 서비스 교체 시 대기열과 재생을 초기화한다. 초기 로그인 데이터 로드는 연출을 만들지 않는다.
 
 LobbyGainEffectDirector는 재화·카드 획득과 동시에 로비 전용 ProfileLevelUpEffect.prefab을 재생한다. 획득 시퀀스 조립 시 같은 프레임에 시작하고, 늦게 도착한 레벨업도 획득 종료를 기다리지 않는다. 팝업·튜토리얼·매치·삽입 진행 중에는 대기한다. 누적 레벨업은 최종 레벨 하나로 합친다. 기존 Playing에 포함하지만 OnAnyFinished는 발행하지 않는다. 공용 ProfileAvatarView.prefab과 사운드·보상 지급은 변경하지 않는다.
+
+## 프로필 꾸미기 소유·지급
+
+2026-09-22. CosmeticItem_sheet.csv는 서버 검증·기본 소유의 진실원이다. SpecFirestoreUploader가 CSV 전용 DTO로 발행하며 SpecPayloadCodec.ServerOnlyTableNames에만 포함한다. 클라이언트 필수 표·자동 생성 C#·SpecData.bytes에는 추가하지 않는다. ProfileConfig와 EmoteCatalog는 표시 자산을 제공한다.
+
+ProfileSaveData.ownedAvatarIds / ownedFrameIds / ownedEmoteIds는 서버가 확정한다. 신규 계정은 buildFreshAccountSlots에서 기본 소유를 받고, 구 계정은 초기 세이브 채택 전에 ensureProfileCosmetics로 보완한 문서를 다시 읽는다. 명령은 기존 소유·장착·칭호·닉네임·경험치를 보존하는 합집합이며 표 미발행 시 명시 실패한다.
+
+grantRewardItems는 Avatar·Frame·Emote를 수량 1로 지급하고 cosmetics에 종류·ID·신규 여부를 반환한다. 중복 소유는 재화로 보상하지 않는다. 소유·지갑·영수증은 기존 mutateSave 트랜잭션으로 확정한다. 계정 경험치는 지급 후 profile에 병합한다. 실제 외형 상품·구매 callable은 없으며 미래 구매는 영수증 재생 후 assertCosmeticPurchasable로 기소유 여부를 검사한다.
+
+DataSaveManager.AdoptServerSlots는 서버 소유와 로컬 편집값을 병합한다. 일반 지급은 닉네임·장착·칭호 후보를 보존하고 명시적 devResetSave만 외형 장착을 서버값으로 초기화한다. PlayerSaveDocument는 프로필 편집 필드만 부분 업로드하며 소유·경험치를 보내지 않는다. Firestore 규칙은 소유 변조와 미소유 장착을 거절한다.
+
+ServerSlotRehydrator → ProfileManager.NotifyOwnershipRehydrated → OnOwnershipChanged가 저장 없이 목록 갱신을 통지한다. ProfileEditPanel은 소유하고 표시 가능한 항목만 카탈로그 순서로 삽입하며 기존 셀·편집 후보·탭·스크롤과 고정 장착 6칸을 유지한다. 미지원 소유 ID는 보존하고 진단한다. RewardClaimOutcome.Cosmetics는 기존 보상 큐와 팝업으로 연결하며 신규는 골드, 중복은 무채색 표식을 쓴다.
+
+검증: scripts/test-profile-cosmetics.ps1, Functions 외형·에뮬레이터·규칙·출석 회귀, Unity Tools/검증/프로필 꾸미기 회귀(실제 프리팹 격리 검사). 원격 표 발행·서버/규칙 배포·실기기 재접속 검증은 별도다.

@@ -27,6 +27,7 @@ const guideCatalog = [{id: "guide.caretaker", period: "guide", event: "Guide.Car
   sortOrder: 1, guideActId: 1, guideActName: "Collection", enabled: true}];
 
 async function setup(t, options = {}) {
+  t.mock.method(specs, "readOptionalSpecRows", async () => null);
   const uid = "craft-test-" + randomUUID();
   const env = options.env ?? "test";
   const root = db.doc(`envs/${env}/users/${uid}`);

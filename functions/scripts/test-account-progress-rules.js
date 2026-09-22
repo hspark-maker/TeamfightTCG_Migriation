@@ -82,7 +82,63 @@ test("legacy profile can serialize zero defaults while retaining legacy XP", asy
 test("fresh server account permits first client profile save", async () => {
   const fresh = original(buildFreshAccountSlots([], "test").profile);
   await seed(fresh);
-  await assertSucceeds(update({profile: {...fresh.profile, emoteIds: [], contentUnlocks: {}, nickname: "new"}}));
+  await assertSucceeds(update({profile: {...fresh.profile, emoteIds: [0, 0, 0, 0, 0, 0], contentUnlocks: {}, nickname: "new"}}));
+});
+
+const cosmeticProfile = () => ({
+  nickname: "test", accountExp: 350, accountRewardLevel: 2,
+  avatarId: "avatar_00", frameId: "frame_default", emoteIds: [1, 2, 0, 0, 0, 0],
+  ownedAvatarIds: ["avatar_00", "avatar_01"],
+  ownedFrameIds: ["frame_default", "frame_Sun"], ownedEmoteIds: [1, 2, 3],
+});
+
+test("cosmetic ownership cannot be added, removed, replaced or reordered by clients", async () => {
+  const profile = cosmeticProfile();
+  await seed(original(profile));
+  for (const field of ["ownedAvatarIds", "ownedFrameIds", "ownedEmoteIds"]) {
+    for (const value of [[], [...profile[field], "forged"], [...profile[field]].reverse(), null, deleteField()]) {
+      await assertFails(update({[`profile.${field}`]: value}));
+    }
+  }
+  await assertFails(update({profile: {nickname: "erase", accountExp: 350, accountRewardLevel: 2}}));
+  await assertSucceeds(update({"profile.nickname": "renamed", "profile.titleId": "unchanged-title-policy"}));
+});
+
+test("owned equipment changes accept the correct kind and reject forged IDs", async () => {
+  await seed(original(cosmeticProfile()));
+  for (const value of ["unregistered", "frame_Sun", "", null, 1, deleteField()]) {
+    await assertFails(update({"profile.avatarId": value}));
+  }
+  for (const value of ["unregistered", "avatar_01", "", null, 1, deleteField()]) {
+    await assertFails(update({"profile.frameId": value}));
+  }
+  await assertFails(update({"profile.avatarId": "forged", "profile.ownedAvatarIds": ["forged"]}));
+  await assertSucceeds(update({"profile.avatarId": "avatar_01", "profile.frameId": "frame_Sun"}));
+});
+
+test("emotes retain six ordered slots, zero gaps and unique positive owned IDs", async () => {
+  await seed(original(cosmeticProfile()));
+  for (const value of [[], [1], [1, 2, 3, 0, 0, 0, 0], [1, 1, 0, 0, 0, 0],
+    [-1, 0, 0, 0, 0, 0], [4, 0, 0, 0, 0, 0], [1.5, 0, 0, 0, 0, 0],
+    ["1", 0, 0, 0, 0, 0], [null, 0, 0, 0, 0, 0], null, deleteField()]) {
+    await assertFails(update({"profile.emoteIds": value}));
+  }
+  await assertSucceeds(update({"profile.emoteIds": [3, 0, 1, 0, 2, 0]}));
+  await seed(original(cosmeticProfile()));
+  await assertSucceeds(update({"profile.emoteIds": [0, 0, 0, 0, 0, 0]}));
+});
+
+test("legacy equipment remains unchanged until server ownership migration", async () => {
+  const legacy = {nickname: "legacy", avatarId: "old_avatar", frameId: "old_frame", emoteIds: []};
+  await seed(original(legacy));
+  await assertSucceeds(update({"profile.nickname": "legacy-renamed"}));
+  await seed(original(legacy));
+  await assertSucceeds(update({deck: {slots: []}, profile: {...legacy, nickname: "legacy-edit"}}));
+  await seed(original(legacy));
+  await assertFails(update({"profile.avatarId": "avatar_00"}));
+  await assertFails(update({"profile.ownedAvatarIds": []}));
+  await assertFails(update({"profile.ownedFrameIds": []}));
+  await assertFails(update({"profile.ownedEmoteIds": []}));
 });
 test("other users and anonymous clients cannot update profile", async () => {
   await assertFails(update({"profile.nickname": "attack"}, "stranger"));

@@ -147,7 +147,7 @@ export function grantAccountExperience(
   ) : {slots: {}, cards: [], packs: [], currencies: []};
   return {
     ...itemGrant,
-    slots: {...itemGrant.slots, profile: {...profile, accountExp: nextExp, accountRewardLevel: Math.max(watermark, level)}},
+    slots: {...itemGrant.slots, profile: {...(itemGrant.slots.profile ?? profile), accountExp: nextExp, accountRewardLevel: Math.max(watermark, level)}},
     currencies: [...rewards.flatMap((reward) => reward.gains), ...itemGrant.currencies],
     accountExperience: {grantedExp, previousLevel, level},
   };

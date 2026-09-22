@@ -64,9 +64,6 @@ public class RoulettePanel : ContentsPooledUI
     // 수명은 회전 1회에 매단다 — 패널 수명에 매달면 닫았다 다시 연 뒤 회전이 돌지 않는다.
     CancellationTokenSource m_spinCts;
 
-    // 풀 컨테이너에서 떨어져 나오려고 확보한 Canvas(LiftToOverlayLayer 참조)
-    Canvas m_sortingCanvas;
-
     public override void Initialization(UIData _data) => this.InitializeUI();
 
     public override void Show() => this.Open();
@@ -95,7 +92,6 @@ public class RoulettePanel : ContentsPooledUI
 
     protected override void OnInitializeUI()
     {
-        this.LiftToOverlayLayer();
         if (this.spinButton != null)
         {
             this.spinButton.onClick.RemoveAllListeners();
@@ -175,6 +171,8 @@ public class RoulettePanel : ContentsPooledUI
         CancellationToken t_token = t_cts.Token;
 
         this.ReleaseCloseLockAfterAsync(t_token).Forget();
+        var releaseDisplay = CurrencyHud.HoldRewardDisplays();
+        bool displayHandedOff = false;
 
         try
         {
@@ -205,10 +203,11 @@ public class RoulettePanel : ContentsPooledUI
 
             this.PlayWinPunch(t_outcome.SlotIndex);
 
-            await this.ShowRewardAsync(t_outcome);
+            displayHandedOff = await this.ShowRewardAsync(t_outcome, releaseDisplay);
         }
         finally
         {
+            if (!displayHandedOff) releaseDisplay();
             // 어느 갈래로 끝나든 되돌린다 — 안 풀면 이 화면이 통째로 굳는다.
             if (this.m_spinCts == t_cts) this.m_spinCts = null;
 
@@ -310,7 +309,7 @@ public class RoulettePanel : ContentsPooledUI
     }
 
     // 지급은 이미 끝났다. 팝업은 결과를 표시하고 확인 뒤 획득·개봉 연출만 잇는다.
-    async UniTask ShowRewardAsync(RouletteSpinOutcome _outcome)
+    async UniTask<bool> ShowRewardAsync(RouletteSpinOutcome _outcome, System.Action _releaseDisplay)
     {
         if (_outcome.IsPack)
         {
@@ -337,8 +336,9 @@ public class RoulettePanel : ContentsPooledUI
             if (t_granted != null)
                 foreach (var t_gain in t_granted) t_lines.Add(new RewardLine(t_gain));
 
-            t_popup.Show("룰렛 보상", t_lines, () => UniTask.FromResult(t_reward), _claimOnDim: true);
-            return;
+            t_popup.Show("룰렛 보상", t_lines, () => UniTask.FromResult(t_reward), _claimOnDim: true,
+                _onClosed: _releaseDisplay);
+            return true;
         }
 
         // 팝업을 사용할 수 없는 환경에서도 기존 결과 연출은 남긴다.
@@ -357,12 +357,13 @@ public class RoulettePanel : ContentsPooledUI
                             t_packPlayer.Play(null, new CurrencyGain(t_type, t_bucket[t_type]), null);
                     }
             }
-            return;
+            return false;
         }
         CurrencyGainEffectPlayer t_player = this.gainPlayer;
-        if (t_player == null && !CurrencyGainEffectPlayer.TryGet(this, out t_player)) return;
+        if (t_player == null && !CurrencyGainEffectPlayer.TryGet(this, out t_player)) return false;
 
         t_player.Play(this.ResolveGainOrigin(_outcome.SlotIndex), new CurrencyGain(_outcome.Currency, _outcome.Amount), null);
+        return false;
     }
 
     RectTransform ResolveGainOrigin(int _slotIndex)
@@ -411,9 +412,4 @@ public class RoulettePanel : ContentsPooledUI
         // 판은 급정지시키지 않는다 — 트윈은 대상이 꺼질 때 SetLink가 걷는다.
         this.m_spinCts?.Cancel();
     }
-
-    // 풀 컨테이너(UiSortingOrder.Pool)에서 떨어져 나와 로비 오버레이 층에 내려앉는다(절차는 UiSortingOrder가 쥔다).
-    void LiftToOverlayLayer()
-        => this.m_sortingCanvas = UiSortingOrder.LiftNested(gameObject, UiSortingOrder.PooledOverlay);
-
 }

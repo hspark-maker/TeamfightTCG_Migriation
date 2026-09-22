@@ -77,7 +77,7 @@ internal static class RewardClaimCommand
                     t_result.RankProgress.ClaimedTierIndexes);
 
             Debug.Log($"[RewardClaimCommand] {_ownerType}/{_ownerId} claimed — {Describe(t_result)}");
-            return RewardItemDisplay.ToOutcome(ToGains(t_result, _ownerType, _ownerId), t_result?.Cards, t_result?.Packs);
+            return RewardItemDisplay.ToOutcome(ToGains(t_result, _ownerType, _ownerId), t_result?.Cards, t_result?.Packs, t_result?.Cosmetics, t_result?.Titles);
         }
         catch (ServerCommandRejectedException t_rejected)
         {
