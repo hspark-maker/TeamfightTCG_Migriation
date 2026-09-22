@@ -21,6 +21,7 @@ public enum EContentUnlockDestination
     Adventure = 4,
     Roulette = 5,
     Collection = 6,
+    CardEnhance = 7,
 }
 
 [Serializable]

@@ -79,7 +79,8 @@ public sealed class MissionRewardStrip : MonoBehaviour, IUIInitializable
             foreach (var t_item in _reward.Items)
             {
                 if (t_item == null || t_item.Amount <= 0) continue;
-                this.m_entries.Add(new Entry(RewardItemDisplay.NameOf(t_item.RewardType, t_item.RewardId),
+                this.m_entries.Add(new Entry(t_item.RewardType == "Title" ? "칭호"
+                        : RewardItemDisplay.NameOf(t_item.RewardType, t_item.RewardId),
                     t_item.Amount, t_item.RewardType == "Pack" ? PackSpec.Art(t_item.RewardId)
                         : RewardItemDisplay.ItemIcon(t_item.RewardType, t_item.RewardId),
                     this.backgroundColors != null ? this.backgroundColors.Item(t_item.RewardType) : FallbackColor));

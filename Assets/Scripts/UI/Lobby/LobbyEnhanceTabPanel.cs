@@ -105,14 +105,15 @@ public sealed class LobbyEnhanceTabPanel : LobbyTabPanel
         s_instance = this;
     }
 
-    public static bool CanOpenForCard(int _card)
+    public static bool CanOpenForCard(int _card, bool _allowUnowned = false)
         => s_instance != null && s_instance.m_shell != null && s_instance.m_shell.isActiveAndEnabled
-            && OwnershipManager.IsOwned(_card) && OutgameFeatureLock.IsUnlocked(EOutgameFeature.CardEnhance);
+            && CardCatalog.Contains(_card) && (_allowUnowned || OwnershipManager.IsOwned(_card))
+            && OutgameFeatureLock.IsUnlocked(EOutgameFeature.CardEnhance);
 
-    public static bool TryOpenForCard(int _card, Action _onOpened = null)
+    public static bool TryOpenForCard(int _card, Action _onOpened = null, bool _allowUnowned = false)
     {
         var panel = s_instance;
-        if (!CanOpenForCard(_card)) return false;
+        if (!CanOpenForCard(_card, _allowUnowned)) return false;
         if (panel.m_pending)
         {
             if (!panel.IsViewVisible || panel.m_card != _card) return false;
@@ -125,7 +126,13 @@ public sealed class LobbyEnhanceTabPanel : LobbyTabPanel
             panel.filterIndicator.color = Color.white;
             panel.m_card = _card;
             panel.m_amount = 10;
+            if (!OwnershipManager.IsOwned(_card))
+            {
+                panel.m_showUnowned = true;
+                panel.showUnownedToggle.SetIsOnWithoutNotify(true);
+            }
             panel.Rebuild();
+            if (!OwnershipManager.IsOwned(_card)) panel.RefreshCraftCatalogAsync().Forget();
             _onOpened?.Invoke();
         });
     }

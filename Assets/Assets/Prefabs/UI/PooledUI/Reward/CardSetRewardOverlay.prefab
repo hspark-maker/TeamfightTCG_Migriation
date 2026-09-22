@@ -782,7 +782,7 @@ MonoBehaviour:
   cellWidth: 300
   cellHeight: 360
   spacingX: 24
-  spacingY: 24
+  spacingY: 64
   cardStagger: 0.06
   cardPopDuration: 0.25
   cardPopFromScale: 0.7

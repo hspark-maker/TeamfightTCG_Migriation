@@ -74,4 +74,4 @@ MonoBehaviour:
     items:
     - name: "\uCE74\uB4DC \uAC15\uD654"
       icon: {fileID: 21300000, guid: 4dfdc5e70c80d0844ba8ab856f983d47, type: 3}
-      destination: 6
+      destination: 7

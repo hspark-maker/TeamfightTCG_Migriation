@@ -101,7 +101,6 @@ public class MatchmakingShell : ContentsUIBehaviour
     {
         OpenProfiles();
         if (opponentProfile != null) opponentProfile.ShowSearching();
-        if (versusRoot != null) versusRoot.SetActive(true);
         if (cancelButton != null) cancelButton.gameObject.SetActive(true);
         SetCancelInteractable(true);
         ShowMatchStatus(true);
@@ -112,7 +111,6 @@ public class MatchmakingShell : ContentsUIBehaviour
         SetCancelInteractable(false);
         if (cancelButton != null) cancelButton.gameObject.SetActive(false);
         if (opponentProfile != null) opponentProfile.Render(_opponent.Profile);
-        if (versusRoot != null) versusRoot.SetActive(true);
         ShowMatchStatus(false);
         if (!m_versusMode) PlayFoundSequence();
     }
@@ -397,6 +395,7 @@ public class MatchmakingShell : ContentsUIBehaviour
         m_searching = _searching;
         m_statusAnimating = true;
 
+        if (versusRoot != null) versusRoot.SetActive(!_searching);
         if (modeTitleText != null) modeTitleText.text = m_versusMode ? versusTitle : rankedTitle;
         if (matchStatusText != null)
         {
@@ -404,8 +403,13 @@ public class MatchmakingShell : ContentsUIBehaviour
             matchStatusText.text = _searching ? "상대를 찾는 중.." : "매칭완료!";
         }
         if (searchClockRoot != null) searchClockRoot.SetActive(_searching);
-        if (searchingHintRoot != null) searchingHintRoot.SetActive(_searching);
-        if (preparingHintRoot != null) preparingHintRoot.SetActive(!_searching);
+        if (searchingHintRoot != null)
+        {
+            searchingHintRoot.SetActive(true);
+            if (searchingHintRoot.TryGetComponent<TMP_Text>(out var t_hint))
+                t_hint.text = _searching ? "잠시만 기다려주세요." : "대전 준비중";
+        }
+        if (preparingHintRoot != null) preparingHintRoot.SetActive(false);
         if (battleStartingRoot != null) battleStartingRoot.SetActive(!_searching);
         if (loadingSpinner != null) loadingSpinner.gameObject.SetActive(false);
 

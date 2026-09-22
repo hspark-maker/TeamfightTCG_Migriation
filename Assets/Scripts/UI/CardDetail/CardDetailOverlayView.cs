@@ -854,7 +854,11 @@ public class CardDetailOverlayView : PooledOverlay, IPointerClickHandler
             || !GuidanceCoordinator.AllowsUserAction(EOutgameTutorialAnchor.None)) return;
         int t_card = CardAt(this.m_index);
         if (t_card <= 0) return;
-        this.acquisitionView.Show(t_card, NavigateToAcquisitionPack, RefreshArrows);
+        this.acquisitionView.Show(t_card, NavigateToAcquisitionPack, RefreshArrows, () =>
+        {
+            AlbumPageOverlayView.CloseOpen();
+            if (this != null && IsViewVisible) Hide();
+        });
         RefreshArrows();
     }
 

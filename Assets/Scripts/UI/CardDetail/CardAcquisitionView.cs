@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-// 카드 상세 안에서 열리는 획득처 목록. 구매와 보상 지급은 기존 상점이 담당한다.
+// 카드 상세·강화 화면의 획득처 목록. 팩 구매와 카드 제작은 각 화면에서 진행한다.
 public sealed class CardAcquisitionView : MonoBehaviour
 {
     [SerializeField] Button closeButton;
@@ -20,10 +21,11 @@ public sealed class CardAcquisitionView : MonoBehaviour
     bool m_initialized;
     Action<string> m_navigate;
     Action m_closed;
+    Action m_craftOpened;
 
     public bool IsOpen => gameObject.activeSelf;
 
-    public void Show(int _card, Action<string> _navigate, Action _closed)
+    public void Show(int _card, Action<string> _navigate, Action _closed, Action _craftOpened = null)
     {
         if (!m_initialized)
         {
@@ -35,8 +37,10 @@ public sealed class CardAcquisitionView : MonoBehaviour
         m_card = _card;
         m_navigate = _navigate;
         m_closed = _closed;
+        m_craftOpened = _craftOpened;
         gameObject.SetActive(true);
         Refresh();
+        CardCraftCommands.RefreshAsync().Forget();
         scroll.StopMovement();
         Canvas.ForceUpdateCanvases();
         scroll.verticalNormalizedPosition = 1f;
@@ -49,18 +53,21 @@ public sealed class CardAcquisitionView : MonoBehaviour
         m_closed?.Invoke();
         m_closed = null;
         m_navigate = null;
+        m_craftOpened = null;
     }
 
     void OnEnable()
     {
         RankManager.OnChanged += Refresh;
         OutgameFeatureLock.OnChanged += Refresh;
+        CardCraftCommands.OnChanged += Refresh;
     }
 
     void OnDisable()
     {
         RankManager.OnChanged -= Refresh;
         OutgameFeatureLock.OnChanged -= Refresh;
+        CardCraftCommands.OnChanged -= Refresh;
     }
 
     void Refresh()
@@ -75,18 +82,41 @@ public sealed class CardAcquisitionView : MonoBehaviour
             && GuidanceCoordinator.CanCloseCardDetail
             && GuidanceCoordinator.AllowsUserNavigation(EOutgameTutorialAnchor.LobbyPackTab);
 
+        int t_count = t_sources.Count + 1;
+        for (int t_i = m_rows.Count; t_i < t_count; t_i++)
+            m_rows.Add(Instantiate(rowTemplate, scroll.content));
+
+        m_rows[0].BindCraft(m_card, CanNavigateToCraft(), NavigateToCraft);
+        m_rows[0].gameObject.SetActive(true);
         for (int t_i = 0; t_i < t_sources.Count; t_i++)
         {
-            if (t_i >= m_rows.Count) m_rows.Add(Instantiate(rowTemplate, scroll.content));
-            m_rows[t_i].Bind(t_sources[t_i], t_canNavigate, _pack => m_navigate?.Invoke(_pack));
-            m_rows[t_i].gameObject.SetActive(true);
+            m_rows[t_i + 1].Bind(t_sources[t_i], t_canNavigate, _pack => m_navigate?.Invoke(_pack));
+            m_rows[t_i + 1].gameObject.SetActive(true);
         }
-        for (int t_i = t_sources.Count; t_i < m_rows.Count; t_i++)
+        for (int t_i = t_count; t_i < m_rows.Count; t_i++)
             m_rows[t_i].gameObject.SetActive(false);
 
-        emptyText.gameObject.SetActive(t_sources.Count == 0);
-        footer.text = t_canNavigate ? "카드팩에서 확률에 따라 획득합니다."
-            : "상점 이용이 가능해지면 이동할 수 있습니다.";
+        emptyText.gameObject.SetActive(false);
+        footer.text = "획득 방법을 선택하면 해당 화면으로 이동합니다.";
+    }
+
+    bool CanNavigateToCraft()
+        => GuidanceCoordinator.CanCloseCardDetail
+            && GuidanceCoordinator.AllowsUserNavigation(EOutgameTutorialAnchor.None)
+            && !OwnershipManager.IsOwned(m_card) && !CardCraftCommands.IsCrafting
+            && LobbyEnhanceTabPanel.CanOpenForCard(m_card, _allowUnowned: true);
+
+    void NavigateToCraft()
+    {
+        if (!CanNavigateToCraft()) return;
+        if (CardCraftCommands.IsReady &&
+            (!CardCraftCommands.TryGetRecipe(m_card, out var t_recipe) || !t_recipe.Available)) return;
+        var t_opened = m_craftOpened;
+        if (!LobbyEnhanceTabPanel.TryOpenForCard(m_card, () =>
+        {
+            Hide();
+            t_opened?.Invoke();
+        }, _allowUnowned: true)) footer.text = "지금은 제작 화면으로 이동할 수 없습니다.";
     }
 
     public void ShowNavigationUnavailable()

@@ -120,6 +120,18 @@ public sealed class ContentUnlockPresentation : MonoBehaviour
 
     FeatureLockView FindButton(EContentUnlockDestination destination)
     {
+        if (destination == EContentUnlockDestination.CardEnhance)
+        {
+            var tabBar = GetComponentInParent<LobbyTabController>()?.GetComponentInChildren<LobbyTabBarView>(true);
+            if (tabBar == null) return null;
+            for (int i = 0; i < tabBar.Count; i++)
+            {
+                var view = tabBar.GetFeatureLock(i);
+                if (view != null && view.isActiveAndEnabled && view.Feature == EOutgameFeature.CardEnhance)
+                    return view;
+            }
+            return null;
+        }
         if (destination == EContentUnlockDestination.Collection)
         {
             if (!TutorialAnchorRegistry.TryGet(EOutgameTutorialAnchor.LobbyCollectionTab,
