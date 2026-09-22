@@ -27,8 +27,9 @@ import {
   type Player,
   type ReplayDay,
 } from "./api";
+import { SpecManager } from "./SpecManager";
 
-type Page = "overview" | "players" | "content" | "replay";
+type Page = "overview" | "players" | "content" | "replay" | "specs";
 type IconName = Page | "arrow" | "refresh" | "shield" | "logout" | "search";
 const number = new Intl.NumberFormat("ko-KR");
 const nav: { id: Page; label: string; caption: string }[] = [
@@ -52,10 +53,16 @@ const nav: { id: Page; label: string; caption: string }[] = [
     label: "전투 검증",
     caption: "최근 7일의 서버 전투 검증 결과입니다.",
   },
+  {
+    id: "specs",
+    label: "CSV · SpecData",
+    caption: "CSV를 편집하고 저장한 데이터를 서버와 비교하세요.",
+  },
 ];
 
 function Icon({ name }: { name: IconName }) {
   const paths: Record<IconName, ReactNode> = {
+    specs: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 9v12M15 9v12M3 15h18" /></>,
     overview: (
       <>
         <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -262,24 +269,32 @@ export function App() {
     if (!api) return;
     let generation = 0;
     let active = true;
+    let verifiedUid: string | null = null;
     const unsubscribe = onIdTokenChanged(api.auth, (user) => {
       const ticket = ++generation;
-      // A token change also invalidates any data held by the previous session.
-      setSession(null);
+      // A same-account token refresh must not discard an unsaved CSV draft.
+      if (verifiedUid !== user?.uid) setSession(null);
       if (!user) {
+        verifiedUid = null;
+        setSession(null);
         setChecking(false);
         return;
       }
-      setChecking(true);
+      if (verifiedUid !== user.uid) setChecking(true);
       user
         .getIdTokenResult()
         .then((token) => {
-          if (active && ticket === generation)
+          if (active && ticket === generation) {
+            verifiedUid = user.uid;
             setSession({ user, allowed: token.claims.admin === true });
+          }
         })
         .catch((error) => {
-          if (active && ticket === generation)
+          if (active && ticket === generation) {
+            verifiedUid = null;
+            setSession(null);
             setAuthError(errorMessage(error));
+          }
         })
         .finally(() => {
           if (active && ticket === generation) setChecking(false);
@@ -352,7 +367,7 @@ export function App() {
             <Login error={authError} />
           )}
           <div className="auth-footer">
-            <Badge>조회 전용</Badge>
+            <Badge>관리자 전용</Badge>
             <span>{projectId}</span>
           </div>
         </section>
@@ -447,6 +462,14 @@ function Workspace({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
   const [refresh, setRefresh] = useState(0);
+  const [hasDraft, setHasDraft] = useState(false);
+  const [specBusy, setSpecBusy] = useState(false);
+  function leave(action: () => void) {
+    if (specBusy) return;
+    if (hasDraft && !window.confirm("저장하지 않은 CSV 변경을 버리고 이동할까요?")) return;
+    setHasDraft(false);
+    action();
+  }
   useEffect(() => {
     let active = true;
     setOverview(null);
@@ -477,9 +500,10 @@ function Workspace({
           {nav.map((item) => (
             <button
               key={item.id}
+              disabled={specBusy}
               className={page === item.id ? "active" : ""}
               aria-current={page === item.id ? "page" : undefined}
-              onClick={() => setPage(item.id)}
+              onClick={() => { if (page !== item.id) leave(() => setPage(item.id)); }}
             >
               <Icon name={item.id} />
               {item.label}
@@ -491,8 +515,8 @@ function Workspace({
           <div className="scope-note">
             <Icon name="shield" />
             <div>
-              <strong>조회 전용 워크스페이스</strong>
-              <p>현재 상태를 확인하는 공간입니다.</p>
+              <strong>운영 워크스페이스</strong>
+              <p>유저 조회와 CSV 기반 콘텐츠 관리.</p>
             </div>
           </div>
           <div className="operator">
@@ -507,8 +531,9 @@ function Workspace({
             </div>
             <button
               className="icon-button"
-              onClick={onLogout}
+              onClick={() => leave(onLogout)}
               aria-label="로그아웃"
+              disabled={specBusy}
             >
               <Icon name="logout" />
             </button>
@@ -527,9 +552,10 @@ function Workspace({
               {(["test", "live"] as const).map((value) => (
                 <button
                   key={value}
+                  disabled={specBusy}
                   className={env === value ? `selected ${value}` : ""}
                   aria-pressed={env === value}
-                  onClick={() => onEnv(value)}
+                  onClick={() => { if (env !== value) leave(() => onEnv(value)); }}
                 >
                   {value === "test" ? "TEST" : "LIVE"}
                 </button>
@@ -547,7 +573,7 @@ function Workspace({
               <h1>{current.label}</h1>
               <p>{current.caption}</p>
             </div>
-            {page !== "players" && (
+            {page !== "players" && page !== "specs" && (
               <button
                 onClick={() => setRefresh((value) => value + 1)}
                 disabled={busy}
@@ -557,7 +583,9 @@ function Workspace({
               </button>
             )}
           </div>
-          {page === "players" ? (
+          {page === "specs" ? (
+            <SpecManager env={env} onDirtyChange={setHasDraft} onBusyChange={setSpecBusy} onPublished={() => setRefresh(value => value + 1)} />
+          ) : page === "players" ? (
             <PlayerSearch env={env} />
           ) : (
             <>
@@ -596,7 +624,7 @@ function Workspace({
             <span>
               {projectId} <b>·</b> 서울 리전 <b>·</b> cardbattle
             </span>
-            <span>Card Battle Operations / 01</span>
+            <span>Card Battle Operations / 02</span>
           </footer>
         </main>
       </div>
