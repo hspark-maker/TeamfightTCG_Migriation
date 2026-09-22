@@ -1299,7 +1299,7 @@ RectTransform:
   m_GameObject: {fileID: 3258554938050372299}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.85, y: 0.85, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 3258554937734531380}
@@ -1335,6 +1335,7 @@ MonoBehaviour:
   searchingNickname: ""
   profileView: {fileID: 7108033471561608438}
   nicknameText: {fileID: 4963259445832746805}
+  titleText: {fileID: 261125385724510625}
   rankBadge: {fileID: 6396806899609297070}
   rankNameText: {fileID: 436584696407005914}
 --- !u!1 &3258554938092359116
@@ -1500,7 +1501,7 @@ RectTransform:
   m_GameObject: {fileID: 3258554938115611323}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.85, y: 0.85, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 3258554938556150646}
@@ -1533,6 +1534,7 @@ MonoBehaviour:
   searchingNickname: ???
   profileView: {fileID: 445807360594169866}
   nicknameText: {fileID: 8968125485998074327}
+  titleText: {fileID: 2343460121547887044}
   rankBadge: {fileID: 2051683357517267254}
   rankNameText: {fileID: 3659904244070674459}
 --- !u!1 &3258554938163674342

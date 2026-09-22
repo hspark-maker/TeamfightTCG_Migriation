@@ -188,10 +188,32 @@ public sealed class AchievementPanel : ContentsPooledUI
         // 표시 목록도 서버가 확정한 실지급량만 사용한다. 팝업 확인은 재지급을 요청하지 않는다.
         var t_lines = new List<RewardLine>();
         foreach (var t_gain in t_outcome.Granted) t_lines.Add(new RewardLine(t_gain));
-        if (t_lines.Count > 0 && RewardClaimPopup.TryGet(out var t_popup))
+        if (RewardClaimPopup.TryGet(out var t_popup) && t_popup.RewardSlotCount > 0)
+        {
+            // 획득한 칭호의 아이콘·이름을 재화와 함께 바로 보여준다.
+            // 칸을 넘는 칭호만 다음 팝업으로 넘겨 누락·중복 표시를 막는다.
+            var t_remainingTitles = new List<GrantedTitle>();
+            if (t_outcome.Titles != null)
+                foreach (var t_title in t_outcome.Titles)
+                {
+                    if (t_title == null) continue;
+                    if (t_lines.Count < t_popup.RewardSlotCount)
+                        t_lines.Add(new RewardLine(t_title));
+                    else
+                        t_remainingTitles.Add(t_title);
+                }
+            var t_remaining = new RewardClaimOutcome(t_outcome.Granted, t_outcome.Cards, t_outcome.Packs,
+                t_outcome.PresentationBatches, t_outcome.ShowCardsIndividually,
+                t_outcome.Cosmetics, t_remainingTitles);
+            if (t_lines.Count == 0)
+            {
+                RewardPackPresentation.Show(t_remaining);
+                return;
+            }
             t_popup.Show(_definition.Title, t_lines,
                 () => UniTask.FromResult(new RewardClaimOutcome(t_outcome.Granted)),
-                _onClosed: () => RewardPackPresentation.Show(t_outcome));
+                _onClosed: () => RewardPackPresentation.Show(t_remaining));
+        }
         else
             RewardPackPresentation.Show(t_outcome);
     }

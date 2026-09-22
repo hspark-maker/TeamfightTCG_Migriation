@@ -27,6 +27,7 @@ public class MatchProfileView : MonoBehaviour
     [Tooltip("판·얼굴·링 3층을 그리는 공용 프로필 뷰. 비우면 프로필 그림 갱신만 건너뛴다 — 이름·랭크는 그대로 칠한다.")]
     [SerializeField] ProfileAvatarView profileView;
     [SerializeField] TMP_Text nicknameText;
+    [SerializeField] TMP_Text titleText;
     [SerializeField] Image    rankBadge;
     [SerializeField] TMP_Text rankNameText;
 
@@ -68,6 +69,7 @@ public class MatchProfileView : MonoBehaviour
         // 이름·랭크는 foundRoot 밖에 있어 틀과 함께 감춰지지 않는다 — 여기서 직접 비우지 않으면
         // 원본 프리팹의 더미 이름이 상대를 찾기도 전에 그대로 보인다.
         if (nicknameText != null) nicknameText.text = searchingNickname;
+        RenderTitle(string.Empty);
         if (rankNameText != null) rankNameText.text = string.Empty;
 
         // 배지도 같은 이유로 직접 감춘다. 스프라이트를 비우지 않고 오브젝트를 내리는 이유는
@@ -83,6 +85,7 @@ public class MatchProfileView : MonoBehaviour
         if (foundRoot     != null) foundRoot.SetActive(true);
 
         if (nicknameText != null) nicknameText.text = _profile.Nickname;
+        RenderTitle(_profile.TitleName);
         if (rankNameText != null) rankNameText.text = _profile.RankName;
 
         // 판·얼굴·링은 공용 뷰가 그린다. 층별 스프라이트가 null이면 그 층은 저작값이 유지된다(상대·모험는 판·링이 null).
@@ -99,5 +102,12 @@ public class MatchProfileView : MonoBehaviour
         if (_profile.RankBadge != null) rankBadge.sprite = _profile.RankBadge;
 
         rankBadge.gameObject.SetActive(_profile.RankBadge != null);
+    }
+
+    void RenderTitle(string _titleName)
+    {
+        if (titleText == null) return;
+        titleText.text = _titleName ?? string.Empty;
+        titleText.gameObject.SetActive(!string.IsNullOrWhiteSpace(_titleName));
     }
 }

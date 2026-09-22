@@ -6,6 +6,7 @@ public readonly struct MatchProfile
     public readonly string Nickname;
     public readonly int    TierIndex;
     public readonly string RankName;
+    public readonly string TitleName;
 
     // 배지가 없으면 뷰에서 숨긴다.
     public readonly Sprite RankBadge;
@@ -21,11 +22,12 @@ public readonly struct MatchProfile
 
     public MatchProfile(string _nickname, int _tierIndex, string _rankName, Sprite _rankBadge, Sprite _avatar,
                         Sprite _frame = null, Color _frameColor = default,
-                        Sprite _plate = null, Color _plateColor = default)
+                        Sprite _plate = null, Color _plateColor = default, string _titleName = null)
     {
         Nickname  = _nickname != null ? _nickname : string.Empty;
         TierIndex = _tierIndex;
         RankName  = _rankName != null ? _rankName : string.Empty;
+        TitleName = _titleName ?? string.Empty;
         RankBadge = _rankBadge;
         Avatar    = _avatar;
         Frame     = _frame;
@@ -41,9 +43,13 @@ public readonly struct MatchProfile
     public static MatchProfile OfLocalPlayer()
     {
         RankInfo t_rank = RankManager.GetInfo();
+        TitleEntry t_title = null;
+        bool t_hasTitle = TitleManager.Catalog != null &&
+            TitleManager.Catalog.TryGet(TitleManager.EquippedId, out t_title);
         return new MatchProfile(ProfileManager.Nickname, t_rank.TierIndex, t_rank.DisplayName, t_rank.Badge,
                                 ProfileManager.AvatarLarge, ProfileManager.Frame, ProfileManager.FrameColor,
-                                ProfileManager.AvatarPlate, ProfileManager.AvatarColor);
+                                ProfileManager.AvatarPlate, ProfileManager.AvatarColor,
+                                t_hasTitle ? t_title.displayName : string.Empty);
     }
 
     // 페이크 매칭의 상대. 랭크 표시를 내 것에서 그대로 가져오는 이유: 상대의 덱과 카드 레벨이 실제로
