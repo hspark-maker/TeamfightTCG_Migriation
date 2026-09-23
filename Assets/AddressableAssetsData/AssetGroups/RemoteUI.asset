@@ -131,14 +131,32 @@ MonoBehaviour:
     m_SerializedLabels:
     - RemoteUI
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 35ddd74ab48a4df499ff8aa36806d01d
+    m_Address: Icon_Title_BlueTraveler_128
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 397e58311ca372c4abd78f896f53a9f2
     m_Address: Atlases/UILobby
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteUI
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 404ba69c70794455a231f4567022f7ff
+    m_Address: Icon_Title_DawnGuardian_128
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 408410dc0be34c648afdaf57203b958c
     m_Address: Config/rankConfig
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 42882c96d5cf48a889963af85b5a1898
+    m_Address: Icon_Title_StarlightCompanion_128
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteUI
@@ -279,6 +297,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - RemoteUI
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a5c6ad0f09df4fa3a3f70fd32b5d09b0
+    m_Address: Icon_Title_FirstStep_128
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a64b31e8fbca7b04989d81542f9ad953
     m_Address: Atlases/UIDetail
     m_ReadOnly: 0
@@ -301,6 +325,12 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b43fd212a19425d4db544e64d1db58bd
     m_Address: Atlases/UIRewards
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b4bada41c9d546b5a265ec0099d735bb
+    m_Address: Icon_Title_SmallUniverse_128
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteUI
@@ -417,8 +447,26 @@ MonoBehaviour:
     - RemoteUI
     - UIPrefab
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e830d3e227ff400aba2ddfdee4ecf84b
+    m_Address: Icon_Title_SilentSword_128
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ed4cd9df9407f0a4e97ba1a9c52f5890
     m_Address: Config/cardFrameConfig
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ef6c5b9873844b6a99c6efc8df4004b1
+    m_Address: Icon_Title_GoldenCollector_128
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - RemoteUI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f246e692fc4949f2bc5f987cf6c5d3fa
+    m_Address: Icon_Title_EndlessAdventure_128
     m_ReadOnly: 0
     m_SerializedLabels:
     - RemoteUI
