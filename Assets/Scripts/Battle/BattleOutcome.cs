@@ -72,8 +72,10 @@ public sealed class BattleOutcome
 
     void SubmitMatchEvidence(bool _won, int _remaining, long _rankPointsBefore, EMatchEndReason _reason)
     {
+        // AI전 디버그 승리는 상대 항복 명령을 기록했으므로 정상 제출한다.
+        // 멀티 디버그는 상대와 명령 로그를 동기화하지 않아 제출할 수 없다.
         if ((!DeckConfig.IsMultiplayer && !SoloMatchHandoff.UsesResultSubmission) ||
-            _reason == EMatchEndReason.DebugForceWin || DeckConfig.AiTakeover)
+            (_reason == EMatchEndReason.DebugForceWin && DeckConfig.IsMultiplayer) || DeckConfig.AiTakeover)
             return;
 
         int t_opponentRemaining = rules.enemyField.GetActiveCards().Count + rules.enemyField.WaitingCount;

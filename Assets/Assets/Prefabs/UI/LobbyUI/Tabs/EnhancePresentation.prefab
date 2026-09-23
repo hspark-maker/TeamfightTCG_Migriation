@@ -796,14 +796,14 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.25, g: 0.28, b: 0.34, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 0e61a0e6f42684ba396cff3392eb24bc, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 1e0d3bec20cebbc45b248527414bde90, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -1014,6 +1014,8 @@ MonoBehaviour:
   - {fileID: 2054169212293829315}
   - {fileID: 6680695235787631548}
   - {fileID: 8985359729173384960}
+  filledStar: {fileID: 21300000, guid: a3c83835c8ce0e8429502ba858a70b2e, type: 3}
+  emptyStar: {fileID: 21300000, guid: 1e0d3bec20cebbc45b248527414bde90, type: 3}
 --- !u!1 &2140508447805465341
 GameObject:
   m_ObjectHideFlags: 0
@@ -5342,14 +5344,14 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.25, g: 0.28, b: 0.34, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 0e61a0e6f42684ba396cff3392eb24bc, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 1e0d3bec20cebbc45b248527414bde90, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -5554,14 +5556,14 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.25, g: 0.28, b: 0.34, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 0e61a0e6f42684ba396cff3392eb24bc, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 1e0d3bec20cebbc45b248527414bde90, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -5582,6 +5584,7 @@ GameObject:
   - component: {fileID: 8984300000000000101}
   - component: {fileID: 8984300000000000102}
   - component: {fileID: 8984300000000000103}
+  - component: {fileID: 8984300000000000104}
   - component: {fileID: 6026985106791762235}
   - component: {fileID: 5383091894969724125}
   m_Layer: 5
@@ -6519,3 +6522,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+--- !u!114 &8984300000000000104
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8984300000000000100}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e6a6fa1b57ada134eb7acbb86043d45f, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::ScreenFillRect
+  offset: {x: 0, y: 0}
+  overscan: 1

@@ -39,6 +39,8 @@ public class CardVisualView : MonoBehaviour
     [SerializeField] TMP_Text   levelText;
     [Tooltip("고정 3칸 성장 별. 프리팹에서 미리 저작하고 런타임에는 채움 상태만 바꾼다.")]
     [SerializeField] Image[]    growthStars;
+    [SerializeField] Sprite     filledGrowthStar;
+    [SerializeField] Sprite     emptyGrowthStar;
     [SerializeField] CardKeywordIconView[]  keywordIconSlots;
     [SerializeField] CardSynergyBadgeView[] synergyBadgeSlots;
     [SerializeField] Transform  keywordIconRoot;
@@ -394,7 +396,11 @@ public class CardVisualView : MonoBehaviour
             if (t_icon == null) continue;
 
             t_icon.gameObject.SetActive(_show);
-            t_icon.color = t_i < t_star ? GrowthStarStrip.FilledColor : GrowthStarStrip.EmptyColor;
+            bool t_filled = t_i < t_star;
+            Sprite t_sprite = t_filled ? this.filledGrowthStar : this.emptyGrowthStar;
+            if (t_sprite != null) t_icon.sprite = t_sprite;
+            t_icon.color = t_sprite != null ? Color.white
+                : t_filled ? GrowthStarStrip.FilledColor : GrowthStarStrip.EmptyColor;
         }
     }
 

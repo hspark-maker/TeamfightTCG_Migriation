@@ -149,9 +149,32 @@ public class TurnRunner : MonoBehaviour
     }
 
 #if UNITY_EDITOR
-    /// <summary>디버그 강제 승리. 에디터 전용 — 빌드에는 이 심볼 자체가 없다.
+    /// <summary>디버그 강제 승리. AI전은 상대 항복을 기록해 서버에서도 승리로 정산한다.
     /// 멀티에서는 이쪽 화면만 끝나고 상대는 계속 진행한다(디버그 용도라 동기화하지 않는다).</summary>
-    public void DebugForceWin() => ForceEnd(true, EMatchEndReason.DebugForceWin);
+    public void DebugForceWin()
+    {
+        if (this.resultFinalized) return;
+
+        if (!DeckConfig.IsMultiplayer && SoloMatchHandoff.UsesResultSubmission)
+        {
+            // 승리 화면만 강제하면 서버 재생에는 종료 명령이 없어 정산할 수 없다.
+            // 보드를 임의로 지우지 않고 서버가 재생할 수 있는 상대 항복을 남긴다.
+            if (this.enemyField == null || this.enemyField.OwnerIndex != 1 ||
+                BattleCommandLog.IsFrozen || BattleCommandLog.IsTruncated ||
+                BattleCommandLog.Count >= BattleCommandLog.MaxCommands)
+            {
+                Debug.LogWarning("[BattleDebug] 전투 초기화 또는 명령 로그 상태를 확인하세요. 서버 승리를 기록할 수 없습니다.");
+                return;
+            }
+            BattleCommandLog.RecordSurrender(this.enemyField.OwnerIndex);
+        }
+        else if (DeckConfig.IsMultiplayer)
+        {
+            Debug.LogWarning("[BattleDebug] 멀티플레이 디버그 승리는 로컬 화면에만 적용됩니다. 서버 승리 정산은 AI전에서 지원합니다.");
+        }
+
+        ForceEnd(true, EMatchEndReason.DebugForceWin);
+    }
 #endif
 
     void ForceEnd(bool _won, EMatchEndReason _reason)

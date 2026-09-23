@@ -67,40 +67,6 @@ public class PackCardView : MonoBehaviour
     [Tooltip("신규는 광택이 이만큼 더 훑는다(0이면 중복과 같은 1회). 색만으로는 갈림이 약해 횟수로도 벌린다.")]
     [Min(0)] [SerializeField] int cardGleamNewExtraSweeps = 1;
 
-    // 신규 카드 테두리를 한 바퀴 훑는 림라이트. UIEffect의 Edge-Shiny가 그린다 —
-    // 그래픽의 alpha 경계를 따라 빛나는 띠라, 프레임 실루엣 그대로를 훑을 수 있다.
-    //
-    // ⚠ 이 축은 cardGleam(Frame의 UIEffect)을 쓰지 않는다. 그쪽에 걸면 Portrait과 프레임 장식들의
-    //   UIEffectReplica가 효과를 **통째로** 복제하므로(파라미터별 제외 옵션이 없다) 아트 테두리와 아이콘마다
-    //   같은 띠가 따로 생긴다 — 프레임을 따라 흐르는 한 줄이 아니라 여러 조각으로 갈라져 보인다.
-    //   그래서 림은 Replica가 가리키지 않는 전용 노드(FrameRim)의 UIEffect가 혼자 그린다.
-    //
-    // ⚠ 배선 전제(전용 노드): Frame과 같은 스프라이트·같은 rect를 가진 Image이고, **색은 검정 + 블렌드는 Additive**다.
-    //   검은 바탕은 Additive에서 아무것도 더하지 않으므로 평소엔 완전히 투명한 것과 같고, 테두리에 얹히는
-    //   빛만 화면에 더해진다. edge 계열 필터는 모두 샘플 알파에 비례하므로(셰이더 apply_color_filter)
-    //   바탕 알파를 지워 숨기는 방법은 쓸 수 없다 — 그러면 림도 함께 사라진다.
-    //
-    // ⚠ edge는 transition과 반대로 rate 0에서도 계속 보인다(띠가 항상 테두리 어딘가에 있다).
-    //   그래서 내릴 때는 rate가 아니라 노드째 끈다 — edgeMode만 None으로 내리면 필터가 하나도 없는 상태가 되어
-    //   커스텀 블렌드가 붙은 머티리얼이 걷힐 수 있고, 그 순간 검은 바탕이 프레임 위에 그대로 드러난다.
-    //   그리고 띠는 서로 반대편에서 도는 한 쌍이다(셰이더가 각도를 반주기로 감는다) — rate 0→1이 정확히 한 바퀴다.
-    [Header("신규 림라이트")]
-    [Tooltip("림라이트를 그리는 전용 UIEffect(FrameRim 노드). cardGleam과 같은 컴포넌트를 물리면 " +
-             "Replica를 타고 아트·아이콘에까지 번진다 — 반드시 별도 노드여야 한다. 미배선이면 림라이트 없음.")]
-    [SerializeField] UIEffect cardRim;
-    [Tooltip("림라이트 색. Additive로 얹히므로 밝은 색일수록 강하다.")]
-    [SerializeField] Color rimColor = new Color(1f, 0.86f, 0.55f, 1f);
-    [Tooltip("테두리에서 빛나는 띠의 두께. 카드 실루엣 안쪽으로 이만큼 번진다.")]
-    [Range(0f, 1f)] [SerializeField] float rimThickness = 0.35f;
-    [Tooltip("한 번에 빛나는 호의 길이(둘레 대비). 크면 테두리 절반이 통째로 빛나 \"훑는다\"가 아니라 \"켜졌다\"가 된다.")]
-    [Range(0.02f, 0.5f)] [SerializeField] float rimArc = 0.12f;
-    [Tooltip("펀치가 꽂힌 뒤 림라이트가 출발하기까지의 뜸.")]
-    [SerializeField] float rimSweepDelay = 0.02f;
-    [Tooltip("테두리를 한 바퀴 훑는 시간.")]
-    [SerializeField] float rimSweepDuration = 0.6f;
-    [Tooltip("결과 격자에서 신규 카드의 림라이트가 계속 도는 속도(회/초). 셰이더가 스스로 돌려 코드 트윈이 없다. 0이면 결과판에서는 멈춘다.")]
-    [SerializeField] float rimResultSpeed = 0.12f;
-
     [Header("결과 격자 대비")]
     [Tooltip("결과 격자에서 중복 카드를 이만큼 탈채도한다(0=그대로, 1=완전 흑백). " +
              "낱장 확인 순간에는 걸지 않는다 — 그때는 중복도 온전한 획득이어야 한다.")]
@@ -251,10 +217,6 @@ public class PackCardView : MonoBehaviour
         // 펀치처럼 빼버리면 안 되는 이유는 반대다: 빼면 rate가 0에 남아 띠가 카드 앞에 걸린 채로 굳는다.
         PlayCardGleam(_instant);
 
-        // 테두리 림라이트는 "지금 이 한 장이 나왔다"는 순간의 것이라 즉시 모드엔 없다.
-        // 결과 격자의 지속 대비는 ApplyResultContrast가 따로 쥔다 — 한 메서드가 두 순간을 겸하지 않게 갈랐다.
-        if (IsNew && !_instant) PlayRim();
-
         if (IsNew)
         {
             PlayNewBadge(_instant);
@@ -266,22 +228,14 @@ public class PackCardView : MonoBehaviour
 
     /// <summary>
     /// 결과 격자에 놓인 상태의 신규/중복 대비. 여기서 주는 것은 순간이 아니라 지속 상태다 —
-    /// 신규는 림라이트가 계속 돌고 중복은 탈채도된 채 놓여, 마지막 화면이 "이번에 뭘 건졌나"를 한눈에 말한다.
+    /// 신규는 원래 색을 유지하고 중복은 탈채도한다.
     ///
     /// 격자의 팝(PackResultGrid.PlayPop)은 전 카드 동일하게 둔다. 정렬과 리듬이 어긋나면 격자가
     /// 결과판이 아니라 또 한 번의 연출로 읽힌다 — 대비는 움직임이 아니라 이 상태 차이로 준다.
     /// </summary>
     public void ApplyResultContrast()
     {
-        if (IsNew)
-        {
-            // 림라이트는 셰이더가 스스로 돌린다(autoPlaySpeed) — 카드가 여러 장이라 장당 트윈을 굴리지 않는다.
-            SetRim(true);
-            if (cardRim != null) cardRim.edgeShinyAutoPlaySpeed = rimResultSpeed;
-            return;
-        }
-
-        SetRim(false);
+        if (IsNew) return;
 
         // 낱장 확인용 칩은 결과판에 남지 않는다. PlayRevealAccent(_instant: true)가 이미 내려 두지만,
         // 격자가 아닌 경로로 이 상태에 들어오는 카드(낱장 확인 중 요약으로 넘어간 경우)도 있어 여기서 못 박는다.
@@ -330,42 +284,6 @@ public class PackCardView : MonoBehaviour
                .SetLink(cardGleam.gameObject);
     }
 
-    // 림라이트가 프레임을 한 바퀴 돈다(신규 전용, 낱장이 드러나는 순간).
-    void PlayRim()
-    {
-        if (cardRim == null) return;
-
-        SetRim(true);
-
-        DOTween.Kill(cardRim);
-        cardRim.edgeShinyRate = 0f;
-
-        // 등속이 아니라 InOutSine — 빛은 테두리를 도는 동안 모서리에서 잠깐 머물렀다 빠진다.
-        DOTween.To(() => cardRim.edgeShinyRate, _v => cardRim.edgeShinyRate = _v, 1f, rimSweepDuration)
-               .SetDelay(rimSweepDelay)
-               .SetEase(Ease.InOutSine)
-               .SetTarget(cardRim)
-               .SetLink(cardRim.gameObject);
-    }
-
-    // 림라이트의 룩을 세우거나 완전히 내린다.
-    // 내릴 때 노드째 끄는 이유와 edgeColorFilter를 코드가 못 박는 이유는 위 ⚠ 참고 —
-    // 둘 다 룩을 고르는 값이 아니라 이 효과가 성립하기 위한 전제라 인스펙터에 맡기지 않는다.
-    void SetRim(bool _on)
-    {
-        if (cardRim == null) return;
-
-        cardRim.gameObject.SetActive(_on);
-        if (!_on) return;
-
-        cardRim.edgeMode = EdgeMode.Shiny;
-        cardRim.edgeColorFilter = ColorFilter.Additive;
-        cardRim.edgeColor = rimColor;
-        cardRim.edgeWidth = rimThickness;
-        cardRim.edgeShinyWidth = rimArc;
-        cardRim.edgeShinyAutoPlaySpeed = 0f;   // 낱장 구간은 코드가 rate를 민다.
-    }
-
     // 강조 요소를 내린 초기 상태. 재사용(풀링 없이 Instantiate이지만 Bind 재호출 대비)에도 안전하게.
     // 펀치는 여기서 되돌리지 않는다 — 그 축은 이 트랜스폼이고, 트랜스폼은 PackCardStack이 쥐고 있다.
     // 걷어낼 시점을 아는 쪽이 그쪽이라 취소도 그쪽이 SnapPunchToRest로 부른다.
@@ -386,11 +304,6 @@ public class PackCardView : MonoBehaviour
             cardGleam.toneFilter = ToneFilter.None;
             cardGleam.toneIntensity = 0f;
         }
-
-        // 림라이트를 내린다. rate 0은 "안 보이는 상태"가 아니므로 노드째 꺼야 한다(SetRim 주석 참고).
-        // 더미에 깔린 카드들은 아직 자기 차례가 아니라 여기서 전부 내려간 상태로 시작한다.
-        if (cardRim != null) DOTween.Kill(cardRim);
-        SetRim(false);
 
         if (revealFlash != null)
         {

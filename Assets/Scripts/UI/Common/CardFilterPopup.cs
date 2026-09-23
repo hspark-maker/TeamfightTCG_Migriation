@@ -56,6 +56,7 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
     RectTransform m_sectionPanel;
     TMP_Text m_sectionHeader;
     float m_sectionY;
+    Vector2 m_lockedOffTextPosition;
 
     protected override int SortingOrder => UiSortingOrder.CardFilter;
 
@@ -93,6 +94,7 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
         resetButton.onClick.AddListener(ResetFilter);
         applyButton.onClick.AddListener(ApplyFilter);
         includeLockedButton.onClick.AddListener(ToggleIncludeLocked);
+        m_lockedOffTextPosition = includeLockedText.rectTransform.anchoredPosition;
         optionTemplate.gameObject.SetActive(false);
         sectionTemplate.gameObject.SetActive(false);
         sectionPanelTemplate.gameObject.SetActive(false);
@@ -191,7 +193,8 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
             if (keyword == CardKeyword.None || (availableKeywords & keyword) == 0) continue;
             CardKeyword value = keyword;
             AddOption(KeywordName(value), () => m_edit.Keywords.Contains(value),
-                () => Toggle(m_edit.Keywords, value));
+                () => Toggle(m_edit.Keywords, value),
+                DataLibrary.instance != null ? DataLibrary.instance.keywordIconConfig?.GetIcon(value) : null);
         }
 
         AddSection("시너지");
@@ -199,7 +202,7 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
         {
             string value = pair.Key;
             AddOption(SynergyText.Name(pair.Value), () => m_edit.SynergyIds.Contains(value),
-                () => Toggle(m_edit.SynergyIds, value));
+                () => Toggle(m_edit.SynergyIds, value), pair.Value.activeIcon);
         }
         FinishSection();
         optionContent.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, m_y);
@@ -235,7 +238,7 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
         m_sectionHeader = null;
     }
 
-    void AddOption(string caption, Func<bool> isSelected, Action toggle)
+    void AddOption(string caption, Func<bool> isSelected, Action toggle, Sprite iconSprite = null)
     {
         Button button = Instantiate(optionTemplate, optionContent);
         button.gameObject.SetActive(true);
@@ -249,6 +252,12 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
             Caption = caption,
             IsSelected = isSelected
         };
+        Image icon = button.transform.Find("Icon").GetComponent<Image>();
+        icon.sprite = iconSprite;
+        icon.gameObject.SetActive(iconSprite != null);
+        option.Label.rectTransform.offsetMin = new Vector2(iconSprite != null ? 90f : 10f, 4f);
+        option.Label.horizontalAlignment = iconSprite != null
+            ? HorizontalAlignmentOptions.Left : HorizontalAlignmentOptions.Center;
         button.onClick.AddListener(() => { toggle(); RefreshSelection(); });
         m_options.Add(option);
         m_generated.Add(button.gameObject);
@@ -277,10 +286,9 @@ public sealed class CardFilterPopup : PooledOverlay<CardFilterPopup>
         float travel = (includeLockedTrack.rectTransform.rect.width - includeLockedKnob.rect.width) * 0.5f - 3f;
         includeLockedKnob.anchoredPosition = new Vector2(includeLocked ? travel : -travel,
             includeLockedKnob.anchoredPosition.y);
-        RectTransform stateRect = includeLockedText.rectTransform;
-        stateRect.anchorMin = new Vector2(includeLocked ? 0f : 0.45f, 0f);
-        stateRect.anchorMax = new Vector2(includeLocked ? 0.55f : 1f, 1f);
-        stateRect.offsetMin = stateRect.offsetMax = Vector2.zero;
+        includeLockedText.rectTransform.anchoredPosition = new Vector2(
+            includeLocked ? -m_lockedOffTextPosition.x : m_lockedOffTextPosition.x,
+            m_lockedOffTextPosition.y);
         hintText.text = "같은 항목은 하나만 맞아도 표시 · 다른 항목은 모두 일치";
         foreach (Option option in m_options)
         {

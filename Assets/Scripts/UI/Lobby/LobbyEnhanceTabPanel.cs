@@ -105,14 +105,15 @@ public sealed class LobbyEnhanceTabPanel : LobbyTabPanel
         s_instance = this;
     }
 
-    public static bool CanOpenForCard(int _card)
+    public static bool CanOpenForCard(int _card, bool _allowUnowned = false)
         => s_instance != null && s_instance.m_shell != null && s_instance.m_shell.isActiveAndEnabled
-            && OwnershipManager.IsOwned(_card) && OutgameFeatureLock.IsUnlocked(EOutgameFeature.CardEnhance);
+            && CardCatalog.Contains(_card) && (_allowUnowned || OwnershipManager.IsOwned(_card))
+            && OutgameFeatureLock.IsUnlocked(EOutgameFeature.CardEnhance);
 
-    public static bool TryOpenForCard(int _card, Action _onOpened = null)
+    public static bool TryOpenForCard(int _card, Action _onOpened = null, bool _allowUnowned = false)
     {
         var panel = s_instance;
-        if (!CanOpenForCard(_card)) return false;
+        if (!CanOpenForCard(_card, _allowUnowned)) return false;
         if (panel.m_pending)
         {
             if (!panel.IsViewVisible || panel.m_card != _card) return false;
@@ -125,7 +126,13 @@ public sealed class LobbyEnhanceTabPanel : LobbyTabPanel
             panel.filterIndicator.color = Color.white;
             panel.m_card = _card;
             panel.m_amount = 10;
+            if (!OwnershipManager.IsOwned(_card))
+            {
+                panel.m_showUnowned = true;
+                panel.showUnownedToggle.SetIsOnWithoutNotify(true);
+            }
             panel.Rebuild();
+            if (!OwnershipManager.IsOwned(_card)) panel.RefreshCraftCatalogAsync().Forget();
             _onOpened?.Invoke();
         });
     }
@@ -330,7 +337,7 @@ public sealed class LobbyEnhanceTabPanel : LobbyTabPanel
         int hp = DeckPower.MaxHpOf(m_card);
         int gain = preview.HpBonus - current.HpBonus;
         hpPreviewText.text = gain > 0
-            ? $"{hp:N0} <color=#63816B>→ {hp + gain:N0}\n<size=75%>(+{gain:N0})</size></color>"
+            ? $"{hp:N0} <color=#73B84D>→ {hp + gain:N0}\n<size=75%>(+{gain:N0})</size></color>"
             : hp.ToString("N0");
 
         int required = CardGrowthManager.ShardRequiredOf(m_card);
@@ -342,7 +349,7 @@ public sealed class LobbyEnhanceTabPanel : LobbyTabPanel
         progressPreviewFill.gameObject.SetActive(!max && afterProgress > progress);
         progressPreviewFill.anchorMax = new Vector2(required > 0 ? (float)afterProgress / required : 0f, 1f);
         progressText.text = max ? "최대 성장" : afterProgress > progress
-            ? $"진화 진행 {progress:N0} <color=#A8BFBC>→ {afterProgress:N0}</color> / {required:N0}"
+            ? $"진화 진행 {progress:N0} <color=#D8B56C>→ {afterProgress:N0}</color> / {required:N0}"
             : $"진화 진행 {progress:N0} / {required:N0}";
         if (!m_pending && evolves) actionText.text = "진화";
         RefreshAbilityDescriptions(preview);
@@ -650,7 +657,6 @@ public sealed class LobbyEnhanceTabPanel : LobbyTabPanel
         bool synergy = m_unlockSynergy;
         if (keywords == CardKeyword.None && !synergy) return;
 
-        LobbyShellBars.Hide(this, transform, EShellBars.All);
         RefreshSelection(); // 진화한 외형 아래 잠김 판은 해금 연출까지 유지한다.
         var rows = new List<AbilityDescriptionRow>();
         if (keywords != CardKeyword.None) rows.Add(keywordDescription);
@@ -720,6 +726,7 @@ public sealed class LobbyEnhanceTabPanel : LobbyTabPanel
             return;
         }
         m_presenting = true;
+        UiSortingOrder.LiftNested(presentationRoot, UiSortingOrder.CardGrowthPresentation);
         presentationRoot.SetActive(true);
         presentationRoot.transform.SetAsLastSibling();
         Canvas.ForceUpdateCanvases();
@@ -737,7 +744,6 @@ public sealed class LobbyEnhanceTabPanel : LobbyTabPanel
         presentationMotion.localScale = Vector3.one * fromScale;
         cardView.gameObject.SetActive(false);
         m_sourceHidden = true;
-        LobbyShellBars.Hide(this, transform, EShellBars.All);
 
         m_presentationMove = DOTween.Sequence().SetLink(gameObject)
             .Join(presentationMotion.DOLocalMove(parent.rect.center, .25f).SetEase(Ease.OutCubic))
@@ -804,7 +810,6 @@ public sealed class LobbyEnhanceTabPanel : LobbyTabPanel
         if (presentationRoot != null) presentationRoot.SetActive(false);
         if (m_sourceHidden && cardView != null) cardView.gameObject.SetActive(true);
         m_sourceHidden = false;
-        LobbyShellBars.Show(this);
     }
 
     void ShowEnhanceStatus(EnhanceResult result, int fromLevel)

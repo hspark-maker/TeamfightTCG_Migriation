@@ -9,6 +9,9 @@ using UnityEngine.UI;
 public sealed class AttendancePanel : ContentsPooledUI
 {
     [SerializeField] AttendanceDayView[] dayViews;
+    [SerializeField] RectTransform currentDayPanel;
+    [SerializeField] RectTransform currentDayHighlight;
+    [SerializeField] TMP_Text currentDayLabel;
     [SerializeField] TMP_Text resetText;
     [SerializeField] TMP_Text statusText;
     [SerializeField] Button claimButton;
@@ -70,6 +73,8 @@ public sealed class AttendancePanel : ContentsPooledUI
                     t_ready && i < t_state.ClaimedDays,
                     t_ready && t_state.CanClaim && i + 1 == t_state.ClaimDay,
                     AttendanceCommands.CanClaim);
+        UpdateCurrentDayPanel(t_ready ? (t_state.CanClaim ? t_state.ClaimDay : t_state.ClaimedDays) : 0,
+            t_ready && !t_state.CanClaim);
         bool t_retry = !t_ready || AttendanceCommands.NeedsRefresh || AttendanceCommands.Error != null;
         if (claimButton != null) claimButton.interactable = !m_claiming && !AttendanceCommands.IsReading
             && (AttendanceCommands.CanClaim || t_retry);
@@ -91,6 +96,25 @@ public sealed class AttendancePanel : ContentsPooledUI
             resetText.text = t_ready ? $"다음 출석까지 {(int)t_time.TotalHours:00}:{t_time.Minutes:00}:{t_time.Seconds:00} · 매일 오전 5시"
                 : "매일 오전 5시 갱신 · 접속하지 않아도 출석 일수 유지";
         }
+    }
+
+    // 수령 직후에는 서버의 다음 claimDay가 아니라 오늘 수령한 칸에 표시를 유지한다.
+    void UpdateCurrentDayPanel(int _day, bool _claimed)
+    {
+        if (currentDayPanel == null) return;
+        AttendanceDayView target = dayViews != null && _day > 0 && _day <= dayViews.Length
+            ? dayViews[_day - 1] : null;
+        currentDayPanel.gameObject.SetActive(target != null);
+        if (currentDayHighlight != null) currentDayHighlight.gameObject.SetActive(target != null);
+        if (target == null) return;
+
+        if (currentDayHighlight != null) target.MoveHighlightHere(currentDayHighlight);
+
+        // 앵커·오프셋·크기는 프리팹 저작값을 유지한다. 넓은 7일차도 같은 상대 위치를 사용한다.
+        if (currentDayPanel.parent != target.transform)
+            currentDayPanel.SetParent(target.transform, false);
+        currentDayPanel.SetAsLastSibling();
+        if (currentDayLabel != null) currentDayLabel.text = _claimed ? "출석 완료" : "오늘";
     }
 
     void ClaimOrRetry()

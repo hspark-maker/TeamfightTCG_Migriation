@@ -311,7 +311,7 @@ public class CardDecorView
     /// 배경판 선택이 공유하는 단일 판정 지점이다.
     ///
     /// 게이트 순서: 튜토리얼 은닉 → 빈 슬롯/뒷면(정보 은닉) → 시너지 해금(1차 진화) →
-    /// 표시 대상·순서(CardVisualRules 단독: 중복 제외 → 활성 우선 → requiredCount 내림차순 → 상한).
+    /// 표시 대상·순서(CardVisualRules: 중복 제외 → 활성 우선 → requiredCount 내림차순 → 상한) → 비활성 제외.
     /// 활성 판정은 확정 SynergyState 조회다(재계산·집계 금지).
     ///
     /// 배선(root/prefab)이 비어 있으면 배지를 못 그리므로 여기서도 "없음"으로 친다 —
@@ -325,7 +325,11 @@ public class CardDecorView
 
         int t_max = this.synergySlots.Length > 0
             ? Mathf.Min(this.synergyMaxBadges, this.synergySlots.Length) : this.synergyMaxBadges;
-        return CardVisualRules.CollectSynergyBadges(CardCatalog.RequireSynergies(_card.cardId), _synergy, t_max);
+        List<SynergyData> t_badges = CardVisualRules.CollectSynergyBadges(CardCatalog.RequireSynergies(_card.cardId), _synergy, t_max);
+        // 활성 배지가 먼저 정렬되므로 상한 적용 뒤 비활성을 빼도 표시할 활성 배지는 누락되지 않는다.
+        // 배지·아이콘 배경·카드 프레임 모두 이 목록의 개수를 써서 빈 시너지 칸을 남기지 않는다.
+        t_badges.RemoveAll(t_tag => !CardVisualRules.IsSynergyActive(_synergy, t_tag));
+        return t_badges;
     }
 
     // 카드의 synergies 배열(있는 것만, 중복 제외)을 색+텍스트 배지로 세로 정렬 표시(최대 synergyMaxBadges개).
