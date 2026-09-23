@@ -1,11 +1,11 @@
-﻿고유번호,칭호 영구 식별자
-id,titleId
-int,string
-1,test_first_step
-2,test_blue_traveler
-3,test_golden_collector
-4,test_dawn_guardian
-5,test_long_journey
-6,test_silent_sword
-7,test_small_universe
-8,test_endless_adventure
+﻿고유번호,칭호 영구 식별자,,,,
+id,titleId,eventKey,synergyId,targetCount,description
+int,string,string,string,int,string
+1,test_first_step,WinBattle,,1,전투에서 누적 1회 승리하세요
+2,test_blue_traveler,WinBattle,,10,전투에서 누적 10회 승리하세요
+3,test_golden_collector,OpenPack,,10,카드 팩을 누적 10개 개봉하세요
+4,test_dawn_guardian,WinStreak,,2,최고 2연승을 달성하세요
+5,test_long_journey,WinBattle,,100,전투에서 누적 100회 승리하세요
+6,test_silent_sword,DestroyCards,,50,전투에서 상대 카드를 누적 50장 파괴하세요
+7,test_small_universe,CompleteAlbum,,1,앨범 테마 1개를 완성하세요
+8,test_endless_adventure,WinBattle,,300,전투에서 누적 300회 승리하세요
