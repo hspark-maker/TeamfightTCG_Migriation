@@ -82,6 +82,7 @@ public sealed partial class GuidanceCoordinator
             || _step.Anchor == EOutgameTutorialAnchor.LobbyEnhanceButton
             || _step.Anchor == EOutgameTutorialAnchor.LobbyEnhanceShardIcon
             || _step.Anchor == EOutgameTutorialAnchor.LobbyEnhanceShardAmount
+            || _step.Anchor == EOutgameTutorialAnchor.LobbyEnhanceShardControls
             || _step.Anchor == EOutgameTutorialAnchor.LobbyEnhanceCardView
             || _step.Anchor == EOutgameTutorialAnchor.LobbyEnhanceKeywordDescription
             || _step.Anchor == EOutgameTutorialAnchor.LobbyEnhanceSynergyDescription);

@@ -45,4 +45,6 @@ public enum EOutgameTutorialAnchor
     LobbyEnhanceButton           = 40,
     LobbyEnhanceShardIcon        = 41,
     LobbyEnhanceShardAmount      = 42,
+    LobbyShardBalance           = 43,
+    LobbyEnhanceShardControls   = 44,
 }

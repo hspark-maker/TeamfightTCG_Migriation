@@ -701,7 +701,7 @@ MonoBehaviour:
       - stepId: 83
         action: 1
         anchor: 41
-        spotlight: 0
+        spotlight: 43
         guideMessage: "\uC0E4\uB4DC\uB294 \uAC15\uD654\uC5D0 \uC0AC\uC6A9\uB418\uB294
           \uC7AC\uD654\uC608\uC694."
         messageAtBottom: 0
@@ -725,7 +725,7 @@ MonoBehaviour:
         contentIntros: 
       - stepId: 84
         action: 1
-        anchor: 42
+        anchor: 44
         spotlight: 0
         guideMessage: "\uC0AC\uC6A9\uD560 \uC0E4\uB4DC \uAC1C\uC218\uB97C \uC815\uD574
           \uAC15\uD654\uD560 \uC218 \uC788\uC5B4\uC694.\n\uD544\uC694\uB7C9\uC744

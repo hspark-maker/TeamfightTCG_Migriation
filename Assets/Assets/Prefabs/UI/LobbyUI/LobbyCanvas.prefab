@@ -3266,6 +3266,7 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
+  - component: {fileID: 8984200000000000043}
   - component: {fileID: 7022201782333478622}
   - component: {fileID: 5482114945406907122}
   - component: {fileID: 3251720595112796475}
@@ -5994,3 +5995,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 04ffdbbeb31d3ea42a9ad20de68b8d54, type: 3}
   m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::LobbyStoreTabPanel
+--- !u!114 &8984200000000000043
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6320877353773061386}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42205b1617da6ad4f86c85237321ada9, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  key: 43
+  spotlightBackground: {fileID: 0}
