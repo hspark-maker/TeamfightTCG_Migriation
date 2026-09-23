@@ -121,7 +121,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         }
     }
 
-    // 카탈로그 미배선이면 매칭도 대치 인트로도 없이 구 동작으로 내려간다.
+    // 카탈로그 미배선이면 랭크전 매칭 화면을 열 수 없다.
     // 실패는 캐시하지 않는다 — 적재가 한 번 미끄러진 것뿐인데 캐시하면 그 로비 세션 내내 구 동작으로 굳는다.
     // 대신 실패한 판마다 SyncUiPrefabs의 LogError가 진입 판정과 생성에서 두 줄 남는다.
     GameObject MatchShellPrefab
@@ -427,7 +427,7 @@ public class LobbyMatchLauncher : MonoBehaviour
         ShowEntryBlocked("상대가 매칭을 취소했거나 연결이 끊겼습니다.\n다시 매칭해 주세요.");
     }
 
-    /// <summary>중단한 모험 안내의 대치·덱 선택 대기를 끝내 재개할 로비를 되돌린다.</summary>
+    /// <summary>중단한 모험 안내의 덱 선택 대기를 끝내 재개할 로비를 되돌린다.</summary>
     public void CancelGuidedAdventureEntry()
     {
         if (!m_adventureEntry || m_entryCancellation == null) return;
@@ -559,50 +559,8 @@ public class LobbyMatchLauncher : MonoBehaviour
             return TryApplySelectedDeck();
         }
 
-        // 고정 상대는 매칭 대신 대치 인트로를 앞세운다 — 정점을 누른 것과 덱을 짜는 것 사이가
-        // 비어 있으면 상대가 누구인지 화면이 한 번도 말하지 않는다.
-        //
-        // 셸을 여기서 붙잡아 넘긴다 — MatchShell은 비어 있으면 새로 만드는 프로퍼티라,
-        // 전환 도중 셸이 파괴되면 저작 상태의 새 셸에서 갈라짐만 도는 경로가 생긴다.
-        // 셸이 미배선(카탈로그에 MatchmakingRoot 없음)이면 null이라 아래 곧장 뜨는 경로로 내려간다.
-        if (_preset.HasValue)
-        {
-            MatchmakingShell t_versus = MatchShell;
-
-            if (t_versus != null) return await RunSelectionWithVersusAsync(t_versus, _preset.Value, _ct);
-        }
-
-        // 앞세울 화면이 없는 경로(튜토리얼·셸 미배선)는 옮겨 앉힐 이전 화면도 없다 — 덱 화면이 곧장 뜬다.
+        // 모험·튜토리얼은 확정된 상대 덱을 곧바로 보여 준다.
         return await DeckShell.RunSelectionAsync(_ct);
-    }
-
-    // 대치 인트로 → 갈라짐 → 덱 화면. 고정 상대(모험)는 상대를 먼저 보여 준 뒤 덱을 짠다 —
-    // 랭크전은 반대로 덱 화면이 매칭보다 앞에 선다(상대가 아직 없다).
-    //
-    // 덱 화면을 대치가 "끝난 뒤에" 세우는 이유: 상대가 이미 정해져 있어 미리 세울 시간을 벌어 줄 대기가 없다.
-    // 진입 안무 앞에 세우면 그 레이아웃 비용이 첫 프레임에 그대로 얹힌다.
-    async UniTask<bool> RunSelectionWithVersusAsync(MatchmakingShell _versus, MatchOpponent _opponent,
-                                                    CancellationToken _ct)
-    {
-        await _versus.PlayVersusAsync(_opponent, _ct);
-
-        // 씬이 내려가는 중이다 — 파괴될 화면을 세우지 않는다.
-        if (_ct.IsCancellationRequested) return false;
-
-        // 여기서부터 화면을 내릴 책임은 갈라짐에 있다. 덱 화면을 세우다 던지면 넘겨받을 것이 없으므로,
-        // 대치 화면이 로비를 덮은 채(터치까지 먹는다) 남지 않게 이 구간만 감싼다.
-        try
-        {
-            DeckShell.PrepareForHandoff();
-            _versus.Close();
-            return await DeckShell.RunSelectionAsync(_ct);
-        }
-        catch
-        {
-            _versus.Close();
-
-            throw;
-        }
     }
 
     // 상대를 전투 전에 확정한다 — 덱 화면의 EnemySection과 실제 전투가 같은 값을 보게 하는 유일한 지점.

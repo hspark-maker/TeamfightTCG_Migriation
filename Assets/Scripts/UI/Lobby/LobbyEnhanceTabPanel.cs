@@ -337,7 +337,7 @@ public sealed class LobbyEnhanceTabPanel : LobbyTabPanel
         int hp = DeckPower.MaxHpOf(m_card);
         int gain = preview.HpBonus - current.HpBonus;
         hpPreviewText.text = gain > 0
-            ? $"{hp:N0} <color=#63816B>→ {hp + gain:N0}\n<size=75%>(+{gain:N0})</size></color>"
+            ? $"{hp:N0} <color=#73B84D>→ {hp + gain:N0}\n<size=75%>(+{gain:N0})</size></color>"
             : hp.ToString("N0");
 
         int required = CardGrowthManager.ShardRequiredOf(m_card);
@@ -349,7 +349,7 @@ public sealed class LobbyEnhanceTabPanel : LobbyTabPanel
         progressPreviewFill.gameObject.SetActive(!max && afterProgress > progress);
         progressPreviewFill.anchorMax = new Vector2(required > 0 ? (float)afterProgress / required : 0f, 1f);
         progressText.text = max ? "최대 성장" : afterProgress > progress
-            ? $"진화 진행 {progress:N0} <color=#A8BFBC>→ {afterProgress:N0}</color> / {required:N0}"
+            ? $"진화 진행 {progress:N0} <color=#D8B56C>→ {afterProgress:N0}</color> / {required:N0}"
             : $"진화 진행 {progress:N0} / {required:N0}";
         if (!m_pending && evolves) actionText.text = "진화";
         RefreshAbilityDescriptions(preview);
